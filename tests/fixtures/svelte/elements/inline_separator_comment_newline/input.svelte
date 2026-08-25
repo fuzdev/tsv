@@ -12,25 +12,25 @@
 	control: newline on BOTH sides — the comment owns its line
 -->
 <p>
-	text1
+	text1 text2
 	<!-- c -->
-	text2
+	text3 text4
 </p>
 
 <!--
 	control: newline AFTER only — the following run stays off the comment's line
 -->
 <p>
-	text1 <!-- c -->
-	text2
+	text1 text2 <!-- c -->
+	text3 text4
 </p>
 
 <!--
 	control: newline BEFORE only — the comment stays off the preceding run's line
 -->
 <p>
-	text1
-	<!-- c --> text2
+	text1 text2
+	<!-- c --> text3 text4
 </p>
 
 <!--
@@ -39,4 +39,4 @@
 	varying the same dimension (is there a newline at this boundary?): without it, an
 	implementation that always broke both sides of a comment would pass every case above.
 -->
-<p>text1 <!-- c --> text2</p>
+<p>text1 text2 <!-- c --> text3 text4</p>

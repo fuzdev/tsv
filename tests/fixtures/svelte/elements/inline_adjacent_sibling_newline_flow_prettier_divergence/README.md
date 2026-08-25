@@ -10,7 +10,7 @@ Svelte 5 collapses inter-sibling whitespace to one space, so this separator is t
 whichever way it is spelled, and it flows exactly like the text-bounded ones beside it. Without
 that, one run reaches two answers: the boundaries touching a text node flow while the one between
 the two siblings does not, leaving a break in a line that fits —
-`text1 <span>inline1</span>⏎<span>inline2</span> text2`, which is neither formatter's form.
+`text1 text2 <span>inline1</span>⏎<span>inline2</span> text3`, which is neither formatter's form.
 
 - **element pair** — `<span>` beside `<span>`, prose in the run. Prettier agrees on this one.
 - **expression-tag pair** — `{expr1}` beside `{expr2}`. Prettier splits the pair here even though

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 209,
+	"end": 215,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 147,
-				"end": 208,
+				"end": 214,
 				"name": "div",
 				"name_loc": {
 					"start": {
@@ -44,49 +44,49 @@
 						{
 							"type": "Text",
 							"start": 152,
-							"end": 160,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"end": 166,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 160,
-							"end": 177,
+							"start": 166,
+							"end": 183,
 							"name": "a",
 							"name_loc": {
 								"start": {
 									"line": 4,
-									"column": 8,
-									"character": 161
+									"column": 14,
+									"character": 167
 								},
 								"end": {
 									"line": 4,
-									"column": 9,
-									"character": 162
+									"column": 15,
+									"character": 168
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 163,
-									"end": 171,
+									"start": 169,
+									"end": 177,
 									"name": "href",
 									"name_loc": {
 										"start": {
 											"line": 4,
-											"column": 10,
-											"character": 163
+											"column": 16,
+											"character": 169
 										},
 										"end": {
 											"line": 4,
-											"column": 14,
-											"character": 167
+											"column": 20,
+											"character": 173
 										}
 									},
 									"value": [
 										{
-											"start": 169,
-											"end": 170,
+											"start": 175,
+											"end": 176,
 											"type": "Text",
 											"raw": "x",
 											"data": "x"
@@ -99,8 +99,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 172,
-										"end": 173,
+										"start": 178,
+										"end": 179,
 										"raw": "a",
 										"data": "a"
 									}
@@ -109,50 +109,50 @@
 						},
 						{
 							"type": "Text",
-							"start": 177,
-							"end": 184,
-							"raw": " text2 ",
-							"data": " text2 "
+							"start": 183,
+							"end": 190,
+							"raw": " text3 ",
+							"data": " text3 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 184,
-							"end": 201,
+							"start": 190,
+							"end": 207,
 							"name": "a",
 							"name_loc": {
 								"start": {
 									"line": 4,
-									"column": 32,
-									"character": 185
+									"column": 38,
+									"character": 191
 								},
 								"end": {
 									"line": 4,
-									"column": 33,
-									"character": 186
+									"column": 39,
+									"character": 192
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 187,
-									"end": 195,
+									"start": 193,
+									"end": 201,
 									"name": "href",
 									"name_loc": {
 										"start": {
 											"line": 4,
-											"column": 34,
-											"character": 187
+											"column": 40,
+											"character": 193
 										},
 										"end": {
 											"line": 4,
-											"column": 38,
-											"character": 191
+											"column": 44,
+											"character": 197
 										}
 									},
 									"value": [
 										{
-											"start": 193,
-											"end": 194,
+											"start": 199,
+											"end": 200,
 											"type": "Text",
 											"raw": "y",
 											"data": "y"
@@ -165,8 +165,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 196,
-										"end": 197,
+										"start": 202,
+										"end": 203,
 										"raw": "b",
 										"data": "b"
 									}
@@ -175,8 +175,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 201,
-							"end": 202,
+							"start": 207,
+							"end": 208,
 							"raw": "\n",
 							"data": "\n"
 						}

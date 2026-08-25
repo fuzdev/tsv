@@ -15,48 +15,48 @@
 		<b>inline1</b>
 	</span>
 	<b>inline2</b>
-	text2
+	text2 text3
 </p>
 
 <!-- a component after a component with content, in an inline container -->
 <span>
-	text3
+	text4
 	<Comp1>
 		<b>inline3</b>
 	</Comp1>
-	<Comp2 /> text4
+	<Comp2 /> text5 text6
 </span>
 
 <!-- a tag after an element with a structurally multiline tag content -->
 <p>
-	text5
+	text7
 	<a href="/a">
 		{expr1}
 	</a>
-	{expr2} text6
+	{expr2} text8 text9
 </p>
 
 <!-- a void element after an element block-styled by wide text -->
 <p>
-	text7
+	text10
 	<code>
 		alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar
 	</code>
-	<input /> text8
+	<input /> text11 text12
 </p>
 
 <!-- control: after a unit that renders INLINE the newline reflows with the fill -->
 <p>
-	text9 <span>inline4</span>
-	<b>inline5</b> text10
+	text13 text14 <span>inline4</span>
+	<b>inline5</b> text15
 </p>
 
 <!-- control: after a breaking TAG the sibling hugs -->
 <p>
-	text11
+	text16
 	{fn(
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 	)}
-	<b>inline6</b> text12
+	<b>inline6</b> text17 text18
 </p>

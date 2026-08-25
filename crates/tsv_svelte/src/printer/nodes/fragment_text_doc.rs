@@ -14,7 +14,7 @@
 use super::element_doc::MultilineCause;
 use super::fragment_doc::{DeferredBoundary, text_starts_with_linebreak};
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{FragmentNode, Text, is_collapsible_ws_char, split_collapsible_ws};
+use crate::ast::internal::{FragmentNode, Text, split_collapsible_ws, text_edge_newlines};
 use crate::printer::Printer;
 use smallvec::SmallVec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -74,14 +74,26 @@ pub(super) struct TextChildContext {
     /// it is, *why* the layout went multiline. The cause is read by the sibling-newline flow rule
     /// alone; every other site asks only [`MultilineCause::is_multiline`].
     pub(super) cause: MultilineCause,
-    /// Whether this node's inline run holds prose — one of the two gates on the sibling-newline
-    /// flow rule at its standalone-separator site (`cause` is the other). Computed once per run by
-    /// the caller ([`Printer::scan_inline_run`]) and only on the `multiline` path; `false`
-    /// everywhere else, which is inert because that site returns before reading it in the
-    /// non-multiline arm. Note "inert per arm" is NOT "the arms agree" — the inline arm reaches
-    /// the same separator through its own `next_is_tag` case, and the two emitting a different doc
-    /// for one logical separator is exactly the period-2 cycle `cause` exists to close.
+    /// Whether this node's inline run holds prose — [`Printer::run_is_prose`] over the run's
+    /// [`Printer::prose_words`] maximum — the prose gate of the sibling-newline flow rule at all
+    /// three of its sites: the standalone separator, and a content text's leading and trailing
+    /// runs (`Printer::boundary_newline_flows`). Computed once per run by the caller
+    /// ([`Printer::scan_inline_run`]); read only in the `multiline` arms, since a
+    /// newline-spelled boundary is a hardline question there alone. Note "inert per arm" is NOT
+    /// "the arms agree" — the inline arm reaches the same separator through its own
+    /// `next_is_tag` case, and the two emitting a different doc for one logical separator is
+    /// exactly the period-2 cycle `cause` exists to close.
     pub(super) run_has_prose: bool,
+    /// Whether this node's inline run holds a word at all ([`Printer::run_has_word`]) — the gate
+    /// the SPACE-spelled whitespace-only separator before a tag keeps, in both arms of the
+    /// separator site. Split from `run_has_prose` on purpose: the prose gate decides whether
+    /// an authored NEWLINE may reflow (a one-word run holds it), and a hold must never become a
+    /// forced break — so a one-word run's space-spelled tag pair defers to the per-width group
+    /// as a prose run's does (`inline_sibling_newline_label_hold_tag_pair_space`), while a
+    /// WORDLESS run's keeps the bare `line` that breaks with the container. Both arms read
+    /// this one value, which is what keeps the width-broken and newline-authored twins of one
+    /// document on one layout.
+    pub(super) run_has_word: bool,
     /// The first and last index in `trimmed_nodes` that the whitespace rules see — the fragment's
     /// content bounds once every HOISTED node is skipped
     /// ([`FragmentNode::content_bounds`]). `handle_content_text_child`'s `is_first` / `is_last` are
@@ -196,6 +208,7 @@ impl<'a> Printer<'a> {
         let TextChildContext {
             cause,
             run_has_prose,
+            run_has_word,
             content_bounds,
             prev_sibling_head,
             ..
@@ -298,10 +311,12 @@ impl<'a> Printer<'a> {
         // multiline arm's newline case re-spells itself as the space rather than emitting a
         // parallel form.
         //
-        // ⚠️ **Asked once, ahead of the multiline split, because both arms below need this
-        // same answer.** The question is about the RUN and its two neighbours; nothing in it
-        // depends on WHY the container went multiline. A conjunct on the cause would be dead in
-        // the arm the `!multiline` test already selected, and wrong as a narrowing: the flow
+        // ⚠️ **The run and neighbour facts are asked once, ahead of the multiline split, because
+        // both arms below need the same answer** (`tag_space_defers`; the newline hold
+        // `separator_flows` is read by the multiline arm alone, the only place a newline is a
+        // hardline question). Nothing in either depends on WHY the container went multiline. A
+        // conjunct on the cause would be dead in the arm the `!multiline` test already selected,
+        // and wrong as a narrowing: the flow
         // rule's other two call sites — a content text's leading and trailing runs — carry no
         // cause gate at all, so a container-keyed one half-applies the rule. Within a single
         // run the boundaries touching a text node would flow while the one between two adjacent
@@ -312,9 +327,18 @@ impl<'a> Printer<'a> {
         // Flowing converges a tag pair onto one line where prettier splits it — a deliberate
         // divergence in the same family as the rest of this rule, pinned by
         // `elements/inline_adjacent_sibling_newline_flow_prettier_divergence`.
-        let separator_flows = run_has_prose
-            && self.neighbour_newline_flows(prev_node)
-            && self.neighbour_newline_flows(next_node);
+        let neighbours_flow =
+            self.neighbour_newline_flows(prev_node) && self.neighbour_newline_flows(next_node);
+        let separator_flows = run_has_prose && neighbours_flow;
+        // The SPACE-spelled separator before a tag asks the weaker run gate — any word in the
+        // run (`run_has_word`), not prose. The prose gate is a HOLD on an authored newline and
+        // must never turn a space into one: a one-word run's `text1 {a} {b}` packs per width
+        // exactly as a prose run's does (`inline_sibling_newline_label_hold_tag_pair_space`), and
+        // only a prose-FREE run's tag pair keeps the bare `line` that breaks with the container.
+        // Read by both arms below, so the width-broken and newline-authored twins agree. A
+        // flowing NEWLINE reaches the tag case too, re-spelled as the space by `ws_flows`; prose
+        // implies text, so it defers as before.
+        let tag_space_defers = run_has_word && neighbours_flow;
         if !multiline {
             // Before a tag the separator is a bare collapsible break — a space while
             // the fragment fits, a newline once it breaks — exactly as the multiline
@@ -334,10 +358,10 @@ impl<'a> Printer<'a> {
             // Tier-2 element-expansion class, not this bug. A tag has no such structure
             // to protect, so the bare break is strictly better.
             //
-            // ⚠️ A FLOWING run is the exception, and it is the same question the multiline
-            // arm's `next_is_tag && separator_flows` case asks — asked here so one run's
-            // interior does not depend on WHY its element went multiline. A width-broken
-            // element and a newline-authored one lay the same prose run out identically:
+            // ⚠️ A run holding a content text is the exception, and it is the same question
+            // the multiline arm's `next_is_tag && tag_space_defers` case asks — asked here so
+            // one run's interior does not depend on WHY its element went multiline. A
+            // width-broken element and a newline-authored one lay the same run out identically:
             // both defer to the next sibling's per-width `group([line, tag])`, so the run
             // packs. Without this the two modes hold contradictory interior policies — the
             // bare `line` resolves all-or-nothing with the parent group, which is already
@@ -358,8 +382,8 @@ impl<'a> Printer<'a> {
             // cure for that cycle is one policy in both arms, not a hold in both: a component is
             // inline flow content like a `<span>`, so the pair packs per width from either
             // spelling (`inline_adjacent_component_flow`).
-            // The layout-keyed hold (`arm_hold` above). `run_has_prose` is not computed on this
-            // path, so the candidate asks the two neighbours directly — a tag follower always
+            // The layout-keyed hold (`arm_hold` above). The candidate does not read
+            // `run_has_prose`; it asks the two neighbours directly — a tag follower always
             // flows, an inline element or component flows by kind. A TAG follower that takes
             // the hold takes the wrap with it (the `!*hold_next_lead` below): its bare `line`
             // renders flat past a multiline predecessor (`</a> {expr}` through a glued head),
@@ -372,7 +396,7 @@ impl<'a> Printer<'a> {
             {
                 arm_hold(child_docs, deferred);
             }
-            if next_is_tag && !separator_flows && !deferred.held {
+            if next_is_tag && !tag_space_defers && !deferred.held {
                 child_docs.push(d.line());
             } else {
                 // Defer the separator to the next sibling, which leads with it. NOT only "the
@@ -471,8 +495,9 @@ impl<'a> Printer<'a> {
                 child_docs.push(d.hardline());
             }
             child_docs.push(d.hardline());
-        } else if next_is_tag && separator_flows {
-            // A flowing separator before a TAG. `trim_to_collapsible` above covers only a next
+        } else if next_is_tag && tag_space_defers {
+            // A space (or a flowing newline, re-spelled above) before a TAG in a run that holds a
+            // content text. `trim_to_collapsible` above covers only a next
             // inline *element*, so without this arm the boundary would fall to the bare `line`
             // below — which resolves all-or-nothing with the parent group, and the parent is
             // already broken whenever the fragment is multiline. The whole run would then hard-
@@ -481,7 +506,7 @@ impl<'a> Printer<'a> {
             // to the next sibling gives the tag the same per-width `group([line, tag])` an inline
             // element gets, so the run reflows as one.
             //
-            // Gated on `separator_flows` — NOT on `next_is_tag` alone. A plain authored space
+            // Gated on `tag_space_defers` — NOT on `next_is_tag` alone. A plain authored space
             // before a tag keeps the bare `line`: its neighbour may be a **comment**, whose own
             // line is authorship (`<!-- c -->` `{expr}` must not weld — `root_expressions_spaced`),
             // and the flow predicate is exactly what excludes it.
@@ -508,6 +533,7 @@ impl<'a> Printer<'a> {
     ) {
         let TextChildContext {
             cause,
+            run_has_prose,
             content_bounds,
             glued_prefix,
             prev_sibling_head,
@@ -623,16 +649,18 @@ impl<'a> Printer<'a> {
         // [`Self::is_separator_like_text`] for why such a node is excluded, and why this one
         // reads the decoded text where the rest of the path reads `raw`.
         //
-        // This is the node-local face of the flow rule's prose gate: here the text node IS the
-        // run's fill, so `!separator_like_text` answers the same question `run_has_prose` answers
-        // for the whitespace-only separator site, which owns no fill (see [`Self::is_run_prose`]).
-        // Node-local is the stricter reading and is the one that belongs here — a separator-like
-        // node must not flow even when its run holds prose elsewhere, or the fill re-reads a break
-        // it emitted itself (the NBSP F1 break).
+        // Two prose gates, one per axis. `run_has_prose` is the RUN-level one the separator site
+        // asks too — a fill needs a phrase, so a one-word run is a label whose newlines hold
+        // (see [`Self::prose_words`], and why the count is never boundary-local: this text is often
+        // the one-word tail a previous wrap left behind, and holding it alone is the accretion
+        // ratchet in reverse). `!separator_like_text` is the NODE-local one and stays beside it:
+        // a separator-like node must not flow even when its run holds prose elsewhere, or the
+        // fill re-reads a break it emitted itself (the NBSP F1 break).
         let separator_like_text = Self::is_separator_like_text(&text.data(self.source));
-        let leading_run = &raw[..raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len()];
+        let leading_newlines = text_edge_newlines(raw, true);
         let leading_newline_flows = self.boundary_newline_flows(
-            leading_run.matches('\n').count(),
+            leading_newlines,
+            run_has_prose,
             separator_like_text,
             prev_node,
         );
@@ -641,7 +669,7 @@ impl<'a> Printer<'a> {
             // boundary — the tag's own break_after is the line. Checked ahead of the
             // `splitTextToDocs` linebreak arm below, which would double it.
             trim_left = true;
-            if leading_run.matches('\n').count() >= 2 {
+            if leading_newlines >= 2 {
                 child_docs.push(d.hardline());
             }
         } else if multiline
@@ -662,8 +690,7 @@ impl<'a> Printer<'a> {
             // A blank line (2+ leading newlines) is preserved as `[hardline, hardline]` —
             // prettier's `splitTextToDocs` startsWithLinebreak(_, 2). A single newline → one
             // hardline.
-            let content_start = raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len();
-            if raw[..content_start].matches('\n').count() >= 2 {
+            if leading_newlines >= 2 {
                 child_docs.push(d.hardline());
             }
             child_docs.push(d.hardline());
@@ -695,7 +722,7 @@ impl<'a> Printer<'a> {
             // the space); in an inline container (`multiline` false) the hardline arms above
             // are skipped, so a blank-line run can arrive too — the exact count keeps a blank
             // out of the layout-keyed rule, which is defined over the single-newline spelling.
-            let authored_newline = leading_run.matches('\n').count() == 1;
+            let authored_newline = leading_newlines == 1;
             let glued_head =
                 self.leading_boundary_glued(trimmed_nodes, prev_sibling_head, content_bounds.0);
             if authored_newline && !prev_is_tag && !separator_like_text && !glued_head {
@@ -913,21 +940,21 @@ impl<'a> Printer<'a> {
         // this handler's `handle_whitespace_of_prev_text`) so the next element gets wrapped with
         // group([line, element]).
         let mut trailing_line = false;
-        // Count newlines in the trailing whitespace run (multiline structural-break detection).
-        let trailing_ws_newlines = if has_trailing_ws {
-            let content_end = raw.trim_end_matches(is_collapsible_ws_char).len();
-            raw[content_end..].matches('\n').count()
-        } else {
-            0
-        };
+        // Newlines in the trailing whitespace run (multiline structural-break detection); `0` for
+        // a glued edge, since the edge run is then empty.
+        let trailing_ws_newlines = text_edge_newlines(raw, false);
         let mut trailing_hardlines = 0usize;
         // The third face of the same rule (after the whitespace-only separator and a content
         // text's leading run): a SINGLE trailing newline before flowing inline content is a
         // spelling difference only, so it falls through to the space arms below and reflows with
         // the fill. Blank lines, comments and block elements keep the structural hardline. See
         // [`Self::sibling_newline_flows`].
-        let trailing_newline_flows =
-            self.boundary_newline_flows(trailing_ws_newlines, separator_like_text, next_node);
+        let trailing_newline_flows = self.boundary_newline_flows(
+            trailing_ws_newlines,
+            run_has_prose,
+            separator_like_text,
+            next_node,
+        );
         if multiline && next_owns_line {
             // Mirror of the leading arm: the tag below supplies the line, so this run is trimmed
             // rather than printed. Reached at a fragment edge too, where `is_last` already trims —

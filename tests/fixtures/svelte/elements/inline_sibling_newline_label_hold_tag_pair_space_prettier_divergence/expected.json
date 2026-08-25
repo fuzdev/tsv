@@ -1,0 +1,536 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 912,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 420,
+				"data": "\n\tThe sibling-newline flow rule's prose gate is a HOLD on an authored newline, never a forced\n\tone: a one-word run keeps its authored lines, but its SPACE-spelled tag pair is a fill like a\n\tprose run's and packs per width, where prettier's bare `line` between two tags breaks with\n\tthe multiline container. Only a prose-FREE run's tag pair — no content text at all — takes\n\tthat break under tsv too: the control.\n"
+			},
+			{
+				"type": "Text",
+				"start": 420,
+				"end": 422,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 422,
+				"end": 484,
+				"data": " a word before a spaced tag pair, and a word after one "
+			},
+			{
+				"type": "Text",
+				"start": 484,
+				"end": 485,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 485,
+				"end": 516,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 486
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 487
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 488,
+							"end": 496,
+							"raw": "\n\ttext1 ",
+							"data": "\n\ttext1 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 496,
+							"end": 503,
+							"expression": {
+								"type": "Identifier",
+								"start": 497,
+								"end": 502,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 8
+									},
+									"end": {
+										"line": 11,
+										"column": 13
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 503,
+							"end": 504,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 504,
+							"end": 511,
+							"expression": {
+								"type": "Identifier",
+								"start": 505,
+								"end": 510,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 16
+									},
+									"end": {
+										"line": 11,
+										"column": 21
+									}
+								},
+								"name": "expr2"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 511,
+							"end": 512,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 516,
+				"end": 517,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 517,
+				"end": 556,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 518
+					},
+					"end": {
+						"line": 13,
+						"column": 2,
+						"character": 519
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 520,
+							"end": 522,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 522,
+							"end": 529,
+							"expression": {
+								"type": "Identifier",
+								"start": 523,
+								"end": 528,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 7
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 529,
+							"end": 530,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 530,
+							"end": 537,
+							"expression": {
+								"type": "Identifier",
+								"start": 531,
+								"end": 536,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 10
+									},
+									"end": {
+										"line": 14,
+										"column": 15
+									}
+								},
+								"name": "expr2"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 537,
+							"end": 538,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 538,
+							"end": 545,
+							"expression": {
+								"type": "Identifier",
+								"start": 539,
+								"end": 544,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 18
+									},
+									"end": {
+										"line": 14,
+										"column": 23
+									}
+								},
+								"name": "expr3"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 545,
+							"end": 552,
+							"raw": " text1\n",
+							"data": " text1\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 556,
+				"end": 558,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 558,
+				"end": 716,
+				"data": " at the root, which is always a multiline container: the escaped-angle-bracket pair, whose\n     glued `div` / `code` words make the run a one-word run "
+			},
+			{
+				"type": "Text",
+				"start": 716,
+				"end": 717,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 717,
+				"end": 722,
+				"expression": {
+					"type": "Literal",
+					"start": 718,
+					"end": 721,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 4
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 722,
+				"end": 725,
+				"raw": "div",
+				"data": "div"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 725,
+				"end": 730,
+				"expression": {
+					"type": "Literal",
+					"start": 726,
+					"end": 729,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 9
+						},
+						"end": {
+							"line": 19,
+							"column": 12
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 730,
+				"end": 731,
+				"raw": " ",
+				"data": " "
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 731,
+				"end": 736,
+				"expression": {
+					"type": "Literal",
+					"start": 732,
+					"end": 735,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 15
+						},
+						"end": {
+							"line": 19,
+							"column": 18
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 736,
+				"end": 740,
+				"raw": "code",
+				"data": "code"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 740,
+				"end": 745,
+				"expression": {
+					"type": "Literal",
+					"start": 741,
+					"end": 744,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 24
+						},
+						"end": {
+							"line": 19,
+							"column": 27
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 745,
+				"end": 750,
+				"expression": {
+					"type": "Literal",
+					"start": 746,
+					"end": 749,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 29
+						},
+						"end": {
+							"line": 19,
+							"column": 32
+						}
+					},
+					"value": "<",
+					"raw": "'<'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 750,
+				"end": 755,
+				"raw": "/code",
+				"data": "/code"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 755,
+				"end": 760,
+				"expression": {
+					"type": "Literal",
+					"start": 756,
+					"end": 759,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 39
+						},
+						"end": {
+							"line": 19,
+							"column": 42
+						}
+					},
+					"value": ">",
+					"raw": "'>'"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 760,
+				"end": 762,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 762,
+				"end": 884,
+				"data": " control: a prose-free pair has no fill at all, and its space breaks with the container\n     under both formatters "
+			},
+			{
+				"type": "Text",
+				"start": 884,
+				"end": 885,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 885,
+				"end": 911,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 23,
+						"column": 1,
+						"character": 886
+					},
+					"end": {
+						"line": 23,
+						"column": 2,
+						"character": 887
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 888,
+							"end": 890,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 890,
+							"end": 897,
+							"expression": {
+								"type": "Identifier",
+								"start": 891,
+								"end": 896,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 7
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 897,
+							"end": 899,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 899,
+							"end": 906,
+							"expression": {
+								"type": "Identifier",
+								"start": 900,
+								"end": 905,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 7
+									}
+								},
+								"name": "expr2"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 906,
+							"end": 907,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

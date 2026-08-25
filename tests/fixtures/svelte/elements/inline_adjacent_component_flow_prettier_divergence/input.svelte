@@ -12,33 +12,33 @@
 	are the author's only structure.
 -->
 <p>
-	text1 <Comp1 /> <Comp2 /> text2
+	text1 text2 <Comp1 /> <Comp2 /> text3
 </p>
 <p>
-	text1 <span>inline1</span> <span>inline2</span> text2
+	text1 text2 <span>inline1</span> <span>inline2</span> text3
 </p>
 
 <!-- kind order: an element before a component, and a component before an element -->
 <p>
-	text1 <span>inline1</span> <Comp /> text2
+	text1 text2 <span>inline1</span> <Comp /> text3
 </p>
 <p>
-	text1 <Comp /> <span>inline1</span> text2
+	text1 text2 <Comp /> <span>inline1</span> text3
 </p>
 
 <!-- components with children -->
 <p>
-	text1 <Comp1>inline1</Comp1> <Comp2>inline2</Comp2> text2
+	text1 text2 <Comp1>inline1</Comp1> <Comp2>inline2</Comp2> text3
 </p>
 
 <!-- prose only at the END of the run: every separator in the run flows, not just the last -->
 <p>
-	<Comp1 /> <Comp2 /> <Comp3 /> text
+	<Comp1 /> <Comp2 /> <Comp3 /> text1 text2
 </p>
 
 <!-- control: multiline STRUCTURALLY (a block child), not by the run's own newlines -->
 <div>
-	text1 <Comp1 /> <Comp2 /> text2
+	text1 text2 <Comp1 /> <Comp2 /> text3
 	<div>block1</div>
 </div>
 

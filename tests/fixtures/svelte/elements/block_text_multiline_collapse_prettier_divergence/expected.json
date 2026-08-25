@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 209,
+	"end": 215,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 174,
-				"end": 208,
+				"end": 214,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -44,25 +44,25 @@
 						{
 							"type": "Text",
 							"start": 177,
-							"end": 185,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"end": 191,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 185,
-							"end": 203,
+							"start": 191,
+							"end": 209,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 4,
-									"column": 8,
-									"character": 186
+									"column": 14,
+									"character": 192
 								},
 								"end": {
 									"line": 4,
-									"column": 12,
-									"character": 190
+									"column": 18,
+									"character": 196
 								}
 							},
 							"attributes": [],
@@ -71,18 +71,18 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 191,
-										"end": 196,
-										"raw": "text2",
-										"data": "text2"
+										"start": 197,
+										"end": 202,
+										"raw": "text3",
+										"data": "text3"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 203,
-							"end": 204,
+							"start": 209,
+							"end": 210,
 							"raw": "\n",
 							"data": "\n"
 						}

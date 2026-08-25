@@ -1,19 +1,19 @@
 <!-- 100 chars - fits, stays inline -->
 <div>
-	<small>{a} {bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb} text</small>
+	<small>{a} {bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb} text1 text2</small>
 </div>
 
 <!-- 101 chars - overflows; block-style, and the content run packs as one fill -->
 <div>
 	<small>
-		{a} {bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb} text
+		{a} {bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb} text1 text2
 	</small>
 </div>
 
 <!-- Element lead, tag glued to its trailing word - same packed layout -->
 <div>
 	<small>
-		<Comp /> {ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc}text
+		<Comp /> {ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc}text1 text2
 	</small>
 </div>
 
@@ -21,6 +21,6 @@
 	assertion: the interior does not depend on why the element expanded -->
 <div>
 	<small>
-		{a} {b} text
+		{a} {b} text1 text2
 	</small>
 </div>

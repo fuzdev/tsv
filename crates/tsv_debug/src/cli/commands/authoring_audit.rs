@@ -70,7 +70,7 @@ use std::path::{Path, PathBuf};
 
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
-use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char};
+use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char, text_edge_ws};
 
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
@@ -235,7 +235,7 @@ fn collect_sites(nodes: &[FragmentNode<'_>], src: &str, ws_sig: bool, out: &mut 
             } else {
                 // Content text: its leading run is a boundary iff a previous
                 // sibling exists; its trailing run iff a next sibling exists.
-                let lead_len = raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len();
+                let lead_len = text_edge_ws(raw, true).len();
                 if i > 0
                     && lead_len > 0
                     && let Some((had_nl, flip)) = flip_run(&raw[..lead_len])
@@ -248,7 +248,7 @@ fn collect_sites(nodes: &[FragmentNode<'_>], src: &str, ws_sig: bool, out: &mut 
                         flipped: flip,
                     });
                 }
-                let trail_len = raw.len() - raw.trim_end_matches(is_collapsible_ws_char).len();
+                let trail_len = text_edge_ws(raw, false).len();
                 if i + 1 < len
                     && trail_len > 0
                     && let Some((had_nl, flip)) = flip_run(&raw[raw.len() - trail_len..])
@@ -307,19 +307,13 @@ fn collect_boundary_sites(
     // for the trailing run. The two can't overlap: the fragment has non-whitespace content
     // between them.
     let lead = match first {
-        FragmentNode::Text(t) => {
-            let raw = t.raw(src);
-            raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len()
-        }
+        FragmentNode::Text(t) => text_edge_ws(t.raw(src), true).len(),
         _ => 0,
     };
     push_boundary_forms(content_start, content_start + lead, src, kinds.0, out);
 
     let trail = match last {
-        FragmentNode::Text(t) => {
-            let raw = t.raw(src);
-            raw.len() - raw.trim_end_matches(is_collapsible_ws_char).len()
-        }
+        FragmentNode::Text(t) => text_edge_ws(t.raw(src), false).len(),
         _ => 0,
     };
     push_boundary_forms(content_end - trail, content_end, src, kinds.1, out);

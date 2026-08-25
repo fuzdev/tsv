@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 773,
+	"end": 787,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -100,11 +100,11 @@
 									{
 										"type": "ExpressionTag",
 										"start": 58,
-										"end": 132,
+										"end": 125,
 										"expression": {
 											"type": "Identifier",
 											"start": 59,
-											"end": 131,
+											"end": 124,
 											"loc": {
 												"start": {
 													"line": 3,
@@ -112,18 +112,18 @@
 												},
 												"end": {
 													"line": 3,
-													"column": 85
+													"column": 78
 												}
 											},
-											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 										}
 									},
 									{
 										"type": "Text",
-										"start": 132,
+										"start": 125,
 										"end": 137,
-										"raw": " text",
-										"data": " text"
+										"raw": " text1 text2",
+										"data": " text1 text2"
 									}
 								]
 							}
@@ -245,11 +245,11 @@
 									{
 										"type": "ExpressionTag",
 										"start": 258,
-										"end": 333,
+										"end": 326,
 										"expression": {
 											"type": "Identifier",
 											"start": 259,
-											"end": 332,
+											"end": 325,
 											"loc": {
 												"start": {
 													"line": 9,
@@ -257,18 +257,18 @@
 												},
 												"end": {
 													"line": 9,
-													"column": 80
+													"column": 73
 												}
 											},
-											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 										}
 									},
 									{
 										"type": "Text",
-										"start": 333,
+										"start": 326,
 										"end": 340,
-										"raw": " text\n\t",
-										"data": " text\n\t"
+										"raw": " text1 text2\n\t",
+										"data": " text1 text2\n\t"
 									}
 								]
 							}
@@ -306,7 +306,7 @@
 			{
 				"type": "RegularElement",
 				"start": 432,
-				"end": 554,
+				"end": 561,
 				"name": "div",
 				"name_loc": {
 					"start": {
@@ -334,7 +334,7 @@
 						{
 							"type": "RegularElement",
 							"start": 439,
-							"end": 547,
+							"end": 554,
 							"name": "small",
 							"name_loc": {
 								"start": {
@@ -413,17 +413,17 @@
 									{
 										"type": "Text",
 										"start": 533,
-										"end": 539,
-										"raw": "text\n\t",
-										"data": "text\n\t"
+										"end": 546,
+										"raw": "text1 text2\n\t",
+										"data": "text1 text2\n\t"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 547,
-							"end": 548,
+							"start": 554,
+							"end": 555,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -432,39 +432,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 554,
-				"end": 556,
+				"start": 561,
+				"end": 563,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 556,
-				"end": 725,
+				"start": 563,
+				"end": 732,
 				"data": " The SAME run in an element made multiline by AUTHORED AIR rather than by width - the parity\n\tassertion: the interior does not depend on why the element expanded "
 			},
 			{
 				"type": "Text",
-				"start": 725,
-				"end": 726,
+				"start": 732,
+				"end": 733,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 726,
-				"end": 772,
+				"start": 733,
+				"end": 786,
 				"name": "div",
 				"name_loc": {
 					"start": {
 						"line": 22,
 						"column": 1,
-						"character": 727
+						"character": 734
 					},
 					"end": {
 						"line": 22,
 						"column": 4,
-						"character": 730
+						"character": 737
 					}
 				},
 				"attributes": [],
@@ -473,26 +473,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 731,
-							"end": 733,
+							"start": 738,
+							"end": 740,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 733,
-							"end": 765,
+							"start": 740,
+							"end": 779,
 							"name": "small",
 							"name_loc": {
 								"start": {
 									"line": 23,
 									"column": 2,
-									"character": 734
+									"character": 741
 								},
 								"end": {
 									"line": 23,
 									"column": 7,
-									"character": 739
+									"character": 746
 								}
 							},
 							"attributes": [],
@@ -501,19 +501,19 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 740,
-										"end": 743,
+										"start": 747,
+										"end": 750,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 743,
-										"end": 746,
+										"start": 750,
+										"end": 753,
 										"expression": {
 											"type": "Identifier",
-											"start": 744,
-											"end": 745,
+											"start": 751,
+											"end": 752,
 											"loc": {
 												"start": {
 													"line": 24,
@@ -529,19 +529,19 @@
 									},
 									{
 										"type": "Text",
-										"start": 746,
-										"end": 747,
+										"start": 753,
+										"end": 754,
 										"raw": " ",
 										"data": " "
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 747,
-										"end": 750,
+										"start": 754,
+										"end": 757,
 										"expression": {
 											"type": "Identifier",
-											"start": 748,
-											"end": 749,
+											"start": 755,
+											"end": 756,
 											"loc": {
 												"start": {
 													"line": 24,
@@ -557,18 +557,18 @@
 									},
 									{
 										"type": "Text",
-										"start": 750,
-										"end": 757,
-										"raw": " text\n\t",
-										"data": " text\n\t"
+										"start": 757,
+										"end": 771,
+										"raw": " text1 text2\n\t",
+										"data": " text1 text2\n\t"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 765,
-							"end": 766,
+							"start": 779,
+							"end": 780,
 							"raw": "\n",
 							"data": "\n"
 						}

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1912,
+	"end": 1948,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -36,7 +36,7 @@
 			{
 				"type": "RegularElement",
 				"start": 1237,
-				"end": 1280,
+				"end": 1286,
 				"name": "button",
 				"name_loc": {
 					"start": {
@@ -87,26 +87,26 @@
 						{
 							"type": "Text",
 							"start": 1256,
-							"end": 1263,
-							"raw": " text1 ",
-							"data": " text1 "
+							"end": 1269,
+							"raw": " text1 text2 ",
+							"data": " text1 text2 "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 1263,
-							"end": 1270,
+							"start": 1269,
+							"end": 1276,
 							"expression": {
 								"type": "Identifier",
-								"start": 1264,
-								"end": 1269,
+								"start": 1270,
+								"end": 1275,
 								"loc": {
 									"start": {
 										"line": 19,
-										"column": 18
+										"column": 24
 									},
 									"end": {
 										"line": 19,
-										"column": 23
+										"column": 29
 									}
 								},
 								"name": "expr1"
@@ -114,8 +114,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1270,
-							"end": 1271,
+							"start": 1276,
+							"end": 1277,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -124,26 +124,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 1280,
-				"end": 1282,
+				"start": 1286,
+				"end": 1288,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1282,
-				"end": 1323,
+				"start": 1288,
+				"end": 1335,
 				"name": "label",
 				"name_loc": {
 					"start": {
 						"line": 22,
 						"column": 1,
-						"character": 1283
+						"character": 1289
 					},
 					"end": {
 						"line": 22,
 						"column": 6,
-						"character": 1288
+						"character": 1294
 					}
 				},
 				"attributes": [],
@@ -152,26 +152,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1289,
-							"end": 1291,
+							"start": 1295,
+							"end": 1297,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 1291,
-							"end": 1300,
+							"start": 1297,
+							"end": 1306,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 23,
 									"column": 2,
-									"character": 1292
+									"character": 1298
 								},
 								"end": {
 									"line": 23,
 									"column": 7,
-									"character": 1297
+									"character": 1303
 								}
 							},
 							"attributes": [],
@@ -182,27 +182,27 @@
 						},
 						{
 							"type": "Text",
-							"start": 1300,
-							"end": 1307,
-							"raw": " text1 ",
-							"data": " text1 "
+							"start": 1306,
+							"end": 1319,
+							"raw": " text1 text2 ",
+							"data": " text1 text2 "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 1307,
-							"end": 1314,
+							"start": 1319,
+							"end": 1326,
 							"expression": {
 								"type": "Identifier",
-								"start": 1308,
-								"end": 1313,
+								"start": 1320,
+								"end": 1325,
 								"loc": {
 									"start": {
 										"line": 23,
-										"column": 18
+										"column": 24
 									},
 									"end": {
 										"line": 23,
-										"column": 23
+										"column": 29
 									}
 								},
 								"name": "expr1"
@@ -210,8 +210,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1314,
-							"end": 1315,
+							"start": 1326,
+							"end": 1327,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -220,39 +220,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 1323,
-				"end": 1325,
+				"start": 1335,
+				"end": 1337,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1325,
-				"end": 1378,
+				"start": 1337,
+				"end": 1390,
 				"data": " block element: the same run, the same answer "
 			},
 			{
 				"type": "Text",
-				"start": 1378,
-				"end": 1379,
+				"start": 1390,
+				"end": 1391,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1379,
-				"end": 1412,
+				"start": 1391,
+				"end": 1430,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 27,
 						"column": 1,
-						"character": 1380
+						"character": 1392
 					},
 					"end": {
 						"line": 27,
 						"column": 2,
-						"character": 1381
+						"character": 1393
 					}
 				},
 				"attributes": [],
@@ -261,26 +261,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1382,
-							"end": 1384,
+							"start": 1394,
+							"end": 1396,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 1384,
-							"end": 1393,
+							"start": 1396,
+							"end": 1405,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 28,
 									"column": 2,
-									"character": 1385
+									"character": 1397
 								},
 								"end": {
 									"line": 28,
 									"column": 7,
-									"character": 1390
+									"character": 1402
 								}
 							},
 							"attributes": [],
@@ -291,27 +291,27 @@
 						},
 						{
 							"type": "Text",
-							"start": 1393,
-							"end": 1400,
-							"raw": " text1 ",
-							"data": " text1 "
+							"start": 1405,
+							"end": 1418,
+							"raw": " text1 text2 ",
+							"data": " text1 text2 "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 1400,
-							"end": 1407,
+							"start": 1418,
+							"end": 1425,
 							"expression": {
 								"type": "Identifier",
-								"start": 1401,
-								"end": 1406,
+								"start": 1419,
+								"end": 1424,
 								"loc": {
 									"start": {
 										"line": 28,
-										"column": 18
+										"column": 24
 									},
 									"end": {
 										"line": 28,
-										"column": 23
+										"column": 29
 									}
 								},
 								"name": "expr1"
@@ -319,8 +319,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1407,
-							"end": 1408,
+							"start": 1425,
+							"end": 1426,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -329,39 +329,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 1412,
-				"end": 1414,
+				"start": 1430,
+				"end": 1432,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1414,
-				"end": 1442,
+				"start": 1432,
+				"end": 1460,
 				"data": " component: the same "
 			},
 			{
 				"type": "Text",
-				"start": 1442,
-				"end": 1443,
+				"start": 1460,
+				"end": 1461,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 1443,
-				"end": 1484,
+				"start": 1461,
+				"end": 1508,
 				"name": "Comp2",
 				"name_loc": {
 					"start": {
 						"line": 32,
 						"column": 1,
-						"character": 1444
+						"character": 1462
 					},
 					"end": {
 						"line": 32,
 						"column": 6,
-						"character": 1449
+						"character": 1467
 					}
 				},
 				"attributes": [],
@@ -370,26 +370,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1450,
-							"end": 1452,
+							"start": 1468,
+							"end": 1470,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 1452,
-							"end": 1461,
+							"start": 1470,
+							"end": 1479,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 33,
 									"column": 2,
-									"character": 1453
+									"character": 1471
 								},
 								"end": {
 									"line": 33,
 									"column": 7,
-									"character": 1458
+									"character": 1476
 								}
 							},
 							"attributes": [],
@@ -400,27 +400,27 @@
 						},
 						{
 							"type": "Text",
-							"start": 1461,
-							"end": 1468,
-							"raw": " text1 ",
-							"data": " text1 "
+							"start": 1479,
+							"end": 1492,
+							"raw": " text1 text2 ",
+							"data": " text1 text2 "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 1468,
-							"end": 1475,
+							"start": 1492,
+							"end": 1499,
 							"expression": {
 								"type": "Identifier",
-								"start": 1469,
-								"end": 1474,
+								"start": 1493,
+								"end": 1498,
 								"loc": {
 									"start": {
 										"line": 33,
-										"column": 18
+										"column": 24
 									},
 									"end": {
 										"line": 33,
-										"column": 23
+										"column": 29
 									}
 								},
 								"name": "expr1"
@@ -428,8 +428,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1475,
-							"end": 1476,
+							"start": 1499,
+							"end": 1500,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -438,39 +438,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 1484,
-				"end": 1486,
+				"start": 1508,
+				"end": 1510,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1486,
-				"end": 1570,
+				"start": 1510,
+				"end": 1594,
 				"data": " special element, inline-classified: the `svelte:*` projection answers alike "
 			},
 			{
 				"type": "Text",
-				"start": 1570,
-				"end": 1571,
+				"start": 1594,
+				"end": 1595,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "SvelteElement",
-				"start": 1571,
-				"end": 1641,
+				"start": 1595,
+				"end": 1671,
 				"name": "svelte:element",
 				"name_loc": {
 					"start": {
 						"line": 37,
 						"column": 1,
-						"character": 1572
+						"character": 1596
 					},
 					"end": {
 						"line": 37,
 						"column": 15,
-						"character": 1586
+						"character": 1610
 					}
 				},
 				"attributes": [],
@@ -479,26 +479,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1598,
-							"end": 1600,
+							"start": 1622,
+							"end": 1624,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 1600,
-							"end": 1609,
+							"start": 1624,
+							"end": 1633,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 38,
 									"column": 2,
-									"character": 1601
+									"character": 1625
 								},
 								"end": {
 									"line": 38,
 									"column": 7,
-									"character": 1606
+									"character": 1630
 								}
 							},
 							"attributes": [],
@@ -509,27 +509,27 @@
 						},
 						{
 							"type": "Text",
-							"start": 1609,
-							"end": 1616,
-							"raw": " text1 ",
-							"data": " text1 "
+							"start": 1633,
+							"end": 1646,
+							"raw": " text1 text2 ",
+							"data": " text1 text2 "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 1616,
-							"end": 1623,
+							"start": 1646,
+							"end": 1653,
 							"expression": {
 								"type": "Identifier",
-								"start": 1617,
-								"end": 1622,
+								"start": 1647,
+								"end": 1652,
 								"loc": {
 									"start": {
 										"line": 38,
-										"column": 18
+										"column": 24
 									},
 									"end": {
 										"line": 38,
-										"column": 23
+										"column": 29
 									}
 								},
 								"name": "expr1"
@@ -537,8 +537,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1623,
-							"end": 1624,
+							"start": 1653,
+							"end": 1654,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -546,8 +546,8 @@
 				},
 				"tag": {
 					"type": "Identifier",
-					"start": 1593,
-					"end": 1596,
+					"start": 1617,
+					"end": 1620,
 					"loc": {
 						"start": {
 							"line": 37,
@@ -563,39 +563,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 1641,
-				"end": 1643,
+				"start": 1671,
+				"end": 1673,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1643,
-				"end": 1724,
+				"start": 1673,
+				"end": 1754,
 				"data": " special element, block-classified: the same, on the other boundary arity "
 			},
 			{
 				"type": "Text",
-				"start": 1724,
-				"end": 1725,
+				"start": 1754,
+				"end": 1755,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "SvelteHead",
-				"start": 1725,
-				"end": 1778,
+				"start": 1755,
+				"end": 1814,
 				"name": "svelte:head",
 				"name_loc": {
 					"start": {
 						"line": 42,
 						"column": 1,
-						"character": 1726
+						"character": 1756
 					},
 					"end": {
 						"line": 42,
 						"column": 12,
-						"character": 1737
+						"character": 1767
 					}
 				},
 				"attributes": [],
@@ -604,26 +604,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1738,
-							"end": 1740,
+							"start": 1768,
+							"end": 1770,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 1740,
-							"end": 1749,
+							"start": 1770,
+							"end": 1779,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 43,
 									"column": 2,
-									"character": 1741
+									"character": 1771
 								},
 								"end": {
 									"line": 43,
 									"column": 7,
-									"character": 1746
+									"character": 1776
 								}
 							},
 							"attributes": [],
@@ -634,27 +634,27 @@
 						},
 						{
 							"type": "Text",
-							"start": 1749,
-							"end": 1756,
-							"raw": " text1 ",
-							"data": " text1 "
+							"start": 1779,
+							"end": 1792,
+							"raw": " text1 text2 ",
+							"data": " text1 text2 "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 1756,
-							"end": 1763,
+							"start": 1792,
+							"end": 1799,
 							"expression": {
 								"type": "Identifier",
-								"start": 1757,
-								"end": 1762,
+								"start": 1793,
+								"end": 1798,
 								"loc": {
 									"start": {
 										"line": 43,
-										"column": 18
+										"column": 24
 									},
 									"end": {
 										"line": 43,
-										"column": 23
+										"column": 29
 									}
 								},
 								"name": "expr1"
@@ -662,8 +662,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1763,
-							"end": 1764,
+							"start": 1799,
+							"end": 1800,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -672,39 +672,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 1778,
-				"end": 1780,
+				"start": 1814,
+				"end": 1816,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1780,
-				"end": 1872,
+				"start": 1816,
+				"end": 1908,
 				"data": " control: a prose-free run has no fill, so its authored lines are structure and stay "
 			},
 			{
 				"type": "Text",
-				"start": 1872,
-				"end": 1873,
+				"start": 1908,
+				"end": 1909,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1873,
-				"end": 1911,
+				"start": 1909,
+				"end": 1947,
 				"name": "button",
 				"name_loc": {
 					"start": {
 						"line": 47,
 						"column": 1,
-						"character": 1874
+						"character": 1910
 					},
 					"end": {
 						"line": 47,
 						"column": 7,
-						"character": 1880
+						"character": 1916
 					}
 				},
 				"attributes": [],
@@ -713,26 +713,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1881,
-							"end": 1883,
+							"start": 1917,
+							"end": 1919,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 1883,
-							"end": 1892,
+							"start": 1919,
+							"end": 1928,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 48,
 									"column": 2,
-									"character": 1884
+									"character": 1920
 								},
 								"end": {
 									"line": 48,
 									"column": 7,
-									"character": 1889
+									"character": 1925
 								}
 							},
 							"attributes": [],
@@ -743,19 +743,19 @@
 						},
 						{
 							"type": "Text",
-							"start": 1892,
-							"end": 1894,
+							"start": 1928,
+							"end": 1930,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 1894,
-							"end": 1901,
+							"start": 1930,
+							"end": 1937,
 							"expression": {
 								"type": "Identifier",
-								"start": 1895,
-								"end": 1900,
+								"start": 1931,
+								"end": 1936,
 								"loc": {
 									"start": {
 										"line": 49,
@@ -771,8 +771,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1901,
-							"end": 1902,
+							"start": 1937,
+							"end": 1938,
 							"raw": "\n",
 							"data": "\n"
 						}
