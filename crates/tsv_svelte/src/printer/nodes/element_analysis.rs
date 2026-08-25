@@ -375,8 +375,10 @@ impl<'a> Printer<'a> {
         // `run.len() - 1`: `trimmed_content_run` drops only whitespace-only text, so a HOISTED
         // node (`{@debug}`, `<title>`, `{@const}`, `{#snippet}`) sits at a real index and the
         // text beside it is the effective edge. That is exactly `blocks/hoisted_boundary_convergence`.
+        // The `None` arm (every node hoisted) is inert rather than load-bearing: no hoisted kind
+        // is a `Text`, so the scan below never reaches a node to compare these against.
         let content_edges =
-            FragmentNode::content_bounds(run).unwrap_or((0, run.len().saturating_sub(1)));
+            FragmentNode::content_bounds(run).unwrap_or_else(|| (0, run.len().saturating_sub(1)));
 
         // Check for newlines in content between first and last non-whitespace nodes
         run.iter().enumerate().any(|(idx, n)| {
