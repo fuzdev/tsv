@@ -3,7 +3,7 @@
 > **EXPERIMENTAL — may never ship.** TypeScript binder + checker targeting
 > exact TS7/tsgo error conformance — early scaffolding: the pipeline skeleton
 > is real (parse → lower+bind → check → sort/dedup), the semantic phases are
-> landing family by family.
+> being built family by family.
 
 ## Position & invariants
 
@@ -72,14 +72,13 @@
     `SoaWalk` struct, its `add`/`close`/`leaf` id-recording primitives, and
     `bind_file` live here; the per-node visitor methods live in `lower/`
     (`statement.rs`/`expression.rs`/`types.rs` — additional `impl SoaWalk`
-    blocks, split by the AST shape each visitor descends), unchanged in
-    responsibility.
+    blocks, split by the AST shape each visitor descends).
   - `sym/` — the container-threaded, functions-first symbol-bind walk:
     `getContainerFlags`, `declareSymbolEx` + the duplicate/conflict cascade
     (TS2451/2300/2567/2528 with per-prior-declaration related info),
     internal-name mangling (incl. private `#` names), the dual local/export
     collapse (documented at the site; revisited at multi-file). A
-    directory-module split by concern (unchanged responsibilities): `mod.rs`
+    directory-module split by concern: `mod.rs`
     (the `SymbolBinder` struct, its lifecycle — `new`/`bind_program`/`finish`
     — the table/symbol/atom primitives every descendant shares, the
     member-key resolver, the functions-first statement-list driver
@@ -204,10 +203,9 @@
   name, `FlowBuilder::finish`'s label flush by `FlowNodeId`). A future consumer that
   let a map's iteration order reach a diagnostic's order, span, or the flow
   pool layout would make the hasher observable — the canonical
-  `compare_diagnostics` sort is the backstop, not a license. The former
-  crate-private hasher documented a wasm/native hash-equality property; that
-  note is retired. `tsv_lang`'s integer methods widen to a 64-bit word exactly
-  as it did (so integer keys are target-independent regardless) and its byte
+  `compare_diagnostics` sort is the backstop, not a license. `tsv_lang`'s
+  integer methods widen to a 64-bit word (so integer keys are
+  target-independent regardless) and its byte
   path folds native-endian words rather than little-endian ones — a difference
   only a big-endian target could observe, and one no output depends on, since
   hashes never leave the process. (Where tsgo reaches for xxh3-128 —

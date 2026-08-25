@@ -38,6 +38,11 @@ Each `## Unreleased` section must be non-empty and carry a
   [#764](https://github.com/fuzdev/tsv/pull/764)), plus span, loc and key-order alignments
   ([#553](https://github.com/fuzdev/tsv/pull/553), [#583](https://github.com/fuzdev/tsv/pull/583),
   [#625](https://github.com/fuzdev/tsv/pull/625), [#885](https://github.com/fuzdev/tsv/pull/885))
+- fix: the bundled `tsv_ast.d.ts` now types the whole wire and is gated against the fixture
+  corpus — `Script.content` is a `Program` (was `unknown`), `LogicalExpression` and the
+  Svelte-built node shapes are declared, acorn nodes inside a Svelte component carry
+  `leadingComments`/`trailingComments`, and the never-emitted `TSInterfaceHeritage` is gone
+  ([#890](https://github.com/fuzdev/tsv/pull/890))
 - **breaking** fix: naming a file tsv doesn't format (`tsv format some.json`) is now an
   upfront argument error instead of being parsed as TypeScript; directory arguments are
   unaffected ([#709](https://github.com/fuzdev/tsv/pull/709))

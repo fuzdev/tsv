@@ -250,16 +250,16 @@ pub enum Refusal {
     /// (`2-analyze/visitors/VariableDeclarator.js:94-103` for a destructure key, and
     /// `MemberExpression.js:11-16` for a `rest_prop.$$…` access; `$$`-prefixed names
     /// are reserved for Svelte internals). One variant covers both call sites, as the
-    /// oracle uses one error code. **Declare-site** (this variant's live use): a
+    /// oracle uses one error code. **Declare-site** (`script_props`): a
     /// `$props()` ObjectPattern property with a non-computed Identifier key starting
-    /// with `$$` (`let { $$slots: a } = $props()`). A `$$`-prefixed *binding* — a
+    /// with `$$` (`let { $$slots: a } = $props()`); the key is read decoded
+    /// (`Identifier::name`), so an escaped spelling refuses too. **Reference-site**
+    /// (`needs_context`): a `rest_prop.$$…` member access on the rest binding. A `$$`-prefixed *binding* — a
     /// shorthand `{ $$foo }` or a default `{ $$foo = 1 }` — is refused UPSTREAM as
     /// [`Self::DollarPrefixedBinding`] (the oracle's `dollar_prefix_invalid`, which
     /// fires first), so only the `{ $$key: value }` form reaches the declare-site check
     /// — no reason overlap. A computed key (`{ [$$x]: a }`) is the oracle's
     /// `props_invalid_pattern`, a separate rule, so this is scoped to non-computed keys.
-    /// An escaped key falls through (the crate's standing escaped-identifier residual,
-    /// shared with `DollarPrefixedBinding`).
     #[error("prop name starting with `$$` (reserved for Svelte internals — the oracle rejects it)")]
     PropsIllegalName,
     /// A `$props()` ObjectPattern property that is COMPUTED (`{ [x]: a }`) or whose

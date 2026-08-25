@@ -10,7 +10,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 - Svelte docs: `../../svelte/documentation/docs/`
 - Compiler source: `../../svelte/packages/svelte/src/`
-- Existing fixtures: `tests/fixtures/svelte/` (850+ fixtures)
+- Existing fixtures: `tests/fixtures/svelte/`
 
 ---
 
@@ -158,8 +158,8 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Shorthand catch (`{#await promise catch error}`)
 - Destructuring in `then`/`catch` bindings (`{:then {a = 1}}`) — same brace-hugging + default-value divergences as each blocks
 - Typed `then`/`catch` value (`{:then value: number}`, `{:catch error: Error}`, lang="ts") — including a destructured pattern (`{:then { a }: { a: number }}`), which carries the same `end`/`loc` asymmetry as a typed each binding
-- `then`/`catch` value is a bare pattern — a comment immediately before it, or in either gap around its annotation (between the bare pattern and its `:` — or `}` when untyped — and between the annotation and the `}`), is rejected (matching Svelte's `read_pattern` + `read_type_annotation`, which cross those gaps with `allow_whitespace` alone), never relocated or dropped; a comment *inside* a destructure (`{a /* c */}`) or *inside* the type (`value: /* c */ number`) stays valid. See `await/{then_shorthand,then,catch_shorthand,catch}/input_invalid_*_comment` and `await/binding_annotation_comment_prettier_divergence/input_invalid_*`
-- Each clause is filled once — a repeated `{:then}` or `{:catch}` is rejected (Svelte's `block_duplicate_clause`) rather than overwriting the earlier fragment, in the full form and after either shorthand head. See `await/{then_catch,then_shorthand,catch_shorthand,then_shorthand_catch}/input_invalid_duplicate_*`, with the error wording pinned by `tests/svelte_block_continuation_clause.rs`
+- `then`/`catch` value is a bare pattern — a comment immediately before it, or in either gap around its annotation (between the bare pattern and its `:` — or `}` when untyped — and between the annotation and the `}`), is rejected (matching Svelte's `read_pattern` + `read_type_annotation`, which cross those gaps with `allow_whitespace` alone), never relocated or dropped; a comment *inside* a destructure (`{a /* c */}`) or *inside* the type (`value: /* c */ number`) stays valid. See `blocks/await/{then_shorthand,then,catch_shorthand,catch}/input_invalid_*_comment` and `blocks/await/binding_annotation_comment_prettier_divergence/input_invalid_*`
+- Each clause is filled once — a repeated `{:then}` or `{:catch}` is rejected (Svelte's `block_duplicate_clause`) rather than overwriting the earlier fragment, in the full form and after either shorthand head. See `blocks/await/{then_catch,then_shorthand,catch_shorthand,then_shorthand_catch}/input_invalid_duplicate_*`, with the error wording pinned by `tests/svelte_block_continuation_clause.rs`
 - A **plain-identifier** `{:then}` / `{:catch}` binding takes the reserved-word rule, like an `{#each}` binding — both are `read_pattern` positions, and only its destructuring branch defers to acorn
 - Nested await blocks
 

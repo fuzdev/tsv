@@ -1,8 +1,8 @@
 # Compiler Tooling
 
-> The sidecar-dependent harnesses that grade `tsv_svelte_compile` against the canonical Svelte compiler — the wide-net corpus run, the differential fuzzer, and the type-eraser comment census. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
+> The on-demand harnesses that grade `tsv_svelte_compile` against the canonical Svelte compiler — the wide-net corpus run and the differential fuzzer (both sidecar-dependent), plus the pure-Rust type-eraser comment census. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
 
-None of these run in `deno task check` — they need the Deno sidecar, and that gate is pure Rust. The two pure-Rust compiler audits (`conformance:audit:compiler`, `canonicalize:audit`) are gated there and live in [audits.md](audits.md), as does [`compile:fixtures:validate`](audits.md#compile-fixture-validation-compilefixturesvalidate) — split across both cadences, its parity legs pure Rust in `check` and its oracle-freshness leg sidecar-bound in `conformance`. The validation-suite ratchet, which shares this pipeline but grades against a committed snapshot, has its own doc: [compile_validation_ratchet.md](compile_validation_ratchet.md).
+None of these run in `deno task check` — the first two need the Deno sidecar, and that gate is pure Rust; the census is a sizing tool, not a gate. The two pure-Rust compiler audits (`conformance:audit:compiler`, `canonicalize:audit`) are gated there and live in [audits.md](audits.md), as does [`compile:fixtures:validate`](audits.md#compile-fixture-validation-compilefixturesvalidate) — split across both cadences, its parity legs pure Rust in `check` and its oracle-freshness leg sidecar-bound in `conformance`. The validation-suite ratchet, which shares this pipeline but grades against a committed snapshot, has its own doc: [compile_validation_ratchet.md](compile_validation_ratchet.md).
 
 ## Corpus Comparison (`compile:corpus:compare`)
 
@@ -44,7 +44,7 @@ None of these run in `deno task check` — they need the Deno sidecar, and that 
 # Exit codes: 0 clean, 1 FAILURE (mismatch or over-acceptance), 2 harness error. Sidecar-dependent —
 # kept out of `deno task check`; the `compile:corpus:compare` deno task points it at the real-repo
 # corpus + Svelte suites. `--json` carries the full per-file path list per refusal / oracle-reject /
-# over-acceptance bucket plus the `target_set` object, so a bucket's population (and a slice's parity
+# over-acceptance bucket plus the `target_set` object, so a bucket's population (and a change's parity
 # estimate) is checkable.
 cargo run -p tsv_debug compile_corpus_compare <paths...>
 # Also: --list, --json, --census (the sole-blocker refusal census: per refusal class,
@@ -76,7 +76,7 @@ deno task compile:validation                                       # the on-dema
 # compile fixtures and grade each mutant against the canonical compiler. The compiler's
 # adversarial leg. `compile_corpus_compare` is a wide net over REAL components, so it
 # exercises every feature and still misses nearly every feature PAIR — every interaction
-# bug found in this arc was corpus-invisible while the full corpus was green.
+# bug the fuzzer has found was corpus-invisible while the full corpus was green.
 #
 # Operators are AST/FEATURE level, never byte level: a mutant must stay oracle-COMPILABLE to
 # grade anything, so each operator splices a whole well-formed construct at an offset read
@@ -109,12 +109,12 @@ deno task compile:validation                                       # the on-dema
 # ⚠️ THE GATE IS CURRENTLY RED, BY DESIGN OF THE FINDINGS, NOT AS AN ORDINARY GREEN GATE.
 # A `--seed 0 --iterations 20000` run reports over-acceptances across several oracle error
 # codes plus mismatches, so it ALWAYS exits 1 today — run it for the current tally rather
-# than trusting a figure in prose, which drifts with every slice. It is a discovery tool
+# than trusting a figure in prose, which drifts with every compiler change. It is a discovery tool
 # with an open work list, not a regression gate — which is also why it is on demand rather
 # than in `deno task check`. The findings are cataloged in
 # docs/checklist_svelte_compiler.md §The wider validation surface + §Mismatch classes
 # under mutation. Turning it into a real gate wants a known-bug RATCHET keyed on the
-# oracle error codes (gap_audit / blank_audit style) — the recommended follow-up slice.
+# oracle error codes (gap_audit / blank_audit style) — the recommended follow-up.
 #
 # Throughput: tsv's compile runs FIRST and a refusal skips the sidecar entirely — a refusal is
 # definitionally outside the target set, and tsv's compile is ~10-40x faster than a warm
@@ -123,9 +123,8 @@ deno task compile:validation                                       # the on-dema
 # deterministic, but has a near-0% hit rate on fresh mutants). The report prints the measured
 # pass-through rate, since it is what the throughput model rests on. Measured: ~68% of
 # mutants survive the pre-filter, and 3 concurrent sidecar slots at ~0.83 ms per round trip
-# sustain ~218-235K oracle calls/min — well above the 35-75K originally predicted, because
-# that prediction was calibrated for REAL-FILE-sized inputs and this generates 50-200-byte
-# mutants. Not a measurement error; no further throughput work is indicated.
+# sustain ~218-235K oracle calls/min (mutants are 50-200 bytes, far smaller than real
+# files, which is why the rate is high); no further throughput work is indicated.
 #
 # Determinism: every mutant is generated up front, single-threaded, from per-seed-file
 # path-keyed PRNG streams scheduled round-robin; grading then fans out over the sidecar pool
