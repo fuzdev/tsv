@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 36,
+	"end": 37,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 35,
+				"end": 36,
 				"name": "div",
 				"name_loc": {
 					"start": {
@@ -31,25 +31,25 @@
 						{
 							"type": "Text",
 							"start": 5,
-							"end": 12,
-							"raw": "\n\ttext ",
-							"data": "\n\ttext "
+							"end": 13,
+							"raw": "\n\ttext\n\t",
+							"data": "\n\ttext\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 12,
-							"end": 28,
+							"start": 13,
+							"end": 29,
 							"name": "div",
 							"name_loc": {
 								"start": {
-									"line": 2,
-									"column": 7,
-									"character": 13
+									"line": 3,
+									"column": 2,
+									"character": 14
 								},
 								"end": {
-									"line": 2,
-									"column": 10,
-									"character": 16
+									"line": 3,
+									"column": 5,
+									"character": 17
 								}
 							},
 							"attributes": [],
@@ -58,8 +58,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 17,
-										"end": 22,
+										"start": 18,
+										"end": 23,
 										"raw": "block",
 										"data": "block"
 									}
@@ -68,8 +68,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 28,
-							"end": 29,
+							"start": 29,
+							"end": 30,
 							"raw": "\n",
 							"data": "\n"
 						}
