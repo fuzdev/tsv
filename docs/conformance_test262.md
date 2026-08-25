@@ -203,9 +203,9 @@ least one digit after its prefix (`0x`, `0b`, `0o` with no digits rejected). And
 the BigInt suffix `n` attaches only to an integer-form literal — never to a
 fraction or exponent (`1.5n`, `1e3n` rejected; `123n`, `0xffn`, `0o7n`, `1_000n`
 accepted) — matching acorn's "Identifier directly after number". Two adjacent
-edges stay accepted, tangled with the intentional sloppy-mode `08`/`09`
-carve-out: `0_1` (separator in a legacy-octal-shaped literal) and `5.n` (lexed as
-member access `(5).n`). A `\u{…}` string escape must be terminated with `}`
+edges reject too: `0_1` (a separator in a legacy-octal-shaped literal) and `5.n`
+(an identifier directly after the number, never member access `(5).n`). A `\u{…}`
+string escape must be terminated with `}`
 (`'\u{41'` rejected).
 
 Three **TypeScript-grammar** over-acceptances are likewise rejected. A mapped-type
@@ -364,10 +364,10 @@ Processing: 49136/49136
 
 Results:
   Positive tests: 42113 passed, 0 failed
-  Negative tests: 1858 passed, 2573 failed
+  Negative tests: 1864 passed, 2567 failed
   Skipped:        2592 (sloppy mode: 2520, unimplemented feature: 0, runtime: 38, resolution: 34)
 
-Pass rate: 43971/46544 (94.5%)
+Pass rate: 43977/46544 (94.5%)
 ```
 
 ### Verbose (Failures)

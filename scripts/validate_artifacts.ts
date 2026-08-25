@@ -71,44 +71,16 @@ function file_size(path: string | URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const satisfies readonly WasmVariant[];
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-08-21 at the 0.3 release tip (deno target; npm == deno,
-// identical `.wasm`): format 2,218,322 B; parse 913,218 B; all 2,470,951 B.
-// Bounds recentered ±8%.
+// Center measured 2026-08-21 (deno target; npm == deno, identical `.wasm`):
+// format 2,218,322 B; parse 913,218 B; all 2,470,951 B. Bounds are ±8% of it.
 //
-// Drift, not a step: +4.7% format, +2.9% parse, +4.7% all above the 2026-07-27
-// center, accumulated across the whole 0.3 fix run rather than traceable to one
-// change. Recentered here because two measures had walked to within ~3% of a
-// band edge (`all` and `all − format`) — a release-time change would have
-// discovered them as a publish failure instead of as a visible size move.
-// The smallest identifiable contributor at the tail is `reinstantiate`,
-// which adds an export to every variant; parse moving least is the expected
-// shape, since most of the run's work landed in the printers.
-//
-// Prior center, 2026-07-27: format 2,118,243 B; parse 887,893 B; all
-// 2,360,007 B.
-//
-// A real size cut, not drift: `ParseError` became a newtype over a boxed payload
-// (`struct ParseError(Box<ParseErrorKind>)`), so the type is pointer-sized and a
-// `Result<T, ParseError>` is no longer sized by a 96-byte error at every fallible
-// function whose success payload is smaller than that. The cut is code size rather
-// than data path — the error half of each `Result` shrinks at every site in all
-// three language crates, including the many whose `Result` size never changed
-// because a fat AST node already dominated it. Because it lands in the shared
-// `tsv_lang` type, it reaches the TypeScript, Svelte and CSS parsers alike, which
-// is why `format` moves too (it builds without the `json` feature, so no
-// convert-path change can touch it): −7.5% format, −16.7% parse, −6.7% all.
-// Tolerance stays ±8%.
-//
-// Prior center, 2026-07-27 (recentering after every variant had drifted
-// +5.0..+5.3% above the 2026-07-04 center through accumulated work): format
-// 2,290,432 B; parse 1,066,009 B; all 2,529,682 B.
-//
-// Prior center, 2026-07-04 (two size cuts landed together: the wasm32 feature
-// baseline moved to `+simd128,+multivalue` — the multivalue return ABI
-// shrinks the pair-return-dense parse path most, ≈−9% parse / ≈−4.4%
-// format+all — and talc replaced std's default dlmalloc as the wasm32 global
-// allocator, dropping a few more KB per bundle): format 2,178,122 B; parse
-// 1,015,388 B; all 2,401,628 B.
+// Recenter (and re-measure the deltas below) whenever a measure has drifted to
+// within a few percent of a band edge through accumulated work — otherwise the
+// next release discovers it as a publish failure instead of as a visible size
+// move. A real size step (a cut or a regression traceable to one change) is what
+// the tight band exists to surface; recenter on it deliberately, with the cause
+// named in the commit. The retired centers and what moved them are recorded in
+// the release lore, not here.
 const BOUNDS = {
 	format: { min: 2_041_000, max: 2_396_000 },
 	parse: { min: 840_000, max: 986_000 },
@@ -117,30 +89,16 @@ const BOUNDS = {
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
 // convert path); `all − parse` is what the format feature adds (printers + doc
-// builder, dropped from the parse-only build at link time; measured 1,472,114 B —
-// the gate-health signal). A delta near zero means a feature gate broke.
+// builder, dropped from the parse-only build at link time) — the gate-health
+// signal. A delta near zero means a feature gate broke. Read a delta as the
+// feature's weight MINUS whatever both variants share: `js-sys` is linked by both
+// (the format exports take an options bag), so `all − format` is the parse
+// feature net of that shared weight, not a clean readout of the parse feature
+// alone. A change that lands in code both variants link (a parser cut) moves the
+// bundles and leaves the deltas where they were; a delta that moves with the
+// bundles means a feature boundary shifted, not that code got smaller.
 //
-// Both deltas barely moved across the `ParseError` newtype (−539 B and −280 B):
-// the cut lands in the parser, which both variants link, so it leaves the *feature
-// boundary* where it was. That is the expected shape — a delta that moved with the
-// bundles would mean a feature gate had shifted, not that code got smaller.
-//
-// `all − format` then DID shift, by design: the format exports gained an options
-// bag, so `js-sys` moved from a parse-exclusive dep to one both variants link.
-// `all` already linked it, so the weight lands in `format` alone and shows up as
-// a smaller delta rather than a bundle-wide move — and the delta is no longer a
-// clean readout of "the parse feature", it is the parse feature minus whatever
-// the two now share. It stood at 241,764 B at the
-// 2026-07-27 center and measures 252,629 B at the 2026-08-21 one (format
-// 2,218,322 B, all 2,470,951 B); the shared `js-sys` is the only
-// feature-boundary change across those points, but accumulated work moved both
-// bundles too, so read the difference as attribution rather than a controlled
-// A/B. Read a future move against the current number.
-//
-// `all − parse` (the format feature's weight) is 1,557,733 B at this center,
-// up from 1,472,114 B — the printers are where the 0.3 run's work landed, so
-// this is the delta that grew, and it was the measure nearest a band edge
-// (2.0% of headroom) before the recentering.
+// At the current center: `all − format` 252,629 B; `all − parse` 1,557,733 B.
 const DELTAS = {
 	format: { min: 232_000, max: 273_000 }, // all − format
 	parse: { min: 1_433_000, max: 1_682_000 } // all − parse

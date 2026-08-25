@@ -79,19 +79,10 @@ Foundation for all parsing.
 - Line continuation (`\` at EOL)
 - Null character (`\0`)
 
-⚠️ **Known over-acceptance**: a **raw `LineTerminator` inside a string literal** is
-accepted. ECMA-262 §12.9.4.1 forbids it — `DoubleStringCharacter :: SourceCharacter but
-not one of " or \ or LineTerminator` — and only a `LineContinuation` (a `\` immediately
-before the terminator) may span lines. The canonical parsers reject it
-(`Unterminated string constant`), so `"a<LF>b"` parses in tsv where acorn and Svelte
-both error. Unlike the deferred **early errors** in
-[§Strict Mode Only](#strict-mode-only-with-an-explicit-goal-axis), this is a plain
-**grammar** rule rather than a static semantic, so it is a gap in the lexer rather than a
-deliberate deferral to a diagnostics layer. The over-accepted form flows all the way
-through the printer — the string prints verbatim, its raw newline force-breaking the
-doc — so printer-side soundness checks must tolerate it (the poorly-breakable
-`debug_assert`'s string exemption, `chain_has_multiline_string_arg`, keys on the raw span
-containing a newline rather than on a line continuation for exactly this reason).
+A **raw `LineTerminator` inside a string literal** is rejected (`Unterminated string
+literal`), as ECMA-262 §12.9.4.1 requires — `DoubleStringCharacter :: SourceCharacter but
+not one of " or \ or LineTerminator` — and as acorn and Svelte do; only a
+`LineContinuation` (a `\` immediately before the terminator) may span lines.
 
 ### Template Literals
 

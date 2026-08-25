@@ -71,8 +71,11 @@ into `crates/tsv_napi/pkg/` (gitignored):
   `<loader>-<dash triple>` shape (swc's). The set: `linux-x64-gnu`,
   `linux-arm64-gnu`, `linux-x64-musl`, `darwin-arm64`, `win32-x64`. One per
   invocation by design — a machine can only have built its own triple; the
-  release workflow runs the script once per matrix target (`--triple` +
-  `--artifact`/`--cli-artifact` name cross-built binaries).
+  release workflow runs the script once per matrix target with `--triple` alone —
+  every row builds on its own architecture (the gnu/musl rows in pinned containers, the
+  arm row on an arm runner, mac and Windows on native runners), so the
+  `--artifact`/`--cli-artifact` flags that would name cross-built binaries exist but go
+  unused today.
 
 **The loader is ESM**, the same module system as the wasm packages — one
 dialect across tsv's whole npm surface, which is what lets shared sources

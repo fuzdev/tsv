@@ -960,7 +960,7 @@ because it is traversed repeatedly.
 
 **Still open (separate axis):** re-run the **flat/indexed structure** comparison
 on the mature codebase — an independent question from allocation strategy (the
-early prototype conflated the two). Bump allocation for the nested model is now
+early prototype conflated the two). Bump allocation for the nested model is
 the implemented design.
 
 ### Red-Green Trees (Deferred)

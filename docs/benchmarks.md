@@ -434,7 +434,7 @@ prettier. Load-bearing on two axes:
   by both bindings). Counting the array's length instead would score a merely
   warned-about file as a rejection — under-reporting oxc's coverage and, in the
   default intersection mode, dropping that file out of the set every row in the
-  group is timed on. Measured across 52,106 conformance-corpus files, every
+  group is timed on. Measured across the conformance corpus (52,106 files when measured), every
   diagnostic oxc produced was `Error`, so this moves no published number today; it
   is stated because the accept definition should be correct rather than accidentally
   correct. The classification is written as a NON-fatal denylist rather than an

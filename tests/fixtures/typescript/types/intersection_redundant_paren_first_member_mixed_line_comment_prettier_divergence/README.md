@@ -21,7 +21,7 @@ keeps `/* b */ // c` **glued** on one line. tsv holds that form too — a pair t
 author glued onto one line keeps it wherever a comment run is emitted
 (`docs/comments.md` §Trailing and dangling runs) — so the terminal is **dual-stable**:
 a `variant_glued`, pinned by the `prettier_intermediate_to_variant_*` marker
-(rule N7c). That is the same shape as the trailing counterpart below; the two
+(rule N7b). That is the same shape as the trailing counterpart below; the two
 cases must not differ on it, and this seam is the only place they could.
 
 This is the intersection analog of the whole-RHS

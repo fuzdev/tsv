@@ -29,7 +29,8 @@ export interface ParseOptions {
 	 * `false` emits the span-only wire (~46% smaller; Svelte also omits
 	 * `name_loc`): `loc` stays derivable from `start`/`end` plus the source,
 	 * via this package's own `reconstruct_locations` / `create_locator` /
-	 * `loc_of`. Inert for CSS (its wire has no `loc`).
+	 * `loc_of` (which throw on the two Svelte shapes the span-only wire can't
+	 * disambiguate — see `locations.d.ts`). Inert for CSS (its wire has no `loc`).
 	 * @default true
 	 */
 	locations?: boolean | undefined;

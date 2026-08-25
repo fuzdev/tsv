@@ -15,7 +15,7 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 Mirrors `tsv_wasm`'s split so the bench can size scope-matched native artifacts:
 
 - `format` (default) — `tsv_format_<lang>` exports
-- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `convert` layer on each language crate
+- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_<lang>_no_locations` + `tsv_parse_internal_<lang>` exports, and the `convert` layer on each language crate
 
 The default both-features build is the full `libtsv_ffi` the bench perf rows load and any FFI host links. The size table also reports two subset builds, each into its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv_format_wasm`, no convert layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv_parse_wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `deno task typecheck:features` (in `check`) `cargo check`s each half on its own.
 
@@ -25,7 +25,7 @@ The `lang_bindings!` macro generates four `extern "C"` functions per language (s
 
 - `tsv_parse_<lang>` — JSON AST (public, converted)
 - `tsv_parse_<lang>_no_locations` — the span-only variant (drops per-node `loc`; Svelte also drops `name_loc`). CSS is byte-identical to `tsv_parse_css` (`parseCss` emits no `loc`). See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
-- `tsv_parse_internal_<lang>` — Empty string (benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
+- `tsv_parse_internal_<lang>` — Empty payload (`*out_len == 0` with `TSV_STATUS_OK`; benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
 - `tsv_format_<lang>` — Formatted source
 
 Plus `tsv_free(ptr, len)` for deallocation.
