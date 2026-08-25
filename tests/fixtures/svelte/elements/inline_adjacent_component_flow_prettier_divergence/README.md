@@ -13,7 +13,7 @@ collapses here is inter-node whitespace that renders as one space either way.
 Prettier's `isInlineElement` requires a `RegularElement`, so a component is neither inline nor block
 to it: the whitespace-only node before a component is printed as a plain `line` that breaks with the
 container, while the text-adjacent boundaries of the same run hug in its fill. From the **space**
-spelling it therefore emits `text1 <Comp1 />⏎<Comp2 /> text2` whenever the container is multiline —
+spelling it therefore emits `text1 text2 <Comp1 />⏎<Comp2 /> text3` whenever the container is multiline —
 one run, two answers, in a line that fits — which `output_prettier.svelte` records; from the
 **newline** spelling it holds every line (`prettier_variant_newline.svelte`, which tsv normalizes to
 `input.svelte`). The `<span>` pair beside the first case is the parity assertion: both formatters

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 2996,
+	"end": 3050,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -605,7 +605,7 @@
 			{
 				"type": "RegularElement",
 				"start": 2024,
-				"end": 2058,
+				"end": 2070,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -626,61 +626,61 @@
 						{
 							"type": "Text",
 							"start": 2027,
-							"end": 2036,
-							"raw": "\n\ttext1\n\t",
-							"data": "\n\ttext1\n\t"
+							"end": 2042,
+							"raw": "\n\ttext1 text2\n\t",
+							"data": "\n\ttext1 text2\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 2036,
-							"end": 2046,
+							"start": 2042,
+							"end": 2052,
 							"data": " c "
 						},
 						{
 							"type": "Text",
-							"start": 2046,
-							"end": 2054,
-							"raw": "\n\ttext2\n",
-							"data": "\n\ttext2\n"
+							"start": 2052,
+							"end": 2066,
+							"raw": "\n\ttext3 text4\n",
+							"data": "\n\ttext3 text4\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 2058,
-				"end": 2060,
+				"start": 2070,
+				"end": 2072,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 2060,
-				"end": 2345,
+				"start": 2072,
+				"end": 2357,
 				"data": " control: a comment BOUNDS the run without sterilizing it — it keeps its own line, and the\n     inline runs on BOTH sides of it still flow. Without this the comment control above is equally\n     satisfied by \"a run holding a comment keeps every line\", which is a different rule "
 			},
 			{
 				"type": "Text",
-				"start": 2345,
-				"end": 2346,
+				"start": 2357,
+				"end": 2358,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 2346,
-				"end": 2434,
+				"start": 2358,
+				"end": 2458,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 56,
 						"column": 1,
-						"character": 2347
+						"character": 2359
 					},
 					"end": {
 						"line": 56,
 						"column": 2,
-						"character": 2348
+						"character": 2360
 					}
 				},
 				"attributes": [],
@@ -689,26 +689,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 2349,
-							"end": 2357,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"start": 2361,
+							"end": 2375,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 2357,
-							"end": 2377,
+							"start": 2375,
+							"end": 2395,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 57,
-									"column": 8,
-									"character": 2358
+									"column": 14,
+									"character": 2376
 								},
 								"end": {
 									"line": 57,
-									"column": 12,
-									"character": 2362
+									"column": 18,
+									"character": 2380
 								}
 							},
 							"attributes": [],
@@ -717,8 +717,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2363,
-										"end": 2370,
+										"start": 2381,
+										"end": 2388,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -727,39 +727,39 @@
 						},
 						{
 							"type": "Text",
-							"start": 2377,
-							"end": 2385,
-							"raw": " text2\n\t",
-							"data": " text2\n\t"
+							"start": 2395,
+							"end": 2403,
+							"raw": " text3\n\t",
+							"data": " text3\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 2385,
-							"end": 2395,
+							"start": 2403,
+							"end": 2413,
 							"data": " c "
 						},
 						{
 							"type": "Text",
-							"start": 2395,
-							"end": 2403,
-							"raw": "\n\ttext3 ",
-							"data": "\n\ttext3 "
+							"start": 2413,
+							"end": 2427,
+							"raw": "\n\ttext4 text5 ",
+							"data": "\n\ttext4 text5 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 2403,
-							"end": 2423,
+							"start": 2427,
+							"end": 2447,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 59,
-									"column": 8,
-									"character": 2404
+									"column": 14,
+									"character": 2428
 								},
 								"end": {
 									"line": 59,
-									"column": 12,
-									"character": 2408
+									"column": 18,
+									"character": 2432
 								}
 							},
 							"attributes": [],
@@ -768,8 +768,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2409,
-										"end": 2416,
+										"start": 2433,
+										"end": 2440,
 										"raw": "inline2",
 										"data": "inline2"
 									}
@@ -778,49 +778,49 @@
 						},
 						{
 							"type": "Text",
-							"start": 2423,
-							"end": 2430,
-							"raw": " text4\n",
-							"data": " text4\n"
+							"start": 2447,
+							"end": 2454,
+							"raw": " text6\n",
+							"data": " text6\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 2434,
-				"end": 2436,
+				"start": 2458,
+				"end": 2460,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 2436,
-				"end": 2647,
+				"start": 2460,
+				"end": 2671,
 				"data": " control: a `<br />` bounds the run exactly as a comment does — its newline is a rendered\n     line break, not a spelling of a space, so it keeps its own line while the runs on both\n     sides still flow "
 			},
 			{
 				"type": "Text",
-				"start": 2647,
-				"end": 2648,
+				"start": 2671,
+				"end": 2672,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 2648,
-				"end": 2732,
+				"start": 2672,
+				"end": 2768,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 65,
 						"column": 1,
-						"character": 2649
+						"character": 2673
 					},
 					"end": {
 						"line": 65,
 						"column": 2,
-						"character": 2650
+						"character": 2674
 					}
 				},
 				"attributes": [],
@@ -829,26 +829,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 2651,
-							"end": 2659,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"start": 2675,
+							"end": 2689,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 2659,
-							"end": 2679,
+							"start": 2689,
+							"end": 2709,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 66,
-									"column": 8,
-									"character": 2660
+									"column": 14,
+									"character": 2690
 								},
 								"end": {
 									"line": 66,
-									"column": 12,
-									"character": 2664
+									"column": 18,
+									"character": 2694
 								}
 							},
 							"attributes": [],
@@ -857,8 +857,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2665,
-										"end": 2672,
+										"start": 2695,
+										"end": 2702,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -867,26 +867,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 2679,
-							"end": 2687,
-							"raw": " text2\n\t",
-							"data": " text2\n\t"
+							"start": 2709,
+							"end": 2717,
+							"raw": " text3\n\t",
+							"data": " text3\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 2687,
-							"end": 2693,
+							"start": 2717,
+							"end": 2723,
 							"name": "br",
 							"name_loc": {
 								"start": {
 									"line": 67,
 									"column": 2,
-									"character": 2688
+									"character": 2718
 								},
 								"end": {
 									"line": 67,
 									"column": 4,
-									"character": 2690
+									"character": 2720
 								}
 							},
 							"attributes": [],
@@ -897,26 +897,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 2693,
-							"end": 2701,
-							"raw": "\n\ttext3 ",
-							"data": "\n\ttext3 "
+							"start": 2723,
+							"end": 2737,
+							"raw": "\n\ttext4 text5 ",
+							"data": "\n\ttext4 text5 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 2701,
-							"end": 2721,
+							"start": 2737,
+							"end": 2757,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 68,
-									"column": 8,
-									"character": 2702
+									"column": 14,
+									"character": 2738
 								},
 								"end": {
 									"line": 68,
-									"column": 12,
-									"character": 2706
+									"column": 18,
+									"character": 2742
 								}
 							},
 							"attributes": [],
@@ -925,8 +925,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2707,
-										"end": 2714,
+										"start": 2743,
+										"end": 2750,
 										"raw": "inline2",
 										"data": "inline2"
 									}
@@ -935,49 +935,49 @@
 						},
 						{
 							"type": "Text",
-							"start": 2721,
-							"end": 2728,
-							"raw": " text4\n",
-							"data": " text4\n"
+							"start": 2757,
+							"end": 2764,
+							"raw": " text6\n",
+							"data": " text6\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 2732,
-				"end": 2734,
+				"start": 2768,
+				"end": 2770,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 2734,
-				"end": 2777,
+				"start": 2770,
+				"end": 2813,
 				"data": " control: a blank line still breaks "
 			},
 			{
 				"type": "Text",
-				"start": 2777,
-				"end": 2778,
+				"start": 2813,
+				"end": 2814,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 2778,
-				"end": 2824,
+				"start": 2814,
+				"end": 2872,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 72,
 						"column": 1,
-						"character": 2779
+						"character": 2815
 					},
 					"end": {
 						"line": 72,
 						"column": 2,
-						"character": 2780
+						"character": 2816
 					}
 				},
 				"attributes": [],
@@ -986,26 +986,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 2781,
-							"end": 2791,
-							"raw": "\n\ttext1\n\n\t",
-							"data": "\n\ttext1\n\n\t"
+							"start": 2817,
+							"end": 2833,
+							"raw": "\n\ttext1 text2\n\n\t",
+							"data": "\n\ttext1 text2\n\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 2791,
-							"end": 2811,
+							"start": 2833,
+							"end": 2853,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 75,
 									"column": 2,
-									"character": 2792
+									"character": 2834
 								},
 								"end": {
 									"line": 75,
 									"column": 6,
-									"character": 2796
+									"character": 2838
 								}
 							},
 							"attributes": [],
@@ -1014,8 +1014,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2797,
-										"end": 2804,
+										"start": 2839,
+										"end": 2846,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -1024,49 +1024,49 @@
 						},
 						{
 							"type": "Text",
-							"start": 2811,
-							"end": 2820,
-							"raw": "\n\n\ttext2\n",
-							"data": "\n\n\ttext2\n"
+							"start": 2853,
+							"end": 2868,
+							"raw": "\n\n\ttext3 text4\n",
+							"data": "\n\n\ttext3 text4\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 2824,
-				"end": 2826,
+				"start": 2872,
+				"end": 2874,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 2826,
-				"end": 2916,
+				"start": 2874,
+				"end": 2964,
 				"data": " control: a block sibling takes its own line; the inline run before it still flows "
 			},
 			{
 				"type": "Text",
-				"start": 2916,
-				"end": 2917,
+				"start": 2964,
+				"end": 2965,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 2917,
-				"end": 2995,
+				"start": 2965,
+				"end": 3049,
 				"name": "div",
 				"name_loc": {
 					"start": {
 						"line": 81,
 						"column": 1,
-						"character": 2918
+						"character": 2966
 					},
 					"end": {
 						"line": 81,
 						"column": 4,
-						"character": 2921
+						"character": 2969
 					}
 				},
 				"attributes": [],
@@ -1075,26 +1075,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 2922,
-							"end": 2930,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"start": 2970,
+							"end": 2984,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 2930,
-							"end": 2950,
+							"start": 2984,
+							"end": 3004,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 82,
-									"column": 8,
-									"character": 2931
+									"column": 14,
+									"character": 2985
 								},
 								"end": {
 									"line": 82,
-									"column": 12,
-									"character": 2935
+									"column": 18,
+									"character": 2989
 								}
 							},
 							"attributes": [],
@@ -1103,8 +1103,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2936,
-										"end": 2943,
+										"start": 2990,
+										"end": 2997,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -1113,26 +1113,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 2950,
-							"end": 2958,
-							"raw": " text2\n\t",
-							"data": " text2\n\t"
+							"start": 3004,
+							"end": 3012,
+							"raw": " text3\n\t",
+							"data": " text3\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 2958,
-							"end": 2975,
+							"start": 3012,
+							"end": 3029,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 83,
 									"column": 2,
-									"character": 2959
+									"character": 3013
 								},
 								"end": {
 									"line": 83,
 									"column": 5,
-									"character": 2962
+									"character": 3016
 								}
 							},
 							"attributes": [],
@@ -1141,8 +1141,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2963,
-										"end": 2969,
+										"start": 3017,
+										"end": 3023,
 										"raw": "block1",
 										"data": "block1"
 									}
@@ -1151,10 +1151,10 @@
 						},
 						{
 							"type": "Text",
-							"start": 2975,
-							"end": 2989,
-							"raw": "\n\ttext3 text4\n",
-							"data": "\n\ttext3 text4\n"
+							"start": 3029,
+							"end": 3043,
+							"raw": "\n\ttext4 text5\n",
+							"data": "\n\ttext4 text5\n"
 						}
 					]
 				}

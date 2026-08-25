@@ -14,7 +14,7 @@
 use super::element_doc::MultilineCause;
 use super::fragment_text_doc::TextChildContext;
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::internal::{self, FragmentNode, text_edge_ws};
 use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
@@ -223,10 +223,10 @@ impl<'a> Printer<'a> {
         // each node once and keeps the total cost O(n). Reading it at the separator instead would
         // rescan per separator, and a mid-run `continue` (a glued run skips its tail) would leave
         // a later rescan blind to the prose *before* it in the same run.
-        let (mut run_end, mut run_has_prose) = (0usize, false);
+        let (mut run_end, mut run_words) = (0usize, 0usize);
         for (i, node) in trimmed_nodes.iter().enumerate() {
             if i >= run_end {
-                (run_end, run_has_prose) = self.scan_inline_run(trimmed_nodes, i);
+                (run_end, run_words) = self.scan_inline_run(trimmed_nodes, i);
             }
             if i > 0 && is_inline_content(&trimmed_nodes[i - 1]) {
                 has_preceding_breakable = true;
@@ -301,7 +301,8 @@ impl<'a> Printer<'a> {
                     i,
                     TextChildContext {
                         cause,
-                        run_has_prose,
+                        run_has_prose: Self::run_is_prose(run_words),
+                        run_has_text: Self::run_has_text(run_words),
                         content_bounds,
                         glued_prefix: pending_glued_prefix.take(),
                         prev_sibling_head,
@@ -681,41 +682,145 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether `node` is **prose** — a text node carrying a word for a `fill` to pack. An
-    /// NBSP-only node is a separator wearing content's clothing
-    /// ([`Self::is_separator_like_text`]) and is not prose, for the same reason it is excluded
-    /// from the flow rule itself.
+    /// The number of **words** `node` gives a `fill` to pack — its prose. A content text counts
+    /// its collapsible-whitespace-separated words ([`internal::split_collapsible_ws`]) over its
+    /// SOURCE BYTES (`raw`) — the fill's own item split, so the count and the fill cannot
+    /// disagree about where a seam is: an NBSP-joined pair is one word because it is one fill
+    /// item, and so is an entity-encoded space (`text1&#32;text2` — the entity's bytes print
+    /// verbatim, and neither tsv's fill nor prettier's breaks inside it; counting the decoded
+    /// characters instead promised a wrap point no fill has). A whitespace-only node and every
+    /// non-text node count zero — an expression tag renders as a value, not a word, so
+    /// `chars⏎{n}` is a label beside its value — and so does an NBSP-only node, a separator
+    /// wearing content's clothing ([`Self::is_separator_like_text`]), excluded from the flow rule
+    /// for the same reason. That one test reads the DECODED text on purpose: whether a node
+    /// renders as a separator is a render question, where a word count is a print question.
     ///
-    /// This is the run-level spelling of the node-local `!separator_like_text` test the content
-    /// text sites already make: at those sites the node *is* the run's fill, so asking about the
-    /// node and asking about the run are the same question. The sites that own no fill have to
-    /// ask it of the run instead — the whitespace-only separator here, and
-    /// `Printer::content_is_reflowable_fill` in `element_analysis.rs`, which decides whether an
-    /// element's render-free content boundary may select its layout. Both are the one "is there
-    /// a fill to reflow into?" question, so they share this predicate rather than each spelling
-    /// out what counts as prose.
-    pub(super) fn is_run_prose(&self, node: &FragmentNode<'_>) -> bool {
-        matches!(node, FragmentNode::Text(t)
-            if !t.is_collapsible_ws_only && !Self::is_separator_like_text(&t.data(self.source)))
+    /// The count is taken over a RUN — the most words any one node carries — and graded by
+    /// [`Self::run_is_prose`]: a run needs a
+    /// **phrase** to reflow into, so a run holding a single word is a label, not prose:
+    /// `<Comp />⏎Delete⏎{n}`, `hue:⏎<input />`, `<input />⏎private`, `chars⏎{n}` are a caption
+    /// beside its icon, a field beside its unit, and their authored newlines are structure the
+    /// flow rule holds, exactly as it holds a prose-free run's. Two callers ask it of a run:
+    /// [`Self::scan_inline_run`], which feeds the flow rule's three sites (the whitespace-only
+    /// separator and a content text's two edge runs, through `TextChildContext::run_has_prose`),
+    /// and `Printer::content_is_reflowable_fill` in `element_analysis.rs`, which decides whether
+    /// an interior newline may select the element's layout. Both are the one "is there a fill to
+    /// reflow into?" question, so they share this count rather than each spelling out what
+    /// counts as prose.
+    ///
+    /// ⚠️ **Run-level, never boundary-local.** At a content text's edge run the node adjacent to
+    /// the sibling is often the one-word TAIL a previous wrap left behind
+    /// (`…<code>x</code>⏎prop.`) — prettier's own fill writes one every time a paragraph wraps
+    /// at an element, and holds it as authored on the next pass. A boundary-local "≥2 words"
+    /// reads that leftover as a label and holds it, which is the accretion ratchet the flow rule
+    /// exists to heal, run in reverse (measured: 32 of 40 corpus movers under the boundary-local
+    /// variant were NOT the authored form). Taken over the run, the count sees the sentence
+    /// the node belongs to, so a one-word node that ends a real sentence flows with it. Pinned
+    /// by `elements/inline_sibling_newline_label_hold_prettier_divergence` (the label shapes
+    /// held, the two-word cliff and the one-word sentence tail flowing).
+    pub(super) fn prose_words(&self, node: &FragmentNode<'_>) -> usize {
+        match node {
+            FragmentNode::Text(t) if !t.is_collapsible_ws_only => {
+                if Self::is_separator_like_text(&t.data(self.source)) {
+                    0
+                } else {
+                    internal::split_collapsible_ws(t.raw(self.source)).count()
+                }
+            }
+            _ => 0,
+        }
     }
 
-    /// Scan the inline run beginning at `start`: its exclusive end, and whether it holds prose
-    /// ([`Self::is_run_prose`]) — which is what puts a `fill` in the run for a flowing separator
-    /// to reflow into.
+    /// Whether a run whose [`Self::prose_words`] total is `words` is **prose** — holds a fill to
+    /// reflow into. The cliff is two words: a run holding one is a label
+    /// ([`Self::prose_words`]), and two is where label and prose genuinely blur (`Remember me`
+    /// packs), so the boundary is stated here rather than approximated by a sentence heuristic
+    /// (`.!?`, ≥3 words — measured to hold wrap artifacts the two-word rule does not).
+    ///
+    /// The count is the run's **maximum** over its nodes, and only its TEXT counts. Three
+    /// alternatives were measured and rejected: counting an expression tag as a word packs a
+    /// label beside its value (`chars⏎{n}` — authored vertical structure); a sentence heuristic
+    /// (`.!?`, ≥3 words) holds prettier's own two-word wrap tails; and SUMMING the run's words
+    /// packs every list of one-word captions the moment it holds two
+    /// (`<Icon />⏎Delete⏎<Icon />⏎Edit` → one line) — words in two text nodes are separated by
+    /// a sibling, and that separation is the author's. The maximum's own cost is a sentence
+    /// spelled entirely as one-word fragments between siblings (`text1⏎<span>a</span>⏎text2`),
+    /// which holds; real prose has a two-word node somewhere in its run.
+    #[inline]
+    pub(super) fn run_is_prose(words: usize) -> bool {
+        words >= 2
+    }
+
+    /// Whether a run whose [`Self::prose_words`] maximum is `words` holds a **content text** at
+    /// all — a fill for a whitespace-only separator to sit in, prose or not. The gate the
+    /// SPACE-spelled separator before a tag keeps (`TextChildContext::run_has_text`): the prose
+    /// gate is a hold on an authored NEWLINE and must never turn a space into one, so a one-word
+    /// run's `text1 {a} {b}` defers to the per-width group exactly as a prose run's does
+    /// (`elements/inline_sibling_newline_label_hold_tag_pair_space_prettier_divergence`), and
+    /// only a prose-FREE run's tag pair (`{a} {b}`) breaks with its container.
+    #[inline]
+    pub(super) fn run_has_text(words: usize) -> bool {
+        words >= 1
+    }
+
+    /// Scan the inline run beginning at `start`: its exclusive end, and the most words any one
+    /// of its nodes carries ([`Self::prose_words`]) — graded by [`Self::run_is_prose`] for the
+    /// newline hold (a `fill` to reflow into) and by [`Self::run_has_text`] for the space-spelled
+    /// tag separator (a fill to sit in at all).
+    ///
+    /// A run ends at a node [`Self::breaks_inline_run`] names, and at an authored blank line a
+    /// content text carries on its edge ([`Self::text_edge_has_blank`]) — the boundary set
+    /// `Printer::content_is_reflowable_fill` reads too, with one deliberate difference: that
+    /// predicate asks its blank question of the WHOLE text (`has_authored_blank_line`), this scan
+    /// of the two EDGES alone, since a run is a partition of nodes and cannot split one at an
+    /// interior blank. The two agree wherever a blank sits beside a sibling; a blank INSIDE a
+    /// text (`text1⏎⏎text2` in one node) makes the fill predicate answer "no fill" while this
+    /// scan still counts the node's words — the fill collapses that blank either way, so the
+    /// boundaries beside it flow with the run's prose.
     ///
     /// Called only when the caller's cursor reaches a fresh run, so the scans partition
     /// `trimmed_nodes` and cost O(n) across the whole fragment — not the O(n²) a per-separator
     /// rescan would cost on a long all-flowing run (a generated per-token `<span>` list). A
     /// run-breaking node at `start` is its own one-node span: the loop stops immediately and the
     /// `max` advances the cursor past it, so the caller cannot stall on it.
-    fn scan_inline_run(&self, nodes: &[FragmentNode<'_>], start: usize) -> (usize, bool) {
+    fn scan_inline_run(&self, nodes: &[FragmentNode<'_>], start: usize) -> (usize, usize) {
         let mut end = start;
-        let mut has_prose = false;
+        let mut words = 0usize;
         while end < nodes.len() && !self.breaks_inline_run(&nodes[end]) {
-            has_prose = has_prose || self.is_run_prose(&nodes[end]);
+            // An authored blank line bounds the run wherever the parser put it. Between two
+            // non-text siblings it is a whitespace-only node `breaks_inline_run` sees; beside a
+            // text it is folded into that text's edge whitespace, so the text itself must end
+            // the run — BEFORE it for a leading blank, AFTER it for a trailing one. Without this
+            // a blank beside a text split the layout (the blank-line arms hold it) but not the
+            // count, and `text1 text2⏎<span>a</span>⏎⏎text3⏎<span>b</span>` flowed the one-word
+            // half with the prose half as one run where the same shape with a comment for a
+            // boundary held it.
+            if end > start && self.text_edge_has_blank(&nodes[end], true) {
+                break;
+            }
+            words = words.max(self.prose_words(&nodes[end]));
             end += 1;
+            if self.text_edge_has_blank(&nodes[end - 1], false) {
+                break;
+            }
         }
-        (end.max(start + 1), has_prose)
+        (end.max(start + 1), words)
+    }
+
+    /// Whether `node` is a content text whose `leading` (else trailing) edge whitespace carries
+    /// an authored blank line — the run boundary a blank spells when the parser folds it into
+    /// the text beside it rather than into a whitespace-only node ([`Self::scan_inline_run`]).
+    /// Reads `raw`: a blank is a question about the bytes, like every blank-line scan.
+    fn text_edge_has_blank(&self, node: &FragmentNode<'_>, leading: bool) -> bool {
+        match node {
+            FragmentNode::Text(t) if !t.is_collapsible_ws_only => {
+                text_edge_ws(t.raw(self.source), leading)
+                    .matches('\n')
+                    .count()
+                    >= 2
+            }
+            _ => false,
+        }
     }
 
     /// Whether a **single-newline** separator beside `node` may collapse to a plain space.
@@ -805,23 +910,35 @@ impl<'a> Printer<'a> {
     /// The flow rule asked of **one side** of a content text's boundary run — the leading and
     /// trailing halves of [`Printer::handle_text_child`], which are exact mirrors.
     ///
-    /// A SINGLE newline beside flowing inline content is a spelling difference only, so the run
-    /// reflows with the fill instead of pinning a hardline; a blank line (2+) still breaks, and a
-    /// separator-like node ([`Self::is_separator_like_text`]) never flows whatever sits beside it.
+    /// A SINGLE newline beside flowing inline content, in a run that holds prose to reflow into
+    /// (`run_has_prose` — [`Self::run_is_prose`] over the run, from [`Self::scan_inline_run`]),
+    /// is a spelling difference only, so the run reflows with the fill instead of pinning a
+    /// hardline; a blank line (2+) still breaks, a one-word run is a label whose lines are held
+    /// ([`Self::run_is_prose`]), and a separator-like node ([`Self::is_separator_like_text`])
+    /// never flows whatever sits beside it — that last exclusion is the one NODE-local gate, and
+    /// it stays beside the run-level one on purpose: a separator-like node must not flow even
+    /// when its run holds prose elsewhere, or the fill re-reads a break it emitted itself (the
+    /// NBSP F1 break).
     ///
     /// One question, one predicate. The third site — the whitespace-only separator *between* two
-    /// siblings — asks the same rule of BOTH neighbours, plus its run's prose. Letting the sites
-    /// drift apart is what left a single run with two answers: the boundaries touching a text node
-    /// flowed while the one between two adjacent siblings did not
-    /// (`inline_adjacent_sibling_newline_flow_prettier_divergence`).
+    /// siblings — asks the same two gates (the run's prose, the neighbour's kind) of BOTH
+    /// neighbours. Letting the sites drift apart is what left a single run with two answers: the
+    /// boundaries touching a text node flowed while the one between two adjacent siblings did
+    /// not (`inline_adjacent_sibling_newline_flow_prettier_divergence`) — and, before the prose
+    /// gate was asked here at all, a one-word run's edge runs flowed while its standalone
+    /// separator held.
     #[inline]
     pub(super) fn boundary_newline_flows(
         &self,
         newlines: usize,
+        run_has_prose: bool,
         separator_like_text: bool,
         neighbour: Option<&FragmentNode<'_>>,
     ) -> bool {
-        newlines == 1 && !separator_like_text && self.neighbour_newline_flows(neighbour)
+        newlines == 1
+            && run_has_prose
+            && !separator_like_text
+            && self.neighbour_newline_flows(neighbour)
     }
 
     /// Whether this text node is a **separator** wearing content's clothing: every character it

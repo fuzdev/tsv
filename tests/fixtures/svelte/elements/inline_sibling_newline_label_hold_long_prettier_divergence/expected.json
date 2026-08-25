@@ -1,0 +1,606 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 934,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 76,
+				"data": " 100 chars - fits: the space spelling of a one-word run stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 76,
+				"end": 77,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 77,
+				"end": 185,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 78
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 79
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 80,
+							"end": 82,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 82,
+							"end": 174,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 83
+								},
+								"end": {
+									"line": 3,
+									"column": 6,
+									"character": 87
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 88,
+									"end": 171,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 7,
+											"character": 88
+										},
+										"end": {
+											"line": 3,
+											"column": 11,
+											"character": 92
+										}
+									},
+									"value": [
+										{
+											"start": 94,
+											"end": 170,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 174,
+							"end": 181,
+							"raw": " text1\n",
+							"data": " text1\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 185,
+				"end": 187,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 187,
+				"end": 284,
+				"data": " 101 chars - overflows: the fill wraps at the separator, onto the held (newline) spelling "
+			},
+			{
+				"type": "Text",
+				"start": 284,
+				"end": 285,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 285,
+				"end": 395,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 286
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 287
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 288,
+							"end": 290,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 290,
+							"end": 383,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 291
+								},
+								"end": {
+									"line": 8,
+									"column": 6,
+									"character": 295
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 296,
+									"end": 380,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 7,
+											"character": 296
+										},
+										"end": {
+											"line": 8,
+											"column": 11,
+											"character": 300
+										}
+									},
+									"value": [
+										{
+											"start": 302,
+											"end": 379,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 383,
+							"end": 391,
+							"raw": "\n\ttext1\n",
+							"data": "\n\ttext1\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 395,
+				"end": 397,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 397,
+				"end": 451,
+				"data": " the same boundary at a void element: 100 fits "
+			},
+			{
+				"type": "Text",
+				"start": 451,
+				"end": 452,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 452,
+				"end": 568,
+				"name": "label",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 453
+					},
+					"end": {
+						"line": 13,
+						"column": 6,
+						"character": 458
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 459,
+							"end": 461,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 461,
+							"end": 553,
+							"name": "input",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 2,
+									"character": 462
+								},
+								"end": {
+									"line": 14,
+									"column": 7,
+									"character": 467
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 468,
+									"end": 483,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 14,
+											"column": 8,
+											"character": 468
+										},
+										"end": {
+											"line": 14,
+											"column": 12,
+											"character": 472
+										}
+									},
+									"value": [
+										{
+											"start": 474,
+											"end": 482,
+											"type": "Text",
+											"raw": "checkbox",
+											"data": "checkbox"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 484,
+									"end": 550,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 14,
+											"column": 24,
+											"character": 484
+										},
+										"end": {
+											"line": 14,
+											"column": 28,
+											"character": 488
+										}
+									},
+									"value": [
+										{
+											"start": 490,
+											"end": 549,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 553,
+							"end": 560,
+							"raw": " text1\n",
+							"data": " text1\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 568,
+				"end": 570,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 570,
+				"end": 588,
+				"data": " 101 wraps "
+			},
+			{
+				"type": "Text",
+				"start": 588,
+				"end": 589,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 589,
+				"end": 707,
+				"name": "label",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 590
+					},
+					"end": {
+						"line": 18,
+						"column": 6,
+						"character": 595
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 596,
+							"end": 598,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 598,
+							"end": 691,
+							"name": "input",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 2,
+									"character": 599
+								},
+								"end": {
+									"line": 19,
+									"column": 7,
+									"character": 604
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 605,
+									"end": 620,
+									"name": "type",
+									"name_loc": {
+										"start": {
+											"line": 19,
+											"column": 8,
+											"character": 605
+										},
+										"end": {
+											"line": 19,
+											"column": 12,
+											"character": 609
+										}
+									},
+									"value": [
+										{
+											"start": 611,
+											"end": 619,
+											"type": "Text",
+											"raw": "checkbox",
+											"data": "checkbox"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 621,
+									"end": 688,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 19,
+											"column": 24,
+											"character": 621
+										},
+										"end": {
+											"line": 19,
+											"column": 28,
+											"character": 625
+										}
+									},
+									"value": [
+										{
+											"start": 627,
+											"end": 687,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 691,
+							"end": 699,
+							"raw": "\n\ttext1\n",
+							"data": "\n\ttext1\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 707,
+				"end": 709,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 709,
+				"end": 809,
+				"data": " the tag alone overflows: its attributes break, and the word stays hugged to the closing tag "
+			},
+			{
+				"type": "Text",
+				"start": 809,
+				"end": 810,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 810,
+				"end": 933,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 24,
+						"column": 1,
+						"character": 811
+					},
+					"end": {
+						"line": 24,
+						"column": 2,
+						"character": 812
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 813,
+							"end": 815,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 815,
+							"end": 922,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 25,
+									"column": 2,
+									"character": 816
+								},
+								"end": {
+									"line": 25,
+									"column": 6,
+									"character": 820
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 823,
+									"end": 918,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 26,
+											"column": 2,
+											"character": 823
+										},
+										"end": {
+											"line": 26,
+											"column": 6,
+											"character": 827
+										}
+									},
+									"value": [
+										{
+											"start": 829,
+											"end": 917,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 922,
+							"end": 929,
+							"raw": " text1\n",
+							"data": " text1\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

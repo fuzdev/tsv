@@ -1,13 +1,13 @@
 <!-- 100 chars - fits, stays inline -->
 <div>
-	<small>{a} {bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb} text</small>
+	<small>{a} {bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb} text1 text2</small>
 </div>
 
 <!-- 101 chars - overflows; block-style, and the content run packs as one fill -->
 <div>
 	<small>
 		{a}
-		{bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb} text
+		{bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb} text1 text2
 	</small>
 </div>
 
@@ -15,7 +15,7 @@
 <div>
 	<small>
 		<Comp />
-		{ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc}text
+		{ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc}text1 text2
 	</small>
 </div>
 
@@ -24,6 +24,6 @@
 <div>
 	<small>
 		{a}
-		{b} text
+		{b} text1 text2
 	</small>
 </div>

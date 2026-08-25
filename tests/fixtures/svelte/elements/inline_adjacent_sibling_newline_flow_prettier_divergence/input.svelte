@@ -11,15 +11,15 @@
 	so the authored newlines are the author's only structure.
 -->
 <p>
-	text1 <span>inline1</span> <span>inline2</span> text2
+	text1 text2 <span>inline1</span> <span>inline2</span> text3
 </p>
 <p>
-	text1 {expr1} {expr2} text2
+	text1 text2 {expr1} {expr2} text3
 </p>
 
 <!-- control: multiline STRUCTURALLY (a block child), not by the run's own newlines -->
 <div>
-	text1 <span>inline1</span> <span>inline2</span> text2
+	text1 text2 <span>inline1</span> <span>inline2</span> text3
 	<div>block1</div>
 </div>
 

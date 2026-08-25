@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1784,
+	"end": 1827,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 997,
-				"end": 1038,
+				"end": 1044,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -44,25 +44,25 @@
 						{
 							"type": "Text",
 							"start": 1000,
-							"end": 1008,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"end": 1014,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "Component",
-							"start": 1008,
-							"end": 1017,
+							"start": 1014,
+							"end": 1023,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 15,
-									"column": 8,
-									"character": 1009
+									"column": 14,
+									"character": 1015
 								},
 								"end": {
 									"line": 15,
-									"column": 13,
-									"character": 1014
+									"column": 19,
+									"character": 1020
 								}
 							},
 							"attributes": [],
@@ -73,26 +73,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1017,
-							"end": 1018,
+							"start": 1023,
+							"end": 1024,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "Component",
-							"start": 1018,
-							"end": 1027,
+							"start": 1024,
+							"end": 1033,
 							"name": "Comp2",
 							"name_loc": {
 								"start": {
 									"line": 15,
-									"column": 18,
-									"character": 1019
+									"column": 24,
+									"character": 1025
 								},
 								"end": {
 									"line": 15,
-									"column": 23,
-									"character": 1024
+									"column": 29,
+									"character": 1030
 								}
 							},
 							"attributes": [],
@@ -103,36 +103,36 @@
 						},
 						{
 							"type": "Text",
-							"start": 1027,
-							"end": 1034,
-							"raw": " text2\n",
-							"data": " text2\n"
+							"start": 1033,
+							"end": 1040,
+							"raw": " text3\n",
+							"data": " text3\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 1038,
-				"end": 1039,
+				"start": 1044,
+				"end": 1045,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1039,
-				"end": 1102,
+				"start": 1045,
+				"end": 1114,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 17,
 						"column": 1,
-						"character": 1040
+						"character": 1046
 					},
 					"end": {
 						"line": 17,
 						"column": 2,
-						"character": 1041
+						"character": 1047
 					}
 				},
 				"attributes": [],
@@ -141,26 +141,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1042,
-							"end": 1050,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"start": 1048,
+							"end": 1062,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 1050,
-							"end": 1070,
+							"start": 1062,
+							"end": 1082,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 18,
-									"column": 8,
-									"character": 1051
+									"column": 14,
+									"character": 1063
 								},
 								"end": {
 									"line": 18,
-									"column": 12,
-									"character": 1055
+									"column": 18,
+									"character": 1067
 								}
 							},
 							"attributes": [],
@@ -169,8 +169,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1056,
-										"end": 1063,
+										"start": 1068,
+										"end": 1075,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -179,26 +179,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1070,
-							"end": 1071,
+							"start": 1082,
+							"end": 1083,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "RegularElement",
-							"start": 1071,
-							"end": 1091,
+							"start": 1083,
+							"end": 1103,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 18,
-									"column": 29,
-									"character": 1072
+									"column": 35,
+									"character": 1084
 								},
 								"end": {
 									"line": 18,
-									"column": 33,
-									"character": 1076
+									"column": 39,
+									"character": 1088
 								}
 							},
 							"attributes": [],
@@ -207,8 +207,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1077,
-										"end": 1084,
+										"start": 1089,
+										"end": 1096,
 										"raw": "inline2",
 										"data": "inline2"
 									}
@@ -217,49 +217,49 @@
 						},
 						{
 							"type": "Text",
-							"start": 1091,
-							"end": 1098,
-							"raw": " text2\n",
-							"data": " text2\n"
+							"start": 1103,
+							"end": 1110,
+							"raw": " text3\n",
+							"data": " text3\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 1102,
-				"end": 1104,
+				"start": 1114,
+				"end": 1116,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1104,
-				"end": 1189,
+				"start": 1116,
+				"end": 1201,
 				"data": " kind order: an element before a component, and a component before an element "
 			},
 			{
 				"type": "Text",
-				"start": 1189,
-				"end": 1190,
+				"start": 1201,
+				"end": 1202,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1190,
-				"end": 1241,
+				"start": 1202,
+				"end": 1259,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 22,
 						"column": 1,
-						"character": 1191
+						"character": 1203
 					},
 					"end": {
 						"line": 22,
 						"column": 2,
-						"character": 1192
+						"character": 1204
 					}
 				},
 				"attributes": [],
@@ -268,26 +268,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1193,
-							"end": 1201,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"start": 1205,
+							"end": 1219,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 1201,
-							"end": 1221,
+							"start": 1219,
+							"end": 1239,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 23,
-									"column": 8,
-									"character": 1202
+									"column": 14,
+									"character": 1220
 								},
 								"end": {
 									"line": 23,
-									"column": 12,
-									"character": 1206
+									"column": 18,
+									"character": 1224
 								}
 							},
 							"attributes": [],
@@ -296,8 +296,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1207,
-										"end": 1214,
+										"start": 1225,
+										"end": 1232,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -306,26 +306,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1221,
-							"end": 1222,
+							"start": 1239,
+							"end": 1240,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "Component",
-							"start": 1222,
-							"end": 1230,
+							"start": 1240,
+							"end": 1248,
 							"name": "Comp",
 							"name_loc": {
 								"start": {
 									"line": 23,
-									"column": 29,
-									"character": 1223
+									"column": 35,
+									"character": 1241
 								},
 								"end": {
 									"line": 23,
-									"column": 33,
-									"character": 1227
+									"column": 39,
+									"character": 1245
 								}
 							},
 							"attributes": [],
@@ -336,36 +336,36 @@
 						},
 						{
 							"type": "Text",
-							"start": 1230,
-							"end": 1237,
-							"raw": " text2\n",
-							"data": " text2\n"
+							"start": 1248,
+							"end": 1255,
+							"raw": " text3\n",
+							"data": " text3\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 1241,
-				"end": 1242,
+				"start": 1259,
+				"end": 1260,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1242,
-				"end": 1293,
+				"start": 1260,
+				"end": 1317,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 25,
 						"column": 1,
-						"character": 1243
+						"character": 1261
 					},
 					"end": {
 						"line": 25,
 						"column": 2,
-						"character": 1244
+						"character": 1262
 					}
 				},
 				"attributes": [],
@@ -374,26 +374,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1245,
-							"end": 1253,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"start": 1263,
+							"end": 1277,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "Component",
-							"start": 1253,
-							"end": 1261,
+							"start": 1277,
+							"end": 1285,
 							"name": "Comp",
 							"name_loc": {
 								"start": {
 									"line": 26,
-									"column": 8,
-									"character": 1254
+									"column": 14,
+									"character": 1278
 								},
 								"end": {
 									"line": 26,
-									"column": 12,
-									"character": 1258
+									"column": 18,
+									"character": 1282
 								}
 							},
 							"attributes": [],
@@ -404,26 +404,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1261,
-							"end": 1262,
+							"start": 1285,
+							"end": 1286,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "RegularElement",
-							"start": 1262,
-							"end": 1282,
+							"start": 1286,
+							"end": 1306,
 							"name": "span",
 							"name_loc": {
 								"start": {
 									"line": 26,
-									"column": 17,
-									"character": 1263
+									"column": 23,
+									"character": 1287
 								},
 								"end": {
 									"line": 26,
-									"column": 21,
-									"character": 1267
+									"column": 27,
+									"character": 1291
 								}
 							},
 							"attributes": [],
@@ -432,8 +432,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1268,
-										"end": 1275,
+										"start": 1292,
+										"end": 1299,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -442,49 +442,49 @@
 						},
 						{
 							"type": "Text",
-							"start": 1282,
-							"end": 1289,
-							"raw": " text2\n",
-							"data": " text2\n"
+							"start": 1306,
+							"end": 1313,
+							"raw": " text3\n",
+							"data": " text3\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 1293,
-				"end": 1295,
+				"start": 1317,
+				"end": 1319,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1295,
-				"end": 1328,
+				"start": 1319,
+				"end": 1352,
 				"data": " components with children "
 			},
 			{
 				"type": "Text",
-				"start": 1328,
-				"end": 1329,
+				"start": 1352,
+				"end": 1353,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1329,
-				"end": 1396,
+				"start": 1353,
+				"end": 1426,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 30,
 						"column": 1,
-						"character": 1330
+						"character": 1354
 					},
 					"end": {
 						"line": 30,
 						"column": 2,
-						"character": 1331
+						"character": 1355
 					}
 				},
 				"attributes": [],
@@ -493,26 +493,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1332,
-							"end": 1340,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"start": 1356,
+							"end": 1370,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "Component",
-							"start": 1340,
-							"end": 1362,
+							"start": 1370,
+							"end": 1392,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 31,
-									"column": 8,
-									"character": 1341
+									"column": 14,
+									"character": 1371
 								},
 								"end": {
 									"line": 31,
-									"column": 13,
-									"character": 1346
+									"column": 19,
+									"character": 1376
 								}
 							},
 							"attributes": [],
@@ -521,8 +521,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1347,
-										"end": 1354,
+										"start": 1377,
+										"end": 1384,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -531,26 +531,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1362,
-							"end": 1363,
+							"start": 1392,
+							"end": 1393,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "Component",
-							"start": 1363,
-							"end": 1385,
+							"start": 1393,
+							"end": 1415,
 							"name": "Comp2",
 							"name_loc": {
 								"start": {
 									"line": 31,
-									"column": 31,
-									"character": 1364
+									"column": 37,
+									"character": 1394
 								},
 								"end": {
 									"line": 31,
-									"column": 36,
-									"character": 1369
+									"column": 42,
+									"character": 1399
 								}
 							},
 							"attributes": [],
@@ -559,8 +559,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1370,
-										"end": 1377,
+										"start": 1400,
+										"end": 1407,
 										"raw": "inline2",
 										"data": "inline2"
 									}
@@ -569,49 +569,49 @@
 						},
 						{
 							"type": "Text",
-							"start": 1385,
-							"end": 1392,
-							"raw": " text2\n",
-							"data": " text2\n"
+							"start": 1415,
+							"end": 1422,
+							"raw": " text3\n",
+							"data": " text3\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 1396,
-				"end": 1398,
+				"start": 1426,
+				"end": 1428,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1398,
-				"end": 1492,
+				"start": 1428,
+				"end": 1522,
 				"data": " prose only at the END of the run: every separator in the run flows, not just the last "
 			},
 			{
 				"type": "Text",
-				"start": 1492,
-				"end": 1493,
+				"start": 1522,
+				"end": 1523,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1493,
-				"end": 1537,
+				"start": 1523,
+				"end": 1574,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 35,
 						"column": 1,
-						"character": 1494
+						"character": 1524
 					},
 					"end": {
 						"line": 35,
 						"column": 2,
-						"character": 1495
+						"character": 1525
 					}
 				},
 				"attributes": [],
@@ -620,26 +620,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1496,
-							"end": 1498,
+							"start": 1526,
+							"end": 1528,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 1498,
-							"end": 1507,
+							"start": 1528,
+							"end": 1537,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 36,
 									"column": 2,
-									"character": 1499
+									"character": 1529
 								},
 								"end": {
 									"line": 36,
 									"column": 7,
-									"character": 1504
+									"character": 1534
 								}
 							},
 							"attributes": [],
@@ -650,26 +650,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1507,
-							"end": 1508,
+							"start": 1537,
+							"end": 1538,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "Component",
-							"start": 1508,
-							"end": 1517,
+							"start": 1538,
+							"end": 1547,
 							"name": "Comp2",
 							"name_loc": {
 								"start": {
 									"line": 36,
 									"column": 12,
-									"character": 1509
+									"character": 1539
 								},
 								"end": {
 									"line": 36,
 									"column": 17,
-									"character": 1514
+									"character": 1544
 								}
 							},
 							"attributes": [],
@@ -680,26 +680,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1517,
-							"end": 1518,
+							"start": 1547,
+							"end": 1548,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "Component",
-							"start": 1518,
-							"end": 1527,
+							"start": 1548,
+							"end": 1557,
 							"name": "Comp3",
 							"name_loc": {
 								"start": {
 									"line": 36,
 									"column": 22,
-									"character": 1519
+									"character": 1549
 								},
 								"end": {
 									"line": 36,
 									"column": 27,
-									"character": 1524
+									"character": 1554
 								}
 							},
 							"attributes": [],
@@ -710,49 +710,49 @@
 						},
 						{
 							"type": "Text",
-							"start": 1527,
-							"end": 1533,
-							"raw": " text\n",
-							"data": " text\n"
+							"start": 1557,
+							"end": 1570,
+							"raw": " text1 text2\n",
+							"data": " text1 text2\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 1537,
-				"end": 1539,
+				"start": 1574,
+				"end": 1576,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1539,
-				"end": 1626,
+				"start": 1576,
+				"end": 1663,
 				"data": " control: multiline STRUCTURALLY (a block child), not by the run's own newlines "
 			},
 			{
 				"type": "Text",
-				"start": 1626,
-				"end": 1627,
+				"start": 1663,
+				"end": 1664,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1627,
-				"end": 1691,
+				"start": 1664,
+				"end": 1734,
 				"name": "div",
 				"name_loc": {
 					"start": {
 						"line": 40,
 						"column": 1,
-						"character": 1628
+						"character": 1665
 					},
 					"end": {
 						"line": 40,
 						"column": 4,
-						"character": 1631
+						"character": 1668
 					}
 				},
 				"attributes": [],
@@ -761,26 +761,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1632,
-							"end": 1640,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"start": 1669,
+							"end": 1683,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "Component",
-							"start": 1640,
-							"end": 1649,
+							"start": 1683,
+							"end": 1692,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 41,
-									"column": 8,
-									"character": 1641
+									"column": 14,
+									"character": 1684
 								},
 								"end": {
 									"line": 41,
-									"column": 13,
-									"character": 1646
+									"column": 19,
+									"character": 1689
 								}
 							},
 							"attributes": [],
@@ -791,26 +791,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1649,
-							"end": 1650,
+							"start": 1692,
+							"end": 1693,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "Component",
-							"start": 1650,
-							"end": 1659,
+							"start": 1693,
+							"end": 1702,
 							"name": "Comp2",
 							"name_loc": {
 								"start": {
 									"line": 41,
-									"column": 18,
-									"character": 1651
+									"column": 24,
+									"character": 1694
 								},
 								"end": {
 									"line": 41,
-									"column": 23,
-									"character": 1656
+									"column": 29,
+									"character": 1699
 								}
 							},
 							"attributes": [],
@@ -821,26 +821,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1659,
-							"end": 1667,
-							"raw": " text2\n\t",
-							"data": " text2\n\t"
+							"start": 1702,
+							"end": 1710,
+							"raw": " text3\n\t",
+							"data": " text3\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 1667,
-							"end": 1684,
+							"start": 1710,
+							"end": 1727,
 							"name": "div",
 							"name_loc": {
 								"start": {
 									"line": 42,
 									"column": 2,
-									"character": 1668
+									"character": 1711
 								},
 								"end": {
 									"line": 42,
 									"column": 5,
-									"character": 1671
+									"character": 1714
 								}
 							},
 							"attributes": [],
@@ -849,8 +849,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1672,
-										"end": 1678,
+										"start": 1715,
+										"end": 1721,
 										"raw": "block1",
 										"data": "block1"
 									}
@@ -859,8 +859,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1684,
-							"end": 1685,
+							"start": 1727,
+							"end": 1728,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -869,39 +869,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 1691,
-				"end": 1693,
+				"start": 1734,
+				"end": 1736,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1693,
-				"end": 1752,
+				"start": 1736,
+				"end": 1795,
 				"data": " control: a prose-free run keeps its authored lines "
 			},
 			{
 				"type": "Text",
-				"start": 1752,
-				"end": 1753,
+				"start": 1795,
+				"end": 1796,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1753,
-				"end": 1783,
+				"start": 1796,
+				"end": 1826,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 46,
 						"column": 1,
-						"character": 1754
+						"character": 1797
 					},
 					"end": {
 						"line": 46,
 						"column": 2,
-						"character": 1755
+						"character": 1798
 					}
 				},
 				"attributes": [],
@@ -910,26 +910,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1756,
-							"end": 1758,
+							"start": 1799,
+							"end": 1801,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 1758,
-							"end": 1767,
+							"start": 1801,
+							"end": 1810,
 							"name": "Comp1",
 							"name_loc": {
 								"start": {
 									"line": 47,
 									"column": 2,
-									"character": 1759
+									"character": 1802
 								},
 								"end": {
 									"line": 47,
 									"column": 7,
-									"character": 1764
+									"character": 1807
 								}
 							},
 							"attributes": [],
@@ -940,26 +940,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 1767,
-							"end": 1769,
+							"start": 1810,
+							"end": 1812,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 1769,
-							"end": 1778,
+							"start": 1812,
+							"end": 1821,
 							"name": "Comp2",
 							"name_loc": {
 								"start": {
 									"line": 48,
 									"column": 2,
-									"character": 1770
+									"character": 1813
 								},
 								"end": {
 									"line": 48,
 									"column": 7,
-									"character": 1775
+									"character": 1818
 								}
 							},
 							"attributes": [],
@@ -970,8 +970,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1778,
-							"end": 1779,
+							"start": 1821,
+							"end": 1822,
 							"raw": "\n",
 							"data": "\n"
 						}

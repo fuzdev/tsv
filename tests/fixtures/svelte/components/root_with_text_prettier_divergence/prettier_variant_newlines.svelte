@@ -1,3 +1,3 @@
 <Comp1 />
-text
+text1 text2
 <Comp2 />

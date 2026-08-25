@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1323,
+	"end": 1371,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -36,7 +36,7 @@
 			{
 				"type": "RegularElement",
 				"start": 647,
-				"end": 681,
+				"end": 693,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -57,61 +57,61 @@
 						{
 							"type": "Text",
 							"start": 650,
-							"end": 659,
-							"raw": "\n\ttext1\n\t",
-							"data": "\n\ttext1\n\t"
+							"end": 665,
+							"raw": "\n\ttext1 text2\n\t",
+							"data": "\n\ttext1 text2\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 659,
-							"end": 669,
+							"start": 665,
+							"end": 675,
 							"data": " c "
 						},
 						{
 							"type": "Text",
-							"start": 669,
-							"end": 677,
-							"raw": "\n\ttext2\n",
-							"data": "\n\ttext2\n"
+							"start": 675,
+							"end": 689,
+							"raw": "\n\ttext3 text4\n",
+							"data": "\n\ttext3 text4\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 681,
-				"end": 683,
+				"start": 693,
+				"end": 695,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 683,
-				"end": 769,
+				"start": 695,
+				"end": 781,
 				"data": "\n\tcontrol: newline AFTER only — the following run stays off the comment's line\n"
 			},
 			{
 				"type": "Text",
-				"start": 769,
-				"end": 770,
+				"start": 781,
+				"end": 782,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 770,
-				"end": 803,
+				"start": 782,
+				"end": 827,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 23,
 						"column": 1,
-						"character": 771
+						"character": 783
 					},
 					"end": {
 						"line": 23,
 						"column": 2,
-						"character": 772
+						"character": 784
 					}
 				},
 				"attributes": [],
@@ -120,62 +120,62 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 773,
-							"end": 781,
-							"raw": "\n\ttext1 ",
-							"data": "\n\ttext1 "
+							"start": 785,
+							"end": 799,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
 						},
 						{
 							"type": "Comment",
-							"start": 781,
-							"end": 791,
+							"start": 799,
+							"end": 809,
 							"data": " c "
 						},
 						{
 							"type": "Text",
-							"start": 791,
-							"end": 799,
-							"raw": "\n\ttext2\n",
-							"data": "\n\ttext2\n"
+							"start": 809,
+							"end": 823,
+							"raw": "\n\ttext3 text4\n",
+							"data": "\n\ttext3 text4\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 803,
-				"end": 805,
+				"start": 827,
+				"end": 829,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 805,
-				"end": 892,
+				"start": 829,
+				"end": 916,
 				"data": "\n\tcontrol: newline BEFORE only — the comment stays off the preceding run's line\n"
 			},
 			{
 				"type": "Text",
-				"start": 892,
-				"end": 893,
+				"start": 916,
+				"end": 917,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 893,
-				"end": 926,
+				"start": 917,
+				"end": 962,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 31,
 						"column": 1,
-						"character": 894
+						"character": 918
 					},
 					"end": {
 						"line": 31,
 						"column": 2,
-						"character": 895
+						"character": 919
 					}
 				},
 				"attributes": [],
@@ -184,62 +184,62 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 896,
-							"end": 905,
-							"raw": "\n\ttext1\n\t",
-							"data": "\n\ttext1\n\t"
+							"start": 920,
+							"end": 935,
+							"raw": "\n\ttext1 text2\n\t",
+							"data": "\n\ttext1 text2\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 905,
-							"end": 915,
+							"start": 935,
+							"end": 945,
 							"data": " c "
 						},
 						{
 							"type": "Text",
-							"start": 915,
-							"end": 922,
-							"raw": " text2\n",
-							"data": " text2\n"
+							"start": 945,
+							"end": 958,
+							"raw": " text3 text4\n",
+							"data": " text3 text4\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 926,
-				"end": 928,
+				"start": 962,
+				"end": 964,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 928,
-				"end": 1292,
+				"start": 964,
+				"end": 1328,
 				"data": "\n\tcontrol: NEITHER side — the rule HOLDS what was authored, it does not FORCE a break around a\n\tcomment, so the hugged authoring stays hugged. This is the null control of the pair above,\n\tvarying the same dimension (is there a newline at this boundary?): without it, an\n\timplementation that always broke both sides of a comment would pass every case above.\n"
 			},
 			{
 				"type": "Text",
-				"start": 1292,
-				"end": 1293,
+				"start": 1328,
+				"end": 1329,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1293,
-				"end": 1322,
+				"start": 1329,
+				"end": 1370,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 42,
 						"column": 1,
-						"character": 1294
+						"character": 1330
 					},
 					"end": {
 						"line": 42,
 						"column": 2,
-						"character": 1295
+						"character": 1331
 					}
 				},
 				"attributes": [],
@@ -248,23 +248,23 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1296,
-							"end": 1302,
-							"raw": "text1 ",
-							"data": "text1 "
+							"start": 1332,
+							"end": 1344,
+							"raw": "text1 text2 ",
+							"data": "text1 text2 "
 						},
 						{
 							"type": "Comment",
-							"start": 1302,
-							"end": 1312,
+							"start": 1344,
+							"end": 1354,
 							"data": " c "
 						},
 						{
 							"type": "Text",
-							"start": 1312,
-							"end": 1318,
-							"raw": " text2",
-							"data": " text2"
+							"start": 1354,
+							"end": 1366,
+							"raw": " text3 text4",
+							"data": " text3 text4"
 						}
 					]
 				}

@@ -28,8 +28,15 @@ separated by a space or a newline, so tsv converges them; prettier holds a stabl
 ## Cases
 
 The one shape that diverges, and nothing else: two escaped-bracket tags on adjacent lines, in a
-run whose glued `div` / `code` words are the prose the rule needs. The comment is load-bearing —
-it bounds the run above, so the pair is the whole flowing run.
+run whose `text1 text2` content is the prose the rule needs. The glued `div` / `code` words are
+one word each, and a pair with nothing else in its run is a list of labels whose authored newline
+both formatters hold — the flow rule's prose gate,
+[inline_sibling_newline_label_hold](../../elements/inline_sibling_newline_label_hold_prettier_divergence/);
+its space spelling is
+[inline_sibling_newline_label_hold_tag_pair_space](../../elements/inline_sibling_newline_label_hold_tag_pair_space_prettier_divergence/),
+where tsv keeps the pair packed and prettier splits it — so the two-word content is what makes
+the newline-authored run flow here. The comment is load-bearing — it bounds the run above, so the
+pair and its content are the whole flowing run.
 
 The rest of the escaped-angle-bracket matrix lives in the sibling
 [angle_escaped](../angle_escaped/), where both formatters agree: those cases either have no

@@ -15,7 +15,7 @@ the boundary's layout follows the unit's rendered layout, not the spelling alone
   and not repeated here).
 - After a unit that renders **inline**, the same newline is a spelling difference only and
   reflows with the fill — the fitting control, and the held sibling's own text tail
-  (`<b>inline2</b> text2`): `prettier_variant_fitting_newline` pins those newline authorings,
+  (`<b>inline2</b> text2 text3`): `prettier_variant_fitting_newline` pins those newline authorings,
   which prettier keeps stable and tsv packs. After a **breaking tag** the sibling hugs the
   tag's closing brace (`)} <b>inline6</b>`): the tag's break lands inside its own expression,
   so the tag-pile reading does not arise, and prettier's own-line authoring of it is in the

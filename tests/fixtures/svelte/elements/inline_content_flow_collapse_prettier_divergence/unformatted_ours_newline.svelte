@@ -23,26 +23,26 @@
 </div>
 
 <div>
-	<span><Comp prop="value" /> text1
+	<span><Comp prop="value" /> text1 text2
 		<Comp prop="value" /></span>
 </div>
 
 <div>
-	<span>text1
+	<span>text1 text2
 		<code>a</code></span>
 </div>
 
 <div>
-	<span>{a} text1
+	<span>{a} text1 text2
 		{b}</span>
 </div>
 
 <div>
 	<span><code>a</code>
-		text1</span>
+		text1 text2</span>
 </div>
 
 <div>
 	<span><code>a</code>
-		<code>b</code> text1</span>
+		<code>b</code> text1 text2</span>
 </div>

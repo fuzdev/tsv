@@ -16,31 +16,31 @@
 
 <!-- inline element -->
 <button>
-	<Comp1 /> text1 {expr1}
+	<Comp1 /> text1 text2 {expr1}
 </button>
 
 <label>
-	<Comp1 /> text1 {expr1}
+	<Comp1 /> text1 text2 {expr1}
 </label>
 
 <!-- block element: the same run, the same answer -->
 <p>
-	<Comp1 /> text1 {expr1}
+	<Comp1 /> text1 text2 {expr1}
 </p>
 
 <!-- component: the same -->
 <Comp2>
-	<Comp1 /> text1 {expr1}
+	<Comp1 /> text1 text2 {expr1}
 </Comp2>
 
 <!-- special element, inline-classified: the `svelte:*` projection answers alike -->
 <svelte:element this={tag}>
-	<Comp1 /> text1 {expr1}
+	<Comp1 /> text1 text2 {expr1}
 </svelte:element>
 
 <!-- special element, block-classified: the same, on the other boundary arity -->
 <svelte:head>
-	<Comp1 /> text1 {expr1}
+	<Comp1 /> text1 text2 {expr1}
 </svelte:head>
 
 <!-- control: a prose-free run has no fill, so its authored lines are structure and stay -->

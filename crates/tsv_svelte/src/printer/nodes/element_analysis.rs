@@ -179,9 +179,10 @@ impl<'a> Printer<'a> {
     /// states the rule as "the presence of a `fill` to reflow into, **not the shape of the
     /// separator node**". A fill needs two things, and both are load-bearing:
     ///
-    /// - **prose to pack** — a content text, asked through the flow rule's own
-    ///   [`Printer::is_run_prose`] so the two rules cannot drift (an NBSP-only node is a
-    ///   separator wearing content's clothing and is not prose);
+    /// - **prose to pack** — a phrase, not a word: the run's [`Printer::prose_words`] maximum
+    ///   graded by [`Printer::run_is_prose`], the flow rule's own count, so the two rules cannot
+    ///   drift (an NBSP-only node is a separator wearing content's clothing and counts nothing;
+    ///   a one-word run is a label whose lines are structure);
     /// - **a whitespace seam to reflow at** — glued content (`<a>{expr}text</a>`) is a single
     ///   unbreakable unit. With nothing to reflow, the boundary is the only signal the author
     ///   has, so it keeps its authored lines — `elements/inline_multiline_nontext`, where
@@ -213,7 +214,10 @@ impl<'a> Printer<'a> {
     /// text below it onto one line, and deleted an authored blank line — two content-preservation
     /// breaks, not layout choices. The blank-line arm is asked of content texts too, since
     /// `breaks_inline_run` sees a blank only in a whitespace-ONLY node while `modern⏎⏎<Checkbox/>`
-    /// carries it in a content text's trailing run.
+    /// carries it in a content text's trailing run. The flow rule's own scan
+    /// (`Printer::scan_inline_run`) ends a run at that EDGE blank too; where the two readers part
+    /// is a blank INTERIOR to a text node (`text1⏎⏎text2`), which this arm sees (the whole text
+    /// is scanned) and a run scan cannot, a run being a partition of nodes.
     ///
     /// Because both conjuncts are about the *run*, the answer is independent of the separator's
     /// spelling and of how many siblings the run holds. That is the point: without it a prose
@@ -258,7 +262,8 @@ impl<'a> Printer<'a> {
         // A pair is reflowable when the boundary between them is NOT glued — the whitespace lives on
         // one of the two texts' facing edges, so there is a break point to reflow at. Same predicate
         // the fragment path's glue decisions ask, negated (`Printer::text_glued_before` / `_after`).
-        run.iter().any(|n| self.is_run_prose(n)) && run.windows(2).any(|w| {
+        Printer::run_is_prose(run.iter().map(|n| self.prose_words(n)).max().unwrap_or(0))
+            && run.windows(2).any(|w| {
             matches!(&w[0], FragmentNode::Text(t) if !Self::text_glued_after(t.raw(source)))
                 || matches!(&w[1], FragmentNode::Text(t) if !Self::text_glued_before(t.raw(source)))
         })

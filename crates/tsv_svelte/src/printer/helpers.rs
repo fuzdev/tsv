@@ -1,7 +1,7 @@
 //! Fragment analysis and child printing helpers
 
 use super::Printer;
-use crate::ast::internal::{Fragment, FragmentNode, is_collapsible_ws_char};
+use crate::ast::internal::{Fragment, FragmentNode, text_edge_ws};
 
 impl<'a> Printer<'a> {
     /// Check if a fragment's content is inline (huggable at both ends).
@@ -53,12 +53,6 @@ impl<'a> Printer<'a> {
         let Some(FragmentNode::Text(text)) = node else {
             return false;
         };
-        let raw = text.raw(self.source);
-        let run = if is_leading {
-            &raw[..raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len()]
-        } else {
-            &raw[raw.trim_end_matches(is_collapsible_ws_char).len()..]
-        };
-        run.contains('\n')
+        text_edge_ws(text.raw(self.source), is_leading).contains('\n')
     }
 }

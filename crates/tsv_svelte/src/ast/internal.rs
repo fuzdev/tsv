@@ -1536,6 +1536,19 @@ pub fn split_collapsible_ws(s: &str) -> impl Iterator<Item = &str> {
     s.split(is_collapsible_ws_char).filter(|w| !w.is_empty())
 }
 
+/// The `leading` (else trailing) edge whitespace run of a text node's `raw` — its
+/// [`is_collapsible_ws_char`] prefix (else suffix), empty when that edge is content. The one
+/// slice every edge question reads (a newline count, a blank-line presence, a boundary's
+/// authoring), so the edge is delimited by the same class the fill collapses.
+#[inline]
+pub fn text_edge_ws(raw: &str, leading: bool) -> &str {
+    if leading {
+        &raw[..raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len()]
+    } else {
+        &raw[raw.trim_end_matches(is_collapsible_ws_char).len()..]
+    }
+}
+
 /// Svelte Text node - raw text content
 ///
 /// Represents static text in the template or attribute values.

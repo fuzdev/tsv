@@ -22,7 +22,7 @@ and both are already sanctioned:
 The last four cases pin the interior side of the second rule's predicate. What lets those
 newlines reflow rather than expand the element is that the content is a **fill to reflow
 into** — asked of the RUN, never of the separator's shape or
-the sibling count. A separator carrying words (`text1`) is as much a fill as a space-only one,
+the sibling count. A separator carrying words (`text1 text2`) is as much a fill as a space-only one,
 and a lone element beside prose is one too, so all of them must reach the same form the
 space-separated twin already reaches. Otherwise one document has two layouts depending on
 whether the author happened to put words between the siblings.
