@@ -726,9 +726,17 @@ impl<'a> Printer<'a> {
     /// split, since breaking there would inject a rendered space.) So an inline sibling isolated
     /// by authored newlines flows back onto the content line, converging those authorings.
     ///
-    /// Four neighbours are excluded, none of them a mere spelling difference:
+    /// Five neighbours are excluded, none of them a mere spelling difference:
     /// - a **comment**, whose authored position is authorship — folding one into a text fill
     ///   would relocate it across a semantic boundary (§Comment Position Philosophy);
+    /// - a **`<br>`**, which IS a rendered line break, so the source newline beside it mirrors
+    ///   the render rather than spelling a space — the one licence this rule runs on. It is
+    ///   line-owning exactly as a comment is: it BOUNDS the run without sterilizing it (the runs
+    ///   on either side still flow), and its space spelling stays as authored (`text <br /> text`
+    ///   is never forced open). Prettier holds it too, so this is parity
+    ///   (`elements/void_br_newline`; the bounding control is in
+    ///   `inline_sibling_newline_flow_prettier_divergence`). The other void elements (`<img>`,
+    ///   `<input>`, …) render inline and flow like any inline element;
     /// - a **block element**, which owns its own line via `handle_block_child`;
     /// - a **blank line** (2+ newlines), a Tier-2 authoring signal, screened by the callers;
     /// - a **control-flow block** (`{#if}` / `{#each}` / `{#key}` / `{#await}` / `{#snippet}`),
@@ -766,6 +774,10 @@ impl<'a> Printer<'a> {
             FragmentNode::ExpressionTag(_)
             | FragmentNode::RenderTag(_)
             | FragmentNode::HtmlTag(_) => true,
+            // A `<br>` is a rendered line break — line-owning, like a comment (the doc comment's
+            // second exclusion). Keyed on the name alone: `TagFacts::is_void` covers every void
+            // element, and the others render inline.
+            FragmentNode::Element(el) if el.name(self.source) == "br" => false,
             // An inline element/component flows; a block one owns its line.
             FragmentNode::Element(_) | FragmentNode::SpecialElement(_) => {
                 !self.is_block_element_node(node)
