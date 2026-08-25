@@ -831,6 +831,19 @@ deno task fixtures:update
 
 When `output_prettier.*` exists, prettier baseline validation (F3) is skipped — F2 checks the file matches prettier instead.
 
+**`output_prettier.*` is a claim about prettier only.** F2 pins prettier's first pass on the
+input and F4/F4b its chain to a fixed point; nothing grades what *tsv* does with that form.
+tsv's answer is one of three classes — it **holds** prettier's form, **normalizes** it back to
+input, or rewrites it to a **third** stable form — and only two are expressible today, each by a
+byte-copy of `output_prettier.*` under a variant name: a `variant_*` copy claims *holds* (N9), a
+`divergent_variant_*` copy claims *third form* (N11). *Normalizes* has no marker: a
+`prettier_variant_*` copy is refused as redundant (`RedundantPrettierVariantMatchesOutputPrettier`),
+so that claim lives in README prose only. A copy also drifts silently — `fixtures:update:formatted`
+regenerates `output_prettier.*` but never a copy of it — so prefer stating the class in the README
+and reading it live with `deno task fixtures:audit -v <pattern>`, whose `output_prettier.*` row
+(`ours -> self` / `ours -> input` / a novel form) is the grade. A validator-computed grade of that
+row is the intended replacement for the copies.
+
 ---
 
 ### Svelte Parser Divergence

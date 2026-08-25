@@ -613,6 +613,11 @@ impl<'a> Printer<'a> {
         // of `break_before_wide_flow` below (never folded into `next_is_flow_or_tag`, whose
         // other readers key the leading-side arms and the inline-sibling wrap on the flow set).
         let next_is_rendering_block = next_node.is_some_and(is_control_flow_block);
+        // Whether the next sibling is a BLOCK element. Its own `handle_block_child` supplies the
+        // break in front of it, so a trailing space before it is spent on that break at EVERY
+        // position of this text — the deferred-trim arm below — never kept as the fill's own
+        // `line`. See that arm.
+        let next_is_block_el = next_node.is_some_and(|n| self.is_block_element_node(n));
         // Whether the next sibling is a flowing inline element OR component (the
         // Fill-idempotency boundary). Text before such a node ends its fill with a trailing
         // `line` so the boundary breaks per width inside the fill (keeping the run idempotent),
@@ -994,7 +999,23 @@ impl<'a> Printer<'a> {
             trim_right = true;
             trailing_hardlines = if trailing_ws_newlines >= 2 { 2 } else { 1 };
         } else if has_trailing_ws && !is_last && position.next_is_inline() {
-            if is_first || next_is_flow_or_tag {
+            if next_is_block_el {
+                // BLOCK element follower: a block sibling takes its own line, so the space is
+                // spent on the break its `handle_block_child` emits (`break_before` reads the
+                // deferred trim), at every position of this text alike. A FIRST child used to
+                // fall through to the `trailing_line` arm below instead, keeping the block hugged
+                // on the text line (`text1 text2 <div>block1</div>`) where the same text one
+                // sibling later broke before it — prettier-plugin-svelte's `handleTextChild`
+                // returns early for its first child before its block-follower trim, and tsv had
+                // mirrored the artifact. Of that boundary's three spellings only the first-child
+                // space hugged (the glued and newline spellings already break), so a spelling
+                // and a position were selecting the layout; and a block that renders multiline
+                // dangled its head on the text line, the one unit kind without the whole-unit
+                // drop. Cataloged: conformance_prettier_svelte.md §Svelte: Inline content
+                // block-style, `elements/block_after_spaced_text_prettier_divergence`.
+                trim_right = true;
+                *handle_whitespace_of_prev_text = true;
+            } else if is_first || next_is_flow_or_tag {
                 // One boundary, one answer: a first child, and a middle child before a tag or
                 // before a flowing inline element / component, all end the fill with a trailing
                 // `line`, so the boundary breaks per width INSIDE the fill — which is what keeps
@@ -1020,11 +1041,11 @@ impl<'a> Printer<'a> {
                 trailing_line = true;
                 // A first child's leading boundary is the parent's, already trimmed.
                 trim_right = !is_first;
-            } else if !is_first {
-                // Remaining inline callers: the follower is `is_inline_content` but neither
-                // `is_inline_el_or_comp` nor a tag, which leaves exactly a BLOCK element. Wrap it
-                // with `group([line, element])`. (Not a comment — see the arm below, which is
-                // where a comment follower actually lands.)
+            } else {
+                // Remaining inline callers: the follower is `is_inline_content` but neither a
+                // block element, `is_inline_el_or_comp`, nor a tag. Wrap it with
+                // `group([line, element])`. (Not a comment — see the arm below, which is where a
+                // comment follower actually lands.)
                 trim_right = true;
                 *handle_whitespace_of_prev_text = true;
             }
