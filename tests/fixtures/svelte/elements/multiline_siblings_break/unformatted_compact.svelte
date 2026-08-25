@@ -1,7 +1,8 @@
 <Foo/>
 <Bar/>
 
-{a}   {b}
+{a}
+{b}
 
 <section>
 <Baz/>

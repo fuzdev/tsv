@@ -1,0 +1,491 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1106,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 451,
+				"data": "\n\tA spaced tag pair where one expression must break. A tag whose expression breaks expands\n\tINSIDE its own braces and leaves its adjacencies untouched, so a space-spelled tag after it\n\thugs the closing `)}` per width, exactly as an element or a word does after a broken tag;\n\tthe newline spelling of that boundary is held. A tag whose expression cannot fit flat after\n\tits predecessor travels to a fresh line whole and breaks internally there.\n"
+			},
+			{
+				"type": "Text",
+				"start": 451,
+				"end": 453,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 453,
+				"end": 527,
+				"data": " the first expression breaks: the second tag hugs its closing line "
+			},
+			{
+				"type": "Text",
+				"start": 527,
+				"end": 528,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 528,
+				"end": 664,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 529
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 530
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 531,
+							"end": 533,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 533,
+							"end": 652,
+							"expression": {
+								"type": "CallExpression",
+								"start": 534,
+								"end": 651,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 534,
+									"end": 536,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 4
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 540,
+										"end": 591,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 53
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 595,
+										"end": 648,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 55
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								],
+								"optional": false
+							}
+						},
+						{
+							"type": "Text",
+							"start": 652,
+							"end": 653,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 653,
+							"end": 659,
+							"expression": {
+								"type": "Identifier",
+								"start": 654,
+								"end": 658,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 5
+									},
+									"end": {
+										"line": 14,
+										"column": 9
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 659,
+							"end": 660,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 664,
+				"end": 666,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 666,
+				"end": 733,
+				"data": " control: the newline spelling of the same boundary is held "
+			},
+			{
+				"type": "Text",
+				"start": 733,
+				"end": 734,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 734,
+				"end": 871,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 735
+					},
+					"end": {
+						"line": 18,
+						"column": 2,
+						"character": 736
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 737,
+							"end": 739,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 739,
+							"end": 858,
+							"expression": {
+								"type": "CallExpression",
+								"start": 740,
+								"end": 857,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 740,
+									"end": 742,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 4
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 746,
+										"end": 797,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 53
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 801,
+										"end": 854,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 2
+											},
+											"end": {
+												"line": 21,
+												"column": 55
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								],
+								"optional": false
+							}
+						},
+						{
+							"type": "Text",
+							"start": 858,
+							"end": 860,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 860,
+							"end": 866,
+							"expression": {
+								"type": "Identifier",
+								"start": 861,
+								"end": 865,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 6
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 866,
+							"end": 867,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 871,
+				"end": 873,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 873,
+				"end": 967,
+				"data": " control: the second expression breaks, so it travels whole and breaks on its own line "
+			},
+			{
+				"type": "Text",
+				"start": 967,
+				"end": 968,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 968,
+				"end": 1105,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 27,
+						"column": 1,
+						"character": 969
+					},
+					"end": {
+						"line": 27,
+						"column": 2,
+						"character": 970
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 971,
+							"end": 973,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 973,
+							"end": 979,
+							"expression": {
+								"type": "Identifier",
+								"start": 974,
+								"end": 978,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 6
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 979,
+							"end": 981,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 981,
+							"end": 1100,
+							"expression": {
+								"type": "CallExpression",
+								"start": 982,
+								"end": 1099,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 982,
+									"end": 984,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 4
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 988,
+										"end": 1039,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 2
+											},
+											"end": {
+												"line": 30,
+												"column": 53
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 1043,
+										"end": 1096,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 55
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								],
+								"optional": false
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1100,
+							"end": 1101,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 976,
+	"end": 993,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,44 +10,44 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 425,
-				"data": "\n\tThe deferred separator in front of a run-ending sibling is a BARE collapsible break, resolved\n\tby the container's own group: a space while the whole element fits, a newline the moment it\n\tdoes not. The 101-char cases are the discriminator — their content line is only 97 wide, so a\n\tseparator measured on its OWN width would keep the sibling on it, and the next pass, reading\n\tthat break back, would move it anyway.\n"
+				"end": 412,
+				"data": "\n\tThe deferred separator in front of a run-ending sibling — a comment, a {@debug} — is that\n\tfollower's own per-width wrap, exactly as before an element: when the element overflows and\n\tgoes block-style, the content line is only 97 wide, so the follower stays on it. Prettier\n\tbreaks that space with the container instead. The width boundary of the hug itself is in\n\tinline_sibling_space_before_bounding.\n"
 			},
 			{
 				"type": "Text",
-				"start": 425,
-				"end": 427,
+				"start": 412,
+				"end": 414,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 427,
-				"end": 503,
+				"start": 414,
+				"end": 490,
 				"data": " exactly 100 chars — inline, and the separator is the rendered space "
 			},
 			{
 				"type": "Text",
-				"start": 503,
-				"end": 504,
+				"start": 490,
+				"end": 491,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 504,
-				"end": 604,
+				"start": 491,
+				"end": 591,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 10,
 						"column": 1,
-						"character": 505
+						"character": 492
 					},
 					"end": {
 						"line": 10,
 						"column": 2,
-						"character": 506
+						"character": 493
 					}
 				},
 				"attributes": [],
@@ -56,26 +56,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 507,
-							"end": 576,
+							"start": 494,
+							"end": 563,
 							"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 ",
 							"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 "
 						},
 						{
 							"type": "Component",
-							"start": 576,
-							"end": 584,
+							"start": 563,
+							"end": 571,
 							"name": "Comp",
 							"name_loc": {
 								"start": {
 									"line": 10,
 									"column": 73,
-									"character": 577
+									"character": 564
 								},
 								"end": {
 									"line": 10,
 									"column": 77,
-									"character": 581
+									"character": 568
 								}
 							},
 							"attributes": [],
@@ -86,21 +86,21 @@
 						},
 						{
 							"type": "Text",
-							"start": 584,
-							"end": 585,
+							"start": 571,
+							"end": 572,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "Comment",
-							"start": 585,
-							"end": 595,
+							"start": 572,
+							"end": 582,
 							"data": " c "
 						},
 						{
 							"type": "Text",
-							"start": 595,
-							"end": 600,
+							"start": 582,
+							"end": 587,
 							"raw": "text2",
 							"data": "text2"
 						}
@@ -109,39 +109,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 604,
-				"end": 606,
+				"start": 591,
+				"end": 593,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 606,
-				"end": 679,
-				"data": " 101 chars — the element breaks, and the separator breaks with it "
+				"start": 593,
+				"end": 698,
+				"data": " 101 chars — the element breaks block-style, and the follower keeps its space on the content line "
 			},
 			{
 				"type": "Text",
-				"start": 679,
-				"end": 680,
+				"start": 698,
+				"end": 699,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 680,
-				"end": 785,
+				"start": 699,
+				"end": 803,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 13,
 						"column": 1,
-						"character": 681
+						"character": 700
 					},
 					"end": {
 						"line": 13,
 						"column": 2,
-						"character": 682
+						"character": 701
 					}
 				},
 				"attributes": [],
@@ -150,26 +150,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 683,
-							"end": 755,
+							"start": 702,
+							"end": 774,
 							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 ",
 							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 "
 						},
 						{
 							"type": "Component",
-							"start": 755,
-							"end": 763,
+							"start": 774,
+							"end": 782,
 							"name": "Comp",
 							"name_loc": {
 								"start": {
 									"line": 14,
 									"column": 72,
-									"character": 756
+									"character": 775
 								},
 								"end": {
 									"line": 14,
 									"column": 76,
-									"character": 760
+									"character": 779
 								}
 							},
 							"attributes": [],
@@ -180,21 +180,21 @@
 						},
 						{
 							"type": "Text",
-							"start": 763,
-							"end": 765,
-							"raw": "\n\t",
-							"data": "\n\t"
+							"start": 782,
+							"end": 783,
+							"raw": " ",
+							"data": " "
 						},
 						{
 							"type": "Comment",
-							"start": 765,
-							"end": 775,
+							"start": 783,
+							"end": 793,
 							"data": " c "
 						},
 						{
 							"type": "Text",
-							"start": 775,
-							"end": 781,
+							"start": 793,
+							"end": 799,
 							"raw": "text2\n",
 							"data": "text2\n"
 						}
@@ -203,39 +203,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 785,
-				"end": 787,
+				"start": 803,
+				"end": 805,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 787,
-				"end": 869,
+				"start": 805,
+				"end": 887,
 				"data": " the `{@debug}` follower is the same run-ending kind, at the same boundary "
 			},
 			{
 				"type": "Text",
-				"start": 869,
-				"end": 870,
+				"start": 887,
+				"end": 888,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 870,
-				"end": 975,
+				"start": 888,
+				"end": 992,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 19,
+						"line": 18,
 						"column": 1,
-						"character": 871
+						"character": 889
 					},
 					"end": {
-						"line": 19,
+						"line": 18,
 						"column": 2,
-						"character": 872
+						"character": 890
 					}
 				},
 				"attributes": [],
@@ -244,26 +244,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 873,
-							"end": 945,
+							"start": 891,
+							"end": 963,
 							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 ",
 							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1 "
 						},
 						{
 							"type": "Component",
-							"start": 945,
-							"end": 953,
+							"start": 963,
+							"end": 971,
 							"name": "Comp",
 							"name_loc": {
 								"start": {
-									"line": 20,
+									"line": 19,
 									"column": 72,
-									"character": 946
+									"character": 964
 								},
 								"end": {
-									"line": 20,
+									"line": 19,
 									"column": 76,
-									"character": 950
+									"character": 968
 								}
 							},
 							"attributes": [],
@@ -274,28 +274,28 @@
 						},
 						{
 							"type": "Text",
-							"start": 953,
-							"end": 955,
-							"raw": "\n\t",
-							"data": "\n\t"
+							"start": 971,
+							"end": 972,
+							"raw": " ",
+							"data": " "
 						},
 						{
 							"type": "DebugTag",
-							"start": 955,
-							"end": 965,
+							"start": 972,
+							"end": 982,
 							"identifiers": [
 								{
 									"type": "Identifier",
-									"start": 963,
-									"end": 964,
+									"start": 980,
+									"end": 981,
 									"loc": {
 										"start": {
-											"line": 21,
-											"column": 9
+											"line": 19,
+											"column": 88
 										},
 										"end": {
-											"line": 21,
-											"column": 10
+											"line": 19,
+											"column": 89
 										}
 									},
 									"name": "a"
@@ -304,8 +304,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 965,
-							"end": 971,
+							"start": 982,
+							"end": 988,
 							"raw": "text2\n",
 							"data": "text2\n"
 						}

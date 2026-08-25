@@ -65,7 +65,7 @@ tag, or inside a content text — so it is dual-stable. The one space spelling i
 newline form is a whitespace-only space between two **tags**: tsv keeps that packed as well (the
 separator defers to its per-width group as a prose run's does), but prettier's bare `line`
 between two tags breaks with the container, so that pair is its own fixture,
-[inline_sibling_newline_label_hold_tag_pair_space](../inline_sibling_newline_label_hold_tag_pair_space_prettier_divergence/).
+[inline_tag_pair_space](../inline_tag_pair_space_prettier_divergence/).
 Without the null control an implementation that always broke a one-word run would satisfy every
 other file here.
 

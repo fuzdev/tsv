@@ -20,8 +20,9 @@
 <p>text1 <span>x</span><!-- c -->text2</p>
 
 <!--
-	control: multiline STRUCTURALLY (a block child), where the separator becomes a break rather
-	than a space — the same boundary, held by the other arm
+	control: multiline STRUCTURALLY (a block child), authored with a NEWLINE before the comment,
+	which is held — the space spelling stays a space in a multiline container too
+	(inline_sibling_space_before_bounding)
 -->
 <div>
 	text1 <span>x</span>

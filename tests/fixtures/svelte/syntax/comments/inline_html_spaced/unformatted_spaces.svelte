@@ -1,1 +1,2 @@
-<span>a</span> <!-- comment --> <span>b</span>
+<span>a</span>
+<!-- comment -->   <span>b</span>

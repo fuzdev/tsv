@@ -30,7 +30,11 @@ use tsv_lang::is_format_ignore_directive;
 pub(super) enum LeadBoundary {
     /// The previous text trimmed a space-only boundary and deferred the separator to this sibling
     /// (prettier's `handleWhitespaceOfPrevTextNode`): lead with a collapsible `line` inside a
-    /// group — a space when the fill fits, a break when it wraps.
+    /// group — a space when the fill fits, a break when it wraps. Every follower kind but an
+    /// own-line declaration takes it: an inline element, a component, a tag, a comment, a
+    /// `{@debug}`, a control-flow block — a space is the follower's own per-width boundary after
+    /// any sibling, as it is after text, and a unit that renders multiline breaks the group and
+    /// drops to a fresh line whole (`inline_sibling_space_before_bounding`).
     Spaced,
     /// [`Self::Spaced`] whose leading `line` carries the layout-keyed hold
     /// (`tsv_lang::doc::DocContext::hold_line_after_broken_flow`): it renders as a forced break
@@ -41,18 +45,20 @@ pub(super) enum LeadBoundary {
     /// the `line` inside it (`DocArena::inline_sibling_line_group_held`, whose inverse
     /// `strip_leading_line_group_ex` reports it so a rejoin re-wraps held-as-held).
     SpacedHeld,
-    /// The same deferred boundary in front of a sibling that ENDS the inline run — a comment, a
-    /// `{@debug}`: a **bare** collapsible `line`, a space while the parent group is flat and a
-    /// newline once it breaks. The block arm spells its own answer the same way
-    /// ([`Printer::handle_block_child`]'s `sep()`), and so does the separator site itself for a
-    /// tag follower ([`Printer::handle_separator_text_child`]'s `next_is_tag` case).
+    /// The same deferred boundary in front of a DECLARATION that owns its line (`{@const}` /
+    /// `{const}` / `{let}` / `{#snippet}`), reached outside the multiline path where the
+    /// declaration arm has not given it that line yet: a **bare** collapsible `line`, a space
+    /// while the parent group is flat and a newline once it breaks — so the moment the container
+    /// breaks by width the declaration already sits where the multiline arm will hold it, and
+    /// the two passes agree. The block arm spells its own answer the same way
+    /// ([`Printer::handle_block_child`]'s `sep()`).
     ///
-    /// ⚠️ **Not [`Self::Spaced`]** — the group form decides the separator on its OWN width,
-    /// independently of whether the parent broke, and these followers own no fill to be measured
-    /// with. A run whose content line still fits then keeps the sibling on it while prettier (and
-    /// tsv's own multiline arm, reading the emitted break back) drops it to the next line: pass 2
-    /// re-splits what pass 1 packed, an F1 break. The wrap's own site states the same rule from the
-    /// other side — see the `next_is_tag` comment in `fragment_text_doc.rs`.
+    /// ⚠️ This used to be every run-ending follower's lead — a comment, a `{@debug}` — on the
+    /// argument that such a follower owns no fill to be measured with, so the wrap would keep it
+    /// on a content line the multiline arm then broke: pass 2 re-splitting what pass 1 packed.
+    /// That cycle was the multiline arm's bare `line` disagreeing with this arm's wrap, not a
+    /// property of the follower; both arms now defer to [`Self::Spaced`], and the hazard is gone
+    /// with the disagreement.
     SpacedBare,
     /// Byte-glued to the sibling before it: there is no boundary space to honor, and the doc is
     /// instead **marked** as the continuation of a welded run (`glued_lead` + `glued_atom`). The
@@ -76,8 +82,9 @@ pub(super) enum LeadBoundary {
 #[derive(Clone, Copy, Default)]
 pub(super) struct DeferredBoundary {
     /// The previous text trimmed a boundary space and left the separator to this sibling to
-    /// emit — the wrap for an inline element or component, a bare `line` for a run-ending
-    /// comment / `{@debug}`, a block's own `break_before`.
+    /// emit — the per-width wrap for an inline element, component, tag, comment, `{@debug}` or
+    /// control-flow block, a bare `line` for a declaration that owns its line, a block's own
+    /// `break_before`.
     pub(super) trimmed: bool,
     /// That deferred separator is the layout-keyed hold ([`LeadBoundary::SpacedHeld`]): an
     /// authored newline whose run flows, after a predecessor now carrying the flow probe.
@@ -302,7 +309,6 @@ impl<'a> Printer<'a> {
                     TextChildContext {
                         cause,
                         run_has_prose: Self::run_is_prose(run_words),
-                        run_has_word: Self::run_has_word(run_words),
                         content_bounds,
                         glued_prefix: pending_glued_prefix.take(),
                         prev_sibling_head,
@@ -345,6 +351,9 @@ impl<'a> Printer<'a> {
                 if let Some((element_doc, block_doc)) =
                     self.try_block_sibling_gt_dangle(trimmed_nodes, i)
                 {
+                    // Glued to the element: no whitespace node stands between them, so no
+                    // separator can have deferred to this block.
+                    debug_assert!(!prev_text_ws);
                     if let Some(last) = child_docs.last_mut() {
                         *last = element_doc;
                     } else {
@@ -367,8 +376,16 @@ impl<'a> Printer<'a> {
                     } else {
                         self.build_fragment_node_doc_in_multiline(node)
                     };
+                    // The deferred boundary space, honored exactly as the inline arm does: the
+                    // block leads with the per-width wrap, and one that renders multiline breaks
+                    // it and drops to a fresh line whole ([`LeadBoundary::Spaced`]).
                     if let Some(node_doc) = node_doc {
-                        child_docs.push(node_doc);
+                        let lead = if prev_text_ws {
+                            LeadBoundary::Spaced
+                        } else {
+                            LeadBoundary::Plain
+                        };
+                        self.push_inline_child_doc(&mut child_docs, node_doc, lead);
                     }
                 }
             } else if is_inline_content(node) {
@@ -451,13 +468,12 @@ impl<'a> Printer<'a> {
                 // raw path, and `!prev_text_ws` so a trimmed boundary space from the previous text
                 // is never dropped — a fused prefix has nowhere to carry that space, so the comments
                 // take the ordinary per-node path below, where the final arm emits it
-                // ([`LeadBoundary::SpacedBare`]) and `glued_lead` guards the text's own boundary as
+                // ([`LeadBoundary::Spaced`]) and `glued_lead` guards the text's own boundary as
                 // before.
                 //
-                // ⚠️ The space is a **bare** `line` there, NOT a `group([line, …])` wrap: the
-                // comment run ends the inline run, so its separator is the parent group's to
-                // resolve. Reading it as the wrap is what makes a fix reach for `Spaced` and
-                // break F1 — see the variant's own note.
+                // The comments then take the ordinary per-width wrap in front of the fused text
+                // ([`LeadBoundary::Spaced`]): a space before a comment is the comment's own
+                // boundary after any sibling.
                 pending_glued_prefix = Some((prefix, i));
                 glued_run_consumed_until = text_idx;
             } else {
@@ -474,15 +490,19 @@ impl<'a> Printer<'a> {
                 // is render-visible: both node kinds render nothing, so the separator beside them is
                 // the only thing holding the two runs apart (`inline_adjacent_comment_space`).
                 //
-                // `SpacedBare`, not `Spaced`: these followers end the inline run, so the boundary is
-                // the parent group's to resolve rather than its own — see the variant's own note.
+                // `Spaced` for a comment, a `{@debug}` and (outside the multiline path) a
+                // control-flow block: a space before a run-ending follower is that follower's own
+                // per-width wrap after any sibling, as it is after text. `SpacedBare` only for a
+                // declaration that owns its line — see the variants' contracts.
                 if let Some(node_doc) = self
                     .build_fragment_node_doc_with_preceding_context(node, has_preceding_breakable)
                 {
-                    let lead = if prev_text_ws {
+                    let lead = if !prev_text_ws {
+                        LeadBoundary::Plain
+                    } else if self.is_own_line_declaration(trimmed_nodes, i) {
                         LeadBoundary::SpacedBare
                     } else {
-                        LeadBoundary::Plain
+                        LeadBoundary::Spaced
                     };
                     self.push_inline_child_doc(&mut child_docs, node_doc, lead);
                 }
@@ -763,27 +783,9 @@ impl<'a> Printer<'a> {
     /// reason: the printer only ever asks `== 0` / `>= 1` / `>= 2` of it.
     const PROSE_WORDS_CAP: usize = 2;
 
-    /// Whether a run whose [`Self::prose_words`] maximum is `words` holds a **word** — one thing
-    /// for a fill to pack, prose or not. The gate the SPACE-spelled separator before a tag keeps
-    /// (`TextChildContext::run_has_word`): the prose gate is a hold on an authored NEWLINE and
-    /// must never turn a space into one, so a one-word run's `text1 {a} {b}` defers to the
-    /// per-width group exactly as a prose run's does
-    /// (`elements/inline_sibling_newline_label_hold_tag_pair_space_prettier_divergence`), and
-    /// only a WORDLESS run's tag pair (`{a} {b}`) breaks with its container.
-    ///
-    /// A word, not "a content text": the two part on a content text that carries none, which is
-    /// a text whose *decoded* form is all whitespace — an `&nbsp;` node, or an entity-spelled
-    /// space (`&#32;`, the `inline_separator_entity_newline` case). Such a node is a separator
-    /// wearing content's clothing ([`Self::is_separator_like_text`]) and gives the separator
-    /// nothing to sit in, so the run answers `false` here even though a `Text` is present.
-    #[inline]
-    pub(super) fn run_has_word(words: usize) -> bool {
-        words >= 1
-    }
-
     /// The most words any one node of `nodes` carries ([`Self::prose_words`]) — the run count
-    /// [`Self::run_is_prose`] and [`Self::run_has_word`] grade. The one counter for both readers
-    /// of a run: [`Self::scan_inline_run`] over the run it has just bounded, and
+    /// [`Self::run_is_prose`] grades. The one counter for both readers of a run:
+    /// [`Self::scan_inline_run`] over the run it has just bounded, and
     /// `Printer::content_is_reflowable_fill` over an element's already-bounded content.
     pub(super) fn run_prose_words(&self, nodes: &[FragmentNode<'_>]) -> usize {
         let mut words = 0;
@@ -798,8 +800,9 @@ impl<'a> Printer<'a> {
 
     /// Scan the inline run beginning at `start`: its exclusive end, and its
     /// [`Self::run_prose_words`] — graded by [`Self::run_is_prose`] for the newline hold (a
-    /// `fill` to reflow into) and by [`Self::run_has_word`] for the space-spelled tag separator
-    /// (a fill to sit in at all).
+    /// `fill` to reflow into). The run's count gates a NEWLINE alone: a space-spelled separator
+    /// before a tag defers to the tag's per-width group whatever the run holds and whatever
+    /// precedes it (`handle_separator_text_child`'s `tag_space_wraps`).
     ///
     /// A run ends at a node [`Self::breaks_inline_run`] names, and at an authored blank line a
     /// content text carries on its edge ([`Self::text_edge_has_blank`]) — the boundary set
@@ -869,7 +872,14 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether a **single-newline** separator beside `node` may collapse to a plain space.
+    /// Whether a **single-newline** separator beside `node` may collapse to a plain space — the
+    /// neighbour question of the sibling-newline flow rule, asked of the NEWLINE spelling alone.
+    /// A **space** never asks it: a space before a tag, an inline element or a component is that
+    /// follower's own per-width wrap whatever stands before it (`<!-- c --> <span>x</span>` and
+    /// `<!-- c --> {x}` hug alike — `inline_adjacent_component_space`,
+    /// `inline_tag_pair_space_bounded`, `inline_sibling_space_before_bounding`), and only a block
+    /// element on either side breaks one — a unit that renders multiline drops to a fresh line
+    /// whole because its own hardlines break the wrap (`Printer::handle_separator_text_child`).
     ///
     /// Svelte 5 collapses an inter-sibling whitespace run to one whitespace, so a space and a
     /// newline between two siblings render identically — the newline's *spelling* carries no
