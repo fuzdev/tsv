@@ -36,6 +36,34 @@
 	</span>
 </div>
 
+<!-- the same one-word interior newline spelled at a CONTENT TEXT's edge rather than in a
+     whitespace-only node: one class, one answer, whichever node the parser folded the newline
+     into. A lone `,` is a word like any other, so its run is a label and the newline is held -->
+<div>
+	<span>
+		<code>a</code> <code>b</code>,
+		<code>c</code>
+	</span>
+</div>
+<div>
+	<span>
+		text1
+		<code>a</code>
+	</span>
+</div>
+<div>
+	<span>
+		<code>a</code>
+		text1
+	</span>
+</div>
+
+<!-- control: the same content-text edge in a run whose text carries two words — prose, so the
+     newline is the fill's wrap point and the element collapses -->
+<div>
+	<span>text1 text2 <code>a</code></span>
+</div>
+
 <!-- control: the same newline in a run whose text carries two words — the run is prose and the
      newline is the fill's wrap point -->
 <div>

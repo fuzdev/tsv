@@ -14,8 +14,8 @@
 use super::element_doc::MultilineCause;
 use super::fragment_text_doc::TextChildContext;
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{self, FragmentNode, text_edge_newlines};
-use crate::printer::Printer;
+use crate::ast::internal::{self, FragmentNode};
+use crate::printer::{Printer, text};
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
 
@@ -302,7 +302,7 @@ impl<'a> Printer<'a> {
                     TextChildContext {
                         cause,
                         run_has_prose: Self::run_is_prose(run_words),
-                        run_has_text: Self::run_has_text(run_words),
+                        run_has_word: Self::run_has_word(run_words),
                         content_bounds,
                         glued_prefix: pending_glued_prefix.take(),
                         prev_sibling_head,
@@ -718,13 +718,15 @@ impl<'a> Printer<'a> {
     /// the node belongs to, so a one-word node that ends a real sentence flows with it. Pinned
     /// by `elements/inline_sibling_newline_label_hold_prettier_divergence` (the label shapes
     /// held, the two-word cliff and the one-word sentence tail flowing).
-    pub(super) fn prose_words(&self, node: &FragmentNode<'_>) -> usize {
+    fn prose_words(&self, node: &FragmentNode<'_>) -> usize {
         match node {
             FragmentNode::Text(t) if !t.is_collapsible_ws_only => {
                 if Self::is_separator_like_text(&t.data(self.source)) {
                     0
                 } else {
-                    internal::split_collapsible_ws(t.raw(self.source)).count()
+                    internal::split_collapsible_ws(t.raw(self.source))
+                        .take(Self::PROSE_WORDS_CAP)
+                        .count()
                 }
             }
             _ => 0,
@@ -748,32 +750,55 @@ impl<'a> Printer<'a> {
     /// which holds; real prose has a two-word node somewhere in its run.
     #[inline]
     pub(super) fn run_is_prose(words: usize) -> bool {
-        words >= 2
+        words >= Self::PROSE_WORDS_CAP
     }
 
-    /// Whether a run whose [`Self::prose_words`] maximum is `words` holds a **content text** at
-    /// all — a fill for a whitespace-only separator to sit in, prose or not. The gate the
-    /// SPACE-spelled separator before a tag keeps (`TextChildContext::run_has_text`): the prose
-    /// gate is a hold on an authored NEWLINE and must never turn a space into one, so a one-word
-    /// run's `text1 {a} {b}` defers to the per-width group exactly as a prose run's does
+    /// The word count [`Self::prose_words`] and [`Self::run_prose_words`] **saturate** at — the
+    /// prose cliff [`Self::run_is_prose`] grades, and therefore the most either counter ever
+    /// needs to know. The two graders test `>= 1` and `>= 2` and nothing else, so a count capped
+    /// here is indistinguishable from the true one, and neither counter walks a long paragraph
+    /// to learn a number it would discard.
+    ///
+    /// The same trade `internal::Text::newline_count` makes one crate-module over, for the same
+    /// reason: the printer only ever asks `== 0` / `>= 1` / `>= 2` of it.
+    const PROSE_WORDS_CAP: usize = 2;
+
+    /// Whether a run whose [`Self::prose_words`] maximum is `words` holds a **word** — one thing
+    /// for a fill to pack, prose or not. The gate the SPACE-spelled separator before a tag keeps
+    /// (`TextChildContext::run_has_word`): the prose gate is a hold on an authored NEWLINE and
+    /// must never turn a space into one, so a one-word run's `text1 {a} {b}` defers to the
+    /// per-width group exactly as a prose run's does
     /// (`elements/inline_sibling_newline_label_hold_tag_pair_space_prettier_divergence`), and
-    /// only a prose-FREE run's tag pair (`{a} {b}`) breaks with its container.
+    /// only a WORDLESS run's tag pair (`{a} {b}`) breaks with its container.
+    ///
+    /// A word, not "a content text": the two part on a content text that carries none, which is
+    /// a text whose *decoded* form is all whitespace — an `&nbsp;` node, or an entity-spelled
+    /// space (`&#32;`, the `inline_separator_entity_newline` case). Such a node is a separator
+    /// wearing content's clothing ([`Self::is_separator_like_text`]) and gives the separator
+    /// nothing to sit in, so the run answers `false` here even though a `Text` is present.
     #[inline]
-    pub(super) fn run_has_text(words: usize) -> bool {
+    pub(super) fn run_has_word(words: usize) -> bool {
         words >= 1
     }
 
     /// The most words any one node of `nodes` carries ([`Self::prose_words`]) — the run count
-    /// [`Self::run_is_prose`] and [`Self::run_has_text`] grade. The one counter for both readers
+    /// [`Self::run_is_prose`] and [`Self::run_has_word`] grade. The one counter for both readers
     /// of a run: [`Self::scan_inline_run`] over the run it has just bounded, and
     /// `Printer::content_is_reflowable_fill` over an element's already-bounded content.
     pub(super) fn run_prose_words(&self, nodes: &[FragmentNode<'_>]) -> usize {
-        nodes.iter().map(|n| self.prose_words(n)).max().unwrap_or(0)
+        let mut words = 0;
+        for node in nodes {
+            words = words.max(self.prose_words(node));
+            if words >= Self::PROSE_WORDS_CAP {
+                break;
+            }
+        }
+        words
     }
 
     /// Scan the inline run beginning at `start`: its exclusive end, and its
     /// [`Self::run_prose_words`] — graded by [`Self::run_is_prose`] for the newline hold (a
-    /// `fill` to reflow into) and by [`Self::run_has_text`] for the space-spelled tag separator
+    /// `fill` to reflow into) and by [`Self::run_has_word`] for the space-spelled tag separator
     /// (a fill to sit in at all).
     ///
     /// A run ends at a node [`Self::breaks_inline_run`] names, and at an authored blank line a
@@ -801,12 +826,14 @@ impl<'a> Printer<'a> {
             // a blank beside a text split the layout (the blank-line arms hold it) but not the
             // count, and `text1 text2⏎<span>a</span>⏎⏎text3⏎<span>b</span>` flowed the one-word
             // half with the prose half as one run where the same shape with a comment for a
-            // boundary held it.
+            // boundary held it. Both edges are asked of the SAME node, so the trailing answer
+            // is taken before the cursor moves past it.
             if end > start && self.text_edge_has_blank(&nodes[end], true) {
                 break;
             }
+            let ends_run = self.text_edge_has_blank(&nodes[end], false);
             end += 1;
-            if self.text_edge_has_blank(&nodes[end - 1], false) {
+            if ends_run {
                 break;
             }
         }
@@ -817,11 +844,26 @@ impl<'a> Printer<'a> {
     /// Whether `node` is a content text whose `leading` (else trailing) edge whitespace carries
     /// an authored blank line — the run boundary a blank spells when the parser folds it into
     /// the text beside it rather than into a whitespace-only node ([`Self::scan_inline_run`]).
-    /// Reads `raw`: a blank is a question about the bytes, like every blank-line scan.
+    ///
+    /// The node-unwrap alone: the blank question itself is the printer's one seam pair,
+    /// [`text::has_leading_blank_line`] / [`text::has_trailing_blank_line`], asked of the whole
+    /// `raw` so this caller never holds an edge slice of its own. Counting newlines inside a
+    /// slice of [`internal::text_edge_ws`] answers the same thing and is the near miss that
+    /// module's doc names — it is a newline TOTAL, correct only because the slice happens to be
+    /// pure whitespace.
+    ///
+    /// Pre-gated on the parse-time `newline_count` (saturating at 2, source-free), which bounds
+    /// either edge run: no blank line anywhere in `raw` means none at an edge of it, so the
+    /// common node never reaches `source` at all.
     fn text_edge_has_blank(&self, node: &FragmentNode<'_>, leading: bool) -> bool {
         match node {
-            FragmentNode::Text(t) if !t.is_collapsible_ws_only => {
-                text_edge_newlines(t.raw(self.source), leading) >= 2
+            FragmentNode::Text(t) if !t.is_collapsible_ws_only && t.newline_count >= 2 => {
+                let raw = t.raw(self.source);
+                if leading {
+                    text::has_leading_blank_line(raw)
+                } else {
+                    text::has_trailing_blank_line(raw)
+                }
             }
             _ => false,
         }

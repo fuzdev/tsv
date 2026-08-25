@@ -84,16 +84,16 @@ pub(super) struct TextChildContext {
     /// `next_is_tag` case, and the two emitting a different doc for one logical separator is
     /// exactly the period-2 cycle `cause` exists to close.
     pub(super) run_has_prose: bool,
-    /// Whether this node's inline run holds a content text at all ([`Printer::run_has_text`]) —
-    /// the gate the SPACE-spelled whitespace-only separator before a tag keeps, in both arms of
-    /// the separator site. Split from `run_has_prose` on purpose: the prose gate decides whether
+    /// Whether this node's inline run holds a word at all ([`Printer::run_has_word`]) — the gate
+    /// the SPACE-spelled whitespace-only separator before a tag keeps, in both arms of the
+    /// separator site. Split from `run_has_prose` on purpose: the prose gate decides whether
     /// an authored NEWLINE may reflow (a one-word run holds it), and a hold must never become a
     /// forced break — so a one-word run's space-spelled tag pair defers to the per-width group
     /// as a prose run's does (`inline_sibling_newline_label_hold_tag_pair_space`), while a
-    /// prose-FREE run's keeps the bare `line` that breaks with the container. Both arms read
+    /// WORDLESS run's keeps the bare `line` that breaks with the container. Both arms read
     /// this one value, which is what keeps the width-broken and newline-authored twins of one
     /// document on one layout.
-    pub(super) run_has_text: bool,
+    pub(super) run_has_word: bool,
     /// The first and last index in `trimmed_nodes` that the whitespace rules see — the fragment's
     /// content bounds once every HOISTED node is skipped
     /// ([`FragmentNode::content_bounds`]). `handle_content_text_child`'s `is_first` / `is_last` are
@@ -208,7 +208,7 @@ impl<'a> Printer<'a> {
         let TextChildContext {
             cause,
             run_has_prose,
-            run_has_text,
+            run_has_word,
             content_bounds,
             prev_sibling_head,
             ..
@@ -314,8 +314,9 @@ impl<'a> Printer<'a> {
         // ⚠️ **The run and neighbour facts are asked once, ahead of the multiline split, because
         // both arms below need the same answer** (`tag_space_defers`; the newline hold
         // `separator_flows` is read by the multiline arm alone, the only place a newline is a
-        // hardline question). Nothing in either depends on WHY the container went multiline. A conjunct on the cause would be dead in
-        // the arm the `!multiline` test already selected, and wrong as a narrowing: the flow
+        // hardline question). Nothing in either depends on WHY the container went multiline. A
+        // conjunct on the cause would be dead in the arm the `!multiline` test already selected,
+        // and wrong as a narrowing: the flow
         // rule's other two call sites — a content text's leading and trailing runs — carry no
         // cause gate at all, so a container-keyed one half-applies the rule. Within a single
         // run the boundaries touching a text node would flow while the one between two adjacent
@@ -329,15 +330,15 @@ impl<'a> Printer<'a> {
         let neighbours_flow =
             self.neighbour_newline_flows(prev_node) && self.neighbour_newline_flows(next_node);
         let separator_flows = run_has_prose && neighbours_flow;
-        // The SPACE-spelled separator before a tag asks the weaker run gate — any content text in
-        // the run (`run_has_text`), not prose. The prose gate is a HOLD on an authored newline and
+        // The SPACE-spelled separator before a tag asks the weaker run gate — any word in the
+        // run (`run_has_word`), not prose. The prose gate is a HOLD on an authored newline and
         // must never turn a space into one: a one-word run's `text1 {a} {b}` packs per width
         // exactly as a prose run's does (`inline_sibling_newline_label_hold_tag_pair_space`), and
         // only a prose-FREE run's tag pair keeps the bare `line` that breaks with the container.
         // Read by both arms below, so the width-broken and newline-authored twins agree. A
         // flowing NEWLINE reaches the tag case too, re-spelled as the space by `ws_flows`; prose
         // implies text, so it defers as before.
-        let tag_space_defers = run_has_text && neighbours_flow;
+        let tag_space_defers = run_has_word && neighbours_flow;
         if !multiline {
             // Before a tag the separator is a bare collapsible break — a space while
             // the fragment fits, a newline once it breaks — exactly as the multiline

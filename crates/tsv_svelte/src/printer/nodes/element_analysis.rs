@@ -262,10 +262,12 @@ impl<'a> Printer<'a> {
         // A pair is reflowable when the boundary between them is NOT glued — the whitespace lives on
         // one of the two texts' facing edges, so there is a break point to reflow at. Same predicate
         // the fragment path's glue decisions ask, negated (`Printer::text_glued_before` / `_after`).
-        Printer::run_is_prose(self.run_prose_words(run)) && run.windows(2).any(|w| {
+        // The glue test leads: it short-circuits on the first unglued pair, where the word count
+        // has to reach the run's widest text before it can stop.
+        run.windows(2).any(|w| {
             matches!(&w[0], FragmentNode::Text(t) if !Self::text_glued_after(t.raw(source)))
                 || matches!(&w[1], FragmentNode::Text(t) if !Self::text_glued_before(t.raw(source)))
-        })
+        }) && Printer::run_is_prose(self.run_prose_words(run))
     }
 
     /// Check if element content has source breaks (newlines) that should trigger multiline.
@@ -369,9 +371,15 @@ impl<'a> Printer<'a> {
         // arms, and computed only once one can be reached (every boundary-air case above returns
         // before the scan).
         let is_fill = self.content_is_reflowable_fill(run);
+        // The run's own content edges — where the ELEMENT's boundary air lives. Not `0` and
+        // `run.len() - 1`: `trimmed_content_run` drops only whitespace-only text, so a HOISTED
+        // node (`{@debug}`, `<title>`, `{@const}`, `{#snippet}`) sits at a real index and the
+        // text beside it is the effective edge. That is exactly `blocks/hoisted_boundary_convergence`.
+        let content_edges =
+            FragmentNode::content_bounds(run).unwrap_or((0, run.len().saturating_sub(1)));
 
         // Check for newlines in content between first and last non-whitespace nodes
-        run.iter().any(|n| {
+        run.iter().enumerate().any(|(idx, n)| {
             let FragmentNode::Text(t) = n else {
                 return false;
             };
@@ -386,21 +394,40 @@ impl<'a> Printer<'a> {
                 // living in different nodes. See [`Self::content_is_reflowable_fill`].
                 !is_fill && t.has_newline()
             } else {
-                // Text with content: exclude the boundary collapsible-whitespace runs
-                // on BOTH edges, whatever the node's position. An NBSP or form feed is content,
-                // so the trim keeps it attached.
+                // Text with content. An NBSP or form feed is content, so every trim below
+                // keeps it attached.
                 //
-                // The edge run is a *separator* between this text and its neighbour, and the
-                // fill owns it either way — it reflows to a space when the run fits and to a
-                // break when it does not. So its spelling is not the element-expansion signal;
-                // only a newline strictly INSIDE the text's own content is. Trimming just the
-                // fragment-edge sides (the old `is_first_content`/`is_last_content` match) left a
-                // middle text's separator run counted, which made `<span><code>a</code> b,⏎<code>c
-                // </code></span>` report SourceBreaks: the element went block-style on pass 1, the
-                // fill then reflowed that very newline away, and pass 2 — seeing no newline left —
-                // collapsed it inline. Two mechanisms reading one newline and answering
-                // differently, the same class [`MultilineCause`] closed at the separator-flow site
-                // (conformance_prettier_svelte.md §Svelte: Inline content block-style).
+                // ⚠️ **Two different reasons trim a text's edge run, and only ONE of them is the
+                // fill's** — keeping them apart is the whole of this arm.
+                //
+                // (a) **The element's own boundary air**, at `content_edges`. A newline there is
+                // the boundary question, answered by `boundary.both()` above; letting it reach
+                // this interior scan makes a ONE-SIDED boundary expand the element, which
+                // `elements/boundary_air_one_sided` pins as collapsing. Unconditional — it has
+                // nothing to do with what the content is made of.
+                //
+                // (b) **An edge facing a SIBLING**, which is the fill's separator: the fill owns
+                // it either way, reflowing it to a space when the run fits and to a break when it
+                // does not, so its spelling is not the element-expansion signal. Trimming just
+                // the fragment-edge sides (the old `is_first_content`/`is_last_content` match)
+                // left a middle text's separator run counted, which made `<span><code>a</code>
+                // b,⏎<code>c</code></span>` report SourceBreaks: the element went block-style on
+                // pass 1, the fill then reflowed that very newline away, and pass 2 — seeing no
+                // newline left — collapsed it inline. Two mechanisms reading one newline and
+                // answering differently, the same class [`MultilineCause`] closed at the
+                // separator-flow site (conformance_prettier_svelte.md §Svelte: Inline content
+                // block-style).
+                //
+                // But (b)'s argument is the FILL's, so it is gated on `is_fill` like every other
+                // reader of that answer. Hoisting it out of the guard was invisible while any
+                // content text made its run a fill; once a ONE-WORD run became a label with no
+                // fill ([`Self::content_is_reflowable_fill`]), the hoist started answering the
+                // same physical newline two ways — held in a whitespace-only node, collapsed at
+                // a content text's edge — keyed on nothing but which node the parser folded it
+                // into. That is the accident the run scan's own blank-line boundary rules out
+                // one layer up (`Printer::scan_inline_run`), and prettier holds the newline at
+                // both spellings. Pinned by
+                // `elements/inline_interior_newline_label_hold_prettier_divergence`.
                 //
                 // The same argument reaches one step further inside a FILL, where the fill owns
                 // the text's interior too: a newline there is one the fill itself wrapped in on a
@@ -408,7 +435,14 @@ impl<'a> Printer<'a> {
                 // two-mechanisms-one-newline bug, merely relocated from the edge run to the
                 // middle of a sentence. That is the F1 break the suppression exists to stop —
                 // see [`Self::content_is_reflowable_fill`].
-                !is_fill && raw.trim_matches(is_collapsible_ws_char).contains('\n')
+                let mut scan = raw;
+                if idx == content_edges.0 || is_fill {
+                    scan = scan.trim_start_matches(is_collapsible_ws_char);
+                }
+                if idx == content_edges.1 || is_fill {
+                    scan = scan.trim_end_matches(is_collapsible_ws_char);
+                }
+                !is_fill && scan.contains('\n')
             }
         })
     }

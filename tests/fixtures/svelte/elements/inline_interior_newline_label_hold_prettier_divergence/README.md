@@ -26,10 +26,24 @@ sibling arms do.
 (`<span⏎><code>a</code>⏎<code>b</code> text1</span⏎>`) — its interior newline is held but never
 selects the element's layout.
 
-⚠️ The hold reaches only the whitespace-only separator. The content-text arm's edge trim still
-collapses the newline when it sits at a text node's edge (`<span>text1⏎<code>a</code></span>`
-→ `<span>text1 <code>a</code></span>`), so the two spellings of a one-word interior newline do
-not yet agree; that arm is tracked as open work and deliberately not pinned here.
+The hold reaches **both spellings of the newline**, which is the point: an authored newline
+between two inline siblings is folded by the parser into a whitespace-only node when nothing else
+sits there, and into the edge whitespace of the content text beside it when something does. One
+document must not get two layouts by that accident — the same reason the run scan bounds a run at
+an authored blank line wherever the parser put it
+([inline_sibling_newline_run_bounded](../inline_sibling_newline_run_bounded_prettier_divergence/)).
+So `<span>text1⏎<code>a</code></span>`, `<span><code>a</code>⏎text1</span>` and
+`<span><code>a</code> <code>b</code>,⏎<code>c</code></span>` hold exactly as the whitespace-only
+cases above do; a lone `,` is a word like any other, since a word is a run of non-collapsible
+whitespace and nothing else
+([inline_sibling_newline_prose_words](../inline_sibling_newline_prose_words_prettier_divergence/)).
+Prettier holds the newline at both spellings too, so the hold is agreement and the divergence
+stays the dangle-vs-block-style spelling this fixture already owns.
+
+The control is the two-word twin of the same edge (`<span>text1 text2 <code>a</code></span>`):
+the run is prose, the newline is the fill's own wrap point, and the element collapses — the
+positive case [inline_content_flow_collapse](../inline_content_flow_collapse_prettier_divergence/)
+is built on.
 
 See
 [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
