@@ -1549,6 +1549,14 @@ pub fn text_edge_ws(raw: &str, leading: bool) -> &str {
     }
 }
 
+/// The number of newlines in a text node's `leading` (else trailing) edge whitespace run
+/// ([`text_edge_ws`]) — `0` for a glued edge, `1` for an authored line break, `2+` for an
+/// authored blank line. The one count every edge-newline question reads.
+#[inline]
+pub fn text_edge_newlines(raw: &str, leading: bool) -> usize {
+    text_edge_ws(raw, leading).matches('\n').count()
+}
+
 /// Svelte Text node - raw text content
 ///
 /// Represents static text in the template or attribute values.

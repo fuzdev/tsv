@@ -14,7 +14,7 @@
 use super::element_doc::MultilineCause;
 use super::fragment_doc::{DeferredBoundary, text_starts_with_linebreak};
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{FragmentNode, Text, split_collapsible_ws, text_edge_ws};
+use crate::ast::internal::{FragmentNode, Text, split_collapsible_ws, text_edge_newlines};
 use crate::printer::Printer;
 use smallvec::SmallVec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -311,9 +311,10 @@ impl<'a> Printer<'a> {
         // multiline arm's newline case re-spells itself as the space rather than emitting a
         // parallel form.
         //
-        // ⚠️ **Asked once, ahead of the multiline split, because both arms below need this
-        // same answer.** The question is about the RUN and its two neighbours; nothing in it
-        // depends on WHY the container went multiline. A conjunct on the cause would be dead in
+        // ⚠️ **The run and neighbour facts are asked once, ahead of the multiline split, because
+        // both arms below need the same answer** (`tag_space_defers`; the newline hold
+        // `separator_flows` is read by the multiline arm alone, the only place a newline is a
+        // hardline question). Nothing in either depends on WHY the container went multiline. A conjunct on the cause would be dead in
         // the arm the `!multiline` test already selected, and wrong as a narrowing: the flow
         // rule's other two call sites — a content text's leading and trailing runs — carry no
         // cause gate at all, so a container-keyed one half-applies the rule. Within a single
@@ -357,9 +358,9 @@ impl<'a> Printer<'a> {
             // to protect, so the bare break is strictly better.
             //
             // ⚠️ A run holding a content text is the exception, and it is the same question
-            // the multiline arm's `next_is_tag && tag_space_defers` case asks — asked here so one run's
-            // interior does not depend on WHY its element went multiline. A width-broken
-            // element and a newline-authored one lay the same prose run out identically:
+            // the multiline arm's `next_is_tag && tag_space_defers` case asks — asked here so
+            // one run's interior does not depend on WHY its element went multiline. A
+            // width-broken element and a newline-authored one lay the same run out identically:
             // both defer to the next sibling's per-width `group([line, tag])`, so the run
             // packs. Without this the two modes hold contradictory interior policies — the
             // bare `line` resolves all-or-nothing with the parent group, which is already
@@ -655,9 +656,9 @@ impl<'a> Printer<'a> {
         // a separator-like node must not flow even when its run holds prose elsewhere, or the
         // fill re-reads a break it emitted itself (the NBSP F1 break).
         let separator_like_text = Self::is_separator_like_text(&text.data(self.source));
-        let leading_run = text_edge_ws(raw, true);
+        let leading_newlines = text_edge_newlines(raw, true);
         let leading_newline_flows = self.boundary_newline_flows(
-            leading_run.matches('\n').count(),
+            leading_newlines,
             run_has_prose,
             separator_like_text,
             prev_node,
@@ -667,7 +668,7 @@ impl<'a> Printer<'a> {
             // boundary — the tag's own break_after is the line. Checked ahead of the
             // `splitTextToDocs` linebreak arm below, which would double it.
             trim_left = true;
-            if leading_run.matches('\n').count() >= 2 {
+            if leading_newlines >= 2 {
                 child_docs.push(d.hardline());
             }
         } else if multiline
@@ -688,7 +689,7 @@ impl<'a> Printer<'a> {
             // A blank line (2+ leading newlines) is preserved as `[hardline, hardline]` —
             // prettier's `splitTextToDocs` startsWithLinebreak(_, 2). A single newline → one
             // hardline.
-            if leading_run.matches('\n').count() >= 2 {
+            if leading_newlines >= 2 {
                 child_docs.push(d.hardline());
             }
             child_docs.push(d.hardline());
@@ -720,7 +721,7 @@ impl<'a> Printer<'a> {
             // the space); in an inline container (`multiline` false) the hardline arms above
             // are skipped, so a blank-line run can arrive too — the exact count keeps a blank
             // out of the layout-keyed rule, which is defined over the single-newline spelling.
-            let authored_newline = leading_run.matches('\n').count() == 1;
+            let authored_newline = leading_newlines == 1;
             let glued_head =
                 self.leading_boundary_glued(trimmed_nodes, prev_sibling_head, content_bounds.0);
             if authored_newline && !prev_is_tag && !separator_like_text && !glued_head {
@@ -938,12 +939,9 @@ impl<'a> Printer<'a> {
         // this handler's `handle_whitespace_of_prev_text`) so the next element gets wrapped with
         // group([line, element]).
         let mut trailing_line = false;
-        // Count newlines in the trailing whitespace run (multiline structural-break detection).
-        let trailing_ws_newlines = if has_trailing_ws {
-            text_edge_ws(raw, false).matches('\n').count()
-        } else {
-            0
-        };
+        // Newlines in the trailing whitespace run (multiline structural-break detection); `0` for
+        // a glued edge, since the edge run is then empty.
+        let trailing_ws_newlines = text_edge_newlines(raw, false);
         let mut trailing_hardlines = 0usize;
         // The third face of the same rule (after the whitespace-only separator and a content
         // text's leading run): a SINGLE trailing newline before flowing inline content is a

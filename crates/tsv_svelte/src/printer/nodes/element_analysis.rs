@@ -262,8 +262,7 @@ impl<'a> Printer<'a> {
         // A pair is reflowable when the boundary between them is NOT glued — the whitespace lives on
         // one of the two texts' facing edges, so there is a break point to reflow at. Same predicate
         // the fragment path's glue decisions ask, negated (`Printer::text_glued_before` / `_after`).
-        Printer::run_is_prose(run.iter().map(|n| self.prose_words(n)).max().unwrap_or(0))
-            && run.windows(2).any(|w| {
+        Printer::run_is_prose(self.run_prose_words(run)) && run.windows(2).any(|w| {
             matches!(&w[0], FragmentNode::Text(t) if !Self::text_glued_after(t.raw(source)))
                 || matches!(&w[1], FragmentNode::Text(t) if !Self::text_glued_before(t.raw(source)))
         })

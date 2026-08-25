@@ -14,7 +14,7 @@
 use super::element_doc::MultilineCause;
 use super::fragment_text_doc::TextChildContext;
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{self, FragmentNode, text_edge_ws};
+use crate::ast::internal::{self, FragmentNode, text_edge_newlines};
 use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
@@ -731,7 +731,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether a run whose [`Self::prose_words`] total is `words` is **prose** — holds a fill to
+    /// Whether a run whose [`Self::prose_words`] maximum is `words` is **prose** — holds a fill to
     /// reflow into. The cliff is two words: a run holding one is a label
     /// ([`Self::prose_words`]), and two is where label and prose genuinely blur (`Remember me`
     /// packs), so the boundary is stated here rather than approximated by a sentence heuristic
@@ -763,10 +763,18 @@ impl<'a> Printer<'a> {
         words >= 1
     }
 
-    /// Scan the inline run beginning at `start`: its exclusive end, and the most words any one
-    /// of its nodes carries ([`Self::prose_words`]) — graded by [`Self::run_is_prose`] for the
-    /// newline hold (a `fill` to reflow into) and by [`Self::run_has_text`] for the space-spelled
-    /// tag separator (a fill to sit in at all).
+    /// The most words any one node of `nodes` carries ([`Self::prose_words`]) — the run count
+    /// [`Self::run_is_prose`] and [`Self::run_has_text`] grade. The one counter for both readers
+    /// of a run: [`Self::scan_inline_run`] over the run it has just bounded, and
+    /// `Printer::content_is_reflowable_fill` over an element's already-bounded content.
+    pub(super) fn run_prose_words(&self, nodes: &[FragmentNode<'_>]) -> usize {
+        nodes.iter().map(|n| self.prose_words(n)).max().unwrap_or(0)
+    }
+
+    /// Scan the inline run beginning at `start`: its exclusive end, and its
+    /// [`Self::run_prose_words`] — graded by [`Self::run_is_prose`] for the newline hold (a
+    /// `fill` to reflow into) and by [`Self::run_has_text`] for the space-spelled tag separator
+    /// (a fill to sit in at all).
     ///
     /// A run ends at a node [`Self::breaks_inline_run`] names, and at an authored blank line a
     /// content text carries on its edge ([`Self::text_edge_has_blank`]) — the boundary set
@@ -785,7 +793,6 @@ impl<'a> Printer<'a> {
     /// `max` advances the cursor past it, so the caller cannot stall on it.
     fn scan_inline_run(&self, nodes: &[FragmentNode<'_>], start: usize) -> (usize, usize) {
         let mut end = start;
-        let mut words = 0usize;
         while end < nodes.len() && !self.breaks_inline_run(&nodes[end]) {
             // An authored blank line bounds the run wherever the parser put it. Between two
             // non-text siblings it is a whitespace-only node `breaks_inline_run` sees; beside a
@@ -798,13 +805,13 @@ impl<'a> Printer<'a> {
             if end > start && self.text_edge_has_blank(&nodes[end], true) {
                 break;
             }
-            words = words.max(self.prose_words(&nodes[end]));
             end += 1;
             if self.text_edge_has_blank(&nodes[end - 1], false) {
                 break;
             }
         }
-        (end.max(start + 1), words)
+        let end = end.max(start + 1);
+        (end, self.run_prose_words(&nodes[start..end]))
     }
 
     /// Whether `node` is a content text whose `leading` (else trailing) edge whitespace carries
@@ -814,10 +821,7 @@ impl<'a> Printer<'a> {
     fn text_edge_has_blank(&self, node: &FragmentNode<'_>, leading: bool) -> bool {
         match node {
             FragmentNode::Text(t) if !t.is_collapsible_ws_only => {
-                text_edge_ws(t.raw(self.source), leading)
-                    .matches('\n')
-                    .count()
-                    >= 2
+                text_edge_newlines(t.raw(self.source), leading) >= 2
             }
             _ => false,
         }
