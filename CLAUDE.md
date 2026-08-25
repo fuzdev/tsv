@@ -102,7 +102,7 @@ See [Debug Tooling](#debug-tooling).
 deno task build            # workspace dev build
 deno task build:release    # workspace optimized build
 deno task build:all        # release + ffi + build:packages + build:napi:packages (everything)
-deno task build:packages   # the 6 publishable WASM bundles (npm + deno) — single source of truth shared by CI + publish.ts
+deno task build:packages   # the 6 WASM bundles: the 3 publishable npm packages + their 3 deno bundles (benches/sidecar) — single source of truth shared by CI + publish.ts
 deno task build:bench      # the artifact set `bench`/`smoke` measure, and what EVERY bench leg builds (ffi×3 + the 3 wasm:deno variants + the node half: napi + wasm:all:nodejs)
 deno task build:ffi        # C FFI library (:format / :parse size-only variants; :all builds all three)
 deno task build:wasm:deno  # deno-target WASM bundle (requires wasm-pack; :parse:deno / :all:deno for the other variants)
@@ -158,6 +158,7 @@ deno task typecheck:bench-core # the bench modules that are DELIBERATELY node-mo
 #                          transitive imports) or `test:deno`. NOT the maximal checkable set: the impl
 #                          wrappers qualify only because their npm imports are dynamic. See deno.json's `//` note
 deno task test           # cargo test
+deno task test:deno      # deno test over the bench harness's node-modules-free core (divergence detectors, format-config probe, gate_counts); gates in `check`
 deno task test:audits    # cargo test -p tsv_lang --features audits — the `swallow_check` + `comment_check` seams' own tests (compiled out by default); gates in `check`
 deno task lint           # cargo clippy
 cargo fmt                # format Rust code
@@ -600,7 +601,7 @@ and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 
 ### Commands
 
-**Input methods** (consistent across content-processing commands): a file path (parser auto-detected from extension), `--content <string> --parser <type>`, or `--stdin --parser <type>` (`svelte|typescript|css`) — except the single-language commands (`canonical_compile`, `compile_compare`, `line_width`), which take `--content`/`--stdin` with no `--parser`.
+**Input methods** (consistent across content-processing commands): a file path (parser auto-detected from extension), `--content <string> --parser <type>`, or `--stdin --parser <type>` (`svelte|typescript|css`) — except the single-language commands (`canonical_compile`, `compile_compare`, `compile_fixture_init`, `render_compare`, `line_width`), which take `--content`/`--stdin` with no `--parser`.
 
 **Content-Processing Commands:**
 
@@ -980,9 +981,9 @@ cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — 
 
 ### Rust Crates (minimal deps)
 
-The shipped language/foundation crates' external deps (dev tooling adds `argh`, `tokio`, `futures-util`, and serde derive; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
+The shipped language/foundation crates' external deps (the `tsv_cli` binary adds `argh` and a direct `serde` dep; dev tooling adds `tokio`, `futures-util`, and the serde `derive` macro on top; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
 
-- `serde_json` — wire-JSON emission (exact string-escape / `f64` formatting) + reparsing bytes to a `Value` (CLI `--pretty`, tests). Language crates depend on `serde` only transitively, without its `derive` (derive is dev-tooling only: `tsv_debug` / `tsv_cli`)
+- `serde_json` — wire-JSON emission (exact string-escape / `f64` formatting) + reparsing bytes to a `Value` (CLI `--pretty`, tests). Language crates depend on `serde` only transitively, without its `derive` (the `derive` macro is used only in `tsv_debug`; `tsv_cli` takes `serde` directly for its `Serialize`-bound tab-indented `--pretty` helper but derives nothing)
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `thiserror` — error type derivation
 - `phf` — compile-time perfect hash maps (keywords, entities)

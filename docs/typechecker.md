@@ -113,7 +113,7 @@ duplicate-conflict family (TS2300/2451/2567/2528 + merge-path codes) and the flo
 classified by deferred cause (`merge` / `lib` / `deferred_late_bound` / `deferred_cfa` /
 `other`, the last a HARD zero — any unclassified miss is a cascade or construction bug).
 It also publishes the parse-divergence census, runs each test `catch_unwind`-wrapped on a
-generous-stack worker (tracked parser crashes live in a pinned `CRASH_EXCLUSIONS`
+generous-stack worker (a tracked parser crash would live in the pinned, currently empty `CRASH_EXCLUSIONS`
 ledger), and drops per-test `.diff` artifacts under `target/tsc_conformance/diffs/` on
 failure.
 
@@ -162,10 +162,11 @@ mangled by a bad merge, so it must not be blocked behind the file it repairs.
 
 **The Rust consts** — never machine-written, each for its own reason:
 
-- The **semantically-zero gates** in `crates/tsv_debug/src/cli/commands/tsc_conformance/pins.rs`:
-  `family_extra`, the unclassified (`other`) misses, `family_span_mismatch`, the
-  related-info `missing` / `extra` / `span_mismatch`, the four lib error channels, and zero
-  panics. A zero here is a contract, not a measurement — a red one means the run is broken,
+- The **semantically-zero gates** — the `RUN_*` zero pins in
+  `crates/tsv_debug/src/cli/commands/tsc_conformance/pins.rs` (`family_extra`, the
+  unclassified (`other`) misses, `family_span_mismatch`, the related-info `missing` /
+  `extra` / `span_mismatch`) plus the emptiness assertions in `tsc_conformance/gates.rs`
+  (the four lib error channels, and zero panics). A zero here is a contract, not a measurement — a red one means the run is broken,
   so `--update` refuses rather than pinning it. (`extra`, `missing other`, panics, stale
   crash exclusions, and the lib channels gate on a filtered triage run too.)
 - **The crash-exclusion count**, which lives beside the `CRASH_EXCLUSIONS` ledger it

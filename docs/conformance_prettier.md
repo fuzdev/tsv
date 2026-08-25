@@ -31,7 +31,7 @@ units (search `◆` for every tag, `◆prettier_bug` for one category):
 
 ### Prettier bug index
 
-Every `◆prettier_bug` — cases where Prettier produces output that is non-idempotent, fails to re-parse, throws, or changes meaning, and tsv refuses to replicate. Grep `◆prettier_bug` for each in context.
+The fixture-pinned `◆prettier_bug` cases — where Prettier produces output that is non-idempotent, fails to re-parse, throws, or changes meaning, and tsv refuses to replicate. The catalogs carry more under the same tag than this index lists; grep `◆prettier_bug` for the full set in context.
 
 **Cataloged** (pinned by a fixture oracle or marker):
 
@@ -326,7 +326,7 @@ its tail:
   ([expr_leading_own_line](../tests/fixtures/svelte/syntax/comments/expr_leading_own_line_prettier_divergence/),
   the same sweep). That shape is not new — it is the one an honored `prettier-ignore` in
   this gap already took, because a directive flush against the prefix is inert under the
-  placement floor; one resolver now answers both (`Printer::head_layout`), so the freeze
+  placement floor; one resolver answers both (`Printer::head_layout`), so the freeze
   is a special case of the ordinary own-line form rather than a rule beside it. And the
   two authorings differ in **that placement alone**: an unprefixed `{` takes the same
   space before a trailing comment (`{ // c`) that every prefixed literal already carries,

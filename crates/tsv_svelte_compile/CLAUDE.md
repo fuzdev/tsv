@@ -163,7 +163,7 @@ project-wide conventions.
   two tags *declare*). Each is deprecation-warned or superseded by the oracle in
   Svelte 5, the slot system by the snippets this compiler already emits.
   **`<svelte:boundary>` is deliberately outside the set**: a first-class Svelte 5
-  feature — and it now compiles, so it has no `TemplateNode` label at all; its
+  feature — and it compiles, so it has no `TemplateNode` label at all; its
   residual refusals (an oracle-rejected attribute, the `failed=`/`pending=`
   attribute forms) are ordinary gaps. So is `ComponentDirective` — what a legacy `on:`/`let:` on
   a *component* raises instead of `RunesOnlyFence` — because that bucket also holds
@@ -287,7 +287,7 @@ project-wide conventions.
   `template_value.rs`), and a **store access** (`$name` where the `$`-stripped base is a
   binding and not a rune — a bare reference OR a call/new **callee root** `$fn()` /
   `$obj.m()` / `new $C()`, via `store_read_exemption` shared by the identifier,
-  call, and new arms), which the guard now EXEMPTS in a script or dropped
+  call, and new arms), which the guard EXEMPTS in a script or dropped
   position when the caller opts in via `WalkCtx::allow_store_reads` (a
   template-position store read is exempted by `template_value.rs`'s walk before it
   reaches the guard) — the store rewrite (`store_rewrite.rs`) or a dropped-region
@@ -394,7 +394,7 @@ project-wide conventions.
   function name is recorded where the walk reaches it rather than hoisted, and a class
   EXPRESSION's own name is unrecorded — the last two harmless because the oracle
   declares a class name `'let'`, not `const`. A missing `const` form is not: a `switch`
-  therefore now gets ONE scope shared by all its cases (the oracle's `SwitchStatement:
+  therefore gets ONE scope shared by all its cases (the oracle's `SwitchStatement:
   create_block_scope`) and a block's `const` declarations hoist into scope before its
   statements are walked (the oracle's scope pre-pass), closing two over-acceptances. The
   hoist is deliberately `const`-only — hoisting a rule-free binding could only remove a
@@ -742,7 +742,7 @@ pipeline order.
   never folds (`$.escape(s)`). That holds however the argument itself evaluates —
   a plain `let` argument does not fold either. The duplicate-`$props()` flag is
   per-SCRIPT state, scoped to one `analyze_script` call, mirroring the oracle's
-  fresh `has_props_rune` per script. v1 supports **plain** module scripts only: a
+  fresh `has_props_rune` per script. Only **plain** module scripts are supported: a
   module-scope rune, a `$name` store read, or a top-level `await` refuses (the
   corpus is rune-free, so a lossless over-refusal), and a supported module body
   emits verbatim post-erase.
@@ -780,7 +780,7 @@ pipeline order.
     property), and `static\u{FEFF}{ … }` was invisible to the fence, compiling the
     rune where the oracle emits a store read. Over-reporting stays harmless
     (`static` in a comment or string, a `/` that is division, a `U+0085` that JS
-    would reject anyway) — measured at zero, none of the ~4900 `.svelte` files
+    would reject anyway) — measured at zero, no `.svelte` file
     under the compile-corpus roots contains a static block;
   - the `$stem` REFERENCE test, a whole-document, boundary-checked source scan
     rather than an AST walk: tsv recognizes a rune at half a dozen scattered sites
@@ -917,6 +917,12 @@ pipeline order.
   turns both into `$.store_get(…)` / `d()` after the loop) while both shadow
   refusals are deferred — the store's needs the full nested-scope set, the
   derived's is a whole-compile check in `compile_server`.
+- `destructure.rs` — the destructured rune declarator lowering
+  (`expand_destructured_state` / `expand_destructured_derived`): one source declarator
+  → N synthetic declarators, one per destructuring leaf, over the oracle's single
+  `extract_paths` extractor. Oracle phase 3, **server**: `VariableDeclaration.js`'s
+  `$derived`/`$derived.by` branch and `create_state_declarators`. Detail under
+  `script_rewrite.rs` above.
 - `script_props.rs` — the `$props()` binding-pattern rewrite. Oracle phase 3,
   **server**: a rest element in the pattern gains the oracle's `$$slots,
   $$events` injection immediately before it, and a non-destructured `let props =
@@ -1081,7 +1087,7 @@ Both recurse back into `fragment.rs` through `emit_child_body`.
   validated against the oracle's closed `onerror`/`failed`/`pending` list (six
   distinct over-acceptances otherwise); `onerror` drops but is guard-walked, and the
   `failed=`/`pending=` attribute FORMS refuse. ⚠️ Emitting rather than refusing a
-  boundary made three **pre-existing, general** validation over-acceptances
+  boundary makes three **general** validation over-acceptances
   REACHABLE through one — a `<svelte:head>`/`<svelte:options>` inside it
   (`svelte_meta_invalid_placement`), a duplicate `onerror` (`attribute_duplicate`),
   and a duplicate snippet name (`declaration_duplicate`). Each reproduces identically

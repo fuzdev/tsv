@@ -212,10 +212,10 @@ scanner serving two grammars, so both oracles must be given their own class toge
 is the declaration-vs-rule byte scan's own ASCII class: `a { color <NBSP>: red }` and `a { color /* c */<NBSP>: red }` are declarations to
 `parseCss` (which reads the property raw and trims it) and parse errors to tsv, because the
 scan stops on the run and the token lookahead behind it reads it as the identifier that should
-have been the `:`. They are enumerated and pinned in that test. A `<ZWNBSP>` leading or trailing a declaration VALUE was a
-fourth and is closed: the wire's own trims are JS `\s` now (`ast/convert/mod.rs`'s
-`trim_wire_start` / `trim_wire_end`, mirroring `read_value`'s `value.trim()`) where they used
-to be `str::trim`, which kept a `<ZWNBSP>` `read_value` drops and deleted a `<NEL>` it keeps.
+have been the `:`. They are enumerated and pinned in that test. A `<ZWNBSP>` leading or trailing a declaration VALUE would be a
+fourth: the wire's own trims are JS `\s` (`ast/convert/mod.rs`'s
+`trim_wire_start` / `trim_wire_end`, mirroring `read_value`'s `value.trim()`) rather than
+`str::trim`, which would keep a `<ZWNBSP>` `read_value` drops and delete a `<NEL>` it keeps.
 The printer's property→colon trim is the same seam read from the other side and took the same
 correction (`trim_property_part`); a class that moves on only one of them is the doubling bug
 above.
@@ -464,8 +464,9 @@ spelling that reaches those two unguarded assignments instead:
   unclosed-block error, since canonical rejects it too and the verdict already
   matches.
 
-The `{#await}` arm is **matched**, not corrected — tsv had been the permissive side
-there, overwriting `then` / `catch` exactly the way canonical's `{:else}` does; the
+The `{#await}` arm is **matched**, not corrected — the permissive reading there
+(overwriting `then` / `catch` exactly the way canonical's `{:else}` does) is what
+canonical rejects; the
 duplicate-clause verdicts are pinned as `input_invalid_*` files beside the
 [then_catch](../tests/fixtures/svelte/blocks/await/then_catch/),
 [then_shorthand](../tests/fixtures/svelte/blocks/await/then_shorthand/),
@@ -574,7 +575,7 @@ There is no fixture for the strict-reserved words themselves, because acorn reje
 
 Binding-pattern **elements** follow from the reference widening rather than needing their own rule: tsv parses a binding pattern by running the expression parser and converting (`parse_destructured_binding` → `to_assignable`), so an element head asks the `IdentifierReference` channel. Widening that channel closed a declaration (`var [let] = a`, `var {a: let} = o`), a parameter (`function f([let]) {}`) and a `catch` binding (`try {} catch ([let]) {}`) in one move; object shorthand always worked, having its own keyword arm. A `void` element still rejects — a production bar, not a deferred early error.
 
-**A contextual keyword as a label or an `infer` name** — the two channels the same work reached, and here acorn agrees, so they are ordinary fixtures. A `LabelIdentifier` and an `infer` type-parameter name are both plain names, but tsv reached each through a `TokenKind::Identifier` test that only saw the words its lexer never keyword-izes: `async: for (;;) break async;`, `string: while (0) continue string;` and `type A<T> = T extends Array<infer string> ? string : never` all rejected while `foo:` / `infer U` worked. Both now use the shared name channel, so a label can be declared *and* referenced with any of these words. Pinned by [labeled/contextual_keyword_name](../tests/fixtures/typescript/statements/labeled/contextual_keyword_name/) and [infer/contextual_keyword_name](../tests/fixtures/typescript/types/infer/contextual_keyword_name/). What may be *labelled* is unchanged: `LabelledItem : Statement | FunctionDeclaration`, and the `FunctionDeclaration` arm carries the "It is a Syntax Error if any source text is matched by this production" phrasing (browser carve-out for non-strict code only, and tsv is strict-only), so `lbl: function f() {}` and `label: let x = 1` both still reject.
+**A contextual keyword as a label or an `infer` name** — the two channels the same work reached, and here acorn agrees, so they are ordinary fixtures. A `LabelIdentifier` and an `infer` type-parameter name are both plain names, and a `TokenKind::Identifier` test there sees only the words the lexer never keyword-izes — it would reject `async: for (;;) break async;`, `string: while (0) continue string;` and `type A<T> = T extends Array<infer string> ? string : never` while `foo:` / `infer U` work. Both use the shared name channel, so a label can be declared *and* referenced with any of these words. Pinned by [labeled/contextual_keyword_name](../tests/fixtures/typescript/statements/labeled/contextual_keyword_name/) and [infer/contextual_keyword_name](../tests/fixtures/typescript/types/infer/contextual_keyword_name/). What may be *labelled* is unchanged: `LabelledItem : Statement | FunctionDeclaration`, and the `FunctionDeclaration` arm carries the "It is a Syntax Error if any source text is matched by this production" phrasing (browser carve-out for non-strict code only, and tsv is strict-only), so `lbl: function f() {}` and `label: let x = 1` both still reject.
 
 **Reserved word in a heritage clause** — the one entry here where tsv is *stricter* than acorn, and the one place all three oracles disagree in three different directions. A heritage element is a type **reference** (`TypeReference: TypeName`, `TypeName: IdentifierReference | NamespaceName . IdentifierReference`), so a reserved word can never head one. tsv follows that grammar, which is exactly prettier's line — its error states the rule outright ("Interface declaration can only extend an identifier/qualified name with optional type arguments") and tsv matches prettier on every element form tested:
 
@@ -855,7 +856,7 @@ statement (`definite: true` with the annotation). tsv rejects instead: building 
 tree has its printer **drop the `!`** on the way out
 (`for (let a!: number; ;)` → `for (let a: number; ;)`) — a silent deletion of
 authored source whose output re-parses as a different program, which is the
-faithful-reprint floor failing rather than a layout choice. tsv now rejects
+faithful-reprint floor failing rather than a layout choice. tsv rejects
 (`a definite assignment assertion is not permitted in a for header`), stated once
 for all four keyword spellings (`let`/`const`/`var`, `using`, `await using`), and
 already spelled the guard's other two conjuncts — the `[no LineTerminator here]`

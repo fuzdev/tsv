@@ -138,7 +138,8 @@ and package READMEs for the full API and CLI flags:
     and there are no config files or CLI options for formatting style;
     i.e. `tsv format` is opinionated like `gofmt`, `zig fmt`, and Python's Black,
     see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
-  - `<svelte:options preserveWhitespace />` is not detected: whitespace handling
+  - `<svelte:options preserveWhitespace />` is parsed (it's in the wire AST) but
+    not honored by the formatter: whitespace handling
     is uniform (only `<pre>`/`<textarea>` content is whitespace-sensitive), any
     reformatting under that option is already render-visible, and prettier
     behaves the same — see

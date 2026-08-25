@@ -20,8 +20,8 @@ corpus at all, while the compiler's known validation holes lived as prose in
 
 A file the oracle **rejects** that tsv nevertheless **compiles** is an
 **over-acceptance** — a refusal-contract bug, since nothing invalid in runes mode may
-compile. There are enough of them today that a green pass/fail gate is unreachable, hence
-the ratchet.
+compile. Some remain today (the snapshot is the count), so a green pass/fail gate is not yet
+reachable, hence the ratchet.
 
 ## Running it
 
@@ -85,7 +85,7 @@ tsv compiler self-check firing (`tsv-corrupt-output`, `tsv-type-erasure-leak` �
 compiler bug that fails its run everywhere else in this repo), a tsv parse over-rejection
 (`tsv-parse`), a canonicalizer failure (`canonicalize-ours`, `canonicalize-oracle`,
 `oracle-recanonicalize`, `oracle-non-idempotent`), and environment failures (`read`,
-`oracle-sidecar`). Were those pinnable, a slice that introduced a corrupt output would
+`oracle-sidecar`). Were those pinnable, a change that introduced a corrupt output would
 fail once as a `NEW` key and could then be laundered by the next `--update` into a list
 whose header tells the reader an errored line is *upstream's* bug. Classification is by
 error kind, defaulting to the **unpinnable** side, so a harness error kind added later
@@ -115,7 +115,7 @@ own. That is inherent to "the oracle cannot speak here", not a choice the ratche
 ## What is deliberately not pinned
 
 `refused` and `fenced` counts. A refusal is not a defect — it is the honest "not yet" the
-refusal contract rests on — and its buckets churn with every compiler slice, so pinning
+refusal contract rests on — and its buckets churn with every compiler change, so pinning
 them would fail on ordinary forward progress and get the gate turned off. The refusal
 surface is already reported by the ordinary run and re-priced by `--census`.
 
@@ -176,7 +176,7 @@ snapshot file is a hard read error, never an empty set.
 - **`MISMATCH`** / **`HARNESS-ERROR`** — never pin. Each is tsv's own bug (or, for
   `read` / `oracle-sidecar`, a broken environment), not a line in the upstream-debt list.
 
-`--update` prints a yield line (`over-acceptances −retired +added`) so a slice's effect on
+`--update` prints a yield line (`over-acceptances −retired +added`) so a change's effect on
 the debt is visible without diffing the file. It counts `OVER-ACCEPT` keys only — a
 retired `ORACLE-ERROR` is not an over-acceptance win, and is reported on its own line.
 
