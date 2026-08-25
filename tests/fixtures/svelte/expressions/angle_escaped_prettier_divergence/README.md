@@ -33,7 +33,7 @@ one word each, and a pair with nothing else in its run is a list of labels whose
 both formatters hold — the flow rule's prose gate,
 [inline_sibling_newline_label_hold](../../elements/inline_sibling_newline_label_hold_prettier_divergence/);
 its space spelling is
-[inline_sibling_newline_label_hold_tag_pair_space](../../elements/inline_sibling_newline_label_hold_tag_pair_space_prettier_divergence/),
+[inline_tag_pair_space](../../elements/inline_tag_pair_space_prettier_divergence/),
 where tsv keeps the pair packed and prettier splits it — so the two-word content is what makes
 the newline-authored run flow here. The comment is load-bearing — it bounds the run above, so the
 pair and its content are the whole flowing run.

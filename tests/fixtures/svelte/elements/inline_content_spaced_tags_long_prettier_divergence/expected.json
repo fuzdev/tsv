@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 579,
+	"end": 572,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -141,31 +141,31 @@
 			{
 				"type": "Comment",
 				"start": 154,
-				"end": 241,
-				"data": " 101 chars - overflows; block-style, and each expression tag takes its own line "
+				"end": 236,
+				"data": " 101 chars - overflows; block-style, and the tags pack on the content line "
 			},
 			{
 				"type": "Text",
-				"start": 241,
-				"end": 242,
+				"start": 236,
+				"end": 237,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 242,
-				"end": 362,
+				"start": 237,
+				"end": 355,
 				"name": "div",
 				"name_loc": {
 					"start": {
 						"line": 7,
 						"column": 1,
-						"character": 243
+						"character": 238
 					},
 					"end": {
 						"line": 7,
 						"column": 4,
-						"character": 246
+						"character": 241
 					}
 				},
 				"attributes": [],
@@ -174,26 +174,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 247,
-							"end": 249,
+							"start": 242,
+							"end": 244,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 249,
-							"end": 355,
+							"start": 244,
+							"end": 348,
 							"name": "small",
 							"name_loc": {
 								"start": {
 									"line": 8,
 									"column": 2,
-									"character": 250
+									"character": 245
 								},
 								"end": {
 									"line": 8,
 									"column": 7,
-									"character": 255
+									"character": 250
 								}
 							},
 							"attributes": [],
@@ -202,19 +202,19 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 256,
-										"end": 259,
+										"start": 251,
+										"end": 254,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 259,
-										"end": 262,
+										"start": 254,
+										"end": 257,
 										"expression": {
 											"type": "Identifier",
-											"start": 260,
-											"end": 261,
+											"start": 255,
+											"end": 256,
 											"loc": {
 												"start": {
 													"line": 9,
@@ -230,27 +230,27 @@
 									},
 									{
 										"type": "Text",
-										"start": 262,
-										"end": 265,
-										"raw": "\n\t\t",
-										"data": "\n\t\t"
+										"start": 257,
+										"end": 258,
+										"raw": " ",
+										"data": " "
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 265,
-										"end": 345,
+										"start": 258,
+										"end": 338,
 										"expression": {
 											"type": "Identifier",
-											"start": 266,
-											"end": 344,
+											"start": 259,
+											"end": 337,
 											"loc": {
 												"start": {
-													"line": 10,
-													"column": 3
+													"line": 9,
+													"column": 7
 												},
 												"end": {
-													"line": 10,
-													"column": 81
+													"line": 9,
+													"column": 85
 												}
 											},
 											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -258,8 +258,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 345,
-										"end": 347,
+										"start": 338,
+										"end": 340,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -268,8 +268,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 355,
-							"end": 356,
+							"start": 348,
+							"end": 349,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -278,39 +278,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 362,
-				"end": 364,
+				"start": 355,
+				"end": 357,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 364,
-				"end": 459,
+				"start": 357,
+				"end": 452,
 				"data": " 101 chars, text between the tags - the content flows as one fill, so they share a line "
 			},
 			{
 				"type": "Text",
-				"start": 459,
-				"end": 460,
+				"start": 452,
+				"end": 453,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 460,
-				"end": 578,
+				"start": 453,
+				"end": 571,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 15,
+						"line": 14,
 						"column": 1,
-						"character": 461
+						"character": 454
 					},
 					"end": {
-						"line": 15,
+						"line": 14,
 						"column": 4,
-						"character": 464
+						"character": 457
 					}
 				},
 				"attributes": [],
@@ -319,26 +319,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 465,
-							"end": 467,
+							"start": 458,
+							"end": 460,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 467,
-							"end": 571,
+							"start": 460,
+							"end": 564,
 							"name": "small",
 							"name_loc": {
 								"start": {
-									"line": 16,
+									"line": 15,
 									"column": 2,
-									"character": 468
+									"character": 461
 								},
 								"end": {
-									"line": 16,
+									"line": 15,
 									"column": 7,
-									"character": 473
+									"character": 466
 								}
 							},
 							"attributes": [],
@@ -347,26 +347,26 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 474,
-										"end": 477,
+										"start": 467,
+										"end": 470,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 477,
-										"end": 480,
+										"start": 470,
+										"end": 473,
 										"expression": {
 											"type": "Identifier",
-											"start": 478,
-											"end": 479,
+											"start": 471,
+											"end": 472,
 											"loc": {
 												"start": {
-													"line": 17,
+													"line": 16,
 													"column": 3
 												},
 												"end": {
-													"line": 17,
+													"line": 16,
 													"column": 4
 												}
 											},
@@ -375,26 +375,26 @@
 									},
 									{
 										"type": "Text",
-										"start": 480,
-										"end": 485,
+										"start": 473,
+										"end": 478,
 										"raw": " and ",
 										"data": " and "
 									},
 									{
 										"type": "ExpressionTag",
-										"start": 485,
-										"end": 561,
+										"start": 478,
+										"end": 554,
 										"expression": {
 											"type": "Identifier",
-											"start": 486,
-											"end": 560,
+											"start": 479,
+											"end": 553,
 											"loc": {
 												"start": {
-													"line": 17,
+													"line": 16,
 													"column": 11
 												},
 												"end": {
-													"line": 17,
+													"line": 16,
 													"column": 85
 												}
 											},
@@ -403,8 +403,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 561,
-										"end": 563,
+										"start": 554,
+										"end": 556,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -413,8 +413,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 571,
-							"end": 572,
+							"start": 564,
+							"end": 565,
 							"raw": "\n",
 							"data": "\n"
 						}

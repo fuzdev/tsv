@@ -1,2 +1,0 @@
-<Comp /> <!-- comment -->
-<Comp2 />
