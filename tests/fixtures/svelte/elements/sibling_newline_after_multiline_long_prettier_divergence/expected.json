@@ -1,0 +1,317 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 653,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 179,
+				"data": " 100: the component renders inline (its line is exactly 100), so the authored newline\n\tafter it is a spelling the fill reflows — the <b> takes its own line by width alone. "
+			},
+			{
+				"type": "Text",
+				"start": 179,
+				"end": 180,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 180,
+				"end": 311,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 181
+					},
+					"end": {
+						"line": 3,
+						"column": 2,
+						"character": 182
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 183,
+							"end": 192,
+							"raw": "\n\ttext1\n\t",
+							"data": "\n\ttext1\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 192,
+							"end": 290,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 193
+								},
+								"end": {
+									"line": 5,
+									"column": 6,
+									"character": 197
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 198,
+									"end": 277,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 7,
+											"character": 198
+										},
+										"end": {
+											"line": 5,
+											"column": 11,
+											"character": 202
+										}
+									},
+									"value": [
+										{
+											"start": 204,
+											"end": 276,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 278,
+										"end": 283,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 290,
+							"end": 292,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 292,
+							"end": 306,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 2,
+									"character": 293
+								},
+								"end": {
+									"line": 6,
+									"column": 3,
+									"character": 294
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 295,
+										"end": 302,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 306,
+							"end": 307,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 311,
+				"end": 313,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 313,
+				"end": 514,
+				"data": " 101: one character wider, the component renders multiline (block-style), and the\n\tauthored newline after it is PRESERVED — the <b> keeps its own line where a space\n\twould hug (variant_welded). "
+			},
+			{
+				"type": "Text",
+				"start": 514,
+				"end": 515,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 515,
+				"end": 652,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 516
+					},
+					"end": {
+						"line": 12,
+						"column": 2,
+						"character": 517
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 518,
+							"end": 527,
+							"raw": "\n\ttext3\n\t",
+							"data": "\n\ttext3\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 527,
+							"end": 631,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 2,
+									"character": 528
+								},
+								"end": {
+									"line": 14,
+									"column": 6,
+									"character": 532
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 533,
+									"end": 613,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 14,
+											"column": 7,
+											"character": 533
+										},
+										"end": {
+											"line": 14,
+											"column": 11,
+											"character": 537
+										}
+									},
+									"value": [
+										{
+											"start": 539,
+											"end": 612,
+											"type": "Text",
+											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 614,
+										"end": 624,
+										"raw": "\n\t\ttext4\n\t",
+										"data": "\n\t\ttext4\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 631,
+							"end": 633,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 633,
+							"end": 647,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 2,
+									"character": 634
+								},
+								"end": {
+									"line": 17,
+									"column": 3,
+									"character": 635
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 636,
+										"end": 643,
+										"raw": "inline2",
+										"data": "inline2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 647,
+							"end": 648,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

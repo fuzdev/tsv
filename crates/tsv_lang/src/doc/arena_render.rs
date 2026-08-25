@@ -1034,7 +1034,36 @@ fn render_doc_core<P: RenderPolicy>(
                     arena.flow_probe_begin(output.len());
                 }
 
-                if policy.tracking_suffix() {
+                // A hold-flagged LINE — the leading boundary of the held inline-sibling wrap
+                // (`DocArena::inline_sibling_line_group_held`) — consumes the immediately
+                // preceding flow probe and renders as a forced break when the probed
+                // predecessor broke; otherwise it descends as the ordinary collapsible line.
+                // The group-shaped twin of the fill hook in `render_fill_iterative`: same
+                // probe, same positional pairing (the wrap's command follows the sentinel
+                // directly), and measurement never sees the flag — `arena_fits` descends
+                // through `WithContext` — so the wrap's own fit decision is untouched.
+                if context.hold_line_after_broken_flow()
+                    && policy.tracking_suffix()
+                    && let DocNode::Line(kind @ (LineKind::Normal | LineKind::Soft)) =
+                        &nodes[inner_doc.index()]
+                {
+                    if arena.flow_probe_consume() {
+                        render_line_node(
+                            ctx,
+                            *kind,
+                            Mode::Break,
+                            cmd.indent,
+                            output,
+                            pos,
+                            policy.tracking_suffix(),
+                            line_suffix,
+                            should_remeasure,
+                        );
+                    } else {
+                        cmd = cmd.with_doc(inner_doc);
+                        continue;
+                    }
+                } else if policy.tracking_suffix() {
                     if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
                         let context = context.clone();
                         let parts = fill_range.resolve(children_vec);

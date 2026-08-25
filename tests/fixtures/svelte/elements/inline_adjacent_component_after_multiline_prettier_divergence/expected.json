@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 910,
+	"end": 1216,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 529,
-				"data": "\n\tThe adjacent separator — the whitespace-only node between two non-text siblings — before a\n\tCOMPONENT keeps its own line. An inline element or a tag in that position flows onto the\n\tcontent line (inline_adjacent_sibling_newline_flow_prettier_divergence); a space-separated\n\tcomponent sibling breaks to its own line instead, and prettier agrees.\n\n\tThe cases vary only what made the container multiline — the run and its separators are the\n\tsame in each — so the component's line does not depend on the container's cause.\n"
+				"end": 837,
+				"data": "\n\tThe adjacent separator — the whitespace-only node between two non-text siblings — before a\n\tCOMPONENT whose predecessor renders MULTILINE, spelled as a SPACE. The component hugs the\n\tpredecessor's closing tag exactly as an inline element in that position does (the boundary is\n\tmeasured from the closing tag's column, where it fits); prettier splits it off. The NEWLINE\n\tspelling is held by both formatters — the layout-keyed rule sibling_newline_after_multiline\n\tpins — so the boundary is dual-stable here (variant_newline).\n\n\tThe cases vary only what made the container multiline — the run and its separators are the\n\tsame in each — so the component's boundary does not depend on the container's cause. The\n\tprose-free control keeps its authored line: with no fill to reflow into, the newline is the\n\tauthor's only structure.\n"
 			},
 			{
 				"type": "Text",
-				"start": 529,
-				"end": 530,
+				"start": 837,
+				"end": 838,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 530,
-				"end": 589,
+				"start": 838,
+				"end": 896,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 10,
+						"line": 14,
 						"column": 1,
-						"character": 531
+						"character": 839
 					},
 					"end": {
-						"line": 10,
+						"line": 14,
 						"column": 2,
-						"character": 532
+						"character": 840
 					}
 				},
 				"attributes": [],
@@ -43,26 +43,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 533,
-							"end": 542,
+							"start": 841,
+							"end": 850,
 							"raw": "\n\ttext1\n\t",
 							"data": "\n\ttext1\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 542,
-							"end": 574,
+							"start": 850,
+							"end": 882,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 12,
+									"line": 16,
 									"column": 2,
-									"character": 543
+									"character": 851
 								},
 								"end": {
-									"line": 12,
+									"line": 16,
 									"column": 6,
-									"character": 547
+									"character": 855
 								}
 							},
 							"attributes": [],
@@ -71,26 +71,26 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 548,
-										"end": 551,
+										"start": 856,
+										"end": 859,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "RegularElement",
-										"start": 551,
-										"end": 565,
+										"start": 859,
+										"end": 873,
 										"name": "b",
 										"name_loc": {
 											"start": {
-												"line": 13,
+												"line": 17,
 												"column": 3,
-												"character": 552
+												"character": 860
 											},
 											"end": {
-												"line": 13,
+												"line": 17,
 												"column": 4,
-												"character": 553
+												"character": 861
 											}
 										},
 										"attributes": [],
@@ -99,8 +99,8 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 554,
-													"end": 561,
+													"start": 862,
+													"end": 869,
 													"raw": "inline1",
 													"data": "inline1"
 												}
@@ -109,8 +109,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 565,
-										"end": 567,
+										"start": 873,
+										"end": 875,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -119,26 +119,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 574,
-							"end": 576,
-							"raw": "\n\t",
-							"data": "\n\t"
+							"start": 882,
+							"end": 883,
+							"raw": " ",
+							"data": " "
 						},
 						{
 							"type": "Component",
-							"start": 576,
-							"end": 584,
+							"start": 883,
+							"end": 891,
 							"name": "Comp",
 							"name_loc": {
 								"start": {
-									"line": 15,
-									"column": 2,
-									"character": 577
+									"line": 18,
+									"column": 10,
+									"character": 884
 								},
 								"end": {
-									"line": 15,
-									"column": 6,
-									"character": 581
+									"line": 18,
+									"column": 14,
+									"character": 888
 								}
 							},
 							"attributes": [],
@@ -149,8 +149,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 584,
-							"end": 585,
+							"start": 891,
+							"end": 892,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -159,39 +159,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 589,
-				"end": 591,
+				"start": 896,
+				"end": 898,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 591,
-				"end": 678,
+				"start": 898,
+				"end": 985,
 				"data": " control: multiline STRUCTURALLY (a block child), not by the run's own newlines "
 			},
 			{
 				"type": "Text",
-				"start": 678,
-				"end": 679,
+				"start": 985,
+				"end": 986,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 679,
-				"end": 761,
+				"start": 986,
+				"end": 1067,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 19,
+						"line": 22,
 						"column": 1,
-						"character": 680
+						"character": 987
 					},
 					"end": {
-						"line": 19,
+						"line": 22,
 						"column": 4,
-						"character": 683
+						"character": 990
 					}
 				},
 				"attributes": [],
@@ -200,26 +200,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 684,
-							"end": 693,
+							"start": 991,
+							"end": 1000,
 							"raw": "\n\ttext1\n\t",
 							"data": "\n\ttext1\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 693,
-							"end": 725,
+							"start": 1000,
+							"end": 1032,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 21,
+									"line": 24,
 									"column": 2,
-									"character": 694
+									"character": 1001
 								},
 								"end": {
-									"line": 21,
+									"line": 24,
 									"column": 6,
-									"character": 698
+									"character": 1005
 								}
 							},
 							"attributes": [],
@@ -228,26 +228,26 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 699,
-										"end": 702,
+										"start": 1006,
+										"end": 1009,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "RegularElement",
-										"start": 702,
-										"end": 716,
+										"start": 1009,
+										"end": 1023,
 										"name": "b",
 										"name_loc": {
 											"start": {
-												"line": 22,
+												"line": 25,
 												"column": 3,
-												"character": 703
+												"character": 1010
 											},
 											"end": {
-												"line": 22,
+												"line": 25,
 												"column": 4,
-												"character": 704
+												"character": 1011
 											}
 										},
 										"attributes": [],
@@ -256,8 +256,8 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 705,
-													"end": 712,
+													"start": 1012,
+													"end": 1019,
 													"raw": "inline1",
 													"data": "inline1"
 												}
@@ -266,8 +266,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 716,
-										"end": 718,
+										"start": 1023,
+										"end": 1025,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -276,26 +276,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 725,
-							"end": 727,
-							"raw": "\n\t",
-							"data": "\n\t"
+							"start": 1032,
+							"end": 1033,
+							"raw": " ",
+							"data": " "
 						},
 						{
 							"type": "Component",
-							"start": 727,
-							"end": 735,
+							"start": 1033,
+							"end": 1041,
 							"name": "Comp",
 							"name_loc": {
 								"start": {
-									"line": 24,
-									"column": 2,
-									"character": 728
+									"line": 26,
+									"column": 10,
+									"character": 1034
 								},
 								"end": {
-									"line": 24,
-									"column": 6,
-									"character": 732
+									"line": 26,
+									"column": 14,
+									"character": 1038
 								}
 							},
 							"attributes": [],
@@ -306,26 +306,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 735,
-							"end": 737,
+							"start": 1041,
+							"end": 1043,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 737,
-							"end": 754,
+							"start": 1043,
+							"end": 1060,
 							"name": "div",
 							"name_loc": {
 								"start": {
-									"line": 25,
+									"line": 27,
 									"column": 2,
-									"character": 738
+									"character": 1044
 								},
 								"end": {
-									"line": 25,
+									"line": 27,
 									"column": 5,
-									"character": 741
+									"character": 1047
 								}
 							},
 							"attributes": [],
@@ -334,8 +334,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 742,
-										"end": 748,
+										"start": 1048,
+										"end": 1054,
 										"raw": "block1",
 										"data": "block1"
 									}
@@ -344,8 +344,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 754,
-							"end": 755,
+							"start": 1060,
+							"end": 1061,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -354,39 +354,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 761,
-				"end": 763,
+				"start": 1067,
+				"end": 1069,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 763,
-				"end": 856,
-				"data": " control: a prose-free run, which has no fill to reflow into, reaches the same layout "
+				"start": 1069,
+				"end": 1162,
+				"data": " control: a prose-free run, which has no fill to reflow into, keeps its authored line "
 			},
 			{
 				"type": "Text",
-				"start": 856,
-				"end": 857,
+				"start": 1162,
+				"end": 1163,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 857,
-				"end": 909,
+				"start": 1163,
+				"end": 1215,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 29,
+						"line": 31,
 						"column": 1,
-						"character": 858
+						"character": 1164
 					},
 					"end": {
-						"line": 29,
+						"line": 31,
 						"column": 2,
-						"character": 859
+						"character": 1165
 					}
 				},
 				"attributes": [],
@@ -395,26 +395,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 860,
-							"end": 862,
+							"start": 1166,
+							"end": 1168,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 862,
-							"end": 894,
+							"start": 1168,
+							"end": 1200,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 30,
+									"line": 32,
 									"column": 2,
-									"character": 863
+									"character": 1169
 								},
 								"end": {
-									"line": 30,
+									"line": 32,
 									"column": 6,
-									"character": 867
+									"character": 1173
 								}
 							},
 							"attributes": [],
@@ -423,26 +423,26 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 868,
-										"end": 871,
+										"start": 1174,
+										"end": 1177,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "RegularElement",
-										"start": 871,
-										"end": 885,
+										"start": 1177,
+										"end": 1191,
 										"name": "b",
 										"name_loc": {
 											"start": {
-												"line": 31,
+												"line": 33,
 												"column": 3,
-												"character": 872
+												"character": 1178
 											},
 											"end": {
-												"line": 31,
+												"line": 33,
 												"column": 4,
-												"character": 873
+												"character": 1179
 											}
 										},
 										"attributes": [],
@@ -451,8 +451,8 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 874,
-													"end": 881,
+													"start": 1180,
+													"end": 1187,
 													"raw": "inline1",
 													"data": "inline1"
 												}
@@ -461,8 +461,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 885,
-										"end": 887,
+										"start": 1191,
+										"end": 1193,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -471,26 +471,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 894,
-							"end": 896,
+							"start": 1200,
+							"end": 1202,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 896,
-							"end": 904,
+							"start": 1202,
+							"end": 1210,
 							"name": "Comp",
 							"name_loc": {
 								"start": {
-									"line": 33,
+									"line": 35,
 									"column": 2,
-									"character": 897
+									"character": 1203
 								},
 								"end": {
-									"line": 33,
+									"line": 35,
 									"column": 6,
-									"character": 901
+									"character": 1207
 								}
 							},
 							"attributes": [],
@@ -501,8 +501,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 904,
-							"end": 905,
+							"start": 1210,
+							"end": 1211,
 							"raw": "\n",
 							"data": "\n"
 						}
