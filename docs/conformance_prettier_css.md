@@ -175,7 +175,7 @@ tsv declines to reproduce any of it — its format→re-parse invariant outranks
 
 ## CSS: Comments
 
-**◆stable_quirk** (except where a per-entry reason is noted). Prettier has stable variants for comment positioning. tsv normalizes consistently.
+**◆stable_quirk** (except where a per-entry reason is noted). Prettier has stable variants for comment positioning. tsv normalizes consistently — the CSS instance of [§Authoring Convergence Philosophy](./conformance_prettier.md#authoring-convergence-philosophy), where the spec supplies both the equivalence (Syntax 3: this whitespace is not significant) and, often, the canonical form to normalize onto.
 
 - At-rule before `{` — [atrule_before_opening_brace](../tests/fixtures/css/tokens/comments/atrule_before_opening_brace_prettier_divergence/)
 - At-rule in prelude — [atrule_in_prelude](../tests/fixtures/css/tokens/comments/atrule_in_prelude_prettier_divergence/)

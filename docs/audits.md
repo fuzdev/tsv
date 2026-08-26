@@ -576,7 +576,10 @@ cargo run --profile corpus -p tsv_debug --features audits ignore_audit ../zzz/sr
 # untested by the skip and ride on the member-freeze fixtures.
 # Scope: JS positions only (the TS `//` directive over code_regions — standalone .ts/.svelte.ts +
 # Svelte <script>/{expr}); CSS `/* prettier-ignore */` and Svelte template `<!-- prettier-ignore -->`
-# are a follow-up; whitespace-perturbation only (a quote/paren-only reformat is invisible — Arm B's
+# are a follow-up — and the template one has the most reach of any uncovered surface, because there
+# the gap between the directive and the node it freezes is itself whitespace the printer emits, so
+# getting it wrong is render-visible rather than a layout choice (conformance_prettier_ignore.md
+# §Format-ignore directive); whitespace-perturbation only (a quote/paren-only reformat is invisible — Arm B's
 # remit); only format fixed points injected.
 ```
 
@@ -951,6 +954,13 @@ passes vacuously. Alignment is a version-string comparison — it says the check
 expectations that oracle produces are still fresh.
 
 ## Authoring-Independence Audit (`authoring:audit`)
+
+The doctrine this gate enforces — what counts as "one document", which holds are deliberate, and
+the enumerated dual-stable remainder — is [§Authoring Convergence
+Philosophy](./conformance_prettier.md#authoring-convergence-philosophy). ⚠️ Read the blind spots
+there before treating a green run as evidence: this audit fails on **non-idempotency only**, so
+the `diverge (dual-stable)` bucket — sanctioned holds and accidental ones alike — is reported but
+never graded and carries no ratchet file.
 
 ```bash
 # authoring_audit - probe whether the SAME logical document, authored with

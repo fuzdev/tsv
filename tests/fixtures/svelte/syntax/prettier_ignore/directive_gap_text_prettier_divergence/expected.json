@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 937,
+	"end": 1083,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -79,7 +79,7 @@
 				"type": "IfBlock",
 				"elseif": false,
 				"start": 539,
-				"end": 596,
+				"end": 594,
 				"test": {
 					"type": "Identifier",
 					"start": 544,
@@ -115,9 +115,9 @@
 						{
 							"type": "Text",
 							"start": 583,
-							"end": 591,
-							"raw": "\n\ttext1\n",
-							"data": "\n\ttext1\n"
+							"end": 589,
+							"raw": "text1\n",
+							"data": "text1\n"
 						}
 					]
 				},
@@ -125,26 +125,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 596,
-				"end": 598,
+				"start": 594,
+				"end": 596,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 598,
-				"end": 651,
+				"start": 596,
+				"end": 649,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 23,
+						"line": 22,
 						"column": 1,
-						"character": 599
+						"character": 597
 					},
 					"end": {
-						"line": 23,
+						"line": 22,
 						"column": 4,
-						"character": 602
+						"character": 600
 					}
 				},
 				"attributes": [],
@@ -153,21 +153,21 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 603,
-							"end": 613,
+							"start": 601,
+							"end": 611,
 							"raw": "\n\ttext0\n\n\t",
 							"data": "\n\ttext0\n\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 613,
-							"end": 637,
+							"start": 611,
+							"end": 635,
 							"data": " prettier-ignore "
 						},
 						{
 							"type": "Text",
-							"start": 637,
-							"end": 645,
+							"start": 635,
+							"end": 643,
 							"raw": "\n\ntext1\n",
 							"data": "\n\ntext1\n"
 						}
@@ -176,26 +176,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 651,
-				"end": 653,
+				"start": 649,
+				"end": 651,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 653,
-				"end": 717,
+				"start": 651,
+				"end": 715,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 31,
+						"line": 30,
 						"column": 1,
-						"character": 654
+						"character": 652
 					},
 					"end": {
-						"line": 31,
+						"line": 30,
 						"column": 4,
-						"character": 657
+						"character": 655
 					}
 				},
 				"attributes": [],
@@ -204,39 +204,39 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 658,
-							"end": 660,
+							"start": 656,
+							"end": 658,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 660,
-							"end": 684,
+							"start": 658,
+							"end": 682,
 							"data": " prettier-ignore "
 						},
 						{
 							"type": "Text",
-							"start": 684,
-							"end": 692,
+							"start": 682,
+							"end": 690,
 							"raw": "\n\ntext1\n",
 							"data": "\n\ntext1\n"
 						},
 						{
 							"type": "RegularElement",
-							"start": 692,
-							"end": 710,
+							"start": 690,
+							"end": 708,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 35,
+									"line": 34,
 									"column": 1,
-									"character": 693
+									"character": 691
 								},
 								"end": {
-									"line": 35,
+									"line": 34,
 									"column": 5,
-									"character": 697
+									"character": 695
 								}
 							},
 							"attributes": [],
@@ -245,8 +245,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 698,
-										"end": 703,
+										"start": 696,
+										"end": 701,
 										"raw": "text2",
 										"data": "text2"
 									}
@@ -255,8 +255,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 710,
-							"end": 711,
+							"start": 708,
+							"end": 709,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -265,27 +265,27 @@
 			},
 			{
 				"type": "Text",
-				"start": 717,
-				"end": 719,
+				"start": 715,
+				"end": 717,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 719,
-				"end": 785,
+				"start": 717,
+				"end": 783,
 				"test": {
 					"type": "Identifier",
-					"start": 724,
-					"end": 728,
+					"start": 722,
+					"end": 726,
 					"loc": {
 						"start": {
-							"line": 38,
+							"line": 37,
 							"column": 5
 						},
 						"end": {
-							"line": 38,
+							"line": 37,
 							"column": 9
 						}
 					},
@@ -296,28 +296,28 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 729,
-							"end": 731,
+							"start": 727,
+							"end": 729,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 731,
-							"end": 755,
+							"start": 729,
+							"end": 753,
 							"data": " prettier-ignore "
 						},
 						{
 							"type": "Text",
-							"start": 755,
-							"end": 765,
+							"start": 753,
+							"end": 763,
 							"raw": "\n\ntext1\n\n\t",
 							"data": "\n\ntext1\n\n\t"
 						},
 						{
 							"type": "ConstTag",
-							"start": 765,
-							"end": 779,
+							"start": 763,
+							"end": 777,
 							"declaration": {
 								"type": "VariableDeclaration",
 								"kind": "const",
@@ -327,50 +327,50 @@
 										"id": {
 											"type": "Identifier",
 											"name": "y",
-											"start": 773,
-											"end": 774,
+											"start": 771,
+											"end": 772,
 											"loc": {
 												"start": {
-													"line": 43,
+													"line": 42,
 													"column": 9,
-													"character": 773
+													"character": 771
 												},
 												"end": {
-													"line": 43,
+													"line": 42,
 													"column": 10,
-													"character": 774
+													"character": 772
 												}
 											}
 										},
 										"init": {
 											"type": "Literal",
-											"start": 777,
-											"end": 778,
+											"start": 775,
+											"end": 776,
 											"loc": {
 												"start": {
-													"line": 43,
+													"line": 42,
 													"column": 13
 												},
 												"end": {
-													"line": 43,
+													"line": 42,
 													"column": 14
 												}
 											},
 											"value": 1,
 											"raw": "1"
 										},
-										"start": 773,
-										"end": 778
+										"start": 771,
+										"end": 776
 									}
 								],
-								"start": 767,
-								"end": 778
+								"start": 765,
+								"end": 776
 							}
 						},
 						{
 							"type": "Text",
-							"start": 779,
-							"end": 780,
+							"start": 777,
+							"end": 778,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -380,27 +380,27 @@
 			},
 			{
 				"type": "Text",
-				"start": 785,
-				"end": 787,
+				"start": 783,
+				"end": 785,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 787,
-				"end": 863,
+				"start": 785,
+				"end": 861,
 				"test": {
 					"type": "Identifier",
-					"start": 792,
-					"end": 796,
+					"start": 790,
+					"end": 794,
 					"loc": {
 						"start": {
-							"line": 46,
+							"line": 45,
 							"column": 5
 						},
 						"end": {
-							"line": 46,
+							"line": 45,
 							"column": 9
 						}
 					},
@@ -411,43 +411,43 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 797,
-							"end": 799,
+							"start": 795,
+							"end": 797,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 799,
-							"end": 823,
+							"start": 797,
+							"end": 821,
 							"data": " prettier-ignore "
 						},
 						{
 							"type": "Text",
-							"start": 823,
-							"end": 832,
+							"start": 821,
+							"end": 830,
 							"raw": "\n\ntext1\n\t",
 							"data": "\n\ntext1\n\t"
 						},
 						{
 							"type": "SnippetBlock",
-							"start": 832,
-							"end": 857,
+							"start": 830,
+							"end": 855,
 							"expression": {
 								"type": "Identifier",
 								"name": "s",
-								"start": 842,
-								"end": 843,
+								"start": 840,
+								"end": 841,
 								"loc": {
 									"start": {
-										"line": 50,
+										"line": 49,
 										"column": 11,
-										"character": 842
+										"character": 840
 									},
 									"end": {
-										"line": 50,
+										"line": 49,
 										"column": 12,
-										"character": 843
+										"character": 841
 									}
 								}
 							},
@@ -457,8 +457,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 846,
-										"end": 847,
+										"start": 844,
+										"end": 845,
 										"raw": "b",
 										"data": "b"
 									}
@@ -467,8 +467,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 857,
-							"end": 858,
+							"start": 855,
+							"end": 856,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -478,26 +478,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 863,
-				"end": 865,
+				"start": 861,
+				"end": 863,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 865,
-				"end": 936,
+				"start": 863,
+				"end": 934,
 				"name": "select",
 				"name_loc": {
 					"start": {
-						"line": 53,
+						"line": 52,
 						"column": 1,
-						"character": 866
+						"character": 864
 					},
 					"end": {
-						"line": 53,
+						"line": 52,
 						"column": 7,
-						"character": 872
+						"character": 870
 					}
 				},
 				"attributes": [],
@@ -506,39 +506,39 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 873,
-							"end": 875,
+							"start": 871,
+							"end": 873,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 875,
-							"end": 899,
+							"start": 873,
+							"end": 897,
 							"data": " prettier-ignore "
 						},
 						{
 							"type": "Text",
-							"start": 899,
-							"end": 908,
+							"start": 897,
+							"end": 906,
 							"raw": "\n\ntext1\n\t",
 							"data": "\n\ntext1\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 908,
-							"end": 926,
+							"start": 906,
+							"end": 924,
 							"name": "option",
 							"name_loc": {
 								"start": {
-									"line": 57,
+									"line": 56,
 									"column": 2,
-									"character": 909
+									"character": 907
 								},
 								"end": {
-									"line": 57,
+									"line": 56,
 									"column": 8,
-									"character": 915
+									"character": 913
 								}
 							},
 							"attributes": [],
@@ -547,8 +547,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 916,
-										"end": 917,
+										"start": 914,
+										"end": 915,
 										"raw": "a",
 										"data": "a"
 									}
@@ -557,13 +557,199 @@
 						},
 						{
 							"type": "Text",
-							"start": 926,
-							"end": 927,
+							"start": 924,
+							"end": 925,
 							"raw": "\n",
 							"data": "\n"
 						}
 					]
 				}
+			},
+			{
+				"type": "Text",
+				"start": 934,
+				"end": 936,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 936,
+				"end": 1007,
+				"test": {
+					"type": "Identifier",
+					"start": 941,
+					"end": 945,
+					"loc": {
+						"start": {
+							"line": 59,
+							"column": 5
+						},
+						"end": {
+							"line": 59,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 946,
+							"end": 948,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 948,
+							"end": 965,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 60,
+									"column": 2,
+									"character": 949
+								},
+								"end": {
+									"line": 60,
+									"column": 5,
+									"character": 952
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 953,
+										"end": 959,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 965,
+							"end": 972,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "Comment",
+							"start": 972,
+							"end": 996,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "Text",
+							"start": 996,
+							"end": 1002,
+							"raw": "text2\n",
+							"data": "text2\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 1007,
+				"end": 1009,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 1009,
+				"end": 1082,
+				"test": {
+					"type": "Identifier",
+					"start": 1014,
+					"end": 1018,
+					"loc": {
+						"start": {
+							"line": 64,
+							"column": 5
+						},
+						"end": {
+							"line": 64,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1019,
+							"end": 1021,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1021,
+							"end": 1038,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 65,
+									"column": 2,
+									"character": 1022
+								},
+								"end": {
+									"line": 65,
+									"column": 5,
+									"character": 1025
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1026,
+										"end": 1032,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1038,
+							"end": 1045,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "Comment",
+							"start": 1045,
+							"end": 1069,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "Text",
+							"start": 1069,
+							"end": 1077,
+							"raw": "  text2\n",
+							"data": "  text2\n"
+						}
+					]
+				},
+				"alternate": null
 			}
 		]
 	},
