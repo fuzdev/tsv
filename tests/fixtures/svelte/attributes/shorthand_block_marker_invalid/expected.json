@@ -1,0 +1,134 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 378,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 341,
+				"data": "\n\t`{@attach}` and `{...spread}` are the markers an attribute POSITION accepts. Every\n\tother `{`-marker leaves an interior that is not an identifier, and the shorthand\n\treader rejects it — the input_invalid_* files carry those spellings, the non-attach\n\t`{@…}` included (it is the attach reader that rejects that one, on its keyword).\n"
+			},
+			{
+				"type": "Text",
+				"start": 341,
+				"end": 342,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 342,
+				"end": 377,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 343
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 346
+					}
+				},
+				"attributes": [
+					{
+						"type": "AttachTag",
+						"start": 347,
+						"end": 359,
+						"expression": {
+							"type": "Identifier",
+							"start": 356,
+							"end": 358,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 14
+								},
+								"end": {
+									"line": 7,
+									"column": 16
+								}
+							},
+							"name": "fn"
+						}
+					},
+					{
+						"type": "SpreadAttribute",
+						"start": 360,
+						"end": 366,
+						"expression": {
+							"type": "Identifier",
+							"start": 364,
+							"end": 365,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 22
+								},
+								"end": {
+									"line": 7,
+									"column": 23
+								}
+							},
+							"name": "a"
+						}
+					},
+					{
+						"type": "Attribute",
+						"start": 367,
+						"end": 370,
+						"name": "b",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 26,
+								"character": 368
+							},
+							"end": {
+								"line": 7,
+								"column": 27,
+								"character": 369
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 368,
+							"end": 369,
+							"expression": {
+								"type": "Identifier",
+								"name": "b",
+								"start": 368,
+								"end": 369,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 26,
+										"character": 368
+									},
+									"end": {
+										"line": 7,
+										"column": 27,
+										"character": 369
+									}
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
