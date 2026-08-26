@@ -8,18 +8,25 @@ use crate::whitespace::{char_at, is_svelte_ws, name_run_end, skip_svelte_ws};
 use tsv_lang::{ParseError, Span};
 use tsv_ts::ast::internal::{Expression, IdentName, Identifier};
 
-use super::expression_tag::scan_to_matching_brace;
+use super::expression_tag::{SequenceLocation, scan_to_matching_brace};
 use super::parser_impl::SvelteParser;
 
-// In an attribute value a `{` ALWAYS opens an expression tag — there is no block
-// dispatch here. Blocks (`{#if}`, `{:else}`, `{/if}`) and tags (`{@html}`) are
-// *fragment* constructs; Svelte's attribute reader (`read_sequence`) never looks for
-// them and hands everything after the `{` to the JS parser. So `{/a}` is not a block
-// close, it is the expression `/a}`, which fails to parse — likewise `{#a}` / `{:a}` /
-// `{@a}`. All four are errors in Svelte. The comment forms (`{/* c */ x}`, `{// c⏎ x}`)
-// need no special case: they are simply valid JS.
+// In an attribute value there is no block DISPATCH — blocks (`{#if}`, `{:else}`, `{/if}`)
+// and tags (`{@html}`) are *fragment* constructs, and no `{` here opens one. But the four
+// markers do not all reach the same answer, and reading them as one rule is what let a
+// block live in an attribute value for a release:
 //
-// A helper mirroring the *lexer's* brace dispatch and reading those four as literal text
+//   - `{:` and `{/` are simply unguarded. Svelte's `read_sequence` hands everything after
+//     the `{` to the JS parser, so `{/a}` is not a block close but the expression `/a}`,
+//     which fails to parse — as `{:a}` does. The comment forms (`{/* c */ x}`, `{// c⏎ x}`)
+//     need no special case: they are simply valid JS.
+//   - `{#` and `{@` are GUARDED, *before* the expression is read
+//     (`SvelteParser::check_sequence_placement`, Svelte's `block_invalid_placement` /
+//     `tag_invalid_placement`). Assuming they fail as JS is the false step: `{#x in y}` is
+//     the ergonomic brand check, the one production where a private name is an operand, so
+//     it PARSES — the guard is the only thing standing between it and an over-acceptance.
+//
+// A helper mirroring the *lexer's* brace dispatch and reading the four as literal text
 // over-accepts (the canonical parser rejects all four), and the literal text then
 // round-trips into output tsv's own parser rejects: an unquoted `a={/a` re-emitted quoted
 // as `a="{/a"`, where the `{` reopens as an expression and runs unterminated.
@@ -175,9 +182,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 break;
             }
 
-            if reader == AttributeReader::Element
-                && (self.check(TokenKind::TagOpen) || self.check(TokenKind::LeftBrace))
-            {
+            if reader == AttributeReader::Element && self.current_token_opens_a_brace_attribute() {
                 // Element attribute reader: `{@attach}`, `{...spread}`, or `{shorthand}`.
                 if self.check(TokenKind::TagOpen) {
                     attributes.push(AttributeNode::AttachTag(self.parse_attach_tag()?));
@@ -207,6 +212,29 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         Ok(attributes)
+    }
+
+    /// Does the current token open a `{`-led attribute — `{@attach}`, `{...spread}`, or
+    /// `{shorthand}`?
+    ///
+    /// ⚠️ **Every `{` does, the block markers included.** Svelte has no such token: its
+    /// `read_attribute` eats the brace and runs `read_identifier`, so `{#`, `{:` and `{/`
+    /// simply leave an interior that is not an identifier and the shorthand reader rejects
+    /// them (`attribute_empty_shorthand`). tsv's lexer classifies those braces *first*
+    /// ([`TokenKind::BlockOpen`] and friends), so testing only `LeftBrace` here dropped them
+    /// through to the attribute-**name** run below — and that is not an over-acceptance but
+    /// FABRICATION: `<div {#if a}>` came back as a `RegularElement` carrying two boolean
+    /// attributes named `{#if` and `a}`, a shape Svelte's AST never contains.
+    ///
+    /// `{/* … */}` is not among them — the lexer keeps a comment-led brace a `LeftBrace`, so
+    /// it reaches the shorthand reader by the ordinary route (and is rejected there, for the
+    /// ordinary reason).
+    ///
+    /// So the question is exactly [`TokenKind::starts_with_brace`], which the enum answers
+    /// under an exhaustive match — re-listing the brace kinds here is what let three of them
+    /// slip past in the first place.
+    fn current_token_opens_a_brace_attribute(&self) -> bool {
+        self.current_kind.starts_with_brace()
     }
 
     /// Peek at the first non-whitespace character after the opening brace — Svelte's
@@ -423,12 +451,38 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
     }
 
+    /// The `{…}` placement guard for the two directive arms.
+    ///
+    /// A directive value is an attribute value in Svelte's model — `read_attribute_value`
+    /// runs `read_sequence` for every attribute, directive or not — but tsv reaches the
+    /// `{…}` form through the **token stream** (`parse_expression_tag`) rather than through
+    /// the sequence readers, so it needs the same question asked here or the rule splits by
+    /// route: `on:click="{#x in y}"` would reject and `on:click={#x in y}` would answer with
+    /// a generic "not an expression".
+    ///
+    /// Only the glued spellings are the lexer's `{#`/`{@` *and* Svelte's guard; a
+    /// whitespace-separated marker (`{ #if}`, which the lexer still tokenizes as `BlockOpen`)
+    /// falls through to the arm's own error, as it falls through to Svelte's JS parse error.
+    ///
+    /// ⚠️ **The token test is load-bearing, not a fast path.** `check_sequence_placement`
+    /// reads the byte after `current_start` and so needs `current_start` to BE a `{`; the
+    /// only thing that knows it is the token kind. On a `String` token `current_start` is the
+    /// opening quote, and `<div style:color="#fff">` — valid Svelte — would have its `#`
+    /// read as a block marker and be rejected.
+    fn check_directive_value_placement(&self) -> Result<(), ParseError> {
+        if matches!(self.current_kind, TokenKind::BlockOpen | TokenKind::TagOpen) {
+            self.check_sequence_placement(self.current_start, SequenceLocation::AttributeValue)?;
+        }
+        Ok(())
+    }
+
     /// Parse directive expression (the part after `=`)
     /// Returns the expression and the span of the expression tag (for comment lookup)
     ///
     /// Accepts both `{expr}` and `"{expr}"` (quoted mustache) forms.
     /// Svelte's parser accepts quoted expressions in directives; prettier strips the quotes.
     fn parse_directive_expression(&mut self) -> Result<(Expression<'arena>, Span), ParseError> {
+        self.check_directive_value_placement()?;
         if self.check(TokenKind::LeftBrace) {
             // Standard form: {expr}
             let expr_tag = self.parse_expression_tag()?;
@@ -502,6 +556,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let value = if self.check(TokenKind::Equals) {
             self.advance()?; // consume =
 
+            self.check_directive_value_placement()?;
             // Style directive can have either expression {value} or string "value"
             if self.check(TokenKind::LeftBrace) {
                 let expr_tag = self.parse_expression_tag()?;
@@ -987,9 +1042,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.advance()?;
 
         // Scan the quoted value as a sequence of Text and {expr} chunks. Each
-        // `{expr}` is parsed by the shared `parse_expression_tag_at`, which skips
-        // nested braces, strings, comments, and regex literals — so a `}` inside one
-        // (`"{/* } */ x}"`, `"{f(/[}]/)}"`) doesn't desync brace matching.
+        // `{expr}` goes through `parse_sequence_expression_tag_at` — the placement guard
+        // plus the shared `parse_expression_tag_at`, which skips nested braces, strings,
+        // comments, and regex literals — so a `}` inside one (`"{/* } */ x}"`,
+        // `"{f(/[}]/)}"`) doesn't desync brace matching.
         // Example: "delete {'\"'}" contains text "delete " and expression {'\"'}.
         let mut pos = content_start;
         let source_bytes = self.source.as_bytes();
@@ -1014,7 +1070,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }
 
             if pos < content_end && source_bytes[pos] == b'{' {
-                let tag = self.parse_expression_tag_at(pos)?;
+                let tag =
+                    self.parse_sequence_expression_tag_at(pos, SequenceLocation::AttributeValue)?;
                 pos = tag.span.end as usize;
                 parts.push(AttributeValue::ExpressionTag(tag));
             }
@@ -1121,7 +1178,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // Parse the `{expr}` without disturbing the lexer (it handles nested
                 // braces, strings, comments, and regex that a raw byte scan cannot);
                 // we own the cursor and sync the lexer once below.
-                let tag = self.parse_expression_tag_at(pos)?;
+                let tag =
+                    self.parse_sequence_expression_tag_at(pos, SequenceLocation::AttributeValue)?;
                 pos = tag.span.end as usize;
                 text_start = pos;
                 parts.push(AttributeValue::ExpressionTag(tag));

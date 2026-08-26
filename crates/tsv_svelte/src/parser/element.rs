@@ -7,6 +7,7 @@ use crate::lexer::TokenKind;
 use crate::whitespace::{char_at, is_svelte_ws, name_run_end};
 use tsv_lang::{ParseError, Span};
 
+use super::expression_tag::SequenceLocation;
 use super::parser_impl::SvelteParser;
 use super::{find_exact_tag_close, rcdata_close_at};
 
@@ -843,10 +844,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 }
                 // `{expr}` — flush the text before it, parse the tag off the byte position
                 // (no lexer), resume after the `}`. A `{` with no matching `}` errors in
-                // `parse_expression_tag_at`, matching Svelte's reject.
+                // `parse_expression_tag_at`, matching Svelte's reject. A `{#`/`{@` is not an
+                // expression here at all: it is rejected first, like Svelte's `read_sequence`.
                 Some(b'{') => {
                     self.push_rcdata_text(&mut nodes, chunk_start, i);
-                    let tag = self.parse_expression_tag_at(i)?;
+                    let tag =
+                        self.parse_sequence_expression_tag_at(i, SequenceLocation::InsideTextarea)?;
                     i = tag.span.end as usize;
                     chunk_start = i;
                     nodes.push(FragmentNode::ExpressionTag(tag));

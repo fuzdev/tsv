@@ -1,0 +1,129 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 146,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 90,
+				"data": " A `{expr}` still interpolates inside RCDATA, and a regex `/` is not a block close "
+			},
+			{
+				"type": "Text",
+				"start": 90,
+				"end": 91,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 91,
+				"end": 118,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 92
+					},
+					"end": {
+						"line": 2,
+						"column": 9,
+						"character": 100
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 101,
+							"end": 107,
+							"expression": {
+								"type": "Identifier",
+								"start": 102,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 15
+									}
+								},
+								"name": "expr"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 118,
+				"end": 119,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 119,
+				"end": 145,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 120
+					},
+					"end": {
+						"line": 3,
+						"column": 9,
+						"character": 128
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 129,
+							"end": 134,
+							"expression": {
+								"type": "Literal",
+								"start": 130,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 14
+									}
+								},
+								"value": {},
+								"raw": "/a/",
+								"regex": {
+									"pattern": "a",
+									"flags": ""
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

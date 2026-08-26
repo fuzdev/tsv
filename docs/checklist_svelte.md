@@ -69,6 +69,8 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Shorthand attributes (`{variable}`) — the interior goes through the same `read_identifier` as the block-head and block-binding positions, so all of its rules apply: the ECMAScript `ID_Start`/`ID_Continue` classes (`{℘}` valid, `{a²}` not), an empty name (`{123}`, `{1a}`, `{²}`), and a reserved word (`{this}`, `{class}`). See `attributes/{shorthand_numeric_invalid,shorthand_reserved_invalid,shorthand_unicode_identifier}` and, for the whole 48-word list across all six `read_identifier` positions, `tests/svelte_read_identifier.rs`
 - Spread attributes (`{...object}`)
 - Multiple spread attributes
+- Every `{`-led attribute reaches the `{@attach}` / `{...spread}` / `{shorthand}` split, the block markers included. Svelte has no marker token at this position — `read_attribute` eats the brace and runs `read_identifier`, so `{#`, `{:` and `{/` merely leave a non-identifier interior and the shorthand reader rejects it. tsv's lexer classifies those braces first, so routing on `LeftBrace` alone dropped them into the attribute-**name** run: `<div {#if a}>` came back as a `RegularElement` carrying two boolean attributes named `{#if` and `a}` — fabrication, not just an over-acceptance. See `attributes/shorthand_block_marker_invalid/`
+- A `{#…}` block or `{@…}` tag is rejected in an attribute value — one instance of the *sequence* rule stated under [§Expression Tags](#expression-tags), which the value readers share with `<textarea>` content. See `attributes/value_block_tag_placement/`
 
 ### Quote Handling
 
@@ -99,6 +101,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Expressions in text context
 - Expressions in attribute context
 - Nested ternary expressions
+- A `{#…}` block or `{@…}` tag is rejected where only a *sequence* — a run of text and `{expr}` chunks — belongs, with Svelte's own wording (`{#if ...} block cannot be in attribute value`, `{@html ...} tag cannot be inside <textarea>`). Svelte asks this once, in `read_sequence`, *before* the expression is read; tsv reaches the same sequences by five routes — `<textarea>` RCDATA content, a quoted attribute value, an unquoted one, and the two directive arms that take their `{…}` off the token stream — so one guard is called from all five (`SvelteParser::check_sequence_placement`). ⚠️ It reads the byte **glued** to the `{`, not the lexer's `{#`/`{@` token, which allows whitespace between the two where Svelte's `parser.match('#')` does not: `{ #if}` is a JS parse error on both sides, not a placement one. Without the guard the brace contents reached the TypeScript expression parser and came back answering another language's question — and `{#x in y}`, the one production where a private name is an operand, *parsed*. See `svelte/elements/textarea_block_tag_placement/` and `svelte/attributes/value_block_tag_placement/`, with the wording pinned by `tests/svelte_sequence_block_tag_placement.rs` and the guard's outer edge by `svelte/script/static_attribute_block_tag_literal/` — a top-level `<script>`/`<style>` head runs `read_static_attribute`, which reads no sequence at all, so the same spellings are literal text there
 
 ### HTML Entities
 
