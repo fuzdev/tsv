@@ -318,6 +318,9 @@ const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
 /** The two of those in which tsv is the side that refused. */
 const TSV_REFUSED: ReadonlySet<string> = new Set(['tsv_error', 'both_error']);
 
+/** The two in which the ORACLE is the side that refused — the mirror of `TSV_REFUSED`. */
+const CANONICAL_REFUSED: ReadonlySet<string> = new Set(['canonical_error', 'both_error']);
+
 /**
  * Drop from each injected variant every diff its **base file already had**, and re-grade
  * what remains.
@@ -358,11 +361,21 @@ const TSV_REFUSED: ReadonlySet<string> = new Set(['tsv_error', 'both_error']);
  * `tsv_rejects` set, each of which fails identically in every variant derived from it, and
  * a base the oracle also refused is a document tsv never accepted at all.
  *
- * The other two terminal statuses are **not** findings and stay dropped. A variant the
- * ORACLE refuses is the blunt generator working as designed (see this module's header), and
- * one both sides refuse is an injection that simply made the document invalid. Their counts
- * stay raw in the run's own "parse-fail skipped" line, which is where an unfindable
- * manufactured input belongs.
+ * **The oracle-refused half is the same finding, mirrored, and is kept on the same
+ * condition.** A variant the ORACLE refuses and tsv ACCEPTS is a tsv over-acceptance — the
+ * other direction of the drop-in claim, and the axis `skip_triage.ts` buckets by name. That
+ * the injector manufactures such inputs on purpose (whitespace where Svelte's readers do not
+ * allow it) says why the input exists, not what tsv did with it. So it is kept whenever its
+ * base was one the ORACLE accepted, mirroring the tsv arm byte for byte — otherwise the
+ * count is the `_svelte_divergence` fixtures' own sanctioned over-acceptances, re-reported
+ * once per variant derived from them, which is the reading that made the raw number
+ * unsizeable. It is reported, never gated: a deferred early error is a documented tsv
+ * posture.
+ *
+ * Only `both_error` stays dropped — an injection that made the document invalid outright,
+ * which no side accepted and which therefore carries no claim about either. Its count stays
+ * raw in the run's own "parse-fail skipped" line, where an unfindable manufactured input
+ * belongs.
  */
 export function subtract_baseline_diffs<T extends SubtractableResult>(results: T[]): T[] {
 	const baseline = new Map<string, { signatures: Set<string>; status: string }>();
@@ -385,8 +398,13 @@ export function subtract_baseline_diffs<T extends SubtractableResult>(results: T
 			if (!TSV_REFUSED.has(base?.status ?? 'match')) kept.push(r);
 			continue;
 		}
-		// The oracle refused it, or both sides did: never a finding, and carrying no diffs to
-		// be graded by either.
+		if (r.status === 'canonical_error') {
+			// The mirror, read the same way: an undefined base is one the ORACLE accepted, so
+			// only then is the variant's over-acceptance the injection's doing.
+			if (!CANONICAL_REFUSED.has(base?.status ?? 'match')) kept.push(r);
+			continue;
+		}
+		// Both sides refused it: never a finding, and carrying no diffs to be graded by either.
 		if (TERMINAL_STATUSES.has(r.status)) continue;
 		const diffs = base ? r.diffs.filter((d) => !base.signatures.has(d.signature)) : r.diffs;
 		if (diffs.length === 0) continue; // the injection changed nothing — not a finding
