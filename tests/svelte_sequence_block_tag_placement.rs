@@ -17,9 +17,16 @@
 //! case below names its route, because a guard landing on some of them is the bug this
 //! rejection exists to close, one spelling over.
 //!
+//! The file also holds the rule's two **boundaries**, since each is a wording question about
+//! the same braces and no fixture can hold one either: the attribute *position*, which is not
+//! a sequence at all and where tsv answers in its own words rather than Svelte's, and an
+//! attribute value whose quote never closes, where the lexer speaks first and the placement
+//! rule never gets to.
+//!
 //! Verdict parity with canonical is fixture-side:
-//! `svelte/elements/textarea_block_tag_placement/input_invalid_*` and
-//! `svelte/attributes/value_block_tag_placement/input_invalid_*` (both parsers reject).
+//! `svelte/elements/textarea_block_tag_placement/input_invalid_*`,
+//! `svelte/attributes/value_block_tag_placement/input_invalid_*` and
+//! `svelte/attributes/shorthand_block_marker_invalid/input_invalid_*` (both parsers reject).
 
 // The expected messages are spelled out as LITERALS on purpose — that is the pin. Building
 // them the way `check_sequence_placement` does would make this file a mirror of the code it
@@ -249,5 +256,102 @@ fn an_expression_still_interpolates_in_every_sequence() {
         "<div {@attach fn}></div>",
     ] {
         assert_parses(source);
+    }
+}
+
+/// The attribute **position** is not a sequence, and the marker there answers in tsv's own
+/// words rather than in Svelte's.
+///
+/// Svelte reaches every one of these through one reader — `read_attribute` eats the `{`, runs
+/// `allow_whitespace()`, then `read_identifier()` — so a marker simply leaves the identifier
+/// empty and it reports the same message for all of them: `attribute_empty_shorthand`,
+/// "Attribute shorthand cannot be empty". tsv's lexer classifies the marker brace first, so
+/// the dispatch names the construct the author actually wrote: a non-attach `{@…}` reaches the
+/// attach reader and fails on its keyword, every other marker reaches the shorthand reader and
+/// fails on its interior. Both parsers reject either way — verdict parity is fixture-side
+/// (`svelte/attributes/shorthand_block_marker_invalid/input_invalid_*`), so what is pinned
+/// here is the wording alone, and the divergence is deliberate: Svelte's message names a
+/// shorthand the author never wrote.
+///
+/// The **separated** spelling is the same message by a different route, and needs its own pin
+/// for that reason: the attach reader used to read the author's space as the keyword's first
+/// byte, and now skips the gap and reads `@html` — one message standing for two questions
+/// until `<div { @attach fn}>` (valid, and what prettier emits) proved they were different.
+#[test]
+fn a_brace_attribute_marker_answers_in_its_own_words() {
+    for (source, message) in [
+        // The attach reader, on its keyword — every `{@…}` that is not `{@attach}`.
+        ("<div {@html x}></div>", "Expected 'attach' keyword"),
+        ("<div { @html x}></div>", "Expected 'attach' keyword"),
+        ("<div {@debug x}></div>", "Expected 'attach' keyword"),
+        ("<div { @debug x}></div>", "Expected 'attach' keyword"),
+        // The shorthand reader, on its interior — the open, the continuation and the close.
+        (
+            "<div {#if x}></div>",
+            "Invalid shorthand attribute: '#if x'",
+        ),
+        (
+            "<div { #if x}></div>",
+            "Invalid shorthand attribute: '#if x'",
+        ),
+        (
+            "<div {:else}></div>",
+            "Invalid shorthand attribute: ':else'",
+        ),
+        (
+            "<div { :else}></div>",
+            "Invalid shorthand attribute: ':else'",
+        ),
+        ("<div {/if}></div>", "Invalid shorthand attribute: '/if'"),
+        ("<div { /if}></div>", "Invalid shorthand attribute: '/if'"),
+    ] {
+        assert_rejected_with(source, message);
+    }
+}
+
+/// Where the guard stops: an attribute value whose quote never closes dies in the **lexer**,
+/// before there is a value for the placement rule to speak about.
+///
+/// This is the last spelling of the accident the guard removed from the closed case — a
+/// quoted value used to run past `{/if}`'s `/` onto a regex that never terminated and come
+/// back `Unterminated string literal in template`. With a closing quote every route now names
+/// the placement (the cases above); with none, the string genuinely does not close, so tsv
+/// reports the enclosing failure and the interior is never judged. Svelte answers from the
+/// other end — its `read_sequence` runs to EOF and reports the marker it passed on the way
+/// (`block_invalid_placement`), or `js_parse_error` for the separated spelling — so the
+/// verdicts agree and only the wording differs
+/// (`svelte/attributes/value_block_tag_placement/input_invalid_quoted_block_unterminated.svelte`
+/// holds that parity).
+///
+/// The pin is on the ordering, not on a preference: it is the notice that fires if a later
+/// change lets the placement rule reach here. Truncation alone does not — an unquoted value
+/// and RCDATA content both still name the placement at EOF.
+#[test]
+fn an_unterminated_value_dies_in_the_lexer_before_the_placement_rule() {
+    for (source, message) in [
+        (
+            r#"<div data-attr="{#if a}></div>"#,
+            "Unterminated string literal in template",
+        ),
+        (
+            r#"<div data-attr="{ #if a}></div>"#,
+            "Unterminated string literal in template",
+        ),
+        (
+            r#"<div data-attr="{@html expr}></div>"#,
+            "Unterminated string literal in template",
+        ),
+        // The same truncation without the quote keeps the rule: the unquoted reader and
+        // RCDATA content both reach the marker before they reach the end of the input.
+        (
+            "<div data-attr={#if a}",
+            "{#if ...} block cannot be in attribute value",
+        ),
+        (
+            "<textarea>{#if a}",
+            "{#if ...} block cannot be inside <textarea>",
+        ),
+    ] {
+        assert_rejected_with(source, message);
     }
 }

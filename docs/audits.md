@@ -287,12 +287,25 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
   line class and no per-parse seed), and the `ws` family additionally reaches only heads.
 - **A base that already diverges at a signature masks a new divergence at that same
   signature** in its variants. A clean base is the better seed.
-- **A variant the ORACLE rejects is not a finding.** It buckets as `canonical_error` and is
-  skipped, so an over-acceptance introduced by an injection is not graded here. The mirror
-  case IS graded: a variant **tsv** rejects where its base parsed is kept as a finding, with
-  its `#inj:` label, since an injection-introduced over-rejection carries no diffs to be
-  found by (196 of them on `tests/fixtures` under `terminators` today, against 577 before
-  the inherited ones — every `input_invalid_*` fixture's — were subtracted out).
+- **A rejection is a finding on either side, and neither carries diffs to be found by.** A
+  variant **tsv** rejects where its base parsed is an injection-introduced over-rejection;
+  one the **ORACLE** rejects where its base parsed is an injection-introduced
+  over-acceptance. Both are kept with their `#inj:` label — the only thing that reproduces
+  them — both are baseline-subtracted on their own side (`TSV_REFUSED` / `CANONICAL_REFUSED`
+  in `wire_inject.ts`), and both are listed per file in `--json`'s `errors`. Reported, never
+  gated, in both directions: a deferred early error is a documented tsv posture. On
+  `tests/fixtures` today: 196 over-rejections under `terminators` (against 577 before the
+  inherited ones — every `input_invalid_*` fixture's — were subtracted out), and under `ws`
+  0 over-rejections against **33** over-acceptances (against 64 raw, the rest inherited).
+  ⚠️ The subtraction is what makes the number readable: raw, the oracle-side count
+  re-reports each `_svelte_divergence` fixture's own sanctioned over-acceptance once per
+  variant derived from it, so it sizes the fixture tree rather than the injection.
+  Only `both_error` — an injection that made the document invalid outright — stays a raw
+  skip, being a claim about neither side.
+- **`both_error` hides the over-acceptance's twin.** An injection that turns a document
+  tsv accepted into one it rejects *while the oracle also rejects it* is dropped, since a
+  variant no side accepts says nothing about either. A real over-rejection whose injected
+  form happens to be invalid Svelte therefore never surfaces.
 - **The head scan is approximate** — it counts braces without tracking strings or
   comments, so a head containing `'}'` ends early. That costs sites; it cannot
   manufacture a wrong finding.
@@ -301,15 +314,37 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
 list, not a regression gate, which is why it is not in `deno task check` (it also needs
 the canonical parser, so it is conformance-tier at best). Standing findings:
 
-- **`ws`** (census: 25 files / 19 signature groups) — **one bug in every one of them**: a
-  `//` comment's extent is **clipped at a trimmed slice boundary** in the bounded-slice tag
-  readers. `{@html expr // c ⏎}` ends the comment before the trailing space where acorn ends
-  it after; `{expr // c ⏎}` and `<script>` both agree, so the divergence is the bounded
-  readers' whitespace-trimmed slice, not the comment lexer. Because the family is a census
-  and its whole finding set is this one bug, closing it takes the run to zero — which makes
-  `ws` a candidate to become a **green gate at zero**, not a ratchet: there would be nothing
-  left to pin. (Its 83 tsv-side rejections are a separate triage list — tier-4 by the robustness
-  bar, so over-rejection-sweep material rather than this audit's.)
+- **`ws`** (census: 25 files / 19 signature groups) — **two bugs, and both are the same
+  question asked of a sub-parse: which SOURCE did that parse actually see?**
+  - **A comment's extent is clipped at a trimmed slice boundary** (15 files, from 5 bases):
+    the `{@…}` readers hand their interior to the sub-parse whitespace-**trimmed**, so a
+    trailing `//` comment ends where the trim did. `{@html expr // c ⏎}` ends the comment
+    before the trailing space where acorn ends it after — and every node whose end is the
+    comment's end comes back short with it. The whole `{@…}` family reaches it (`html`,
+    `render`, `debug`, `const`, and the `{@attach}` attribute); `{expr // c ⏎}`, an
+    attribute value and `<script>` all agree, so the divergence is the bounded readers'
+    slice, not the comment lexer, and a comment that is not last in the interior is
+    unaffected.
+  - **The acorn comment DEDENT is computed against the document** (10 files, from 2
+    `tags/const/` bases) where canonical computes it against the synthetic source it built.
+    Svelte's `onComment` strips the comment line's own indentation from every line of a
+    multiline block comment's `value` (`1-parse/acorn.js`), and `Comment::wire_value`
+    mirrors it — but `read_pattern` and `read_type_annotation` parse a **manufactured**
+    string (`<spaces>(pattern = 1)` / `<spaces>_ as T`), whose line prefix is spaces or
+    `_ as` rather than the author's tab, so canonical strips nothing there. tsv strips the
+    document's indentation and loses a tab from the `value` of a comment inside a
+    `{@const}` destructuring pattern or type annotation. Same shape as the per-parse `loc`
+    line class (`AcornSeed`), one field over: what acorn saw, not what the document says.
+
+  Because the family is a census, closing both takes the run to zero — which makes `ws` a
+  candidate to become a **green gate at zero**, not a ratchet: there would be nothing left
+  to pin. Its oracle-side rejections are separately sized above and are currently **all
+  documented** — 32 split `!==` into `! ==`, whose non-null assertion only a TS parse
+  accepts (the tracked [TypeScript-mode
+  gating](./conformance_svelte.md#typescript-mode-gating-tracked-over-acceptance)
+  over-acceptance), and 1 splits `?:` into `? :`, feeding Svelte's own `/\?\s*:/g` template
+  rewrite (pinned in
+  [`block_pattern_annotation_span.rs`](../tests/block_pattern_annotation_span.rs)).
 - **`terminators`** (sampled: 277 files / 175 signature groups), by file count over
   `tests/fixtures` — two groups, neither of them a line-*class* question despite the family
   that surfaced them:

@@ -1061,10 +1061,15 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			// `tsv_rejects` set, and each fails in every variant derived from it while its
 			// own base is excluded as a control — so the raw number reports inherited
 			// failures as injected ones. What survives here is an injection that turned an
-			// accepted document into a rejected one. The other two stay raw: neither is a
-			// finding, and "parse-fail skipped" is the right home for a manufactured input
-			// the oracle refused.
+			// accepted document into a rejected one. The oracle-side rejections are
+			// re-derived for the mirror-image reason — raw, they re-report each
+			// `_svelte_divergence` fixture's own sanctioned over-acceptance once per variant
+			// derived from it — and what survives there is an injection that turned a
+			// document the ORACLE accepted into one only tsv does. `both_error` stays raw: no
+			// side accepted it, so it is a finding about neither, and "parse-fail skipped" is
+			// the right home for it.
 			s.tsv_errors = count('tsv_error');
+			s.canonical_errors = count('canonical_error');
 		}
 	}
 
@@ -1129,6 +1134,15 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		console.log(
 			`\n\x1b[2mParse failures skipped (tsv ${totals.tsv_errors} / canonical ${totals.canonical_errors} / both ${totals.both_errors}) — triage with diagnostics/skip_triage.ts\x1b[0m`
 		);
+		// In inject mode the first two numbers are baseline-subtracted FINDINGS, not skips:
+		// each is an injection that moved a verdict, one per direction of the drop-in claim.
+		// Both are listed per file in `--json`'s `errors`, which is the only place the
+		// `#inj:` label that reproduces them survives.
+		if (injecting && totals.tsv_errors + totals.canonical_errors > 0) {
+			console.log(
+				`\x1b[2m  of those, injected: ${totals.tsv_errors} over-rejection(s) (tsv refused what it accepted before) and ${totals.canonical_errors} over-acceptance(s) (canonical refused, tsv did not) — per-file in --json\x1b[0m`
+			);
+		}
 	}
 
 	const groups = build_groups(results);
