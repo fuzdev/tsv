@@ -1037,6 +1037,30 @@ impl<'arena> FragmentNode<'arena> {
         let last = nodes.iter().rposition(|n| !n.is_hoisted_from_fragment())?;
         Some((first, last))
     }
+
+    /// Whether index `i` sits at (or past) the **start** of [`FragmentNode::content_bounds`] —
+    /// no node the whitespace rules see stands before it, so the run on its leading side is the
+    /// fragment's own boundary air rather than a seam between two children.
+    ///
+    /// ⚠️ **The one spelling of that comparison**, and it is shared because the readers must not
+    /// drift: `Printer::handle_content_text_child` TRIMS a text's leading run here
+    /// (`is_first`), `Printer::content_holds_interior_blank` declines to read a blank there for
+    /// the same reason, and `Printer::is_hoisted_edge_separator` asks it of the separator node
+    /// between two non-text siblings. A gate that answered it differently from the emitter it
+    /// models would break a body open on a blank that emitter had already deleted — the whole
+    /// bug class those three exist to close. `<=` rather than `==` because a HOISTED node sits
+    /// at a real index below `bounds.0`, and every index it occupies answers the same.
+    #[inline]
+    pub fn at_content_start(i: usize, bounds: (usize, usize)) -> bool {
+        i <= bounds.0
+    }
+
+    /// The mirror of [`FragmentNode::at_content_start`] at the **end** of the content bounds —
+    /// same rule, same readers, same reason for `>=`.
+    #[inline]
+    pub fn at_content_end(i: usize, bounds: (usize, usize)) -> bool {
+        i >= bounds.1
+    }
 }
 
 /// Svelte Element kind - distinguishes HTML elements from components.

@@ -16,6 +16,7 @@ use super::fragment_text_doc::TextChildContext;
 use super::helpers::{is_control_flow_block, is_inline_content};
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::{Printer, text};
+use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
 
@@ -219,6 +220,10 @@ impl<'a> Printer<'a> {
             FragmentNode::content_bounds(trimmed_nodes).unwrap_or((0, trimmed_len - 1));
 
         let mut format_ignore_next = false;
+        // Newlines in the whitespace-only run between a pending directive and the node it
+        // freezes — skipped rather than printed, so this is where its authoring survives until
+        // the frozen node re-emits it (`push_format_ignore_gap`).
+        let mut format_ignore_gap_newlines = 0usize;
         // Exclusive upper bound of indices already consumed by a maximal glued-element run built
         // at its head (`build_glued_element_run`): the run is built ONCE at its first element and
         // its tail elements are skipped, so the build is O(run length), not the O(run length²) a
@@ -269,18 +274,43 @@ impl<'a> Printer<'a> {
             let prev_sibling_head = std::mem::replace(&mut sibling_head, i);
             // format-ignore: skip whitespace, emit raw source for ignored node
             if format_ignore_next {
-                if let Some(raw_doc) = self.format_ignore_raw_doc(node) {
-                    // The directive comment is the previous child and the whitespace between it
-                    // and this node was skipped above; in `multiline` mode that boundary must keep
-                    // its line break (path 1 flushed the buffer here) so the ignored node starts on
-                    // its own line (`<!-- prettier-ignore -->⏎<div …>`) rather than hugging the
-                    // directive. A first node (no preceding sibling) defers to the parent boundary.
+                let trailing_owned = self.format_ignore_trailing_boundary_owned(trimmed_nodes, i);
+                let frozen = self.format_ignore_frozen_span(node, trailing_owned);
+                if let Some(raw_doc) = self.format_ignore_raw_doc(node, frozen) {
+                    // The directive comment is the previous child, and the gap between it and this
+                    // node is the author's: in `multiline` mode it is re-emitted here (path 1
+                    // flushed the buffer at it) so the ignored node starts on its own line
+                    // (`<!-- prettier-ignore -->⏎<div …>`) rather than hugging the directive, and a
+                    // blank line in it survives. Emitted ONCE — a frozen text carries that gap in
+                    // its own bytes and takes nothing here. See `push_format_ignore_gap`.
+                    // A first node (no preceding sibling) defers to the parent boundary.
                     if multiline && !child_docs.is_empty() {
-                        child_docs.push(self.d().hardline());
+                        self.push_format_ignore_gap(
+                            format_ignore_gap_newlines,
+                            frozen,
+                            &mut child_docs,
+                        );
                     }
                     child_docs.push(raw_doc);
+                    // The trailing run the slice gave up: its boundary is the follower's own line,
+                    // but an authored blank in it is content that one break cannot carry — the
+                    // same second hardline `handle_content_text_child` pushes at this seam. At the
+                    // fragment's own edge there is no follower and the blank is boundary air,
+                    // which both formatters drop.
+                    if multiline
+                        && i + 1 < trimmed_len
+                        && self.format_ignore_dropped_trailing_blank(node, frozen)
+                    {
+                        child_docs.push(self.d().hardline());
+                    }
                     deferred = DeferredBoundary::default();
                     format_ignore_next = false;
+                    format_ignore_gap_newlines = 0;
+                } else if let FragmentNode::Text(t) = node {
+                    // The skipped run IS the gap: keep what the author wrote in it for the arm
+                    // above, which is the only place it can still be spent.
+                    format_ignore_gap_newlines =
+                        format_ignore_gap_newlines.max(t.newline_count as usize);
                 }
                 continue;
             }
@@ -586,7 +616,8 @@ impl<'a> Printer<'a> {
     /// Tier-2 blank) is the same question and needs the same guard, or it forces a body open on a
     /// blank the trim consumed. The content-text half of that exclusion is already spelled as an
     /// index-vs-`content_bounds` test where such a gate reads a TEXT's edges; this is the same
-    /// exclusion for the separator node, and the two must not drift apart.
+    /// exclusion for the separator node, and the two cannot drift apart — all three readers ask
+    /// [`internal::FragmentNode::at_content_start`] / [`internal::FragmentNode::at_content_end`].
     ///
     /// ⚠️ **The render-free fact licenses the trim; it does not decide it.** Being deletable makes
     /// both spellings one document, so *some* form must be chosen — and the base rule's own
@@ -627,8 +658,8 @@ impl<'a> Printer<'a> {
         // Interior: a node the whitespace rules see stands on BOTH sides, so neither run is an
         // edge — the two merge into one rendered space (`a {@debug x} b` → `a b`) and gluing
         // would be a different document. This is what bounds the rule.
-        let trailing_edge = i >= bounds.1;
-        let leading_edge = i <= bounds.0;
+        let trailing_edge = FragmentNode::at_content_end(i, bounds);
+        let leading_edge = FragmentNode::at_content_start(i, bounds);
         if !trailing_edge && !leading_edge {
             return false;
         }
@@ -733,7 +764,11 @@ impl<'a> Printer<'a> {
     /// whitespace-only text to skip — the pin then carries to the next real node.
     /// Shared leading step of the three `build_nodes_doc_*` accumulation loops; each
     /// caller owns its sink and clears `format_ignore_next` only when this returns `Some`.
-    fn format_ignore_raw_doc(&self, node: &FragmentNode<'_>) -> Option<DocId> {
+    ///
+    /// Takes the span rather than deriving it, because both callers need it for the gap
+    /// question ([`Self::push_format_ignore_gap`]) before they need the doc, and deriving it in
+    /// two places is two answers to [`Self::format_ignore_frozen_span`] waiting to disagree.
+    fn format_ignore_raw_doc(&self, node: &FragmentNode<'_>, frozen: Span) -> Option<DocId> {
         if let FragmentNode::Text(text) = node
             && text.is_collapsible_ws_only
         {
@@ -742,7 +777,98 @@ impl<'a> Printer<'a> {
         // The ignored node's subtree can hold `{expr}` / block-head comments (all in
         // `Root.comments`); they ride out inside the raw slice — see
         // `tsv_lang::comment_ledger`.
-        Some(self.verbatim_source_doc(node.span()))
+        Some(self.verbatim_source_doc(frozen))
+    }
+
+    /// The span a `format-ignore` freezes for `node` — its own span, less the one run that is
+    /// not part of the construct the directive names.
+    ///
+    /// A frozen **text** node's span carries the collapsible whitespace on its two edges, which
+    /// the parser folded into it: those runs are *separators*, where every other frozen kind's
+    /// span holds none. The **leading** one stays — it is the boundary the author wrote in front
+    /// of the node, and [`Self::push_format_ignore_gap`] is what makes sure the printer does not
+    /// print a second one on top of it. The **trailing** one goes when the boundary after it is
+    /// the printer's to emit ([`Self::format_ignore_trailing_boundary_owned`]).
+    ///
+    /// ⚠️ The two must partition that boundary, and keeping both was an unbounded F1 divergence
+    /// rather than a stray space: each pass writes one more line into the frozen slice, which the
+    /// next pass reads back as the author's
+    /// (`syntax/prettier_ignore/directive_gap_text_prettier_divergence`).
+    fn format_ignore_frozen_span(&self, node: &FragmentNode<'_>, trailing_owned: bool) -> Span {
+        let span = node.span();
+        if !trailing_owned {
+            return span;
+        }
+        let FragmentNode::Text(text) = node else {
+            return span;
+        };
+        let trailing = internal::text_edge_ws(text.raw(self.source), false).len() as u32;
+        Span::new(span.start, span.end - trailing)
+    }
+
+    /// Whether the boundary AFTER a format-ignored node is the **printer's** to emit rather than
+    /// the frozen slice's — the one question deciding whether a frozen text keeps its own
+    /// trailing run ([`Self::format_ignore_frozen_span`]).
+    ///
+    /// Two ways it is, and they are the two the printer emits a line for unconditionally: nothing
+    /// follows, so the fragment's own close is that boundary; or the follower **owns its line**
+    /// ([`Self::is_own_line_declaration`]) and prints it whatever precedes. Every other follower
+    /// reads the previous text's trailing whitespace before deciding — a block element through
+    /// `handle_block_child`'s `break_before`, an inline element, tag or comment through the
+    /// deferred boundary — so it emits nothing beside a slice that already ends in a break, and
+    /// the run must stay or the two nodes weld.
+    ///
+    /// ⚠️ This is the same seam `handle_content_text_child` answers with `next_owns_line` for a
+    /// NON-frozen text, and it answers it the same way — including keeping an authored blank
+    /// there. A frozen text is still a text at its edges; only its interior is the author's.
+    fn format_ignore_trailing_boundary_owned(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        i + 1 >= nodes.len() || self.is_own_line_declaration(nodes, i + 1)
+    }
+
+    /// Whether the trailing run [`Self::format_ignore_frozen_span`] dropped held an authored
+    /// blank line — the Tier-2 signal the boundary that replaces it then owes, exactly as
+    /// `handle_content_text_child`'s `next_owns_line` arm owes it. Empty (and so `false`) when
+    /// nothing was dropped.
+    fn format_ignore_dropped_trailing_blank(&self, node: &FragmentNode<'_>, frozen: Span) -> bool {
+        let dropped = &self.source[frozen.end as usize..node.span().end as usize];
+        dropped.matches('\n').count() >= 2
+    }
+
+    /// The break the printer owes in front of a format-ignored node: `gap_newlines` is what the
+    /// author wrote in the whitespace-only run [`Self::format_ignore_raw_doc`] skipped, and
+    /// `frozen` is the slice about to be emitted.
+    ///
+    /// **The gap is printed once.** A frozen slice that opens with a line break carries the
+    /// boundary in its own bytes (a frozen text's leading run — see
+    /// [`Self::format_ignore_frozen_span`]), so the printer adds nothing; every other frozen kind
+    /// sits behind a whitespace-only node that was skipped, so the printer re-emits it. Printing
+    /// both is the same line twice, and because the next pass reads the printer's break back as
+    /// part of the frozen bytes it is not idempotent — the gap grows a line per pass.
+    ///
+    /// An authored **blank** in a skipped run survives as the second break, the Tier-2 signal it
+    /// is everywhere else — the answer `build_container_content_doc`'s `pending_blank` already
+    /// gave on the whitespace-collapsing path, stated here for the general one
+    /// (`syntax/prettier_ignore/directive_gap_blank`).
+    fn push_format_ignore_gap(&self, gap_newlines: usize, frozen: Span, child_docs: &mut DocBuf) {
+        if self.format_ignore_slice_carries_gap(frozen) {
+            return;
+        }
+        let d = self.d();
+        if gap_newlines >= 2 {
+            child_docs.push(d.hardline());
+        }
+        child_docs.push(d.hardline());
+    }
+
+    /// Whether the frozen slice opens with the boundary in its own bytes, so the printer owes
+    /// none — the half of [`Self::push_format_ignore_gap`] the whitespace-collapsing container
+    /// loop asks on its own, where the same answer is its `glued_before`.
+    ///
+    /// One predicate for both loops on purpose: a loop that answered it differently would print
+    /// the gap twice in the container the other one gets right, and the second copy is invisible
+    /// until the pass after next.
+    fn format_ignore_slice_carries_gap(&self, frozen: Span) -> bool {
+        text_starts_with_linebreak(frozen.extract(self.source))
     }
 
     /// Handle an inline child element - matches prettier-plugin-svelte's handleInlineChild
@@ -1017,8 +1143,13 @@ impl<'a> Printer<'a> {
     /// approximation of both:
     ///
     /// - a **whitespace-only separator** is deleted by the hoisted-edge trim
-    ///   ([`Self::is_hoisted_edge_separator`]) — and by nothing else, the body's own boundary air
-    ///   having gone with the slice trim above;
+    ///   ([`Self::is_hoisted_edge_separator`]); the body's own boundary air is already gone with
+    ///   the slice trim above, and the one other emitter that skips such a run — the
+    ///   format-ignore arm, for the gap between a directive and the node it freezes — re-emits
+    ///   it rather than deleting it ([`Self::push_format_ignore_gap`]), so the blank survives
+    ///   there too and this gate may count it. ⚠️ That was not always so: while the arm ate the
+    ///   blank, this gate counted one the output did not contain and forced the body open on
+    ///   bytes that were not there;
     /// - a **content text's edge** is deleted by [`Printer::handle_content_text_child`], whose
     ///   `is_first` / `is_last` are this same `content_bounds`.
     ///
@@ -1057,8 +1188,9 @@ impl<'a> Printer<'a> {
             // `handle_content_text_child` trims it, which is `is_first` / `is_last` against the
             // very same `content_bounds` — so the two cannot answer differently.
             FragmentNode::Text(_) => {
-                (i > bounds.0 && self.text_edge_has_blank(n, true))
-                    || (i < bounds.1 && self.text_edge_has_blank(n, false))
+                (!FragmentNode::at_content_start(i, bounds) && self.text_edge_has_blank(n, true))
+                    || (!FragmentNode::at_content_end(i, bounds)
+                        && self.text_edge_has_blank(n, false))
             }
             _ => false,
         })
@@ -1448,7 +1580,19 @@ impl<'a> Printer<'a> {
             // and its authored whitespace, not a re-emitted space, decides each separator.
             let (node_doc, glued_before, glued_after) = if format_ignore_next {
                 format_ignore_next = false;
-                (self.format_ignore_raw_doc(node), false, false)
+                // Always the printer's here: this loop hardline-separates every child it emits
+                // and trims every run between them, so a frozen text's trailing run is never the
+                // boundary — at the container's edge and between two children alike.
+                let frozen = self.format_ignore_frozen_span(node, true);
+                // A frozen slice that opens with a line break carries this boundary itself, so
+                // the separator below must not print a second one — `glued_before` is that same
+                // "no separator here" answer, reached because the gap is in the bytes rather than
+                // absent from them. The general path states the pair at `push_format_ignore_gap`.
+                (
+                    self.format_ignore_raw_doc(node, frozen),
+                    self.format_ignore_slice_carries_gap(frozen),
+                    false,
+                )
             } else if let FragmentNode::Text(t) = node {
                 let raw = t.raw(self.source);
                 (

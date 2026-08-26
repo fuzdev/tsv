@@ -618,10 +618,12 @@ impl<'a> Printer<'a> {
         // between this text and the fragment edge: `clean_nodes` lifts those out before it trims,
         // making this text the real last node and its trailing run a render-free edge run
         // ([`FragmentNode::is_hoisted_from_fragment`]). The bounds are computed once per fragment
-        // by the caller rather than scanned here — see [`TextChildContext::content_bounds`].
+        // by the caller rather than scanned here — see [`TextChildContext::content_bounds`]; the
+        // comparison itself is `FragmentNode::at_content_start` / `at_content_end`, shared with
+        // every gate that models this trim.
         let raw: &str = text.raw(self.source);
-        let is_first = i <= content_bounds.0;
-        let is_last = i >= content_bounds.1;
+        let is_first = FragmentNode::at_content_start(i, content_bounds);
+        let is_last = FragmentNode::at_content_end(i, content_bounds);
         let prev_is_inline = prev_node.is_some_and(is_inline_content);
         let prev_is_tag = prev_node.is_some_and(Self::is_tag_node);
         // A byte-glued HTML-comment run (`<!--c--><a…>`) between this text and an inline element
