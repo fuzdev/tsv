@@ -942,6 +942,13 @@ expectations that oracle produces are still fresh.
 
 ## Authoring-Independence Audit (`authoring:audit`)
 
+The doctrine this gate enforces — what counts as "one document", which holds are deliberate, and
+the enumerated dual-stable remainder — is [§Authoring Convergence
+Philosophy](./conformance_prettier.md#authoring-convergence-philosophy). ⚠️ Read the blind spots
+there before treating a green run as evidence: this audit fails on **non-idempotency only**, so
+the `diverge (dual-stable)` bucket — sanctioned holds and accidental ones alike — is reported but
+never graded and carries no ratchet file.
+
 ```bash
 # authoring_audit - probe whether the SAME logical document, authored with
 # different boundary whitespace, formats to ONE tsv fixed point. Stronger than the
