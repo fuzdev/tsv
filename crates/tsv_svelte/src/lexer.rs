@@ -23,6 +23,34 @@ pub enum TokenKind {
     Eof,
 }
 
+impl TokenKind {
+    /// Does this token begin at a `{`?
+    ///
+    /// The lexer classifies a brace-led construct at the brace, so the answer is a fact
+    /// about the enum rather than about any one reader — and the match is deliberately
+    /// **exhaustive, with no wildcard**: a new brace-led variant must then be classified
+    /// here or the crate stops compiling. Enumerating a subset by hand is how `{#`, `{:`
+    /// and `{/` came to miss the attribute dispatch (`SvelteParser::parse_attributes_inner`).
+    pub(crate) const fn starts_with_brace(self) -> bool {
+        match self {
+            Self::LeftBrace
+            | Self::BlockOpen
+            | Self::BlockClose
+            | Self::BlockContinue
+            | Self::TagOpen => true,
+            Self::LeftAngle
+            | Self::RightAngle
+            | Self::Slash
+            | Self::RightBrace
+            | Self::Equals
+            | Self::String
+            | Self::Identifier
+            | Self::Comment
+            | Self::Eof => false,
+        }
+    }
+}
+
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -74,6 +102,60 @@ pub struct Lexer<'a> {
     /// positions are unaffected (the parser shifts those by its own `base_offset`).
     /// See [`Lexer::host_err`].
     base_offset: usize,
+}
+
+/// A `{`-glued `#` or `@` — the marker that makes a brace a `{#…}` block or a `{@…}` tag
+/// rather than an expression.
+///
+/// ⚠️ **Glued, deliberately.** The lexer's own [`TokenKind::BlockOpen`] / [`TokenKind::TagOpen`]
+/// allow whitespace between the brace and the marker (`{ #if}` tokenizes like `{#if}`, matching
+/// Svelte's `tag()`, which runs `allow_whitespace()` after the `{`). The *placement* rule does
+/// not: Svelte's `read_sequence` asks `parser.match('#')` immediately after `eat('{')`, so
+/// `{ #x in y}` is handed to the expression parser and fails there as JS. Reading the raw byte
+/// is what keeps those two questions apart.
+///
+/// `{:` and `{/` are deliberately absent — `read_sequence` does not guard them either, and they
+/// fall through to the expression parser on both sides.
+///
+/// Two callers, and they must agree **exactly**: the placement guard
+/// (`SvelteParser::check_sequence_placement`), which turns a marker into Svelte's own error, and
+/// the quoted-attribute-value scan below, which stops treating the value as a sequence at one.
+/// A wider set here breaks a valid value; a narrower one hands the guard's error back to the
+/// scan accident it replaced.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum BlockOrTagMarker {
+    /// `{#` — a block, e.g. `{#if …}`.
+    Block,
+    /// `{@` — a tag, e.g. `{@html …}`.
+    Tag,
+}
+
+impl BlockOrTagMarker {
+    /// The marker glued to the `{` at `brace_pos`, if any.
+    #[inline]
+    pub(crate) fn glued_at(bytes: &[u8], brace_pos: usize) -> Option<Self> {
+        match bytes.get(brace_pos + 1) {
+            Some(b'#') => Some(Self::Block),
+            Some(b'@') => Some(Self::Tag),
+            _ => None,
+        }
+    }
+
+    /// The marker byte itself, for spelling the construct back to the author.
+    pub(crate) const fn sigil(self) -> char {
+        match self {
+            Self::Block => '#',
+            Self::Tag => '@',
+        }
+    }
+
+    /// What Svelte calls it in `block_invalid_placement` / `tag_invalid_placement`.
+    pub(crate) const fn construct(self) -> &'static str {
+        match self {
+            Self::Block => "block",
+            Self::Tag => "tag",
+        }
+    }
 }
 
 impl<'a> Lexer<'a> {
@@ -338,21 +420,41 @@ impl<'a> Lexer<'a> {
                 // same way (via `parse_expression_tag_at`); this is the tokenizing half.
                 self.advance(); // consume opening quote
 
+                // A `{#`/`{@` glued to the brace ends the value's life as a *sequence*:
+                // Svelte's `read_sequence` rejects a block or tag in an attribute value before
+                // it reads an expression, and so does `SvelteParser::check_sequence_placement`.
+                // From that marker on there is no expression to skip, and pretending otherwise
+                // loses the error: `style="{#if c}a{/if}"` reaches the `{/if}`, whose `/` opens
+                // a regex literal that never closes, so the scan runs to EOF and the whole
+                // value dies as `Unterminated string literal` — a lexer accident standing in
+                // for the placement rule the author actually broke. Reading the rest as plain
+                // bytes closes the string at its real quote, which is the HTML-level delimiter
+                // the static reader uses anyway, and hands the parser the position where the
+                // rule lives.
+                let mut sequence_is_invalid = false;
+                // `&'a [u8]` borrowed from the immutable source, so it outlives the `&mut self`
+                // `seek_to` below rather than being re-taken per brace.
+                let bytes = self.source.as_bytes();
+
                 while let Some(ch) = self.current {
                     if ch == quote {
                         self.advance(); // consume closing quote
                         return Ok(self.make_token(TokenKind::String, start));
                     }
-                    if ch == '{' {
-                        let Some(close) = source_scan::scan_to_matching_brace(
-                            self.source.as_bytes(),
-                            self.position + 1,
-                            self.source.len(),
-                        ) else {
-                            break; // unterminated `{` — the value can't close
-                        };
-                        self.seek_to(close + '}'.len_utf8());
-                        continue;
+                    if ch == '{' && !sequence_is_invalid {
+                        if BlockOrTagMarker::glued_at(bytes, self.position).is_some() {
+                            sequence_is_invalid = true;
+                        } else {
+                            let Some(close) = source_scan::scan_to_matching_brace(
+                                bytes,
+                                self.position + 1,
+                                self.source.len(),
+                            ) else {
+                                break; // unterminated `{` — the value can't close
+                            };
+                            self.seek_to(close + '}'.len_utf8());
+                            continue;
+                        }
                     }
                     // Attribute-value text. HTML/Svelte attribute values have NO backslash
                     // escapes (unlike a JS string inside `{expr}`, skipped above), so `\`

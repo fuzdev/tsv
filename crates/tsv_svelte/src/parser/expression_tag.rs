@@ -1,10 +1,31 @@
 // Expression tag parsing
 
 use crate::ast::internal::*;
-use crate::lexer::TokenKind;
+use crate::lexer::{BlockOrTagMarker, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
+
+/// The two contexts Svelte's `read_sequence` runs in — a run of text and `{expr}` chunks,
+/// where a `{#…}` block or `{@…}` tag is invalid. The strings are Svelte's own `location`
+/// argument to `block_invalid_placement` / `tag_invalid_placement`, so the messages
+/// [`SvelteParser::check_sequence_placement`] builds read exactly as the canonical parser's.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum SequenceLocation {
+    /// `<textarea>` RCDATA content — Svelte's sole RCDATA element.
+    InsideTextarea,
+    /// An attribute value, quoted or not, a directive's and a style directive's included.
+    AttributeValue,
+}
+
+impl SequenceLocation {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::InsideTextarea => "inside <textarea>",
+            Self::AttributeValue => "in attribute value",
+        }
+    }
+}
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse an expression tag `{expression}` at the current lexer position, then
@@ -30,6 +51,65 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.advance_to_position(tag.span.end as usize)?;
 
         Ok(tag)
+    }
+
+    /// Parse an expression tag inside a **sequence** — a run of text and `{expr}` chunks —
+    /// rejecting a `{#…}` block or `{@…}` tag first, as Svelte's `read_sequence` does.
+    ///
+    /// This is the entry point every sequence reader takes, rather than
+    /// [`Self::parse_expression_tag_at`] plus a guard the next reader can forget: tsv reaches
+    /// by five routes what Svelte reaches through one `read_sequence`, and a guard missing
+    /// from one of them is the whole bug. The two routes this cannot serve — the directive
+    /// arms, which take their `{…}` off the token stream — ask
+    /// [`Self::check_sequence_placement`] directly.
+    pub(crate) fn parse_sequence_expression_tag_at(
+        &mut self,
+        brace_pos: usize,
+        location: SequenceLocation,
+    ) -> Result<ExpressionTag<'arena>, ParseError> {
+        self.check_sequence_placement(brace_pos, location)?;
+        self.parse_expression_tag_at(brace_pos)
+    }
+
+    /// Reject a `{#…}` block or `{@…}` tag written where only a text/`{expr}` sequence is
+    /// allowed — Svelte's `read_sequence` guard (`1-parse/state/element.js`), which runs
+    /// *before* the expression is read.
+    ///
+    /// Without it the brace contents reach the TypeScript expression parser, which answers a
+    /// question nobody asked: `{@debug e}` becomes a decorator (`Expected 'class' after
+    /// 'decorator'`) and `{#x in y}` is the one production where a private name is an operand
+    /// (the ergonomic brand check), so it *parses* — an over-acceptance in every sequence
+    /// context, attribute values included.
+    ///
+    /// The marker must be **glued** to the `{`; [`BlockOrTagMarker::glued_at`] owns that
+    /// question and says why.
+    pub(crate) fn check_sequence_placement(
+        &self,
+        brace_pos: usize,
+        location: SequenceLocation,
+    ) -> Result<(), ParseError> {
+        let bytes = self.source.as_bytes();
+        let Some(marker) = BlockOrTagMarker::glued_at(bytes, brace_pos) else {
+            return Ok(());
+        };
+        // Svelte names the construct with `read_until(/[^a-z]/)` — lowercase ASCII only, so
+        // `{@html expr}` names `html` and `{#}` names nothing.
+        // `name_start <= bytes.len()`: the marker byte at `brace_pos + 1` was found, so the
+        // slice below is in range even when the document ends right after it (`{#`).
+        let name_start = brace_pos + 2;
+        let rest = &bytes[name_start..];
+        let name_len = rest
+            .iter()
+            .position(|b| !b.is_ascii_lowercase())
+            .unwrap_or(rest.len());
+        let name = &self.source[name_start..name_start + name_len];
+        let sigil = marker.sigil();
+        let construct = marker.construct();
+        let location = location.as_str();
+        Err(self.error_msg_at(
+            &format!("{{{sigil}{name} ...}} {construct} cannot be {location}"),
+            brace_pos,
+        ))
     }
 
     /// Scan and parse an expression tag `{expression}` starting at byte `brace_pos`
