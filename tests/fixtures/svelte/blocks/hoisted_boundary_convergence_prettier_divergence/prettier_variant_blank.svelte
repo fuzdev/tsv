@@ -23,11 +23,7 @@
 >
 
 <!-- Interior: `a {@debug} b` renders `a b`, so one space is kept -->
-{#if cond}a
-
-	{@debug cond}
-
-	b{/if}
+{#if cond}a {@debug cond} b{/if}
 
 <!-- The ROOT fragment is a fragment too: at its edge, a hoisted `{@debug}` trims the run -->
 text1

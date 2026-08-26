@@ -16,6 +16,7 @@ use super::fragment_text_doc::TextChildContext;
 use super::helpers::{is_control_flow_block, is_inline_content};
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::{Printer, text};
+use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
 
@@ -107,16 +108,37 @@ pub(super) fn text_starts_with_linebreak(raw: &str) -> bool {
 }
 
 impl<'a> Printer<'a> {
-    /// Find the inclusive-exclusive index range of `nodes` after trimming boundary nodes for
-    /// which `skip` returns true. Returns `None` when every node is skipped (the range is empty),
-    /// so callers can short-circuit to an empty doc.
-    fn trimmed_node_bounds(
-        nodes: &[FragmentNode<'_>],
-        skip: impl Fn(&FragmentNode<'_>) -> bool,
-    ) -> Option<(usize, usize)> {
-        let start = nodes.iter().position(|n| !skip(n))?;
-        let end = nodes.iter().rposition(|n| !skip(n)).map_or(0, |i| i + 1);
+    /// The inclusive-exclusive index range of `nodes` with the fragment's **own boundary air**
+    /// removed — its first through its last node that is not collapsible-whitespace-only.
+    /// `None` when every node is, so callers can short-circuit to an empty doc.
+    ///
+    /// Collapsible only: a non-breaking space or a form feed is content, not a boundary, so a
+    /// node made of those is never skipped.
+    ///
+    /// ⚠️ **This is the ONE definition of the slice the printer works on**, and it is shared
+    /// rather than re-scanned because a gate that models an emitter has to be asked about the
+    /// *same fragment* the emitter was. A gate re-deriving its own bounds is how
+    /// [`Self::content_holds_interior_blank`] came to index a different node than
+    /// [`Printer::handle_content_text_child`] had been handed, and to measure `content_bounds`
+    /// against a slice neither of them saw. Reach for [`Self::boundary_trimmed`] when the slice
+    /// is all you want.
+    fn boundary_trimmed_bounds(nodes: &[FragmentNode<'_>]) -> Option<(usize, usize)> {
+        let start = nodes.iter().position(|n| !n.is_whitespace_only_text())?;
+        let end = nodes
+            .iter()
+            .rposition(|n| !n.is_whitespace_only_text())
+            .map_or(0, |i| i + 1);
         Some((start, end))
+    }
+
+    /// [`Self::boundary_trimmed_bounds`] as the slice itself — for the readers that ask a
+    /// content-shape question of the whole run and never need the indices back
+    /// (`element_analysis`'s multiline scan, [`Self::content_holds_interior_blank`]).
+    pub(super) fn boundary_trimmed<'n, 'x>(
+        nodes: &'n [FragmentNode<'x>],
+    ) -> Option<&'n [FragmentNode<'x>]> {
+        let (start, end) = Self::boundary_trimmed_bounds(nodes)?;
+        Some(&nodes[start..end])
     }
 
     /// Build a doc for a node slice with boundary whitespace trimmed
@@ -162,13 +184,9 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        // Skip whitespace-only text nodes at the fragment boundaries (collapsible whitespace
-        // only — a non-breaking space (U+00A0) or a form feed is content, not a collapsible
-        // boundary, so a node made only of those is never skipped).
+        // Drop the fragment's own boundary air — see `boundary_trimmed_bounds`.
         let source = self.source;
-        let Some((start_idx, end_idx)) =
-            Self::trimmed_node_bounds(nodes, |n: &FragmentNode<'_>| n.is_whitespace_only_text())
-        else {
+        let Some((start_idx, end_idx)) = Self::boundary_trimmed_bounds(nodes) else {
             return d.empty();
         };
 
@@ -202,6 +220,10 @@ impl<'a> Printer<'a> {
             FragmentNode::content_bounds(trimmed_nodes).unwrap_or((0, trimmed_len - 1));
 
         let mut format_ignore_next = false;
+        // Newlines in the whitespace-only run between a pending directive and the node it
+        // freezes — skipped rather than printed, so this is where its authoring survives until
+        // the frozen node re-emits it (`push_format_ignore_gap`).
+        let mut format_ignore_gap_newlines = 0usize;
         // Exclusive upper bound of indices already consumed by a maximal glued-element run built
         // at its head (`build_glued_element_run`): the run is built ONCE at its first element and
         // its tail elements are skipped, so the build is O(run length), not the O(run length²) a
@@ -252,18 +274,43 @@ impl<'a> Printer<'a> {
             let prev_sibling_head = std::mem::replace(&mut sibling_head, i);
             // format-ignore: skip whitespace, emit raw source for ignored node
             if format_ignore_next {
-                if let Some(raw_doc) = self.format_ignore_raw_doc(node) {
-                    // The directive comment is the previous child and the whitespace between it
-                    // and this node was skipped above; in `multiline` mode that boundary must keep
-                    // its line break (path 1 flushed the buffer here) so the ignored node starts on
-                    // its own line (`<!-- prettier-ignore -->⏎<div …>`) rather than hugging the
-                    // directive. A first node (no preceding sibling) defers to the parent boundary.
+                let trailing_owned = self.format_ignore_trailing_boundary_owned(trimmed_nodes, i);
+                let frozen = self.format_ignore_frozen_span(node, trailing_owned);
+                if let Some(raw_doc) = self.format_ignore_raw_doc(node, frozen) {
+                    // The directive comment is the previous child, and the gap between it and this
+                    // node is the author's: in `multiline` mode it is re-emitted here (path 1
+                    // flushed the buffer at it) so the ignored node starts on its own line
+                    // (`<!-- prettier-ignore -->⏎<div …>`) rather than hugging the directive, and a
+                    // blank line in it survives. Emitted ONCE — a frozen text carries that gap in
+                    // its own bytes and takes nothing here. See `push_format_ignore_gap`.
+                    // A first node (no preceding sibling) defers to the parent boundary.
                     if multiline && !child_docs.is_empty() {
-                        child_docs.push(self.d().hardline());
+                        self.push_format_ignore_gap(
+                            format_ignore_gap_newlines,
+                            frozen,
+                            &mut child_docs,
+                        );
                     }
                     child_docs.push(raw_doc);
+                    // The trailing run the slice gave up: its boundary is the follower's own line,
+                    // but an authored blank in it is content that one break cannot carry — the
+                    // same second hardline `handle_content_text_child` pushes at this seam. At the
+                    // fragment's own edge there is no follower and the blank is boundary air,
+                    // which both formatters drop.
+                    if multiline
+                        && i + 1 < trimmed_len
+                        && self.format_ignore_dropped_trailing_blank(node, frozen)
+                    {
+                        child_docs.push(self.d().hardline());
+                    }
                     deferred = DeferredBoundary::default();
                     format_ignore_next = false;
+                    format_ignore_gap_newlines = 0;
+                } else if let FragmentNode::Text(t) = node {
+                    // The skipped run IS the gap: keep what the author wrote in it for the arm
+                    // above, which is the only place it can still be spent.
+                    format_ignore_gap_newlines =
+                        format_ignore_gap_newlines.max(t.newline_count as usize);
                 }
                 continue;
             }
@@ -569,7 +616,8 @@ impl<'a> Printer<'a> {
     /// Tier-2 blank) is the same question and needs the same guard, or it forces a body open on a
     /// blank the trim consumed. The content-text half of that exclusion is already spelled as an
     /// index-vs-`content_bounds` test where such a gate reads a TEXT's edges; this is the same
-    /// exclusion for the separator node, and the two must not drift apart.
+    /// exclusion for the separator node, and the two cannot drift apart — all three readers ask
+    /// [`internal::FragmentNode::at_content_start`] / [`internal::FragmentNode::at_content_end`].
     ///
     /// ⚠️ **The render-free fact licenses the trim; it does not decide it.** Being deletable makes
     /// both spellings one document, so *some* form must be chosen — and the base rule's own
@@ -610,8 +658,8 @@ impl<'a> Printer<'a> {
         // Interior: a node the whitespace rules see stands on BOTH sides, so neither run is an
         // edge — the two merge into one rendered space (`a {@debug x} b` → `a b`) and gluing
         // would be a different document. This is what bounds the rule.
-        let trailing_edge = i >= bounds.1;
-        let leading_edge = i <= bounds.0;
+        let trailing_edge = FragmentNode::at_content_end(i, bounds);
+        let leading_edge = FragmentNode::at_content_start(i, bounds);
         if !trailing_edge && !leading_edge {
             return false;
         }
@@ -619,20 +667,19 @@ impl<'a> Printer<'a> {
         // (Both bounds can hold at once — the separator is then the only node the rules see, and
         // the arbitrary pick below still answers `false` on the hoist test below, whichever side
         // it picked: with no content in the fragment, both of them are hoisted.)
-        let (hoisted_side, content_side) = if trailing_edge {
-            (i.checked_add(1), i.checked_sub(1))
+        let before = i.checked_sub(1).and_then(|j| nodes.get(j));
+        let after = nodes.get(i + 1);
+        let (hoisted, content) = if trailing_edge {
+            (after, before)
         } else {
-            (i.checked_sub(1), i.checked_add(1))
+            (before, after)
         };
-        let (Some(hoisted_side), Some(content_side)) = (hoisted_side, content_side) else {
+        let (Some(hoisted), Some(content)) = (hoisted, content) else {
             return false;
         };
-        if hoisted_side >= nodes.len() || content_side >= nodes.len() {
-            return false;
-        }
-        matches!(nodes[hoisted_side], FragmentNode::DebugTag(_))
-            && !nodes[content_side].is_hoisted_from_fragment()
-            && self.sibling_newline_flows(&nodes[content_side])
+        matches!(hoisted, FragmentNode::DebugTag(_))
+            && !content.is_hoisted_from_fragment()
+            && self.sibling_newline_flows(content)
     }
 
     /// Whether the node at `i` is glued to the nearest **content** before (`prev`) or after
@@ -717,7 +764,11 @@ impl<'a> Printer<'a> {
     /// whitespace-only text to skip — the pin then carries to the next real node.
     /// Shared leading step of the three `build_nodes_doc_*` accumulation loops; each
     /// caller owns its sink and clears `format_ignore_next` only when this returns `Some`.
-    fn format_ignore_raw_doc(&self, node: &FragmentNode<'_>) -> Option<DocId> {
+    ///
+    /// Takes the span rather than deriving it, because both callers need it for the gap
+    /// question ([`Self::push_format_ignore_gap`]) before they need the doc, and deriving it in
+    /// two places is two answers to [`Self::format_ignore_frozen_span`] waiting to disagree.
+    fn format_ignore_raw_doc(&self, node: &FragmentNode<'_>, frozen: Span) -> Option<DocId> {
         if let FragmentNode::Text(text) = node
             && text.is_collapsible_ws_only
         {
@@ -726,7 +777,98 @@ impl<'a> Printer<'a> {
         // The ignored node's subtree can hold `{expr}` / block-head comments (all in
         // `Root.comments`); they ride out inside the raw slice — see
         // `tsv_lang::comment_ledger`.
-        Some(self.verbatim_source_doc(node.span()))
+        Some(self.verbatim_source_doc(frozen))
+    }
+
+    /// The span a `format-ignore` freezes for `node` — its own span, less the one run that is
+    /// not part of the construct the directive names.
+    ///
+    /// A frozen **text** node's span carries the collapsible whitespace on its two edges, which
+    /// the parser folded into it: those runs are *separators*, where every other frozen kind's
+    /// span holds none. The **leading** one stays — it is the boundary the author wrote in front
+    /// of the node, and [`Self::push_format_ignore_gap`] is what makes sure the printer does not
+    /// print a second one on top of it. The **trailing** one goes when the boundary after it is
+    /// the printer's to emit ([`Self::format_ignore_trailing_boundary_owned`]).
+    ///
+    /// ⚠️ The two must partition that boundary, and keeping both was an unbounded F1 divergence
+    /// rather than a stray space: each pass writes one more line into the frozen slice, which the
+    /// next pass reads back as the author's
+    /// (`syntax/prettier_ignore/directive_gap_text_prettier_divergence`).
+    fn format_ignore_frozen_span(&self, node: &FragmentNode<'_>, trailing_owned: bool) -> Span {
+        let span = node.span();
+        if !trailing_owned {
+            return span;
+        }
+        let FragmentNode::Text(text) = node else {
+            return span;
+        };
+        let trailing = internal::text_edge_ws(text.raw(self.source), false).len() as u32;
+        Span::new(span.start, span.end - trailing)
+    }
+
+    /// Whether the boundary AFTER a format-ignored node is the **printer's** to emit rather than
+    /// the frozen slice's — the one question deciding whether a frozen text keeps its own
+    /// trailing run ([`Self::format_ignore_frozen_span`]).
+    ///
+    /// Two ways it is, and they are the two the printer emits a line for unconditionally: nothing
+    /// follows, so the fragment's own close is that boundary; or the follower **owns its line**
+    /// ([`Self::is_own_line_declaration`]) and prints it whatever precedes. Every other follower
+    /// reads the previous text's trailing whitespace before deciding — a block element through
+    /// `handle_block_child`'s `break_before`, an inline element, tag or comment through the
+    /// deferred boundary — so it emits nothing beside a slice that already ends in a break, and
+    /// the run must stay or the two nodes weld.
+    ///
+    /// ⚠️ This is the same seam `handle_content_text_child` answers with `next_owns_line` for a
+    /// NON-frozen text, and it answers it the same way — including keeping an authored blank
+    /// there. A frozen text is still a text at its edges; only its interior is the author's.
+    fn format_ignore_trailing_boundary_owned(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        i + 1 >= nodes.len() || self.is_own_line_declaration(nodes, i + 1)
+    }
+
+    /// Whether the trailing run [`Self::format_ignore_frozen_span`] dropped held an authored
+    /// blank line — the Tier-2 signal the boundary that replaces it then owes, exactly as
+    /// `handle_content_text_child`'s `next_owns_line` arm owes it. Empty (and so `false`) when
+    /// nothing was dropped.
+    fn format_ignore_dropped_trailing_blank(&self, node: &FragmentNode<'_>, frozen: Span) -> bool {
+        let dropped = &self.source[frozen.end as usize..node.span().end as usize];
+        dropped.matches('\n').count() >= 2
+    }
+
+    /// The break the printer owes in front of a format-ignored node: `gap_newlines` is what the
+    /// author wrote in the whitespace-only run [`Self::format_ignore_raw_doc`] skipped, and
+    /// `frozen` is the slice about to be emitted.
+    ///
+    /// **The gap is printed once.** A frozen slice that opens with a line break carries the
+    /// boundary in its own bytes (a frozen text's leading run — see
+    /// [`Self::format_ignore_frozen_span`]), so the printer adds nothing; every other frozen kind
+    /// sits behind a whitespace-only node that was skipped, so the printer re-emits it. Printing
+    /// both is the same line twice, and because the next pass reads the printer's break back as
+    /// part of the frozen bytes it is not idempotent — the gap grows a line per pass.
+    ///
+    /// An authored **blank** in a skipped run survives as the second break, the Tier-2 signal it
+    /// is everywhere else — the answer `build_container_content_doc`'s `pending_blank` already
+    /// gave on the whitespace-collapsing path, stated here for the general one
+    /// (`syntax/prettier_ignore/directive_gap_blank`).
+    fn push_format_ignore_gap(&self, gap_newlines: usize, frozen: Span, child_docs: &mut DocBuf) {
+        if self.format_ignore_slice_carries_gap(frozen) {
+            return;
+        }
+        let d = self.d();
+        if gap_newlines >= 2 {
+            child_docs.push(d.hardline());
+        }
+        child_docs.push(d.hardline());
+    }
+
+    /// Whether the frozen slice opens with the boundary in its own bytes, so the printer owes
+    /// none — the half of [`Self::push_format_ignore_gap`] the whitespace-collapsing container
+    /// loop asks on its own, where the same answer is its `glued_before`.
+    ///
+    /// One predicate for both loops on purpose: a loop that answered it differently would print
+    /// the gap twice in the container the other one gets right, and the second copy is invisible
+    /// until the pass after next.
+    fn format_ignore_slice_carries_gap(&self, frozen: Span) -> bool {
+        text_starts_with_linebreak(frozen.extract(self.source))
     }
 
     /// Handle an inline child element - matches prettier-plugin-svelte's handleInlineChild
@@ -899,14 +1041,13 @@ impl<'a> Printer<'a> {
     /// precedes it (`handle_separator_text_child`'s `tag_space_wraps`).
     ///
     /// A run ends at a node [`Self::breaks_inline_run`] names, and at an authored blank line a
-    /// content text carries on its edge ([`Self::text_edge_has_blank`]) — the boundary set
-    /// `Printer::content_is_reflowable_fill` reads too, with one deliberate difference: that
-    /// predicate asks its blank question of the WHOLE text (`has_authored_blank_line`), this scan
-    /// of the two EDGES alone, since a run is a partition of nodes and cannot split one at an
-    /// interior blank. The two agree wherever a blank sits beside a sibling; a blank INSIDE a
-    /// text (`text1⏎⏎text2` in one node) makes the fill predicate answer "no fill" while this
-    /// scan still counts the node's words — the fill collapses that blank either way, so the
-    /// boundaries beside it flow with the run's prose.
+    /// content text carries on its edge ([`Self::text_edge_has_blank`]) — the same boundary set
+    /// `Printer::content_is_reflowable_fill` reads, asked with the same two predicates, so the two
+    /// readers of the one fill answer cannot disagree about where a run ends. A blank INSIDE a
+    /// text (`text1⏎⏎text2` in one node) bounds nothing under either: a run is a partition of
+    /// nodes and cannot split one, and the fill collapses that blank anyway — so the boundaries
+    /// beside it flow with the run's prose, and the element holding it does not expand
+    /// (`elements/content_interior_blank_collapse`).
     ///
     /// Called only when the caller's cursor reaches a fresh run, so the scans partition
     /// `trimmed_nodes` and cost O(n) across the whole fragment — not the O(n²) a per-separator
@@ -964,6 +1105,95 @@ impl<'a> Printer<'a> {
             }
             _ => false,
         }
+    }
+
+    /// Whether `node` is a **content text carrying an authored blank line on either edge** — the
+    /// half of a run's boundary [`Self::breaks_inline_run`] cannot see, because that blank was
+    /// folded into a content text rather than left standing in a whitespace-only node of its own.
+    ///
+    /// ⚠️ **Always asked BESIDE `breaks_inline_run`, never instead of it.** It is deliberately
+    /// only the half its sibling misses: asked alone it answers `false` for a whitespace-only
+    /// separator carrying a blank, which is the commonest spelling of all. It used to carry that
+    /// arm too, restating its sibling's answer verbatim — a false equation between two predicates
+    /// that made every call a double evaluation and every non-text node two dead ones, and that
+    /// invited exactly the misuse this name now rules out.
+    ///
+    /// ⚠️ A blank **interior** to a text (`text1⏎⏎text2` in one node) is NOT one: a run is a
+    /// partition of nodes and cannot be split inside one, so such a blank bounds nothing and the
+    /// fill collapses it under both formatters (`elements/content_interior_blank_collapse`).
+    ///
+    /// `Printer::content_is_reflowable_fill` asks it undirected — does anything in this run bound
+    /// it, so that the run is structured rather than flowed. [`Self::scan_inline_run`] wants the
+    /// two edges apart (a leading blank ends the run BEFORE its node, a trailing one after), so it
+    /// asks [`Self::text_edge_has_blank`], the directional primitive underneath this.
+    /// ⚠️ [`Self::content_holds_interior_blank`] asks NEITHER: it is about whether a blank
+    /// survives into the OUTPUT, a question about the emitters, where these two are about where a
+    /// run ends in the input.
+    pub(super) fn text_edge_blank(&self, node: &FragmentNode<'_>) -> bool {
+        self.text_edge_has_blank(node, true) || self.text_edge_has_blank(node, false)
+    }
+
+    /// Whether this fragment holds an authored blank line at a run boundary **that survives into
+    /// the output** — the content fact [`Self::fragment_should_force_break_content`] breaks a
+    /// hugged body on.
+    ///
+    /// **A blank carries a Tier-2 signal unless the printer DELETES the run it sits in**, and
+    /// that is the whole rule. The two spellings the parser gives a blank are deleted by two
+    /// different emitters, so each arm asks its own emitter's question rather than a shared
+    /// approximation of both:
+    ///
+    /// - a **whitespace-only separator** is deleted by the hoisted-edge trim
+    ///   ([`Self::is_hoisted_edge_separator`]); the body's own boundary air is already gone with
+    ///   the slice trim above, and the one other emitter that skips such a run — the
+    ///   format-ignore arm, for the gap between a directive and the node it freezes — re-emits
+    ///   it rather than deleting it ([`Self::push_format_ignore_gap`]), so the blank survives
+    ///   there too and this gate may count it. ⚠️ That was not always so: while the arm ate the
+    ///   blank, this gate counted one the output did not contain and forced the body open on
+    ///   bytes that were not there;
+    /// - a **content text's edge** is deleted by [`Printer::handle_content_text_child`], whose
+    ///   `is_first` / `is_last` are this same `content_bounds`.
+    ///
+    /// ⚠️ **The exclusion must be keyed on the DELETION, never on hoisted ADJACENCY.** The two
+    /// coincide only where the trim fires, and the trim is deliberately narrow — the hoisted end
+    /// a `{@debug}`, the content end a sibling whose newline flows. Keyed on adjacency instead,
+    /// this gate answered "no signal" at every kind that trim declines (a comment, a `<br />`, a
+    /// hoisted `<title>` end), the body hugged past the blank, and its fill then DELETED it: the
+    /// exact drop this gate exists to prevent, surviving at the kinds its own control did not
+    /// reach (`blocks/body_blank_hoisted_edge_kinds_prettier_divergence`; the trimmed side is
+    /// `blocks/body_blank_break_prettier_divergence`'s `{@debug}` control).
+    ///
+    /// ⚠️ The trim reaches a fragment EDGE only: with content on BOTH sides a hoisted node's two
+    /// runs merge into the one rendered space rather than vanishing, so the blank there is
+    /// interior and survives — the answer the element twin (`<div>a⏎⏎{@debug cond}⏎⏎b</div>`)
+    /// already gave under both formatters, and which a hugged block body used to lose along with
+    /// every other body blank.
+    fn content_holds_interior_blank(&self, nodes: &[FragmentNode<'_>]) -> bool {
+        // The emitters answer against the boundary-TRIMMED slice (`build_nodes_doc_trimmed`'s
+        // own first act), so this gate reads that same slice — an index into `nodes` names a
+        // different node than the one the emitter was asked about, and `bounds` below would be
+        // measured against a fragment neither of them sees.
+        let Some(trimmed) = Self::boundary_trimmed(nodes) else {
+            return false;
+        };
+        let Some(bounds) = FragmentNode::content_bounds(trimmed) else {
+            return false;
+        };
+        trimmed.iter().enumerate().any(|(i, n)| match n {
+            // The separator spelling: deleted by the hoisted-edge trim, and by nothing else —
+            // the fragment's own boundary air is already gone with the slice above.
+            FragmentNode::Text(t) if t.is_collapsible_ws_only => {
+                t.newline_count >= 2 && !self.is_hoisted_edge_separator(trimmed, i, bounds)
+            }
+            // The content-text spelling: each edge is deleted exactly when
+            // `handle_content_text_child` trims it, which is `is_first` / `is_last` against the
+            // very same `content_bounds` — so the two cannot answer differently.
+            FragmentNode::Text(_) => {
+                (!FragmentNode::at_content_start(i, bounds) && self.text_edge_has_blank(n, true))
+                    || (!FragmentNode::at_content_end(i, bounds)
+                        && self.text_edge_has_blank(n, false))
+            }
+            _ => false,
+        })
     }
 
     /// Whether a **single-newline** separator beside `node` may collapse to a plain space — the
@@ -1350,7 +1580,19 @@ impl<'a> Printer<'a> {
             // and its authored whitespace, not a re-emitted space, decides each separator.
             let (node_doc, glued_before, glued_after) = if format_ignore_next {
                 format_ignore_next = false;
-                (self.format_ignore_raw_doc(node), false, false)
+                // Always the printer's here: this loop hardline-separates every child it emits
+                // and trims every run between them, so a frozen text's trailing run is never the
+                // boundary — at the container's edge and between two children alike.
+                let frozen = self.format_ignore_frozen_span(node, true);
+                // A frozen slice that opens with a line break carries this boundary itself, so
+                // the separator below must not print a second one — `glued_before` is that same
+                // "no separator here" answer, reached because the gap is in the bytes rather than
+                // absent from them. The general path states the pair at `push_format_ignore_gap`.
+                (
+                    self.format_ignore_raw_doc(node, frozen),
+                    self.format_ignore_slice_carries_gap(frozen),
+                    false,
+                )
             } else if let FragmentNode::Text(t) = node {
                 let raw = t.raw(self.source);
                 (
@@ -1406,6 +1648,15 @@ impl<'a> Printer<'a> {
     /// the same break — its line is one the fragment must have room for, so the block's
     /// inline/expanding fast path (`fragment_inline_authored`) may not take an inline authoring
     /// at its word.
+    ///
+    /// So does an authored **blank line** inside the content
+    /// ([`Self::content_holds_interior_blank`]), for the same reason and against the same
+    /// hazard: a blank is a Tier-2 authoring signal independent of render, and a body hugged
+    /// past one lays out as a single flowed run whose fill then DELETES it — authored content
+    /// gone, where every other fragment kind (an element, a component, a special element, the
+    /// root) already expands and keeps it. It is the body's CONTENT that decides this, never its
+    /// boundary spelling, which is render-free and stays width's alone (§Svelte: Blocks,
+    /// body-expand). Pinned by `blocks/body_blank_break_prettier_divergence`.
     pub(super) fn fragment_should_force_break_content(&self, nodes: &[FragmentNode<'_>]) -> bool {
         let non_ws_count = nodes
             .iter()
@@ -1413,6 +1664,7 @@ impl<'a> Printer<'a> {
             .count();
         (non_ws_count > 1 && nodes.iter().any(|n| self.is_block_fragment_node(n)))
             || self.has_own_line_declaration(nodes)
+            || self.content_holds_interior_blank(nodes)
     }
 
     /// Whether the node at `trimmed_nodes[i + 1]` is an **inline HTML element** (`<span>`, `<a>`,

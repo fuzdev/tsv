@@ -19,6 +19,24 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - `format-ignore` standalone `.css` — ◆design_choice — [css_standalone](../tests/fixtures/css/syntax/comments/format_ignore_prettier_divergence/)
 - comment beside a hoisted section **inside** a range — ◆design_choice — [range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)
 - glued nodes **inside** a range (byte-verbatim vs prettier's inter-node re-layout) — ◆design_choice — [range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)
+- the gap in front of a frozen **text** node, where prettier never converges — ◆content_preservation — [directive_gap_text](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_text_prettier_divergence/)
+
+**The gap in front of a frozen node is the author's, and it is printed once.** A directive and
+the node it freezes are separated by whatever the author wrote there, and that gap reaches the
+printer in two spellings: a whitespace-only node between the directive and a frozen element, tag
+or component, and — when the frozen node is a **text** — the run the parser folded into the
+text's own span. The printer skips the first and re-emits it, so an authored **blank line** in it
+survives as the Tier-2 signal it is everywhere else, matching prettier
+([directive_gap_blank](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_blank/), a
+parity fixture). It emits nothing for the second: that gap is already in the frozen bytes, and a
+break printed on top of it is the same boundary twice — which the next pass reads back as part of
+the author's slice, so the gap grows by a line on every pass. Prettier has that defect and
+**never converges** on the shape, so there is no oracle for it and the fixture carries a
+`prettier_nonconvergent.txt` — ◆content_preservation
+([directive_gap_text](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_text_prettier_divergence/)).
+The frozen slice's **trailing** run goes with the fragment edge where the frozen text is the last
+node — render-free there, and the same trim a whitespace-only node in that position takes — and
+stays between siblings, where it is a real separator.
 
 **A range does not pin a section's position.** A `<script>` / `<style>` / `<svelte:options>` written *inside* a range is still lifted to the component root and printed at its canonical position, and its bytes are cut out of the frozen slice — leaving them there emits the section twice, which the parser rejects (`Duplicate instance script found`). Prettier does the same, so the plain case needs no divergence ([range_section_hoist](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_hoist/)); a comment sitting beside such a section diverges ([range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)), and the seam the cut leaves behind follows the byte-verbatim rule ([range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)): tsv freezes the whole slice including inter-node whitespace, where prettier freezes node *content* but re-lays out the whitespace between nodes.
 

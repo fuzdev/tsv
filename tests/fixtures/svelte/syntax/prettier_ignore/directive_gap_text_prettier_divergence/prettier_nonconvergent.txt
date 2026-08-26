@@ -1,0 +1,1 @@
+prettier grows the gap beside a frozen text slice by one line on every pass
