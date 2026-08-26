@@ -441,7 +441,7 @@ ES2015 module syntax with ES2025 additions.
 - Static private fields
 - Private methods
 - Static initialization blocks (`static {}`)
-- `#x in obj` (private field check)
+- `#x in obj` (private field check) — the one production where a private name is an operand rather than part of a member access or a declaration, and it is in the grammar unconditionally. ⚠️ What confines it is `AllPrivateIdentifiersValid`, a *whole-Script* early error about **binding, not containment** — so `class C { m(y) { return #nope in y } }` is a syntax error too, and the Script rule even carries a direct-eval carve-out that re-runs it against the caller's private environment. Nothing local decides it, so tsv defers it, as tsc's parser and prettier do; acorn rejects. See [conformance_svelte.md](./conformance_svelte.md#typescript-corrections)
 
 ### TypeScript Class Features
 
