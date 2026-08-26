@@ -21,7 +21,10 @@ not here. This crate stays AST-agnostic.
 
 - **Element classification** (`elements.rs`): `is_block_element`,
   `is_void_element`, `is_svg_element`, `is_mathml_element`,
-  `is_foreign_element`. Inline-ness is derived by negation in the
+  `is_foreign_element`, `is_line_break_element` (`<br>` alone — the
+  element that IS a rendered line break; deliberately narrower than
+  void, and `<wbr>` — a break *opportunity* — is not a member).
+  Inline-ness is derived by negation in the
   consumer (matches prettier-plugin-svelte: `isInline = !isBlock`); no
   positive list is exported.
 - **Custom-element name chars** (`elements.rs`): `is_pcen_char` — the one
