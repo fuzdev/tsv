@@ -60,7 +60,16 @@ exceptions:
 In a **Svelte template**, a `<!-- format-ignore -->` is a *node*, not
 line-attached trivia, so the line test doesn't apply: a directive comment node
 freezes the next sibling node wherever it was authored, and the formatter puts
-the directive on its own line — the output always reads as the own-line form.
+the directive on its own line wherever the author left whitespace to reshape —
+so the output normally reads as the own-line form.
+
+⚠️ It stops at a **glued** boundary. A directive written with no whitespace at
+all between it and the node it freezes stays welded to it, on both sides: there
+is no whitespace there to re-spell, so breaking would inject a rendered space
+the source does not have. An authored gap is kept for the same reason — inline
+it survives as the one space it renders as. The gap in front of a frozen node is
+the author's: the formatter prints it once, never invents one, and never eats
+one.
 
 To freeze a construct, put the directive alone on the line above it.
 
