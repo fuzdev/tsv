@@ -11,7 +11,7 @@ mod whitespace;
 // Re-export public API
 pub use elements::{
     closing_tag_omitted, collapses_child_whitespace, is_block_element, is_foreign_element,
-    is_mathml_element, is_pcen_char, is_svg_element, is_void_element,
+    is_line_break_element, is_mathml_element, is_pcen_char, is_svg_element, is_void_element,
 };
 pub use entities::decode_character_references;
 pub use whitespace::preserves_whitespace;

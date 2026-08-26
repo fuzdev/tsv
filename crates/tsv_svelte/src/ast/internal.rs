@@ -1139,6 +1139,10 @@ impl TagFacts {
     /// `tsv_html::collapses_child_whitespace` — a whitespace-collapsing container (`<table>`,
     /// `<select>`, …) whose inter-sibling whitespace the compiler removes entirely.
     const WS_COLLAPSING: u16 = 1 << 10;
+    /// `tsv_html::is_line_break_element` (`<br>` alone — the element that IS a rendered line
+    /// break). Deliberately narrower than [`VOID`](Self::VOID): the other void elements render
+    /// inline, so a `<img>`/`<input>`/`<wbr>` flows where a `<br>` owns its line.
+    const LINE_BREAK: u16 = 1 << 11;
 
     /// Derive the facts from the tag name. The single source: [`Element::facts`] stores exactly
     /// this, and the equivalence test grades every accessor against the predicates named here.
@@ -1177,6 +1181,9 @@ impl TagFacts {
         if tag_name.starts_with('!') {
             bits |= Self::DECLARATION;
         }
+        if tsv_html::is_line_break_element(tag_name) {
+            bits |= Self::LINE_BREAK;
+        }
         Self(bits)
     }
 
@@ -1212,6 +1219,9 @@ impl TagFacts {
     }
     pub(crate) fn is_declaration(self) -> bool {
         self.0 & Self::DECLARATION != 0
+    }
+    pub(crate) fn is_line_break(self) -> bool {
+        self.0 & Self::LINE_BREAK != 0
     }
 }
 
@@ -1877,10 +1887,12 @@ mod tests {
             "pre",
             "hr",
             "blockquote",
-            // void members (incl. the case-insensitive !doctype family)
+            // void members (incl. the case-insensitive !doctype family; wbr is the line-break
+            // bit's decided-against near-miss — a break OPPORTUNITY, so it flows)
             "br",
             "img",
             "input",
+            "wbr",
             "command",
             "keygen",
             "!doctype",
@@ -1967,6 +1979,11 @@ mod tests {
                 facts.is_declaration(),
                 tag.starts_with('!'),
                 "declaration: {tag:?}"
+            );
+            assert_eq!(
+                facts.is_line_break(),
+                tsv_html::is_line_break_element(tag),
+                "line break: {tag:?}"
             );
         }
     }

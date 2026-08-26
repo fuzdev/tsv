@@ -192,6 +192,27 @@ pub fn is_void_element(tag_name: &str) -> bool {
         || tag_name.eq_ignore_ascii_case("!doctype")
 }
 
+/// Whether this element IS a rendered line break — `<br>` alone. The [spec][br] says it
+/// outright: the element "represents a line break", to "be used only for line breaks that are
+/// actually part of the content, as in poems or addresses" — so the break is authored CONTENT,
+/// not layout.
+///
+/// Deliberately narrower than [`is_void_element`]: the other void elements (`<img>`,
+/// `<input>`, …) render inline, and prose reflows around them as around any inline element —
+/// while a `<br>` renders the very break a source newline beside it mirrors, so a
+/// prose-reflowing formatter holds the lines a `<br>` bounds. `<wbr>` is NOT a member: it
+/// ["represents a line break opportunity"][wbr] — a wrap affordance inside flowing prose (the
+/// spec's own example places it mid-word), not a break — so it reflows with the run like
+/// `<img>` and `<input>` do, and measuring confirms the line: prettier formats a `<wbr>`
+/// exactly as it formats a `<span>` in the same shapes, and a `<br>` unlike either.
+///
+/// [br]: https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-br-element
+/// [wbr]: https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-wbr-element
+#[inline]
+pub fn is_line_break_element(tag_name: &str) -> bool {
+    tag_name == "br"
+}
+
 /// Whether inter-sibling whitespace inside this element is removed **entirely** by Svelte's
 /// compiler (`clean_nodes` `can_remove_entirely`) rather than collapsed to a rendered space.
 ///
@@ -436,6 +457,20 @@ mod tests {
         assert!(is_void_element("!DocType"));
         // ...but it needs the leading '!'.
         assert!(!is_void_element("doctype"));
+    }
+
+    #[test]
+    fn test_is_line_break_element() {
+        assert!(is_line_break_element("br"));
+        // Narrower than void: the other void elements render inline.
+        assert!(!is_line_break_element("img"));
+        assert!(!is_line_break_element("input"));
+        assert!(!is_line_break_element("hr"));
+        // A line break OPPORTUNITY, not a break — it reflows with the prose around it.
+        assert!(!is_line_break_element("wbr"));
+        // Case-sensitive like the other regular-element predicates.
+        assert!(!is_line_break_element("BR"));
+        assert!(!is_line_break_element("div"));
     }
 
     #[test]
