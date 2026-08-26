@@ -3,7 +3,7 @@ use std::str::Chars;
 // Shared lexer-error constructor: used by the unterminated/unexpected sites in `next_token`.
 use tsv_lang::{ParseError, lex_err, source_scan};
 
-use crate::whitespace::is_svelte_ws;
+use crate::whitespace::{brace_interior_start, is_svelte_ws};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
@@ -104,15 +104,33 @@ pub struct Lexer<'a> {
     base_offset: usize,
 }
 
-/// A `{`-glued `#` or `@` — the marker that makes a brace a `{#…}` block or a `{@…}` tag
-/// rather than an expression.
+/// The `#` or `@` that makes a brace a `{#…}` block or a `{@…}` tag rather than an
+/// expression, whitespace between the two allowed.
 ///
-/// ⚠️ **Glued, deliberately.** The lexer's own [`TokenKind::BlockOpen`] / [`TokenKind::TagOpen`]
-/// allow whitespace between the brace and the marker (`{ #if}` tokenizes like `{#if}`, matching
-/// Svelte's `tag()`, which runs `allow_whitespace()` after the `{`). The *placement* rule does
-/// not: Svelte's `read_sequence` asks `parser.match('#')` immediately after `eat('{')`, so
-/// `{ #x in y}` is handed to the expression parser and fails there as JS. Reading the raw byte
-/// is what keeps those two questions apart.
+/// ⚠️ **Wider than Svelte's own sequence rule, deliberately.** Svelte's `read_sequence` asks
+/// `parser.match('#')` immediately after `eat('{')`, so on that side a separated `{ #if}` is
+/// not a placement question at all — it goes to the expression parser and dies there as JS.
+/// tsv reports the placement error at **both** spellings. The verdict is the same either way
+/// (both parsers reject), so what the widening costs is wording, and what it buys is three
+/// things the glued reading left broken:
+///
+/// - `{ @html x}` reached the TypeScript expression parser and came back
+///   `Expected 'class' after 'decorator'` — another language's question, which is the whole
+///   reason the placement guard exists.
+/// - `a="{ #if c}a{/if}"` reached the `{/if}`, whose `/` opens a regex that never closes, so
+///   the scan ran to EOF and the value died as `Unterminated string literal` — the lexer
+///   accident the sequence stop below exists to prevent.
+/// - `{ #x in y}` *parsed*: the brand check is the one production where a private name is an
+///   operand, and its binding rule is a whole-`Script` early error tsv defers. The printer
+///   then normalizes the brace, so `{ #x in y}` became `{#x in y}` — which the glued reading
+///   rejected. `tsv format` emitted what `tsv parse` refused.
+///
+/// The third is why the offset cannot be fixed: reading byte `brace_pos + 1` assumes a gap of
+/// width **zero**, and closing that gap is exactly what the printer does.
+///
+/// **Sequence positions only.** Both callers are inside a tag or an RCDATA body; a template
+/// `{ #each items as item}` is a genuine block there (Svelte's `tag()` runs
+/// `allow_whitespace()`) and never reaches this.
 ///
 /// `{:` and `{/` are deliberately absent — `read_sequence` does not guard them either, and they
 /// fall through to the expression parser on both sides.
@@ -131,14 +149,22 @@ pub(crate) enum BlockOrTagMarker {
 }
 
 impl BlockOrTagMarker {
-    /// The marker glued to the `{` at `brace_pos`, if any.
+    /// The marker opening the brace at `brace_pos`, and its own byte offset — `None` when the
+    /// brace opens neither a block nor a tag.
+    ///
+    /// The offset is returned rather than re-derived because the marker no longer sits at a
+    /// fixed distance from the brace: [`brace_interior_start`] is Svelte's
+    /// `allow_whitespace()`, so the gap is any width, and a caller that recomputes
+    /// `brace_pos + 2` reads the author's whitespace as the construct's name.
     #[inline]
-    pub(crate) fn glued_at(bytes: &[u8], brace_pos: usize) -> Option<Self> {
-        match bytes.get(brace_pos + 1) {
-            Some(b'#') => Some(Self::Block),
-            Some(b'@') => Some(Self::Tag),
-            _ => None,
-        }
+    pub(crate) fn in_sequence_at(source: &str, brace_pos: usize) -> Option<(Self, usize)> {
+        let marker_pos = brace_interior_start(source, brace_pos);
+        let marker = match source.as_bytes().get(marker_pos)? {
+            b'#' => Self::Block,
+            b'@' => Self::Tag,
+            _ => return None,
+        };
+        Some((marker, marker_pos))
     }
 
     /// The marker byte itself, for spelling the construct back to the author.
@@ -420,9 +446,12 @@ impl<'a> Lexer<'a> {
                 // same way (via `parse_expression_tag_at`); this is the tokenizing half.
                 self.advance(); // consume opening quote
 
-                // A `{#`/`{@` glued to the brace ends the value's life as a *sequence*:
+                // A `{#`/`{@` opening the brace ends the value's life as a *sequence*:
                 // Svelte's `read_sequence` rejects a block or tag in an attribute value before
                 // it reads an expression, and so does `SvelteParser::check_sequence_placement`.
+                // The marker need not be glued — `BlockOrTagMarker::in_sequence_at` skips the
+                // gap, and must, or the accident below survives one space
+                // (`a="{ #if c}a{/if}"`).
                 // From that marker on there is no expression to skip, and pretending otherwise
                 // loses the error: `style="{#if c}a{/if}"` reaches the `{/if}`, whose `/` opens
                 // a regex literal that never closes, so the scan runs to EOF and the whole
@@ -432,9 +461,10 @@ impl<'a> Lexer<'a> {
                 // the static reader uses anyway, and hands the parser the position where the
                 // rule lives.
                 let mut sequence_is_invalid = false;
-                // `&'a [u8]` borrowed from the immutable source, so it outlives the `&mut self`
-                // `seek_to` below rather than being re-taken per brace.
-                let bytes = self.source.as_bytes();
+                // Borrowed from the immutable source, so both outlive the `&mut self` `seek_to`
+                // below rather than being re-taken per brace.
+                let source = self.source;
+                let bytes = source.as_bytes();
 
                 while let Some(ch) = self.current {
                     if ch == quote {
@@ -442,7 +472,7 @@ impl<'a> Lexer<'a> {
                         return Ok(self.make_token(TokenKind::String, start));
                     }
                     if ch == '{' && !sequence_is_invalid {
-                        if BlockOrTagMarker::glued_at(bytes, self.position).is_some() {
+                        if BlockOrTagMarker::in_sequence_at(source, self.position).is_some() {
                             sequence_is_invalid = true;
                         } else {
                             let Some(close) = source_scan::scan_to_matching_brace(

@@ -199,11 +199,24 @@ both the instant such an input exists; this audit makes them exist.
 
 **What it perturbs — two families, because there are two kinds of claim to break.**
 
-- **`ws`** — whitespace inside a head, at two kinds of position: the start of each
-  existing whitespace run (does this construct measure from the token or from the gap?)
-  and each `:` / `,` / `=` with nothing before it (does it assume the two are adjacent?).
-  Heads are where tsv hand-rolls its scanning — head splitting, binding/annotation
-  separation, delimiter finding — rather than delegating to acorn.
+- **`ws`** — whitespace inside a head, at three kinds of position: the head's own `#` /
+  `:` / `@` **marker** (does the reader assume the marker is glued to the `{`?), the start
+  of each existing whitespace run (does this construct measure from the token or from the
+  gap?), and each `:` / `,` / `=` with nothing before it (does it assume the two are
+  adjacent?). Heads are where tsv hand-rolls its scanning — head splitting,
+  binding/annotation separation, delimiter finding — rather than delegating to acorn.
+
+  ⚠️ **The marker position is the sharpest of the three, and was reachable only for `:`
+  until it was made explicit** (`:` is in the delimiter set; `#` and `@` are not, so the
+  axis was blind for exactly the two markers a placement rule reads). It is the one
+  position where the two sides of the language disagree by design — Svelte's `tag()` and
+  `read_attribute` run `allow_whitespace()` after the `{`, its `read_sequence` does not —
+  so a reader mirroring either reads a byte at a **fixed offset** from the brace, i.e.
+  assumes a gap of width **zero**. That is the same emit-set ⊆ parse-set hazard a baked-in
+  keyword width is, one notch narrower: the formatter's brace normalization *closes* that
+  gap, so the assumption is reachable from tsv's own output. Two bugs came out of it at
+  once — `<div { @attach fn}>` rejected though prettier formats it, and a `{ #x in y}`
+  the printer glued into a form tsv then refused to reparse.
 - **`terminators`** — a lone `\r`, `<LS>` or `<PS>` at every whitespace-run start in the
   document, head or not. These are exactly the spellings on which the two `loc` line
   classes DISAGREE, and which class a node was counted under is decided *per acorn parse*

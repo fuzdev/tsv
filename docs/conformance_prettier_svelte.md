@@ -557,3 +557,4 @@ with the parser gap: once tsv honors the document's TypeScript flag it rejects t
 and the case converts to `input_invalid_*`.
 
 - TypeScript in a component with no `lang="ts"` (script annotations, generic/typed snippet heads, typed block bindings, casts in expression tags) — `Expected token (` — [script/no_lang_typescript](../tests/fixtures/svelte/script/no_lang_typescript_svelte_prettier_divergence/)
+- The unbound private-name brand check in template positions (`{...#x in y}`, `{/* c */ #x in y}`) — `Unexpected token` — [expressions/brand_check_unbound](../tests/fixtures/svelte/expressions/brand_check_unbound_svelte_prettier_divergence/). Its tsv side is the deferred `AllPrivateIdentifiersValid` early error, cataloged in [conformance_svelte.md §Brand check with no binding class](./conformance_svelte.md#typescript-corrections); it retires only if that deferral ends

@@ -4,7 +4,9 @@ use bumpalo::collections::Vec as BumpVec;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use crate::whitespace::{char_at, is_svelte_ws, name_run_end, skip_svelte_ws};
+use crate::whitespace::{
+    brace_interior_start, char_at, is_svelte_ws, name_run_end, skip_svelte_ws,
+};
 use tsv_lang::{ParseError, Span};
 use tsv_ts::ast::internal::{Expression, IdentName, Identifier};
 
@@ -240,7 +242,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Peek at the first non-whitespace character after the opening brace — Svelte's
     /// `parser.eat('{')` + `allow_whitespace()` before the spread/shorthand split.
     fn peek_char_after_brace(&self) -> Option<char> {
-        let pos = skip_svelte_ws(self.source, self.current_start + 1); // past the '{'
+        let pos = brace_interior_start(self.source, self.current_start);
         char_at(self.source, pos).map(|(c, _)| c)
     }
 
@@ -460,9 +462,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// route: `on:click="{#x in y}"` would reject and `on:click={#x in y}` would answer with
     /// a generic "not an expression".
     ///
-    /// Only the glued spellings are the lexer's `{#`/`{@` *and* Svelte's guard; a
-    /// whitespace-separated marker (`{ #if}`, which the lexer still tokenizes as `BlockOpen`)
-    /// falls through to the arm's own error, as it falls through to Svelte's JS parse error.
+    /// The separated spelling asks the same question: the lexer tokenizes `{ #if}` as
+    /// `BlockOpen` and [`SvelteParser::check_sequence_placement`] skips the gap too, so both
+    /// spellings reach the placement error rather than the arm's generic "not an expression".
+    /// A quoted directive value (`on:click="{ #x in y}"`) went further still and *parsed*,
+    /// since the brand check is a valid expression once the marker stops being read as one.
     ///
     /// ⚠️ **The token test is load-bearing, not a fast path.** `check_sequence_placement`
     /// reads the byte after `current_start` and so needs `current_start` to BE a `{`; the
@@ -639,7 +643,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // The content is: {@attach expr}
         let brace_start = self.current_start;
 
-        let content_start = brace_start + 2; // Skip "{@"
+        // Svelte's `read_attribute` runs `allow_whitespace()` after `eat('{')` before it tries
+        // `eat('@attach')`, so the marker need not be glued: `brace_start + 2` read the
+        // author's space as the keyword's first byte and `<div { @attach fn}>` — which
+        // prettier formats — came back `Expected 'attach' keyword`. The sibling
+        // `{...spread}` / `{shorthand}` split already skips the gap, via
+        // `peek_char_after_brace`; this arm was the one re-deriving the offset by hand.
+        let marker_pos = brace_interior_start(self.source, brace_start);
+        let content_start = marker_pos + 1; // past the `@`
 
         // Find the matching closing `}` (skips strings/comments/regex).
         let Some(content_end) = scan_to_matching_brace(self.source.as_bytes(), content_start)
