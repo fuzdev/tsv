@@ -958,12 +958,19 @@ impl<'arena> FragmentNode<'arena> {
     /// Whether the compiler **hoists** this node out of its fragment before it applies the
     /// whitespace rules — `clean_nodes`' `hoisted` list.
     ///
-    /// Such a node is invisible to those rules, so the text beside it is the fragment's real
-    /// first/last node and the run between them is a render-free *edge* run rather than an
+    /// Such a node is invisible to those rules, so the node beside it is the fragment's real
+    /// first/last one and the run between them is a render-free *edge* run rather than an
     /// inter-sibling one: `{#if c}text {@const x = 1}{/if}` compiles to `text`, exactly like the
     /// glued authoring, where `{#if c}text <b>y</b>{/if}` keeps its space. The printer's boundary
     /// analysis therefore has to skip these nodes when it asks "am I at the content boundary?"
     /// ([`FragmentNode::content_bounds`]).
+    ///
+    /// ⚠️ The neighbour is **not** always a text — a whitespace-only separator between a hoisted
+    /// node and a non-text sibling is the same edge run, and
+    /// [`crate::printer::Printer::is_hoisted_edge_separator`] is where that half is decided
+    /// (`blocks/hoisted_boundary_sibling_kinds`). Being deletable only licenses a choice of form
+    /// there; which form is picked is the "a node that owns its own line keeps it" exclusion
+    /// below, asked of BOTH ends of the run.
     ///
     /// ⚠️ The hoist is **not** one of Svelte 5's three published whitespace rules (collapse
     /// between nodes / trim at the edges / `<pre>` exempt) — those say nothing about which nodes

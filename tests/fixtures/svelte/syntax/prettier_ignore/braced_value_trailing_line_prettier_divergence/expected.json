@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 635,
+	"end": 901,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -370,45 +370,45 @@
 			{
 				"type": "Comment",
 				"start": 358,
-				"end": 540,
-				"data": " the prefixed heads already drop the second break, so the parity is the assertion —\n\t`{@debug}` included, whose head freezes an identifier list and emits its own trailing run "
+				"end": 447,
+				"data": " the prefixed heads already drop the second break, so the parity is the assertion "
 			},
 			{
 				"type": "Text",
-				"start": 540,
-				"end": 541,
+				"start": 447,
+				"end": 448,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "HtmlTag",
-				"start": 541,
-				"end": 587,
+				"start": 448,
+				"end": 494,
 				"expression": {
 					"type": "BinaryExpression",
-					"start": 569,
-					"end": 580,
+					"start": 476,
+					"end": 487,
 					"loc": {
 						"start": {
-							"line": 28,
+							"line": 27,
 							"column": 1
 						},
 						"end": {
-							"line": 28,
+							"line": 27,
 							"column": 12
 						}
 					},
 					"left": {
 						"type": "Identifier",
-						"start": 569,
-						"end": 572,
+						"start": 476,
+						"end": 479,
 						"loc": {
 							"start": {
-								"line": 28,
+								"line": 27,
 								"column": 1
 							},
 							"end": {
-								"line": 28,
+								"line": 27,
 								"column": 4
 							}
 						},
@@ -417,15 +417,15 @@
 					"operator": "+",
 					"right": {
 						"type": "Identifier",
-						"start": 577,
-						"end": 580,
+						"start": 484,
+						"end": 487,
 						"loc": {
 							"start": {
-								"line": 28,
+								"line": 27,
 								"column": 9
 							},
 							"end": {
-								"line": 28,
+								"line": 27,
 								"column": 12
 							}
 						},
@@ -435,43 +435,56 @@
 						{
 							"type": "Line",
 							"value": " prettier-ignore",
-							"start": 549,
-							"end": 567
+							"start": 456,
+							"end": 474
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Line",
 							"value": " c",
-							"start": 581,
-							"end": 585
+							"start": 488,
+							"end": 492
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 587,
-				"end": 588,
+				"start": 494,
+				"end": 496,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 496,
+				"end": 853,
+				"data": " `{@debug}` included, whose head freezes an identifier list and emits its own trailing run.\n\tThe comment is load-bearing: a `{@debug}` is HOISTED, so the run between it and a flowing\n\tsibling is a render-free fragment-edge run tsv trims (blocks/hoisted_boundary_sibling_kinds),\n\tand a comment owns its line, which is what keeps these two cases apart "
+			},
+			{
+				"type": "Text",
+				"start": 853,
+				"end": 854,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "DebugTag",
-				"start": 588,
-				"end": 634,
+				"start": 854,
+				"end": 900,
 				"identifiers": [
 					{
 						"type": "Identifier",
-						"start": 617,
-						"end": 620,
+						"start": 883,
+						"end": 886,
 						"loc": {
 							"start": {
-								"line": 32,
+								"line": 36,
 								"column": 1
 							},
 							"end": {
-								"line": 32,
+								"line": 36,
 								"column": 4
 							}
 						},
@@ -479,15 +492,15 @@
 					},
 					{
 						"type": "Identifier",
-						"start": 624,
-						"end": 627,
+						"start": 890,
+						"end": 893,
 						"loc": {
 							"start": {
-								"line": 32,
+								"line": 36,
 								"column": 8
 							},
 							"end": {
-								"line": 32,
+								"line": 36,
 								"column": 11
 							}
 						},
@@ -598,15 +611,15 @@
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
-			"start": 549,
-			"end": 567,
+			"start": 456,
+			"end": 474,
 			"loc": {
 				"start": {
-					"line": 27,
+					"line": 26,
 					"column": 1
 				},
 				"end": {
-					"line": 27,
+					"line": 26,
 					"column": 19
 				}
 			}
@@ -614,15 +627,15 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 581,
-			"end": 585,
+			"start": 488,
+			"end": 492,
 			"loc": {
 				"start": {
-					"line": 28,
+					"line": 27,
 					"column": 13
 				},
 				"end": {
-					"line": 28,
+					"line": 27,
 					"column": 17
 				}
 			}
@@ -630,15 +643,15 @@
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
-			"start": 597,
-			"end": 615,
+			"start": 863,
+			"end": 881,
 			"loc": {
 				"start": {
-					"line": 31,
+					"line": 35,
 					"column": 1
 				},
 				"end": {
-					"line": 31,
+					"line": 35,
 					"column": 19
 				}
 			}
@@ -646,15 +659,15 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 628,
-			"end": 632,
+			"start": 894,
+			"end": 898,
 			"loc": {
 				"start": {
-					"line": 32,
+					"line": 36,
 					"column": 12
 				},
 				"end": {
-					"line": 32,
+					"line": 36,
 					"column": 16
 				}
 			}
