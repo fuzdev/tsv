@@ -1,4 +1,6 @@
-<script {...spread}></script>
+<script module { #a}></script>
 
-<style {shorthand}>
+<script {...spread} { @b}></script>
+
+<style {shorthand} { :c}>
 </style>

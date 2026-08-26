@@ -140,34 +140,92 @@ fn a_block_or_tag_in_any_attribute_value_names_its_placement() {
     }
 }
 
-/// The guard reads the byte glued to the `{`, not the lexer's `{#`/`{@` token — which
-/// allows whitespace between the two, and Svelte's `parser.match('#')` does not. A separated
-/// marker is therefore not a placement question at all on either side: Svelte hands
-/// `{ #x in y}` to acorn, which rejects it as JS.
+/// A marker **separated** from its `{` is the same placement question, at every route.
 ///
-/// Both halves are asserted, because each alone is satisfied by the other's answer. A
-/// separated `{@…}` still reaches the expression parser and is rejected there — but as an
-/// expression, so the placement claim must be absent. A separated `{#x in y}` reaches the
-/// same parser and *parses*: the brand check is the one production where a private name is
-/// an operand, and what confines it is `AllPrivateIdentifiersValid` — a whole-Script early
-/// error about BINDING, not containment, which tsv defers — pinned by
-/// `typescript/expressions/private_brand_check_unbound_svelte_divergence`. Should that
-/// deferral ever end, this case fails rather than silently turning the half above vacuous.
+/// This is the one place tsv is deliberately wider than `read_sequence`, which asks
+/// `parser.match('#')` with no `allow_whitespace()` and so hands `{ #if}` to acorn. Both
+/// parsers still reject; only the wording differs, and the wording is what the separated
+/// spelling had no way to get right — it reached the TypeScript expression parser, which
+/// answered about decorators, ran a quoted value onto a regex that never closes, or (for the
+/// brand check, the one production where a private name is an operand) simply *parsed*.
+///
+/// That last one is why the gap cannot be assumed away: the printer normalizes `{ expr}` to
+/// `{expr}`, so an accepted `{ #x in y}` was printed as `{#x in y}` and the glued reading
+/// then rejected tsv's own output. Reading a byte at a fixed offset from the brace assumes a
+/// gap of width zero, and closing that gap is exactly what the printer does.
 #[test]
-fn a_separated_marker_is_not_a_placement_question() {
-    for source in [
-        "<div data-attr={ @html expr}></div>",
-        "<textarea>{ @debug e}</textarea>",
+fn a_separated_marker_names_the_same_placement() {
+    for (source, message) in [
+        // RCDATA content. The brand check is the case that used to PARSE.
+        (
+            "<textarea>{ #x in y}</textarea>",
+            "{#x ...} block cannot be inside <textarea>",
+        ),
+        (
+            "<textarea>{ @debug e}</textarea>",
+            "{@debug ...} tag cannot be inside <textarea>",
+        ),
+        // Unquoted value.
+        (
+            "<div data-attr={ #x in y}></div>",
+            "{#x ...} block cannot be in attribute value",
+        ),
+        (
+            "<div data-attr={ @html expr}></div>",
+            "{@html ...} tag cannot be in attribute value",
+        ),
+        // Quoted value, and the closed-block shape whose `{/if}` used to open an
+        // unterminated regex and kill the whole value as `Unterminated string literal`.
+        (
+            r#"<div data-attr="{ #x in y}"></div>"#,
+            "{#x ...} block cannot be in attribute value",
+        ),
+        (
+            r#"<div data-attr="{ #if a}text1{/if}"></div>"#,
+            "{#if ...} block cannot be in attribute value",
+        ),
+        // The two directive arms, in both of their spellings — the quoted one parsed.
+        (
+            "<div on:click={ #x in y}></div>",
+            "{#x ...} block cannot be in attribute value",
+        ),
+        (
+            r#"<div on:click="{ #x in y}"></div>"#,
+            "{#x ...} block cannot be in attribute value",
+        ),
+        (
+            "<div style:color={ #x in y}></div>",
+            "{#x ...} block cannot be in attribute value",
+        ),
+        (
+            r#"<div style:color="{ #x in y}"></div>"#,
+            "{#x ...} block cannot be in attribute value",
+        ),
+        // Any width, not just one space — `skip_svelte_ws` is Svelte's `allow_whitespace()`.
+        (
+            "<textarea>{\n\t#x in y}</textarea>",
+            "{#x ...} block cannot be inside <textarea>",
+        ),
     ] {
-        let error = parse_error(source).unwrap_or_else(|| "<parsed successfully>".to_owned());
-        assert!(
-            !error.contains("cannot be"),
-            "expected {source:?} to reject without a placement claim, got: {error}"
-        );
+        assert_rejected_with(source, message);
     }
+}
+
+/// The widening is scoped to **sequences**. In template position a separated marker opens a
+/// real block — Svelte's `tag()` does run `allow_whitespace()` after the `{` — so the guard
+/// must not reach there, and neither must the quoted-value scan that shares its lookup.
+///
+/// A comment between the brace and the marker is likewise not whitespace: it leaves the
+/// interior an expression on both sides of tsv, and the brand check inside it stays a
+/// deferred early error rather than becoming a placement claim.
+#[test]
+fn template_position_and_a_comment_lead_are_untouched() {
     for source in [
-        "<textarea>{ #x in y}</textarea>",
-        "<div data-attr={ #x in y}></div>",
+        "{ #each items as item}<p>{item}</p>{/each}",
+        "{ #if cond}<p>text1</p>{ :else}<p>text2</p>{ /if}",
+        "{ @html expr}",
+        "<textarea>{/* c */ #x in y}</textarea>",
+        "<div data-attr={/* c */ #x in y}></div>",
     ] {
         assert_parses(source);
     }

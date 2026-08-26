@@ -81,22 +81,24 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// (the ergonomic brand check), so it *parses* — an over-acceptance in every sequence
     /// context, attribute values included.
     ///
-    /// The marker must be **glued** to the `{`; [`BlockOrTagMarker::glued_at`] owns that
-    /// question and says why.
+    /// The marker need not be glued to the `{`: [`BlockOrTagMarker::in_sequence_at`] skips the
+    /// gap and owns the question of why tsv is wider here than `read_sequence` is. The error is
+    /// still reported **at the brace**, matching Svelte's own `block_invalid_placement` index.
     pub(crate) fn check_sequence_placement(
         &self,
         brace_pos: usize,
         location: SequenceLocation,
     ) -> Result<(), ParseError> {
-        let bytes = self.source.as_bytes();
-        let Some(marker) = BlockOrTagMarker::glued_at(bytes, brace_pos) else {
+        let Some((marker, marker_pos)) = BlockOrTagMarker::in_sequence_at(self.source, brace_pos)
+        else {
             return Ok(());
         };
+        let bytes = self.source.as_bytes();
         // Svelte names the construct with `read_until(/[^a-z]/)` — lowercase ASCII only, so
         // `{@html expr}` names `html` and `{#}` names nothing.
-        // `name_start <= bytes.len()`: the marker byte at `brace_pos + 1` was found, so the
-        // slice below is in range even when the document ends right after it (`{#`).
-        let name_start = brace_pos + 2;
+        // `name_start <= bytes.len()`: the marker byte at `marker_pos` was found, so the slice
+        // below is in range even when the document ends right after it (`{#`).
+        let name_start = marker_pos + 1;
         let rest = &bytes[name_start..];
         let name_len = rest
             .iter()
