@@ -16,8 +16,7 @@ text1
 {#if cond}
 	text0
 
-	<!-- prettier-ignore -->
-	text1
+	<!-- prettier-ignore -->text1
 {/if}
 
 <div>
@@ -56,3 +55,13 @@ text1
 text1
 	<option>a</option>
 </select>
+
+{#if cond}
+	<div>block1</div>
+	text1<!-- prettier-ignore -->text2
+{/if}
+
+{#if cond}
+	<div>block1</div>
+	text1<!-- prettier-ignore -->  text2
+{/if}

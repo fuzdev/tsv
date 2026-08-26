@@ -93,6 +93,23 @@ pub(super) struct DeferredBoundary {
     pub(super) held: bool,
 }
 
+/// The pending `format-ignore` freeze the sibling loop carries: that it saw a directive, and the
+/// gap the author wrote between that directive and the node it freezes.
+///
+/// One value rather than two loose locals, for the same reason [`DeferredBoundary`] is one: the
+/// gap is meaningless without `armed`, and both must be cleared together at the node that spends
+/// them. Clearing only `armed` would carry this freeze's authored gap into the NEXT one in the
+/// same fragment, printing a blank line the second directive's author never wrote.
+#[derive(Clone, Copy, Default)]
+struct PendingFreeze {
+    /// The previous child was a directive, so the next non-whitespace node is emitted verbatim.
+    armed: bool,
+    /// Newlines in the whitespace-only run skipped since. `None` means the author wrote no run
+    /// at all — a different document from one they spelled with a space, and the distinction
+    /// [`Printer::push_format_ignore_gap`] turns on.
+    gap: Option<usize>,
+}
+
 /// Whether `raw` begins with a linebreak, ignoring leading horizontal whitespace — prettier's
 /// `startsWithLinebreak` (`^([\t\f\r ]*\n)`) with the form feed dropped, since a form feed is
 /// content rather than skippable whitespace ([`is_collapsible_ws`]). Used by the block-child
@@ -219,11 +236,7 @@ impl<'a> Printer<'a> {
         let content_bounds =
             FragmentNode::content_bounds(trimmed_nodes).unwrap_or((0, trimmed_len - 1));
 
-        let mut format_ignore_next = false;
-        // Newlines in the whitespace-only run between a pending directive and the node it
-        // freezes — skipped rather than printed, so this is where its authoring survives until
-        // the frozen node re-emits it (`push_format_ignore_gap`).
-        let mut format_ignore_gap_newlines = 0usize;
+        let mut freeze = PendingFreeze::default();
         // Exclusive upper bound of indices already consumed by a maximal glued-element run built
         // at its head (`build_glued_element_run`): the run is built ONCE at its first element and
         // its tail elements are skipped, so the build is O(run length), not the O(run length²) a
@@ -273,23 +286,20 @@ impl<'a> Printer<'a> {
             // says nothing about the unit's. See `handle_text_child`'s after-element fold.
             let prev_sibling_head = std::mem::replace(&mut sibling_head, i);
             // format-ignore: skip whitespace, emit raw source for ignored node
-            if format_ignore_next {
+            if freeze.armed {
                 let trailing_owned = self.format_ignore_trailing_boundary_owned(trimmed_nodes, i);
                 let frozen = self.format_ignore_frozen_span(node, trailing_owned);
                 if let Some(raw_doc) = self.format_ignore_raw_doc(node, frozen) {
-                    // The directive comment is the previous child, and the gap between it and this
-                    // node is the author's: in `multiline` mode it is re-emitted here (path 1
-                    // flushed the buffer at it) so the ignored node starts on its own line
-                    // (`<!-- prettier-ignore -->⏎<div …>`) rather than hugging the directive, and a
-                    // blank line in it survives. Emitted ONCE — a frozen text carries that gap in
-                    // its own bytes and takes nothing here. See `push_format_ignore_gap`.
+                    // The directive comment is the previous child, and the gap between it and
+                    // this node is the AUTHOR'S — re-emitted here (path 1 flushed the buffer at
+                    // it), once, and only if they wrote one. A gap with a newline gives the
+                    // ignored node its own line (`<!-- prettier-ignore -->⏎<div …>`) and a blank
+                    // in it survives; a glued directive stays glued, and a frozen text carries
+                    // the gap in its own bytes and takes nothing here. See
+                    // `push_format_ignore_gap` for all four answers.
                     // A first node (no preceding sibling) defers to the parent boundary.
-                    if multiline && !child_docs.is_empty() {
-                        self.push_format_ignore_gap(
-                            format_ignore_gap_newlines,
-                            frozen,
-                            &mut child_docs,
-                        );
+                    if !child_docs.is_empty() {
+                        self.push_format_ignore_gap(freeze.gap, frozen, multiline, &mut child_docs);
                     }
                     child_docs.push(raw_doc);
                     // The trailing run the slice gave up: its boundary is the follower's own line,
@@ -304,18 +314,17 @@ impl<'a> Printer<'a> {
                         child_docs.push(self.d().hardline());
                     }
                     deferred = DeferredBoundary::default();
-                    format_ignore_next = false;
-                    format_ignore_gap_newlines = 0;
+                    freeze = PendingFreeze::default();
                 } else if let FragmentNode::Text(t) = node {
                     // The skipped run IS the gap: keep what the author wrote in it for the arm
                     // above, which is the only place it can still be spent.
-                    format_ignore_gap_newlines =
-                        format_ignore_gap_newlines.max(t.newline_count as usize);
+                    let seen = freeze.gap.unwrap_or(0);
+                    freeze.gap = Some(seen.max(t.newline_count as usize));
                 }
                 continue;
             }
             if Self::is_format_ignore_comment(node, source) {
-                format_ignore_next = true;
+                freeze.armed = true;
             }
 
             // Collapse a run of consecutive whitespace-only text nodes (left adjacent by
@@ -478,7 +487,7 @@ impl<'a> Printer<'a> {
                 } else {
                     self.handle_inline_child(node, &mut child_docs, lead);
                 }
-            } else if !format_ignore_next
+            } else if !freeze.armed
                 && let Some((unit_doc, run_end)) =
                     self.try_build_glued_comment_prefixed_element(trimmed_nodes, i)
             {
@@ -489,7 +498,7 @@ impl<'a> Printer<'a> {
                 // the whole unit flat and moves it to a fresh line together (its `next_is_flow`
                 // looked through the comments via `comment_glued_next_flow`), rather than dangling
                 // the opening tag after a space. Honor a trimmed boundary space from the previous
-                // text exactly as the single-element path does. Guarded on `!format_ignore_next` so
+                // text exactly as the single-element path does. Guarded on `!freeze.armed` so
                 // a `<!-- prettier-ignore -->` directive still routes to the raw path below.
                 // Spaced or Plain only — the fused unit carries no welded-run mark, so an earlier
                 // boundary's welded walk ends in front of it.
@@ -500,7 +509,7 @@ impl<'a> Printer<'a> {
                 };
                 self.push_inline_child_doc(&mut child_docs, unit_doc, lead);
                 glued_run_consumed_until = run_end + 1;
-            } else if !format_ignore_next
+            } else if !freeze.armed
                 && !prev_text_ws
                 && let Some((prefix, text_idx)) =
                     self.try_build_glued_comment_prefix_for_text(trimmed_nodes, i)
@@ -511,7 +520,7 @@ impl<'a> Printer<'a> {
                 // the comments, so the text is the next node visited and takes the prefix.
                 //
                 // The two dispatch guards are the caller's state, which is why they stay here rather
-                // than inside the builder: `!format_ignore_next` so a directive still routes to the
+                // than inside the builder: `!freeze.armed` so a directive still routes to the
                 // raw path, and `!prev_text_ws` so a trimmed boundary space from the previous text
                 // is never dropped — a fused prefix has nowhere to carry that space, so the comments
                 // take the ordinary per-node path below, where the final arm emits it
@@ -821,6 +830,15 @@ impl<'a> Printer<'a> {
     /// ⚠️ This is the same seam `handle_content_text_child` answers with `next_owns_line` for a
     /// NON-frozen text, and it answers it the same way — including keeping an authored blank
     /// there. A frozen text is still a text at its edges; only its interior is the author's.
+    ///
+    /// The `next` half restates `handle_content_text_child`'s `next_owns_line` rather than
+    /// sharing it. Both folds are correct and both were measured to GROW `.text` (`objcopy -O
+    /// binary --only-section=.text target/corpus/tsv`): a `prev_owns_own_line` /
+    /// `next_owns_own_line` pair over the four sites costs +224 bytes, and `#[inline(always)]`
+    /// recovers none of it — the same behaviour-neutral-but-not-code-neutral trade
+    /// `printing::text`'s three blank-line scans record, declined for the same reason. What the
+    /// duplication buys back is small: the expression is one line, and each site names
+    /// [`Self::is_own_line_declaration`] in its own comment.
     fn format_ignore_trailing_boundary_owned(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
         i + 1 >= nodes.len() || self.is_own_line_declaration(nodes, i + 1)
     }
@@ -849,11 +867,38 @@ impl<'a> Printer<'a> {
     /// is everywhere else — the answer `build_container_content_doc`'s `pending_blank` already
     /// gave on the whitespace-collapsing path, stated here for the general one
     /// (`syntax/prettier_ignore/directive_gap_blank`).
-    fn push_format_ignore_gap(&self, gap_newlines: usize, frozen: Span, child_docs: &mut DocBuf) {
+    ///
+    /// ⚠️ **And never invented.** `gap` is `None` when the author GLUED the directive to the node
+    /// it freezes, and there the arm prints nothing: there is no whitespace at that boundary, so
+    /// a break injects a rendered space the source does not have — the standing "a glued boundary
+    /// is never split" rule, which this arm already honors on the directive's OTHER side (the
+    /// run before it is a sibling's, and no one splits it). Own-line normalization is a layout
+    /// preference and the glue is a render fact, so the glue wins; `docs/directives.md` says the
+    /// output "always reads as the own-line form", which holds wherever the author left
+    /// whitespace to reshape (`syntax/prettier_ignore/directive_gap_glued`).
+    fn push_format_ignore_gap(
+        &self,
+        gap: Option<usize>,
+        frozen: Span,
+        multiline: bool,
+        child_docs: &mut DocBuf,
+    ) {
         if self.format_ignore_slice_carries_gap(frozen) {
             return;
         }
+        let Some(gap_newlines) = gap else {
+            return;
+        };
         let d = self.d();
+        if !multiline {
+            // Inline: every spelling of this gap renders as the one collapsed space, and a
+            // collapsible `line` IS that space — the doc every other inline sibling boundary
+            // takes. Emitting nothing here deleted it, which is a rendered space the source
+            // HAS: the mirror of inventing one, and the reason this arm is no longer gated on
+            // the container's multiline-ness at all.
+            child_docs.push(d.line());
+            return;
+        }
         if gap_newlines >= 2 {
             child_docs.push(d.hardline());
         }
@@ -867,8 +912,14 @@ impl<'a> Printer<'a> {
     /// One predicate for both loops on purpose: a loop that answered it differently would print
     /// the gap twice in the container the other one gets right, and the second copy is invisible
     /// until the pass after next.
+    ///
+    /// Any collapsible whitespace opens it, not a linebreak alone: the author's spelling of that
+    /// gap is inside the frozen bytes either way, and re-spelling a space as a break is the
+    /// printer overwriting a slice it was told not to touch.
     fn format_ignore_slice_carries_gap(&self, frozen: Span) -> bool {
-        text_starts_with_linebreak(frozen.extract(self.source))
+        frozen
+            .extract(self.source)
+            .starts_with(internal::is_collapsible_ws_char)
     }
 
     /// Handle an inline child element - matches prettier-plugin-svelte's handleInlineChild
