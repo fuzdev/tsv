@@ -69,7 +69,9 @@
 {#if cond}<span>inline1</span> <span>inline2</span>{/if}
 
 <!-- control: a hoisted {@debug} at the body's EDGE trims its run, blank and all — in the text
-	spelling and in the whitespace-only-node spelling alike -->
+	spelling and in the whitespace-only-node spelling alike, so the blank gate must not fire
+	there. The element spellings are written glued because that IS their formatted form
+	(blocks/hoisted_boundary_sibling_kinds) -->
 {#if cond}text1
 
 	{@debug cond}{/if}

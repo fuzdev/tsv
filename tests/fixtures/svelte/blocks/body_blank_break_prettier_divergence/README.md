@@ -49,9 +49,16 @@ formatters:
 - a body with **no blank** keeps the hug the rule must not take away;
 - a blank whose run a hoisted `{@debug}` **trims** away at the body's EDGE carries no signal,
   because the run it lived in is deleted — and it is deleted in **either** spelling, so the
-  text-neighbour and element-neighbour authorings converge alike
-  ([hoisted_boundary_convergence](../hoisted_boundary_convergence_prettier_divergence/) owns
-  that answer; prettier keeps that blank as it keeps the others). The `{#each}` twin is what
+  text-neighbour and element-neighbour authorings converge alike. The two halves are owned by
+  two fixtures, and this control reads their answer rather than restating it: the **text**
+  neighbour by
+  [hoisted_boundary_convergence](../hoisted_boundary_convergence_prettier_divergence/), the
+  **sibling** neighbour by
+  [hoisted_boundary_sibling_kinds](../hoisted_boundary_sibling_kinds_prettier_divergence/),
+  which is why the element spellings here are written glued — that IS their formatted form, so
+  prettier reaches this file's `input` from them too and they can sit in the plain
+  `unformatted_*` variants. Prettier keeps that blank as it keeps the others, from the blank
+  authoring in `unformatted_ours_hugged.svelte`. The `{#each}` twin is what
   says the exclusion is not keyed to `{#if}`. Reading the *compiler's*
   content bounds here — where a whitespace-only node counts as content, since the compiler is
   asked whether a node stands between the content and the edge — split those two spellings:

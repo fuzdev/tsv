@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 2982,
+	"end": 3138,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -1899,32 +1899,32 @@
 			{
 				"type": "Comment",
 				"start": 2478,
-				"end": 2633,
-				"data": " control: a hoisted {@debug} at the body's EDGE trims its run, blank and all — in the text\n\tspelling and in the whitespace-only-node spelling alike "
+				"end": 2792,
+				"data": " control: a hoisted {@debug} at the body's EDGE trims its run, blank and all — in the text\n\tspelling and in the whitespace-only-node spelling alike, so the blank gate must not fire\n\tthere. The element spellings are written glued because that IS their formatted form\n\t(blocks/hoisted_boundary_sibling_kinds) "
 			},
 			{
 				"type": "Text",
-				"start": 2633,
-				"end": 2634,
+				"start": 2792,
+				"end": 2793,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 2634,
-				"end": 2667,
+				"start": 2793,
+				"end": 2826,
 				"test": {
 					"type": "Identifier",
-					"start": 2639,
-					"end": 2643,
+					"start": 2798,
+					"end": 2802,
 					"loc": {
 						"start": {
-							"line": 109,
+							"line": 111,
 							"column": 5
 						},
 						"end": {
-							"line": 109,
+							"line": 111,
 							"column": 9
 						}
 					},
@@ -1935,27 +1935,27 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 2644,
-							"end": 2649,
+							"start": 2803,
+							"end": 2808,
 							"raw": "text1",
 							"data": "text1"
 						},
 						{
 							"type": "DebugTag",
-							"start": 2649,
-							"end": 2662,
+							"start": 2808,
+							"end": 2821,
 							"identifiers": [
 								{
 									"type": "Identifier",
-									"start": 2657,
-									"end": 2661,
+									"start": 2816,
+									"end": 2820,
 									"loc": {
 										"start": {
-											"line": 109,
+											"line": 111,
 											"column": 23
 										},
 										"end": {
-											"line": 109,
+											"line": 111,
 											"column": 27
 										}
 									},
@@ -1969,27 +1969,27 @@
 			},
 			{
 				"type": "Text",
-				"start": 2667,
-				"end": 2668,
+				"start": 2826,
+				"end": 2827,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 2668,
-				"end": 2717,
+				"start": 2827,
+				"end": 2875,
 				"test": {
 					"type": "Identifier",
-					"start": 2673,
-					"end": 2677,
+					"start": 2832,
+					"end": 2836,
 					"loc": {
 						"start": {
-							"line": 110,
+							"line": 112,
 							"column": 5
 						},
 						"end": {
-							"line": 110,
+							"line": 112,
 							"column": 9
 						}
 					},
@@ -2000,19 +2000,19 @@
 					"nodes": [
 						{
 							"type": "RegularElement",
-							"start": 2678,
-							"end": 2698,
+							"start": 2837,
+							"end": 2857,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 110,
+									"line": 112,
 									"column": 11,
-									"character": 2679
+									"character": 2838
 								},
 								"end": {
-									"line": 110,
+									"line": 112,
 									"column": 15,
-									"character": 2683
+									"character": 2842
 								}
 							},
 							"attributes": [],
@@ -2021,8 +2021,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2684,
-										"end": 2691,
+										"start": 2843,
+										"end": 2850,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -2030,29 +2030,22 @@
 							}
 						},
 						{
-							"type": "Text",
-							"start": 2698,
-							"end": 2699,
-							"raw": " ",
-							"data": " "
-						},
-						{
 							"type": "DebugTag",
-							"start": 2699,
-							"end": 2712,
+							"start": 2857,
+							"end": 2870,
 							"identifiers": [
 								{
 									"type": "Identifier",
-									"start": 2707,
-									"end": 2711,
+									"start": 2865,
+									"end": 2869,
 									"loc": {
 										"start": {
-											"line": 110,
-											"column": 39
+											"line": 112,
+											"column": 38
 										},
 										"end": {
-											"line": 110,
-											"column": 43
+											"line": 112,
+											"column": 42
 										}
 									},
 									"name": "cond"
@@ -2065,27 +2058,27 @@
 			},
 			{
 				"type": "Text",
-				"start": 2717,
-				"end": 2718,
+				"start": 2875,
+				"end": 2876,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 2718,
-				"end": 2767,
+				"start": 2876,
+				"end": 2924,
 				"test": {
 					"type": "Identifier",
-					"start": 2723,
-					"end": 2727,
+					"start": 2881,
+					"end": 2885,
 					"loc": {
 						"start": {
-							"line": 111,
+							"line": 113,
 							"column": 5
 						},
 						"end": {
-							"line": 111,
+							"line": 113,
 							"column": 9
 						}
 					},
@@ -2096,20 +2089,20 @@
 					"nodes": [
 						{
 							"type": "DebugTag",
-							"start": 2728,
-							"end": 2741,
+							"start": 2886,
+							"end": 2899,
 							"identifiers": [
 								{
 									"type": "Identifier",
-									"start": 2736,
-									"end": 2740,
+									"start": 2894,
+									"end": 2898,
 									"loc": {
 										"start": {
-											"line": 111,
+											"line": 113,
 											"column": 18
 										},
 										"end": {
-											"line": 111,
+											"line": 113,
 											"column": 22
 										}
 									},
@@ -2118,27 +2111,20 @@
 							]
 						},
 						{
-							"type": "Text",
-							"start": 2741,
-							"end": 2742,
-							"raw": " ",
-							"data": " "
-						},
-						{
 							"type": "RegularElement",
-							"start": 2742,
-							"end": 2762,
+							"start": 2899,
+							"end": 2919,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 111,
-									"column": 25,
-									"character": 2743
+									"line": 113,
+									"column": 24,
+									"character": 2900
 								},
 								"end": {
-									"line": 111,
-									"column": 29,
-									"character": 2747
+									"line": 113,
+									"column": 28,
+									"character": 2904
 								}
 							},
 							"attributes": [],
@@ -2147,8 +2133,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2748,
-										"end": 2755,
+										"start": 2905,
+										"end": 2912,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -2161,26 +2147,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 2767,
-				"end": 2768,
+				"start": 2924,
+				"end": 2925,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "EachBlock",
-				"start": 2768,
-				"end": 2830,
+				"start": 2925,
+				"end": 2986,
 				"expression": {
 					"type": "Identifier",
-					"start": 2775,
-					"end": 2780,
+					"start": 2932,
+					"end": 2937,
 					"loc": {
 						"start": {
-							"line": 112,
+							"line": 114,
 							"column": 7
 						},
 						"end": {
-							"line": 112,
+							"line": 114,
 							"column": 12
 						}
 					},
@@ -2191,19 +2177,19 @@
 					"nodes": [
 						{
 							"type": "RegularElement",
-							"start": 2789,
-							"end": 2809,
+							"start": 2946,
+							"end": 2966,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 112,
+									"line": 114,
 									"column": 22,
-									"character": 2790
+									"character": 2947
 								},
 								"end": {
-									"line": 112,
+									"line": 114,
 									"column": 26,
-									"character": 2794
+									"character": 2951
 								}
 							},
 							"attributes": [],
@@ -2212,8 +2198,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 2795,
-										"end": 2802,
+										"start": 2952,
+										"end": 2959,
 										"raw": "inline1",
 										"data": "inline1"
 									}
@@ -2221,29 +2207,22 @@
 							}
 						},
 						{
-							"type": "Text",
-							"start": 2809,
-							"end": 2810,
-							"raw": " ",
-							"data": " "
-						},
-						{
 							"type": "DebugTag",
-							"start": 2810,
-							"end": 2823,
+							"start": 2966,
+							"end": 2979,
 							"identifiers": [
 								{
 									"type": "Identifier",
-									"start": 2818,
-									"end": 2822,
+									"start": 2974,
+									"end": 2978,
 									"loc": {
 										"start": {
-											"line": 112,
-											"column": 50
+											"line": 114,
+											"column": 49
 										},
 										"end": {
-											"line": 112,
-											"column": 54
+											"line": 114,
+											"column": 53
 										}
 									},
 									"name": "cond"
@@ -2255,57 +2234,57 @@
 				"context": {
 					"type": "Identifier",
 					"name": "item",
-					"start": 2784,
-					"end": 2788,
+					"start": 2941,
+					"end": 2945,
 					"loc": {
 						"start": {
-							"line": 112,
+							"line": 114,
 							"column": 16,
-							"character": 2784
+							"character": 2941
 						},
 						"end": {
-							"line": 112,
+							"line": 114,
 							"column": 20,
-							"character": 2788
+							"character": 2945
 						}
 					}
 				}
 			},
 			{
 				"type": "Text",
-				"start": 2830,
-				"end": 2832,
+				"start": 2986,
+				"end": 2988,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 2832,
-				"end": 2912,
+				"start": 2988,
+				"end": 3068,
 				"data": " control: <pre> is whitespace-significant, so the body is never reshaped "
 			},
 			{
 				"type": "Text",
-				"start": 2912,
-				"end": 2913,
+				"start": 3068,
+				"end": 3069,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 2913,
-				"end": 2981,
+				"start": 3069,
+				"end": 3137,
 				"name": "pre",
 				"name_loc": {
 					"start": {
-						"line": 115,
+						"line": 117,
 						"column": 1,
-						"character": 2914
+						"character": 3070
 					},
 					"end": {
-						"line": 115,
+						"line": 117,
 						"column": 4,
-						"character": 2917
+						"character": 3073
 					}
 				},
 				"attributes": [],
@@ -2315,19 +2294,19 @@
 						{
 							"type": "IfBlock",
 							"elseif": false,
-							"start": 2918,
-							"end": 2975,
+							"start": 3074,
+							"end": 3131,
 							"test": {
 								"type": "Identifier",
-								"start": 2923,
-								"end": 2927,
+								"start": 3079,
+								"end": 3083,
 								"loc": {
 									"start": {
-										"line": 115,
+										"line": 117,
 										"column": 10
 									},
 									"end": {
-										"line": 115,
+										"line": 117,
 										"column": 14
 									}
 								},
@@ -2338,19 +2317,19 @@
 								"nodes": [
 									{
 										"type": "RegularElement",
-										"start": 2928,
-										"end": 2948,
+										"start": 3084,
+										"end": 3104,
 										"name": "span",
 										"name_loc": {
 											"start": {
-												"line": 115,
+												"line": 117,
 												"column": 16,
-												"character": 2929
+												"character": 3085
 											},
 											"end": {
-												"line": 115,
+												"line": 117,
 												"column": 20,
-												"character": 2933
+												"character": 3089
 											}
 										},
 										"attributes": [],
@@ -2359,8 +2338,8 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 2934,
-													"end": 2941,
+													"start": 3090,
+													"end": 3097,
 													"raw": "inline1",
 													"data": "inline1"
 												}
@@ -2369,26 +2348,26 @@
 									},
 									{
 										"type": "Text",
-										"start": 2948,
-										"end": 2950,
+										"start": 3104,
+										"end": 3106,
 										"raw": "\n\n",
 										"data": "\n\n"
 									},
 									{
 										"type": "RegularElement",
-										"start": 2950,
-										"end": 2970,
+										"start": 3106,
+										"end": 3126,
 										"name": "span",
 										"name_loc": {
 											"start": {
-												"line": 117,
+												"line": 119,
 												"column": 1,
-												"character": 2951
+												"character": 3107
 											},
 											"end": {
-												"line": 117,
+												"line": 119,
 												"column": 5,
-												"character": 2955
+												"character": 3111
 											}
 										},
 										"attributes": [],
@@ -2397,8 +2376,8 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 2956,
-													"end": 2963,
+													"start": 3112,
+													"end": 3119,
 													"raw": "inline2",
 													"data": "inline2"
 												}
