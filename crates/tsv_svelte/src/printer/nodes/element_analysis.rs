@@ -69,7 +69,7 @@ struct MultilineInputs {
 /// alone decides its layout. `compute_multiline_cause` skips the authoring-derived trigger for
 /// such content (the `only_text_content` gate), which is why a text-only element authored with
 /// boundary air collapses back inline where any other content kind stays expanded. (The answer
-/// is invariant under [`trimmed_content_run`]'s trim anyway — the trim removes only
+/// is invariant under [`Printer::boundary_trimmed`]'s trim anyway — the trim removes only
 /// whitespace-only `Text` nodes.)
 ///
 /// It once had a second reader, a mirror answering what a width-broken element's OUTPUT
@@ -79,15 +79,6 @@ struct MultilineInputs {
 /// to predict the re-parse.
 fn content_is_text_only(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)))
-}
-
-/// The content run between a fragment's first and last non-whitespace nodes — the slice every
-/// content-shape question is asked of ([`Printer::has_source_breaks_in_content`]), so the
-/// boundary-trim scan has one definition. `None` when there is no content at all.
-fn trimmed_content_run<'n, 'x>(nodes: &'n [FragmentNode<'x>]) -> Option<&'n [FragmentNode<'x>]> {
-    let first = nodes.iter().position(|n| !n.is_whitespace_only_text())?;
-    let last = nodes.iter().rposition(|n| !n.is_whitespace_only_text())?;
-    Some(&nodes[first..=last])
 }
 
 impl<'a> Printer<'a> {
@@ -251,18 +242,19 @@ impl<'a> Printer<'a> {
     /// document reached two layouts — `elements/inline_content_flow_collapse_prettier_divergence`
     /// carries the case.
     ///
-    /// Takes the already-trimmed content run (the caller shares [`trimmed_content_run`]'s trim),
-    /// so the boundary-trim scan is not repeated per reader.
+    /// Takes the already-trimmed content run (the caller shares
+    /// [`Printer::boundary_trimmed`]'s trim), so the boundary-trim scan is not repeated per
+    /// reader.
     fn content_is_reflowable_fill(&self, run: &[FragmentNode<'_>]) -> bool {
         let source = self.source;
 
-        // One run, or nothing to reflow as one — see the doc comment. The blank question is the
-        // shared [`Printer::node_boundary_blank`], so this gate cannot spell it differently from
-        // the block path's; its whitespace-only arm restates what `breaks_inline_run` already
-        // answers for such a node, and what it ADDS here is a content text's two edges.
+        // One run, or nothing to reflow as one — see the doc comment. The two terms partition the
+        // question rather than overlap it: `breaks_inline_run` owns the whitespace-only spelling
+        // of a blank (and every non-text node that ends a run), `text_edge_blank` the spelling
+        // folded into a content text's edge, which is the half the first cannot see.
         if run
             .iter()
-            .any(|n| self.breaks_inline_run(n) || self.node_boundary_blank(n))
+            .any(|n| self.breaks_inline_run(n) || self.text_edge_blank(n))
         {
             return false;
         }
@@ -321,7 +313,7 @@ impl<'a> Printer<'a> {
 
         let source = self.source;
 
-        let Some(run) = trimmed_content_run(nodes) else {
+        let Some(run) = Printer::boundary_trimmed(nodes) else {
             return false;
         };
 
@@ -380,9 +372,10 @@ impl<'a> Printer<'a> {
         // before the scan).
         let is_fill = self.content_is_reflowable_fill(run);
         // The run's own content edges — where the ELEMENT's boundary air lives. Not `0` and
-        // `run.len() - 1`: `trimmed_content_run` drops only whitespace-only text, so a HOISTED
-        // node (`{@debug}`, `<title>`, `{@const}`, `{#snippet}`) sits at a real index and the
-        // text beside it is the effective edge. That is exactly `blocks/hoisted_boundary_convergence`.
+        // `run.len() - 1`: `Printer::boundary_trimmed` drops only whitespace-only text, so a
+        // HOISTED node (`{@debug}`, `<title>`, `{@const}`, `{#snippet}`) sits at a real index
+        // and the text beside it is the effective edge — exactly
+        // `blocks/hoisted_boundary_convergence`.
         // The `None` arm (every node hoisted) is inert rather than load-bearing: no hoisted kind
         // is a `Text`, so the scan below never reaches a node to compare these against.
         let content_edges =
