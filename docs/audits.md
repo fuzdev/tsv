@@ -272,8 +272,10 @@ A census has no divisor and no such motion — the same edit moved the `ws` cens
 **zero** signatures — and it is monotone under a fixture addition, since a new file can
 only add sites. So the rule is: **census ⇒ gradeable; sample ⇒ discovery only.** Making
 `ws` a census was not merely a stability win, either — the sampled form found 3
-undocumented files where the census finds **25** (7 signature groups vs 19), all of them
-the one comment-extent bug below. The sample was hiding 8x its own findings.
+undocumented files where the census found **25** (7 signature groups vs 19), which is 8x
+its own findings hidden. That reading is kept because it is the evidence; it has since
+been worked down to the 10 below, the comment-extent bug having accounted for 15 of the
+25 and all but 4 of the groups.
 
 **Each variant is graded against its own base file.** A divergence the base already had
 is not the injection's doing, and `tests/fixtures` deliberately contains ~91
@@ -314,17 +316,8 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
 list, not a regression gate, which is why it is not in `deno task check` (it also needs
 the canonical parser, so it is conformance-tier at best). Standing findings:
 
-- **`ws`** (census: 25 files / 19 signature groups) — **two bugs, and both are the same
-  question asked of a sub-parse: which SOURCE did that parse actually see?**
-  - **A comment's extent is clipped at a trimmed slice boundary** (15 files, from 5 bases):
-    the `{@…}` readers hand their interior to the sub-parse whitespace-**trimmed**, so a
-    trailing `//` comment ends where the trim did. `{@html expr // c ⏎}` ends the comment
-    before the trailing space where acorn ends it after — and every node whose end is the
-    comment's end comes back short with it. The whole `{@…}` family reaches it (`html`,
-    `render`, `debug`, `const`, and the `{@attach}` attribute); `{expr // c ⏎}`, an
-    attribute value and `<script>` all agree, so the divergence is the bounded readers'
-    slice, not the comment lexer, and a comment that is not last in the interior is
-    unaffected.
+- **`ws`** (census: 10 files / 4 signature groups) — one bug, and it asks a sub-parse the
+  question its retired sibling asked: **which SOURCE did that parse actually see?**
   - **The acorn comment DEDENT is computed against the document** (10 files, from 2
     `tags/const/` bases) where canonical computes it against the synthetic source it built.
     Svelte's `onComment` strips the comment line's own indentation from every line of a
@@ -336,9 +329,29 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
     `{@const}` destructuring pattern or type annotation. Same shape as the per-parse `loc`
     line class (`AcornSeed`), one field over: what acorn saw, not what the document says.
 
-  Because the family is a census, closing both takes the run to zero — which makes `ws` a
-  candidate to become a **green gate at zero**, not a ratchet: there would be nothing left
-  to pin. Its oracle-side rejections are separately sized above and are currently **all
+  The sibling it retired was a **comment extent clipped at a trimmed slice boundary**: the
+  bounded head readers handed their interior to the sub-parse whitespace-trimmed at BOTH
+  ends, so a `//` that ended the interior ended where the trim did — a line comment runs to
+  the terminator, so the space in `{@html expr // c ⏎}` is the comment's own text. **Eight**
+  readers spelled it that way against the neighbours' leading-only trim, and the census could
+  name only five: it injects WHITESPACE, so it reveals the bug just where a fixture already
+  carried a trailing `//` in that head. Defining the class by the trim rather than by the
+  bases it surfaced is what reached the `{#each}` key and the `{#key}` head; enumerating the
+  sub-parse ENTRY POINT's callers is what reached the eighth, `reparse_each_iterable`, whose
+  slice ends at a `{#each}` head's second `as` and which no head-shaped sweep passes over.
+  That last enumeration also bounds the class: the three remaining both-ends trims that feed
+  a sub-parse (the `{#each}` binding's, the `{:then}`/`{:catch}` region's, the `{@const}`
+  binding's) are unreachable, each guarded by an explicit rejection of the trailing comment
+  that canonical rejects too. `Parser::parse_ts_expression` now states the rule for its
+  callers, and the extents of every head — the trimmed ones and the agreeing neighbours, in
+  one wire — are pinned by
+  [head_final_line_comment_extent](../tests/fixtures/svelte/syntax/comments/head_final_line_comment_extent/),
+  whose `prettier-ignore` is what makes the trigger format-stable enough to be a fixture at
+  all (both formatters trim a line comment's trailing whitespace).
+
+  Because the family is a census, closing the one above takes the run to zero — which makes
+  `ws` a candidate to become a **green gate at zero**, not a ratchet: there would be nothing
+  left to pin. Its oracle-side rejections are separately sized above and are currently **all
   documented** — 32 split `!==` into `! ==`, whose non-null assertion only a TS parse
   accepts (the tracked [TypeScript-mode
   gating](./conformance_svelte.md#typescript-mode-gating-tracked-over-acceptance)
