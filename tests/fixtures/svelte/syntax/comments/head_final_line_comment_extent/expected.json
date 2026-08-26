@@ -1,0 +1,1257 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1288,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 801,
+				"data": "\n\tA line comment runs to the line terminator, so the TRAILING SPACE in each `// c ` below\n\tbelongs to the comment's own text: its value is ` c ` and its end is one past the space.\n\tThat space is the claim of this fixture and it is invisible — trimming these lines \"for\n\ttidiness\" turns every case into the glued null control at the bottom rather than failing\n\there. The `prettier-ignore` is what lets them survive: both formatters trim a line\n\tcomment's trailing whitespace, so an unfrozen spelling of this file is not a fixed point.\n\tEvery reader that hands the sub-parser a region is here, whether or not it needs to be,\n\tbecause the extent is one rule. The `lang=\"ts\"` is for the `{#each xs as A[] … as x}`\n\tcase alone, whose second `as` is a type assertion and whose iterable is re-parsed.\n"
+			},
+			{
+				"type": "Text",
+				"start": 801,
+				"end": 802,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 845,
+				"end": 847,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 847,
+				"end": 871,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Text",
+				"start": 871,
+				"end": 872,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 872,
+				"end": 1287,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 873
+					},
+					"end": {
+						"line": 17,
+						"column": 4,
+						"character": 876
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 877,
+							"end": 879,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "HtmlTag",
+							"start": 879,
+							"end": 899,
+							"expression": {
+								"type": "Identifier",
+								"start": 886,
+								"end": 890,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 8
+									},
+									"end": {
+										"line": 18,
+										"column": 12
+									}
+								},
+								"name": "expr",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c ",
+										"start": 891,
+										"end": 896
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 899,
+							"end": 901,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RenderTag",
+							"start": 901,
+							"end": 923,
+							"expression": {
+								"type": "CallExpression",
+								"start": 910,
+								"end": 914,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 10
+									},
+									"end": {
+										"line": 20,
+										"column": 14
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 910,
+									"end": 912,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 10
+										},
+										"end": {
+											"line": 20,
+											"column": 12
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [],
+								"optional": false,
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c ",
+										"start": 915,
+										"end": 920
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 923,
+							"end": 925,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "DebugTag",
+							"start": 925,
+							"end": 946,
+							"identifiers": [
+								{
+									"type": "Identifier",
+									"start": 933,
+									"end": 937,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 9
+										},
+										"end": {
+											"line": 22,
+											"column": 13
+										}
+									},
+									"name": "expr",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c ",
+											"start": 938,
+											"end": 943
+										}
+									]
+								}
+							]
+						},
+						{
+							"type": "Text",
+							"start": 946,
+							"end": 948,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 948,
+							"end": 985,
+							"test": {
+								"type": "Identifier",
+								"start": 953,
+								"end": 957,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 6
+									},
+									"end": {
+										"line": 24,
+										"column": 10
+									}
+								},
+								"name": "expr"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ConstTag",
+										"start": 958,
+										"end": 980,
+										"declaration": {
+											"type": "VariableDeclaration",
+											"kind": "const",
+											"declarations": [
+												{
+													"type": "VariableDeclarator",
+													"id": {
+														"type": "Identifier",
+														"name": "a",
+														"start": 966,
+														"end": 967,
+														"loc": {
+															"start": {
+																"line": 24,
+																"column": 19,
+																"character": 966
+															},
+															"end": {
+																"line": 24,
+																"column": 20,
+																"character": 967
+															}
+														}
+													},
+													"init": {
+														"type": "Literal",
+														"start": 970,
+														"end": 971,
+														"loc": {
+															"start": {
+																"line": 24,
+																"column": 23
+															},
+															"end": {
+																"line": 24,
+																"column": 24
+															}
+														},
+														"value": 1,
+														"raw": "1",
+														"trailingComments": [
+															{
+																"type": "Line",
+																"value": " c ",
+																"start": 972,
+																"end": 977
+															}
+														]
+													},
+													"start": 966,
+													"end": 977
+												}
+											],
+											"start": 960,
+											"end": 979
+										}
+									}
+								]
+							},
+							"alternate": null
+						},
+						{
+							"type": "Text",
+							"start": 985,
+							"end": 987,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 987,
+							"end": 1021,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 26,
+									"column": 2,
+									"character": 988
+								},
+								"end": {
+									"line": 26,
+									"column": 6,
+									"character": 992
+								}
+							},
+							"attributes": [
+								{
+									"type": "AttachTag",
+									"start": 993,
+									"end": 1013,
+									"expression": {
+										"type": "Identifier",
+										"start": 1002,
+										"end": 1004,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 16
+											},
+											"end": {
+												"line": 26,
+												"column": 18
+											}
+										},
+										"name": "fn",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c ",
+												"start": 1005,
+												"end": 1010
+											}
+										]
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1021,
+							"end": 1023,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "EachBlock",
+							"start": 1023,
+							"end": 1057,
+							"expression": {
+								"type": "Identifier",
+								"start": 1030,
+								"end": 1032,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 8
+									},
+									"end": {
+										"line": 28,
+										"column": 10
+									}
+								},
+								"name": "xs"
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": []
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "x",
+								"start": 1036,
+								"end": 1037,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 14,
+										"character": 1036
+									},
+									"end": {
+										"line": 28,
+										"column": 15,
+										"character": 1037
+									}
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 1039,
+								"end": 1040,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 17
+									},
+									"end": {
+										"line": 28,
+										"column": 18
+									}
+								},
+								"name": "x",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c ",
+										"start": 1041,
+										"end": 1046
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1057,
+							"end": 1059,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "KeyBlock",
+							"start": 1059,
+							"end": 1084,
+							"expression": {
+								"type": "Identifier",
+								"start": 1065,
+								"end": 1069,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 11
+									}
+								},
+								"name": "expr",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c ",
+										"start": 1070,
+										"end": 1075
+									}
+								]
+							},
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1084,
+							"end": 1086,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 1086,
+							"end": 1109,
+							"test": {
+								"type": "Identifier",
+								"start": 1091,
+								"end": 1095,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 6
+									},
+									"end": {
+										"line": 32,
+										"column": 10
+									}
+								},
+								"name": "expr",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c ",
+										"start": 1096,
+										"end": 1101
+									}
+								]
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": []
+							},
+							"alternate": null
+						},
+						{
+							"type": "Text",
+							"start": 1109,
+							"end": 1111,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 1111,
+							"end": 1137,
+							"expression": {
+								"type": "Identifier",
+								"start": 1119,
+								"end": 1120,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 9
+									},
+									"end": {
+										"line": 34,
+										"column": 10
+									}
+								},
+								"name": "p",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c ",
+										"start": 1121,
+										"end": 1126
+									}
+								]
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": []
+							},
+							"then": null,
+							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 1137,
+							"end": 1139,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1139,
+							"end": 1153,
+							"expression": {
+								"type": "Identifier",
+								"start": 1140,
+								"end": 1144,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 2
+									},
+									"end": {
+										"line": 36,
+										"column": 6
+									}
+								},
+								"name": "expr",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c ",
+										"start": 1145,
+										"end": 1150
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1153,
+							"end": 1155,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1155,
+							"end": 1188,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 38,
+									"column": 2,
+									"character": 1156
+								},
+								"end": {
+									"line": 38,
+									"column": 6,
+									"character": 1160
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 1161,
+									"end": 1180,
+									"name": "attr",
+									"name_loc": {
+										"start": {
+											"line": 38,
+											"column": 7,
+											"character": 1161
+										},
+										"end": {
+											"line": 38,
+											"column": 11,
+											"character": 1165
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 1166,
+										"end": 1180,
+										"expression": {
+											"type": "Identifier",
+											"start": 1167,
+											"end": 1171,
+											"loc": {
+												"start": {
+													"line": 38,
+													"column": 13
+												},
+												"end": {
+													"line": 38,
+													"column": 17
+												}
+											},
+											"name": "expr",
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c ",
+													"start": 1172,
+													"end": 1177
+												}
+											]
+										}
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1188,
+							"end": 1190,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1190,
+							"end": 1221,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 40,
+									"column": 2,
+									"character": 1191
+								},
+								"end": {
+									"line": 40,
+									"column": 6,
+									"character": 1195
+								}
+							},
+							"attributes": [
+								{
+									"type": "SpreadAttribute",
+									"start": 1196,
+									"end": 1213,
+									"expression": {
+										"type": "Identifier",
+										"start": 1200,
+										"end": 1204,
+										"loc": {
+											"start": {
+												"line": 40,
+												"column": 11
+											},
+											"end": {
+												"line": 40,
+												"column": 15
+											}
+										},
+										"name": "expr",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c ",
+												"start": 1205,
+												"end": 1210
+											}
+										]
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1221,
+							"end": 1223,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "EachBlock",
+							"start": 1223,
+							"end": 1259,
+							"expression": {
+								"type": "TSAsExpression",
+								"start": 1230,
+								"end": 1239,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 8
+									},
+									"end": {
+										"line": 42,
+										"column": 17
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 1230,
+									"end": 1232,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 8
+										},
+										"end": {
+											"line": 42,
+											"column": 10
+										}
+									},
+									"name": "xs"
+								},
+								"typeAnnotation": {
+									"type": "TSArrayType",
+									"start": 1236,
+									"end": 1239,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 14
+										},
+										"end": {
+											"line": 42,
+											"column": 17
+										}
+									},
+									"elementType": {
+										"type": "TSTypeReference",
+										"start": 1236,
+										"end": 1237,
+										"loc": {
+											"start": {
+												"line": 42,
+												"column": 14
+											},
+											"end": {
+												"line": 42,
+												"column": 15
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1236,
+											"end": 1237,
+											"loc": {
+												"start": {
+													"line": 42,
+													"column": 14
+												},
+												"end": {
+													"line": 42,
+													"column": 15
+												}
+											},
+											"name": "A"
+										}
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c ",
+										"start": 1240,
+										"end": 1245
+									}
+								]
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": []
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "x",
+								"start": 1250,
+								"end": 1251,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 4,
+										"character": 1250
+									},
+									"end": {
+										"line": 43,
+										"column": 5,
+										"character": 1251
+									}
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1259,
+							"end": 1261,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "HtmlTag",
+							"start": 1261,
+							"end": 1280,
+							"expression": {
+								"type": "Identifier",
+								"start": 1268,
+								"end": 1272,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 8
+									},
+									"end": {
+										"line": 44,
+										"column": 12
+									}
+								},
+								"name": "expr",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 1273,
+										"end": 1277
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1280,
+							"end": 1281,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 891,
+			"end": 896,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 13
+				},
+				"end": {
+					"line": 18,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 915,
+			"end": 920,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 15
+				},
+				"end": {
+					"line": 20,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 938,
+			"end": 943,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 14
+				},
+				"end": {
+					"line": 22,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 972,
+			"end": 977,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 25
+				},
+				"end": {
+					"line": 24,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 1005,
+			"end": 1010,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 19
+				},
+				"end": {
+					"line": 26,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 1041,
+			"end": 1046,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 19
+				},
+				"end": {
+					"line": 28,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 1070,
+			"end": 1075,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 12
+				},
+				"end": {
+					"line": 30,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 1096,
+			"end": 1101,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 11
+				},
+				"end": {
+					"line": 32,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 1121,
+			"end": 1126,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 11
+				},
+				"end": {
+					"line": 34,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 1145,
+			"end": 1150,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 7
+				},
+				"end": {
+					"line": 36,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 1172,
+			"end": 1177,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 18
+				},
+				"end": {
+					"line": 38,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 1205,
+			"end": 1210,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 16
+				},
+				"end": {
+					"line": 40,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c ",
+			"start": 1240,
+			"end": 1245,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 18
+				},
+				"end": {
+					"line": 42,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1273,
+			"end": 1277,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 13
+				},
+				"end": {
+					"line": 44,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 802,
+		"end": 845,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 820,
+			"end": 836,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 822,
+					"end": 835,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 826,
+							"end": 834,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 5
+								},
+								"end": {
+									"line": 13,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 826,
+								"end": 828,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 5
+									},
+									"end": {
+										"line": 13,
+										"column": 7
+									}
+								},
+								"name": "xs"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 831,
+								"end": 834,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 10
+									},
+									"end": {
+										"line": 13,
+										"column": 13
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 832,
+										"end": 833,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 11
+											},
+											"end": {
+												"line": 13,
+												"column": 12
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								]
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": "\n\tA line comment runs to the line terminator, so the TRAILING SPACE in each `// c ` below\n\tbelongs to the comment's own text: its value is ` c ` and its end is one past the space.\n\tThat space is the claim of this fixture and it is invisible — trimming these lines \"for\n\ttidiness\" turns every case into the glued null control at the bottom rather than failing\n\there. The `prettier-ignore` is what lets them survive: both formatters trim a line\n\tcomment's trailing whitespace, so an unfrozen spelling of this file is not a fixed point.\n\tEvery reader that hands the sub-parser a region is here, whether or not it needs to be,\n\tbecause the extent is one rule. The `lang=\"ts\"` is for the `{#each xs as A[] … as x}`\n\tcase alone, whose second `as` is a type assertion and whose iterable is re-parsed.\n"
+				}
+			]
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 810,
+				"end": 819,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 8,
+						"character": 810
+					},
+					"end": {
+						"line": 12,
+						"column": 12,
+						"character": 814
+					}
+				},
+				"value": [
+					{
+						"start": 816,
+						"end": 818,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

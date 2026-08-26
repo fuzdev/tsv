@@ -686,7 +686,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         else {
             return Err(self.error_expected_at("'attach' keyword", content_start));
         };
-        let expr_str = after_attach.trim_matches(is_svelte_ws);
+        // Leading whitespace only — the trailing run may be a line comment's own text
+        // (`Parser::parse_ts_expression`) — and that is also the whitespace-only test, since a
+        // region of nothing but whitespace trims to empty from the front alone.
+        let expr_str = after_attach.trim_start_matches(is_svelte_ws);
 
         if expr_str.is_empty() {
             return Err(self.error_msg_at("{@attach} requires an expression", content_start));

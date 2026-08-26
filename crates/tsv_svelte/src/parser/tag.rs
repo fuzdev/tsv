@@ -49,10 +49,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Svelte requires whitespace after the keyword.
+        // Svelte requires whitespace after the keyword. Leading whitespace only — the
+        // trailing run may be a line comment's own text (`Parser::parse_ts_expression`).
         let expr_str = self
             .strip_block_keyword(tag_content, keyword, tag_content_start)?
-            .trim_matches(is_svelte_ws);
+            .trim_start_matches(is_svelte_ws);
 
         let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
@@ -79,7 +80,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse: "const name = expression" — Svelte requires whitespace after the keyword.
         let decl_str = self
             .strip_block_keyword(tag_content, "const", tag_content_start)?
-            .trim_matches(is_svelte_ws);
+            .trim_start_matches(is_svelte_ws);
 
         let decl_offset = tag_content_start + subslice_offset(tag_content, decl_str);
 
@@ -215,12 +216,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         decl_offset: usize,
         eq_pos: usize,
     ) -> Result<(Expression<'arena>, Expression<'arena>), ParseError> {
+        // The id side ends at the `=`, so its trailing run is the head's; the init side ends
+        // at the tag's `}` and its may be a line comment's own text
+        // (`Parser::parse_ts_expression`).
         let id_str = decl_str[..eq_pos].trim_matches(is_svelte_ws);
-        let init_str = decl_str[eq_pos + 1..].trim_matches(is_svelte_ws);
+        let after_eq = &decl_str[eq_pos + 1..];
+        let init_str = after_eq.trim_start_matches(is_svelte_ws);
 
         let id_offset = decl_offset + subslice_offset(decl_str, id_str);
-        let init_offset =
-            decl_offset + eq_pos + 1 + (decl_str[eq_pos + 1..].len() - init_str.len());
+        // The length the init's LEADING run costs, which the start-keyed trim above is what
+        // makes this subtraction: a both-ends trim would fold the trailing run in here too.
+        let init_offset = decl_offset + eq_pos + 1 + (after_eq.len() - init_str.len());
 
         // Taken off the id side derived just above, so the rule and the parse cannot
         // disagree about where the binding is.
@@ -357,7 +363,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // identifiers). Svelte's `regex_whitespace_with_closing_curly_brace`
         // (`/\s*}/y`); a comment is not whitespace, so `{@debug /* c */}` falls
         // through to the parse below, which rejects (there is no expression).
-        let expr_str = rest.trim_matches(is_svelte_ws);
+        //
+        // Leading whitespace only — the trailing run may be a line comment's own text
+        // (`Parser::parse_ts_expression`) — and that is also the whitespace-only test, since
+        // a region of nothing but whitespace trims to empty from the front alone.
+        let expr_str = rest.trim_start_matches(is_svelte_ws);
         if !expr_str.is_empty() {
             let expr_offset = rest_offset + subslice_offset(rest, expr_str);
 

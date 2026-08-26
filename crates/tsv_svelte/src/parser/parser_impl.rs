@@ -536,6 +536,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a TypeScript expression and collect any comments.
     ///
     /// Comments are added to `self.expression_comments` for later inclusion in `Root.comments`.
+    ///
+    /// ⚠️ **`source` must keep its trailing whitespace.** A head reader may trim the LEADING
+    /// run — Svelte reaches every one of these reads through `allow_whitespace()`, so acorn
+    /// starts at the first non-whitespace byte either way — but the trailing run is not the
+    /// head's to remove: a line comment runs to the line terminator, so in
+    /// `{@html expr // c ⏎}` the space before the newline is the COMMENT's own text. Trimming
+    /// the end hands this a slice one byte short, and the comment comes back clipped
+    /// (`value: " c"`, `end` one back) along with every node that ends at it — `{@const}`'s
+    /// `VariableDeclarator`, say. Canonical never shortens one: Svelte hands acorn the rest of
+    /// the document and reads back how far it got. `subslice_offset` is start-keyed, so
+    /// keeping the run costs a caller no offset arithmetic; a caller that also asks "is this
+    /// head EMPTY?" asks a both-ends-trimmed value for that one question alone.
+    ///
+    /// The extents of the whole family are pinned by
+    /// `tests/fixtures/svelte/syntax/comments/head_final_line_comment_extent`.
     pub(crate) fn parse_ts_expression(
         &mut self,
         source: &str,
@@ -557,7 +572,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// obligation the other does not. Neither head is ever asked about `satisfies`: no
     /// Svelte separator is spelled that way, so it stays TypeScript's in both.
     ///
-    /// Comments are collected.
+    /// Comments are collected, and the slice's trailing whitespace is the caller's to keep —
+    /// see [`Self::parse_ts_expression`], whose warning holds for every region handed to a
+    /// sub-parse, this one and [`Self::parse_ts_pattern`] included.
     pub(crate) fn parse_ts_expression_partial(
         &mut self,
         source: &str,
