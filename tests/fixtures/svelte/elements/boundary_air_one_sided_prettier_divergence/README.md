@@ -11,6 +11,14 @@ boundary each kind answers by its boundary rule alone:
 | block (`<p>`), leading | expands | the leading boundary alone is the signal |
 | block (`<p>`), trailing | collapses | the trailing boundary alone is not |
 
+⚠️ **The table is scoped to the ELEMENT kinds.** A block BODY (`{#if}` / `{#each}` / … ) is the
+other fragment family and takes a third answer — *either* boundary alone expands — stated in the
+block catalog's vocabulary as "hug is all-or-nothing"
+([blocks/if/hugged_boundary_convergence](../../blocks/if/hugged_boundary_convergence_prettier_divergence/)).
+The families also part on text-only content ([boundary_air_text_content](../boundary_air_text_content/)).
+Both are the same Tier-2 air request — see
+[conformance_prettier.md §Authoring Convergence Philosophy](../../../../../docs/conformance_prettier.md#authoring-convergence-philosophy).
+
 Where the newline **lands** is not part of the question. A leading boundary in front of text
 sits inside that text node's edge run, while the same boundary in front of an element is a
 whitespace-only node — one boundary, two node shapes, one answer. The component pair pins that

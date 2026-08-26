@@ -18,14 +18,14 @@ units (search `◆` for every tag, `◆prettier_bug` for one category):
 
 - `◆spec_violation` — Prettier emits spec-violating CSS/HTML/JS. tsv follows the spec
 - `◆spec_precedence` — Prettier's output is valid but tsv emits the spec's canonical serialized form
-- `◆stable_quirk` — Prettier preserves multiple forms without normalizing. tsv normalizes consistently
+- `◆stable_quirk` — Prettier preserves multiple forms without normalizing. tsv normalizes consistently. A **convergence-count** disagreement: prettier holds one stable form per *authoring* of a document the language treats as one, tsv holds a single form for all of them — [§Authoring Convergence Philosophy](#authoring-convergence-philosophy)
 - `◆prettier_bug` — Prettier is non-idempotent, emits invalid output, or changes meaning (e.g. strips required parens). tsv produces stable, valid, meaning-preserving output
 - `◆parser_compat` — Prettier's output breaks Svelte's parser. tsv produces Svelte-compatible output
 - `◆print_width` — Prettier allows lines to exceed printWidth. tsv breaks to stay within the limit
 - `◆bom_stripping` — Prettier preserves byte-order marks. tsv strips them
 - `◆comment_preservation` — Prettier moves comments to a different syntactic position. tsv preserves comment position
 - `◆content_preservation` — Prettier silently drops authored content — usually comments, sometimes other semantics-bearing tokens (a directive `|modifier`, a list element). tsv preserves it
-- `◆design_choice` — Other deliberate behavior differences, with rationale in the fixture
+- `◆design_choice` — Other deliberate behavior differences, with rationale in the fixture. Its narrow sense is a **representative** disagreement: both formatters normalize a document to exactly one form and they pick a *different* one (`@scope ()` vs `@scope()`; block-style vs a dangled delimiter). ⚠️ It is also the catch-all, so reach for the specific tag first — in particular, "tsv normalizes what prettier keeps per authoring" is `◆stable_quirk`, whatever the language. An entry can carry both: most of the Svelte whitespace rules converge the authorings **and** pick a different representative than prettier does
 
 > Most `◆comment_preservation` and `◆content_preservation` divergences live in the prose-form [TypeScript: Comments](./conformance_prettier_ts_comments.md#typescript-comments) and [CSS: Comments](./conformance_prettier_css.md#css-comments) catalogs, not the tag-prefixed catalog lists — they're the largest divergence category but don't reduce to a single bullet.
 
@@ -70,7 +70,7 @@ The fixture-pinned `◆prettier_bug` cases — where Prettier produces output th
 - Output that's valid and reasonable
 - Unclear which approach is "better"
 
-**When to differ:** any reason in [Reasons tsv Differs](#reasons-tsv-differs) above. The two cross-cutting principles — comment position and print width — are detailed below.
+**When to differ:** any reason in [Reasons tsv Differs](#reasons-tsv-differs) above. The three cross-cutting principles — comment position, authoring convergence, and print width — are detailed below.
 
 ### Comment Position Philosophy
 
@@ -478,6 +478,224 @@ Distinct from all of the above: a comment prettier **relocates** across the gap 
 `A = /* c */⏎1` → `A /* c */ = 1`; binary `b + /* c */⏎c` → `b /* c */ + c`) is a
 comment-*position* divergence, governed by [§Comment Position
 Philosophy](#comment-position-philosophy), not by this rule.
+
+### Authoring Convergence Philosophy
+
+**The question every whitespace rule in this document is an answer to.** Each language tsv
+formats carries an equivalence relation the formatter did not choose: CSS Syntax 3 says the
+whitespace around a combinator is not part of the selector; Svelte's `clean_nodes` deletes a
+fragment's edge whitespace before anything renders; ECMAScript never sees a line break between
+`{` and a property. For any set of source spellings the language itself declares to be **one
+document**, a formatter must decide how many outputs it keeps. Two goods are in tension and
+only one can win per site:
+
+- **Convergence** — every spelling of one document reaches one form, so a document has a
+  canonical shape and an edit cannot silently change it.
+- **Authorship** — a render-free run may be the only place a distinction the author drew can
+  live, and a weld is unrecoverable: once every spelling collapses to the same output, no later
+  pass can tell which one was written.
+
+**The stance.** *When the language declares two spellings to be one document, tsv emits one
+form for both — unless the spelling it would discard is the only carrier of an authoring signal
+tsv has separately decided to honor.* The default is convergence; every hold is an
+**enumerated exclusion**, and the exclusion set is small, per-language, and listed below.
+
+**Prettier's counter-position, stated once here rather than case by case.** Prettier keeps one
+stable form per authoring at a render-free position. It is idempotent on each — none of this is
+a prettier bug — so the number of fixed points a document has under prettier is the number of
+ways it can be written. `<span><b>a</b></span>` authored hugged, spaced and newline-broken is
+three prettier forms and two tsv forms (the space converges onto the hug; the newline is held as
+the air request below); `--x:;` / `--x: ;` / `--x:     ;` is three prettier forms and one tsv
+form. That is the whole of the disagreement,
+and it is why so many entries in the per-language catalogs carry `prettier_variant_*` files
+rather than an `output_prettier.*`: the divergence is one of **normalization**, not of layout.
+Where prettier's per-authoring form is additionally non-idempotent, the entry is `◆prettier_bug`
+instead and the [Prettier bug index](#prettier-bug-index) carries it.
+
+**The tag for this stance is `◆stable_quirk`**, and it is distinct from `◆design_choice` on an
+axis worth naming: `◆stable_quirk` is a **convergence-count** disagreement (prettier holds a form
+per authoring, tsv holds one), `◆design_choice` a **representative** disagreement (both hold one
+form and choose differently). Most Svelte whitespace rules are **both** at once — tsv converges
+the authorings *and* lays the result out block-style where prettier dangles — which is why they
+read as one entry.
+
+⚠️ **The tags are not this section's index, and cannot cheaply become one.** They are used on the
+bullet-list catalogs and are largely absent from the prose-form ones — 65% of the Svelte
+catalog's divergence fixtures and 98% of the comment catalog's carry no `◆reason` at all, by the
+same design the [Reasons tsv Differs](#reasons-tsv-differs) note already states for
+`◆comment_preservation`. So `grep ◆stable_quirk` finds the CSS instances and almost none of the
+Svelte ones — including the flagship
+[inline_boundary_whitespace](../tests/fixtures/svelte/elements/inline_boundary_whitespace_prettier_divergence/),
+which is untagged. **This section is the index**; the tag is a hint. Two Svelte entries that are
+convergence-count claims currently carry only `◆design_choice` — the authored-newline-after-a-
+closing-tag rule and the space-only section-boundary trim — and should gain `◆stable_quirk` when
+next touched.
+
+#### Three warrants, and they are not interchangeable
+
+What makes convergence legitimate at a site is a source **outside** tsv saying the spellings are
+one document. That source differs per language, and so does how much is left for tsv to decide:
+
+| language | who supplies the equivalence | who supplies the canonical form | what is left to taste |
+| --- | --- | --- | --- |
+| CSS | the spec (Syntax 3 tokenization, "not significant here") | often the spec too (CSS Variables 1 mandates `--x: ;`) | little — see [CSS §Empty custom-property value](./conformance_prettier_css.md#css-values) |
+| TypeScript | the grammar (no significant whitespace) | prettier, and tsv follows it | one held signal: the object literal's `{`→first-property newline |
+| Svelte | the **compiler** (`clean_nodes`), not the spec | **nobody** | everything — hence the exclusion set |
+
+**Svelte is the hard case, and that is structural rather than accidental.** `clean_nodes`
+deletes a fragment's boundary run and collapses an inter-sibling run to a single space, so it
+tells tsv that space, tab, newline and (at a boundary) nothing at all are one program — and then
+stops. It names no preferred spelling, and no other authority does either. So at every such site
+tsv *must* pick, the pick is not derivable from the render, and the argument for a hold has to be
+made on its own terms. Read the Svelte catalog's whitespace rules as a single decision procedure
+spending that licence, not as a list of independent quirks — [§Svelte: Inline content
+block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style) is where it is
+worked out.
+
+**A render-free licence licenses two incompatible actions, and only one may be taken.** Where the
+compiler deletes a run, *trimming* it and *breaking* it are both render-correct — and doing both
+is a period-2 cycle, not a compromise (`<svelte:body … />b` trims to the glued form, whose next
+pass re-breaks it; the fuzz gate caught exactly this). F1 forces the choice; it does not make it.
+The hoisted-node family is where that shows most sharply: a declaration tag and a `{#snippet}`
+spend the licence on the break and take their own line, while `{@debug}` and a `<title>` beside
+text spend it on the trim — [§Svelte: Inline content
+block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style).
+
+#### In Svelte the doctrine reduces to one axis
+
+Across every fragment site, the three whitespace spellings do **not** each get their own answer:
+
+- **space ↔ tab — always converge**, at every site, in every container, for every neighbour kind.
+  No exception outside `<pre>` / `<textarea>`. A rule that lets these two part is a bug against
+  the compiler's rule 1, not a divergence from prettier ([inline_separator_tab](../tests/fixtures/svelte/elements/inline_separator_tab_prettier_divergence/)).
+- **hug ↔ space** — converge at a **content boundary**, where the compiler deletes the run
+  ([inline_boundary_whitespace](../tests/fixtures/svelte/elements/inline_boundary_whitespace_prettier_divergence/));
+  never between **siblings**, where the run's *presence* is render-significant and gluing is a
+  different document.
+- **newline ↔ space** — the only live axis, and the entire exclusion set below lives on it.
+
+So "does tsv converge here?" is, in practice, always the single question **when does an authored
+newline count?** — and the answer is: by default it does not, except in the enumerated cases.
+
+#### Forced exclusions vs taste exclusions
+
+These read identically in the per-language prose today and they are **not the same kind of
+claim**. A forced exclusion is one where the converging alternative does not have a fixed point
+at all: taking it produces a document that formats to one form and reformats to another, so
+there is nothing to decide. A taste exclusion is one where both behaviors are stable, render
+alike, and lose nothing mechanical — tsv holds because it has decided the discarded spelling
+carries meaning. **Only a taste exclusion can be re-litigated.** When adding or changing an
+entry, say which it is.
+
+| exclusion | kind | why |
+| --- | --- | --- |
+| `<pre>` / `<textarea>` content | **not an exclusion at all** | the spellings are not one document — the run renders |
+| an inter-sibling run's *presence* (glued never split) | **forced by render** | breaking injects a rendered space |
+| hoisted trim vs hoisted break (only one) | **forced (F1)** | taking both is a 2-cycle |
+| body-expand keyed on width, never on head-wrap | **forced (F1)** | the welded body reflows at the head's end column |
+| a flowing newline emitting the space arm verbatim | **forced (F1)** | a parallel form is re-read as flowable next pass |
+| two boundaries on one element resolving outside-in | **forced (F1)** | the fused measurement reads a column its output deletes |
+| every reader of "did the author break this content?" sharing one answer | **forced (F1)** | a reader left out re-reports the break the fill just wrote |
+| a **blank line** (Tier-2) | **taste** | preserved as an authoring signal *independent of render* |
+| a **comment**'s own two boundaries | **taste** | the price [§Comment Position Philosophy](#comment-position-philosophy) is already paid for |
+| a **`<br />`**'s own two boundaries | **taste** | the source newline mirrors a rendered break; prettier agrees |
+| a **prose-free / one-word label** run | **taste** | a fill needs a phrase to reflow into; measured against the corpus |
+| **content-boundary air** (the Tier-2 air request) | **taste** | want air, author multiline |
+| `{@debug}` taking the trim where a declaration takes the break | **taste** | a transient aid is welded out of the way of the code it inspects |
+
+⚠️ **Nothing in tsv's current output distinguishes the two columns.** Every held pair below is
+render-identical *and* individually F1-stable — that is what "dual-stable" means. The forced ones
+are forced only in the **counterfactual**, which no gate evaluates and no reader can reconstruct
+from the output. That is the reason this column has to be written down rather than inferred.
+
+#### The dual-stable remainder, enumerated
+
+These are the documents tsv deliberately gives more than one fixed point. Everything not listed
+here converges.
+
+1. **Content-boundary air (Tier-2).** An authored newline at a fragment's content boundary holds
+   the multiline form beside the collapsed one — [inline_boundary_air](../tests/fixtures/svelte/elements/inline_boundary_air/).
+   The **arity** and the **content kinds** that qualify are per fragment family:
+
+   | fragment | air arity | text-only content |
+   | --- | --- | --- |
+   | inline element, component | both boundaries | denied — width alone decides |
+   | block element | the leading boundary alone | denied — width alone decides |
+   | block body (`{#if}` / `{#each}` / `{#key}` / `{#await}` phases / `{#snippet}` / every branch) | **either boundary alone** | **granted** |
+
+   ⚠️ The third row is stated in **two vocabularies and one place**, which is why it reads as
+   missing. Its *arity* is the block catalog's "hug is all-or-nothing" rule — a one-sided weld
+   normalizes to the fully expanded form, pinned from both sides by
+   [if/hugged_boundary_convergence](../tests/fixtures/svelte/blocks/if/hugged_boundary_convergence_prettier_divergence/)'s
+   `unformatted_ours_head_weld` / `_tail_weld`, where prettier holds a form per authoring. Its
+   *content eligibility* — a text-only body grants air where a text-only **element** is glued
+   regardless — is the one place the two fragment families answer this question differently, and
+   is pinned by [boundary_air_text_content](../tests/fixtures/svelte/elements/boundary_air_text_content/),
+   which holds the content kind fixed against the family. ⚠️ On that split **prettier agrees with
+   tsv on both sides** (`<div>⏎text⏎</div>` collapses, `{#if c}⏎text⏎{/if}` holds), so it is not a
+   divergence and not a bug — but neither formatter records an argument for it, so it is inherited
+   rather than reasoned, and the fixture exists so that changing it would be a decision rather
+   than an accident.
+2. **A comment's own two boundaries**, held on each side independently, so all four newline
+   authorings of `text <!-- c --> text` are fixed points — [inline_separator_comment_newline](../tests/fixtures/svelte/elements/inline_separator_comment_newline/).
+3. **A `<br />`'s own two boundaries**, on the same terms — [void_br_newline](../tests/fixtures/svelte/elements/void_br_newline/).
+4. **A prose-free or one-word-label run's authored lines** — [inline_sibling_newline_label_hold](../tests/fixtures/svelte/elements/inline_sibling_newline_label_hold_prettier_divergence/).
+5. **An authored blank line**, everywhere it bounds two nodes — [declaration_blank_line](../tests/fixtures/svelte/tags/declaration_blank_line/),
+   [body_blank_break](../tests/fixtures/svelte/blocks/body_blank_break_prettier_divergence/).
+   The one place a blank is *not* held is the hoisted-edge trim, which deletes the run that would
+   have carried it — [hoisted_boundary_convergence](../tests/fixtures/svelte/blocks/hoisted_boundary_convergence_prettier_divergence/).
+6. **A control-flow block's own line**, which is a consequence of a missing whole-unit drop for a
+   glued block rather than a property of blocks — the flow rule's exclusion list in
+   [§Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style)
+   states what admitting them is gated on.
+7. **TypeScript: the object literal's `{`→first-property newline**, the one Tier-2 newline tsv
+   keeps outside Svelte, inherited from prettier's fixed `objectWrap: "preserve"` —
+   [objects/multiline_source](../tests/fixtures/typescript/expressions/objects/multiline_source/).
+   Arrays, call arguments, parameters, patterns and import lists all converge.
+
+#### What enforces this, and where the enforcement is blind
+
+[`authoring:audit`](./audits.md#authoring-independence-audit-authoringaudit) is the gate: it
+re-spells each boundary and asks whether the authorings reach one tsv fixed point. Three blind
+spots bound what a green run means, and all three are structural:
+
+- **It grades only half the doctrine.** The audit fails on **non-idempotency** alone. A site that
+  settles on two fixed points is bucketed `diverge (dual-stable)` and **never fails the run**, and
+  that bucket carries no ratchet file — so every sanctioned hold above and every accidental one
+  land in the same ungraded pile, indistinguishable, and a new split can appear without any gate
+  moving. The bucket is a substantial fraction of all probed sites, not a rounding error.
+- **It never mutates structure, so it sees only shapes the corpus already holds.** The gate scans
+  `tests/fixtures` only. A rule that decides whether to *force* a break is invisible to it and to
+  F1 alike whenever the already-broken authoring is a fixed point either way — only the **hugged**
+  authoring discriminates, and if no fixture is hugged there, nothing looks.
+- **It varies spelling at one width.** Rules keyed on column 100 are reached by
+  [`razor:audit`](./audits.md#print-width-razor-sweep-razoraudit) instead, and only for the two
+  properties that sweep grades.
+
+`render:audit` and the fixture validator's render-equivalence check are what keep the *licence*
+honest — that the re-spellings really are one document. ⚠️ `ast_diff --render` is **not** a
+substitute: its normalizer implements Svelte's three published whitespace rules and knows nothing
+about the `clean_nodes` hoist, so it reports a whitespace change beside a hoisted node as
+semantic. Reach for `canonical_compile` or `render_compare` when triaging that class.
+
+#### State the rule, then the consequence — in that order
+
+A rule in this family is reachable through more than one emitter (a whitespace-only separator
+between two non-text siblings, and a content text's own edge run, are different code paths asking
+the same question). The catalogs must say which sentence is the **rule** and which is a
+**consequence of where the code happens to ask it**, because a reader who generalizes the wrong
+one derives a different set.
+
+The worked instance is the hoisted-edge trim. The rule is *a node that owns its own line keeps
+it*, asked of **both** ends of the run. The consequence is that a `<title>` beside a text sibling
+still trims — that boundary is reached through the content-text path, which asks only whether it
+is at the fragment's content edge and never asks the hoisted node's kind. Read as a principle,
+"a `<title>` owns its line" predicts a hold in both shapes; read as an emitter, only the sibling
+shape holds. Both readings agree with the code today **only because** the catalog's phrasing is
+narrowed to "owns a line *among sibling elements*" — a scope clause derived from the emitter, not
+from the principle. Say so where it is written: [hoisted_boundary_sibling_kinds](../tests/fixtures/svelte/blocks/hoisted_boundary_sibling_kinds_prettier_divergence/)
+pins the sibling half and [hoisted_boundary_convergence](../tests/fixtures/svelte/blocks/hoisted_boundary_convergence_prettier_divergence/)
+the content-text half.
 
 ### Print Width Philosophy
 
