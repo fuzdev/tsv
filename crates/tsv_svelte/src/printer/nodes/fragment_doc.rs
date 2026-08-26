@@ -106,6 +106,31 @@ pub(super) fn text_starts_with_linebreak(raw: &str) -> bool {
     raw.trim_start_matches([' ', '\t', '\r']).starts_with('\n')
 }
 
+/// The run a fragment's **boundary blank** may be read from — its first through its last node
+/// that is content at all, or `None` when none is. Everything outside it is the fragment's own
+/// boundary air, which is render-free and carries no authoring signal.
+///
+/// Content here is narrower than `FragmentNode::content_bounds`'s, and deliberately so. That
+/// one answers the compiler's question ("does this node stand between the content and the
+/// fragment edge?"), where a whitespace-only node is not hoisted and so scores as content; this
+/// one is asked *of the whitespace itself*, and a whitespace-only node beside a hoisted edge
+/// node IS the deleted run rather than a boundary inside the content. Reading the compiler's
+/// bounds here made `{#if c}<span>x</span>⏎⏎{@debug cond}{/if}` break its body while the text
+/// spelling of the same document (`{#if c}text1⏎⏎{@debug cond}{/if}`) trimmed the blank away —
+/// one rule, two answers, decided by which node the parser happened to fold the whitespace
+/// into.
+///
+/// Excluding whitespace-only nodes is also what subsumes the edge trim
+/// (`element_analysis::trimmed_content_run`), so the caller reads the fragment's own nodes: a
+/// trim ahead of these bounds is inert, and running one would state the exclusion twice.
+fn blank_signal_run<'n, 'x>(nodes: &'n [FragmentNode<'x>]) -> Option<&'n [FragmentNode<'x>]> {
+    let is_content =
+        |n: &FragmentNode<'_>| !n.is_hoisted_from_fragment() && !n.is_whitespace_only_text();
+    let first = nodes.iter().position(is_content)?;
+    let last = nodes.iter().rposition(is_content)?;
+    Some(&nodes[first..=last])
+}
+
 impl<'a> Printer<'a> {
     /// Find the inclusive-exclusive index range of `nodes` after trimming boundary nodes for
     /// which `skip` returns true. Returns `None` when every node is skipped (the range is empty),
@@ -805,14 +830,13 @@ impl<'a> Printer<'a> {
     /// precedes it (`handle_separator_text_child`'s `tag_space_wraps`).
     ///
     /// A run ends at a node [`Self::breaks_inline_run`] names, and at an authored blank line a
-    /// content text carries on its edge ([`Self::text_edge_has_blank`]) — the boundary set
-    /// `Printer::content_is_reflowable_fill` reads too, with one deliberate difference: that
-    /// predicate asks its blank question of the WHOLE text (`has_authored_blank_line`), this scan
-    /// of the two EDGES alone, since a run is a partition of nodes and cannot split one at an
-    /// interior blank. The two agree wherever a blank sits beside a sibling; a blank INSIDE a
-    /// text (`text1⏎⏎text2` in one node) makes the fill predicate answer "no fill" while this
-    /// scan still counts the node's words — the fill collapses that blank either way, so the
-    /// boundaries beside it flow with the run's prose.
+    /// content text carries on its edge ([`Self::text_edge_has_blank`]) — the same boundary set
+    /// `Printer::content_is_reflowable_fill` reads, asked with the same two predicates, so the two
+    /// readers of the one fill answer cannot disagree about where a run ends. A blank INSIDE a
+    /// text (`text1⏎⏎text2` in one node) bounds nothing under either: a run is a partition of
+    /// nodes and cannot split one, and the fill collapses that blank anyway — so the boundaries
+    /// beside it flow with the run's prose, and the element holding it does not expand
+    /// (`elements/content_interior_blank_collapse`).
     ///
     /// Called only when the caller's cursor reaches a fresh run, so the scans partition
     /// `trimmed_nodes` and cost O(n) across the whole fragment — not the O(n²) a per-separator
@@ -870,6 +894,61 @@ impl<'a> Printer<'a> {
             }
             _ => false,
         }
+    }
+
+    /// Whether `node` carries an authored blank line at a run **boundary** — the Tier-2 signal
+    /// in either spelling the parser gives it: a whitespace-only separator node between two
+    /// siblings, or the edge whitespace of the content text beside one. The one name for the
+    /// question this rule's gates all turn on, so a new gate cannot spell it a fourth way.
+    ///
+    /// ⚠️ A blank **interior** to a text (`text1⏎⏎text2` in one node) is deliberately NOT one:
+    /// a run is a partition of nodes and cannot be split inside one, so such a blank bounds
+    /// nothing and the fill collapses it under both formatters
+    /// (`elements/content_interior_blank_collapse`).
+    ///
+    /// Two readers ask it undirected — `Printer::content_is_reflowable_fill`, which decides
+    /// whether an element's interior newline may select its layout, and
+    /// [`Self::content_holds_interior_blank`], the block path's. [`Self::scan_inline_run`] wants
+    /// the two edges apart (a leading blank ends the run BEFORE its node, a trailing one after),
+    /// so it asks [`Self::text_edge_has_blank`], the directional primitive underneath this.
+    pub(super) fn node_boundary_blank(&self, node: &FragmentNode<'_>) -> bool {
+        match node {
+            FragmentNode::Text(t) if t.is_collapsible_ws_only => t.newline_count >= 2,
+            _ => self.text_edge_has_blank(node, true) || self.text_edge_has_blank(node, false),
+        }
+    }
+
+    /// Whether this fragment holds an authored blank line at a run boundary **inside its
+    /// content** — the block path's half of [`Self::node_boundary_blank`], and the content fact
+    /// [`Self::fragment_should_force_break_content`] breaks a hugged body on.
+    ///
+    /// "Inside its content" is what separates a Tier-2 signal from a render-free boundary run,
+    /// and [`blank_signal_run`] is the whole of that measurement: a blank outside that run is
+    /// the body's own boundary air at one end or the other. So a content text's
+    /// leading edge at the content's start and its trailing edge at the end count for nothing,
+    /// and neither does the whitespace-only node that spells the same air between two
+    /// siblings — which is also the `{@debug}` / `<title>` **trim**: that node hoists, the node
+    /// beside it becomes the effective edge, and the run carrying the blank is deleted with no
+    /// boundary left to hold a signal
+    /// (`blocks/hoisted_boundary_convergence_prettier_divergence`).
+    ///
+    /// ⚠️ The exclusion is the **bounds**, not the hoisted node: with content on BOTH sides a
+    /// hoisted node's two runs merge into the one rendered space rather than vanishing, so the
+    /// blank there is interior and survives — the answer the element twin
+    /// (`<div>a⏎⏎{@debug cond}⏎⏎b</div>`) already gave under both formatters, and which a hugged
+    /// block body used to lose along with every other body blank.
+    fn content_holds_interior_blank(&self, nodes: &[FragmentNode<'_>]) -> bool {
+        let Some(run) = blank_signal_run(nodes) else {
+            return false;
+        };
+        let last = run.len() - 1;
+        run.iter().enumerate().any(|(idx, n)| match n {
+            FragmentNode::Text(t) if !t.is_collapsible_ws_only => {
+                (idx != 0 && self.text_edge_has_blank(n, true))
+                    || (idx != last && self.text_edge_has_blank(n, false))
+            }
+            _ => self.node_boundary_blank(n),
+        })
     }
 
     /// Whether a **single-newline** separator beside `node` may collapse to a plain space — the
@@ -1312,6 +1391,15 @@ impl<'a> Printer<'a> {
     /// the same break — its line is one the fragment must have room for, so the block's
     /// inline/expanding fast path (`fragment_inline_authored`) may not take an inline authoring
     /// at its word.
+    ///
+    /// So does an authored **blank line** inside the content
+    /// ([`Self::content_holds_interior_blank`]), for the same reason and against the same
+    /// hazard: a blank is a Tier-2 authoring signal independent of render, and a body hugged
+    /// past one lays out as a single flowed run whose fill then DELETES it — authored content
+    /// gone, where every other fragment kind (an element, a component, a special element, the
+    /// root) already expands and keeps it. It is the body's CONTENT that decides this, never its
+    /// boundary spelling, which is render-free and stays width's alone (§Svelte: Blocks,
+    /// body-expand). Pinned by `blocks/body_blank_break_prettier_divergence`.
     pub(super) fn fragment_should_force_break_content(&self, nodes: &[FragmentNode<'_>]) -> bool {
         let non_ws_count = nodes
             .iter()
@@ -1319,6 +1407,7 @@ impl<'a> Printer<'a> {
             .count();
         (non_ws_count > 1 && nodes.iter().any(|n| self.is_block_fragment_node(n)))
             || self.has_own_line_declaration(nodes)
+            || self.content_holds_interior_blank(nodes)
     }
 
     /// Whether the node at `trimmed_nodes[i + 1]` is an **inline HTML element** (`<span>`, `<a>`,

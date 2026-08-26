@@ -8,7 +8,6 @@
 
 use crate::ast::internal::{FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
-use crate::printer::text::has_authored_blank_line;
 use tsv_lang::doc::arena::DocId;
 use tsv_ts::ast::internal::Expression;
 
@@ -214,10 +213,21 @@ impl<'a> Printer<'a> {
     /// text below it onto one line, and deleted an authored blank line — two content-preservation
     /// breaks, not layout choices. The blank-line arm is asked of content texts too, since
     /// `breaks_inline_run` sees a blank only in a whitespace-ONLY node while `modern⏎⏎<Checkbox/>`
-    /// carries it in a content text's trailing run. The flow rule's own scan
-    /// (`Printer::scan_inline_run`) ends a run at that EDGE blank too; where the two readers part
-    /// is a blank INTERIOR to a text node (`text1⏎⏎text2`), which this arm sees (the whole text
-    /// is scanned) and a run scan cannot, a run being a partition of nodes.
+    /// carries it in a content text's trailing run — so it asks that text's two EDGES
+    /// ([`Printer::text_edge_has_blank`]), the same question the flow rule's own scan
+    /// (`Printer::scan_inline_run`) asks, and the two readers of this one answer therefore agree
+    /// at every blank.
+    ///
+    /// ⚠️ **A blank INTERIOR to a text node (`text1⏎⏎text2`) is deliberately not one of them.**
+    /// A run is a partition of nodes and cannot be split inside one, so such a blank bounds
+    /// nothing — and the fill collapses it, under both formatters. Reading the whole text here
+    /// instead (`has_authored_blank_line`) made this arm answer "no fill" for a blank the output
+    /// would not contain, so the element went block-style on bytes its own emission erased — a
+    /// gate conditioned on what its output destroys, invisible because the expanded form is its
+    /// own fixed point through the `boundary.both()` arm above. Pinned by
+    /// `elements/content_interior_blank_collapse`, and the same answer
+    /// `elements/text_internal_blank_collapse` and
+    /// `elements/inline_sibling_newline_interior_blank_prettier_divergence` already gave.
     ///
     /// Because both conjuncts are about the *run*, the answer is independent of the separator's
     /// spelling and of how many siblings the run holds. That is the point: without it a prose
@@ -246,16 +256,14 @@ impl<'a> Printer<'a> {
     fn content_is_reflowable_fill(&self, run: &[FragmentNode<'_>]) -> bool {
         let source = self.source;
 
-        // One run, or nothing to reflow as one — see the doc comment. The blank-line arm is the
-        // CONTENT-text half of that question and says so: on a whitespace-only node
-        // `breaks_inline_run` already answers it (`newline_count >= 2` is the same predicate there,
-        // since every other byte of such a node is horizontal whitespace), so scanning those bytes
-        // again finds nothing new on the commonest node in a fragment.
-        if run.iter().any(|n| {
-            self.breaks_inline_run(n)
-                || matches!(n, FragmentNode::Text(t)
-                    if !t.is_collapsible_ws_only && has_authored_blank_line(t.raw(source)))
-        }) {
+        // One run, or nothing to reflow as one — see the doc comment. The blank question is the
+        // shared [`Printer::node_boundary_blank`], so this gate cannot spell it differently from
+        // the block path's; its whitespace-only arm restates what `breaks_inline_run` already
+        // answers for such a node, and what it ADDS here is a content text's two edges.
+        if run
+            .iter()
+            .any(|n| self.breaks_inline_run(n) || self.node_boundary_blank(n))
+        {
             return false;
         }
 

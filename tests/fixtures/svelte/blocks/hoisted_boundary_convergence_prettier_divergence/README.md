@@ -71,13 +71,24 @@ and the edge trim but not *which nodes the edge is measured against*. The behavi
 it; tsv normalizes it to `input`) with the interior control unchanged, so the file isolates the
 edge/interior split on its own.
 
-`unformatted_ours_blank.svelte` carries the **blank-line** authoring of every case, and
-`prettier_variant_blank.svelte` is prettier's stable form of it (blanks kept, continuation
+`unformatted_ours_blank.svelte` carries the **blank-line** authoring of every **trimmed** case,
+and `prettier_variant_blank.svelte` is prettier's stable form of it (blanks kept, continuation
 indents). The trim consumes the blank too: a deleted run has no boundary left to carry a Tier-2
 signal, so "every authoring reaches this one form" includes the blank spelling — deliberately the
 opposite answer from the **declaration** family, whose licence is spent on a *break* (a break can
 carry a blank, so there the blank survives — `tags/declaration_blank_line`). Render-safe like the
 rest: the compiler deletes the edge run wholesale, blank included (render-equivalence verified).
+The trim is spelling-independent, so the convergence is too: it reaches the blank whether the
+parser folded the edge whitespace into the **text** beside the hoisted node (this fixture) or
+into a **whitespace-only node** between it and an element sibling — the spelling pinned as a
+control in [blocks/body_blank_break](../body_blank_break_prettier_divergence/), whose
+body-expand rule is the one that would otherwise read that blank as a Tier-2 signal.
+⚠️ The **interior** case is not in that variant, because the trim's argument does not reach it:
+with content on both sides the two runs MERGE into the one rendered space rather than vanishing,
+so a blank there is interior content and breaks its body like any other —
+[blocks/body_blank_break](../body_blank_break_prettier_divergence/) owns that answer, and the
+element twin (`<div>a⏎⏎{@debug cond}⏎⏎b</div>`) already gave it under both formatters. Its
+non-blank authoring stays here, where the surviving *space* is what this fixture is about.
 
 `divergent_variant_boundary_newline.svelte` is the newline authoring of the first case. It shows
 the rule firing in the **multiline** arm as well: tsv collapses the hoisted run
