@@ -423,7 +423,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         mark: EmbeddedParseMark,
     ) -> Result<Expression<'arena>, ParseError> {
         self.rewind_embedded_parses(mark);
-        self.parse_ts_expression(iterable.trim_matches(is_svelte_ws), expr_offset)
+        // Leading whitespace only, and `expr_offset` is already the first non-whitespace byte:
+        // this slice ends at the head's SECOND `as`, so its trailing run may be a line
+        // comment's own text (`Parser::parse_ts_expression`).
+        self.parse_ts_expression(iterable.trim_start_matches(is_svelte_ws), expr_offset)
     }
 
     /// Parse an each block: {#each expression as context, index (key)}...{:else}...{/each}
@@ -591,6 +594,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ) -> Result<EachBindingResult<'arena>, ParseError> {
         // Calculate leading whitespace and adjust offset accordingly
         let leading_ws = binding.len() - binding.trim_start_matches(is_svelte_ws).len();
+        // A trailing trim here cannot clip a line comment the way a head's does
+        // (`Parser::parse_ts_expression`): every sub-parse below is bounded by the grammar —
+        // the pattern by its bracket or identifier run, the annotation by its own end — and a
+        // comment trailing the annotation is REJECTED, as canonical rejects it.
         let trimmed = binding.trim_matches(is_svelte_ws);
         let adjusted_offset = binding_offset + leading_ws;
 
@@ -754,9 +761,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .ok_or_else(|| self.error_expected_at("')'", paren_start + rest_trimmed.len()))?;
             let key_str = &rest_trimmed[1..close];
             let key_offset = paren_start + 1; // after '('
+            // Leading whitespace only — the trailing run may be a line comment's own text
+            // (`Parser::parse_ts_expression`).
+            let key_expr_str = key_str.trim_start_matches(is_svelte_ws);
             let key_expr = self.parse_ts_expression(
-                key_str.trim_matches(is_svelte_ws),
-                key_offset + (key_str.len() - key_str.trim_start_matches(is_svelte_ws).len()),
+                key_expr_str,
+                key_offset + (key_str.len() - key_expr_str.len()),
             )?;
             // Span includes the parentheses: from '(' to after ')'.
             let span = Span::new(paren_start as u32, (paren_start + close + 1) as u32);
@@ -1108,6 +1118,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ) -> Result<Expression<'arena>, ParseError> {
         let lead = region.len() - region.trim_start_matches(is_svelte_ws).len();
         let value_start = region_offset + lead;
+        // The trailing trim is safe here for the reason the doc below gives: a comment at
+        // either edge of this region is REJECTED, so none can be standing at the end for the
+        // trim to clip (contrast a head's, `Parser::parse_ts_expression`).
         let trimmed = region.trim_matches(is_svelte_ws);
         // `{:then p}` / `{:catch p}` are `read_pattern` positions like `{#each … as p}`, so
         // a PLAIN-IDENTIFIER binding takes the reserved-word rule here too — canonical's
@@ -1194,10 +1207,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Scan to find closing } and extract content
         let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Parse: "key expression" — Svelte requires whitespace after the keyword.
+        // Parse: "key expression" — Svelte requires whitespace after the keyword. Leading
+        // whitespace only — the trailing run may be a line comment's own text
+        // (`Parser::parse_ts_expression`).
         let expr_str = self
             .strip_block_keyword(tag_content, "key", tag_content_start)?
-            .trim_matches(is_svelte_ws);
+            .trim_start_matches(is_svelte_ws);
 
         let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
