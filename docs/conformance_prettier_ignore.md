@@ -34,9 +34,26 @@ the author's slice, so the gap grows by a line on every pass. Prettier has that 
 **never converges** on the shape, so there is no oracle for it and the fixture carries a
 `prettier_nonconvergent.txt` — ◆content_preservation
 ([directive_gap_text](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_text_prettier_divergence/)).
-The frozen slice's **trailing** run goes with the fragment edge where the frozen text is the last
-node — render-free there, and the same trim a whitespace-only node in that position takes — and
-stays between siblings, where it is a real separator.
+The frozen slice's **trailing** run goes wherever the boundary after it is the printer's — the
+fragment's own close, a follower that owns its line, a whitespace-collapsing container — and stays
+where the follower would print nothing beside a slice that already ends in a break.
+
+⚠️ **The gap is never invented either.** A directive the author **glued** to the node it freezes
+stays glued: there is no whitespace at that boundary, so a break there injects a rendered space
+the source does not have (`render_compare` grades it VISIBLE — `text0a` becomes `text0 a`), and
+the formatter already declines the same break on the directive's other side. Own-line
+normalization is a layout preference, the glue is a render fact, so the glue wins — matching
+prettier, which keeps every spelling of this gap as authored
+([directive_gap_glued](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_glued/), a
+parity fixture). Nor is it deleted: an **inline** fragment keeps that gap as the one space it
+renders as, a collapsible `line` like every other inline sibling boundary — emitting nothing there
+was the mirror bug, a rendered space the source HAS. Which is why the gap is no longer gated on
+the container's multiline-ness at all; only its *spelling* is (a hardline where the fragment is
+block-style, a `line` where it is inline). One residual difference stays, in the block-style arm
+only: a **space** standing in its own whitespace node before a frozen element becomes a break
+rather than remaining inline. That one is render-neutral (a space and a newline both collapse to
+one rendered space) and matching prettier there would mean a collapsible `line` where every other
+node boundary in a block-style fragment takes a hardline — ◆design_choice.
 
 **A range does not pin a section's position.** A `<script>` / `<style>` / `<svelte:options>` written *inside* a range is still lifted to the component root and printed at its canonical position, and its bytes are cut out of the frozen slice — leaving them there emits the section twice, which the parser rejects (`Duplicate instance script found`). Prettier does the same, so the plain case needs no divergence ([range_section_hoist](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_hoist/)); a comment sitting beside such a section diverges ([range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)), and the seam the cut leaves behind follows the byte-verbatim rule ([range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)): tsv freezes the whole slice including inter-node whitespace, where prettier freezes node *content* but re-lays out the whitespace between nodes.
 
