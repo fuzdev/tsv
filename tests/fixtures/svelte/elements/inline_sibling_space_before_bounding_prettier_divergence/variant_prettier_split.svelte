@@ -47,10 +47,13 @@
 {expr}
 <!-- c -->
 
-<!-- a `{@debug}` is the same follower kind, after an element and after a tag at the root -->
+<!-- a `{@debug}` is the same follower kind, after an element and after a tag at the root. Both
+     are INTERIOR: a `{@debug}` is hoisted, so at a fragment EDGE the run beside it is render-free
+     and trims instead (blocks/hoisted_boundary_sibling_kinds) -->
 <div>
 	<span>inline1</span>
 	{@debug a}
+	text1
 </div>
 {expr}
 {@debug a}

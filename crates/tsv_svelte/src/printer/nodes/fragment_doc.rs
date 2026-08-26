@@ -541,6 +541,100 @@ impl<'a> Printer<'a> {
             && !(self.glued_to_content(nodes, i, true) && self.glued_to_content(nodes, i, false))
     }
 
+    /// Whether the **whitespace-only separator** at `i` is a render-free *hoisted edge run* that
+    /// the printer deletes outright — so no reader may take a layout signal from it either.
+    ///
+    /// `clean_nodes` lifts a hoisted node ([`internal::FragmentNode::is_hoisted_from_fragment`])
+    /// out of the fragment BEFORE it trims, so whatever stands beside such a node IS the
+    /// fragment's first or last node and the run between them is a fragment-EDGE run rather than
+    /// an inter-sibling one: `<div><span>a</span> {@debug x}</div>` and
+    /// `<div><span>a</span>{@debug x}</div>` compile byte-identically. It is the same question
+    /// [`Printer::handle_content_text_child`] asks of a content text's own edge run through
+    /// `content_bounds` — asked here of the separator between two *non-text* siblings, the half
+    /// `blocks/hoisted_boundary_convergence` was cut without and
+    /// `blocks/hoisted_boundary_sibling_kinds` pins.
+    ///
+    /// `bounds` are the CONTENT bounds of the same slice, so `i >= bounds.1` reads "no node the
+    /// whitespace rules see follows me" and `i <= bounds.0` is its mirror; this node is
+    /// whitespace and so is never hoisted itself, which is what makes it exactly the last (or
+    /// first) node those rules count.
+    ///
+    /// ⚠️ **Every reader that takes a signal from this run's bytes must ask.**
+    /// [`Printer::handle_separator_text_child`] deletes the run, so
+    /// `has_source_breaks_in_content` must stop reading its newline as an expansion signal —
+    /// otherwise the element goes block-style on bytes its own output no longer contains, and
+    /// injects the boundary air that makes the wrong answer its own fixed point. That is a rule
+    /// about the class, not a list of two: a **blank-line** gate over the same run
+    /// ([`Self::fragment_should_force_break_content`], which breaks a hugged block body on a
+    /// Tier-2 blank) is the same question and needs the same guard, or it forces a body open on a
+    /// blank the trim consumed. The content-text half of that exclusion is already spelled as an
+    /// index-vs-`content_bounds` test where such a gate reads a TEXT's edges; this is the same
+    /// exclusion for the separator node, and the two must not drift apart.
+    ///
+    /// ⚠️ **The render-free fact licenses the trim; it does not decide it.** Being deletable makes
+    /// both spellings one document, so *some* form must be chosen — and the base rule's own
+    /// exclusion picks which: **a node that owns its own line keeps it.** That sentence is asked
+    /// here of BOTH ends of the run, which is what bounds this rule:
+    ///
+    /// - The **hoisted** end must be a `{@debug}` — the one hoisted kind with no layout claim
+    ///   anywhere (a transient debugging aid, welded out of the way of the code it inspects). A
+    ///   hoisted `<title>` is an ELEMENT, and among sibling elements it owns a line like any
+    ///   other: welding `<svelte:head><title>t</title><meta … /></svelte:head>` would destroy
+    ///   structure the author expressed and that no other spelling could restore. Its own edge
+    ///   run beside a TEXT still trims — that path is the content handler's, and
+    ///   `blocks/hoisted_boundary_convergence` pins it.
+    /// - The **content** end must be **content at all**, and a node whose authored newline flows
+    ///   ([`Self::sibling_newline_flows`]): a text, an inline element, a component or a tag. A
+    ///   comment, a `<br />`, a control-flow block and a block element own their line, and this
+    ///   run is that line's separator rather than a weldable edge. Trimming it there takes away
+    ///   the author's only lever — every spelling of the run, blank included, collapses to the
+    ///   same weld — on a boundary they clearly separated.
+    ///
+    /// ⚠️ A fragment whose only non-hoisted nodes are whitespace has no content end at all
+    /// (`{@debug}⏎⏎{@debug a}` at the root), and the **hoist test is what excludes it** — not the
+    /// flow test, which is asked of neighbour KINDS and knows nothing about hoisting. The two
+    /// coincide for a tag, and part on a hoisted `<title>`: it is a `SpecialElement` that is not
+    /// block-classified, so it FLOWS, and the flow test alone welded
+    /// `<svelte:head><title>t</title> {@debug x}</svelte:head>` — a run between two nodes that
+    /// are both hoisted, which prettier keeps in every spelling, and whose blank authoring the
+    /// weld therefore DELETED. The same `<title>` beside an ordinary element sibling keeps its
+    /// line by the bullet above. One exclusion stated on the side it is about, so a kind that
+    /// flows cannot re-enter through it (`blocks/hoisted_boundary_sibling_kinds`'
+    /// `<title>`-as-content-end control, whose `<b>` twin welds in the identical shape).
+    pub(super) fn is_hoisted_edge_separator(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        i: usize,
+        bounds: (usize, usize),
+    ) -> bool {
+        // Interior: a node the whitespace rules see stands on BOTH sides, so neither run is an
+        // edge — the two merge into one rendered space (`a {@debug x} b` → `a b`) and gluing
+        // would be a different document. This is what bounds the rule.
+        let trailing_edge = i >= bounds.1;
+        let leading_edge = i <= bounds.0;
+        if !trailing_edge && !leading_edge {
+            return false;
+        }
+        // The hoisted end is the side the fragment edge lies past; the content end is the other.
+        // (Both bounds can hold at once — the separator is then the only node the rules see, and
+        // the arbitrary pick below still answers `false` on the hoist test below, whichever side
+        // it picked: with no content in the fragment, both of them are hoisted.)
+        let (hoisted_side, content_side) = if trailing_edge {
+            (i.checked_add(1), i.checked_sub(1))
+        } else {
+            (i.checked_sub(1), i.checked_add(1))
+        };
+        let (Some(hoisted_side), Some(content_side)) = (hoisted_side, content_side) else {
+            return false;
+        };
+        if hoisted_side >= nodes.len() || content_side >= nodes.len() {
+            return false;
+        }
+        matches!(nodes[hoisted_side], FragmentNode::DebugTag(_))
+            && !nodes[content_side].is_hoisted_from_fragment()
+            && self.sibling_newline_flows(&nodes[content_side])
+    }
+
     /// Whether the node at `i` is glued to the nearest **content** before (`prev`) or after
     /// it — the neighbour the compiler's whitespace rules actually see, which is what decides
     /// whether breaking there would inject a rendered space.
