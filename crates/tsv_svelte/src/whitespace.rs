@@ -166,6 +166,32 @@ pub(crate) fn skip_svelte_ws(source: &str, start: usize) -> usize {
     i
 }
 
+/// Byte offset where the interior of the `{` at `brace_pos` begins — Svelte's `eat('{')`
+/// followed by `allow_whitespace()`.
+///
+/// ⚠️ **The one question every brace-led reader must ask, and the one place to ask it.**
+/// The gap between a brace and what follows it is any width, so a reader that reaches its
+/// content by a fixed `brace_pos + 2` has baked in width **zero** — and both bugs that
+/// produced this helper were exactly that: `parse_attach_tag` read the author's space as the
+/// `attach` keyword's first byte, and the sequence placement guard missed a marker one space
+/// over, then rejected the glued form its own printer produced from it. A named helper is
+/// what makes a fourth reader that forgets visible; three independent `skip_svelte_ws(source,
+/// pos + 1)` calls agreeing was invisible.
+///
+/// ⚠️ **A fixed offset is not the only spelling of the mistake** — resuming from a lexer
+/// TOKEN's end is the same assumption wearing a different hat, since the marker braces are one
+/// token ACROSS the gap. That is a question about token boundaries rather than about byte
+/// arithmetic, so it is not this helper's to answer; it is answered at
+/// `parser::attribute::SvelteParser::attribute_name_run_end`, which is where a static
+/// `<script>` head's `{ #a}` folded the author's whitespace into an attribute name. A sweep
+/// for this class has to read both spellings.
+///
+/// `brace_pos + 1` is always a char boundary — `{` is one byte.
+#[inline]
+pub(crate) fn brace_interior_start(source: &str, brace_pos: usize) -> usize {
+    skip_svelte_ws(source, brace_pos + 1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -144,19 +144,35 @@ export function head_regions(source: string): Array<[number, number]> {
 }
 
 /**
- * Offsets inside `source`'s heads at which inserting whitespace is worth trying: the
- * start of each existing whitespace run, and each delimiter that has no whitespace
- * before it.
+ * Offsets inside `source`'s heads at which inserting whitespace is worth trying: the head's
+ * own marker, the start of each existing whitespace run, and each delimiter that has no
+ * whitespace before it.
  *
- * The two rules cover the two ways a position rule goes wrong. Widening an existing run
- * asks "does this construct measure from the token or from the gap?"; inserting before a
- * glued delimiter asks "does it assume the two are adjacent?" — which is precisely the
- * assumption that holds in every document anyone writes by hand.
+ * The rules cover the ways a position rule goes wrong. Widening an existing run asks "does
+ * this construct measure from the token or from the gap?"; inserting before a glued
+ * delimiter asks "does it assume the two are adjacent?" — which is precisely the assumption
+ * that holds in every document anyone writes by hand.
+ *
+ * ⚠️ **The marker is its own rule, and it is the sharpest one.** It is not a separator
+ * inside the head but the byte that CLASSIFIES the brace, and the two sides of the language
+ * answer it differently: Svelte's `tag()` and `read_attribute` run `allow_whitespace()`
+ * after the `{`, its `read_sequence` does not. A parser mirroring either reads a byte at a
+ * FIXED OFFSET from the brace, which assumes a gap of width zero — and the formatter's brace
+ * normalization closes exactly that gap, so the assumption is reachable from the tool's own
+ * output. `:` used to reach this by accident, being in `DELIMITERS`; `#` and `@` are not, so
+ * the axis was untestable for precisely the two markers a placement rule reads. Making it
+ * explicit for all three is what turned three real bugs (`{ @attach}` rejected though prettier
+ * formats it; a `{ #x in y}` the printer glued into a form tsv then refused; a static
+ * `<script { #a}>` head folding the gap into an attribute name) from invisible into counted.
  */
 export function injection_sites(source: string): number[] {
 	const sites: number[] = [];
 	for (const [start, end] of head_regions(source)) {
-		for (let i = start; i < end; i++) {
+		// `head_regions` starts a region AT the marker, and a marker is never whitespace, so
+		// this is unconditional — and the inner loop resumes past it rather than at it, or a
+		// `{:` would be minted twice (once here, once by the `DELIMITERS` arm).
+		sites.push(start);
+		for (let i = start + 1; i < end; i++) {
 			const prev = source[i - 1] ?? '';
 			if (is_ws(source[i])) {
 				if (!is_ws(prev)) sites.push(i);
