@@ -8,7 +8,6 @@
 
 use crate::ast::internal::{FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
-use crate::printer::text::has_authored_blank_line;
 use tsv_lang::doc::arena::DocId;
 use tsv_ts::ast::internal::Expression;
 
@@ -70,7 +69,7 @@ struct MultilineInputs {
 /// alone decides its layout. `compute_multiline_cause` skips the authoring-derived trigger for
 /// such content (the `only_text_content` gate), which is why a text-only element authored with
 /// boundary air collapses back inline where any other content kind stays expanded. (The answer
-/// is invariant under [`trimmed_content_run`]'s trim anyway — the trim removes only
+/// is invariant under [`Printer::boundary_trimmed`]'s trim anyway — the trim removes only
 /// whitespace-only `Text` nodes.)
 ///
 /// It once had a second reader, a mirror answering what a width-broken element's OUTPUT
@@ -80,15 +79,6 @@ struct MultilineInputs {
 /// to predict the re-parse.
 fn content_is_text_only(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)))
-}
-
-/// The content run between a fragment's first and last non-whitespace nodes — the slice every
-/// content-shape question is asked of ([`Printer::has_source_breaks_in_content`]), so the
-/// boundary-trim scan has one definition. `None` when there is no content at all.
-fn trimmed_content_run<'n, 'x>(nodes: &'n [FragmentNode<'x>]) -> Option<&'n [FragmentNode<'x>]> {
-    let first = nodes.iter().position(|n| !n.is_whitespace_only_text())?;
-    let last = nodes.iter().rposition(|n| !n.is_whitespace_only_text())?;
-    Some(&nodes[first..=last])
 }
 
 impl<'a> Printer<'a> {
@@ -214,10 +204,21 @@ impl<'a> Printer<'a> {
     /// text below it onto one line, and deleted an authored blank line — two content-preservation
     /// breaks, not layout choices. The blank-line arm is asked of content texts too, since
     /// `breaks_inline_run` sees a blank only in a whitespace-ONLY node while `modern⏎⏎<Checkbox/>`
-    /// carries it in a content text's trailing run. The flow rule's own scan
-    /// (`Printer::scan_inline_run`) ends a run at that EDGE blank too; where the two readers part
-    /// is a blank INTERIOR to a text node (`text1⏎⏎text2`), which this arm sees (the whole text
-    /// is scanned) and a run scan cannot, a run being a partition of nodes.
+    /// carries it in a content text's trailing run — so it asks that text's two EDGES
+    /// ([`Printer::text_edge_has_blank`]), the same question the flow rule's own scan
+    /// (`Printer::scan_inline_run`) asks, and the two readers of this one answer therefore agree
+    /// at every blank.
+    ///
+    /// ⚠️ **A blank INTERIOR to a text node (`text1⏎⏎text2`) is deliberately not one of them.**
+    /// A run is a partition of nodes and cannot be split inside one, so such a blank bounds
+    /// nothing — and the fill collapses it, under both formatters. Reading the whole text here
+    /// instead (`has_authored_blank_line`) made this arm answer "no fill" for a blank the output
+    /// would not contain, so the element went block-style on bytes its own emission erased — a
+    /// gate conditioned on what its output destroys, invisible because the expanded form is its
+    /// own fixed point through the `boundary.both()` arm above. Pinned by
+    /// `elements/content_interior_blank_collapse`, and the same answer
+    /// `elements/text_internal_blank_collapse` and
+    /// `elements/inline_sibling_newline_interior_blank_prettier_divergence` already gave.
     ///
     /// Because both conjuncts are about the *run*, the answer is independent of the separator's
     /// spelling and of how many siblings the run holds. That is the point: without it a prose
@@ -241,21 +242,20 @@ impl<'a> Printer<'a> {
     /// document reached two layouts — `elements/inline_content_flow_collapse_prettier_divergence`
     /// carries the case.
     ///
-    /// Takes the already-trimmed content run (the caller shares [`trimmed_content_run`]'s trim),
-    /// so the boundary-trim scan is not repeated per reader.
+    /// Takes the already-trimmed content run (the caller shares
+    /// [`Printer::boundary_trimmed`]'s trim), so the boundary-trim scan is not repeated per
+    /// reader.
     fn content_is_reflowable_fill(&self, run: &[FragmentNode<'_>]) -> bool {
         let source = self.source;
 
-        // One run, or nothing to reflow as one — see the doc comment. The blank-line arm is the
-        // CONTENT-text half of that question and says so: on a whitespace-only node
-        // `breaks_inline_run` already answers it (`newline_count >= 2` is the same predicate there,
-        // since every other byte of such a node is horizontal whitespace), so scanning those bytes
-        // again finds nothing new on the commonest node in a fragment.
-        if run.iter().any(|n| {
-            self.breaks_inline_run(n)
-                || matches!(n, FragmentNode::Text(t)
-                    if !t.is_collapsible_ws_only && has_authored_blank_line(t.raw(source)))
-        }) {
+        // One run, or nothing to reflow as one — see the doc comment. The two terms partition the
+        // question rather than overlap it: `breaks_inline_run` owns the whitespace-only spelling
+        // of a blank (and every non-text node that ends a run), `text_edge_blank` the spelling
+        // folded into a content text's edge, which is the half the first cannot see.
+        if run
+            .iter()
+            .any(|n| self.breaks_inline_run(n) || self.text_edge_blank(n))
+        {
             return false;
         }
 
@@ -313,7 +313,7 @@ impl<'a> Printer<'a> {
 
         let source = self.source;
 
-        let Some(run) = trimmed_content_run(nodes) else {
+        let Some(run) = Printer::boundary_trimmed(nodes) else {
             return false;
         };
 
@@ -372,9 +372,10 @@ impl<'a> Printer<'a> {
         // before the scan).
         let is_fill = self.content_is_reflowable_fill(run);
         // The run's own content edges — where the ELEMENT's boundary air lives. Not `0` and
-        // `run.len() - 1`: `trimmed_content_run` drops only whitespace-only text, so a HOISTED
-        // node (`{@debug}`, `<title>`, `{@const}`, `{#snippet}`) sits at a real index and the
-        // text beside it is the effective edge. That is exactly `blocks/hoisted_boundary_convergence`.
+        // `run.len() - 1`: `Printer::boundary_trimmed` drops only whitespace-only text, so a
+        // HOISTED node (`{@debug}`, `<title>`, `{@const}`, `{#snippet}`) sits at a real index
+        // and the text beside it is the effective edge — exactly
+        // `blocks/hoisted_boundary_convergence`.
         // The `None` arm (every node hoisted) is inert rather than load-bearing: no hoisted kind
         // is a `Text`, so the scan below never reaches a node to compare these against.
         let content_edges =
