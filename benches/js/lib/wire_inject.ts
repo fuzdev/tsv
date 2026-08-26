@@ -161,9 +161,9 @@ export function head_regions(source: string): Array<[number, number]> {
  * normalization closes exactly that gap, so the assumption is reachable from the tool's own
  * output. `:` used to reach this by accident, being in `DELIMITERS`; `#` and `@` are not, so
  * the axis was untestable for precisely the two markers a placement rule reads. Making it
- * explicit for all three is what turned two real bugs (`{ @attach}` rejected though prettier
- * formats it; a `{ #x in y}` the printer glued into a form tsv then refused) from invisible
- * into counted.
+ * explicit for all three is what turned three real bugs (`{ @attach}` rejected though prettier
+ * formats it; a `{ #x in y}` the printer glued into a form tsv then refused; a static
+ * `<script { #a}>` head folding the gap into an attribute name) from invisible into counted.
  */
 export function injection_sites(source: string): number[] {
 	const sites: number[] = [];

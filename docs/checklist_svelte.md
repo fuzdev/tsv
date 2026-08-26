@@ -60,7 +60,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Standard attributes (`name="value"`)
 - Empty string values (`attr=""`)
 - Boolean attributes (`disabled`, `checked`)
-- Names with non-identifier chars (`a%b`, directive `on:click%x`) — read up to `[\s=/>"']`, mirroring Svelte's `read_tag`
+- Names with non-identifier chars (`a%b`, directive `on:click%x`) — read up to `[\s=/>"']`, mirroring Svelte's `read_tag`. ⚠️ The run is measured from the name's **first byte**, never resumed from the lexer token's end: the marker braces are one token *across* the gap (`{ #` tokenizes like `{#`, mirroring Svelte's `tag()`), so in a top-level `<script>`/`<style>` head — the one place a `{` is an ordinary name character — resuming there folded the author's whitespace into the name (`<script { #a}>` read `{ #a}` where Svelte reads `{` then `#a}`) and stepped over the `/` in `{/a}`, a terminator Svelte stops at, so a head canonical rejects parsed. Pinned by `svelte/script/brace_attribute_literal/`
 
 ### Dynamic Attributes
 

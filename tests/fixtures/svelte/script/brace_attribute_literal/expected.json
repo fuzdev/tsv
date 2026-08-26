@@ -1,24 +1,62 @@
 {
 	"css": {
 		"type": "StyleSheet",
-		"start": 31,
-		"end": 59,
+		"start": 69,
+		"end": 103,
 		"attributes": [
 			{
 				"type": "Attribute",
-				"start": 38,
-				"end": 49,
+				"start": 76,
+				"end": 87,
 				"name": "{shorthand}",
 				"name_loc": {
 					"start": {
-						"line": 3,
+						"line": 5,
 						"column": 7,
-						"character": 38
+						"character": 76
 					},
 					"end": {
-						"line": 3,
+						"line": 5,
 						"column": 18,
-						"character": 49
+						"character": 87
+					}
+				},
+				"value": true
+			},
+			{
+				"type": "Attribute",
+				"start": 88,
+				"end": 89,
+				"name": "{",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 19,
+						"character": 88
+					},
+					"end": {
+						"line": 5,
+						"column": 20,
+						"character": 89
+					}
+				},
+				"value": true
+			},
+			{
+				"type": "Attribute",
+				"start": 90,
+				"end": 93,
+				"name": ":c}",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 21,
+						"character": 90
+					},
+					"end": {
+						"line": 5,
+						"column": 24,
+						"character": 93
 					}
 				},
 				"value": true
@@ -27,23 +65,30 @@
 		"children": [],
 		"comments": [],
 		"content": {
-			"start": 50,
-			"end": 51,
+			"start": 94,
+			"end": 95,
 			"styles": "\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 60,
+	"end": 104,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
 		"nodes": [
 			{
 				"type": "Text",
-				"start": 29,
-				"end": 31,
+				"start": 30,
+				"end": 32,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Text",
+				"start": 67,
+				"end": 69,
 				"raw": "\n\n",
 				"data": "\n\n"
 			}
@@ -51,15 +96,15 @@
 	},
 	"options": null,
 	"comments": [],
-	"instance": {
+	"module": {
 		"type": "Script",
 		"start": 0,
-		"end": 29,
-		"context": "default",
+		"end": 30,
+		"context": "module",
 		"content": {
 			"type": "Program",
-			"start": 20,
-			"end": 20,
+			"start": 21,
+			"end": 21,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -67,7 +112,7 @@
 				},
 				"end": {
 					"line": 1,
-					"column": 29
+					"column": 30
 				}
 			},
 			"body": [],
@@ -77,8 +122,8 @@
 			{
 				"type": "Attribute",
 				"start": 8,
-				"end": 19,
-				"name": "{...spread}",
+				"end": 14,
+				"name": "module",
 				"name_loc": {
 					"start": {
 						"line": 1,
@@ -87,8 +132,128 @@
 					},
 					"end": {
 						"line": 1,
+						"column": 14,
+						"character": 14
+					}
+				},
+				"value": true
+			},
+			{
+				"type": "Attribute",
+				"start": 15,
+				"end": 16,
+				"name": "{",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 15,
+						"character": 15
+					},
+					"end": {
+						"line": 1,
+						"column": 16,
+						"character": 16
+					}
+				},
+				"value": true
+			},
+			{
+				"type": "Attribute",
+				"start": 17,
+				"end": 20,
+				"name": "#a}",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 17,
+						"character": 17
+					},
+					"end": {
+						"line": 1,
+						"column": 20,
+						"character": 20
+					}
+				},
+				"value": true
+			}
+		]
+	},
+	"instance": {
+		"type": "Script",
+		"start": 32,
+		"end": 67,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 58,
+			"end": 58,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 35
+				}
+			},
+			"body": [],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 40,
+				"end": 51,
+				"name": "{...spread}",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 8,
+						"character": 40
+					},
+					"end": {
+						"line": 3,
 						"column": 19,
-						"character": 19
+						"character": 51
+					}
+				},
+				"value": true
+			},
+			{
+				"type": "Attribute",
+				"start": 52,
+				"end": 53,
+				"name": "{",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 20,
+						"character": 52
+					},
+					"end": {
+						"line": 3,
+						"column": 21,
+						"character": 53
+					}
+				},
+				"value": true
+			},
+			{
+				"type": "Attribute",
+				"start": 54,
+				"end": 57,
+				"name": "@b}",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 22,
+						"character": 54
+					},
+					"end": {
+						"line": 3,
+						"column": 25,
+						"character": 57
 					}
 				},
 				"value": true

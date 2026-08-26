@@ -89,11 +89,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         brace_pos: usize,
         location: SequenceLocation,
     ) -> Result<(), ParseError> {
-        let bytes = self.source.as_bytes();
         let Some((marker, marker_pos)) = BlockOrTagMarker::in_sequence_at(self.source, brace_pos)
         else {
             return Ok(());
         };
+        let bytes = self.source.as_bytes();
         // Svelte names the construct with `read_until(/[^a-z]/)` — lowercase ASCII only, so
         // `{@html expr}` names `html` and `{#}` names nothing.
         // `name_start <= bytes.len()`: the marker byte at `marker_pos` was found, so the slice

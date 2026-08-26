@@ -178,6 +178,14 @@ pub(crate) fn skip_svelte_ws(source: &str, start: usize) -> usize {
 /// what makes a fourth reader that forgets visible; three independent `skip_svelte_ws(source,
 /// pos + 1)` calls agreeing was invisible.
 ///
+/// ⚠️ **A fixed offset is not the only spelling of the mistake** — resuming from a lexer
+/// TOKEN's end is the same assumption wearing a different hat, since the marker braces are one
+/// token ACROSS the gap. That is a question about token boundaries rather than about byte
+/// arithmetic, so it is not this helper's to answer; it is answered at
+/// `parser::attribute::SvelteParser::attribute_name_run_end`, which is where a static
+/// `<script>` head's `{ #a}` folded the author's whitespace into an attribute name. A sweep
+/// for this class has to read both spellings.
+///
 /// `brace_pos + 1` is always a char boundary — `{` is one byte.
 #[inline]
 pub(crate) fn brace_interior_start(source: &str, brace_pos: usize) -> usize {

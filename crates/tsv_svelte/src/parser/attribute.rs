@@ -254,20 +254,32 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         is_attr_name_char_at(self.source, self.current_start)
     }
 
-    /// End of the current attribute/directive name run. The lexer already scanned the
-    /// leading identifier into `current`; Svelte folds any trailing non-terminator chars
-    /// (`%`, `&`, `#`, …) into the same name. In the common case the token already ends
-    /// at a terminator or EOF, so the scan stops on its first check.
-    //
-    // TODO: this covers names that *start* with a lexer-identifier char (the realistic
-    // case). Svelte also accepts attribute names starting with a symbol (`<div %foo>`),
-    // where the lexer chokes before this dispatch runs — handling that needs the in-tag
-    // lexer to stop erroring on symbol-led names. The tag-name half of the guard this once
-    // also required now exists — `element.rs`'s `is_valid_tag_name` rejects a symbol-led
-    // *tag* name (`<%foo>`) directly, so a lexer change can't turn that into an
-    // over-acceptance. Off-frontier (no corpus/real occurrence), deferred deliberately.
+    /// End of the current attribute/directive name run — Svelte's `read_tag`, measured from
+    /// `current_start`. The lexer already scanned a leading token; Svelte folds any trailing
+    /// non-terminator chars (`%`, `&`, `#`, …) into the same name.
+    ///
+    /// ⚠️ **The scan starts at `current_start`, never at the token's end.** Resuming at
+    /// `current_end` gives the same answer only while the token holds no terminator, and
+    /// reading it as a fast path is what hid two bugs: a **marker brace is one token across
+    /// the gap** ([`TokenKind::BlockOpen`] and friends tokenize `{ #`, mirroring Svelte's
+    /// `tag()`), so `<script { #a}>` folded the author's whitespace into the name and came
+    /// back `{ #a}` where Svelte reads `{` then `#a}`; and `{/a}` skipped over a `/` — a
+    /// terminator Svelte stops at — so a head the canonical parser rejects parsed. A token
+    /// boundary is not part of this question at all, which is what the caller's own dispatch
+    /// comment already says: the run is read from `current_start` whatever the lexer made of
+    /// its first character.
+    ///
+    /// Only a **static** `<script>`/`<style>` head reaches here holding a brace token; the
+    /// element reader peels every `{` off first
+    /// ([`Self::current_token_opens_a_brace_attribute`]).
+    ///
+    /// A **symbol-led** name is no special case, which follows from the same sentence: the
+    /// scan starts at the first byte whatever the lexer made of it, so `<div %foo #bar>` and
+    /// `<p }>` read as Svelte reads them (`svelte/attributes/name_leading_symbol/`,
+    /// `svelte/attributes/name_leading_brace/`). The symbol-led *tag* name it would otherwise
+    /// pair with is refused separately, by `element.rs`'s `is_valid_tag_name`.
     fn attribute_name_run_end(&self) -> usize {
-        attr_name_end(self.source, self.current_end)
+        attr_name_end(self.source, self.current_start)
     }
 
     /// Parse an attribute or directive
@@ -278,11 +290,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         reader: AttributeReader,
     ) -> Result<AttributeNode<'arena>, ParseError> {
-        // Read the full attribute/directive name as Svelte's `read_tag` does — a raw run up
-        // to a token-ending char (`/[\s=/>"']/`). The lexer only scanned the leading
-        // identifier; extend it past any special chars (`ysc%%gibberish`) before the
-        // directive `:` split so both paths see the whole name. `&'a str` borrows the
-        // source, so it survives the `&mut self` calls below.
+        // Read the full attribute/directive name as Svelte's `read_tag` does — a raw run from
+        // `current_start` up to a token-ending char (`/[\s=/>"']/`), so a name the lexer split
+        // or over-ran (`ysc%%gibberish`, `{ #a}`) is whole before the directive `:` split and
+        // both paths see the same bytes. `&'a str` borrows the source, so it survives the
+        // `&mut self` calls below.
         let name_start = self.current_start;
         let name_end = self.attribute_name_run_end();
         let name_str = &self.source[name_start..name_end];
@@ -637,19 +649,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// - A conditional: {@attach a ? fn1 : fn2}
     /// - An arrow function: {@attach (el) => el.focus()}
     pub(crate) fn parse_attach_tag(&mut self) -> Result<AttachTag<'arena>, ParseError> {
+        // We're at the `{` of `{@attach expr}`; scan forward to find the closing `}`.
         let start = self.current_start;
 
-        // We're at '{@', scan forward to find the closing '}'
-        // The content is: {@attach expr}
-        let brace_start = self.current_start;
-
         // Svelte's `read_attribute` runs `allow_whitespace()` after `eat('{')` before it tries
-        // `eat('@attach')`, so the marker need not be glued: `brace_start + 2` read the
-        // author's space as the keyword's first byte and `<div { @attach fn}>` — which
-        // prettier formats — came back `Expected 'attach' keyword`. The sibling
-        // `{...spread}` / `{shorthand}` split already skips the gap, via
-        // `peek_char_after_brace`; this arm was the one re-deriving the offset by hand.
-        let marker_pos = brace_interior_start(self.source, brace_start);
+        // `eat('@attach')`, so the marker need not be glued: `start + 2` read the author's
+        // space as the keyword's first byte and `<div { @attach fn}>` — which prettier
+        // formats — came back `Expected 'attach' keyword`. The sibling `{...spread}` /
+        // `{shorthand}` split already skips the gap, via `peek_char_after_brace`; this arm was
+        // the one re-deriving the offset by hand.
+        let marker_pos = brace_interior_start(self.source, start);
         let content_start = marker_pos + 1; // past the `@`
 
         // Find the matching closing `}` (skips strings/comments/regex).

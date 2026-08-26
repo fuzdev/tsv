@@ -125,8 +125,9 @@ pub struct Lexer<'a> {
 ///   then normalizes the brace, so `{ #x in y}` became `{#x in y}` — which the glued reading
 ///   rejected. `tsv format` emitted what `tsv parse` refused.
 ///
-/// The third is why the offset cannot be fixed: reading byte `brace_pos + 1` assumes a gap of
-/// width **zero**, and closing that gap is exactly what the printer does.
+/// The third is why the offset could not simply be nudged: any fixed distance from the brace
+/// assumes a gap of one particular width — the principle, and the helper that answers it once,
+/// are [`brace_interior_start`].
 ///
 /// **Sequence positions only.** Both callers are inside a tag or an RCDATA body; a template
 /// `{ #each items as item}` is a genuine block there (Svelte's `tag()` runs
@@ -478,7 +479,7 @@ impl<'a> Lexer<'a> {
                             let Some(close) = source_scan::scan_to_matching_brace(
                                 bytes,
                                 self.position + 1,
-                                self.source.len(),
+                                source.len(),
                             ) else {
                                 break; // unterminated `{` — the value can't close
                             };

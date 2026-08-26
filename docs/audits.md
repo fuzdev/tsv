@@ -214,9 +214,12 @@ both the instant such an input exists; this audit makes them exist.
   so a reader mirroring either reads a byte at a **fixed offset** from the brace, i.e.
   assumes a gap of width **zero**. That is the same emit-set ⊆ parse-set hazard a baked-in
   keyword width is, one notch narrower: the formatter's brace normalization *closes* that
-  gap, so the assumption is reachable from tsv's own output. Two bugs came out of it at
-  once — `<div { @attach fn}>` rejected though prettier formats it, and a `{ #x in y}`
-  the printer glued into a form tsv then refused to reparse.
+  gap, so the assumption is reachable from tsv's own output. Three bugs came out of it at
+  once — `<div { @attach fn}>` rejected though prettier formats it, a `{ #x in y}` the
+  printer glued into a form tsv then refused to reparse, and a static `<script { #a}>` head
+  whose attribute-name run folded the author's whitespace into the name (that third one
+  reaches the gap through a lexer TOKEN's end rather than through byte arithmetic, so it is
+  the spelling a `+ 2` sweep does not find).
 - **`terminators`** — a lone `\r`, `<LS>` or `<PS>` at every whitespace-run start in the
   document, head or not. These are exactly the spellings on which the two `loc` line
   classes DISAGREE, and which class a node was counted under is decided *per acorn parse*
