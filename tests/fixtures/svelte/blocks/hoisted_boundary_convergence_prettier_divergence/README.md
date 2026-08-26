@@ -42,6 +42,15 @@ What is left — `{@debug}` and `<title>` — is exactly the set no layout rule 
 own. `{@debug}` is not a declaration but a transient debugging aid, so welding it to its neighbour
 keeps it out of the way of the code it inspects.
 
+⚠️ **This fixture's cases all put a TEXT beside the hoisted node, and that is a choice of case, not
+of rule.** `clean_nodes` deletes the fragment's edge runs whatever stands at the edge, so the run
+beside a hoisted node is render-free for an element, a component and a tag too, and tsv trims it
+there as well — the sibling half, with the same "a node that owns its own line keeps it" exclusion
+asked of the neighbour, is
+[hoisted_boundary_sibling_kinds](../hoisted_boundary_sibling_kinds_prettier_divergence/). A hoisted
+`<title>` is an element and keeps its line among *element* siblings, so the `<title>` case below is
+this fixture's alone.
+
 ⚠️ **The hoist is not in Svelte 5's three published whitespace rules** — those state the collapse
 and the edge trim but not *which nodes the edge is measured against*. The behavior is in
 `clean_nodes` and is verified here against the compiler, not against the summary.

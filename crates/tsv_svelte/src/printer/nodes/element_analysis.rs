@@ -402,7 +402,17 @@ impl<'a> Printer<'a> {
                 // reading it back as authored is the two-mechanisms-one-newline bug the
                 // content-text arm below documents — here with the prose and the break simply
                 // living in different nodes. See [`Self::content_is_reflowable_fill`].
-                !is_fill && t.has_newline()
+                //
+                // ⚠️ And never when the separator is a HOISTED EDGE run: the printer deletes it
+                // outright ([`Self::is_hoisted_edge_separator`], the same predicate), so reading
+                // its newline here expands the element on bytes its own output no longer
+                // contains — and the block-style form then injects the boundary air that makes
+                // the wrong answer a fixed point. This is the (b) argument below, reaching the
+                // separator's own node instead of a content text's edge: the compiler's edge
+                // trim, not the fill's.
+                !is_fill
+                    && t.has_newline()
+                    && !self.is_hoisted_edge_separator(run, idx, content_edges)
             } else {
                 // Text with content. An NBSP or form feed is content, so every trim below
                 // keeps it attached.

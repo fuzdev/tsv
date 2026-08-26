@@ -285,6 +285,31 @@ impl<'a> Printer<'a> {
         // would add a stray leading space after that break.
         let prev_is_block_el = prev_node.is_some_and(|n| self.is_block_element_node(n));
 
+        // A HOISTED neighbour makes this separator a fragment EDGE run rather than an
+        // inter-sibling one — the same question `handle_content_text_child` asks of a content
+        // text's own edge run through `content_bounds`, asked here of the separator between two
+        // *non-text* siblings. `clean_nodes` lifts a `{@debug}` out of the fragment BEFORE it
+        // trims, so the sibling beside it IS the fragment's first or last node and the run
+        // between them is deleted at compile: `<div><span>a</span> {@debug x}</div>` and
+        // `<div><span>a</span>{@debug x}</div>` compile byte-identically. A render-free run must
+        // not select a layout, so every authoring of that boundary — space, newline, blank —
+        // reaches the glued form, as it already does beside a TEXT
+        // (`blocks/hoisted_boundary_convergence`; the sibling half is
+        // `blocks/hoisted_boundary_sibling_kinds`).
+        //
+        // Emitting nothing is the separator's spelling of the content path's `trim_left`, and it
+        // consumes an authored BLANK for the same reason that path does — a deleted run has no
+        // boundary left to carry a Tier-2 signal.
+        //
+        // ⚠️ WHICH form the render-free fact licenses is decided by the predicate, not here, and
+        // its bound is narrower than "any hoisted neighbour": the hoisted end must be a
+        // `{@debug}` and the content end a sibling whose own newline flows. The element's
+        // multiline analysis reads the SAME predicate, or it expands on a newline this arm just
+        // deleted — see [`Self::is_hoisted_edge_separator`].
+        if self.is_hoisted_edge_separator(trimmed_nodes, i, content_bounds) {
+            return;
+        }
+
         let d = self.d();
 
         // Whitespace-only text node (never at a fragment boundary — those are skipped

@@ -1,0 +1,1386 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1769,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 462,
+				"data": "\n\tA text after a block element keeps the space before the inline element that follows it:\n\t`text3 text4 <span>x</span>` renders `text3 text4 x`. Prettier deletes that space\n\t(`text3 text4<span>x</span>`, which renders `text3 text4x`) — a content change — whenever the\n\ttext's predecessor is a block element, for a one-word text too, and whether or not the run is the\n\tfragment's first. A tag or a component after the same text keeps its space under both.\n"
+			},
+			{
+				"type": "Text",
+				"start": 462,
+				"end": 464,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 464,
+				"end": 559,
+				"data": " the space before an inline element after block-then-text, from the same-line authoring "
+			},
+			{
+				"type": "Text",
+				"start": 559,
+				"end": 560,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 560,
+				"end": 625,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 561
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 564
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 565,
+							"end": 567,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 567,
+							"end": 584,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 2,
+									"character": 568
+								},
+								"end": {
+									"line": 11,
+									"column": 5,
+									"character": 571
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 572,
+										"end": 578,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 584,
+							"end": 598,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 598,
+							"end": 618,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 14,
+									"character": 599
+								},
+								"end": {
+									"line": 12,
+									"column": 18,
+									"character": 603
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 604,
+										"end": 611,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 618,
+							"end": 619,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 625,
+				"end": 627,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 627,
+				"end": 730,
+				"data": " a run continuing past the element, a one-word text, and a run that is not the fragment's first "
+			},
+			{
+				"type": "Text",
+				"start": 730,
+				"end": 731,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 731,
+				"end": 802,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 732
+					},
+					"end": {
+						"line": 16,
+						"column": 4,
+						"character": 735
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 736,
+							"end": 738,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 738,
+							"end": 755,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 2,
+									"character": 739
+								},
+								"end": {
+									"line": 17,
+									"column": 5,
+									"character": 742
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 743,
+										"end": 749,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 755,
+							"end": 769,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 769,
+							"end": 789,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 14,
+									"character": 770
+								},
+								"end": {
+									"line": 18,
+									"column": 18,
+									"character": 774
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 775,
+										"end": 782,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 789,
+							"end": 796,
+							"raw": " text3\n",
+							"data": " text3\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 802,
+				"end": 803,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 803,
+				"end": 862,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 804
+					},
+					"end": {
+						"line": 20,
+						"column": 4,
+						"character": 807
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 808,
+							"end": 810,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 810,
+							"end": 827,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 21,
+									"column": 2,
+									"character": 811
+								},
+								"end": {
+									"line": 21,
+									"column": 5,
+									"character": 814
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 815,
+										"end": 821,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 827,
+							"end": 835,
+							"raw": "\n\ttext1 ",
+							"data": "\n\ttext1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 835,
+							"end": 855,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 22,
+									"column": 8,
+									"character": 836
+								},
+								"end": {
+									"line": 22,
+									"column": 12,
+									"character": 840
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 841,
+										"end": 848,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 855,
+							"end": 856,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 862,
+				"end": 863,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 863,
+				"end": 950,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 24,
+						"column": 1,
+						"character": 864
+					},
+					"end": {
+						"line": 24,
+						"column": 4,
+						"character": 867
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 868,
+							"end": 870,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 870,
+							"end": 890,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 25,
+									"column": 2,
+									"character": 871
+								},
+								"end": {
+									"line": 25,
+									"column": 6,
+									"character": 875
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 876,
+										"end": 883,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 890,
+							"end": 892,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 892,
+							"end": 909,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 26,
+									"column": 2,
+									"character": 893
+								},
+								"end": {
+									"line": 26,
+									"column": 5,
+									"character": 896
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 897,
+										"end": 903,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 909,
+							"end": 923,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 923,
+							"end": 943,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 27,
+									"column": 14,
+									"character": 924
+								},
+								"end": {
+									"line": 27,
+									"column": 18,
+									"character": 928
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 929,
+										"end": 936,
+										"raw": "inline2",
+										"data": "inline2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 943,
+							"end": 944,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 950,
+				"end": 952,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 952,
+				"end": 1040,
+				"data": " controls: a tag and a component after the same text keep their space under both "
+			},
+			{
+				"type": "Text",
+				"start": 1040,
+				"end": 1041,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1041,
+				"end": 1092,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 31,
+						"column": 1,
+						"character": 1042
+					},
+					"end": {
+						"line": 31,
+						"column": 4,
+						"character": 1045
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1046,
+							"end": 1048,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1048,
+							"end": 1065,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 32,
+									"column": 2,
+									"character": 1049
+								},
+								"end": {
+									"line": 32,
+									"column": 5,
+									"character": 1052
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1053,
+										"end": 1059,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1065,
+							"end": 1079,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1079,
+							"end": 1085,
+							"expression": {
+								"type": "Identifier",
+								"start": 1080,
+								"end": 1084,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 14
+									},
+									"end": {
+										"line": 33,
+										"column": 18
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1085,
+							"end": 1086,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1092,
+				"end": 1093,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1093,
+				"end": 1146,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 35,
+						"column": 1,
+						"character": 1094
+					},
+					"end": {
+						"line": 35,
+						"column": 4,
+						"character": 1097
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1098,
+							"end": 1100,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1100,
+							"end": 1117,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 36,
+									"column": 2,
+									"character": 1101
+								},
+								"end": {
+									"line": 36,
+									"column": 5,
+									"character": 1104
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1105,
+										"end": 1111,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1117,
+							"end": 1131,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
+						},
+						{
+							"type": "Component",
+							"start": 1131,
+							"end": 1139,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 37,
+									"column": 14,
+									"character": 1132
+								},
+								"end": {
+									"line": 37,
+									"column": 18,
+									"character": 1136
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1139,
+							"end": 1140,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1146,
+				"end": 1148,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1148,
+				"end": 1244,
+				"data": " a void and a replaced inline follower: the same deletion, where the render key is blind "
+			},
+			{
+				"type": "Text",
+				"start": 1244,
+				"end": 1245,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1245,
+				"end": 1302,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 41,
+						"column": 1,
+						"character": 1246
+					},
+					"end": {
+						"line": 41,
+						"column": 4,
+						"character": 1249
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1250,
+							"end": 1252,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1252,
+							"end": 1269,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 42,
+									"column": 2,
+									"character": 1253
+								},
+								"end": {
+									"line": 42,
+									"column": 5,
+									"character": 1256
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1257,
+										"end": 1263,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1269,
+							"end": 1283,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1283,
+							"end": 1289,
+							"name": "br",
+							"name_loc": {
+								"start": {
+									"line": 43,
+									"column": 14,
+									"character": 1284
+								},
+								"end": {
+									"line": 43,
+									"column": 16,
+									"character": 1286
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1289,
+							"end": 1296,
+							"raw": " text3\n",
+							"data": " text3\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1302,
+				"end": 1303,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1303,
+				"end": 1363,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 45,
+						"column": 1,
+						"character": 1304
+					},
+					"end": {
+						"line": 45,
+						"column": 4,
+						"character": 1307
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1308,
+							"end": 1310,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1310,
+							"end": 1327,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 46,
+									"column": 2,
+									"character": 1311
+								},
+								"end": {
+									"line": 46,
+									"column": 5,
+									"character": 1314
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1315,
+										"end": 1321,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1327,
+							"end": 1341,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1341,
+							"end": 1350,
+							"name": "input",
+							"name_loc": {
+								"start": {
+									"line": 47,
+									"column": 14,
+									"character": 1342
+								},
+								"end": {
+									"line": 47,
+									"column": 19,
+									"character": 1347
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1350,
+							"end": 1357,
+							"raw": " text3\n",
+							"data": " text3\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1363,
+				"end": 1365,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1365,
+				"end": 1458,
+				"data": " one run, two answers: only the boundary whose text follows the block loses its space "
+			},
+			{
+				"type": "Text",
+				"start": 1458,
+				"end": 1459,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1459,
+				"end": 1551,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 51,
+						"column": 1,
+						"character": 1460
+					},
+					"end": {
+						"line": 51,
+						"column": 4,
+						"character": 1463
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1464,
+							"end": 1466,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1466,
+							"end": 1483,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 52,
+									"column": 2,
+									"character": 1467
+								},
+								"end": {
+									"line": 52,
+									"column": 5,
+									"character": 1470
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1471,
+										"end": 1477,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1483,
+							"end": 1491,
+							"raw": "\n\ttext1 ",
+							"data": "\n\ttext1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1491,
+							"end": 1511,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 53,
+									"column": 8,
+									"character": 1492
+								},
+								"end": {
+									"line": 53,
+									"column": 12,
+									"character": 1496
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1497,
+										"end": 1504,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1511,
+							"end": 1518,
+							"raw": " text2 ",
+							"data": " text2 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1518,
+							"end": 1538,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 53,
+									"column": 35,
+									"character": 1519
+								},
+								"end": {
+									"line": 53,
+									"column": 39,
+									"character": 1523
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1524,
+										"end": 1531,
+										"raw": "inline2",
+										"data": "inline2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1538,
+							"end": 1545,
+							"raw": " text3\n",
+							"data": " text3\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1551,
+				"end": 1553,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1553,
+				"end": 1647,
+				"data": " every block predecessor kind answers alike: a whitespace-sensitive one and a void one "
+			},
+			{
+				"type": "Text",
+				"start": 1647,
+				"end": 1648,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1648,
+				"end": 1713,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 57,
+						"column": 1,
+						"character": 1649
+					},
+					"end": {
+						"line": 57,
+						"column": 4,
+						"character": 1652
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1653,
+							"end": 1655,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1655,
+							"end": 1672,
+							"name": "pre",
+							"name_loc": {
+								"start": {
+									"line": 58,
+									"column": 2,
+									"character": 1656
+								},
+								"end": {
+									"line": 58,
+									"column": 5,
+									"character": 1659
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1660,
+										"end": 1666,
+										"raw": "block1",
+										"data": "block1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1672,
+							"end": 1686,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1686,
+							"end": 1706,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 59,
+									"column": 14,
+									"character": 1687
+								},
+								"end": {
+									"line": 59,
+									"column": 18,
+									"character": 1691
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1692,
+										"end": 1699,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1706,
+							"end": 1707,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1713,
+				"end": 1714,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1714,
+				"end": 1768,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 61,
+						"column": 1,
+						"character": 1715
+					},
+					"end": {
+						"line": 61,
+						"column": 4,
+						"character": 1718
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1719,
+							"end": 1721,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1721,
+							"end": 1727,
+							"name": "hr",
+							"name_loc": {
+								"start": {
+									"line": 62,
+									"column": 2,
+									"character": 1722
+								},
+								"end": {
+									"line": 62,
+									"column": 4,
+									"character": 1724
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1727,
+							"end": 1741,
+							"raw": "\n\ttext1 text2 ",
+							"data": "\n\ttext1 text2 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1741,
+							"end": 1761,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 63,
+									"column": 14,
+									"character": 1742
+								},
+								"end": {
+									"line": 63,
+									"column": 18,
+									"character": 1746
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1747,
+										"end": 1754,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1761,
+							"end": 1762,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
