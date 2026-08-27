@@ -396,7 +396,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// The decorators are a parameter rather than a post-hoc patch so the node is
     /// built once, in place: a builder that hands a bare `Expression` back for its
-    /// caller to fix up makes that caller hold the 176 B value across the boxing
+    /// caller to fix up makes that caller hold the 72 B value across the boxing
     /// call — see `ParsedExpr::from_expr`.
     ///
     /// `None` and `Some(&[])` are **different wire shapes** — the field is omitted
@@ -439,7 +439,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(ParsedExpr::from_expr(
             self.arena,
-            Expression::ClassExpression(ClassExpression {
+            Expression::ClassExpression(self.arena.alloc(ClassExpression {
                 decorators,
                 id,
                 super_class,
@@ -449,7 +449,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 r#abstract: false,
                 type_parameters,
                 span: Span::new(start as u32, end),
-            }),
+            })),
         ))
     }
 

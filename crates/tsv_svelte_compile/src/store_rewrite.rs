@@ -900,15 +900,15 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                         ..obj.clone()
                     })
                 }),
-            Expression::ArrowFunctionExpression(arrow) => {
-                self.arrow(arrow)?.map(Expression::ArrowFunctionExpression)
-            }
+            Expression::ArrowFunctionExpression(arrow) => self
+                .arrow(arrow)?
+                .map(|a| Expression::ArrowFunctionExpression(self.b.arena.alloc(a))),
             Expression::FunctionExpression(func) => self
                 .function_expression(func)?
-                .map(Expression::FunctionExpression),
+                .map(|f| Expression::FunctionExpression(self.b.arena.alloc(f))),
             Expression::ClassExpression(class) => self
                 .class_expression(class)?
-                .map(Expression::ClassExpression),
+                .map(|c| Expression::ClassExpression(self.b.arena.alloc(c))),
             Expression::SpreadElement(spread) => self.expr_ref(spread.argument)?.map(|argument| {
                 Expression::SpreadElement(ast::SpreadElement {
                     argument,
@@ -928,7 +928,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if tag.is_none() && quasi.is_none() {
                     None
                 } else {
-                    Some(Expression::TaggedTemplateExpression(
+                    Some(Expression::TaggedTemplateExpression(self.b.arena.alloc(
                         ast::TaggedTemplateExpression {
                             tag: tag.unwrap_or(tagged.tag),
                             quasi: quasi.map_or_else(
@@ -938,9 +938,9 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                                     ..tagged.quasi.clone()
                                 },
                             ),
-                            ..tagged.clone()
+                            ..(*tagged).clone()
                         },
-                    ))
+                    )))
                 }
             }
             Expression::AwaitExpression(node) => self.expr_ref(node.argument)?.map(|argument| {

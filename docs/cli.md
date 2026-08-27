@@ -149,17 +149,17 @@ host and the platform:
   is above the pool's own reservation, where the pool becomes the shallower route.
   `tsv parse` has no pool at all, so it took the inherited stack on every platform.
 - which recursion binds **depends on the shape**, and on parens — the shape the flat
-  figure below is quoted on — the two sides are level: `parse` reaches within ~0.1% of
-  `format` on the same input (26,877 vs 26,857 parens at 32 MiB). ⚠️ That does **not**
+  figure below is quoted on — the two sides are level: `parse` reaches within ~0.01% of
+  `format` on the same input (34,917 vs 34,916 parens at 32 MiB). ⚠️ That does **not**
   generalize. Wherever a **member chain** is involved the printer binds, and by a wide
-  margin: a nested memberish call (`a.f(a.f(…))`) parses to 17,027 levels and formats to
-  6,385, and a nested computed subscript (`a[a[…]]`) parses to 22,047 and formats to
-  7,263 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. The
+  margin: a nested memberish call (`a.f(a.f(…))`) parses to 26,187 levels and formats to
+  6,406, and a nested computed subscript (`a[a[…]]`) parses to 32,231 and formats to
+  7,324 — the chain printer's own frames set the ceiling at ~¼ of the parser's. The
   wire-JSON writer adds nothing on top of the parser on any shape measured.
 
-Measured on `const x = ((((…1…))));`, one nesting level costs ~1.2 KiB of stack in a
-release build (~21 KiB in a debug build, where frames are much larger), so the shipped
-CLI reaches ~26,900 levels on every route and every platform. For scale: the parsers tsv
+Measured on `const x = ((((…1…))));`, one nesting level costs ~0.94 KiB of stack in a
+release build (~16 KiB in a debug build, where frames are much larger), so the shipped
+CLI reaches ~34,900 levels on every route and every platform. For scale: the parsers tsv
 stands in for stop earlier and on the same input — acorn + `@sveltejs/acorn-typescript`
 at 497 levels and prettier at 805, both through V8's own checked stack limit, which is
 why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the tsc
@@ -168,9 +168,9 @@ corpus nests 69 levels; the exposure is generated and minified code.
 Parens are not the tightest shape, only the easiest to state. Per nesting level, in a
 release build: **nested memberish calls (`a.f(a.f(…))`) ~5.1 KiB** (the worst measured —
 ~6,400 levels, which is the depth every shape clears), nested computed subscripts
-(`a[a[…]]`) ~4.5, nested arrow bodies ~4.0, TS object literals ~3.3, TS *types* ~3.2,
-Svelte elements ~3.1, nested binary chains ~2.0, statement nesting ~2.0, calls ~1.9,
-array literals ~1.7, unary chains ~1.6, parens ~1.2, ternary / assignment chains ~0.8,
+(`a[a[…]]`) ~4.5, nested arrow bodies ~4.0, TS *types* ~3.2, TS object literals ~2.8,
+statement nesting ~2.0, Svelte elements ~1.7, unary chains ~1.6, nested binary chains
+~1.5, calls ~1.25, array literals ~1.2, parens ~0.94, ternary / assignment chains ~0.56,
 CSS rules ~0.4.
 
 The two chain shapes head that list because a member chain is printed from a *grouped*
@@ -178,35 +178,46 @@ view of a linearized chain, and those frames sit on the expression cycle: they c
 and 6.7 KiB a level until `ChainGroup` stopped owning a `SmallVec` of node copies and
 became a borrowed sub-slice (16 bytes), which bought back ~2.2 KiB a level on both and
 ~0.5 on nested arrow bodies. They are also the shapes on which the printer, not the
-parser, sets the ceiling — see the bullet above.
+parser, sets the ceiling — see the bullet above. ⚠️ They are the only two shapes the
+`Expression` enum's own width does *not* reach: every other row above moved when it went
+from 176 bytes to 72 (Svelte elements 3.1 → 1.7, calls 1.9 → 1.25, parens 1.2 → 0.94),
+while these two stayed put, because the chain printer's frames — not an `Expression`
+slot — are what sets them.
 
 What sets a shape's cost is the stack slots its cycle's functions **reserve**, not the
 work they do: a frame is sized once for the widest arm, and every level pays all of it
 whichever arm it takes — so a dispatcher that holds one by-value AST node per arm
 multiplies that node's size by its arm count, at every level, forever. This is why no
-`parse_*` on the expression cycle hands its caller a bare 176-byte `Expression`: a node
+`parse_*` on the expression cycle hands its caller a bare `Expression` by value: a node
 builder either boxes into the arena at its own tail (`ParsedExpr::from_expr`, leaving the
 caller an 8-byte reference) or returns its own concrete node struct — an
 `ObjectExpression` is 32 B, and the dispatcher arm that wraps one back into an
 `Expression` builds a temporary the compiler merges with its sibling arms' rather than a
-return slot it cannot. The statement layer still threads its nodes by value, so the same
-pressure applies to `Statement`'s own width — and there it is answered from the other
-side, by *density*: the four variants wide enough to set the enum's size on their own
-(`ForStatement`, `ForOfStatement`, `ForInStatement`, `TryStatement`) hold their heads as
-arena references, so a `Statement` is 208 B rather than 544. That trade only runs this
-way because those variants are rare — a classic `for (;;)` is 0.05–0.22% of statements in
-real source — while the size is paid on every element of every statement slice and on
-every `?`-propagation copy. The frequent declaration variants stay inline.
+return slot it cannot.
+
+Both node enums also answer the same pressure from the other side, by *density* — the
+variants wide enough to set the enum's size on their own, and rare enough that an arena
+allocation apiece is free, hold their payload by reference. `Expression`'s five widest
+(`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` / `MetaProperty` /
+`TaggedTemplateExpression`) make it 72 B rather than 176, and `Statement`'s four
+(`ForStatement`, `ForOfStatement`, `ForInStatement`, `TryStatement`) make it 200 rather
+than 544. Both trades only run this way because the boxed variants are rare — a classic
+`for (;;)` is 0.05–0.22% of statements, and the five expression variants together are
+~3% of expressions, of which the two widest are ~0.02% — while the width is paid on
+every element of every slice, on both of a property's key and value slots, and on every
+`?`-propagation copy. The frequent variants stay inline: the next-widest expression is
+`CallExpression` at 64 B and it is 14–21% of expressions, which is where the ladder
+stops.
 
 **The other surfaces have their own ceilings, set by their hosts, and the CLI's
 reservation does not reach them:**
 
 | surface | stack | depth |
 | --- | --- | --- |
-| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~26,900 |
-| N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~6,300 at 8 MiB |
-| N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~3,130 |
-| WASM, any host | the wasm shadow stack, 1 MiB by link default | ~1,630 |
+| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~34,900 |
+| N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~8,200 at 8 MiB |
+| N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~4,070 |
+| WASM, any host | the wasm shadow stack, 1 MiB by link default | ~2,120 |
 
 The two binding rows are the host's thread, so the addon cannot size them; a host that
 needs the depth raises it itself (`new Worker(…, {resourceLimits: {stackSizeMb}})`), which

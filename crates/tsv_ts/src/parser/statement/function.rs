@@ -340,7 +340,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(ParsedExpr::from_expr(
             self.arena,
-            Expression::FunctionExpression(FunctionExpression {
+            Expression::FunctionExpression(self.arena.alloc(FunctionExpression {
                 id,
                 type_parameters,
                 params,
@@ -350,7 +350,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 r#async: is_async,
                 params_start: params_start as u32,
                 span: Span::new(start as u32, end),
-            }),
+            })),
         ))
     }
 }

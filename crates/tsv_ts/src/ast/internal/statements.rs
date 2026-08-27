@@ -242,7 +242,7 @@ pub struct SwitchCase<'arena> {
 #[derive(Debug, Clone)]
 pub struct TryStatement<'arena> {
     pub block: BlockStatement<'arena>,
-    /// Arena reference rather than an inline `CatchClause` (208 B on its own) for the
+    /// Arena reference rather than an inline `CatchClause` (104 B on its own) for the
     /// density reason on `ForStatement`.
     pub handler: Option<&'arena CatchClause<'arena>>,
     pub finalizer: Option<BlockStatement<'arena>>,
