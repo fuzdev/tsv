@@ -5,7 +5,8 @@ use crate::printing::visual_width;
 use smallvec::SmallVec;
 
 use super::arena::{
-    ArenaCommand, DocArena, DocId, DocNode, FLAT_WIDTH_BREAKS, FLAT_WIDTH_UNKNOWN, RenderIndent,
+    ArenaCommand, DocArena, DocId, DocNode, FLAT_WIDTH_BREAKS, FLAT_WIDTH_UNKNOWN, FusedWidth,
+    RenderIndent, fused_ascii_width,
 };
 use super::types::{CachedWidth, DocText, LineKind, Mode, resolve_text};
 
@@ -24,11 +25,31 @@ fn text_flat_width(t: &DocText, source: Option<&str>) -> Option<u32> {
             // arena's static width cache), so the resolve never needs the arena
             // text pool; the empty pool passed here would panic loudly (slice
             // OOB) if that invariant ever broke.
+            //
+            // An identifier name is short — a corpus census over 176,801 arrivals
+            // here put the mean at 8.3 bytes, 99.1% under the fused walk's length
+            // gate and **not one** holding a newline — so this asks the same fused
+            // walk the build-time measure asks (`fused_ascii_width`), for the same
+            // reason: `contains('\n')`'s searcher setup, paid whatever the length,
+            // and then a second pass for the width, IS the cost on a slice this
+            // size. The `Searcher` arm keeps the two-pass shape for the long or
+            // multibyte tail, where it still wins.
+            //
+            // ⚠️ Spell it as one expression, with no early `return` and nothing
+            // outlined. `text_flat_width` inlines into `flat_width_fill`, one of
+            // the hottest symbols on every board, and its codegen is sensitive out
+            // of proportion to this arm: a null control — HEAD's own body, byte-
+            // identical work, merely moved behind `#[inline(never)]` — measured
+            // **+0.185% instructions on a pure-CSS corpus and +0.40% on fuz_app**,
+            // and CSS never reaches this arm at all (only `tsv_ts` and `tsv_svelte`
+            // emit unmeasured name spans). An early `return` here costs the same
+            // corpus +0.20%. The shape below costs it +0.09%.
             let s = resolve_text(t, source, "");
-            if s.contains('\n') {
-                None
-            } else {
-                Some(visual_width(s, TAB_WIDTH) as u32)
+            match fused_ascii_width(s) {
+                FusedWidth::Width(w) => Some(w as u32),
+                FusedWidth::Newline => None,
+                FusedWidth::Searcher if s.contains('\n') => None,
+                FusedWidth::Searcher => Some(visual_width(s, TAB_WIDTH) as u32),
             }
         }
     }
@@ -473,6 +494,95 @@ pub(super) fn arena_fits_multi(
         has_line_suffix,
         source,
     )
+}
+
+#[cfg(test)]
+mod text_flat_width_tests {
+    //! Oracle for [`text_flat_width`]'s on-demand `NotComputed` arm — the fits
+    //! path's own measure of an identifier name.
+    //!
+    //! It needs one for the same reason
+    //! [`super::super::arena`]'s `pooled_text_width_tests` does, and the doc there
+    //! spells it out: a width only changes the output once it crosses the print
+    //! width, so an arithmetic slip on a rare byte leaves every formatted file
+    //! byte-identical and sails through the fixtures and any size of format/wire
+    //! diff. This arm shares `fused_ascii_width` with the build-time measure, so a
+    //! defect inside the walk fires in both suites; what only this one grades is
+    //! the **composition** — the length gate, the non-ASCII handoff, and the
+    //! unclamped `Option<u32>` the flat-width cache wants where the other wants a
+    //! clamped `u16` sentinel.
+    use super::text_flat_width;
+    use crate::Span;
+    use crate::config::TAB_WIDTH;
+    use crate::doc::types::{DocText, TEXT_WIDTH_NOT_COMPUTED};
+    use crate::printing::visual_width;
+
+    /// The width, spelled out independently: probe for a newline, then measure.
+    fn reference(s: &str) -> Option<u32> {
+        if s.contains('\n') {
+            None
+        } else {
+            Some(visual_width(s, TAB_WIDTH) as u32)
+        }
+    }
+
+    fn assert_agrees(s: &str) {
+        // An unmeasured verbatim span over a source that is exactly the slice —
+        // the shape `source_span_ident` produces.
+        let t = DocText::SourceSpan(
+            Span {
+                start: 0,
+                end: s.len() as u32,
+            },
+            TEXT_WIDTH_NOT_COMPUTED,
+        );
+        assert_eq!(
+            text_flat_width(&t, Some(s)),
+            reference(s),
+            "text_flat_width disagrees with the reference on {s:?}"
+        );
+    }
+
+    #[test]
+    fn agrees_on_exhaustive_short_strings() {
+        // Every string of length 0-3 over an alphabet spanning each arm: plain
+        // ASCII, the two special ASCII bytes, a control char, DEL, and multi-byte
+        // UTF-8 (including a combining mark and a ZWJ, the clusters that can cross
+        // an ASCII boundary and force the whole-slice re-measure).
+        let alphabet = [
+            "a", "Z", "0", "-", " ", "\t", "\n", "\r", "\x00", "\x1b", "\x7f", "é", "中", "🎉",
+            "\u{0301}", "\u{200d}", "\u{fe0f}", "\u{00a0}",
+        ];
+        assert_agrees("");
+        for a in alphabet {
+            assert_agrees(a);
+            for b in alphabet {
+                assert_agrees(&format!("{a}{b}"));
+                for c in alphabet {
+                    assert_agrees(&format!("{a}{b}{c}"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn agrees_across_the_length_gate() {
+        // `FUSED_WIDTH_SCAN_MAX` is the only speed switch here, so both arms must
+        // answer identically on either side of it — and on a tab or a newline
+        // landing just past it, where only the searcher arm sees them.
+        for len in [0, 1, 31, 32, 33, 63, 64, 65, 128, 1000] {
+            assert_agrees(&"x".repeat(len));
+            assert_agrees(&format!("{}\t{}", "x".repeat(len), "y".repeat(len)));
+            assert_agrees(&format!("{}\n{}", "x".repeat(len), "y".repeat(len)));
+            // A non-ASCII byte before a newline: the fused walk bails mid-slice
+            // and the searcher arm must still find the newline behind it.
+            assert_agrees(&format!("{}é\nafter", "x".repeat(len)));
+            // A combining mark on an ASCII base — the cluster starts on a byte
+            // the fused walk already counted, so the handoff must re-measure the
+            // whole slice, not the remainder.
+            assert_agrees(&format!("{}e\u{0301}x", "x".repeat(len)));
+        }
+    }
 }
 
 #[cfg(test)]
