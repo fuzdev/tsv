@@ -29,9 +29,7 @@ use crate::printer::comments::KeywordOperandGap;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
 };
-use crate::printer::{
-    ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
-};
+use crate::printer::{ParenContext, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -174,8 +172,8 @@ impl<'a> Printer<'a> {
         let callee_with_types = d.concat(&[keyword, callee_with_types_base]);
 
         // Single template literal argument with embedded newlines on the same line as `(` —
-        // hug it. A template on its own line declines and falls through to
-        // has_multiline_content below.
+        // hug it. A template on its own line declines and falls through to the layouts
+        // below, whose `will_break` guards see the template's own newline.
         //
         // Prettier's own position, shared with the plain call and dynamic `import()`:
         // `isTemplateLiteralSingleArg` is the first thing `printCallExpression` asks, above
@@ -472,23 +470,9 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // Check if any argument has multiline content
-        let has_multiline = container_may_have_multiline_content(new_expr.span, self.source)
-            && new_expr
-                .arguments
-                .iter()
-                .any(|arg| has_multiline_content(arg, self.source));
-
-        if has_multiline {
-            // Force expansion with hardlines for multiline content
-            return build_call_args_expanded(
-                self,
-                ArgOpener::Callee(callee_with_types),
-                new_expr.arguments,
-                paren_open,
-                new_expr.span.end,
-            );
-        }
+        // No multiline-content arm here, for the reason the plain-call twin states: an
+        // argument's own newline breaks the layouts below through their `will_break`
+        // guards, which is prettier's only mechanism too.
 
         // "Expand first arg" pattern: callback first, short/empty container last
         // e.g., new Proxy((x) => { ... }, {}) - callback hugs, empty obj stays inline.

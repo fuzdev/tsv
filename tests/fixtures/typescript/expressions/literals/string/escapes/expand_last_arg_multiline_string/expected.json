@@ -1,0 +1,1039 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 610,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " the expand-last hug survives a multiline string in the last argument",
+			"start": 10,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an array last argument hugs the same way",
+			"start": 121,
+			"end": 164,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `new` twin takes the same layout",
+			"start": 199,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same call inside a member chain",
+			"start": 292,
+			"end": 330,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a template literal's own newline is the same trigger",
+			"start": 374,
+			"end": 429,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control - a multiline string in a HEAD argument still breaks every argument out",
+			"start": 471,
+			"end": 553,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 83
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 609,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 600,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 40,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 83,
+					"end": 118,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 83,
+						"end": 117,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 83,
+							"end": 86,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 87,
+								"end": 88,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 90,
+								"end": 116,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 6,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 94,
+										"end": 113,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 5
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 94,
+											"end": 97,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 2
+												},
+												"end": {
+													"line": 4,
+													"column": 5
+												}
+											},
+											"name": "key"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 99,
+											"end": 113,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 7
+												},
+												"end": {
+													"line": 5,
+													"column": 5
+												}
+											},
+											"value": "multi line",
+											"raw": "'multi \\\nline'"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the expand-last hug survives a multiline string in the last argument",
+							"start": 10,
+							"end": 81
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 166,
+					"end": 196,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 166,
+						"end": 195,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 166,
+							"end": 169,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 1
+								},
+								"end": {
+									"line": 9,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 170,
+								"end": 171,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 5
+									},
+									"end": {
+										"line": 9,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ArrayExpression",
+								"start": 173,
+								"end": 194,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 8
+									},
+									"end": {
+										"line": 12,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 177,
+										"end": 191,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 5
+											}
+										},
+										"value": "multi line",
+										"raw": "'multi \\\nline'"
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an array last argument hugs the same way",
+							"start": 121,
+							"end": 164
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 240,
+					"end": 289,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 246,
+							"end": 288,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 246,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 250,
+								"end": 288,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 11
+									},
+									"end": {
+										"line": 18,
+										"column": 3
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 254,
+									"end": 257,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 15
+										},
+										"end": {
+											"line": 15,
+											"column": 18
+										}
+									},
+									"name": "Fn1"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 258,
+										"end": 259,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 19
+											},
+											"end": {
+												"line": 15,
+												"column": 20
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "ObjectExpression",
+										"start": 261,
+										"end": 287,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 22
+											},
+											"end": {
+												"line": 18,
+												"column": 2
+											}
+										},
+										"properties": [
+											{
+												"type": "Property",
+												"start": 265,
+												"end": 284,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 2
+													},
+													"end": {
+														"line": 17,
+														"column": 5
+													}
+												},
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 265,
+													"end": 268,
+													"loc": {
+														"start": {
+															"line": 16,
+															"column": 2
+														},
+														"end": {
+															"line": 16,
+															"column": 5
+														}
+													},
+													"name": "key"
+												},
+												"value": {
+													"type": "Literal",
+													"start": 270,
+													"end": 284,
+													"loc": {
+														"start": {
+															"line": 16,
+															"column": 7
+														},
+														"end": {
+															"line": 17,
+															"column": 5
+														}
+													},
+													"value": "multi line",
+													"raw": "'multi \\\nline'"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the `new` twin takes the same layout",
+							"start": 199,
+							"end": 238
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 332,
+					"end": 371,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 332,
+						"end": 370,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 24,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 332,
+							"end": 339,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 1
+								},
+								"end": {
+									"line": 21,
+									"column": 8
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 332,
+								"end": 335,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 1
+									},
+									"end": {
+										"line": 21,
+										"column": 4
+									}
+								},
+								"name": "obj"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 336,
+								"end": 339,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 5
+									},
+									"end": {
+										"line": 21,
+										"column": 8
+									}
+								},
+								"name": "fn1"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 340,
+								"end": 341,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 9
+									},
+									"end": {
+										"line": 21,
+										"column": 10
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 343,
+								"end": 369,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 12
+									},
+									"end": {
+										"line": 24,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 347,
+										"end": 366,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 5
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 347,
+											"end": 350,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 2
+												},
+												"end": {
+													"line": 22,
+													"column": 5
+												}
+											},
+											"name": "key"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 352,
+											"end": 366,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 7
+												},
+												"end": {
+													"line": 23,
+													"column": 5
+												}
+											},
+											"value": "multi line",
+											"raw": "'multi \\\nline'"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same call inside a member chain",
+							"start": 292,
+							"end": 330
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 431,
+					"end": 468,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 4
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 431,
+						"end": 467,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 30,
+								"column": 3
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 431,
+							"end": 434,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 1
+								},
+								"end": {
+									"line": 27,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 435,
+								"end": 436,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 5
+									},
+									"end": {
+										"line": 27,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 438,
+								"end": 466,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 8
+									},
+									"end": {
+										"line": 30,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 442,
+										"end": 463,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 5
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 442,
+											"end": 445,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 2
+												},
+												"end": {
+													"line": 28,
+													"column": 5
+												}
+											},
+											"name": "key"
+										},
+										"value": {
+											"type": "TemplateLiteral",
+											"start": 447,
+											"end": 463,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 7
+												},
+												"end": {
+													"line": 29,
+													"column": 5
+												}
+											},
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 448,
+													"end": 462,
+													"loc": {
+														"start": {
+															"line": 28,
+															"column": 8
+														},
+														"end": {
+															"line": 29,
+															"column": 4
+														}
+													},
+													"value": {
+														"raw": "tab\\there\nline",
+														"cooked": "tab\there\nline"
+													},
+													"tail": true
+												}
+											]
+										},
+										"kind": "init"
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a template literal's own newline is the same trigger",
+							"start": 374,
+							"end": 429
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 555,
+					"end": 599,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 555,
+						"end": 598,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 1
+							},
+							"end": {
+								"line": 39,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 555,
+							"end": 558,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 1
+								},
+								"end": {
+									"line": 33,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "ObjectExpression",
+								"start": 562,
+								"end": 590,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 3
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 567,
+										"end": 586,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 3
+											},
+											"end": {
+												"line": 36,
+												"column": 5
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 567,
+											"end": 570,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 3
+												},
+												"end": {
+													"line": 35,
+													"column": 6
+												}
+											},
+											"name": "key"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 572,
+											"end": 586,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 8
+												},
+												"end": {
+													"line": 36,
+													"column": 5
+												}
+											},
+											"value": "multi line",
+											"raw": "'multi \\\nline'"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 594,
+								"end": 595,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 3
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control - a multiline string in a HEAD argument still breaks every argument out",
+							"start": 471,
+							"end": 553
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
