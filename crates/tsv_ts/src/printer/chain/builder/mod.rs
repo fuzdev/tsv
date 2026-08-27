@@ -32,7 +32,7 @@ use super::printing::{
     chain_gap_any, has_inside_bracket_comments, member_lookup_group, node_comment_gap, print_group,
     print_group_expanded, print_group_standard_expanded, print_node_inner,
 };
-use super::types::{ChainGroup, ChainNode, ChainNodeVec};
+use super::types::{ChainGroup, ChainNode};
 use super::{InlineLookups, resolve_inline_lookups};
 use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression};
 use crate::printer::Printer;
@@ -439,17 +439,52 @@ fn build_short_chain_doc<'a>(
     d.group(on_line)
 }
 
+/// The trailing member tail as the two contiguous runs it spans: what the last
+/// call's own group holds after that call, then the whole groups following it.
+///
+/// `group_chain_nodes` tiles the linearized chain, so the two runs are adjacent in
+/// the one `ChainNodeVec` the linearizer built — but a [`ChainGroup`] is a bare
+/// sub-slice carrying no absolute offset into that buffer, and joining two adjacent
+/// slices needs `slice::from_raw_parts` (`unsafe_code` is `forbid`ed). So the PAIR is
+/// the tail, rather than a `ChainNodeVec` copy of it: collecting one put a 464-byte
+/// buffer in [`build_chain_doc_impl`]'s frame — which is on the expression recursion
+/// cycle — to carry a mean of 0.02 nodes.
+#[derive(Debug, Clone, Copy)]
+struct TailRuns<'a> {
+    /// The run left in the last call's own group, after that call.
+    head: &'a [ChainNode<'a>],
+    /// The whole groups after that one, in order.
+    rest: &'a [ChainGroup<'a>],
+}
+
+impl<'a> TailRuns<'a> {
+    /// The tail's nodes in source order.
+    fn iter(self) -> impl Iterator<Item = &'a ChainNode<'a>> {
+        self.head
+            .iter()
+            .chain(self.rest.iter().flat_map(|g| g.nodes.iter()))
+    }
+
+    /// The tail's node count. Walked, not stored — see [`PeeledTail::tail_len`].
+    fn len(self) -> usize {
+        self.head.len() + self.rest.iter().map(|g| g.nodes.len()).sum::<usize>()
+    }
+}
+
 /// A chain's trailing member tail, split off by [`peel_trailing_member_tail`]
 /// together with the facts [`build_peeled_tail_doc`] and [`append_member_tail`]
-/// consume — computed once at the peel so the consumers neither re-scan the
+/// consume — answered once at the peel so the consumers neither re-scan the
 /// groups nor re-classify the gap.
 struct PeeledTail<'a, 'p> {
     /// Index of the group holding the chain's last call.
     last_call_group: usize,
     /// Index of that call within its group's nodes.
     last_call_idx: usize,
-    /// Every node after the last call, collected across group boundaries.
-    tail: ChainNodeVec<'a>,
+    /// Every node after the last call — a VIEW of the linearized chain, not a copy.
+    tail: TailRuns<'a>,
+    /// `tail`'s node count, walked once at the peel: [`append_member_tail`] asks it
+    /// per node to find the last one, and a run pair cannot answer it in O(1).
+    tail_len: usize,
     /// The prefix→tail gap's comments — only same-line trailing blocks by
     /// construction (the peel refuses break-forcing ones). `None` when the chain
     /// window holds no comments or the tail's first node has no gap.
@@ -461,10 +496,21 @@ struct PeeledTail<'a, 'p> {
     inlined_last: bool,
 }
 
+// The peel is INLINED into `build_chain_doc_impl`, which sits on the expression
+// recursion cycle, so this type's width is a per-level stack cost on the deepest
+// shape tsv formats (`docs/cli.md` §Recursion Depth). Pinned because that is the
+// whole point of [`TailRuns`]: a field that collected the tail again — or any other
+// buffer sized for a worst case — would silently restore ~424 bytes to every level
+// of a nested member chain, with output byte-identical and no test able to see it.
+// 64-bit only (the count is pointer-width-relative).
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<PeeledTail<'static, 'static>>() == 192);
+
 /// Split off the trailing member tail — every node AFTER the chain's last call,
-/// collected ACROSS group boundaries (the grouping may keep the first post-call
-/// member in the call's own group: `read(...).a.b` groups as
-/// `[[base, call, .a], [.b]]`). Returns `Some` only when the tail is ALL plain
+/// which SPANS group boundaries (the grouping may keep the first post-call member
+/// in the call's own group: `read(...).a.b` groups as `[[base, call, .a], [.b]]`),
+/// so it is named as the run pair [`TailRuns`] rather than copied. Returns `Some`
+/// only when the tail is ALL plain
 /// `.prop` members and its gaps are quiet: a computed / private / non-null node
 /// keeps its own break structure on the existing paths, and a break-forcing comment
 /// (trailing line, or any leading) needs the comment-aware chain paths. A trailing
@@ -483,11 +529,20 @@ struct PeeledTail<'a, 'p> {
 /// over-width lookup printed flat on pass 1 and broke on pass 2, a non-idempotency the
 /// blank-injection audit reaches. See `expressions/member/call_base_tail_blank`.
 fn peel_trailing_member_tail<'a, 'p>(
-    groups: &[ChainGroup<'a>],
+    groups: &'a [ChainGroup<'a>],
     chain_end: u32,
     inline: InlineLookups,
     printer: &'p Printer<'_>,
 ) -> Option<PeeledTail<'a, 'p>> {
+    // The tail is every node AFTER the chain's last call, so the tail's own last node
+    // IS the chain's last node — and every tail node has to be a plain member. Asking
+    // that of the last node first costs two loads and refuses the ~98% of chains that
+    // end in a call (24,099 peels over fuz_app/src, 23,742 of them tail-less), each of
+    // which otherwise pays both reverse scans and the tail walk to reach the same no.
+    if !matches!(groups.last()?.nodes.last()?, ChainNode::Member { .. }) {
+        return None;
+    }
+
     let last_call_group = groups
         .iter()
         .rposition(|g| g.nodes.iter().any(ChainNode::is_call))?;
@@ -496,24 +551,23 @@ fn peel_trailing_member_tail<'a, 'p>(
         .iter()
         .rposition(ChainNode::is_call)?;
 
-    let mut tail: ChainNodeVec<'a> = groups[last_call_group].nodes[last_call_idx + 1..]
-        .iter()
-        .copied()
-        .collect();
-    for group in &groups[last_call_group + 1..] {
-        tail.extend(group.nodes.iter().copied());
-    }
-    if tail.is_empty() || !tail.iter().all(|n| matches!(n, ChainNode::Member { .. })) {
+    let tail = TailRuns {
+        head: &groups[last_call_group].nodes[last_call_idx + 1..],
+        rest: &groups[last_call_group + 1..],
+    };
+    let tail_len = tail.len();
+    if tail_len == 0 || !tail.iter().all(|n| matches!(n, ChainNode::Member { .. })) {
         return None;
     }
+    let first = tail.iter().next()?;
     // The prefix→tail gap: refuse a break-forcing comment. A blank here is not one —
     // see the ⚠️ above.
     let mut gap_comments = None;
     if printer.chain_has_comments()
-        && let Some((object_end, property_start)) = node_comment_gap(&tail[0], printer)
+        && let Some((object_end, property_start)) = node_comment_gap(first, printer)
     {
         let classified =
-            printer.classify_chain_gap(object_end, property_start, tail[0].paren_gap_skip());
+            printer.classify_chain_gap(object_end, property_start, first.paren_gap_skip());
         if gap_has_break_forcing_comments(&classified) {
             return None;
         }
@@ -522,7 +576,7 @@ fn peel_trailing_member_tail<'a, 'p>(
     // The tail's interior gaps must be comment-free — an interior comment needs the
     // comment-aware chain paths.
     if printer.chain_has_comments()
-        && tail[1..].iter().any(|n| {
+        && tail.iter().skip(1).any(|n| {
             n.comment_range().is_some_and(|gap| {
                 chain_gap_any(gap, n.paren_gap_skip(), |start, end| {
                     printer.has_comments_to_emit_between(start, end)
@@ -552,7 +606,7 @@ fn peel_trailing_member_tail<'a, 'p>(
     //
     // Both disjuncts sit behind the POSITION, which is one flag: a chain in any other
     // position never pays for either question.
-    let lone_tail_off_call_with_args = tail.len() == 1
+    let lone_tail_off_call_with_args = tail_len == 1
         && matches!(
             groups[last_call_group].nodes[last_call_idx],
             ChainNode::Call { call, .. } if !call.arguments.is_empty()
@@ -564,6 +618,7 @@ fn peel_trailing_member_tail<'a, 'p>(
         last_call_group,
         last_call_idx,
         tail,
+        tail_len,
         gap_comments,
         inlined_last,
     })
@@ -666,7 +721,7 @@ fn append_member_tail(
         // The first member's gap comments were just emitted above — skip them in the
         // node print so they can't double-print (the add_group_no_break seam).
         let member = print_node_inner(node, printer, false, i == 0);
-        let inlined = inline_every_lookup || (peeled.inlined_last && i + 1 == peeled.tail.len());
+        let inlined = inline_every_lookup || (peeled.inlined_last && i + 1 == peeled.tail_len);
         parts.push(if inlined {
             member
         } else {

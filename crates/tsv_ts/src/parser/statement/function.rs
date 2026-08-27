@@ -40,7 +40,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     pub(super) fn parse_function_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
-        self.parse_function_or_overload(false)
+        self.parse_function_or_overload(false, None)
     }
 
     /// Parse function declaration or overload signature
@@ -51,11 +51,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// function check(x: unknown): x is number;  // overload - TSDeclareFunction
     /// function check(x: unknown) { ... }         // implementation - FunctionDeclaration
     /// ```
+    ///
+    /// `start_override` is the statement's own start when the caller consumed a
+    /// leading token of its own (`async`), so the span is built right rather than
+    /// patched afterwards — both variants are arena-boxed and a `&'arena` head has
+    /// no `&mut` to patch through.
     fn parse_function_or_overload(
         &mut self,
         is_async: bool,
+        start_override: Option<usize>,
     ) -> Result<Statement<'arena>, ParseError> {
-        let (start, _) = self.current_pos();
+        let start = start_override.unwrap_or_else(|| self.current_pos().0);
 
         // Consume 'function' keyword
         debug_assert!(matches!(
@@ -99,32 +105,36 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Function overload signature - parse as TSDeclareFunction
             let end = self.semicolon_end()?;
 
-            Ok(Statement::TSDeclareFunction(TSDeclareFunction {
-                id,
-                type_parameters,
-                params,
-                return_type,
-                declare: false, // Not a `declare function`, just an overload
-                r#async: is_async,
-                generator: is_generator,
-                span: Span::new(start as u32, end),
-            }))
+            Ok(Statement::TSDeclareFunction(self.arena.alloc(
+                TSDeclareFunction {
+                    id,
+                    type_parameters,
+                    params,
+                    return_type,
+                    declare: false, // Not a `declare function`, just an overload
+                    r#async: is_async,
+                    generator: is_generator,
+                    span: Span::new(start as u32, end),
+                },
+            )))
         } else {
             // Function implementation - parse body (the function's `[Await]`/`[Yield]` context).
             let body = self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
             let end = body.span.end;
 
-            Ok(Statement::FunctionDeclaration(FunctionDeclaration {
-                id: Some(id),
-                type_parameters,
-                params,
-                return_type,
-                body,
-                generator: is_generator,
-                r#async: is_async,
-                params_start: params_start as u32,
-                span: Span::new(start as u32, end),
-            }))
+            Ok(Statement::FunctionDeclaration(self.arena.alloc(
+                FunctionDeclaration {
+                    id: Some(id),
+                    type_parameters,
+                    params,
+                    return_type,
+                    body,
+                    generator: is_generator,
+                    r#async: is_async,
+                    params_start: params_start as u32,
+                    span: Span::new(start as u32, end),
+                },
+            )))
         }
     }
 
@@ -141,19 +151,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        // Parse the function (which may be an overload signature or implementation)
-        let mut stmt = self.parse_function_or_overload(true)?;
-
-        // Update span to include 'async' keyword. `parse_function_or_overload`
-        // only ever returns these two variants, both with a `span` field, so an
-        // or-pattern patches the start in place without a fallback arm.
-        if let Statement::FunctionDeclaration(FunctionDeclaration { span, .. })
-        | Statement::TSDeclareFunction(TSDeclareFunction { span, .. }) = &mut stmt
-        {
-            span.start = start as u32;
-        }
-
-        Ok(stmt)
+        // Parse the function (which may be an overload signature or implementation),
+        // handing it the `async` keyword's position so its span covers it.
+        self.parse_function_or_overload(true, Some(start))
     }
 
     /// Inner function that can return either FunctionDeclaration or TSDeclareFunction

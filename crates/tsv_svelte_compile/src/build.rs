@@ -711,7 +711,7 @@ impl<'arena> Builder<'arena> {
         let params_start = self.mint("(").start;
         self.mint(") {");
         let end = self.mint("}").end;
-        Statement::FunctionDeclaration(FunctionDeclaration {
+        Statement::FunctionDeclaration(self.arena.alloc(FunctionDeclaration {
             id: Some(id),
             type_parameters: None,
             params,
@@ -724,7 +724,7 @@ impl<'arena> Builder<'arena> {
             r#async: false,
             params_start,
             span: Span::new(start, end),
-        })
+        }))
     }
 }
 

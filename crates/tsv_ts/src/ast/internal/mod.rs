@@ -110,7 +110,9 @@ pub use expressions::{
 // free, hold their payload by `&'arena` reference: `Expression`'s five widest
 // (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` /
 // `MetaProperty` / `TaggedTemplateExpression`, together ~3% of expressions, of which
-// the widest two are ~0.02%) and `Statement`'s four (`internal::statements`).
+// the widest two are ~0.02%), `Statement`'s eight widest DECLARATION heads (each
+// ≤0.2% of statements) and its four loop / `try` heads one level down
+// (`internal::statements`).
 //
 // Pinned so a variant that widens either enum shows up as a failed build rather
 // than as a silently lower nesting ceiling and a fatter element slot. 64-bit only:
@@ -118,7 +120,7 @@ pub use expressions::{
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Expression<'static>>() == 72);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<Statement<'static>>() == 200);
+const _: () = assert!(size_of::<Statement<'static>>() == 104);
 
 //
 // Foundational Types (defined here, used everywhere)
