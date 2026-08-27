@@ -23,13 +23,12 @@ use tsv_ts::ast::internal::{ImportSpecifier, Statement};
 ///
 /// With the **`buffer_stats` feature** (off by default — the record hooks sit
 /// in the chain printer's hot path), each file is additionally *formatted* and
-/// four printer-buffer populations are sampled at their construction
+/// three printer-buffer populations are sampled at their construction
 /// chokepoints (`tsv_ts::printer::buffer_stats`), so inline-`N` claims about
 /// them are measured data rather than doc-comment prose:
 ///
 /// - **`ChainNodeVec`** — nodes per linearized chain
 /// - **`ChainGroupVec`** — groups per `group_chain_nodes` call
-/// - **`ChainGroup.nodes`** — nodes per built chain group
 /// - **leading-comment `CommentVec`** — comments per
 ///   `collect_leading_comments` call (the type's dominant site)
 ///
@@ -92,7 +91,6 @@ impl BufferSizesCommand {
             let mut stats = tsv_ts::take_buffer_stats();
             stats.chain_nodes.sort_unstable();
             stats.chain_groups.sort_unstable();
-            stats.group_nodes.sort_unstable();
             stats.leading_comments.sort_unstable();
             stats
         };
@@ -181,15 +179,6 @@ fn print_printer_stats(stats: &tsv_ts::BufferStats) {
     eprintln!();
     print_metric(
         &format!(
-            "ChainGroup.nodes (nodes per built chain group; inline N={})",
-            caps.group_nodes
-        ),
-        &stats.group_nodes,
-        &[2, 4, 6, 8],
-    );
-    eprintln!();
-    print_metric(
-        &format!(
             "CommentVec (comments per collect_leading_comments call; inline N={})",
             caps.leading_comments
         ),
@@ -203,10 +192,9 @@ fn print_printer_stats(stats: &tsv_ts::BufferStats) {
 #[cfg(feature = "buffer_stats")]
 fn printer_stats_json_fields(stats: &tsv_ts::BufferStats) -> String {
     format!(
-        "\"chain_nodes\":{},\"chain_groups\":{},\"group_nodes\":{},\"leading_comments\":{}",
+        "\"chain_nodes\":{},\"chain_groups\":{},\"leading_comments\":{}",
         metric_json(&stats.chain_nodes),
         metric_json(&stats.chain_groups),
-        metric_json(&stats.group_nodes),
         metric_json(&stats.leading_comments),
     )
 }

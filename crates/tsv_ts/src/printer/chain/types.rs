@@ -10,20 +10,17 @@ use smallvec::SmallVec;
 use tsv_lang::Span;
 
 /// Buffer for a linearized chain — chains are measured-short, so small chains
-/// (the common case) stay on the stack. `ChainNode` is `Copy` and ~24 bytes.
+/// (the common case) stay on the stack. `ChainNode` is `Copy` and 56 bytes, and
+/// this is the single buffer every [`ChainGroup`] is a sub-slice of.
 pub type ChainNodeVec<'a> = SmallVec<[ChainNode<'a>; 8]>;
 
 /// Stack-friendly buffer for the grouped chain — `group_chain_nodes` builds this
-/// once per chain. `ChainGroup` is ~112 bytes (it embeds an inline `ChainGroupNodesVec`),
-/// so the inline capacity stays small at `4`: most chains are 1–2 groups, but a
-/// 3–4-group chain (`a.b().c()` and friends) is common in real code — a two-call
-/// chain is already 3 groups — so `4` keeps the common shapes on the stack while
-/// the genuinely long chains, which break anyway, spill to the heap.
+/// once per chain. A [`ChainGroup`] is two words (a borrowed sub-slice), so the
+/// inline capacity stays at `4`: most chains are 1–2 groups, but a 3–4-group chain
+/// (`a.b().c()` and friends) is common in real code — a two-call chain is already
+/// 3 groups — so `4` keeps the common shapes on the stack while the genuinely long
+/// chains, which break anyway, spill to the heap.
 pub type ChainGroupVec<'a> = SmallVec<[ChainGroup<'a>; 4]>;
-
-/// Stack-friendly buffer for one group's own nodes (the [`ChainGroup::nodes`]
-/// field) — groups are measured-short, so up to `4` entries stay inline.
-pub type ChainGroupNodesVec<'a> = SmallVec<[ChainNode<'a>; 4]>;
 
 /// Stack-friendly buffer of chain-node references — for the member-only and
 /// base-call flatten passes that collect `&ChainNode` before printing. `8` covers
@@ -426,33 +423,35 @@ impl<'a> ChainNode<'a> {
     }
 }
 
-/// A group of chain nodes that stay on the same line
+/// A group of chain nodes that stay on the same line — a VIEW into the
+/// linearized chain, not a copy of it.
 ///
-/// Groups are measured-short, so the nodes buffer keeps the common shapes
-/// inline (see [`ChainGroupNodesVec`]).
-#[derive(Debug, Clone)]
+/// `group_chain_nodes` partitions its input into consecutive runs and never
+/// reorders or drops a node, so every group is a contiguous sub-slice of the one
+/// `ChainNodeVec` the linearizer built. Borrowing that slice is what keeps the
+/// group at two words: an owning buffer had to be sized for the worst group and
+/// so carried the whole inline array through every `groups.push`, a 240-byte move
+/// for a mean payload of 1.4 nodes.
+///
+/// `'a` is the borrow of that buffer; `ChainNode` is covariant, so the AST
+/// lifetime it points into shortens to it at the call site and one parameter
+/// covers both.
+#[derive(Debug, Clone, Copy)]
 pub struct ChainGroup<'a> {
-    pub nodes: ChainGroupNodesVec<'a>,
+    pub nodes: &'a [ChainNode<'a>],
 }
 
 impl<'a> ChainGroup<'a> {
-    pub fn new() -> Self {
-        Self {
-            nodes: SmallVec::new(),
-        }
-    }
-
-    pub fn push(&mut self, node: ChainNode<'a>) {
-        self.nodes.push(node);
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
+    /// The view of `nodes` this group covers.
+    pub fn new(nodes: &'a [ChainNode<'a>]) -> Self {
+        Self { nodes }
     }
 }
 
-impl<'a> Default for ChainGroup<'a> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// A group is a borrowed slice — two words. Pinned because the size is the whole
+// point of the type: `group_chain_nodes` pushes one per group of every chain in
+// the document, so a field that widened it back would silently restore the
+// per-push move this shape exists to remove, with output byte-identical and no
+// test able to see it. 64-bit only (the count is pointer-width-relative).
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<ChainGroup<'static>>() == 16);

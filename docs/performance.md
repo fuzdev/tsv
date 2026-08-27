@@ -491,12 +491,13 @@ metrics (static AST properties): named-import-specifier count per import
 (`named_specs`), and line count per multi-line block comment (the population the
 parked line-offset scratch iterates). With `--features buffer_stats` (off by
 default — the record hooks sit in the chain printer's hot path), each file is also
-*formatted* and four printer-buffer populations are sampled at their construction
+*formatted* and three printer-buffer populations are sampled at their construction
 chokepoints (`tsv_ts::printer::buffer_stats`), so inline-`N` claims are measured
 data, not doc-comment prose: `ChainNodeVec` (nodes per linearized chain),
-`ChainGroupVec` (groups per `group_chain_nodes` call), `ChainGroup.nodes` (nodes
-per built group), and the leading-comment `CommentVec`
-(per `collect_leading_comments` call — the type's dominant site). Covers
+`ChainGroupVec` (groups per `group_chain_nodes` call), and the leading-comment
+`CommentVec` (per `collect_leading_comments` call — the type's dominant site).
+A `ChainGroup` owns no buffer to size — it is a borrowed sub-slice of the
+linearized chain — so it carries no population of its own. Covers
 `.ts`/`.svelte.ts` AND `.svelte` (the `<script>`/`{expr}` feed the same TS-printer
 buffers). Prints percentiles + spill rate at candidate inline N. For sizing,
 exclude the prettier/svelte test suites (edge-case skew). Pure Rust, no Deno.

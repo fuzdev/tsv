@@ -625,10 +625,8 @@ fn build_peeled_tail_doc<'a>(
         )
     } else {
         let mut prefix: SmallVec<[ChainGroup<'a>; 4]> =
-            groups[..peeled.last_call_group].iter().cloned().collect();
-        let mut cut = call_group.clone();
-        cut.nodes.truncate(peeled.last_call_idx + 1);
-        prefix.push(cut);
+            groups[..peeled.last_call_group].iter().copied().collect();
+        prefix.push(ChainGroup::new(&call_group.nodes[..=peeled.last_call_idx]));
         build_chain_doc_impl(&prefix, chain_end, InlineLookups::NONE, printer)
     };
     append_member_tail(chain_doc, peeled, inline.every, printer)
