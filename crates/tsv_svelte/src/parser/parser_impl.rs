@@ -6,9 +6,8 @@ use crate::parser::element::tag_name_end;
 use crate::whitespace::skip_svelte_ws;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{Comment, ParseError, Span};
+use tsv_lang::{AcornPrefixText, Comment, ParseError, Span};
 use tsv_ts::Expression;
-use tsv_ts::PrefixLines;
 use tsv_ts::TSTypeAnnotation;
 use tsv_ts::TopLevelAs;
 use tsv_ts::{is_id_continue, is_id_start};
@@ -556,7 +555,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<Expression<'arena>, ParseError> {
-        self.record_acorn_region(base_offset, source, PrefixLines::Ecmascript);
+        self.record_acorn_region(base_offset, source, AcornPrefixText::Document);
         let (expr, comments) =
             tsv_ts::parse_expression_with_comments(source, base_offset, self.arena)?;
         self.expression_comments.extend_from_slice(comments);
@@ -581,7 +580,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         base_offset: usize,
         top_level_as: TopLevelAs,
     ) -> Result<(Expression<'arena>, usize), ParseError> {
-        self.record_acorn_region(base_offset, source, PrefixLines::Ecmascript);
+        self.record_acorn_region(base_offset, source, AcornPrefixText::Document);
         let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
             source,
             base_offset,
@@ -625,7 +624,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<Expression<'arena>, ParseError> {
-        self.record_acorn_region(base_offset, source, PrefixLines::Lf);
+        // Svelte's `read_pattern` branches on the same byte: a name is `read_identifier`,
+        // which builds the binding itself and hands acorn nothing, and only a `{` / `[` is
+        // wrapped into the synthetic `(pattern = 1)` expression. The region is recorded
+        // either way — it is what reproduces `locate-character`'s columns for the identifier
+        // arm too — so the kinds part on the manufacture, not on the class: both are LF, and
+        // an identifier binding holds no comment for the dedent half to answer about.
+        let prefix = if source.starts_with(['{', '[']) {
+            AcornPrefixText::BlankedThenParen
+        } else {
+            AcornPrefixText::Blanked
+        };
+        self.record_acorn_region(base_offset, source, prefix);
         let (pattern, comments) =
             tsv_ts::parse_pattern_with_comments(source, base_offset, self.arena)?;
         // A trailing `: T` this sub-parse swallowed is a SECOND acorn parse for
@@ -681,7 +691,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `slice` is the source the sub-parse is about to be handed, so the region's
     /// extent is `origin + slice.len()` — taken from the same value the parse gets,
     /// rather than restated, so the two cannot disagree.
-    pub(crate) fn record_acorn_region(&mut self, origin: usize, slice: &str, prefix: PrefixLines) {
+    pub(crate) fn record_acorn_region(
+        &mut self,
+        origin: usize,
+        slice: &str,
+        prefix: AcornPrefixText,
+    ) {
         let at = skip_svelte_ws(self.source, origin);
         self.record_acorn_region_at(at, at, origin + slice.len(), prefix);
     }
@@ -704,14 +719,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// offset 9; `{:then v:` / `{:catch e:` are shorter heads but never stand
     /// alone, and `{#each … as x:` is longer still.
     fn record_annotation_acorn_region(&mut self, at: u32, end: usize) {
-        const AS_INSERT_LEN: usize = "_ as ".len();
+        const AS_INSERT_LEN: usize = AcornPrefixText::AS_INSERT.len();
         let lex_start = internal::AcornRegion::annotation_lex_start(self.source, at) as usize;
         debug_assert!(
             lex_start >= AS_INSERT_LEN,
             "an annotation at {at} leaves no room for Svelte's synthetic `_ as `, so this \
              is not a block-pattern annotation at all"
         );
-        self.record_acorn_region_at(lex_start, lex_start - AS_INSERT_LEN, end, PrefixLines::Lf);
+        self.record_acorn_region_at(
+            lex_start,
+            lex_start - AS_INSERT_LEN,
+            end,
+            AcornPrefixText::BlankedThenAs,
+        );
     }
 
     /// The explicit form, for the two regions whose parse does **not** begin at
@@ -728,7 +748,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         lex_start: usize,
         origin: usize,
         end: usize,
-        prefix: PrefixLines,
+        prefix: AcornPrefixText,
     ) {
         debug_assert!(
             self.acorn_regions
@@ -780,7 +800,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<tsv_ts::Statement<'arena>, ParseError> {
-        self.record_acorn_region(base_offset, source, PrefixLines::Ecmascript);
+        self.record_acorn_region(base_offset, source, AcornPrefixText::Document);
         let (stmt, comments) =
             tsv_ts::parse_statement_with_comments(source, base_offset, self.arena)?;
         self.expression_comments.extend_from_slice(comments);

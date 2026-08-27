@@ -173,3 +173,25 @@ fn svelte_expression_list_island_attached_comments() {
     // A `{#snippet}` parameter list — one shared queue across several roots.
     assert_svelte("{#snippet s(a, /* c */ b)}x{/snippet}");
 }
+
+/// A **multi-line block** comment, which every case above deliberately isn't: its `value` is
+/// the one comment field that is not a verbatim source slice. Svelte's `onComment` dedents it
+/// by the line of the source *its own parse* was handed, and Svelte manufactures that source
+/// at four of its readers (`tsv_lang::AcornPrefix`) — so the writer must resolve the
+/// preparation per island on **both** variants.
+///
+/// ⭐ That is what this case gates, and nothing else does. The preparation ledger
+/// (`Root::acorn_regions`) sits beside the `loc` seeds, which the `no-locations` path builds
+/// none of; parked with them — its pre-refactor home — the dedent silently reverts to the
+/// document on this variant alone, and every other gate stays green because they all run with
+/// `loc` on. The newline before the `:` is load-bearing twice over: it is what makes the
+/// annotation's seed non-identity (so the seed route is live and the two could be conflated),
+/// and `read_type_annotation`'s `_ as ` swallows it, so the line acorn measured is the
+/// binding's.
+#[test]
+fn svelte_manufactured_multiline_comment_dedent() {
+    assert_svelte(
+        "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n\
+         {#each xs as x\n\t: /* c1\n\t c2 */ number}{x}{/each}",
+    );
+}

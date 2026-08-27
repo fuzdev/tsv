@@ -2,6 +2,7 @@
 use std::borrow::Cow;
 
 use crate::Span;
+use crate::acorn_prefix::AcornPrefix;
 use crate::printing;
 use crate::source_scan::{self, has_newline_after_position, has_newline_before_position};
 use crate::whitespace::is_js_whitespace;
@@ -120,6 +121,12 @@ impl Comment {
     /// template-reader ones) and cleared for acorn-shape ones, so the dedent is gated on
     /// `!emit_character_field`.
     ///
+    /// `prefix` is what acorn SAW ahead of the parse that produced this comment
+    /// ([`AcornPrefix`]) — Svelte manufactures that source at four of its readers, and the
+    /// indentation `onComment` measures is the manufactured line's, not the document's. Every
+    /// standalone parse, and every Svelte island read out of the raw template, passes
+    /// [`AcornPrefix::DOCUMENT`].
+    ///
     /// Returns a `Cow` so the common single-line / verbatim case borrows its content slice
     /// — only the acorn multi-line block dedent path (rare) allocates.
     ///
@@ -127,13 +134,14 @@ impl Comment {
     /// for the root `comments` array, and `tsv_ts`'s online comment attach for every
     /// `leadingComments` / `trailingComments` entry.
     #[must_use]
-    pub fn wire_value<'s>(&self, source: &'s str) -> Cow<'s, str> {
+    pub fn wire_value<'s>(&self, source: &'s str, prefix: AcornPrefix) -> Cow<'s, str> {
         let content = self.content(source);
         if self.is_block && self.multiline && !self.emit_character_field {
             Cow::Owned(printing::strip_comment_indentation(
                 source,
                 content,
                 self.span.start,
+                prefix,
             ))
         } else {
             Cow::Borrowed(content)

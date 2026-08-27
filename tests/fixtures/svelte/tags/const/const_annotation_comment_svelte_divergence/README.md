@@ -34,4 +34,26 @@ once and attaches once. The distinct-comment set is identical, `ast_diff`
 confirms semantic equivalence, and the formatter — which locates comments by
 position — is unaffected and matches prettier on every case here.
 
+## The second claim: which source the DEDENT reads
+
+`a5` is a multi-line block comment inside the annotation, and it pins the other
+thing `read_type_annotation`'s synthetic source decides. acorn's `onComment`
+dedents such a comment by the `[ \t]` run opening its line **in the string acorn
+was given** — and that string is the template blanked to spaces up to five bytes
+behind the type, with `_ as ` spliced over those five. So the tab opening `a5`'s
+line is not indentation acorn can see (it is a blanked space, and the run before
+it ends at the `_`), and the comment's `value` keeps its tab where reading the
+document would have stripped it.
+
+Both parsers answer that identically — the value is a **match**, on the root
+`comments` entry and on the attached `leadingComments` copy alike. What still
+diverges is only the duplication above. The spellings this fixture cannot hold
+unfrozen — a head the formatter would join back onto one line, and the other
+three synthetic sources (`read_script`, `read_pattern`, `{#snippet}`'s prelude),
+none of which is a format fixed point — are pinned by
+[`tests/comment_dedent_manufactured_source.rs`](../../../../../comment_dedent_manufactured_source.rs)
+and, for the template readers, by the `<!-- prettier-ignore -->`-frozen
+[`head_multiline_comment_dedent`](../../../syntax/comments/head_multiline_comment_dedent/)
+fixture.
+
 See [conformance_svelte.md](../../../../../../docs/conformance_svelte.md) §Comment Attachment Differences.
