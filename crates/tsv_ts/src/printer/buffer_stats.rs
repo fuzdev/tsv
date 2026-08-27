@@ -2,10 +2,10 @@
 //! `tsv_debug buffer_sizes`' chain/comment metrics.
 //!
 //! The printer's `SmallVec` inline capacities (`ChainNodeVec`, `ChainGroupVec`,
-//! `ChainGroup.nodes`, the leading-comment `CommentVec`) are sizing claims, and
-//! a claim in a doc comment drifts; this module samples the real populations at
-//! the buffers' construction chokepoints so the inline-`N` choice is graded
-//! against measured lengths on any corpus.
+//! the leading-comment `CommentVec`) are sizing claims, and a claim in a doc
+//! comment drifts; this module samples the real populations at the buffers'
+//! construction chokepoints so the inline-`N` choice is graded against measured
+//! lengths on any corpus.
 //!
 //! Compiled in only under the `buffer_stats` cargo feature (off by default,
 //! like `debug_lex`), so production builds — and default `tsv_debug` builds,
@@ -17,7 +17,7 @@
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use super::chain::{ChainGroupNodesVec, ChainGroupVec, ChainNodeVec};
+use super::chain::{ChainGroupVec, ChainNodeVec};
 use super::comments::CommentVec;
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
@@ -41,9 +41,6 @@ pub struct BufferStats {
     pub chain_nodes: Vec<usize>,
     /// `ChainGroupVec` length per `group_chain_nodes` call.
     pub chain_groups: Vec<usize>,
-    /// `ChainGroup.nodes` length per built group (every group of every
-    /// `group_chain_nodes` call).
-    pub group_nodes: Vec<usize>,
     /// Leading-comment `CommentVec` length per `collect_leading_comments` call
     /// (the statement-gap collector — the buffer type's dominant allocation
     /// site; other `CommentVec` sites are not sampled).
@@ -57,7 +54,6 @@ pub struct BufferStats {
 pub struct BufferInlineCapacities {
     pub chain_nodes: usize,
     pub chain_groups: usize,
-    pub group_nodes: usize,
     pub leading_comments: usize,
 }
 
@@ -66,7 +62,6 @@ pub fn inline_capacities() -> BufferInlineCapacities {
     BufferInlineCapacities {
         chain_nodes: ChainNodeVec::new().inline_size(),
         chain_groups: ChainGroupVec::new().inline_size(),
-        group_nodes: ChainGroupNodesVec::new().inline_size(),
         leading_comments: CommentVec::new().inline_size(),
     }
 }
@@ -84,12 +79,6 @@ pub(crate) fn record_chain_nodes(len: usize) {
 pub(crate) fn record_chain_groups(len: usize) {
     if enabled() {
         SINK.with(|s| s.borrow_mut().chain_groups.push(len));
-    }
-}
-
-pub(crate) fn record_group_nodes(len: usize) {
-    if enabled() {
-        SINK.with(|s| s.borrow_mut().group_nodes.push(len));
     }
 }
 

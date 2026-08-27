@@ -623,7 +623,14 @@ fn linearize_member_node<'a>(
 /// chain-level gap emitters, which break around the comment and keep it in place.
 /// The trailing member's own deferral is a different, sanctioned matter
 /// (`has_comments_forcing_expansion`).
-pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>], comments: &[Comment]) -> ChainGroupVec<'a> {
+///
+/// The grouping is a PARTITION into consecutive runs — `i` only ever advances and
+/// every node joins the run it is scanned into — so each group is recorded as the
+/// index where it opens and emitted as `&nodes[open..close]`. Nothing is copied.
+pub fn group_chain_nodes<'a>(
+    nodes: &'a [ChainNode<'a>],
+    comments: &[Comment],
+) -> ChainGroupVec<'a> {
     if nodes.is_empty() {
         return ChainGroupVec::new();
     }
@@ -631,12 +638,11 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>], comments: &[Comment]) -> C
     // The grouped chain is built on the stack (`ChainGroupVec`): short chains —
     // the common case — never touch the heap; longer chains spill.
     let mut groups: ChainGroupVec<'a> = ChainGroupVec::new();
-    let mut current = ChainGroup::new();
-    let mut i = 0;
-
+    // Where the group being scanned opens. A group is closed by pushing
+    // `&nodes[open..i]`, after which `open` moves to `i`.
+    let mut open = 0;
     // First node always goes into first group
-    current.push(nodes[0]);
-    i += 1;
+    let mut i = 1;
 
     // Phase 1: Build first group
     // Add: calls, non-null, numeric accessors to first group
@@ -645,7 +651,6 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>], comments: &[Comment]) -> C
         if (node.is_call() || node.is_non_null() || node.is_numeric_accessor())
             && !gap_has_line_comment(node, comments)
         {
-            current.push(nodes[i]);
             i += 1;
         } else {
             break;
@@ -660,13 +665,12 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>], comments: &[Comment]) -> C
             && nodes[i + 1].is_member()
             && !gap_has_line_comment(&nodes[i], comments)
         {
-            current.push(nodes[i]);
             i += 1;
         }
     }
 
-    groups.push(current);
-    current = ChainGroup::new();
+    groups.push(ChainGroup::new(&nodes[open..i]));
+    open = i;
 
     // Phase 2: Build remaining groups
     // Pattern: (members)* (calls)*, break at memberish after call — or at a member
@@ -681,9 +685,9 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>], comments: &[Comment]) -> C
         if (seen_call && node.is_member() && !node.is_numeric_accessor())
             || gap_has_line_comment(node, comments)
         {
-            if !current.is_empty() {
-                groups.push(current);
-                current = ChainGroup::new();
+            if open < i {
+                groups.push(ChainGroup::new(&nodes[open..i]));
+                open = i;
             }
             seen_call = false;
         }
@@ -693,22 +697,40 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>], comments: &[Comment]) -> C
             seen_call = true;
         }
 
-        current.push(nodes[i]);
         i += 1;
     }
 
     // Don't forget the last group
-    if !current.is_empty() {
-        groups.push(current);
+    if open < i {
+        groups.push(ChainGroup::new(&nodes[open..i]));
+    }
+
+    // The groups must TILE `nodes`: consecutive, gap-free, and covering it
+    // exactly. Every consumer reads a group's nodes as the chain's own nodes in
+    // source order, so a gap silently drops a link from the printed chain and an
+    // overlap prints one twice — and both are invisible to the fixture suite on
+    // any chain shape the corpus happens not to spell. Checked by pointer
+    // identity (no deref), which catches a mis-stepped `open` that a length sum
+    // alone would let through.
+    #[cfg(debug_assertions)]
+    {
+        let mut offset = 0;
+        for group in &groups {
+            debug_assert!(
+                std::ptr::eq(group.nodes.as_ptr(), nodes[offset..].as_ptr()),
+                "chain group at node {offset} is not the next run of the linearized chain"
+            );
+            offset += group.nodes.len();
+        }
+        debug_assert_eq!(
+            offset,
+            nodes.len(),
+            "chain groups must cover the whole linearized chain"
+        );
     }
 
     #[cfg(feature = "buffer_stats")]
-    {
-        crate::printer::buffer_stats::record_chain_groups(groups.len());
-        for group in &groups {
-            crate::printer::buffer_stats::record_group_nodes(group.nodes.len());
-        }
-    }
+    crate::printer::buffer_stats::record_chain_groups(groups.len());
 
     groups
 }

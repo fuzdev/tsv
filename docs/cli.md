@@ -148,10 +148,14 @@ host and the platform:
   machine — and the asymmetry points the *other* way on a machine whose `RLIMIT_STACK`
   is above the pool's own reservation, where the pool becomes the shallower route.
   `tsv parse` has no pool at all, so it took the inherited stack on every platform.
-- which recursion binds is the **parser**, on all three languages: at a fixed stack,
-  `parse` reaches within ~0.1% of `format` on the same input (26,877 vs 26,857 parens at
-  32 MiB), so neither the printer nor the wire-JSON writer adds a second depth's worth on
-  top of it.
+- which recursion binds **depends on the shape**, and on parens — the shape the flat
+  figure below is quoted on — the two sides are level: `parse` reaches within ~0.1% of
+  `format` on the same input (26,877 vs 26,857 parens at 32 MiB). ⚠️ That does **not**
+  generalize. Wherever a **member chain** is involved the printer binds, and by a wide
+  margin: a nested memberish call (`a.f(a.f(…))`) parses to 17,027 levels and formats to
+  6,385, and a nested computed subscript (`a[a[…]]`) parses to 22,047 and formats to
+  7,263 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. The
+  wire-JSON writer adds nothing on top of the parser on any shape measured.
 
 Measured on `const x = ((((…1…))));`, one nesting level costs ~1.2 KiB of stack in a
 release build (~21 KiB in a debug build, where frames are much larger), so the shipped
@@ -162,11 +166,19 @@ why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the
 corpus nests 69 levels; the exposure is generated and minified code.
 
 Parens are not the tightest shape, only the easiest to state. Per nesting level, in a
-release build: **nested arrow bodies ~4.5 KiB** (the worst measured — ~7,300 levels,
-which is the depth every shape clears), TS object literals ~3.3, TS *types* ~3.2, Svelte
-elements ~3.2, statement nesting ~2.0, nested binary chains ~2.0, calls ~1.9, array
-literals ~1.7, computed member subscripts ~1.5, parens ~1.2, unary / ternary / assignment
-chains ~0.75, CSS rules ~0.4.
+release build: **nested memberish calls (`a.f(a.f(…))`) ~5.1 KiB** (the worst measured —
+~6,400 levels, which is the depth every shape clears), nested computed subscripts
+(`a[a[…]]`) ~4.5, nested arrow bodies ~4.0, TS object literals ~3.3, TS *types* ~3.2,
+Svelte elements ~3.1, nested binary chains ~2.0, statement nesting ~2.0, calls ~1.9,
+array literals ~1.7, unary chains ~1.6, parens ~1.2, ternary / assignment chains ~0.8,
+CSS rules ~0.4.
+
+The two chain shapes head that list because a member chain is printed from a *grouped*
+view of a linearized chain, and those frames sit on the expression cycle: they cost 7.4
+and 6.7 KiB a level until `ChainGroup` stopped owning a `SmallVec` of node copies and
+became a borrowed sub-slice (16 bytes), which bought back ~2.2 KiB a level on both and
+~0.5 on nested arrow bodies. They are also the shapes on which the printer, not the
+parser, sets the ceiling — see the bullet above.
 
 What sets a shape's cost is the stack slots its cycle's functions **reserve**, not the
 work they do: a frame is sized once for the widest arm, and every level pays all of it
