@@ -32,7 +32,7 @@ use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::build_line_breaks_into;
 pub use tsv_lang::{ParseError, Result};
 
-pub use acorn_loc::{AcornSeed, PrefixLines};
+pub use acorn_loc::AcornSeed;
 pub use goal::Goal;
 pub use parser::TopLevelAs;
 

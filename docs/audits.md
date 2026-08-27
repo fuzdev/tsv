@@ -274,8 +274,8 @@ only add sites. So the rule is: **census ⇒ gradeable; sample ⇒ discovery onl
 `ws` a census was not merely a stability win, either — the sampled form found 3
 undocumented files where the census found **25** (7 signature groups vs 19), which is 8x
 its own findings hidden. That reading is kept because it is the evidence; it has since
-been worked down to the 10 below, the comment-extent bug having accounted for 15 of the
-25 and all but 4 of the groups.
+been worked down to zero, the comment-extent bug having accounted for 15 of the 25 and all
+but 4 of the groups, and the dedent bug below for the rest.
 
 **Each variant is graded against its own base file.** A divergence the base already had
 is not the injection's doing, and `tests/fixtures` deliberately contains ~91
@@ -316,18 +316,44 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
 list, not a regression gate, which is why it is not in `deno task check` (it also needs
 the canonical parser, so it is conformance-tier at best). Standing findings:
 
-- **`ws`** (census: 10 files / 4 signature groups) — one bug, and it asks a sub-parse the
-  question its retired sibling asked: **which SOURCE did that parse actually see?**
-  - **The acorn comment DEDENT is computed against the document** (10 files, from 2
-    `tags/const/` bases) where canonical computes it against the synthetic source it built.
-    Svelte's `onComment` strips the comment line's own indentation from every line of a
-    multiline block comment's `value` (`1-parse/acorn.js`), and `Comment::wire_value`
-    mirrors it — but `read_pattern` and `read_type_annotation` parse a **manufactured**
-    string (`<spaces>(pattern = 1)` / `<spaces>_ as T`), whose line prefix is spaces or
-    `_ as` rather than the author's tab, so canonical strips nothing there. tsv strips the
-    document's indentation and loses a tab from the `value` of a comment inside a
-    `{@const}` destructuring pattern or type annotation. Same shape as the per-parse `loc`
-    line class (`AcornSeed`), one field over: what acorn saw, not what the document says.
+- **`ws`** (census: **0 files**) — the family is CLEAN, and both of the bugs it found asked
+  a sub-parse the same question: **which SOURCE did that parse actually see?**
+
+  The one it retired second was **the acorn comment DEDENT computed against the document**
+  (10 files, from 2 `tags/const/` bases) where canonical computes it against the synthetic
+  source it built. Svelte's `onComment` strips the comment line's own indentation from every
+  line of a multiline block comment's `value` (`1-parse/acorn.js`), and `Comment::wire_value`
+  mirrors it — but four of Svelte's parses hand acorn a **manufactured** string whose line
+  prefix is not the author's. `tsv_lang::AcornPrefix` is the model of them, resolved per
+  COMMENT from `Root::acorn_regions` (a block binding's island is up to two parses, each
+  blanking a different span). Same shape as the per-parse `loc` line class (`AcornSeed`), one
+  field over: what acorn saw, not what the document says — and it is subtler than a width in
+  four ways, each of which was a live bug in the first cut: the two blankings differ
+  (`/[^\n]/g` erases the author's tab, `{#snippet}`'s `/\S/g` keeps it and blanks past it);
+  `read_pattern` deletes one blank from its prefix; a run that reaches `read_script`'s body
+  carries on into the body's own whitespace; and `read_type_annotation`'s `_ as ` is spliced
+  OVER five document bytes, so a `\n` among them is one acorn never sees. The blanks are
+  built in **JavaScript's** units at that — `\S` complements JS `\s`, not Rust's
+  `White_Space`, and `String.replace` walks UTF-16 code units, so an astral character blanks
+  to two columns. Pinned by
+  [comment_dedent_manufactured_source.rs](../tests/comment_dedent_manufactured_source.rs)
+  (each reader with its null controls, and the spellings no formatter leaves standing), by
+  the frozen
+  [head_multiline_comment_dedent](../tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent/)
+  fixture (the template readers, kept alive behind `<!-- prettier-ignore -->`), and by
+  [const_annotation_comment_svelte_divergence](../tests/fixtures/svelte/tags/const/const_annotation_comment_svelte_divergence/)
+  (the one spelling that is a fixed point unfrozen).
+
+  ⚠️ **The census's zero certifies only the sources some fixture carries in a head.** It
+  injects whitespace, so it can only reveal the bug where a fixture already holds a
+  multi-line block comment in the affected head — the trigger is a comment that OPENS on the
+  synthetic region's own line, which formatting normally moves off it. The three TEMPLATE
+  readers (`read_pattern`, `read_type_annotation`, `{#snippet}`'s `\S` prelude) are kept
+  reachable by the `<!-- prettier-ignore -->`-frozen
+  [head_multiline_comment_dedent](../tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent/)
+  fixture, which carries each with its null controls; `read_script` cannot be a fixture at
+  all (prettier reformats a script's body through an ignore directive, and both formatters
+  move its content off the tag's line), so there the Rust test is the sole guard.
 
   The sibling it retired was a **comment extent clipped at a trimmed slice boundary**: the
   bounded head readers handed their interior to the sub-parse whitespace-trimmed at BOTH
@@ -349,10 +375,10 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   whose `prettier-ignore` is what makes the trigger format-stable enough to be a fixture at
   all (both formatters trim a line comment's trailing whitespace).
 
-  Because the family is a census, closing the one above takes the run to zero — which makes
-  `ws` a candidate to become a **green gate at zero**, not a ratchet: there would be nothing
-  left to pin. Its oracle-side rejections are separately sized above and are currently **all
-  documented** — 32 split `!==` into `! ==`, whose non-null assertion only a TS parse
+  Because the family is a census it is now at zero, which makes `ws` a candidate to become a
+  **green gate at zero**, not a ratchet: there is nothing left to pin. Its oracle-side
+  rejections are separately sized above and are currently **all documented** — 32 split
+  `!==` into `! ==`, whose non-null assertion only a TS parse
   accepts (the tracked [TypeScript-mode
   gating](./conformance_svelte.md#typescript-mode-gating-tracked-over-acceptance)
   over-acceptance), and 1 splits `?:` into `? :`, feeding Svelte's own `/\?\s*:/g` template

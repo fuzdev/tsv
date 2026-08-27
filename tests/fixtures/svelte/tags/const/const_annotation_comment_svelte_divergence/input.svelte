@@ -15,4 +15,8 @@
 
 	<!-- an init comment with no annotation at all -->
 	{@const a4 = /* c4 */ expr}
+	<!-- the dedent reads the source acorn was handed, and for an annotation Svelte blanks
+		the prefix to spaces, so the tab opening the line below is not indentation it can see -->
+	{@const a5: /*
+	 c5 */ T = expr}
 {/if}

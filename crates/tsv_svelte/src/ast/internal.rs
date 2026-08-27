@@ -19,8 +19,7 @@
 use std::borrow::Cow;
 
 use tsv_css::ast::internal::CssStyleSheet;
-pub use tsv_lang::{Comment, Span};
-pub use tsv_ts::PrefixLines;
+pub use tsv_lang::{AcornPrefix, AcornPrefixText, Comment, Span};
 use tsv_ts::ast::internal::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
@@ -82,12 +81,25 @@ pub struct AcornRegion {
     /// *inserts* synthetic text there (`read_type_annotation`'s `_ as `), which
     /// acorn lexes in place of the bytes it covers.
     pub origin: u32,
-    /// The line class acorn counted in the text ahead of `origin`, which is
-    /// decided by how Svelte prepared that prefix.
-    pub prefix: PrefixLines,
+    /// How Svelte prepared the text ahead of `origin` — which decides both the line
+    /// class acorn counted over it and the indentation `onComment` dedents a
+    /// multi-line block comment by ([`AcornPrefixText`]).
+    pub prefix: AcornPrefixText,
 }
 
 impl AcornRegion {
+    /// This parse's preparation as the writers ask for it — the kind plus the offset its
+    /// manufactured bytes run out at, which is `origin`: Svelte's own slicing is what put
+    /// the boundary there, so the two cannot drift.
+    #[inline]
+    pub(crate) fn acorn_prefix(self) -> AcornPrefix {
+        if self.prefix == AcornPrefixText::Document {
+            AcornPrefix::DOCUMENT
+        } else {
+            AcornPrefix::manufactured(self.prefix, self.origin)
+        }
+    }
+
     /// Where the second acorn parse of a block pattern's trailing `: T` begins
     /// lexing real bytes — one past the `:`, found from the annotation's own
     /// span start.
@@ -118,6 +130,73 @@ impl AcornRegion {
         // recognizable one. `skip_svelte_ws` is Svelte's own `allow_whitespace()`,
         // the same step `read_type_annotation` takes to reach the colon.
         crate::whitespace::skip_svelte_ws(source, annotation_start as usize) as u32 + 1
+    }
+}
+
+/// The document's acorn regions, resolved to the source Svelte handed each parse —
+/// what a multi-line block comment's wire `value` is dedented by.
+///
+/// One resolver rather than a free function per caller, because both halves of the wire
+/// ask it and neither owns the other: the root `comments` array is emitted outside any
+/// island's walk, while the attached `leadingComments` / `trailingComments` copies are
+/// emitted by `tsv_ts`'s island attach. One answer, so the two lists cannot disagree
+/// about the same comment.
+#[derive(Debug, Clone, Copy)]
+pub struct AcornPrefixes<'a> {
+    /// The parse-fact ledger, ascending by `lex_start` — shared with the `loc` seed
+    /// lookup (`Ctx::acorn_seed` indexes its seeds parallel to this slice).
+    pub(crate) regions: &'a [AcornRegion],
+}
+
+impl<'a> AcornPrefixes<'a> {
+    /// Build the resolver for one document.
+    #[must_use]
+    pub fn new(regions: &'a [AcornRegion]) -> Self {
+        Self { regions }
+    }
+
+    /// The **index** of the last region starting at or before `pos` — the one "which
+    /// parse lexed this position" rule, stated once so its two askers cannot resolve one
+    /// position to two parses. Where regions nest (a block pattern and its `: T`) the
+    /// later start is the inner parse, which is the one that lexed the position.
+    ///
+    /// Whether that region also CONTAINS `pos` is deliberately NOT asked here, because
+    /// the two askers answer it differently: [`at`](Self::at) falls back to
+    /// [`AcornPrefix::DOCUMENT`], `Ctx::acorn_seed` asserts.
+    #[inline]
+    pub(crate) fn index_at(self, pos: u32) -> Option<usize> {
+        self.regions
+            .partition_point(|r| r.lex_start <= pos)
+            .checked_sub(1)
+    }
+
+    /// The source Svelte handed acorn for the parse `pos` belongs to, insofar as the
+    /// comment DEDENT reads it.
+    ///
+    /// Answered per POSITION rather than per island, because an island is not the unit: a
+    /// block binding's is up to **two** parses, each blanking a different span, so one
+    /// answer for the whole island is wrong for whichever half it did not come from.
+    ///
+    /// A position outside every region is [`AcornPrefix::DOCUMENT`] rather than an
+    /// assertion — unlike `Ctx::acorn_seed`, which is only ever asked about a position
+    /// inside its own island, this is asked about every comment in the document,
+    /// including ones no acorn parse covers.
+    #[must_use]
+    pub fn at(self, pos: u32) -> AcornPrefix {
+        match self.index_at(pos) {
+            Some(i) if pos <= self.regions[i].end => self.regions[i].acorn_prefix(),
+            _ => AcornPrefix::DOCUMENT,
+        }
+    }
+
+    /// The per-comment dedent sources for a queue, paired with it so the two cannot be
+    /// indexed apart.
+    #[must_use]
+    pub fn pair_with(self, queue: Vec<&Comment>) -> Vec<(&Comment, AcornPrefix)> {
+        queue
+            .into_iter()
+            .map(|c| (c, self.at(c.span.start)))
+            .collect()
     }
 }
 

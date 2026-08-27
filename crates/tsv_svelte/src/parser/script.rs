@@ -57,7 +57,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             content_start,
             content_start,
             content_start + content.len(),
-            PrefixLines::Lf,
+            AcornPrefixText::Blanked,
         );
         let program = tsv_ts::parse_embedded(content, content_start, self.arena)?;
 
