@@ -33,6 +33,44 @@ mod types;
 // Types
 pub use types::{CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan};
 
+/// Run `$copy` under a `match` on `$len` that names each short length in
+/// `[$($k),*]` as its own arm.
+///
+/// **Every arm is the same expression, and that is the point.** The doc
+/// builder's two hottest byte moves — `DocArena::alloc_children`'s child append
+/// and the render loop's output write — carry payloads far smaller than the call
+/// that was carrying them: a child range is exactly two `DocId`s in 65% of
+/// calls, and the render write moves a *mean of 4.69 bytes* with 5% of calls
+/// moving zero. `Vec::extend_from_slice` / `String::push_str` lower a
+/// runtime-length `copy_nonoverlapping` to an indirect `memcpy@plt`, so those
+/// calls cost more than the bytes. Inside an arm that has matched `len == k`,
+/// LLVM knows the count is `k` and stores it inline instead — one `mov` for two
+/// `DocId`s, nothing at all for the empty write.
+///
+/// ⚠️ **Do not "simplify" this to a bare `$copy`.** The arms are load-bearing
+/// codegen, invisible to every test because the output is byte-identical either
+/// way; collapsing them measured **+1.1–1.2% instructions** across five corpora.
+/// Re-slicing to `&x[..k]` inside the arm is *worse*, not better — the arm
+/// already establishes the length, and the re-slice only adds a bounds check
+/// (measured +0.15% against this spelling, and +576 B).
+///
+/// ⚠️ **The arm list is a size decision, per call site.** Arms multiply by the
+/// number of places the enclosing function is inlined into: the render write has
+/// two call sites and affords nine arms for +2.4 KB, while `alloc_children` is
+/// `#[inline]` at many sites and affords exactly **one** — a second arm there
+/// crosses an inliner threshold and costs **+179 KB of `.text`**. Re-measure
+/// `.text` before adding one.
+macro_rules! specialize_short_len {
+	($len:expr, [$($k:literal),* $(,)?], $copy:expr) => {
+		match $len {
+			$($k => $copy,)*
+			_ => $copy,
+		}
+	};
+}
+
+pub(crate) use specialize_short_len;
+
 /// Stack buffer for assembling a node's doc parts before handing them to
 /// `DocArena::concat` / `fill`. Language printers build one such `Vec<DocId>` per
 /// AST node — collectively a top format-phase allocation source — yet most nodes
