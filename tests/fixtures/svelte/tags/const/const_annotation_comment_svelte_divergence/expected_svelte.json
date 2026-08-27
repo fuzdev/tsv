@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 426,
+	"end": 640,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -18,7 +18,7 @@
 				"type": "IfBlock",
 				"elseif": false,
 				"start": 52,
-				"end": 425,
+				"end": 639,
 				"test": {
 					"type": "Identifier",
 					"start": 57,
@@ -537,7 +537,129 @@
 						{
 							"type": "Text",
 							"start": 419,
-							"end": 420,
+							"end": 421,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 421,
+							"end": 599,
+							"data": " the dedent reads the source acorn was handed, and for an annotation Svelte blanks\n\t\tthe prefix to spaces, so the tab opening the line below is not indentation it can see "
+						},
+						{
+							"type": "Text",
+							"start": 599,
+							"end": 601,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 601,
+							"end": 633,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "a5",
+											"start": 609,
+											"end": 611,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 9,
+													"character": 609
+												},
+												"end": {
+													"line": 20,
+													"column": 11,
+													"character": 611
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 611,
+												"end": 625,
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 624,
+													"end": 625,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 8
+														},
+														"end": {
+															"line": 21,
+															"column": 9
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 624,
+														"end": 625,
+														"loc": {
+															"start": {
+																"line": 21,
+																"column": 8
+															},
+															"end": {
+																"line": 21,
+																"column": 9
+															}
+														},
+														"name": "T"
+													},
+													"leadingComments": [
+														{
+															"type": "Block",
+															"value": "\n\t c5 ",
+															"start": 613,
+															"end": 623
+														},
+														{
+															"type": "Block",
+															"value": "\n\t c5 ",
+															"start": 613,
+															"end": 623
+														}
+													]
+												}
+											}
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 628,
+											"end": 632,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 12
+												},
+												"end": {
+													"line": 21,
+													"column": 16
+												}
+											},
+											"name": "expr"
+										},
+										"start": 609,
+										"end": 632
+									}
+								],
+								"start": 603,
+								"end": 632
+							}
+						},
+						{
+							"type": "Text",
+							"start": 633,
+							"end": 634,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -658,6 +780,38 @@
 				"end": {
 					"line": 17,
 					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n\t c5 ",
+			"start": 613,
+			"end": 623,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 13
+				},
+				"end": {
+					"line": 21,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n\t c5 ",
+			"start": 613,
+			"end": 623,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 13
+				},
+				"end": {
+					"line": 21,
+					"column": 7
 				}
 			}
 		}

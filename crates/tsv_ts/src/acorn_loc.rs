@@ -14,28 +14,14 @@
 //! consumers are this crate's wire writer and `tsv_svelte`, which already
 //! depends on it.
 //!
+//! What Svelte *did to the prefix* is the separate question a seed is computed
+//! from, and it does not live here: [`tsv_lang::AcornPrefix`] carries it, because
+//! the comment dedent reads the same fact and that mirror is `tsv_lang`'s. A seed
+//! consults it for one bit — [`AcornPrefix::counts_ecmascript_lines`].
+//!
 //! Full model: docs/architecture.md §`loc` lines — two classes, one per acorn parse.
 
-use tsv_lang::{LocationMapper, LocationTracker, Position};
-
-/// Which line-terminator class acorn counted in the text **ahead of** one
-/// embedded parse — the axis Svelte's per-call source preparation decides.
-///
-/// Svelte hands acorn a different string at every embedded parse, and the choice
-/// of what it does to the bytes before the region is exactly this enum:
-///
-/// - [`Lf`](Self::Lf) — the prefix was blanked with `replace(/[^\n]/g, ' ')`, so
-///   only its LFs survived and acorn's line count over it is Svelte's own
-///   (`<script>` content, `read_pattern` destructures, `read_type_annotation`).
-/// - [`Ecmascript`](Self::Ecmascript) — acorn got the raw template (every
-///   `read_expression` island, the bare `{const …}` / `{let …}` statement, and the
-///   snippet parameter list, whose `replace(/\S/g, ' ')` prelude keeps *all* whitespace),
-///   so every ECMAScript terminator ahead of the region counted.
-#[derive(Clone, Copy, Debug)]
-pub enum PrefixLines {
-    Lf,
-    Ecmascript,
-}
+use tsv_lang::{AcornPrefix, LocationMapper, LocationTracker, Position};
 
 /// The line/column origin of one **acorn parse**, for re-seeding an
 /// ECMAScript-rule tracker's answers onto it.
@@ -104,15 +90,16 @@ impl AcornSeed {
         acorn: LocationMapper<'_>,
         origin: u32,
         lex_start: u32,
-        prefix: PrefixLines,
+        prefix: AcornPrefix,
     ) -> Self {
         // acorn's `lineStart` at `origin` is the last LF at or before it, and its
         // `curLine` is that position's line under whichever rule the prefix left
         // standing — which is the same line as `origin`'s under both.
         let column_origin = lf.line_start_byte(origin as usize);
-        let first_line = match prefix {
-            PrefixLines::Lf => lf.get_line_column(origin as usize).0,
-            PrefixLines::Ecmascript => acorn.tracker.get_line_column(column_origin).0,
+        let first_line = if prefix.counts_ecmascript_lines() {
+            acorn.tracker.get_line_column(column_origin).0
+        } else {
+            lf.get_line_column(origin as usize).0
         };
         // Both hit the tracker's 1-entry line cache, the second for free.
         let acorn_line = acorn.tracker.get_line_column(lex_start as usize).0;

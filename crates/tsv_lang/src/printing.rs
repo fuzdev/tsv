@@ -3,6 +3,7 @@
 // This module provides common printing logic used across language printers
 // (TypeScript, CSS, Svelte) to eliminate code duplication.
 
+use crate::acorn_prefix::AcornPrefix;
 use crate::escapes::swap_quote_escaping;
 use crate::swar::{splat, zero_lanes};
 use crate::whitespace::is_js_whitespace;
@@ -806,44 +807,56 @@ fn next_line_terminator(bytes: &[u8], from: usize) -> Option<(usize, usize)> {
 /// non-empty `[ \t]` indentation can never match — so one boundary or two is the same answer,
 /// and [`line_terminator_len`]'s pairing is free to take it as one.
 ///
+/// ⚠️ **`source` is the document, but the indentation is the one acorn SAW** — and for four of
+/// Svelte's readers those are different strings. `onComment` measures the line out of whatever
+/// `parser.template` slice-and-splice its caller handed acorn, which may be a blanked prefix,
+/// a `(pattern = 1)` wrapper or a `_ as ` insert; `prefix` is that fact, and
+/// [`AcornPrefix::line_indentation`] is what reads it. Measuring the document instead strips
+/// the author's own tab off a `value` Svelte leaves whole. [`AcornPrefix::DOCUMENT`] is the
+/// identity, and is what every standalone parse passes.
+///
 /// The gate above this — a BLOCK comment whose content holds a `\n`, and only those
 /// ([`crate::Comment::content_is_multiline`]) — and the `[ \t]` indentation class are Svelte's
 /// too. All five spellings of both steps are pinned by
-/// `tests/comment_dedent_line_terminators.rs`, whose module doc says why a fixture cannot
-/// carry them.
+/// `tests/comment_dedent_line_terminators.rs`, and the five preparations by
+/// `tests/comment_dedent_manufactured_source.rs`; each module doc says why a fixture cannot
+/// carry what it holds.
 ///
 /// # Examples
 ///
 /// ```
-/// use tsv_lang::printing::strip_comment_indentation;
+/// use tsv_lang::{AcornPrefix, AcornPrefixText, printing::strip_comment_indentation};
 ///
-/// // The comment opens at byte 1, on a line indented by one tab, so one tab comes off the
+/// // The comment opens at byte 2, on a line indented by two tabs, so two tabs come off the
 /// // front of each of its lines.
-/// let source = "\t/* a\n\tb */";
-/// assert_eq!(strip_comment_indentation(source, " a\n\tb ", 1), " a\nb ");
+/// let source = "\t\t/* a\n\t\tb */";
+/// let doc = AcornPrefix::DOCUMENT;
+/// assert_eq!(strip_comment_indentation(source, " a\n\t\tb ", 2, doc), " a\nb ");
 ///
 /// // A `<LS>` inside the content opens a line just as a `\n` does.
 /// assert_eq!(
-///     strip_comment_indentation(source, " a\u{2028}\tb ", 1),
+///     strip_comment_indentation(source, " a\u{2028}\t\tb ", 2, doc),
 ///     " a\u{2028}b "
 /// );
+///
+/// // Under a blanked prefix acorn saw two SPACES where those tabs are, so the tabs are not
+/// // the indentation and the content rides out whole.
+/// let blanked = AcornPrefix::manufactured(AcornPrefixText::Blanked, 2);
+/// assert_eq!(strip_comment_indentation(source, " a\n\t\tb ", 2, blanked), " a\n\t\tb ");
 /// ```
-pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32) -> String {
-    let comment_start = comment_start as usize;
-    let bytes = source.as_bytes();
+pub fn strip_comment_indentation(
+    source: &str,
+    content: &str,
+    comment_start: u32,
+    prefix: AcornPrefix,
+) -> String {
+    // The line the comment opens on — `\n` and nothing else, per the walk-back above, and
+    // read out of what acorn SAW: a preparation that overwrites the author's newline opens
+    // the line further back than the document does ([`AcornPrefix::line_start`]).
+    let line_start = prefix.line_start(source, comment_start as usize);
 
-    // The line the comment opens on — `\n` and nothing else, per the walk-back above.
-    let mut line_start = comment_start;
-    while line_start > 0 && bytes[line_start - 1] != b'\n' {
-        line_start -= 1;
-    }
-
-    // The `[ \t]` run that opens that line.
-    let mut indentation_end = line_start;
-    while matches!(bytes.get(indentation_end), Some(b' ' | b'\t')) {
-        indentation_end += 1;
-    }
-    let indentation = &source[line_start..indentation_end];
+    // The `[ \t]` run that opens that line, as acorn saw it.
+    let indentation = prefix.line_indentation(source, line_start);
     if indentation.is_empty() {
         return content.to_string();
     }
@@ -854,7 +867,7 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
     let mut result = String::with_capacity(content.len());
     let mut pos = 0;
     loop {
-        let body_start = if content[pos..].starts_with(indentation) {
+        let body_start = if content[pos..].starts_with(&*indentation) {
             pos + indentation.len()
         } else {
             pos
@@ -1589,7 +1602,12 @@ mod tests {
         for (term, _) in TERMINATORS {
             let source = format!("x{term}\t\t/* a\n\t\tb */");
             let comment_start = (1 + term.len() + 2) as u32;
-            let stripped = strip_comment_indentation(&source, " a\n\t\tb ", comment_start);
+            let stripped = strip_comment_indentation(
+                &source,
+                " a\n\t\tb ",
+                comment_start,
+                AcornPrefix::DOCUMENT,
+            );
             if term == "\n" || term == "\r\n" {
                 // A line really does start after these two, and it opens with the `\t\t`.
                 assert_eq!(stripped, " a\nb ", "line start after {term:?}");
@@ -1607,7 +1625,12 @@ mod tests {
         // leaves the indent standing after a `<CR>` / `<LS>` / `<PS>`, under-dedenting.
         for (term, _) in TERMINATORS {
             assert_eq!(
-                strip_comment_indentation("\t/* x */", &format!(" a\n\tb{term}\tc "), 1),
+                strip_comment_indentation(
+                    "\t/* x */",
+                    &format!(" a\n\tb{term}\tc "),
+                    1,
+                    AcornPrefix::DOCUMENT
+                ),
                 format!(" a\nb{term}c "),
                 "indent stripped after {term:?}"
             );

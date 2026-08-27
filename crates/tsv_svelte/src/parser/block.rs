@@ -1380,7 +1380,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             self.record_acorn_region(
                 content_offset + head_start,
                 &content[head_start..=close_paren],
-                PrefixLines::Ecmascript,
+                // `replace(/\S/g, ' ')` blanks the non-whitespace ONLY: the author's tab
+                // reaches acorn intact, and the blanked columns after it EXTEND the run the
+                // dedent measures past anything the document has — and it leaves every
+                // ECMAScript terminator standing, which is the line class it derives.
+                AcornPrefixText::WhitespaceKept,
             );
             let program = tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena)?;
             self.expression_comments.extend_from_slice(program.comments);

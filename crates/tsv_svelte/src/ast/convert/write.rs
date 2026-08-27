@@ -164,7 +164,7 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     let acorn_seeds: Vec<AcornSeed> = if may_need_seeds {
         root.acorn_regions
             .iter()
-            .map(|r| AcornSeed::new(&tracker, acorn_loc, r.origin, r.lex_start, r.prefix))
+            .map(|r| AcornSeed::new(&tracker, acorn_loc, r.origin, r.lex_start, r.acorn_prefix()))
             .collect()
     } else {
         Vec::new()
@@ -190,11 +190,11 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
             tracker: &tracker,
             map: &map,
         },
+        acorn_prefixes: internal::AcornPrefixes::new(root.acorn_regions),
         acorn: acorn_seeds_needed.then(|| AcornLines {
             // acorn's own table when it exists; otherwise the LF one, which the
             // classes-agree probe has just certified is byte-identical to it.
             loc: acorn_loc,
-            regions: root.acorn_regions,
             seeds: &acorn_seeds,
         }),
         comments: &template_comments,
@@ -209,13 +209,13 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     w.into_bytes()
 }
 
-/// The line table an acorn-owned position answers through, and the parses that
-/// must be re-based onto it — the whole re-seeding route, present only when some
+/// The line table an acorn-owned position answers through, and the per-parse seeds
+/// that re-base its answers — the whole re-seeding route, present only when some
 /// seed can actually be non-identity (`acorn_seeds_needed`).
 ///
 /// The two travel together because splitting them admits a state that silently
-/// emits wrong positions: regions without a table to answer through would re-base
-/// nothing, and a table without regions would hand every island an unseeded count.
+/// emits wrong positions: seeds without a table to answer through would re-base
+/// nothing, and a table without seeds would hand every island an unseeded count.
 /// Neither fails loudly — both just move `loc`s.
 ///
 /// ⚠️ `loc` is **not** always acorn's own table. When the two line classes agree it
@@ -229,16 +229,14 @@ struct AcornLines<'a> {
     /// The document's byte→UTF-16 map under **acorn's** line table (the
     /// ECMAScript class).
     loc: LocationMapper<'a>,
-    /// Every embedded acorn parse in this component, ascending. Each island's
-    /// `loc` is acorn's, seeded once at the start of the parse Svelte prepared
-    /// for it, so `loc`'s answer has to be re-based onto that parse:
-    /// `Ctx::acorn_seed`.
-    regions: &'a [internal::AcornRegion],
-    /// One seed per region, in the same order — computed once per document, not
-    /// once per island lookup. Parallel to `regions` rather than a field on it
-    /// because a region is a *parse fact* the parser records, where a seed is an
-    /// answer only the writer's line tables can produce, and only for the variant
-    /// that emits `loc` at all.
+    /// One seed per `Ctx::acorn_prefixes` region, in the same order — computed once
+    /// per document, not once per island lookup. Parallel to the regions rather than
+    /// a field on them because a region is a *parse fact* the parser records, where a
+    /// seed is an answer only the writer's line tables can produce, and only for the
+    /// variant that emits `loc` at all. The regions themselves live on `Ctx`, because
+    /// the OTHER thing they answer — what acorn saw ahead of each parse, which a
+    /// comment's `value` is dedented by — is asked on every emission, `no-locations`
+    /// included.
     seeds: &'a [AcornSeed],
 }
 
@@ -261,6 +259,17 @@ struct Ctx<'a> {
     /// document. Always `None` on the `no-locations` path, which emits nothing a
     /// seed could re-base. See [`AcornLines`].
     acorn: Option<AcornLines<'a>>,
+    /// Every embedded acorn parse in this component (the parse-fact ledger
+    /// `Root::acorn_regions` carries), resolved per position to the source Svelte handed
+    /// it. Distinct from `acorn` above, which is built only when a SEED can be
+    /// non-identity: the comment dedent asks a different question of the same regions
+    /// (which source acorn was handed, not which line it started counting from), and it
+    /// has to be answered on every emission — the `no-locations` variant included, which
+    /// is the one thing here no fixture reaches, since every fixture wire is the
+    /// `loc`-bearing variant; `tests/no_locations.rs`'s
+    /// `svelte_manufactured_multiline_comment_dedent` is its pin. `Ctx::acorn_seed`
+    /// indexes its seeds parallel to this ledger's regions.
+    acorn_prefixes: internal::AcornPrefixes<'a>,
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
@@ -337,7 +346,7 @@ impl<'a> Ctx<'a> {
     /// The *third* `read_identifier` position — a simple `{#each … as id}`
     /// binding — does not come through here, because its island can also carry a
     /// trailing `: T` that IS acorn's. It rides `embed_pattern` instead, under a
-    /// `PrefixLines::Lf` seed anchored at the identifier's own start, which
+    /// LF-class seed anchored at the identifier's own start, which
     /// reproduces `locate-character` exactly: an identifier holds no line
     /// terminator, so every position in it sits on the seed's first line, where
     /// the seed's line is the LF-rule one and its column origin is the LF line
@@ -377,7 +386,7 @@ impl<'a> Ctx<'a> {
     /// at and this looks it up by.
     ///
     /// A simple identifier binding is Svelte's `read_identifier`, not an acorn
-    /// parse at all — see `embed_locator` for why its `PrefixLines::Lf` seed is
+    /// parse at all — see `embed_locator` for why its LF-class seed is
     /// nonetheless the `locate-character` answer.
     #[inline]
     fn embed_pattern(
@@ -395,9 +404,10 @@ impl<'a> Ctx<'a> {
         env
     }
 
-    /// The line/column seed of the acorn parse `pos` belongs to — the last region
-    /// starting at or before it. Where regions nest (a block pattern and its `: T`)
-    /// that is the inner parse, which is the one that lexed the position.
+    /// The line/column seed of the acorn parse `pos` belongs to — resolved by the
+    /// shared position→parse rule (`internal::AcornPrefixes::index_at`, the same one
+    /// the comment dedent reads), so the seed and the dedent cannot resolve one
+    /// position to two parses.
     ///
     /// `AcornSeed::NONE` when there is no [`AcornLines`] at all (every seed in this
     /// document is the identity, so there is nothing to re-base), and for a position
@@ -406,11 +416,8 @@ impl<'a> Ctx<'a> {
         let Some(acorn) = self.acorn else {
             return AcornSeed::NONE;
         };
-        let Some(i) = acorn
-            .regions
-            .partition_point(|r| r.lex_start <= pos)
-            .checked_sub(1)
-        else {
+        let regions = self.acorn_prefixes.regions;
+        let Some(i) = self.acorn_prefixes.index_at(pos) else {
             return AcornSeed::NONE;
         };
         // The resolved parse must actually contain `pos`. Without this the lookup's
@@ -419,19 +426,19 @@ impl<'a> Ctx<'a> {
         // only its lines move. Inclusive at the bound: an empty `<script>` records
         // a zero-length region whose `Program` starts exactly at `end`.
         debug_assert!(
-            pos <= acorn.regions[i].end,
+            pos <= regions[i].end,
             "position {pos} resolved to the acorn parse over [{}, {}], which does not \
              contain it — the caller passed a position ahead of its own island (see \
              `Ctx::embed`), so this island would silently take the previous parse's seed",
-            acorn.regions[i].lex_start,
-            acorn.regions[i].end
+            regions[i].lex_start,
+            regions[i].end
         );
         acorn.seeds[i]
     }
 
     /// The shared inputs for a template island's comment attach
     /// (`ast/convert/comment_attachment.rs`'s `attach_*`) — this document's
-    /// template comments and source.
+    /// template comments, source, and per-comment dedent resolver.
     ///
     /// It carries no parser variant and no tracker: the attach runs online off
     /// the one emission, so there is no second pass to configure and no way for
@@ -441,6 +448,7 @@ impl<'a> Ctx<'a> {
         AttachInputs {
             template_comments: self.comments,
             source: self.source,
+            acorn_prefixes: self.acorn_prefixes,
         }
     }
 
@@ -594,6 +602,11 @@ fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
 fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
     let start_char = ctx.loc.pos(comment.span.start);
     let end_char = ctx.loc.pos(comment.span.end);
+    // The dedent basis, per comment — this array is emitted outside the tree walk that
+    // would otherwise carry it. Asked unconditionally: a comment Svelte's own template
+    // reader collected takes no dedent at all, and `Comment::wire_value` is the ONE place
+    // that says so; restating its gate here would put the rule in two crates.
+    let prefix = ctx.acorn_prefixes.at(comment.span.start);
     w.raw("{\"type\":\"");
     w.raw(if comment.is_block { "Block" } else { "Line" });
     if comment.emit_character_field {
@@ -602,10 +615,10 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
         w.raw(",\"end\":");
         w.u32(end_char);
         w.raw(",\"value\":");
-        w.string(&comment.wire_value(ctx.source));
+        w.string(&comment.wire_value(ctx.source, prefix));
     } else {
         w.raw("\",\"value\":");
-        w.string(&comment.wire_value(ctx.source));
+        w.string(&comment.wire_value(ctx.source, prefix));
         w.raw(",\"start\":");
         w.u32(start_char);
         w.raw(",\"end\":");
@@ -1793,7 +1806,11 @@ fn write_script(
     let attach = if script.content.comments.is_empty() && html_leading_comment.is_none() {
         None
     } else {
-        Some(attach_script(script, ctx.source, html_leading_comment))
+        Some(attach_script(
+            script,
+            ctx.attach_inputs(),
+            html_leading_comment,
+        ))
     };
     let mode = attach
         .as_ref()

@@ -680,6 +680,37 @@ sub-parse was handed, and the lookup asserts the resolved parse contains the pos
 one failure mode here is otherwise silent, since a position resolved to the previous parse
 still emits a well-formed wire with only its lines moved.
 
+**The same table answers a second question — the comment `value`.** acorn's `onComment`
+dedents a multi-line block comment by the `[ \t]` run opening the comment's line *in the
+string acorn was handed*, so the four manufactured rows above strip something the document
+does not contain. `tsv_lang::AcornPrefix` models them (`Comment::wire_value`), resolved from
+the same `Root::acorn_regions` by the same "last region starting at or before" rule — per
+COMMENT rather than per island, since a block binding spans two of the rows
+(`AcornPrefixes::at`, which both the root `comments` array and the attached
+`leadingComments`/`trailingComments` copies read, so the two lists cannot disagree about one
+comment).
+
+The two questions are answered off **one** field, `AcornRegion::prefix` (an
+`AcornPrefixText`), because they are one fact seen from two sides: a prefix blanked with
+`/[^\n]/g` both erases the non-`\n` terminators (the line class,
+`AcornPrefix::counts_ecmascript_lines` — what an `AcornSeed` is computed from) and turns the
+author's indentation into spaces (the dedent's run, `AcornPrefix::line_indentation`). The
+dedent's answer is the finer of the two — it alone tells `read_pattern` apart from its
+siblings, which deletes one blank from its prefix so its synthetic `(` does not shift the
+pattern's columns — so it is what the region stores and the line class is derived from it.
+Carrying both would let a record site pass a pair that disagrees, and nothing could catch
+that; the line class is also inert on a pure-LF document, so the disagreement would surface
+nowhere. The two synthetic tokens differ in kind, and the difference is load-bearing for the
+dedent alone: `read_pattern`'s `(` is **spliced** between prefix and region, where
+`read_type_annotation`'s `_ as ` **overwrites** the five bytes it covers — it can swallow an
+author's `\n` (the line then opens further back than the document's does), and a line opening
+on the insert itself has no document indentation to read. The blanking is `String.replace`,
+which lays one space per UTF-16 code unit, so any non-ASCII ahead of the comment on its line
+makes a byte count too long. Pinned by `tests/comment_dedent_manufactured_source.rs` and the
+frozen fixture `tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent`; the
+line-terminator classes the dedent's two steps read are the sibling question, pinned by
+`tests/comment_dedent_line_terminators.rs`.
+
 ### Source-Based Printing
 
 All printers accept `source: &str` to preserve escape sequences:

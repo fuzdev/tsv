@@ -183,7 +183,8 @@ fn an_in_tag_comment_stays_on_locate_characters_lines() {
 /// `parser.template` itself, so the prefix counts as ECMAScript exactly as a `{expr}` island's
 /// does. Its own path through tsv is a different one (`parse_ts_statement`), which is what
 /// this covers that `a_template_expression_counts_the_prefix_under_the_ecmascript_class` does
-/// not: recording this reader as `PrefixLines::Lf` puts the lone-`\r` case a line early.
+/// not: recording this reader under a BLANKED prefix (an LF-class one) puts the lone-`\r`
+/// case a line early.
 ///
 /// Not to be confused with `{@const}`, a different tag on different readers — its `id` is
 /// `read_pattern` (LF) and its `init` is `read_expression` (ECMAScript), so one declarator

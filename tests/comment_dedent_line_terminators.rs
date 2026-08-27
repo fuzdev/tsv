@@ -33,7 +33,9 @@
 //! silently if `onComment` changed.
 //!
 //! `tests/acorn_loc_line_terminators.rs` is the same arrangement for the *other* thing these
-//! terminators decide — which line count a wire `loc` carries.
+//! terminators decide — which line count a wire `loc` carries — and
+//! `tests/comment_dedent_manufactured_source.rs` for the other thing the dedent itself reads
+//! two ways: *which source* the indentation is measured out of.
 
 /// The one comment's dedented wire `value` — the field `onComment` writes.
 fn comment_value(src: &str) -> String {

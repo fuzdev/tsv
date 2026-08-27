@@ -1,0 +1,1292 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1518,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 1130,
+				"data": "\n\tSvelte hands acorn a MANUFACTURED source at four of the parses below, and acorn's\n\t`onComment` dedents a multiline block comment by the indentation of the line THAT source\n\topens with, which is not the document's. Every case here opens its comment on the line the\n\tmanufacture covers, so the indentation acorn measured is the manufacture's own and the tab\n\tthe author wrote survives into the wire `value`. The four are one rule read at one place\n\teach: a block binding's `: T` reads `<spaces>_ as T`, a destructuring binding reads\n\t`<spaces>(pattern = 1)`, and a `{#snippet}` head reads a prelude that blanks only the\n\tNON-whitespace.\n\t`{@const b = ...}` and `{expr ...}` are the null controls: acorn reads those out of the raw\n\ttemplate, so the line it measured IS the document's and the tab comes off.\n\tThe `prettier-ignore` is what keeps the triggers alive. Both formatters reflow every one of\n\tthese heads onto a line the manufacture no longer reaches, so an unfrozen spelling of this\n\tfile turns each case into the control rather than failing here. The `lang=\"ts\"` is for the\n\t`{#each xs as x: T}` annotation alone.\n"
+			},
+			{
+				"type": "Text",
+				"start": 1130,
+				"end": 1131,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 1218,
+				"end": 1220,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1220,
+				"end": 1244,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Text",
+				"start": 1244,
+				"end": 1245,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1245,
+				"end": 1517,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 24,
+						"column": 1,
+						"character": 1246
+					},
+					"end": {
+						"line": 24,
+						"column": 4,
+						"character": 1249
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1250,
+							"end": 1252,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "EachBlock",
+							"start": 1252,
+							"end": 1296,
+							"expression": {
+								"type": "Identifier",
+								"start": 1259,
+								"end": 1261,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 8
+									},
+									"end": {
+										"line": 25,
+										"column": 10
+									}
+								},
+								"name": "xs"
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 1286,
+										"end": 1289,
+										"expression": {
+											"type": "Identifier",
+											"start": 1287,
+											"end": 1288,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 16
+												},
+												"end": {
+													"line": 26,
+													"column": 17
+												}
+											},
+											"name": "x"
+										}
+									}
+								]
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "x",
+								"start": 1265,
+								"end": 1266,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 14,
+										"character": 1265
+									},
+									"end": {
+										"line": 25,
+										"column": 15,
+										"character": 1266
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1266,
+									"end": 1285,
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 1279,
+										"end": 1285,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 8
+											},
+											"end": {
+												"line": 26,
+												"column": 14
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": "\n\t c1 ",
+												"start": 1268,
+												"end": 1278
+											}
+										]
+									}
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1296,
+							"end": 1298,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 1298,
+							"end": 1397,
+							"test": {
+								"type": "Identifier",
+								"start": 1303,
+								"end": 1307,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 6
+									},
+									"end": {
+										"line": 27,
+										"column": 10
+									}
+								},
+								"name": "expr"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1308,
+										"end": 1311,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "ConstTag",
+										"start": 1311,
+										"end": 1352,
+										"declaration": {
+											"type": "VariableDeclaration",
+											"kind": "const",
+											"declarations": [
+												{
+													"type": "VariableDeclarator",
+													"id": {
+														"type": "ObjectPattern",
+														"start": 1319,
+														"end": 1340,
+														"loc": {
+															"start": {
+																"line": 28,
+																"column": 11
+															},
+															"end": {
+																"line": 29,
+																"column": 12
+															}
+														},
+														"properties": [
+															{
+																"type": "Property",
+																"start": 1321,
+																"end": 1338,
+																"loc": {
+																	"start": {
+																		"line": 28,
+																		"column": 13
+																	},
+																	"end": {
+																		"line": 29,
+																		"column": 10
+																	}
+																},
+																"method": false,
+																"shorthand": true,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 1321,
+																	"end": 1322,
+																	"loc": {
+																		"start": {
+																			"line": 28,
+																			"column": 13
+																		},
+																		"end": {
+																			"line": 28,
+																			"column": 14
+																		}
+																	},
+																	"name": "a"
+																},
+																"value": {
+																	"type": "AssignmentPattern",
+																	"start": 1321,
+																	"end": 1338,
+																	"loc": {
+																		"start": {
+																			"line": 28,
+																			"column": 13
+																		},
+																		"end": {
+																			"line": 29,
+																			"column": 10
+																		}
+																	},
+																	"left": {
+																		"type": "Identifier",
+																		"start": 1321,
+																		"end": 1322,
+																		"loc": {
+																			"start": {
+																				"line": 28,
+																				"column": 13
+																			},
+																			"end": {
+																				"line": 28,
+																				"column": 14
+																			}
+																		},
+																		"name": "a"
+																	},
+																	"right": {
+																		"type": "Literal",
+																		"start": 1337,
+																		"end": 1338,
+																		"loc": {
+																			"start": {
+																				"line": 29,
+																				"column": 9
+																			},
+																			"end": {
+																				"line": 29,
+																				"column": 10
+																			}
+																		},
+																		"value": 1,
+																		"raw": "1",
+																		"leadingComments": [
+																			{
+																				"type": "Block",
+																				"value": "\n\t\t c2 ",
+																				"start": 1325,
+																				"end": 1336
+																			}
+																		]
+																	}
+																},
+																"kind": "init"
+															}
+														]
+													},
+													"init": {
+														"type": "ObjectExpression",
+														"start": 1343,
+														"end": 1351,
+														"loc": {
+															"start": {
+																"line": 29,
+																"column": 15
+															},
+															"end": {
+																"line": 29,
+																"column": 23
+															}
+														},
+														"properties": [
+															{
+																"type": "Property",
+																"start": 1345,
+																"end": 1349,
+																"loc": {
+																	"start": {
+																		"line": 29,
+																		"column": 17
+																	},
+																	"end": {
+																		"line": 29,
+																		"column": 21
+																	}
+																},
+																"method": false,
+																"shorthand": false,
+																"computed": false,
+																"key": {
+																	"type": "Identifier",
+																	"start": 1345,
+																	"end": 1346,
+																	"loc": {
+																		"start": {
+																			"line": 29,
+																			"column": 17
+																		},
+																		"end": {
+																			"line": 29,
+																			"column": 18
+																		}
+																	},
+																	"name": "a"
+																},
+																"value": {
+																	"type": "Literal",
+																	"start": 1348,
+																	"end": 1349,
+																	"loc": {
+																		"start": {
+																			"line": 29,
+																			"column": 20
+																		},
+																		"end": {
+																			"line": 29,
+																			"column": 21
+																		}
+																	},
+																	"value": 1,
+																	"raw": "1"
+																},
+																"kind": "init"
+															}
+														]
+													},
+													"start": 1319,
+													"end": 1351
+												}
+											],
+											"start": 1313,
+											"end": 1351
+										}
+									},
+									{
+										"type": "Text",
+										"start": 1352,
+										"end": 1355,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "ConstTag",
+										"start": 1355,
+										"end": 1381,
+										"declaration": {
+											"type": "VariableDeclaration",
+											"kind": "const",
+											"declarations": [
+												{
+													"type": "VariableDeclarator",
+													"id": {
+														"type": "Identifier",
+														"name": "b",
+														"start": 1363,
+														"end": 1364,
+														"loc": {
+															"start": {
+																"line": 30,
+																"column": 10,
+																"character": 1363
+															},
+															"end": {
+																"line": 30,
+																"column": 11,
+																"character": 1364
+															}
+														}
+													},
+													"init": {
+														"type": "Literal",
+														"start": 1379,
+														"end": 1380,
+														"loc": {
+															"start": {
+																"line": 31,
+																"column": 9
+															},
+															"end": {
+																"line": 31,
+																"column": 10
+															}
+														},
+														"value": 1,
+														"raw": "1",
+														"leadingComments": [
+															{
+																"type": "Block",
+																"value": "\n c3 ",
+																"start": 1367,
+																"end": 1378
+															}
+														]
+													},
+													"start": 1363,
+													"end": 1380
+												}
+											],
+											"start": 1357,
+											"end": 1380
+										}
+									},
+									{
+										"type": "Text",
+										"start": 1381,
+										"end": 1384,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 1384,
+										"end": 1387,
+										"expression": {
+											"type": "Identifier",
+											"start": 1385,
+											"end": 1386,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 3
+												},
+												"end": {
+													"line": 32,
+													"column": 4
+												}
+											},
+											"name": "a"
+										}
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 1387,
+										"end": 1390,
+										"expression": {
+											"type": "Identifier",
+											"start": 1388,
+											"end": 1389,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 6
+												},
+												"end": {
+													"line": 32,
+													"column": 7
+												}
+											},
+											"name": "b"
+										}
+									},
+									{
+										"type": "Text",
+										"start": 1390,
+										"end": 1392,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							},
+							"alternate": null
+						},
+						{
+							"type": "Text",
+							"start": 1397,
+							"end": 1399,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 1399,
+							"end": 1446,
+							"expression": {
+								"type": "Identifier",
+								"start": 1407,
+								"end": 1408,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 9
+									},
+									"end": {
+										"line": 34,
+										"column": 10
+									}
+								},
+								"name": "p"
+							},
+							"value": {
+								"type": "ObjectPattern",
+								"start": 1414,
+								"end": 1434,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 17
+									},
+									"end": {
+										"line": 35,
+										"column": 11
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1416,
+										"end": 1432,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 19
+											},
+											"end": {
+												"line": 35,
+												"column": 9
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1416,
+											"end": 1417,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 19
+												},
+												"end": {
+													"line": 34,
+													"column": 20
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "AssignmentPattern",
+											"start": 1416,
+											"end": 1432,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 19
+												},
+												"end": {
+													"line": 35,
+													"column": 9
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 1416,
+												"end": 1417,
+												"loc": {
+													"start": {
+														"line": 34,
+														"column": 19
+													},
+													"end": {
+														"line": 34,
+														"column": 20
+													}
+												},
+												"name": "c"
+											},
+											"right": {
+												"type": "Literal",
+												"start": 1431,
+												"end": 1432,
+												"loc": {
+													"start": {
+														"line": 35,
+														"column": 8
+													},
+													"end": {
+														"line": 35,
+														"column": 9
+													}
+												},
+												"value": 1,
+												"raw": "1",
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": "\n\t c4 ",
+														"start": 1420,
+														"end": 1430
+													}
+												]
+											}
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"error": null,
+							"pending": null,
+							"then": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 1435,
+										"end": 1438,
+										"expression": {
+											"type": "Identifier",
+											"start": 1436,
+											"end": 1437,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 13
+												},
+												"end": {
+													"line": 35,
+													"column": 14
+												}
+											},
+											"name": "c"
+										}
+									}
+								]
+							},
+							"catch": null
+						},
+						{
+							"type": "Text",
+							"start": 1446,
+							"end": 1448,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 1448,
+							"end": 1491,
+							"expression": {
+								"type": "Identifier",
+								"name": "s",
+								"start": 1458,
+								"end": 1459,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 11,
+										"character": 1458
+									},
+									"end": {
+										"line": 36,
+										"column": 12,
+										"character": 1459
+									}
+								}
+							},
+							"parameters": [
+								{
+									"type": "AssignmentPattern",
+									"start": 1460,
+									"end": 1476,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 13
+										},
+										"end": {
+											"line": 37,
+											"column": 9
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 1460,
+										"end": 1461,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 13
+											},
+											"end": {
+												"line": 36,
+												"column": 14
+											}
+										},
+										"name": "d"
+									},
+									"right": {
+										"type": "Literal",
+										"start": 1475,
+										"end": 1476,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 8
+											},
+											"end": {
+												"line": 37,
+												"column": 9
+											}
+										},
+										"value": 1,
+										"raw": "1",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": "\n\t c5 ",
+												"start": 1464,
+												"end": 1474
+											}
+										]
+									}
+								}
+							],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 1478,
+										"end": 1481,
+										"expression": {
+											"type": "Identifier",
+											"start": 1479,
+											"end": 1480,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 12
+												},
+												"end": {
+													"line": 37,
+													"column": 13
+												}
+											},
+											"name": "d"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1491,
+							"end": 1493,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1493,
+							"end": 1510,
+							"expression": {
+								"type": "Identifier",
+								"start": 1494,
+								"end": 1498,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 6
+									}
+								},
+								"name": "expr",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": "\n c6 ",
+										"start": 1499,
+										"end": 1509
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1510,
+							"end": 1511,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": "\n\t c1 ",
+			"start": 1268,
+			"end": 1278,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 17
+				},
+				"end": {
+					"line": 26,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n\t\t c2 ",
+			"start": 1325,
+			"end": 1336,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 17
+				},
+				"end": {
+					"line": 29,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n c3 ",
+			"start": 1367,
+			"end": 1378,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 14
+				},
+				"end": {
+					"line": 31,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n\t c4 ",
+			"start": 1420,
+			"end": 1430,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 23
+				},
+				"end": {
+					"line": 35,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n\t c5 ",
+			"start": 1464,
+			"end": 1474,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 17
+				},
+				"end": {
+					"line": 37,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n c6 ",
+			"start": 1499,
+			"end": 1509,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 7
+				},
+				"end": {
+					"line": 39,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 1131,
+		"end": 1218,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 1149,
+			"end": 1209,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 1151,
+					"end": 1164,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1155,
+							"end": 1163,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 5
+								},
+								"end": {
+									"line": 18,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1155,
+								"end": 1159,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 5
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"name": "expr"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1162,
+								"end": 1163,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 12
+									},
+									"end": {
+										"line": 18,
+										"column": 13
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1166,
+					"end": 1179,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1170,
+							"end": 1178,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 5
+								},
+								"end": {
+									"line": 19,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1170,
+								"end": 1172,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 5
+									},
+									"end": {
+										"line": 19,
+										"column": 7
+									}
+								},
+								"name": "xs"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 1175,
+								"end": 1178,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 10
+									},
+									"end": {
+										"line": 19,
+										"column": 13
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 1176,
+										"end": 1177,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 11
+											},
+											"end": {
+												"line": 19,
+												"column": 12
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								]
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1181,
+					"end": 1208,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 28
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1185,
+							"end": 1207,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 5
+								},
+								"end": {
+									"line": 20,
+									"column": 27
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1185,
+								"end": 1186,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 5
+									},
+									"end": {
+										"line": 20,
+										"column": 6
+									}
+								},
+								"name": "p"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1189,
+								"end": 1207,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 9
+									},
+									"end": {
+										"line": 20,
+										"column": 27
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1189,
+									"end": 1204,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 9
+										},
+										"end": {
+											"line": 20,
+											"column": 24
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 1189,
+										"end": 1196,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 9
+											},
+											"end": {
+												"line": 20,
+												"column": 16
+											}
+										},
+										"name": "Promise"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1197,
+										"end": 1204,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 17
+											},
+											"end": {
+												"line": 20,
+												"column": 24
+											}
+										},
+										"name": "resolve"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 1205,
+										"end": 1206,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 25
+											},
+											"end": {
+												"line": 20,
+												"column": 26
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": "\n\tSvelte hands acorn a MANUFACTURED source at four of the parses below, and acorn's\n\t`onComment` dedents a multiline block comment by the indentation of the line THAT source\n\topens with, which is not the document's. Every case here opens its comment on the line the\n\tmanufacture covers, so the indentation acorn measured is the manufacture's own and the tab\n\tthe author wrote survives into the wire `value`. The four are one rule read at one place\n\teach: a block binding's `: T` reads `<spaces>_ as T`, a destructuring binding reads\n\t`<spaces>(pattern = 1)`, and a `{#snippet}` head reads a prelude that blanks only the\n\tNON-whitespace.\n\t`{@const b = ...}` and `{expr ...}` are the null controls: acorn reads those out of the raw\n\ttemplate, so the line it measured IS the document's and the tab comes off.\n\tThe `prettier-ignore` is what keeps the triggers alive. Both formatters reflow every one of\n\tthese heads onto a line the manufacture no longer reaches, so an unfrozen spelling of this\n\tfile turns each case into the control rather than failing here. The `lang=\"ts\"` is for the\n\t`{#each xs as x: T}` annotation alone.\n"
+				}
+			]
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 1139,
+				"end": 1148,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 8,
+						"character": 1139
+					},
+					"end": {
+						"line": 17,
+						"column": 12,
+						"character": 1143
+					}
+				},
+				"value": [
+					{
+						"start": 1145,
+						"end": 1147,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -280,7 +280,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		// bug, with no duplicate, still surfaces as undocumented).
 		name: 'comment_dedup',
 		conformance_section: 'Comment Attachment Differences',
-		matches: (entry, _canonical_parent, ctx) => {
+		matches: (entry, canonical_parent, ctx) => {
 			if (
 				entry.kind === 'length_mismatch' &&
 				/(^|\.)(comments|leadingComments|trailingComments)$/.test(entry.path) &&
@@ -292,6 +292,24 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 				const root = ctx.canonical_root as { comments?: { start?: number }[] } | null;
 				const starts = root?.comments?.map((c) => c?.start);
 				return Array.isArray(starts) && new Set(starts).size !== starts.length;
+			}
+			// (3) An ATTACHED copy whose `value` disagrees with its own twin. The throwaway
+			// parse is entered over a DIFFERENT synthetic source than the surviving one, and
+			// the comment `value` acorn writes is dedented by the indentation of the comment's
+			// line IN that source — so the two copies of one multi-line block comment can carry
+			// two different values, and index [0] is the discarded parse's. Gated hard on the
+			// twin actually existing and on OUR value being one of the twins', so a genuine
+			// dedent bug — a value neither copy holds — stays undocumented.
+			const attached = /^(.*(?:leadingComments|trailingComments))\[\d+\]\.value$/.exec(entry.path);
+			if (entry.kind === 'value_mismatch' && attached) {
+				const arr = get_at_path(ctx.canonical_root, attached[1]) as
+					{ start?: number; end?: number; value?: unknown }[] | null;
+				const copy = canonical_parent as { start?: number; end?: number } | null;
+				if (!Array.isArray(arr) || copy == null || typeof copy.start !== 'number') {
+					return false;
+				}
+				const twins = arr.filter((c) => c?.start === copy.start && c?.end === copy.end);
+				return twins.length > 1 && twins.some((c) => c?.value === entry.ours);
 			}
 			return false;
 		}
