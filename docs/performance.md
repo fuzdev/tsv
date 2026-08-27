@@ -10,7 +10,7 @@ Profiling methodology and tracking for the TypeScript/Svelte/CSS formatter.
 source → Parse → AST → Format → formatted string
          lexer    │      per-statement:
          parser   │        build_statement_doc() → DocId (arena-allocated)
-                  │        write_arena_doc() → arena_print_doc_with_indent_resolved()
+                  │        write_arena_doc() → arena_print_doc_with_indent_resolved_into()
                   │          └── arena_fits() (line-breaking decisions)
                   │
               tsv_ts::parse()                      tsv_ts::format()
@@ -23,7 +23,7 @@ Doc building and rendering are **interleaved** per-statement inside `format()` �
 - Parse — `tsv_ts` — `parser::parse_typescript()`
 - Format (orchestration) — `tsv_ts` — `printer::Printer::print_program()`
 - Doc building — `tsv_ts` — `printer::Printer::build_statement_doc()` → `DocId`
-- Doc rendering — `tsv_lang` — `doc::arena_render::arena_print_doc_with_indent_resolved()`
+- Doc rendering — `tsv_lang` — `doc::arena_render::arena_print_doc_with_indent_resolved_into()`
 - Line-break decisions — `tsv_lang` — `doc::arena_fits::arena_fits()`
 
 ## Measurement corpora
@@ -83,7 +83,8 @@ Measures parse vs format timing across files. Pure Rust, no external dependencie
 The `--bind` form instead measures parse vs lower+bind timing through the
 `tsv_check` crate (the experimental typechecker, which may never ship — see
 [typechecker.md](typechecker.md); TypeScript files only) and reports peak RSS
-(`VmHWM` from `/proc/self/status`) — the binder's standing perf-anchor form.
+(`VmHWM` from `/proc/self/status`) — the binder's standing perf-anchor form;
+add `--flow-stats` for its deterministic flow-construction counters.
 
 ```bash
 # Profile a directory
@@ -235,12 +236,12 @@ nothing is the tell; `nm` is the confirmation:
 nm -C target/release/tsv_debug | grep node_header_impl   # empty ⇒ fully inlined
 ```
 
-This matters because it changes what a fix can even look like. A leaf that topped
-the wire-writer board at ~16% had **no out-of-line copy in either the release or
-the profiling build**; the lead recorded against it ("take that function apart")
-was unbuildable as stated. Source-line attribution said what the cost actually
-was — `Vec` append bookkeeping, because the node header issues ~16 separate
-appends per AST node, each with its own capacity check:
+This changes what a fix can even look like: an inline-attributed leaf's cost is
+one source site's work scattered across its callers — a "take that function
+apart" lead is unbuildable as stated. Source-line attribution says what the cost
+actually is (the worked case — the wire writer's per-node header, whose 16%
+share turned out to be `Vec` append bookkeeping — continues in
+§An `inline(never)` leaf's real cost below):
 
 ```bash
 perf report --stdio --no-children -q -s srcline -g none   # flat, by source line
@@ -311,10 +312,9 @@ sudo sysctl kernel.perf_event_paranoid=2  # persist via a drop-in in /etc/sysctl
 When `perf` shows time inside malloc/free internals, it can't say _which_
 allocation sites are responsible — glibc's allocator is diffuse from the CPU
 side. `heaptrack` attributes every allocation to its call site, answering
-"swap the allocator" vs "fix the hot sites" — and it sized, then confirmed, the
-AST bump-arena win (per-node `Box`/`Vec` allocations collapse into the arena; see
-[architecture.md §Nested AST](./architecture.md#nested-ast-bump-arena-not-flatindexed)
-for the AST-allocation design).
+"swap the allocator" vs "fix the hot sites" (the AST-allocation design it
+validated:
+[architecture.md §Nested AST](./architecture.md#nested-ast-bump-arena-not-flatindexed)).
 
 ```bash
 # Record (build with the profiling profile for symbols)
@@ -442,9 +442,11 @@ deno run --allow-read --allow-env --allow-net --allow-sys \
   benches/js/diagnostics/wasm_format_probe.ts
 ```
 
-The memory-axis sibling, `benches/js/diagnostics/wasm_memory_probe.ts`,
-measures WASM peak/high-water memory demand per file (documented in
-`benches/js/CLAUDE.md`).
+Two siblings cover the other WASM axes: `wasm_memory_probe.ts` measures
+peak/high-water linear-memory demand per file (the axis the wall probe can't
+see), and `wasm_json_probe.ts` attributes the WASM-vs-native JSON *parse*
+penalty (parse vs materialization vs the JS-side `JSON.parse`). Both are
+documented in `benches/js/CLAUDE.md`.
 
 ### 7. `tsv_debug arena_stats` — doc-arena node population
 
@@ -899,3 +901,12 @@ Wall-clock readings vary several-fold with machine state (CPU frequency scaling
 and concurrent load) — trust only quiet-machine runs, and prefer per-byte rates
 and relative profile shares as the portable metrics. Because the corpus changes
 over time, compare per-byte rates rather than wall totals across runs.
+
+Two failure modes that pass a CPU-idle check: a run started within minutes of a
+long all-core compile can read 20–30% slow on a laptop even with the governor at
+`performance` and nothing else running (package heat clamps sustained boost, and
+recovery is minutes, not seconds); and two sessions' "quiet machines" are not
+the same machine (recorded anchors have disagreed ~5% with a same-binary rerun).
+So a cross-session anchor comparison is a *hypothesis generator only* — any
+regression or win claim needs an interleaved same-session A/B of two binaries,
+which cancels both effects.

@@ -199,6 +199,11 @@ the two crates.
 Shared:
 
 - `find_first_comment_from()` — Binary-search index of first comment with `span.start >= pos`
+- Every *range* lookup short-circuits a range too narrow to hold a whole comment
+  (`Comment::MIN_SPAN_LEN`, guarded at the three parsers' construction sites) without
+  probing the array at all — the printers ask about token-sized gaps by the hundred
+  thousand, and the chain grouping's member gap is the `.` alone in the overwhelming
+  majority of its asks
 - `classify_comment()` — Classify as Trailing, LeadingOwnLine, or LeadingInline
 - `classify_comment_fast()` — Same but using precomputed line breaks (faster)
 - `ClassifiedComments::from_range()` — Batch classify all 4 categories in one pass (emit-keyed)
