@@ -978,9 +978,15 @@ payload by `&'arena` reference:
   Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
   next-widest variant is `CallExpression` at 64 B and it is 14–21% of expressions,
   which is where the ladder stops.
-- `Statement` is **200 B**, not 544 — `ForStatement`, `ForOfStatement`,
-  `ForInStatement` and `TryStatement` hold their heads as references. A classic
-  `for (;;)` is 0.05–0.22% of statements.
+- `Statement` is **104 B**, not 544 — its eight widest declaration heads
+  (`TSTypeAliasDeclaration`, `ExportDefaultDeclaration`, `ClassDeclaration`,
+  `FunctionDeclaration`, `TSInterfaceDeclaration`, `TSDeclareFunction`,
+  `ExportAllDeclaration`, `TSImportEqualsDeclaration`) are boxed, and one level down
+  `ForStatement`, `ForOfStatement`, `ForInStatement` and `TryStatement` hold their
+  heads as references. Each of the eight is ≤0.2% of statements on real source and a
+  classic `for (;;)` is 0.05–0.22%. The next-widest variants are `IfStatement` and
+  `SwitchStatement` at 96 B, and `IfStatement` is 3–6% of statements, which is where
+  the ladder stops.
 
 Both widths are pinned by `const` asserts in `ast/internal/mod.rs`, so a variant that
 widens either enum fails the build rather than silently fattening every slice element

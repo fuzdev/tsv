@@ -11,7 +11,9 @@ use tsv_lang::Span;
 
 /// Buffer for a linearized chain — chains are measured-short, so small chains
 /// (the common case) stay on the stack. `ChainNode` is `Copy` and 56 bytes, and
-/// this is the single buffer every [`ChainGroup`] is a sub-slice of.
+/// this is the single buffer every [`ChainGroup`] is a sub-slice of — as is the
+/// peeled trailing member tail, which is named as a pair of runs over it rather
+/// than collected into a second buffer (`builder::TailRuns`).
 pub type ChainNodeVec<'a> = SmallVec<[ChainNode<'a>; 8]>;
 
 /// Stack-friendly buffer for the grouped chain — `group_chain_nodes` builds this

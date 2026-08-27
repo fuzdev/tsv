@@ -645,15 +645,15 @@ fn rewrite_class_state_fields<'arena>(
     }
 
     match out {
-        // No `$state` field — allocated nothing; clone the whole class through.
-        None => Ok(Statement::ClassDeclaration(class.clone())),
-        Some(members) => Ok(Statement::ClassDeclaration(ClassDeclaration {
+        // No `$state` field — allocated nothing; the class node passes through.
+        None => Ok(Statement::ClassDeclaration(class)),
+        Some(members) => Ok(Statement::ClassDeclaration(arena.alloc(ClassDeclaration {
             body: ClassBody {
                 body: members.into_bump_slice(),
                 span: class.body.span,
             },
             ..class.clone()
-        })),
+        }))),
     }
 }
 

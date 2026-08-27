@@ -19,26 +19,36 @@ use super::{
 pub enum Statement<'arena> {
     ExpressionStatement(ExpressionStatement<'arena>),
     VariableDeclaration(VariableDeclaration<'arena>),
-    // Inline by value: the layout favors traversal locality over node size, so
-    // these declarations are kept inline rather than arena-boxed. That trade only
-    // holds for a variant the corpus actually spells — see the loop and `try` heads
-    // below, which are arena-boxed for the opposite reason.
-    TSTypeAliasDeclaration(TSTypeAliasDeclaration<'arena>),
-    TSInterfaceDeclaration(TSInterfaceDeclaration<'arena>),
-    TSDeclareFunction(TSDeclareFunction<'arena>),
+    // Arena-boxed, unlike every inline variant here: these eight are the widest
+    // declaration heads, and each is rare enough that the allocation is free —
+    // over four app corpora `TSDeclareFunction`, `ExportAllDeclaration` and
+    // `TSImportEqualsDeclaration` occur 0.000% of the time, `TSTypeAliasDeclaration`
+    // 0.019–0.028%, `ExportDefaultDeclaration` 0.016–0.047%, `ClassDeclaration`
+    // 0.000–0.194%, `FunctionDeclaration` 0.026–0.204% and `TSInterfaceDeclaration`
+    // 0.028–0.128%. Inline they would make a `Statement` 200 bytes instead of 104,
+    // and that width is paid on every `Statement` SLOT — every element of every
+    // `&[Statement]` body and every `?`-propagation — not just on the rare
+    // declaration that needs it. The next-widest variants are `IfStatement` and
+    // `SwitchStatement` at 96 bytes, and `IfStatement` is ~3–6% of statements, so
+    // the ladder stops here: boxing it would tax the common path for 8 bytes.
+    // (The loop and `try` heads below hold their own heads by reference for the
+    // same reason, one level down.)
+    TSTypeAliasDeclaration(&'arena TSTypeAliasDeclaration<'arena>),
+    TSInterfaceDeclaration(&'arena TSInterfaceDeclaration<'arena>),
+    TSDeclareFunction(&'arena TSDeclareFunction<'arena>),
     TSEnumDeclaration(TSEnumDeclaration<'arena>),
     TSModuleDeclaration(TSModuleDeclaration<'arena>),
     ReturnStatement(ReturnStatement<'arena>),
     BlockStatement(BlockStatement<'arena>),
-    FunctionDeclaration(FunctionDeclaration<'arena>),
-    ClassDeclaration(ClassDeclaration<'arena>),
+    FunctionDeclaration(&'arena FunctionDeclaration<'arena>),
+    ClassDeclaration(&'arena ClassDeclaration<'arena>),
     ExportNamedDeclaration(ExportNamedDeclaration<'arena>),
-    ExportDefaultDeclaration(ExportDefaultDeclaration<'arena>),
-    ExportAllDeclaration(ExportAllDeclaration<'arena>),
+    ExportDefaultDeclaration(&'arena ExportDefaultDeclaration<'arena>),
+    ExportAllDeclaration(&'arena ExportAllDeclaration<'arena>),
     TSExportAssignment(TSExportAssignment<'arena>),
     TSNamespaceExportDeclaration(TSNamespaceExportDeclaration<'arena>),
     ImportDeclaration(ImportDeclaration<'arena>),
-    TSImportEqualsDeclaration(TSImportEqualsDeclaration<'arena>),
+    TSImportEqualsDeclaration(&'arena TSImportEqualsDeclaration<'arena>),
     // Control flow statements
     IfStatement(IfStatement<'arena>),
     ForStatement(ForStatement<'arena>),
