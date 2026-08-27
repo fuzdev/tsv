@@ -23,7 +23,7 @@ fn expression_comment(
     content: &str,
     emit_character_field: bool,
 ) -> Comment {
-    Comment {
+    let comment = Comment {
         content_span,
         is_block,
         multiline: Comment::content_is_multiline(is_block, content),
@@ -31,7 +31,9 @@ fn expression_comment(
         emit_character_field,
         bump_pattern_columns: false,
         owned_by_node: false,
-    }
+    };
+    comment.debug_assert_span_len();
+    comment
 }
 
 pub(crate) struct SvelteParser<'a, 'arena> {

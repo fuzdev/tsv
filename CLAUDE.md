@@ -424,8 +424,10 @@ For function-level hotspots, use `perf` with the `profiling` cargo profile:
 ```bash
 cargo build --profile profiling -p tsv_debug
 perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ../zzz/src/lib
-perf report --stdio                              # function-level hotspots
-perf annotate --stdio -s fits_with_lookahead     # line-level within a function
+perf report --stdio     # function-level hotspots
+# line-level within a function — -s takes the EXACT demangled name from perf report
+# (a substring silently annotates nothing; see docs/performance.md §perf)
+perf annotate --stdio -s 'tsv_lang::doc::arena_fits::arena_fits_with_lookahead'
 ```
 
 See ./docs/performance.md.

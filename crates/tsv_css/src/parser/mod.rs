@@ -148,7 +148,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             true,
             &self.source[self.current_start + 2..self.current_end - 2],
         );
-        Comment {
+        let comment = Comment {
             content_span: Span {
                 start: self.span_pos(self.current_start + 2),
                 end: self.span_pos(self.current_end - 2),
@@ -162,7 +162,9 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             emit_character_field: false,
             bump_pattern_columns: false,
             owned_by_node: false,
-        }
+        };
+        comment.debug_assert_span_len();
+        comment
     }
 
     /// Register the current token as a comment.

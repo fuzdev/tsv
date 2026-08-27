@@ -99,6 +99,7 @@ fn comment_from_token(
         // Set later by the parser: a `(` glued to this comment makes it a cast's.
         owned_by_node: false,
     };
+    comment.debug_assert_span_len();
     (comment, has_line_terminator)
 }
 
