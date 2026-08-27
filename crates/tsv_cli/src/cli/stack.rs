@@ -31,8 +31,8 @@
 //! far larger; acorn + `@sveltejs/acorn-typescript` give up at 497 levels and prettier
 //! at 805, both through V8's own checked stack limit. 32 MiB clears ~34,900 levels in
 //! release and ~2,070 in debug, so no profile of tsv dies before the tools it replaces
-//! do. Parens are the cheapest shape to state, not the tightest — a nested memberish
-//! call (`a.f(a.f(…))`) costs ~5.1 KiB a level, so ~6,400 is the depth every shape
+//! do. Parens are the cheapest shape to state, not the tightest — a nested arrow body
+//! (`() => {…}`) costs ~3.9 KiB a level, so ~8,300 is the depth every shape
 //! clears (the per-construct table is in `docs/cli.md` §Recursion Depth, which also
 //! records that the chain shapes are the ones where the PRINTER, not the parser, sets
 //! the ceiling). Nesting is not the only recursion that

@@ -497,7 +497,8 @@ data, not doc-comment prose: `ChainNodeVec` (nodes per linearized chain),
 `ChainGroupVec` (groups per `group_chain_nodes` call), and the leading-comment
 `CommentVec` (per `collect_leading_comments` call — the type's dominant site).
 A `ChainGroup` owns no buffer to size — it is a borrowed sub-slice of the
-linearized chain — so it carries no population of its own. Covers
+linearized chain — so it carries no population of its own, and neither does the
+peeled trailing member tail, which is a pair of runs over that same buffer. Covers
 `.ts`/`.svelte.ts` AND `.svelte` (the `<script>`/`{expr}` feed the same TS-printer
 buffers). Prints percentiles + spill rate at candidate inline N. For sizing,
 exclude the prettier/svelte test suites (edge-case skew). Pure Rust, no Deno.

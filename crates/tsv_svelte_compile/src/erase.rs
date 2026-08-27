@@ -491,7 +491,9 @@ impl<'arena> Eraser<'arena, '_> {
             },
             Statement::FunctionDeclaration(decl) => match self.function_declaration(decl)? {
                 None => StmtOut::Keep,
-                Some(new) => StmtOut::Replace(Statement::FunctionDeclaration(new)),
+                Some(new) => {
+                    StmtOut::Replace(Statement::FunctionDeclaration(self.arena.alloc(new)))
+                }
             },
             Statement::ClassDeclaration(decl) => {
                 // `declare class C {}` is ambient — dropped whole.
@@ -501,7 +503,9 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 match self.class_declaration(decl)? {
                     None => StmtOut::Keep,
-                    Some(new) => StmtOut::Replace(Statement::ClassDeclaration(new)),
+                    Some(new) => {
+                        StmtOut::Replace(Statement::ClassDeclaration(self.arena.alloc(new)))
+                    }
                 }
             }
             Statement::ImportDeclaration(decl) => {
@@ -630,10 +634,11 @@ impl<'arena> Eraser<'arena, '_> {
                 match declaration {
                     None => StmtOut::Keep,
                     Some(declaration) => StmtOut::Replace(Statement::ExportDefaultDeclaration(
-                        tsv_ts::ast::internal::ExportDefaultDeclaration {
-                            declaration,
-                            ..decl.clone()
-                        },
+                        self.arena
+                            .alloc(tsv_ts::ast::internal::ExportDefaultDeclaration {
+                                declaration,
+                                ..(*decl).clone()
+                            }),
                     )),
                 }
             }

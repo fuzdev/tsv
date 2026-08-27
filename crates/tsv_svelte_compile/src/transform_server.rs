@@ -1220,7 +1220,7 @@ pub(crate) fn compile_server<'arena>(
     };
 
     let mut export_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-    export_body.push(Statement::ExportDefaultDeclaration(export));
+    export_body.push(Statement::ExportDefaultDeclaration(arena.alloc(export)));
     let export_program = tsv_ts::ast::internal::Program {
         body: export_body.into_bump_slice(),
         comments: arena.alloc_slice_copy(&script_comments),

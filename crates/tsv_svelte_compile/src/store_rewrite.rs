@@ -297,7 +297,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             Statement::BlockStatement(block) => self.block(block)?.map(Statement::BlockStatement),
             Statement::FunctionDeclaration(decl) => self
                 .function_declaration(decl)?
-                .map(Statement::FunctionDeclaration),
+                .map(|d| Statement::FunctionDeclaration(self.b.arena.alloc(d))),
             Statement::ClassDeclaration(decl) => {
                 let super_class = match decl.super_class {
                     Some(sc) => self.expr_ref(sc)?.map(Some),
@@ -307,11 +307,13 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if super_class.is_none() && body.is_none() {
                     None
                 } else {
-                    Some(Statement::ClassDeclaration(ClassDeclaration {
-                        super_class: super_class.unwrap_or(decl.super_class),
-                        body: body.unwrap_or_else(|| decl.body.clone()),
-                        ..decl.clone()
-                    }))
+                    Some(Statement::ClassDeclaration(self.b.arena.alloc(
+                        ClassDeclaration {
+                            super_class: super_class.unwrap_or(decl.super_class),
+                            body: body.unwrap_or_else(|| decl.body.clone()),
+                            ..(*decl).clone()
+                        },
+                    )))
                 }
             }
             Statement::IfStatement(s) => {

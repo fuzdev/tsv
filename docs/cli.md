@@ -153,8 +153,8 @@ host and the platform:
   `format` on the same input (34,917 vs 34,916 parens at 32 MiB). ⚠️ That does **not**
   generalize. Wherever a **member chain** is involved the printer binds, and by a wide
   margin: a nested memberish call (`a.f(a.f(…))`) parses to 26,187 levels and formats to
-  6,406, and a nested computed subscript (`a[a[…]]`) parses to 32,231 and formats to
-  7,324 — the chain printer's own frames set the ceiling at ~¼ of the parser's. The
+  8,481, and a nested computed subscript (`a[a[…]]`) parses to 32,231 and formats to
+  10,169 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. The
   wire-JSON writer adds nothing on top of the parser on any shape measured.
 
 Measured on `const x = ((((…1…))));`, one nesting level costs ~0.94 KiB of stack in a
@@ -166,18 +166,20 @@ why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the
 corpus nests 69 levels; the exposure is generated and minified code.
 
 Parens are not the tightest shape, only the easiest to state. Per nesting level, in a
-release build: **nested memberish calls (`a.f(a.f(…))`) ~5.1 KiB** (the worst measured —
-~6,400 levels, which is the depth every shape clears), nested computed subscripts
-(`a[a[…]]`) ~4.5, nested arrow bodies ~4.0, TS *types* ~3.2, TS object literals ~2.8,
-statement nesting ~2.0, Svelte elements ~1.7, unary chains ~1.6, nested binary chains
-~1.5, calls ~1.25, array literals ~1.2, parens ~0.94, ternary / assignment chains ~0.56,
-CSS rules ~0.4.
+release build: **nested arrow bodies (`() => {…}`) ~3.9 KiB** (the worst measured —
+~8,300 levels, which is the depth every shape clears), nested memberish calls
+(`a.f(a.f(…))`) ~3.9 a shade under it (~8,500 levels), nested computed subscripts
+(`a[a[…]]`) ~3.2, TS *types* ~3.2, TS object literals ~2.8, statement nesting ~1.9,
+Svelte elements ~1.7, unary chains ~1.6, nested binary chains ~1.5, calls ~1.25, array
+literals ~1.2, parens ~0.94, ternary / assignment chains ~0.56, CSS rules ~0.4.
 
-The two chain shapes head that list because a member chain is printed from a *grouped*
-view of a linearized chain, and those frames sit on the expression cycle: they cost 7.4
-and 6.7 KiB a level until `ChainGroup` stopped owning a `SmallVec` of node copies and
-became a borrowed sub-slice (16 bytes), which bought back ~2.2 KiB a level on both and
-~0.5 on nested arrow bodies. They are also the shapes on which the printer, not the
+The two chain shapes used to head that list, because a member chain is printed from a
+*grouped* view of a linearized chain and those frames sit on the expression cycle: they
+cost 7.4 and 6.7 KiB a level until `ChainGroup` stopped owning a `SmallVec` of node
+copies and became a borrowed sub-slice (16 bytes) — ~2.2 KiB a level back on both and
+~0.5 on nested arrow bodies — and 5.1 and 4.5 until the peeled trailing member tail
+stopped being collected into a second `SmallVec` and became a pair of borrowed runs,
+another ~1.2 KiB a level on both. They are also the shapes on which the printer, not the
 parser, sets the ceiling — see the bullet above. ⚠️ They are the only two shapes the
 `Expression` enum's own width does *not* reach: every other row above moved when it went
 from 176 bytes to 72 (Svelte elements 3.1 → 1.7, calls 1.9 → 1.25, parens 1.2 → 0.94),
@@ -199,15 +201,18 @@ Both node enums also answer the same pressure from the other side, by *density* 
 variants wide enough to set the enum's size on their own, and rare enough that an arena
 allocation apiece is free, hold their payload by reference. `Expression`'s five widest
 (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` / `MetaProperty` /
-`TaggedTemplateExpression`) make it 72 B rather than 176, and `Statement`'s four
-(`ForStatement`, `ForOfStatement`, `ForInStatement`, `TryStatement`) make it 200 rather
-than 544. Both trades only run this way because the boxed variants are rare — a classic
-`for (;;)` is 0.05–0.22% of statements, and the five expression variants together are
-~3% of expressions, of which the two widest are ~0.02% — while the width is paid on
-every element of every slice, on both of a property's key and value slots, and on every
-`?`-propagation copy. The frequent variants stay inline: the next-widest expression is
-`CallExpression` at 64 B and it is 14–21% of expressions, which is where the ladder
-stops.
+`TaggedTemplateExpression`) make it 72 B rather than 176, and `Statement`'s eight widest
+declaration heads (`TSTypeAliasDeclaration`, `ExportDefaultDeclaration`,
+`ClassDeclaration`, `FunctionDeclaration`, `TSInterfaceDeclaration`, `TSDeclareFunction`,
+`ExportAllDeclaration`, `TSImportEqualsDeclaration`) plus its four loop / `try` heads one
+level down make it 104 B rather than 544. Both trades only run this way because the boxed
+variants are rare — each of those eight is ≤0.2% of statements, a classic `for (;;)` is
+0.05–0.22%, and the five expression variants together are ~3% of expressions, of which
+the two widest are ~0.02% — while the width is paid on every element of every slice, on
+both of a property's key and value slots, and on every `?`-propagation copy. The frequent
+variants stay inline: the next-widest expression is `CallExpression` at 64 B and it is
+14–21% of expressions, and the next-widest statements are `IfStatement` and
+`SwitchStatement` at 96 B with `IfStatement` at 3–6%, which is where each ladder stops.
 
 **The other surfaces have their own ceilings, set by their hosts, and the CLI's
 reservation does not reach them:**
@@ -215,9 +220,9 @@ reservation does not reach them:**
 | surface | stack | depth |
 | --- | --- | --- |
 | `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~34,900 |
-| N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~8,200 at 8 MiB |
-| N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~4,070 |
-| WASM, any host | the wasm shadow stack, 1 MiB by link default | ~2,120 |
+| N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~6,960 at 8 MiB |
+| N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~3,460 |
+| WASM, any host | the wasm shadow stack, 1 MiB by link default | ~2,230 |
 
 The two binding rows are the host's thread, so the addon cannot size them; a host that
 needs the depth raises it itself (`new Worker(…, {resourceLimits: {stackSizeMb}})`), which

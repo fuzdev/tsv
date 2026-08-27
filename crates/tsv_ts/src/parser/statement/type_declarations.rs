@@ -26,7 +26,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         let decl = self.parse_type_alias_declaration_body(start, false)?;
-        Ok(Statement::TSTypeAliasDeclaration(decl))
+        Ok(Statement::TSTypeAliasDeclaration(self.arena.alloc(decl)))
     }
 
     /// Parse type alias declaration with an external start position (for `declare type`)
@@ -39,7 +39,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         let decl = self.parse_type_alias_declaration_body(start, true)?;
-        Ok(Statement::TSTypeAliasDeclaration(decl))
+        Ok(Statement::TSTypeAliasDeclaration(self.arena.alloc(decl)))
     }
 
     /// Parse type alias declaration inner - assumes 'type' keyword already consumed
@@ -50,7 +50,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         type_start: usize,
     ) -> Result<Statement<'arena>, ParseError> {
         let decl = self.parse_type_alias_declaration_body(type_start, false)?;
-        Ok(Statement::TSTypeAliasDeclaration(decl))
+        Ok(Statement::TSTypeAliasDeclaration(self.arena.alloc(decl)))
     }
 
     /// Parse type alias body - the part after 'type' keyword
@@ -108,9 +108,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
         declare: bool,
     ) -> Result<Statement<'arena>, ParseError> {
-        Ok(Statement::TSInterfaceDeclaration(
-            self.parse_interface_declaration_struct(start, declare)?,
-        ))
+        let decl = self.parse_interface_declaration_struct(start, declare)?;
+        Ok(Statement::TSInterfaceDeclaration(self.arena.alloc(decl)))
     }
 
     /// Parse an interface declaration into its struct, without wrapping in
@@ -446,16 +445,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::TSDeclareFunction(TSDeclareFunction {
-            id,
-            type_parameters,
-            params,
-            return_type,
-            declare: true,
-            r#async: is_async,
-            generator: is_generator,
-            span: Span::new(start as u32, end),
-        }))
+        Ok(Statement::TSDeclareFunction(self.arena.alloc(
+            TSDeclareFunction {
+                id,
+                type_parameters,
+                params,
+                return_type,
+                declare: true,
+                r#async: is_async,
+                generator: is_generator,
+                span: Span::new(start as u32, end),
+            },
+        )))
     }
 
     /// The current token read as a type predicate's SUBJECT — an identifier or
@@ -604,7 +605,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Statement<'arena>, ParseError> {
         let class =
             self.parse_class_declaration_inner_with_start(true, is_abstract, start, true)?;
-        Ok(Statement::ClassDeclaration(class))
+        Ok(Statement::ClassDeclaration(self.arena.alloc(class)))
     }
 
     //
