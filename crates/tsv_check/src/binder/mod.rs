@@ -639,6 +639,13 @@ pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
 /// wrapper and the inner, so the inner's key is always present.
 pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
     use Expression as E;
+    // ⚠️ The five arena-boxed variants deref (`addr_of(*x)`), the rest do not. Their
+    // binder is a `&&Node`, so a bare `addr_of(x)` infers `T = &Node` and keys on the
+    // address of the ENUM's pointer slot instead of the node's — a different key from
+    // the one `visit_expression` registers, which reaches its visitor by deref
+    // coercion and so sees the node. The boxed spelling is also the more stable key:
+    // it survives a copy of the enum, where an inline payload's address does not.
+    // The lockstep `debug_assert` in `lower::expression` is what catches drift here.
     match e {
         E::JsdocCast(c) => expression_addr_kind(c.inner),
         E::Literal(x) => (addr_of(x), NodeKind::Literal),
@@ -653,12 +660,12 @@ pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
         E::NewExpression(x) => (addr_of(x), NodeKind::NewExpression),
         E::MemberExpression(x) => (addr_of(x), NodeKind::MemberExpression),
         E::ConditionalExpression(x) => (addr_of(x), NodeKind::ConditionalExpression),
-        E::ArrowFunctionExpression(x) => (addr_of(x), NodeKind::ArrowFunctionExpression),
-        E::FunctionExpression(x) => (addr_of(x), NodeKind::FunctionExpression),
-        E::ClassExpression(x) => (addr_of(x), NodeKind::ClassExpression),
+        E::ArrowFunctionExpression(x) => (addr_of(*x), NodeKind::ArrowFunctionExpression),
+        E::FunctionExpression(x) => (addr_of(*x), NodeKind::FunctionExpression),
+        E::ClassExpression(x) => (addr_of(*x), NodeKind::ClassExpression),
         E::SpreadElement(x) => (addr_of(x), NodeKind::SpreadElement),
         E::TemplateLiteral(x) => (addr_of(x), NodeKind::TemplateLiteral),
-        E::TaggedTemplateExpression(x) => (addr_of(x), NodeKind::TaggedTemplateExpression),
+        E::TaggedTemplateExpression(x) => (addr_of(*x), NodeKind::TaggedTemplateExpression),
         E::AwaitExpression(x) => (addr_of(x), NodeKind::AwaitExpression),
         E::YieldExpression(x) => (addr_of(x), NodeKind::YieldExpression),
         E::SequenceExpression(x) => (addr_of(x), NodeKind::SequenceExpression),
@@ -677,7 +684,7 @@ pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
         E::TSNonNullExpression(x) => (addr_of(x), NodeKind::TSNonNullExpression),
         E::TSParameterProperty(x) => (addr_of(x), NodeKind::TSParameterProperty),
         E::ImportExpression(x) => (addr_of(x), NodeKind::ImportExpression),
-        E::MetaProperty(x) => (addr_of(x), NodeKind::MetaProperty),
+        E::MetaProperty(x) => (addr_of(*x), NodeKind::MetaProperty),
         E::ParenthesizedExpression(x) => (addr_of(x), NodeKind::ParenthesizedExpression),
     }
 }

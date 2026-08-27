@@ -66,8 +66,8 @@ pub(in crate::parser) struct ParsedExpr<'arena> {
     /// The parsed expression with semantic span (may exclude surrounding parens).
     ///
     /// Arena-boxed (not held by value): the parser's recursion threads `ParsedExpr`
-    /// up the precedence ladder, so a `parse_*` that returned the fat `Expression`
-    /// (176 B) would hand back a 176 B value by sret. The expression is allocated in
+    /// up the precedence ladder, so a `parse_*` that returned the `Expression` enum
+    /// (72 B) would hand back a 72 B value by sret. The expression is allocated in
     /// the arena where it is built (where most callers already re-`alloc`'d it as a
     /// child anyway), so the recursion moves an 8 B reference instead. The format
     /// printer is unaffected: it reads the `Expression` enum, whose definition is
@@ -77,7 +77,7 @@ pub(in crate::parser) struct ParsedExpr<'arena> {
     /// each sret call site its own stack slot and does not merge them across match
     /// arms, and a frame is sized once for its widest arm — so a dispatcher with N
     /// arms that each call a `parse_*` returning a bare `Expression` reserves
-    /// N × 176 B at **every** recursion level, whichever arm it actually takes.
+    /// N × 72 B at **every** recursion level, whichever arm it actually takes.
     /// `Parser::parse_prefix_expression` and `Parser::parse_primary_expression` are
     /// those dispatchers, and both sit on the paren / call / member / object-literal
     /// cycle, so their slots set tsv's whole nesting ceiling — see `docs/cli.md`
@@ -123,7 +123,7 @@ impl<'arena> ParsedExpr<'arena> {
     ///
     /// Called at the **tail of the node builder**, never by its caller: a
     /// `parse_*` that hands back a bare `Expression` makes its caller hold a
-    /// 176 B value across the boxing call, and a caller with N such arms pays N
+    /// 72 B value across the boxing call, and a caller with N such arms pays N
     /// slots in **every** frame — see the `expr` field doc.
     pub(in crate::parser) fn from_expr(
         arena: &'arena bumpalo::Bump,
@@ -2377,11 +2377,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
                 return Ok(ParsedExpr::from_expr(
                     arena,
-                    Expression::MetaProperty(MetaProperty {
+                    Expression::MetaProperty(arena.alloc(MetaProperty {
                         meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
                         property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
                         span: Span::new(start as u32, prop_end as u32),
-                    }),
+                    })),
                 ));
             }
             return Err(self.error_expected_after("'target'", "new."));
@@ -2592,12 +2592,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let end = quasi.span.end;
         ParsedExpr::with_start_end(
             self.arena,
-            Expression::TaggedTemplateExpression(TaggedTemplateExpression {
+            Expression::TaggedTemplateExpression(self.arena.alloc(TaggedTemplateExpression {
                 tag,
                 type_arguments,
                 quasi,
                 span: Span::new(tag_start, end),
-            }),
+            })),
             tag_start,
             end as usize,
         )
@@ -2645,11 +2645,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
                 return Ok(ParsedExpr::from_expr(
                     self.arena,
-                    Expression::MetaProperty(MetaProperty {
+                    Expression::MetaProperty(self.arena.alloc(MetaProperty {
                         meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
                         property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
                         span: Span::new(start as u32, prop_end as u32),
-                    }),
+                    })),
                 ));
             }
             // `import.source(…)` / `import.defer(…)` — the import-phase proposals.

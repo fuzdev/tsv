@@ -1628,27 +1628,27 @@ impl<'arena> Eraser<'arena, '_> {
                 if tagged.type_arguments.is_none() && tag.is_none() && quasi.is_none() {
                     None
                 } else {
-                    Some(Expression::TaggedTemplateExpression(
+                    Some(Expression::TaggedTemplateExpression(self.arena.alloc(
                         tsv_ts::ast::internal::TaggedTemplateExpression {
                             tag: tag.unwrap_or(tagged.tag),
                             type_arguments: None,
                             quasi: quasi.unwrap_or_else(|| tagged.quasi.clone()),
                             span: tagged.span,
                         },
-                    ))
+                    )))
                 }
             }
 
             // ── Functions and classes ──────────────────────────────────────
-            Expression::ArrowFunctionExpression(arrow) => {
-                self.arrow(arrow)?.map(Expression::ArrowFunctionExpression)
-            }
+            Expression::ArrowFunctionExpression(arrow) => self
+                .arrow(arrow)?
+                .map(|a| Expression::ArrowFunctionExpression(self.arena.alloc(a))),
             Expression::FunctionExpression(func) => self
                 .function_expression(func, false)?
-                .map(Expression::FunctionExpression),
+                .map(|f| Expression::FunctionExpression(self.arena.alloc(f))),
             Expression::ClassExpression(class) => self
                 .class_expression(class)?
-                .map(Expression::ClassExpression),
+                .map(|c| Expression::ClassExpression(self.arena.alloc(c))),
 
             // ── Plain recursion ────────────────────────────────────────────
             Expression::ObjectExpression(obj) => map_slice!(self, obj.properties, object_property)

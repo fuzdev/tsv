@@ -955,13 +955,38 @@ recovered from `source[span]` at each consumer, with the rare escaped name carri
 as an `&'arena str` — so the arena is the *only* thing threaded through
 parse/format, and no name-table lifetime lands on the AST or the parser.
 
-**Inline-by-value layout, deliberately not size-minimized.** A node holds its
-children inline by value where they were owned inline before; only genuinely
-recursive children sit behind `&'arena`. Variants are *not* boxed and inline
-fields are *not* indirected to shrink node size — the formatter is traversal-bound,
-and the extra pointer-chases that size-minimization adds on hot traversal paths
-cost more than the cache-density they buy. (The arena allocation itself is the
-win; the node *layout* favors traversal locality over byte size.)
+**Inline-by-value layout, size-minimized only at the variants that set an enum's
+width.** A node holds its children inline by value where they were owned inline
+before; only genuinely recursive children sit behind `&'arena`. Inline fields are
+*not* indirected to shrink node size in general — the formatter is traversal-bound,
+and the extra pointer-chases that size-minimization adds on hot traversal paths cost
+more than the cache-density they buy. (The arena allocation itself is the win; the
+node *layout* favors traversal locality over byte size.)
+
+**The one deliberate exception is a density rule, and it is worth stating precisely,
+because an enum's width is the ELEMENT width of everything that holds one.** An
+`Expression` slot is paid on both of a `Property`'s key and value, on a
+`VariableDeclarator`'s id and init, and on every element of every `&[Expression]`; a
+`Statement` slot on every element of every statement slice and every
+`?`-propagation copy out of the parser. So a variant wide enough to set its enum's
+size on its own taxes the whole tree, while a pointer chase is paid only where that
+variant is actually spelled. Where such a variant is also **rare**, it holds its
+payload by `&'arena` reference:
+
+- `Expression` is **72 B**, not 176 — `ClassExpression`, `FunctionExpression`,
+  `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are boxed.
+  Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
+  next-widest variant is `CallExpression` at 64 B and it is 14–21% of expressions,
+  which is where the ladder stops.
+- `Statement` is **200 B**, not 544 — `ForStatement`, `ForOfStatement`,
+  `ForInStatement` and `TryStatement` hold their heads as references. A classic
+  `for (;;)` is 0.05–0.22% of statements.
+
+Both widths are pinned by `const` asserts in `ast/internal/mod.rs`, so a variant that
+widens either enum fails the build rather than silently fattening every slice element
+and lowering the nesting ceiling. **Rarity is the whole of the argument** — the same
+move on a common variant buys density and pays an allocation plus a pointer chase on
+the majority of the traffic.
 
 The fat inline nodes carry no by-value-return penalty in the **expression**
 recursion, either: each node is built in the arena and threaded up the recursive
@@ -976,8 +1001,10 @@ value reserves its bytes at every recursion level, whichever arm the dispatcher
 takes, so the choice sets nesting depth rather than throughput — the per-construct
 ceilings are in [cli.md §Recursion Depth](./cli.md#recursion-depth). The two
 concerns are decoupled — node *layout* is tuned for the format traversal, while the
-parse-time recursion cost is paid in pointer moves — so a fat inline variant is not
-a reason to box it.
+parse-time recursion cost is paid in pointer moves — so the *parse recursion* is
+never the reason to box a fat inline variant. The density rule above is; and because
+the enums sit on the expression and statement cycles, shrinking them moves the
+nesting ceilings too, as a side effect rather than as the goal.
 
 **Rationale vs flat/indexed:** Flat/indexed layouts (index arrays, à la Zig's
 `MultiArrayList`) were benchmarked early in development and were slower —

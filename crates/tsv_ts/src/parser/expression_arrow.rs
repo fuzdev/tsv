@@ -103,7 +103,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(ParsedExpr::from_expr(
             self.arena,
-            Expression::ArrowFunctionExpression(ArrowFunctionExpression {
+            Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
                 type_parameters: Some(type_parameters),
                 params,
                 body,
@@ -112,7 +112,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 params_start: Some(params_start as u32),
                 arrow_token,
                 span: Span::new(start as u32, end),
-            }),
+            })),
         ))
     }
 
@@ -166,7 +166,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(ParsedExpr::from_expr(
             self.arena,
-            Expression::ArrowFunctionExpression(ArrowFunctionExpression {
+            Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
                 type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
                 params,
                 body,
@@ -175,7 +175,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 params_start: Some(params_start as u32),
                 arrow_token,
                 span: Span::new(start as u32, end),
-            }),
+            })),
         ))
     }
 
@@ -209,7 +209,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(ParsedExpr::from_expr(
             self.arena,
-            Expression::ArrowFunctionExpression(ArrowFunctionExpression {
+            Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
                 type_parameters: None,
                 params,
                 body,
@@ -218,7 +218,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 params_start: None, // No parens for single-param arrows
                 arrow_token,
                 span: Span::new(start as u32, end),
-            }),
+            })),
         ))
     }
 
@@ -270,7 +270,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(ParsedExpr::from_expr(
             self.arena,
-            Expression::ArrowFunctionExpression(ArrowFunctionExpression {
+            Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
                 type_parameters,
                 params,
                 body,
@@ -279,7 +279,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 params_start,
                 arrow_token,
                 span: Span::new(start as u32, end),
-            }),
+            })),
         ))
     }
 }

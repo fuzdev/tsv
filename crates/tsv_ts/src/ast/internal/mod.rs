@@ -99,16 +99,26 @@ pub use expressions::{
 // widest arm, so a dispatcher with N arms that each hold one reserves N times these
 // bytes at every recursion level. `docs/cli.md` §Recursion Depth states the byte
 // counts and the per-construct depths they produce, and `ParsedExpr` (the parser's
-// expression return) exists to keep `Expression` out of those frames. `Statement`
-// answers the same pressure from the other side — its four rare wide variants
-// arena-box their heads (`internal::statements`), which is also why it is 208 and not
-// 544. Pinned so a variant that widens either enum shows up as a failed build rather
-// than as a silently lower nesting ceiling and a fatter statement slice. 64-bit only:
+// expression return) exists to keep `Expression` out of those frames.
+//
+// Both enums are also the ELEMENT WIDTH of the containers that hold them, which is
+// the larger cost: an `Expression` slot is paid on `Property`'s key and value, on
+// `VariableDeclarator`'s id and init, and on every element of every `&[Expression]`
+// (call arguments, array elements, parameters), so the enum's width multiplies
+// through the whole tree. Both are held down the same way — the variants wide enough
+// to set the size on their own, and rare enough that an arena allocation for each is
+// free, hold their payload by `&'arena` reference: `Expression`'s five widest
+// (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` /
+// `MetaProperty` / `TaggedTemplateExpression`, together ~3% of expressions, of which
+// the widest two are ~0.02%) and `Statement`'s four (`internal::statements`).
+//
+// Pinned so a variant that widens either enum shows up as a failed build rather
+// than as a silently lower nesting ceiling and a fatter element slot. 64-bit only:
 // the counts are pointer-width-relative and the doc's measurements are x86-64.
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<Expression<'static>>() == 176);
+const _: () = assert!(size_of::<Expression<'static>>() == 72);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<Statement<'static>>() == 208);
+const _: () = assert!(size_of::<Statement<'static>>() == 200);
 
 //
 // Foundational Types (defined here, used everywhere)

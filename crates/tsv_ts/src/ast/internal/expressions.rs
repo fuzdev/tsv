@@ -26,19 +26,27 @@ pub enum Expression<'arena> {
     NewExpression(NewExpression<'arena>),
     MemberExpression(MemberExpression<'arena>),
     ConditionalExpression(ConditionalExpression<'arena>),
-    // Inline by value: the layout favors traversal locality over node size, so
-    // fat variants are kept inline rather than arena-boxed (boxing them shrinks the
-    // enum but adds a pointer-chase on the hot format-read paths that costs more than
-    // the density win). The fat enum is not a parse-return cost either: the parser
-    // threads expressions up the recursive descent by reference (its transient
-    // `ParsedExpr` holds an `&'arena Expression`), so the recursion moves pointers,
-    // not whole nodes — a fat inline variant is not a reason to box it.
-    ArrowFunctionExpression(ArrowFunctionExpression<'arena>),
-    FunctionExpression(FunctionExpression<'arena>),
-    ClassExpression(ClassExpression<'arena>),
+    // Arena-boxed, unlike every variant above: these five are the only ones wide
+    // enough to set the enum's own size, and each is rare enough that the allocation
+    // is free — over 8 MB of real TypeScript, `ClassExpression` and
+    // `TaggedTemplateExpression` occur 0.000% of the time, `FunctionExpression`
+    // 0.004–0.019%, `MetaProperty` 0.000–0.014%, and `ArrowFunctionExpression`
+    // 3.0–3.8%. Inline they would make an `Expression` 176 bytes instead of 72, and
+    // that width is paid on every `Expression` SLOT in the tree — both of a
+    // `Property`'s, both of a `VariableDeclarator`'s, and every element of every
+    // `&[Expression]` — not just on the rare node that needs it. The next-widest
+    // variant is `CallExpression` at 64 bytes, and it is 14–21% of expressions, so
+    // the ladder stops here: boxing it would tax the common path.
+    //
+    // The pointer chase this adds is on the rare read, and the parser's recursion is
+    // unaffected either way — it threads expressions by reference already (its
+    // transient `ParsedExpr` holds an `&'arena Expression`).
+    ArrowFunctionExpression(&'arena ArrowFunctionExpression<'arena>),
+    FunctionExpression(&'arena FunctionExpression<'arena>),
+    ClassExpression(&'arena ClassExpression<'arena>),
     SpreadElement(SpreadElement<'arena>),
     TemplateLiteral(TemplateLiteral<'arena>),
-    TaggedTemplateExpression(TaggedTemplateExpression<'arena>),
+    TaggedTemplateExpression(&'arena TaggedTemplateExpression<'arena>),
     AwaitExpression(AwaitExpression<'arena>),
     YieldExpression(YieldExpression<'arena>),
     SequenceExpression(SequenceExpression<'arena>),
@@ -64,7 +72,7 @@ pub enum Expression<'arena> {
     // Dynamic import: import('...')
     ImportExpression(ImportExpression<'arena>),
     // Meta property: import.meta, new.target (two inline Identifiers)
-    MetaProperty(MetaProperty<'arena>),
+    MetaProperty(&'arena MetaProperty<'arena>),
     // JSDoc type cast: `/** @type {T} */ (inner)` — internal-only, never serialized
     JsdocCast(JsdocCast<'arena>),
     // Preserved grouping parens: `(expr)` — only produced under the parser's
