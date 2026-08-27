@@ -55,4 +55,4 @@ pub(crate) use inline_lookups::{InlineLookups, resolve_inline_lookups};
 pub(crate) use printing::find_bracket_position;
 pub use types::{ChainCall, ChainNode};
 #[cfg(feature = "buffer_stats")]
-pub use types::{ChainGroupNodesVec, ChainGroupVec, ChainNodeVec};
+pub use types::{ChainGroupVec, ChainNodeVec};
