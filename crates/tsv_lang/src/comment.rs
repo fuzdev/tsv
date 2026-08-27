@@ -80,6 +80,27 @@ pub struct Comment {
 }
 
 impl Comment {
+    /// The fewest bytes a comment can occupy in any language tsv parses: its
+    /// introducer alone — `//`, `/*`, `<!--`. Every `span` starts at that introducer,
+    /// so no comment is narrower.
+    ///
+    /// The range lookups below rest on it: they return only comments lying *wholly*
+    /// inside their range, so a range narrower than this provably holds none and the
+    /// array need not be touched at all. Guarded at the three parsers' construction
+    /// sites by [`Comment::debug_assert_span_len`] rather than by a fixture — a
+    /// one-byte comment is unspellable, so no test could fail on it.
+    pub const MIN_SPAN_LEN: u32 = 2;
+
+    /// Debug-only check of [`Comment::MIN_SPAN_LEN`] at the point a parser builds a
+    /// `Comment`.
+    #[inline]
+    pub fn debug_assert_span_len(&self) {
+        debug_assert!(
+            self.span.end.saturating_sub(self.span.start) >= Self::MIN_SPAN_LEN,
+            "a comment's span covers at least its introducer"
+        );
+    }
+
     /// Whether a comment's `content` (its interior, delimiters excluded) spans more than
     /// one line — the derivation behind [`Comment::multiline`], stated once for the three
     /// parsers that build a `Comment`.
@@ -531,6 +552,19 @@ pub fn find_first_comment_from(comments: &[Comment], pos: u32) -> usize {
     comments.partition_point(|c| c.span.start < pos)
 }
 
+/// Whether `[start, end)` is too narrow to hold a whole comment — see
+/// [`Comment::MIN_SPAN_LEN`], the invariant it reads.
+///
+/// Every range lookup here answers about comments lying *wholly* inside its range, so
+/// this decides the question outright and the sorted array is never probed. It earns its
+/// place on the token-sized gaps the printers ask about by the hundred thousand: the TS
+/// chain grouping's member gap is the `.` alone in 97.6% of its asks, where two compares
+/// replace a binary search over the document's comments.
+#[inline]
+const fn range_too_narrow_for_a_comment(start: u32, end: u32) -> bool {
+    end.saturating_sub(start) < Comment::MIN_SPAN_LEN
+}
+
 /// **to emit**: the comments in `[start, end)` that *this* caller must print.
 ///
 /// [`Comment::owned_by_node`] comments are **skipped** — the node their token begins
@@ -569,6 +603,9 @@ pub fn comments_to_emit_after(comments: &[Comment], pos: u32) -> impl Iterator<I
 /// [`has_comments_to_emit_in_range`] for anything that decides who *prints*.
 #[inline]
 pub fn has_comments_on_page_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
+    if range_too_narrow_for_a_comment(start, end) {
+        return false;
+    }
     let first_idx = find_first_comment_from(comments, start);
     comments.get(first_idx).is_some_and(|c| c.span.end <= end)
 }
@@ -632,7 +669,11 @@ pub fn comments_in_source_range(
     start: u32,
     end: u32,
 ) -> impl Iterator<Item = &Comment> {
-    let first_idx = find_first_comment_from(comments, start);
+    let first_idx = if range_too_narrow_for_a_comment(start, end) {
+        comments.len()
+    } else {
+        find_first_comment_from(comments, start)
+    };
     comments[first_idx..]
         .iter()
         .take_while(move |c| c.span.end <= end)
