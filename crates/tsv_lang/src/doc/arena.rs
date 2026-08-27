@@ -566,19 +566,59 @@ const FUSED_WIDTH_SCAN_MAX: usize = 32;
 /// `\x1b` and `\x7f` precisely because no corpus does.
 #[inline]
 fn pooled_text_width(s: &str) -> u16 {
+    match fused_ascii_width(s) {
+        FusedWidth::Width(w) => w.min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16,
+        FusedWidth::Newline => TEXT_WIDTH_HAS_NEWLINE,
+        FusedWidth::Searcher => pooled_text_width_scanned(s),
+    }
+}
+
+/// [`fused_ascii_width`]'s verdict for one slice.
+pub(super) enum FusedWidth {
+    /// Single-line, all-ASCII: the slice's visual width, unclamped.
+    Width(usize),
+    /// A `\n` was reached before any non-ASCII byte, so the slice has no
+    /// single-line width.
+    Newline,
+    /// The walk declined: the slice is past [`FUSED_WIDTH_SCAN_MAX`], or it holds a
+    /// non-ASCII byte. Either way the caller measures the **whole** slice with the
+    /// searcher shape — a grapheme cluster can start on an ASCII byte the walk
+    /// already counted, so the accumulated width is discarded, not resumed.
+    Searcher,
+}
+
+/// The one fused width walk, shared by the two on-demand measures:
+/// [`pooled_text_width`] (build-time, for pool-stored and verbatim-span text) and
+/// the fits path's `NotComputed` arm (`arena_fits`'s `text_flat_width`, for the
+/// identifier names [`DocArena::source_span_ident`] deliberately leaves
+/// unmeasured). Both previously spelled the question their own way — the fits arm
+/// as `contains('\n')` then [`crate::printing::visual_width`], two searcher-driven
+/// passes over a slice whose median length is a handful of bytes — and only this
+/// one had the exhaustive oracle
+/// (`pooled_text_width_tests`). One walk, one oracle, one answer.
+///
+/// See [`pooled_text_width`]'s doc for why one pass beats three searchers on a
+/// short slice, why the ASCII arm counts a control byte as one column (mirroring
+/// `visual_width`'s ASCII fast path, **not** `printing::ascii_char_width`), and
+/// why the non-ASCII handoff re-measures from the start. The length gate is
+/// **inside** rather than at each caller: it is part of the answer this function
+/// owns (`Searcher` means "the fused walk declines", for either reason), so the
+/// two callers cannot drift apart on where the crossover sits.
+#[inline]
+pub(super) fn fused_ascii_width(s: &str) -> FusedWidth {
     if s.len() > FUSED_WIDTH_SCAN_MAX {
-        return pooled_text_width_scanned(s);
+        return FusedWidth::Searcher;
     }
     let mut width = 0usize;
     for &b in s.as_bytes() {
         match b {
-            b'\n' => return TEXT_WIDTH_HAS_NEWLINE,
+            b'\n' => return FusedWidth::Newline,
             b'\t' => width += TAB_WIDTH,
             0x00..=0x7f => width += 1,
-            _ => return pooled_text_width_scanned(s),
+            _ => return FusedWidth::Searcher,
         }
     }
-    width.min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
+    FusedWidth::Width(width)
 }
 
 /// The searcher-based arm of [`pooled_text_width`]: the whole-slice shape, for a
