@@ -1997,9 +1997,9 @@ pub(super) fn build_args_joined_with_comments(
         } else {
             // The LAST argument's gap to `)` is this builder's too — the counterpart to
             // `open_inter_arg_gap` above. These layouts are reached by force-expansion
-            // triggers (multiline content, function composition, the expand-first
-            // fallback) that preempt the callers' own comment-aware paths, so nothing
-            // else emits it and the loss is total.
+            // triggers (function composition, the expand-first fallback) that preempt the
+            // callers' own comment-aware paths, so nothing else emits it and the loss is
+            // total.
             emit_last_arg_trailing_comments(printer, &mut parts, arg, paren_close);
         }
     }
@@ -2007,9 +2007,10 @@ pub(super) fn build_args_joined_with_comments(
     d.concat(&parts)
 }
 
-/// The forced-expansion argument layout the call and `new` hardline arms share (multiline
-/// content, function composition, all-arrows, the expand-first fallback): one argument per
-/// line with the gap comments preserved, wrapped in the call's hard-broken parens.
+/// The forced-expansion argument layout the call and `new` hardline arms share (function
+/// composition, all-arrows, the expand-first fallback, and every ladder's all-args-broken
+/// state): one argument per line with the gap comments preserved, wrapped in the call's
+/// hard-broken parens.
 pub(super) fn build_call_args_expanded(
     printer: &Printer<'_>,
     opener: ArgOpener,
@@ -2255,7 +2256,8 @@ pub(super) fn multiline_template_hug_applies(
 /// Prettier has source-position-dependent behavior (isTemplateOnItsOwnLine):
 /// - Hugged: `` fn(`line1\nline2`) `` → keep inline (no groups)
 /// - Expanded: template on its own line → returns None so the caller falls
-///   through to the has_multiline_content path (hardline expansion).
+///   through to the ordinary argument layouts, which break on the template's own
+///   newline through their `will_break` guards.
 ///
 /// `gap_start` opens the `(`-line gap — the position after the callee and its type
 /// arguments, i.e. the same `paren_open` every other argument seam scans from. The gap

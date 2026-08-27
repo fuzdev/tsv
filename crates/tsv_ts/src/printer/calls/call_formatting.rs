@@ -3,9 +3,7 @@
 // Contains the primary `build_call_doc_with_wrapping` function that handles
 // all the special cases for call expression formatting.
 
-use super::super::{
-    ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
-};
+use super::super::{ParenContext, Printer};
 use super::CalleeGap;
 use super::arg_comments::{
     PartitionedComments, any_arg_empty_line, first_arg_has_any_comments,
@@ -175,8 +173,8 @@ pub(super) fn build_call_doc_with_wrapping(
     let paren_open = gap.paren_open(call);
 
     // Single template literal argument with embedded newlines on the same line as `(` — hug
-    // it. A template on its own line declines and falls through to has_multiline_content,
-    // which produces the expanded form via build_call_args_expanded.
+    // it. A template on its own line declines and falls through to the layouts below, whose
+    // `will_break` guards see the template's own newline.
     //
     // ⚠️ ABOVE the comment paths, which is prettier's own position and not a preference:
     // `isTemplateLiteralSingleArg` is the FIRST thing `printCallExpression` asks, above the
@@ -412,24 +410,14 @@ pub(super) fn build_call_doc_with_wrapping(
         return doc;
     }
 
-    // Check if any argument has multiline content (e.g., line continuation strings)
-    // Prettier expands calls containing multiline strings (recursively)
-    let has_multiline = container_may_have_multiline_content(call.span, printer.source)
-        && call
-            .arguments
-            .iter()
-            .any(|arg| has_multiline_content(arg, printer.source));
-
-    if has_multiline {
-        // Force expansion with hardlines for multiline content
-        return build_call_args_expanded(
-            printer,
-            ArgOpener::Callee(callee),
-            call.arguments,
-            paren_open,
-            call.span.end,
-        );
-    }
+    // No arm here for an argument carrying its own newline — a line-continuation string, a
+    // multiline template. Prettier has no container-level predicate for one either: it
+    // prints such a literal through `replaceEndOfLine`, whose `literalline` carries a
+    // `breakParent`, and the expansion is `propagateBreaks` alone. tsv's counterparts are
+    // the `will_break` guards each layout below already asks — `expand_all_if_head_breaks`
+    // in the expand-last ladder, `build_expand_first_arg_doc`'s tail scan, and
+    // `wrap_call_with_will_break_guard` on the default path — which is why a source-scanning
+    // twin ahead of them could only pre-empt the hug prettier keeps.
 
     // Function composition pattern: when any argument is a call containing a callback
     // e.g., fn(arr.map((x) => x), b) → fn(\n\tarr.map((x) => x),\n\tb,\n)

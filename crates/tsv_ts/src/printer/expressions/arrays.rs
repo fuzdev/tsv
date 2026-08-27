@@ -3,14 +3,11 @@
 // Handles printing of array expressions with:
 // - Width-based wrapping
 // - Fill mode for number-only arrays
-// - Forced expansion for multiline content
 // - Comment preservation
 
 use crate::ast::internal::{self, Expression, LiteralValue};
 use crate::printer::comments::{block_is_before_comma, next_real_element_start, run_defers_line};
-use crate::printer::{
-    CommentVec, Printer, container_may_have_multiline_content, has_multiline_content,
-};
+use crate::printer::{CommentVec, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -496,7 +493,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an array expression, wrapping on width.
     ///
     /// The single entry point for every array position — top-level and nested alike — so
-    /// multiline content triggers the same expansion everywhere.
+    /// one layout decision serves every one of them.
     pub(in crate::printer) fn build_array_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
         if arr.elements.is_empty() {
             return self.build_empty_brackets_inline_with_comments_doc(arr.span);
@@ -528,22 +525,15 @@ impl<'a> Printer<'a> {
             return self.build_array_doc_with_expanding_comments(arr);
         }
 
-        // Check if any element has multiline content (e.g., line continuation strings)
-        // Prettier expands arrays containing multiline strings (recursively)
-        let has_multiline = container_may_have_multiline_content(arr.span, self.source)
-            && arr
-                .elements
-                .iter()
-                .flatten()
-                .any(|elem| has_multiline_content(elem, self.source));
-
         // Check if this is a "numbers-only" array (use fill) vs other (one-per-line)
+        //
+        // An element carrying its own newline — a line-continuation string, a multiline
+        // template — needs no arm of its own: its text node reports
+        // `CachedWidth::HasNewline`, so `will_break` breaks the group below exactly as
+        // prettier's `literalline`-borne `breakParent` does.
         let is_numbers_only = self.is_numbers_only_array(arr);
 
-        if has_multiline {
-            // Force expansion with hardlines for multiline content
-            self.build_array_group_doc_forced(arr, has_comments)
-        } else if is_numbers_only {
+        if is_numbers_only {
             // Use fill for greedy packing of numbers
             self.build_array_fill_doc(arr, has_comments)
         } else {
@@ -620,10 +610,9 @@ impl<'a> Printer<'a> {
     /// Push slot `i`'s element doc plus its inline leading/trailing block comments.
     ///
     /// The one definition of "an array element and the comments glued around it",
-    /// shared by [`Self::build_array_fill_doc`], [`Self::build_array_group_doc`] and its
-    /// forced twin [`Self::build_array_group_doc_forced`] — the three printers a *glued*
-    /// block comment can reach, since gluing is not an expansion trigger and so does not
-    /// divert the array to the expanding printer. Emitting the element alone DROPS the
+    /// shared by [`Self::build_array_fill_doc`] and [`Self::build_array_group_doc`] — the
+    /// two printers a *glued* block comment can reach, since gluing is not an expansion
+    /// trigger and so does not divert the array to the expanding printer. Emitting the element alone DROPS the
     /// trailing side (the leading side is owned by the element and rides inside its own
     /// doc), so the pairing is an invariant worth having one home rather than three.
     ///
@@ -839,54 +828,6 @@ impl<'a> Printer<'a> {
         } else {
             d.group(group_contents)
         }
-    }
-
-    /// Build group doc for arrays with multiline content (forced expansion with hardlines)
-    ///
-    /// The hardline twin of [`Self::build_array_group_doc`], taking the same array-wide
-    /// `has_comments` gate from the shared dispatch in [`Self::build_array_doc`] and
-    /// sharing its [`Self::push_array_element_with_inline_comments`] seam: a *glued* block
-    /// comment is not an expansion trigger, so `build_array_doc` does not divert a
-    /// commented array to the expanding printer, and a glued comment reaches this path
-    /// whenever some element also holds multiline content.
-    fn build_array_group_doc_forced(
-        &self,
-        arr: &internal::ArrayExpression<'_>,
-        has_comments: bool,
-    ) -> DocId {
-        let d = self.d();
-        let mut parts = DocBuf::new();
-
-        for i in 0..arr.elements.len() {
-            if i > 0 {
-                parts.push(d.text(","));
-
-                // Check for blank line before this element (preserved when wrapped) — the
-                // gap after the previous slot. Use literalline() for the blank line (no
-                // trailing whitespace) then hardline() for the indented content line —
-                // matches the non-forced path.
-                if self.has_blank_line_after_slot(arr, i - 1, None) {
-                    parts.push(d.literalline());
-                }
-
-                parts.push(d.hardline());
-            }
-
-            // Elements and their glued comments (a hole pushes nothing).
-            self.push_array_element_with_inline_comments(arr, i, has_comments, &mut parts);
-        }
-
-        // No trailing comma after the last element under `trailingComma: 'none'`, and no
-        // trailing comment left to place: the last element's same-line run — including a
-        // block past its source trailing comma — is claimed by the element seam above, and
-        // an own-line block comment before the closing bracket can't reach this path.
-        // `build_array_doc` routes an array to `build_array_doc_with_expanding_comments`
-        // whenever one is present — a single-line one via
-        // `has_own_line_block_comments_in_array` (which returns true for any own-line
-        // comment past the last element), a multi-line one via the on-page check.
-        let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
-        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
-        d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
     }
 
     /// Build a Doc for an array with comments that force expansion.
