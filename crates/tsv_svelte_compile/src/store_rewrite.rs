@@ -350,39 +350,60 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     None
                 } else {
                     Some(Statement::ForStatement(ast::ForStatement {
-                        init: init.unwrap_or_else(|| s.init.clone()),
-                        test: test.unwrap_or_else(|| s.test.clone()),
-                        update: update.unwrap_or_else(|| s.update.clone()),
+                        init: match init {
+                            Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
+                            None => s.init,
+                        },
+                        test: match test {
+                            Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
+                            None => s.test,
+                        },
+                        update: match update {
+                            Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
+                            None => s.update,
+                        },
                         body: body.unwrap_or(s.body),
                         span: s.span,
                     }))
                 }
             }
             Statement::ForInStatement(s) => {
-                let left = self.for_in_of_left(&s.left)?;
-                let right = self.expr(&s.right)?;
+                let left = self.for_in_of_left(s.left)?;
+                let right = self.expr(s.right)?;
                 let body = self.statement_ref(s.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
                     None
                 } else {
                     Some(Statement::ForInStatement(ast::ForInStatement {
-                        left: left.unwrap_or_else(|| s.left.clone()),
-                        right: right.unwrap_or_else(|| s.right.clone()),
+                        left: match left {
+                            Some(x) => self.b.arena.alloc(x),
+                            None => s.left,
+                        },
+                        right: match right {
+                            Some(x) => self.b.arena.alloc(x),
+                            None => s.right,
+                        },
                         body: body.unwrap_or(s.body),
                         span: s.span,
                     }))
                 }
             }
             Statement::ForOfStatement(s) => {
-                let left = self.for_in_of_left(&s.left)?;
-                let right = self.expr(&s.right)?;
+                let left = self.for_in_of_left(s.left)?;
+                let right = self.expr(s.right)?;
                 let body = self.statement_ref(s.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
                     None
                 } else {
                     Some(Statement::ForOfStatement(ast::ForOfStatement {
-                        left: left.unwrap_or_else(|| s.left.clone()),
-                        right: right.unwrap_or_else(|| s.right.clone()),
+                        left: match left {
+                            Some(x) => self.b.arena.alloc(x),
+                            None => s.left,
+                        },
+                        right: match right {
+                            Some(x) => self.b.arena.alloc(x),
+                            None => s.right,
+                        },
                         body: body.unwrap_or(s.body),
                         ..s.clone()
                     }))
@@ -442,7 +463,10 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 } else {
                     Some(Statement::TryStatement(ast::TryStatement {
                         block: block.unwrap_or_else(|| s.block.clone()),
-                        handler: handler.unwrap_or_else(|| s.handler.clone()),
+                        handler: match handler {
+                            Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
+                            None => s.handler,
+                        },
                         finalizer: finalizer.unwrap_or_else(|| s.finalizer.clone()),
                         span: s.span,
                     }))

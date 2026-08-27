@@ -363,13 +363,13 @@ fn block_min_stmt(stmt: &Statement<'_>, min: &mut Option<u32>) {
             block_min_stmt(s.body, min);
         }
         Statement::ForInStatement(s) => {
-            block_min_for_left(&s.left, min);
-            block_min_expr(&s.right, min);
+            block_min_for_left(s.left, min);
+            block_min_expr(s.right, min);
             block_min_stmt(s.body, min);
         }
         Statement::ForOfStatement(s) => {
-            block_min_for_left(&s.left, min);
-            block_min_expr(&s.right, min);
+            block_min_for_left(s.left, min);
+            block_min_expr(s.right, min);
             block_min_stmt(s.body, min);
         }
         Statement::WhileStatement(s) => {

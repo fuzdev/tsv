@@ -70,10 +70,10 @@ impl<'a> FlowBuilder<'a> {
             Statement::DoWhileStatement(s) => self.bind_do_statement(id, s),
             Statement::ForStatement(s) => self.bind_for_statement(id, s),
             Statement::ForInStatement(s) => {
-                self.bind_for_in_or_of(id, &s.left, &s.right, s.body);
+                self.bind_for_in_or_of(id, s.left, s.right, s.body);
             }
             Statement::ForOfStatement(s) => {
-                self.bind_for_in_or_of(id, &s.left, &s.right, s.body);
+                self.bind_for_in_or_of(id, s.left, s.right, s.body);
             }
             Statement::BreakStatement(s) => self.bind_break_statement(s),
             Statement::ContinueStatement(s) => self.bind_continue_statement(s),
@@ -150,13 +150,13 @@ impl<'a> FlowBuilder<'a> {
                 self.visit_statement(s.body);
             }
             Statement::ForInStatement(s) => {
-                self.visit_for_left(&s.left);
-                self.visit_expression(&s.right);
+                self.visit_for_left(s.left);
+                self.visit_expression(s.right);
                 self.visit_statement(s.body);
             }
             Statement::ForOfStatement(s) => {
-                self.visit_for_left(&s.left);
-                self.visit_expression(&s.right);
+                self.visit_for_left(s.left);
+                self.visit_expression(s.right);
                 self.visit_statement(s.body);
             }
             Statement::WhileStatement(s) => {
@@ -339,7 +339,7 @@ impl<'a> FlowBuilder<'a> {
         self.current_flow = pre_loop;
         // A nil condition is a true passthrough / false-unreachable, handled by
         // `create_flow_condition`'s nil-expression arm.
-        self.bind_condition(s.test.as_ref(), pre_body, post_loop, false);
+        self.bind_condition(s.test, pre_body, post_loop, false);
         self.current_flow = self.finish_flow_label(pre_body);
         self.bind_iterative_statement(s.body, post_loop, pre_increment);
         self.add_antecedent(pre_increment, self.current_flow);

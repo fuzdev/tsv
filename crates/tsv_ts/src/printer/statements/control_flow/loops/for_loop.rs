@@ -1056,8 +1056,8 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
-            &stmt.left,
-            &stmt.right,
+            stmt.left,
+            stmt.right,
             stmt.body,
             stmt.span.start,
             "in",
@@ -1073,8 +1073,8 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
-            &stmt.left,
-            &stmt.right,
+            stmt.left,
+            stmt.right,
             stmt.body,
             stmt.span.start,
             "of",

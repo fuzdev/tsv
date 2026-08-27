@@ -402,14 +402,14 @@ fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
                 || s.alternate.is_some_and(stmt_contains_import_meta)
         }
         S::ForStatement(s) => {
-            s.test.as_ref().is_some_and(expr_contains_import_meta)
+            s.test.is_some_and(|e| expr_contains_import_meta(e))
                 || stmt_contains_import_meta(s.body)
         }
         S::ForInStatement(s) => {
-            expr_contains_import_meta(&s.right) || stmt_contains_import_meta(s.body)
+            expr_contains_import_meta(s.right) || stmt_contains_import_meta(s.body)
         }
         S::ForOfStatement(s) => {
-            expr_contains_import_meta(&s.right) || stmt_contains_import_meta(s.body)
+            expr_contains_import_meta(s.right) || stmt_contains_import_meta(s.body)
         }
         S::WhileStatement(s) => {
             expr_contains_import_meta(&s.test) || stmt_contains_import_meta(s.body)

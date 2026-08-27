@@ -1218,22 +1218,22 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
                 Some(ForInit::Expression(e)) => walk_expr(e, nc),
                 None => {}
             }
-            walk_opt(s.test.as_ref(), nc);
-            walk_opt(s.update.as_ref(), nc);
+            walk_opt(s.test, nc);
+            walk_opt(s.update, nc);
             walk_stmt(s.body, nc, true);
             js_scope_restore(nc, mark);
         }
         Statement::ForInStatement(s) => {
             let mark = js_scope_mark(nc);
-            walk_for_left(&s.left, nc);
-            walk_expr(&s.right, nc);
+            walk_for_left(s.left, nc);
+            walk_expr(s.right, nc);
             walk_stmt(s.body, nc, true);
             js_scope_restore(nc, mark);
         }
         Statement::ForOfStatement(s) => {
             let mark = js_scope_mark(nc);
-            walk_for_left(&s.left, nc);
-            walk_expr(&s.right, nc);
+            walk_for_left(s.left, nc);
+            walk_expr(s.right, nc);
             walk_stmt(s.body, nc, true);
             js_scope_restore(nc, mark);
         }

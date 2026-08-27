@@ -782,13 +782,13 @@ impl<'s> Collector<'s> {
                 self.stmt(s.body);
             }
             Statement::ForInStatement(s) => {
-                self.for_left(&s.left);
-                self.expr(&s.right);
+                self.for_left(s.left);
+                self.expr(s.right);
                 self.stmt(s.body);
             }
             Statement::ForOfStatement(s) => {
-                self.for_left(&s.left);
-                self.expr(&s.right);
+                self.for_left(s.left);
+                self.expr(s.right);
                 self.stmt(s.body);
             }
             Statement::WhileStatement(s) => {

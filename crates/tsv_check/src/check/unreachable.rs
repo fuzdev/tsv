@@ -497,13 +497,13 @@ impl CandidateWalk<'_> {
                 self.visit_list(std::slice::from_ref(s.body));
             }
             S::ForInStatement(s) => {
-                self.visit_for_left(&s.left);
-                self.visit_expr(&s.right);
+                self.visit_for_left(s.left);
+                self.visit_expr(s.right);
                 self.visit_list(std::slice::from_ref(s.body));
             }
             S::ForOfStatement(s) => {
-                self.visit_for_left(&s.left);
-                self.visit_expr(&s.right);
+                self.visit_for_left(s.left);
+                self.visit_expr(s.right);
                 self.visit_list(std::slice::from_ref(s.body));
             }
             S::WhileStatement(s) => {

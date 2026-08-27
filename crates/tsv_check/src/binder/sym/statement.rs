@@ -141,13 +141,13 @@ impl<'a> SymbolBinder<'a> {
             }
             Statement::ForStatement(s) => self.bind_for_statement(s),
             Statement::ForInStatement(s) => self.with_block_scope(|bd| {
-                bd.bind_for_left(&s.left);
-                bd.visit_expression(&s.right);
+                bd.bind_for_left(s.left);
+                bd.visit_expression(s.right);
                 bd.visit_statement(s.body, DeclMods::default(), false);
             }),
             Statement::ForOfStatement(s) => self.with_block_scope(|bd| {
-                bd.bind_for_left(&s.left);
-                bd.visit_expression(&s.right);
+                bd.bind_for_left(s.left);
+                bd.visit_expression(s.right);
                 bd.visit_statement(s.body, DeclMods::default(), false);
             }),
             Statement::WhileStatement(s) => {

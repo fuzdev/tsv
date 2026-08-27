@@ -762,9 +762,9 @@ pub(crate) fn emit_each_block<'arena>(
     let for_body = block_stmt(&env.b, body_stmts);
     let for_here = env.b.here();
     let for_loop = Statement::ForStatement(ForStatement {
-        init: Some(ForInit::VariableDeclaration(init_decl)),
-        test: Some(test),
-        update: Some(update),
+        init: Some(arena.alloc(ForInit::VariableDeclaration(init_decl))),
+        test: Some(arena.alloc(test)),
+        update: Some(arena.alloc(update)),
         body: for_body,
         span: for_here,
     });
