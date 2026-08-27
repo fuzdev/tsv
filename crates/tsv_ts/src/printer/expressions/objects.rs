@@ -79,23 +79,15 @@ impl<'a> Printer<'a> {
         let first_prop_start = obj.properties[0].span().start;
         let has_source_newline = self.has_newline_between(obj.span.start + 1, first_prop_start);
 
-        // Check if any property value has multiline content (e.g., line continuation strings)
-        // Prettier expands objects containing multiline strings (recursively)
-        let has_multiline =
-            crate::printer::container_may_have_multiline_content(obj.span, self.source)
-                && obj.properties.iter().any(|prop| match prop {
-                    internal::ObjectProperty::Property(p) => {
-                        crate::printer::has_multiline_content(&p.value, self.source)
-                    }
-                    internal::ObjectProperty::SpreadElement(s) => {
-                        crate::printer::has_multiline_content(s.argument, self.source)
-                    }
-                });
-
         // Decide the formatting strategy
-        // must_break: conditions that require hardlines (comments, multiline content)
+        // must_break: conditions that require hardlines (comments)
         // has_source_newline: prefers expanded, but uses group_break for proper propagation
-        let must_break = has_line_comments || has_standalone_block_comment || has_multiline;
+        //
+        // A property value carrying its own newline — a line-continuation string, a
+        // multiline template — needs no term here: its text node reports
+        // `CachedWidth::HasNewline`, so `will_break` breaks this object exactly as
+        // prettier's `literalline`-borne `breakParent` does.
+        let must_break = has_line_comments || has_standalone_block_comment;
 
         if has_comments || must_break {
             // Comment-aware path
