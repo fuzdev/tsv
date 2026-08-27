@@ -27,6 +27,7 @@ use crate::printing::visual_width;
 use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
 
 use super::DocBuf;
+use super::specialize_short_len;
 #[cfg(feature = "swallow_check")]
 use super::swallow::swallow_check_enabled;
 use super::types::{
@@ -1103,6 +1104,11 @@ impl DocArena {
     }
 
     /// Allocate a child range from a slice of DocIds.
+    ///
+    /// A child range holds exactly **two** ids in 65% of calls (census over
+    /// three app corpora, stable within a point on each), so the append is
+    /// specialized on that length — see `specialize_short_len!` for why, and for
+    /// why the list here is one entry rather than the render write's nine.
     #[inline]
     fn alloc_children(&self, ids: &[DocId]) -> ChildRange {
         if ids.is_empty() {
@@ -1111,7 +1117,7 @@ impl DocArena {
         let mut children = self.children.borrow_mut();
         let start = children.len() as u32;
         let len = ids.len() as u32;
-        children.extend_from_slice(ids);
+        specialize_short_len!(ids.len(), [2], children.extend_from_slice(ids));
         ChildRange { start, len }
     }
 
