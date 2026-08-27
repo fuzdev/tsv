@@ -376,11 +376,11 @@ impl<'a> FlowBuilder<'a> {
             E::NewExpression(n) => self.visit_new_expression(n),
             E::ConditionalExpression(c) => self.bind_conditional_expression_flow(c),
             E::ArrowFunctionExpression(a) => {
-                let id = self.require(addr_of(a), NodeKind::ArrowFunctionExpression);
+                let id = self.require(addr_of(*a), NodeKind::ArrowFunctionExpression);
                 self.visit_arrow(a, id, false);
             }
             E::FunctionExpression(f) => {
-                let id = self.require(addr_of(f), NodeKind::FunctionExpression);
+                let id = self.require(addr_of(*f), NodeKind::FunctionExpression);
                 self.visit_function_expression(f, id, false);
             }
             E::ClassExpression(c) => self.visit_class_expr(c),
@@ -489,14 +489,14 @@ impl<'a> FlowBuilder<'a> {
                 for arg in c.arguments {
                     self.visit_expression(arg);
                 }
-                let id = self.require(addr_of(a), NodeKind::ArrowFunctionExpression);
+                let id = self.require(addr_of(*a), NodeKind::ArrowFunctionExpression);
                 self.visit_arrow(a, id, true);
             }
             E::FunctionExpression(f) if !f.r#async && !f.generator => {
                 for arg in c.arguments {
                     self.visit_expression(arg);
                 }
-                let id = self.require(addr_of(f), NodeKind::FunctionExpression);
+                let id = self.require(addr_of(*f), NodeKind::FunctionExpression);
                 self.visit_function_expression(f, id, true);
             }
             _ => {
@@ -639,7 +639,7 @@ impl<'a> FlowBuilder<'a> {
             // (`IsObjectLiteralOrClassExpressionMethodOrAccessor`,
             // utilities.go:566; the class-expression half lives in `visit_method`).
             self.visit_expression(&pr.key);
-            let anchor = self.require(addr_of(f), NodeKind::FunctionExpression);
+            let anchor = self.require(addr_of(*f), NodeKind::FunctionExpression);
             let prop_id = self.require(addr_of(pr), NodeKind::Property);
             self.set_flow_leaf(prop_id);
             let saved = self.enter_container(Some(prop_id), false, false);

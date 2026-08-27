@@ -298,7 +298,7 @@ impl<'arena> Builder<'arena> {
         anchor: Span,
         body: &'arena Expression<'arena>,
     ) -> Expression<'arena> {
-        Expression::ArrowFunctionExpression(ArrowFunctionExpression {
+        Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
             type_parameters: None,
             params: &[],
             body: ArrowFunctionBody::Expression(body),
@@ -307,7 +307,7 @@ impl<'arena> Builder<'arena> {
             params_start: Some(anchor.start),
             arrow_token: anchor.start,
             span: anchor,
-        })
+        }))
     }
 
     /// `$.derived(<argument>)` for a `$derived` / `$derived.by` rewrite. Every
@@ -363,7 +363,7 @@ impl<'arena> Builder<'arena> {
         let params_start = start;
         self.mint(") => {");
         let end = self.mint("}").end;
-        Expression::ArrowFunctionExpression(ArrowFunctionExpression {
+        Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
             type_parameters: None,
             params,
             body: ArrowFunctionBody::BlockStatement(BlockStatement {
@@ -375,7 +375,7 @@ impl<'arena> Builder<'arena> {
             params_start: Some(params_start),
             arrow_token: block_span.start,
             span: Span::new(start, end),
-        })
+        }))
     }
 
     /// A zero-width synthetic span at the current appendix end. For a wrapper

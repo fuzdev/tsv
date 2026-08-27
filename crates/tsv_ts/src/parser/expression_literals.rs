@@ -219,7 +219,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 )?;
                 (
                     accessor,
-                    Expression::FunctionExpression(func_expr),
+                    Expression::FunctionExpression(arena.alloc(func_expr)),
                     false,
                     false,
                 )
@@ -232,7 +232,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let func_expr = self.parse_method_body(is_async_method, is_generator)?;
                 (
                     PropertyKind::Init,
-                    Expression::FunctionExpression(func_expr),
+                    Expression::FunctionExpression(arena.alloc(func_expr)),
                     false,
                     true,
                 )
