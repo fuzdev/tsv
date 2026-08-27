@@ -683,18 +683,18 @@ fn walk_statement(
                 Some(ForInit::Expression(e)) => walk_expression(e, ctx)?,
                 None => {}
             }
-            walk_opt(s.test.as_ref(), ctx)?;
-            walk_opt(s.update.as_ref(), ctx)?;
+            walk_opt(s.test, ctx)?;
+            walk_opt(s.update, ctx)?;
             walk_statement(s.body, ctx, depth + 1)
         }
         Statement::ForInStatement(s) => {
-            walk_for_left(&s.left, ctx, depth)?;
-            walk_expression(&s.right, ctx)?;
+            walk_for_left(s.left, ctx, depth)?;
+            walk_expression(s.right, ctx)?;
             walk_statement(s.body, ctx, depth + 1)
         }
         Statement::ForOfStatement(s) => {
-            walk_for_left(&s.left, ctx, depth)?;
-            walk_expression(&s.right, ctx)?;
+            walk_for_left(s.left, ctx, depth)?;
+            walk_expression(s.right, ctx)?;
             walk_statement(s.body, ctx, depth + 1)
         }
         Statement::WhileStatement(s) => {

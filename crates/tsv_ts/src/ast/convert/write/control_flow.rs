@@ -71,9 +71,9 @@ pub(super) fn write_for_in_statement(
 ) {
     node_header(w, "ForInStatement", for_in.span, ctx);
     w.raw(",\"left\":");
-    write_for_in_of_left(w, &for_in.left, ctx);
+    write_for_in_of_left(w, for_in.left, ctx);
     w.raw(",\"right\":");
-    write_expression(w, &for_in.right, ctx);
+    write_expression(w, for_in.right, ctx);
     w.raw(",\"body\":");
     write_statement(w, for_in.body, ctx);
     close_node(w, "ForInStatement", for_in.span, ctx);
@@ -90,9 +90,9 @@ pub(super) fn write_for_of_statement(
     w.raw(",\"await\":");
     w.bool(for_of.r#await);
     w.raw(",\"left\":");
-    write_for_in_of_left(w, &for_of.left, ctx);
+    write_for_in_of_left(w, for_of.left, ctx);
     w.raw(",\"right\":");
-    write_expression(w, &for_of.right, ctx);
+    write_expression(w, for_of.right, ctx);
     w.raw(",\"body\":");
     write_statement(w, for_of.body, ctx);
     close_node(w, "ForOfStatement", for_of.span, ctx);

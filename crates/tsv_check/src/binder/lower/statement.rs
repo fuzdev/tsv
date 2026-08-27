@@ -127,13 +127,13 @@ impl SoaWalk {
                 self.visit_statement(s.body, id);
             }
             Statement::ForInStatement(s) => {
-                self.visit_for_left(&s.left, id);
-                self.visit_expression(&s.right, id);
+                self.visit_for_left(s.left, id);
+                self.visit_expression(s.right, id);
                 self.visit_statement(s.body, id);
             }
             Statement::ForOfStatement(s) => {
-                self.visit_for_left(&s.left, id);
-                self.visit_expression(&s.right, id);
+                self.visit_for_left(s.left, id);
+                self.visit_expression(s.right, id);
                 self.visit_statement(s.body, id);
             }
             Statement::WhileStatement(s) => {

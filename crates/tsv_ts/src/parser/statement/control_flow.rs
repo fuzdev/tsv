@@ -108,7 +108,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 return self.parse_for_of(
                     start,
-                    ForInOfLeft::VariableDeclaration(var_decl),
+                    self.arena.alloc(ForInOfLeft::VariableDeclaration(var_decl)),
                     is_await,
                 );
             }
@@ -138,20 +138,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             if is_for_in {
                 self.advance()?;
-                return self.parse_for_in(start, ForInOfLeft::VariableDeclaration(var_decl));
+                return self.parse_for_in(
+                    start,
+                    self.arena.alloc(ForInOfLeft::VariableDeclaration(var_decl)),
+                );
             }
             if is_for_of {
                 self.advance()?;
                 return self.parse_for_of(
                     start,
-                    ForInOfLeft::VariableDeclaration(var_decl),
+                    self.arena.alloc(ForInOfLeft::VariableDeclaration(var_decl)),
                     is_await,
                 );
             }
 
             // Standard for loop with var decl init
             self.expect(&TokenKind::Semicolon)?;
-            return self.parse_for_standard(start, Some(ForInit::VariableDeclaration(var_decl)));
+            return self.parse_for_standard(
+                start,
+                Some(self.arena.alloc(ForInit::VariableDeclaration(var_decl))),
+            );
         }
 
         // `for await (async of …)` — here `async` is a plain IdentifierReference
@@ -174,7 +180,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 Span::new(id_start as u32, id_end as u32),
             ));
             self.advance()?; // consume 'of'
-            return self.parse_for_of(start, ForInOfLeft::Pattern(async_ident), is_await);
+            return self.parse_for_of(
+                start,
+                self.arena.alloc(ForInOfLeft::Pattern(async_ident)),
+                is_await,
+            );
         }
 
         // Parse expression (could be init or left-hand side)
@@ -190,30 +200,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
             self.advance()?;
             let left = self.to_assignable(expr, AssignableContext::ForHead)?;
-            return self.parse_for_in(start, ForInOfLeft::Pattern(left));
+            return self.parse_for_in(start, self.arena.alloc(ForInOfLeft::Pattern(left)));
         }
         if self.current_value() == "of" {
             self.advance()?;
             let left = self.to_assignable(expr, AssignableContext::ForHead)?;
-            return self.parse_for_of(start, ForInOfLeft::Pattern(left), is_await);
+            return self.parse_for_of(
+                start,
+                self.arena.alloc(ForInOfLeft::Pattern(left)),
+                is_await,
+            );
         }
 
         // Standard for loop with expression init
         self.expect(&TokenKind::Semicolon)?;
-        self.parse_for_standard(start, Some(ForInit::Expression(expr)))
+        self.parse_for_standard(start, Some(self.arena.alloc(ForInit::Expression(expr))))
     }
 
     /// Parse standard for loop: `for (init; test; update) body`
     fn parse_for_standard(
         &mut self,
         start: usize,
-        init: Option<ForInit<'arena>>,
+        init: Option<&'arena ForInit<'arena>>,
     ) -> Result<Statement<'arena>, ParseError> {
         // Parse test (optional)
         let test = if self.check(&TokenKind::Semicolon) {
             None
         } else {
-            Some(self.parse_expression()?)
+            Some(&*self.arena.alloc(self.parse_expression()?))
         };
         self.expect(&TokenKind::Semicolon)?;
 
@@ -221,7 +235,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let update = if self.check(&TokenKind::ParenClose) {
             None
         } else {
-            Some(self.parse_expression()?)
+            Some(&*self.arena.alloc(self.parse_expression()?))
         };
         self.expect(&TokenKind::ParenClose)?;
 
@@ -242,9 +256,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_for_in(
         &mut self,
         start: usize,
-        left: ForInOfLeft<'arena>,
+        left: &'arena ForInOfLeft<'arena>,
     ) -> Result<Statement<'arena>, ParseError> {
-        let right = self.parse_expression()?;
+        let right = self.arena.alloc(self.parse_expression()?);
         self.expect(&TokenKind::ParenClose)?;
 
         let body = self.arena.alloc(self.parse_statement()?);
@@ -262,7 +276,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_for_of(
         &mut self,
         start: usize,
-        left: ForInOfLeft<'arena>,
+        left: &'arena ForInOfLeft<'arena>,
         r#await: bool,
     ) -> Result<Statement<'arena>, ParseError> {
         // A for-of variable declaration may not have an initializer: ecma262's
@@ -272,7 +286,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `using` / `await using` heads too (all arrive here as a VariableDeclaration
         // left). A default *inside* a binding pattern (`for (const {x = 1} of [])`) is
         // a pattern default, not a declarator initializer, so it stays valid.
-        if matches!(&left, ForInOfLeft::VariableDeclaration(decl)
+        if matches!(left, ForInOfLeft::VariableDeclaration(decl)
             if decl.declarations.iter().any(|d| d.init.is_some()))
         {
             return Err(
@@ -280,7 +294,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             );
         }
 
-        let right = self.parse_expression()?;
+        let right = self.arena.alloc(self.parse_expression()?);
         self.expect(&TokenKind::ParenClose)?;
 
         let body = self.arena.alloc(self.parse_statement()?);
@@ -457,7 +471,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse optional catch clause
         let handler = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Catch)) {
-            Some(self.parse_catch_clause()?)
+            Some(&*self.arena.alloc(self.parse_catch_clause()?))
         } else {
             None
         };
@@ -479,7 +493,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let end = finalizer.as_ref().map_or_else(
-            || handler.as_ref().map_or(block.span.end, |h| h.span.end),
+            || handler.map_or(block.span.end, |h| h.span.end),
             |f| f.span.end,
         );
 
