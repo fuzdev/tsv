@@ -140,13 +140,13 @@ impl<'a> CheckWalk<'a> {
                 self.visit_statement(s.body);
             }
             Statement::ForInStatement(s) => {
-                self.visit_for_left(&s.left);
-                self.visit_expression(&s.right);
+                self.visit_for_left(s.left);
+                self.visit_expression(s.right);
                 self.visit_statement(s.body);
             }
             Statement::ForOfStatement(s) => {
-                self.visit_for_left(&s.left);
-                self.visit_expression(&s.right);
+                self.visit_for_left(s.left);
+                self.visit_expression(s.right);
                 self.visit_statement(s.body);
             }
             Statement::WhileStatement(s) => {

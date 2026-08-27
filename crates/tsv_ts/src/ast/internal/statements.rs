@@ -20,7 +20,9 @@ pub enum Statement<'arena> {
     ExpressionStatement(ExpressionStatement<'arena>),
     VariableDeclaration(VariableDeclaration<'arena>),
     // Inline by value: the layout favors traversal locality over node size, so
-    // these declarations are kept inline rather than arena-boxed.
+    // these declarations are kept inline rather than arena-boxed. That trade only
+    // holds for a variant the corpus actually spells — see the loop and `try` heads
+    // below, which are arena-boxed for the opposite reason.
     TSTypeAliasDeclaration(TSTypeAliasDeclaration<'arena>),
     TSInterfaceDeclaration(TSInterfaceDeclaration<'arena>),
     TSDeclareFunction(TSDeclareFunction<'arena>),
@@ -141,14 +143,24 @@ pub struct IfStatement<'arena> {
 }
 
 /// For statement: `for (init; test; update) body`
+///
+/// The three head slots are arena references, not inline values. `Statement` is a
+/// by-value enum stored inline in `&'arena [Statement]`, so every variant pays its
+/// widest sibling's size on **every** element of **every** statement slice and on
+/// every `?`-propagation copy out of the parser — while a pointer chase is paid only
+/// where the variant is actually spelled. `for (;;)` is 0.05–0.22% of statements in
+/// real source, and inlining `ForInit` + two `Option<Expression>` here set the whole
+/// enum's size on its own. The same trade is taken by `ForInStatement`,
+/// `ForOfStatement` and `TryStatement`; the frequent declaration variants above keep
+/// their inline layout, where it is the right way round.
 #[derive(Debug, Clone)]
 pub struct ForStatement<'arena> {
     /// Initialization: variable declaration or expression (or None)
-    pub init: Option<ForInit<'arena>>,
+    pub init: Option<&'arena ForInit<'arena>>,
     /// Test condition (or None for infinite loop)
-    pub test: Option<Expression<'arena>>,
+    pub test: Option<&'arena Expression<'arena>>,
     /// Update expression (or None)
-    pub update: Option<Expression<'arena>>,
+    pub update: Option<&'arena Expression<'arena>>,
     pub body: &'arena Statement<'arena>,
     pub span: Span,
 }
@@ -161,21 +173,25 @@ pub enum ForInit<'arena> {
 }
 
 /// For-in statement: `for (left in right) body`
+///
+/// Head slots are arena references for the density reason on `ForStatement`.
 #[derive(Debug, Clone)]
 pub struct ForInStatement<'arena> {
     /// Left side: variable declaration or expression pattern
-    pub left: ForInOfLeft<'arena>,
-    pub right: Expression<'arena>,
+    pub left: &'arena ForInOfLeft<'arena>,
+    pub right: &'arena Expression<'arena>,
     pub body: &'arena Statement<'arena>,
     pub span: Span,
 }
 
 /// For-of statement: `for (left of right) body`
+///
+/// Head slots are arena references for the density reason on `ForStatement`.
 #[derive(Debug, Clone)]
 pub struct ForOfStatement<'arena> {
     /// Left side: variable declaration or expression pattern
-    pub left: ForInOfLeft<'arena>,
-    pub right: Expression<'arena>,
+    pub left: &'arena ForInOfLeft<'arena>,
+    pub right: &'arena Expression<'arena>,
     /// Whether this is `for await (... of ...)`
     pub r#await: bool,
     pub body: &'arena Statement<'arena>,
@@ -226,7 +242,9 @@ pub struct SwitchCase<'arena> {
 #[derive(Debug, Clone)]
 pub struct TryStatement<'arena> {
     pub block: BlockStatement<'arena>,
-    pub handler: Option<CatchClause<'arena>>,
+    /// Arena reference rather than an inline `CatchClause` (208 B on its own) for the
+    /// density reason on `ForStatement`.
+    pub handler: Option<&'arena CatchClause<'arena>>,
     pub finalizer: Option<BlockStatement<'arena>>,
     pub span: Span,
 }

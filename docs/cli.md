@@ -162,11 +162,11 @@ why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the
 corpus nests 69 levels; the exposure is generated and minified code.
 
 Parens are not the tightest shape, only the easiest to state. Per nesting level, in a
-release build: **statement nesting ~5.3 KiB** (the worst measured — ~6,200 levels, which
-is the depth every shape clears), TS object literals ~3.3, TS *types* ~3.2, Svelte
-elements ~3.2, nested binary chains ~2.0, calls ~1.9, array literals ~1.7, computed
-member subscripts ~1.5, parens ~1.2, unary / ternary / assignment chains ~0.75, CSS rules
-~0.4.
+release build: **nested arrow bodies ~4.5 KiB** (the worst measured — ~7,300 levels,
+which is the depth every shape clears), TS object literals ~3.3, TS *types* ~3.2, Svelte
+elements ~3.2, statement nesting ~2.0, nested binary chains ~2.0, calls ~1.9, array
+literals ~1.7, computed member subscripts ~1.5, parens ~1.2, unary / ternary / assignment
+chains ~0.75, CSS rules ~0.4.
 
 What sets a shape's cost is the stack slots its cycle's functions **reserve**, not the
 work they do: a frame is sized once for the widest arm, and every level pays all of it
@@ -177,9 +177,14 @@ builder either boxes into the arena at its own tail (`ParsedExpr::from_expr`, le
 caller an 8-byte reference) or returns its own concrete node struct — an
 `ObjectExpression` is 32 B, and the dispatcher arm that wraps one back into an
 `Expression` builds a temporary the compiler merges with its sibling arms' rather than a
-return slot it cannot. Statement nesting is the binding shape because that layer still
-threads statements by value — a `Statement` is 544 B (its `ForStatement` variant sets the
-size) and the statement dispatchers hold several at once.
+return slot it cannot. The statement layer still threads its nodes by value, so the same
+pressure applies to `Statement`'s own width — and there it is answered from the other
+side, by *density*: the four variants wide enough to set the enum's size on their own
+(`ForStatement`, `ForOfStatement`, `ForInStatement`, `TryStatement`) hold their heads as
+arena references, so a `Statement` is 208 B rather than 544. That trade only runs this
+way because those variants are rare — a classic `for (;;)` is 0.05–0.22% of statements in
+real source — while the size is paid on every element of every statement slice and on
+every `?`-propagation copy. The frequent declaration variants stay inline.
 
 **The other surfaces have their own ceilings, set by their hosts, and the CLI's
 reservation does not reach them:**

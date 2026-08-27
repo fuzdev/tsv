@@ -682,41 +682,62 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement::ForStatement(
                     tsv_ts::ast::internal::ForStatement {
-                        init: init.unwrap_or_else(|| stmt.init.clone()),
-                        test: test.unwrap_or_else(|| stmt.test.clone()),
-                        update: update.unwrap_or_else(|| stmt.update.clone()),
+                        init: match init {
+                            Some(v) => v.map(|x| &*self.arena.alloc(x)),
+                            None => stmt.init,
+                        },
+                        test: match test {
+                            Some(v) => v.map(|x| &*self.arena.alloc(x)),
+                            None => stmt.test,
+                        },
+                        update: match update {
+                            Some(v) => v.map(|x| &*self.arena.alloc(x)),
+                            None => stmt.update,
+                        },
                         body: body.unwrap_or(stmt.body),
                         span: stmt.span,
                     },
                 ))
             }
             Statement::ForInStatement(stmt) => {
-                let left = self.for_in_of_left(&stmt.left)?;
-                let right = self.expr(&stmt.right)?;
+                let left = self.for_in_of_left(stmt.left)?;
+                let right = self.expr(stmt.right)?;
                 let body = self.statement_ref(stmt.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
                     return Ok(StmtOut::Keep);
                 }
                 StmtOut::Replace(Statement::ForInStatement(
                     tsv_ts::ast::internal::ForInStatement {
-                        left: left.unwrap_or_else(|| stmt.left.clone()),
-                        right: right.unwrap_or_else(|| stmt.right.clone()),
+                        left: match left {
+                            Some(x) => self.arena.alloc(x),
+                            None => stmt.left,
+                        },
+                        right: match right {
+                            Some(x) => self.arena.alloc(x),
+                            None => stmt.right,
+                        },
                         body: body.unwrap_or(stmt.body),
                         span: stmt.span,
                     },
                 ))
             }
             Statement::ForOfStatement(stmt) => {
-                let left = self.for_in_of_left(&stmt.left)?;
-                let right = self.expr(&stmt.right)?;
+                let left = self.for_in_of_left(stmt.left)?;
+                let right = self.expr(stmt.right)?;
                 let body = self.statement_ref(stmt.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
                     return Ok(StmtOut::Keep);
                 }
                 StmtOut::Replace(Statement::ForOfStatement(
                     tsv_ts::ast::internal::ForOfStatement {
-                        left: left.unwrap_or_else(|| stmt.left.clone()),
-                        right: right.unwrap_or_else(|| stmt.right.clone()),
+                        left: match left {
+                            Some(x) => self.arena.alloc(x),
+                            None => stmt.left,
+                        },
+                        right: match right {
+                            Some(x) => self.arena.alloc(x),
+                            None => stmt.right,
+                        },
                         body: body.unwrap_or(stmt.body),
                         ..stmt.clone()
                     },
@@ -780,7 +801,10 @@ impl<'arena> Eraser<'arena, '_> {
                 StmtOut::Replace(Statement::TryStatement(
                     tsv_ts::ast::internal::TryStatement {
                         block: block.unwrap_or_else(|| stmt.block.clone()),
-                        handler: handler.unwrap_or_else(|| stmt.handler.clone()),
+                        handler: match handler {
+                            Some(v) => v.map(|x| &*self.arena.alloc(x)),
+                            None => stmt.handler,
+                        },
                         finalizer: finalizer.unwrap_or_else(|| stmt.finalizer.clone()),
                         span: stmt.span,
                     },
