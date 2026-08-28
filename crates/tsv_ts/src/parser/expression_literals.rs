@@ -268,7 +268,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 if self.eat(TokenKind::Equals) {
                     // `{ a = 1 }`: parsed as an AssignmentExpression.
-                    let default_value = self.parse_assignment_expression()?;
+                    let default_value = self.parse_assignment_expression_ref()?;
                     // prev_token_end covers a parenthesized default's closing `)`
                     let assign_end = self.prev_token_end() as u32;
                     (
@@ -276,7 +276,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         &*arena.alloc(Expression::AssignmentExpression(AssignmentExpression {
                             left: arena.alloc(key.clone()),
                             operator: AssignmentOperator::Assign,
-                            right: arena.alloc(default_value),
+                            right: default_value,
                             span: Span::new(key.span().start, assign_end),
                         })),
                         true,

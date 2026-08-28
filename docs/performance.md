@@ -537,6 +537,52 @@ Because the ratio is relative to the corpus it ran on, a compiled corpus that
 *grows* (a refusal class getting unlocked) reshapes the denominator — so an anchor
 is only comparable to another anchor over the same corpus.
 
+### 10. `tsv_debug ast_census` + `tsv_debug type_sizes` — the density pair
+
+The two inputs every AST-density decision needs, and the reason they are one
+section: a lever that narrows a type is worth **population × bytes saved**, and
+neither factor can be reasoned out. Width is not population — the widest node
+enum in the tree can be two percent of the traffic — and population is not
+width, so ranking by either alone mis-ranks the ladder.
+
+`type_sizes` prints the `size_of` / `align_of` board for every public AST type
+in `tsv_ts` / `tsv_svelte` / `tsv_css` plus the foundation types, widest first,
+with `size_of::<Result<T, ParseError>>()` beside each (a payload of at least 16
+bytes whose `Result` is wider has no niche for the error and pays a word on
+every fallible return — those rows are starred). `--min` / `--top` / `--group`
+trim it; `--json` for scripting. It complements the in-crate
+`const _: () = assert!(size_of::<T>() == N)` guards rather than replacing them:
+those pin the few widths a change must not move, and this makes the rest
+*visible*, so a type that grows shows up as a row that moved.
+
+`ast_census` counts, per node kind, what a parse over a corpus actually builds.
+`--bytes` joins each row against that board by name and prints `count × size`,
+which is the slot-megabyte column a density lever is ranked by, plus the
+corpus's total slot bytes against its source bytes. `--slots` adds a
+`Parent.field -> Child` tally, which is what separates one struct's two
+populations — an object literal's `Property` from a destructuring pattern's, the
+same Rust type and so the same row without it. `--min` / `--top` / `--json` as
+above.
+
+```bash
+cargo run -p tsv_debug type_sizes --min 96              # the wide end of the board
+cargo run --release -p tsv_debug -- ast_census ../fuz_app/src --bytes --top 20
+cargo run --release -p tsv_debug -- ast_census ../fuz_app/src --slots
+```
+
+⚠️ **Counts come off the wire AST**, which the writer emits by walking the
+internal AST once, one object per node — so a count is the parser's own
+construction count for every node the wire names. The blind spot is an internal
+node the writer does not name: `ParenthesizedExpression` and `JsdocCast` are
+`Expression` variants it prints *through* (so a census of `Expression` values is
+a lower bound, short by exactly the parenthesized ones), and the slot enums
+(`ForInit`, `ArrowFunctionBody`, `AttributeValue`) are field types rather than
+emitted objects, reachable only through `--slots`. Every container the density
+ladder asks about is a named wire node and is counted exactly.
+
+The same query answers a non-perf question: pointed at `tests/fixtures`, the
+census says which node kinds the fixture tree never exercises.
+
 ## Measurement Process
 
 ### Before an optimization
@@ -891,7 +937,9 @@ These aren't set up yet but may be useful for specific investigations:
 
 - **Criterion microbenchmarks** — statistical rigor for isolated hot functions
 - **Custom counters** — `fits()` call counts (when investigating algorithmic
-  issues; doc-node counts are already covered by `arena_stats`, §7)
+  issues; doc-node counts are already covered by `arena_stats`, §7, and AST-node
+  populations by `ast_census`, §10 — reach for those before wiring a throwaway
+  counter table into the parser)
 
 ## Baselines and tracking
 

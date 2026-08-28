@@ -227,7 +227,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let test = if self.check(&TokenKind::Semicolon) {
             None
         } else {
-            Some(&*self.arena.alloc(self.parse_expression()?))
+            Some(self.parse_expression_ref()?)
         };
         self.expect(&TokenKind::Semicolon)?;
 
@@ -235,7 +235,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let update = if self.check(&TokenKind::ParenClose) {
             None
         } else {
-            Some(&*self.arena.alloc(self.parse_expression()?))
+            Some(self.parse_expression_ref()?)
         };
         self.expect(&TokenKind::ParenClose)?;
 
@@ -258,7 +258,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
         left: &'arena ForInOfLeft<'arena>,
     ) -> Result<Statement<'arena>, ParseError> {
-        let right = self.arena.alloc(self.parse_expression()?);
+        let right = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
         let body = self.arena.alloc(self.parse_statement()?);
@@ -294,7 +294,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             );
         }
 
-        let right = self.arena.alloc(self.parse_expression()?);
+        let right = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
         let body = self.arena.alloc(self.parse_statement()?);

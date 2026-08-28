@@ -790,7 +790,13 @@ cargo run --release -p tsv_debug -- json_profile ../zzz/src/lib  # FFI parse pat
 cargo run -p tsv_debug buffer_sizes ../zzz/src ../gro/src     # printer SmallVec sizing histograms (§8)
 cargo run -p tsv_debug arena_stats ../zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile against the format wall (§9)
+cargo run --release -p tsv_debug -- ast_census ../zzz/src        # per-node-kind population (--bytes joins the size board, --slots) (§10)
+cargo run -p tsv_debug type_sizes                                # the `size_of` board: every public AST type's width (§10)
 ```
+
+The last two are the **density pair**: a lever that narrows a type is worth
+`count x bytes saved`, and neither factor is guessable — `ast_census --bytes`
+multiplies them in one table. Also `deno task ast-census` / `deno task type-sizes`.
 
 **Codebase Metrics:**
 
