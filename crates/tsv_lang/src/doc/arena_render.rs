@@ -43,29 +43,6 @@ impl GroupModeMap {
     }
 }
 
-/// Trim trailing whitespace from only the last line of output.
-/// Interior lines are already handled by `trim_trailing_whitespace()` in `render_line_break()`.
-fn trim_last_line(mut s: String) -> String {
-    trim_last_line_in_place(&mut s);
-    s
-}
-
-/// In-place form of [`trim_last_line`] for the `*_into` entry points that
-/// render into a caller-provided buffer.
-fn trim_last_line_in_place(s: &mut String) {
-    // Find the last newline — only trim after it (the final line). A manual
-    // reverse byte scan avoids `str::rfind('\n')`'s `CharSearcher`/`memrchr`
-    // setup; `\n` is single-byte ASCII so its byte index is a char boundary and
-    // the resulting slice is identical.
-    let trim_start = s
-        .as_bytes()
-        .iter()
-        .rposition(|&b| b == b'\n')
-        .map_or(0, |i| i + 1);
-    let trimmed_len = s[trim_start..].trim_end_matches([' ', '\t']).len();
-    s.truncate(trim_start + trimmed_len);
-}
-
 //
 // Shared rendering helpers
 //
@@ -229,7 +206,19 @@ fn remaining_width(pos: usize, render: &RenderConfig, embed: &EmbedContext) -> i
 
 /// Trim trailing whitespace (spaces and tabs) from the end of the output buffer.
 /// Matches Prettier's `trim()` / `trimIndentation()` — called before each
-/// non-literal newline to strip trailing indentation/spaces from code lines.
+/// non-literal newline to strip trailing indentation/spaces from code lines, and
+/// once more when a render finishes, as the **final-line** trim.
+///
+/// ⚠️ **Those two are one question, and the final-line trim's "find the last line
+/// first" step was inert.** It used to `rposition` back to the last `\n` and trim
+/// only the slice after it. But this walk steps over `' '` and `'\t'` and nothing
+/// else, and `'\n'` is neither — so it halts at the last line's start on its own,
+/// whatever precedes it, and the search could only ever re-derive where it was
+/// going to stop anyway. Brute-forced over every string of ≤ 4 symbols drawn from
+/// an alphabet spanning both trimmed bytes, `\n`, `\r`, `U+2028` and multi-byte
+/// UTF-8: the two spellings agree everywhere. (Interior lines are trimmed at
+/// their own break, so reaching one again would be a no-op regardless; the point
+/// is that it *cannot* reach one.)
 ///
 /// One of the printer's hottest calls: every non-literal line break of every
 /// document reaches it (140,851 a fuz_app pass). So it is spelled as a guarded
@@ -403,7 +392,8 @@ pub fn arena_measure_doc_flat_resolved(
         0,
     );
 
-    trim_last_line(output)
+    trim_trailing_whitespace(&mut output);
+    output
 }
 
 /// Render an arena doc tree (with column, indent, and source-span resolution)
@@ -414,10 +404,10 @@ pub fn arena_measure_doc_flat_resolved(
 /// pooled buffer is warm).
 ///
 /// ⚠️ **Empty is a requirement, not a convention.** [`trim_trailing_whitespace`]
-/// (run before every non-literal line break) and the final-line trim walk
-/// backwards from the end with no floor, so text sitting in front of the doc's
-/// first byte is theirs to strip. Every other `output.len()` the render loop
-/// takes is a marker captured mid-render and is already relative, so an empty
+/// — run before every non-literal line break, and once more below as the
+/// final-line trim — walks backwards from the end with no floor, so it will strip
+/// text sitting in front of the doc's first byte. Every other `output.len()` the
+/// render loop takes is a marker captured mid-render and is already relative, so an empty
 /// base is the whole of the invariant — which is what lets a printer whose
 /// buffer *is* empty pass that buffer directly and skip the copy back
 /// (`OutputBuffer::as_empty_render_target`).
@@ -447,7 +437,7 @@ pub fn arena_print_doc_with_indent_resolved_into(
         start_indent_level,
     );
 
-    trim_last_line_in_place(output);
+    trim_trailing_whitespace(output);
 }
 
 /// Render an arena doc tree into a caller-provided (empty) buffer, preserving
@@ -511,7 +501,8 @@ pub(crate) fn arena_print_doc_with_indent_and_render(
         start_indent_level,
     );
 
-    trim_last_line(output)
+    trim_trailing_whitespace(&mut output);
+    output
 }
 
 //

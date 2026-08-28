@@ -1108,7 +1108,22 @@ impl DocArena {
     /// A child range holds exactly **two** ids in 65% of calls (census over
     /// three app corpora, stable within a point on each), so the append is
     /// specialized on that length — see `specialize_short_len!` for why, and for
-    /// why the list here is one entry rather than the render write's nine.
+    /// why the list here is two entries rather than the render write's nine.
+    ///
+    /// The `3` arm is the ≥3-child tail, and it only became affordable once
+    /// [`Self::concat`] was split: while this function was `#[inline]` into a
+    /// `concat` that was itself folded into 1,233 sites, a second arm cost
+    /// **+179 KB of `.text`**; over the split shape it costs **+304 B**, for
+    /// `instructions:u` **−0.038…−0.049%** across four real corpora against a
+    /// parse+bind null control at −0.003%. A `4` arm on top of it is a
+    /// **+0.28% regression** — see `specialize_short_len!`'s ladder note.
+    ///
+    /// ⚠️ The `2` arm is dead in the [`Self::concat_other`] copy — that caller has
+    /// already routed two children to [`Self::concat_pair`] and returned on zero —
+    /// and it is kept anyway, because the other three bodies this folds into
+    /// ([`Self::fill`], `conditional_group`'s expanded states, the line-removal
+    /// rebuild) can reach it. Splitting the list per caller costs a second copy of
+    /// the append to save one compare.
     #[inline]
     fn alloc_children(&self, ids: &[DocId]) -> ChildRange {
         if ids.is_empty() {
@@ -1117,7 +1132,7 @@ impl DocArena {
         let mut children = self.children.borrow_mut();
         let start = children.len() as u32;
         let len = ids.len() as u32;
-        specialize_short_len!(ids.len(), [2], children.extend_from_slice(ids));
+        specialize_short_len!(ids.len(), [2, 3], children.extend_from_slice(ids));
         ChildRange { start, len }
     }
 

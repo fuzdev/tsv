@@ -59,6 +59,23 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
 // length-independently, into a second slot the caller reserves to receive it; the caller's
 // local is where the buffer has to live either way. That slot lands in
 // `build_expression_doc_dispatch`, on the expression recursion cycle, where every level pays.
+//
+// ⚠️ Each one FILLS the buffer; none of them appends to it. The buffer arriving EMPTY is a
+// precondition, because `finalize_chain_nodes` is three WHOLE-SLICE passes over one chain:
+// `fix_callee_base_parens` matches `[Base, Call, ..]` from index 0, and `mark_own_call_layout`
+// walks in reverse carrying `entered` across every node it meets. A stale prefix would defeat
+// the base-paren match and silently re-mark an earlier chain's calls — a mis-LAYOUT, not a
+// crash. Today every caller constructs its buffer immediately above the call, so it is
+// unreachable; the natural next step from this shape (one warm buffer reused across chains)
+// is what would reach it.
+//
+// ⚠️ It is a `debug_assert!`, NOT the release-unreachable spelling `OutputBuffer::
+// as_empty_render_target` uses for the same class of hazard, and the difference is measured,
+// not stylistic: a `nodes.clear()` at these three entry points costs `instructions:u`
+// **+0.08…+0.32%** on `fuz_app/src` against a null control (the same tree with the three
+// `clear()`s removed) that reads ±0.00%. `SmallVec::truncate` has to re-derive the
+// inline-vs-spilled triple before it can store a length, and this runs 40,239 times a pass.
+// The debug assert is free in release and fires on every chain the test suite builds.
 
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
 pub fn linearize_chain_from_call_into<'a>(
@@ -66,6 +83,10 @@ pub fn linearize_chain_from_call_into<'a>(
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
 ) {
+    debug_assert!(
+        nodes.is_empty(),
+        "the linearizer fills its buffer, never appends"
+    );
     let mut paren_gaps = Vec::new();
     linearize_call_callee(call, input, nodes, &mut paren_gaps);
     nodes.push(ChainNode::call(call));
@@ -78,6 +99,10 @@ pub fn linearize_chain_from_member_into<'a>(
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
 ) {
+    debug_assert!(
+        nodes.is_empty(),
+        "the linearizer fills its buffer, never appends"
+    );
     let mut paren_gaps = Vec::new();
     linearize_member_object(member, input, nodes, &mut paren_gaps);
     linearize_member_node(member, input.source, nodes, &mut paren_gaps);
@@ -96,6 +121,10 @@ pub fn linearize_chain_from_non_null_into<'a>(
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
 ) {
+    debug_assert!(
+        nodes.is_empty(),
+        "the linearizer fills its buffer, never appends"
+    );
     let mut paren_gaps = Vec::new();
     linearize_recursive(non_null.expression, input, nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null(non_null));

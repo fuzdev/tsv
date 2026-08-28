@@ -56,10 +56,21 @@ pub use types::{CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolS
 ///
 /// ⚠️ **The arm list is a size decision, per call site.** Arms multiply by the
 /// number of places the enclosing function is inlined into: the render write has
-/// two call sites and affords nine arms for +2.4 KB, while `alloc_children` is
-/// `#[inline]` at many sites and affords exactly **one** — a second arm there
-/// crosses an inliner threshold and costs **+179 KB of `.text`**. Re-measure
-/// `.text` before adding one.
+/// two call sites and affords nine arms for +2.4 KB. `alloc_children` once
+/// afforded exactly **one** — a second arm crossed an inliner threshold and cost
+/// **+179 KB of `.text`** — because it was `#[inline]` into a `DocArena::concat`
+/// that was itself folded into 1,233 sites. Splitting `concat` into an inlined
+/// dispatch over `#[inline(never)]` arms retired that multiplier: `alloc_children`
+/// now folds into five bodies, all of them in `arena.rs`, and a `3` arm measures
+/// **+304 B**. Re-measure `.text` before adding one — the number moves with what
+/// the enclosing function's own inlining is doing, not with this list.
+///
+/// ⚠️ **And the instruction ladder is not monotonic — measure each rung.** At
+/// `alloc_children`, `[2, 3]` reads `instructions:u` **−0.038…−0.049%** on four
+/// real corpora (fuz_app / zzz / gro / fuz_ui) against a parse+bind null control
+/// at **−0.003%**, while `[2, 3, 4]` reads **+0.28%** — a regression, and one that
+/// arrives with `.text` going *down* by 592 B. Adding a rung is not a smaller
+/// version of the rung below it.
 ///
 /// ⚠️ **The constant is the lever, not the call count.** `write_indentation`
 /// spells this mechanism by hand, and its ladder priced the difference: turning
