@@ -152,9 +152,9 @@ host and the platform:
   figure below is quoted on — the two sides are level: `parse` reaches within ~0.01% of
   `format` on the same input (37,411 vs 37,412 parens at 32 MiB). ⚠️ That does **not**
   generalize. Wherever a **member chain** is involved the printer binds, and by a wide
-  margin: a nested memberish call (`a.f(a.f(…))`) parses to 26,187 levels and formats to
-  8,481, and a nested computed subscript (`a[a[…]]`) parses to 32,231 and formats to
-  10,169 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. The
+  margin: a nested memberish call (`a.f(a.f(…))`) parses to 27,566 levels and formats to
+  9,436, and a nested computed subscript (`a[a[…]]`) parses to 34,345 and formats to
+  11,574 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. The
   wire-JSON writer adds nothing on top of the parser on any shape measured.
 
 Measured on `const x = ((((…1…))));`, one nesting level costs ~0.88 KiB of stack in a
@@ -166,11 +166,11 @@ why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the
 corpus nests 69 levels; the exposure is generated and minified code.
 
 Parens are not the tightest shape, only the easiest to state. Per nesting level, in a
-release build: **nested arrow bodies (`() => {…}`) ~3.9 KiB** (the worst measured —
-~8,300 levels, which is the depth every shape clears), nested memberish calls
-(`a.f(a.f(…))`) ~3.9 a shade under it (~8,500 levels), nested computed subscripts
-(`a[a[…]]`) ~3.2, TS object literals ~2.8, TS *types* ~2.35, statement nesting ~2.0,
-Svelte elements ~1.7, unary chains ~1.6, nested binary chains ~1.5, calls ~1.2, array
+release build: **nested arrow bodies (`() => {…}`) ~3.55 KiB** (the worst measured —
+~9,200 levels, which is the depth every shape clears), nested memberish calls
+(`a.f(a.f(…))`) ~3.47 a shade under it (~9,400 levels), nested computed subscripts
+(`a[a[…]]`) ~2.8, TS object literals ~2.4, TS *types* ~2.35, statement nesting ~2.0,
+Svelte elements ~1.7, nested binary chains ~1.5, unary chains ~1.25, calls ~1.2, array
 literals ~1.14, parens ~0.88, ternary / assignment chains ~0.50, CSS rules ~0.4.
 
 The two chain shapes used to head that list, because a member chain is printed from a
@@ -179,8 +179,14 @@ cost 7.4 and 6.7 KiB a level until `ChainGroup` stopped owning a `SmallVec` of n
 copies and became a borrowed sub-slice (16 bytes) — ~2.2 KiB a level back on both and
 ~0.5 on nested arrow bodies — and 5.1 and 4.5 until the peeled trailing member tail
 stopped being collected into a second `SmallVec` and became a pair of borrowed runs,
-another ~1.2 KiB a level on both. They are also the shapes on which the printer, not the
-parser, sets the ceiling — see the bullet above. ⚠️ They are the only two shapes the
+another ~1.2 KiB a level on both. A third slice came off five shapes at once — the same
+0.39 KiB from each — when the chain linearizer stopped *returning* its 464-byte node
+buffer and started filling the caller's: the buffer lives in the caller either way, so a
+returned one cost a second slot in the expression dispatcher's frame, which every shape on
+the expression cycle pays. Both chain shapes, nested arrow bodies and TS object literals
+each dropped 0.39, and so did unary chains (1.64 → 1.25 — nearly a quarter of what a level
+there had cost). The two chain shapes are also the ones on which the printer, not the
+parser, sets the ceiling — see the bullet above. ⚠️ And they are the only two shapes the
 `Expression` enum's own width does *not* reach: every other row above moved when it went
 from 176 bytes to 72 (Svelte elements 3.1 → 1.7, calls 1.9 → 1.25, parens 1.2 → 0.94),
 while these two stayed put, because the chain printer's frames — not an `Expression`
@@ -198,7 +204,10 @@ builder either boxes into the arena at its own tail (`ParsedExpr::from_expr`, le
 caller an 8-byte reference) or returns its own concrete node struct — an
 `ObjectExpression` is 32 B, and the dispatcher arm that wraps one back into an
 `Expression` builds a temporary the compiler merges with its sibling arms' rather than a
-return slot it cannot.
+return slot it cannot. The printer answers the same pressure with the same move on its own
+side: the chain entry points fill a caller-owned `ChainNodeVec` rather than returning one,
+because a returned buffer needs a slot to be built in *and* a slot in the caller to be
+handed to, and only the second of those is load-bearing.
 
 The node enums also answer the same pressure from the other side, by *density*, and in
 two different ways. The first is **rare-variant boxing** — a variant wide enough to set
