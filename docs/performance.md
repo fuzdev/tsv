@@ -477,6 +477,12 @@ skips — the fast native first pass for finding tsv parse over-rejections (a fi
 canonical parser accepts but tsv rejects is a real gap; most corpus rejects are
 intentional-error test fixtures the canonical parser also rejects).
 
+⭐ The `Static` row doubles as the **layout probe** for the address-keyed static
+cache (§A cache keyed on an address…): run the same binary twice with ASLR on and
+a moving `Static` count is a collision draw, not a code change. Under
+`setarch -R` the whole report is deterministic, so the `Static` delta between two
+binaries prices their layout term without touching the PMU.
+
 ```bash
 cargo run -p tsv_debug arena_stats ../zzz/src/lib ../fuz_css/src/lib
 cargo run -p tsv_debug arena_stats <paths> --json
@@ -879,6 +885,49 @@ What to do about it:
   parse column that *improves* on a printer-only change is the same artifact as
   one that regresses, and taking the flattering half is how a layout win gets
   banked as an optimization.
+
+### A cache keyed on an address makes `instructions:u` re-draw on every exec
+
+Retired user instructions are the arc's primary verdict because they are supposed
+to be a property of the *code*: same binary, same input, same count. That holds
+only while nothing the program does depends on **where** it was loaded. One thing
+does — [`DocArena`'s `static_cache`](../crates/tsv_lang/src/doc/arena.rs), a
+direct-mapped table whose index is a multiplicative hash of a `&'static str`'s
+**runtime address** — and while it was small enough to collide, it made the whole
+format board non-deterministic:
+
+- The address is not a link-time constant on a PIE target: it is
+  `image_base + link_offset`, and the base is re-randomized by ASLR on every
+  `execve`. So the *slot* every static lands in is re-drawn per run. (Whether two
+  statics collide is mostly fixed by their offset **difference**, which is a link
+  constant — which is why a given binary usually lands in one or two modes rather
+  than scattering, and why a one-line source edit anywhere re-rolls it.)
+- A collision between two statics that are both hot means every call to either
+  one misses, re-measures its width and **allocates a fresh doc node**. Sized at
+  512 slots, one `tsv_debug` binary spread **0.53%** in `instructions:u` across
+  14 execs of the same binary on the same input, bimodally; `arena_stats` over
+  the same corpus put the `Static` node population anywhere from 18,669 (the
+  no-collision floor) to 30,994.
+
+The table is now sized so the draw stops mattering (per-exec spread ~0.01%), but
+the shape generalizes to any address-keyed cache, so the reading rules stand:
+
+- **A real effect moves min, max and mean together; a layout draw moves the
+  spread.** The `alloc_children` 4-arm rung reads `+0.328 / +0.332 / +0.336%` on
+  three corpora with min, mean and max within 0.01 point of each other — that is
+  code. A binary sitting on a bad draw reads a *wide* distribution whose median
+  is itself a coin flip (three 12-run medians of one comparison read −0.55%,
+  −0.36%, −0.20%).
+- **Report the per-side spread beside every delta.** It is the only thing that
+  separates the two cases, and a median alone hides it.
+- **`setarch -R` pins the draw** (and makes a run deterministic to ~0.001%), but
+  it pins each binary to *its own* draw — so it removes the run-to-run half of
+  the hazard and not the between-binary half. Two binaries can differ by 0.3% in
+  retired instructions on a comment-only edit.
+- **`arena_stats`'s `Static` node count is the free, PMU-free instrument for it.**
+  It moves monotonically with the instruction count (~735 instructions per extra
+  node on a 341-file corpus) and needs no quiet machine: run it under
+  `setarch -R` on both binaries and the difference is the layout term.
 
 ### An `inline(never)` leaf's real cost is paid by its caller
 

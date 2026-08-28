@@ -66,11 +66,18 @@ pub use types::{CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolS
 /// the enclosing function's own inlining is doing, not with this list.
 ///
 /// ⚠️ **And the instruction ladder is not monotonic — measure each rung.** At
-/// `alloc_children`, `[2, 3]` reads `instructions:u` **−0.038…−0.049%** on four
-/// real corpora (fuz_app / zzz / gro / fuz_ui) against a parse+bind null control
-/// at **−0.003%**, while `[2, 3, 4]` reads **+0.28%** — a regression, and one that
-/// arrives with `.text` going *down* by 592 B. Adding a rung is not a smaller
-/// version of the rung below it.
+/// `alloc_children`, `[2, 3]` reads `instructions:u` **−0.038 / −0.040 / −0.046 /
+/// −0.054%** (fuz_ui / gro / fuz_app / zzz) against a parse+bind null control at
+/// **−0.003%**, while `[2, 3, 4]` reads **+0.328…+0.336%** — a regression, and one
+/// that arrives with `.text` going *down* (−924 B on the `-p tsv_debug -p tsv_cli`
+/// corpus build). Adding a rung is not a smaller version of the rung below it.
+///
+/// ⚠️ **Both rungs are quoted from a run where min, mean and max agree to three
+/// decimals**, which is what makes a −0.04% figure meaningful at all: the format
+/// board used to carry a ~0.4% per-exec collision lottery (see
+/// `arena::STATIC_CACHE_SLOTS`), under which a rung
+/// this small is unmeasurable. Print the per-side spread beside any rung you add
+/// — a real rung moves min, max and mean together.
 ///
 /// ⚠️ **The constant is the lever, not the call count.** `write_indentation`
 /// spells this mechanism by hand, and its ladder priced the difference: turning
