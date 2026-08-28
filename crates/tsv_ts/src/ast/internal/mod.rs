@@ -102,25 +102,42 @@ pub use expressions::{
 // expression return) exists to keep `Expression` out of those frames.
 //
 // Both enums are also the ELEMENT WIDTH of the containers that hold them, which is
-// the larger cost: an `Expression` slot is paid on `Property`'s key and value, on
-// `VariableDeclarator`'s id and init, and on every element of every `&[Expression]`
-// (call arguments, array elements, parameters), so the enum's width multiplies
-// through the whole tree. Both are held down the same way — the variants wide enough
-// to set the size on their own, and rare enough that an arena allocation for each is
-// free, hold their payload by `&'arena` reference: `Expression`'s five widest
-// (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` /
+// the larger cost: an `Expression` slot is paid on every element of every
+// `&[Expression]` (call arguments, array elements, parameters), so the enum's width
+// multiplies through the whole tree. Both are held down the same way — the variants
+// wide enough to set the size on their own, and rare enough that an arena allocation
+// for each is free, hold their payload by `&'arena` reference: `Expression`'s five
+// widest (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` /
 // `MetaProperty` / `TaggedTemplateExpression`, together ~3% of expressions, of which
 // the widest two are ~0.02%), `Statement`'s eight widest DECLARATION heads (each
 // ≤0.2% of statements) and its four loop / `try` heads one level down
 // (`internal::statements`).
 //
-// Pinned so a variant that widens either enum shows up as a failed build rather
+// The two LIST-ELEMENT containers whose own width was two inline `Expression`s —
+// `Property` (an object literal's `key: value`, and a destructuring pattern's) and
+// `VariableDeclarator` — instead hold both slots by reference, which is not the same
+// trade: the parser's expression spine (`ParsedExpr`) already returns an
+// arena-allocated `&Expression`, so an inline slot is a COPY OUT of the arena rather
+// than a place the node lives. Naming the slots by reference removes that copy
+// instead of adding an allocation, and takes the element every object-literal and
+// declarator list moves from 160 B to 32 (`ObjectPatternProperty` 40, its
+// `RestElement` arm setting it) — see `parse_expression_ref`.
+//
+// Pinned so a variant that widens any of them shows up as a failed build rather
 // than as a silently lower nesting ceiling and a fatter element slot. 64-bit only:
 // the counts are pointer-width-relative and the doc's measurements are x86-64.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Expression<'static>>() == 72);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Statement<'static>>() == 104);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Property<'static>>() == 32);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<ObjectProperty<'static>>() == 32);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<ObjectPatternProperty<'static>>() == 40);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<VariableDeclarator<'static>>() == 32);
 
 //
 // Foundational Types (defined here, used everywhere)

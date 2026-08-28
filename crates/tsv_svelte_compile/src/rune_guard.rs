@@ -259,7 +259,7 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
             for prop in obj.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
-                        assign_target_roots(&p.value, source, out);
+                        assign_target_roots(p.value, source, out);
                     }
                     ObjectPatternProperty::RestElement(rest) => {
                         assign_target_roots(rest.argument, source, out);
@@ -322,7 +322,7 @@ fn refuse_derived_write_target(
             for prop in pattern.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
-                        refuse_derived_write_target(&p.value, ctx)?;
+                        refuse_derived_write_target(p.value, ctx)?;
                     }
                     ObjectPatternProperty::RestElement(rest) => {
                         refuse_derived_write_target(rest.argument, ctx)?;
@@ -481,7 +481,7 @@ fn collect_decoded_binding_names(
             for prop in obj.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
-                        collect_decoded_binding_names(&p.value, source, out)?;
+                        collect_decoded_binding_names(p.value, source, out)?;
                     }
                     ObjectPatternProperty::RestElement(rest) => {
                         collect_decoded_binding_names(rest.argument, source, out)?;
@@ -493,7 +493,7 @@ fn collect_decoded_binding_names(
             for prop in obj.properties {
                 match prop {
                     ObjectProperty::Property(p) => {
-                        collect_decoded_binding_names(&p.value, source, out)?;
+                        collect_decoded_binding_names(p.value, source, out)?;
                     }
                     ObjectProperty::SpreadElement(s) => {
                         collect_decoded_binding_names(s.argument, source, out)?;
@@ -676,7 +676,7 @@ fn walk_statement(
                     // For-scope declarations are block-scoped — always shadow
                     // candidates regardless of depth.
                     for declarator in decl.declarations {
-                        collect_nested_declared(&declarator.id, ctx);
+                        collect_nested_declared(declarator.id, ctx);
                     }
                     walk_variable_declaration(decl, ctx, depth + 1)?;
                 }
@@ -763,11 +763,11 @@ fn walk_variable_declaration(
 ) -> Result<(), CompileError> {
     for declarator in decl.declarations {
         if depth > 0 || ctx.fn_depth > 0 {
-            collect_nested_declared(&declarator.id, ctx);
+            collect_nested_declared(declarator.id, ctx);
         }
-        refuse_dollar_binding_pattern(&declarator.id, ctx.source)?;
-        walk_expression(&declarator.id, ctx)?;
-        walk_opt(declarator.init.as_ref(), ctx)?;
+        refuse_dollar_binding_pattern(declarator.id, ctx.source)?;
+        walk_expression(declarator.id, ctx)?;
+        walk_opt(declarator.init, ctx)?;
     }
     Ok(())
 }
@@ -780,7 +780,7 @@ fn walk_for_left(
     match left {
         ForInOfLeft::VariableDeclaration(decl) => {
             for declarator in decl.declarations {
-                collect_nested_declared(&declarator.id, ctx);
+                collect_nested_declared(declarator.id, ctx);
             }
             walk_variable_declaration(decl, ctx, depth + 1)
         }
@@ -992,9 +992,9 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
                 match prop {
                     ObjectProperty::Property(p) => {
                         if p.computed {
-                            walk_expression(&p.key, ctx)?;
+                            walk_expression(p.key, ctx)?;
                         }
-                        walk_expression(&p.value, ctx)?;
+                        walk_expression(p.value, ctx)?;
                     }
                     ObjectProperty::SpreadElement(s) => walk_expression(s.argument, ctx)?,
                 }
@@ -1096,9 +1096,9 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
                         if prop.computed {
-                            walk_expression(&prop.key, ctx)?;
+                            walk_expression(prop.key, ctx)?;
                         }
-                        walk_expression(&prop.value, ctx)?;
+                        walk_expression(prop.value, ctx)?;
                     }
                     ObjectPatternProperty::RestElement(rest) => {
                         walk_expression(rest.argument, ctx)?;

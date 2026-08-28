@@ -318,7 +318,7 @@ impl SoaWalk {
         // The binding target — an identifier (with its type annotation) or a
         // destructuring pattern — is an `Expression`, routed through the
         // pattern-aware `visit_expression`.
-        self.visit_expression(&declarator.id, id);
+        self.visit_expression(declarator.id, id);
         if let Some(init) = &declarator.init {
             self.visit_expression(init, id);
         }

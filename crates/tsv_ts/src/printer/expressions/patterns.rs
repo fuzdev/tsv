@@ -1022,8 +1022,8 @@ impl<'a> Printer<'a> {
                     );
                     match &p.value {
                         // Simple shorthand: `{k}` — the value repeats the key.
-                        Expression::Identifier(_) => self.build_expression_doc(&p.key),
-                        _ => self.build_expression_doc(&p.value),
+                        Expression::Identifier(_) => self.build_expression_doc(p.key),
+                        _ => self.build_expression_doc(p.value),
                     }
                 } else {
                     // Handle computed keys: {[key]: value}
@@ -1035,11 +1035,11 @@ impl<'a> Printer<'a> {
                         // object-literal/class spelling (`build_computed_key_expr_doc`).
                         let (doc, end) = self.build_computed_key_bracket_doc(
                             p.span.start,
-                            &p.key,
+                            p.key,
                             Some(ParenContext::ComputedPropertyKey),
                             || {
-                                self.with_jsdoc_cast_cannot_hang_gap(&p.key, || {
-                                    self.build_expression_doc(&p.key)
+                                self.with_jsdoc_cast_cannot_hang_gap(p.key, || {
+                                    self.build_expression_doc(p.key)
                                 })
                             },
                         );
@@ -1047,7 +1047,7 @@ impl<'a> Printer<'a> {
                         doc
                     } else {
                         key_region_end = p.key.span().end;
-                        self.build_property_key_doc(&p.key)
+                        self.build_property_key_doc(p.key)
                     };
                     // Comments between key and value, split at `:`
                     // e.g., `{[x] /* c1 */: /* c2 */ a}` → before `:` and after `:`
@@ -1098,7 +1098,7 @@ impl<'a> Printer<'a> {
                     } else {
                         tail.push(d.text(": "));
                     }
-                    let value_doc = self.build_expression_doc(&p.value);
+                    let value_doc = self.build_expression_doc(p.value);
                     match value_gap {
                         Some((start, end)) => {
                             tail.push(self.build_pattern_value_gap_doc(start, end, value_doc));

@@ -172,7 +172,7 @@ pub(crate) fn expand_destructured_derived<'arena>(
     // rune (`{a = $state(0)}`) or a top-level `await`. The binding leaves are
     // exempt (derived reads allowed; `$`-prefixed leaves already refused by
     // `refuse_dollar_binding_pattern` before this arm).
-    walk_expression_guarded(&declarator.id, ctx)?;
+    walk_expression_guarded(declarator.id, ctx)?;
 
     let (value, is_derived, refusal) = match rune {
         RuneInit::Derived(expr) => (expr, true, Refusal::DestructuringDerived),
@@ -209,8 +209,8 @@ pub(crate) fn expand_destructured_derived<'arena>(
         };
         let init = derived_wrap(b, argument);
         declarations.push(VariableDeclarator {
-            id: d_id,
-            init: Some(init),
+            id: b.arena.alloc(d_id),
+            init: Some(b.arena.alloc(init)),
             definite: false,
             span,
         });
@@ -221,7 +221,7 @@ pub(crate) fn expand_destructured_derived<'arena>(
     };
 
     Extractor::new(b, source, refusal, Lowering::Derived).extract_onto(
-        &declarator.id,
+        declarator.id,
         rhs,
         names,
         declarations,
@@ -259,7 +259,7 @@ pub(crate) fn expand_destructured_state<'arena>(
     // rune (`{a = $state(0)}`) or a top-level `await`. The binding leaves are
     // exempt (`$`-prefixed leaves already refused by `refuse_dollar_binding_pattern`
     // before this arm).
-    walk_expression_guarded(&declarator.id, ctx)?;
+    walk_expression_guarded(declarator.id, ctx)?;
 
     // `value` is the argument the `tmp` holds — `void 0` when argless. The rune's
     // argument is guard-walked (a bare store/derived read is exempt — the store
@@ -293,8 +293,8 @@ pub(crate) fn expand_destructured_state<'arena>(
     let tmp_id = Expression::Identifier(b.ident(&tmp_name));
     let tmp_span = tmp_id.span();
     declarations.push(VariableDeclarator {
-        id: tmp_id,
-        init: Some(value),
+        id: b.arena.alloc(tmp_id),
+        init: Some(b.arena.alloc(value)),
         definite: false,
         span: tmp_span,
     });
@@ -302,7 +302,7 @@ pub(crate) fn expand_destructured_state<'arena>(
     let rhs: &'arena Expression<'arena> = b.ident_expr(&tmp_name);
 
     Extractor::new(b, source, refusal, Lowering::State).extract_onto(
-        &declarator.id,
+        declarator.id,
         rhs,
         names,
         declarations,
@@ -391,7 +391,7 @@ impl<'arena> Extractor<'_, 'arena> {
                         }
                         ObjectPatternProperty::Property(p) => {
                             let member = self.object_member(expr, p)?;
-                            self.extract(&p.value, member, names)?;
+                            self.extract(p.value, member, names)?;
                         }
                     }
                 }
@@ -420,8 +420,8 @@ impl<'arena> Extractor<'_, 'arena> {
                     Lowering::State => to_array,
                 };
                 self.inserts.push(VariableDeclarator {
-                    id,
-                    init: Some(init),
+                    id: self.b.arena.alloc(id),
+                    init: Some(self.b.arena.alloc(init)),
                     definite: false,
                     span: id_span,
                 });
@@ -461,8 +461,8 @@ impl<'arena> Extractor<'_, 'arena> {
         };
         let span = node.span();
         self.paths.push(VariableDeclarator {
-            id: node.clone(),
-            init: Some(init),
+            id: self.b.arena.alloc(node.clone()),
+            init: Some(self.b.arena.alloc(init)),
             definite: false,
             span,
         });

@@ -208,7 +208,7 @@ impl<'a> CheckWalk<'a> {
 
     fn visit_variable_declaration(&mut self, decl: &VariableDeclaration<'_>) {
         for d in decl.declarations {
-            self.visit_param(&d.id);
+            self.visit_param(d.id);
             if let Some(init) = &d.init {
                 self.visit_expression(init);
             }
@@ -418,7 +418,7 @@ impl<'a> CheckWalk<'a> {
             E::ObjectExpression(o) => {
                 for prop in o.properties {
                     match prop {
-                        ObjectProperty::Property(pr) => self.visit_expression(&pr.value),
+                        ObjectProperty::Property(pr) => self.visit_expression(pr.value),
                         ObjectProperty::SpreadElement(s) => self.visit_expression(s.argument),
                     }
                 }
@@ -576,7 +576,7 @@ impl<'a> CheckWalk<'a> {
                 }
                 for prop in op.properties {
                     match prop {
-                        ObjectPatternProperty::Property(pr) => self.visit_param(&pr.value),
+                        ObjectPatternProperty::Property(pr) => self.visit_param(pr.value),
                         ObjectPatternProperty::RestElement(r) => self.visit_param(r.argument),
                     }
                 }

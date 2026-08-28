@@ -132,7 +132,7 @@ impl<'a> SymbolBinder<'a> {
         for prop in obj.properties {
             match prop {
                 ObjectProperty::Property(pr) => {
-                    if let Some(key) = self.resolve_member_key(&pr.key, pr.computed, None) {
+                    if let Some(key) = self.resolve_member_key(pr.key, pr.computed, None) {
                         let (inc, exc) = match pr.kind {
                             PropertyKind::Get => (
                                 SymbolFlags::GET_ACCESSOR,
@@ -160,7 +160,7 @@ impl<'a> SymbolBinder<'a> {
                         };
                         self.declare_symbol(table, None, d, inc, exc);
                     }
-                    self.visit_expression(&pr.value);
+                    self.visit_expression(pr.value);
                 }
                 ObjectProperty::SpreadElement(s) => self.visit_expression(s.argument),
             }

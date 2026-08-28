@@ -974,7 +974,7 @@ impl<'arena> Eraser<'arena, '_> {
         &mut self,
         declarator: &VariableDeclarator<'arena>,
     ) -> Result<Option<VariableDeclarator<'arena>>, CompileError> {
-        let id = self.expr(&declarator.id)?;
+        let id = self.expr(declarator.id)?;
         let init = match &declarator.init {
             Some(init) => self.expr(init)?.map(Some),
             None => None,
@@ -993,8 +993,10 @@ impl<'arena> Eraser<'arena, '_> {
             return Ok(None);
         }
         Ok(Some(VariableDeclarator {
-            id: id.unwrap_or_else(|| declarator.id.clone()),
-            init: init.unwrap_or_else(|| declarator.init.clone()),
+            id: id.map_or(declarator.id, |id| &*self.arena.alloc(id)),
+            init: init.map_or(declarator.init, |init| {
+                init.map(|init| &*self.arena.alloc(init))
+            }),
             definite: false,
             span: declarator.span,
         }))
@@ -1975,14 +1977,14 @@ impl<'arena> Eraser<'arena, '_> {
         &mut self,
         prop: &Property<'arena>,
     ) -> Result<Option<Property<'arena>>, CompileError> {
-        let key = self.expr(&prop.key)?;
-        let value = self.expr(&prop.value)?;
+        let key = self.expr(prop.key)?;
+        let value = self.expr(prop.value)?;
         if key.is_none() && value.is_none() {
             return Ok(None);
         }
         Ok(Some(Property {
-            key: key.unwrap_or_else(|| prop.key.clone()),
-            value: value.unwrap_or_else(|| prop.value.clone()),
+            key: key.map_or(prop.key, |key| &*self.arena.alloc(key)),
+            value: value.map_or(prop.value, |value| &*self.arena.alloc(value)),
             ..prop.clone()
         }))
     }

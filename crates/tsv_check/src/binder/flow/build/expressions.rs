@@ -638,7 +638,7 @@ impl<'a> FlowBuilder<'a> {
             // body Start's subject (binder.go:1534) — the P3 narrowing hint
             // (`IsObjectLiteralOrClassExpressionMethodOrAccessor`,
             // utilities.go:566; the class-expression half lives in `visit_method`).
-            self.visit_expression(&pr.key);
+            self.visit_expression(pr.key);
             let anchor = self.require(addr_of(*f), NodeKind::FunctionExpression);
             let prop_id = self.require(addr_of(pr), NodeKind::Property);
             self.set_flow_leaf(prop_id);
@@ -647,16 +647,16 @@ impl<'a> FlowBuilder<'a> {
             self.visit_statement_list(f.body.body);
             self.exit_container(saved, false, true, true, anchor, false);
         } else {
-            self.visit_expression(&pr.key);
-            self.visit_expression(&pr.value);
+            self.visit_expression(pr.key);
+            self.visit_expression(pr.value);
         }
     }
 
     fn visit_object_pattern_property(&mut self, prop: &ObjectPatternProperty<'_>) {
         match prop {
             ObjectPatternProperty::Property(pr) => {
-                self.visit_expression(&pr.key);
-                self.visit_expression(&pr.value);
+                self.visit_expression(pr.key);
+                self.visit_expression(pr.value);
             }
             ObjectPatternProperty::RestElement(r) => self.visit_expression(r.argument),
         }

@@ -383,7 +383,7 @@ pub(super) fn write_variable_declaration(
     write_array(w, var_decl.declarations, |w, d| {
         node_header(w, "VariableDeclarator", d.span, ctx);
         w.raw(",\"id\":");
-        write_expression(w, &d.id, ctx);
+        write_expression(w, d.id, ctx);
         if d.definite {
             w.raw(",\"definite\":true");
         }

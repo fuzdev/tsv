@@ -1820,7 +1820,7 @@ impl<'a> Printer<'a> {
                         decl_docs.push(self.build_frozen_node_doc(declarator.span));
                         continue;
                     }
-                    let id_doc = self.build_expression_doc(&declarator.id);
+                    let id_doc = self.build_expression_doc(declarator.id);
                     let one = if let Some(init) = &declarator.init {
                         let id_end = declarator.id.span().end;
                         let init_start = init.span().start;
@@ -2055,7 +2055,7 @@ impl<'a> Printer<'a> {
                 // The keyword→binding gap carries a comment (`for (const /* c */ x of y)`)
                 // that must not be dropped — see `build_for_decl_keyword_gap`. Covers
                 // `const`/`let`/`var`/`using`/`await using` uniformly.
-                let id_doc = self.build_expression_doc(&declarator.id);
+                let id_doc = self.build_expression_doc(declarator.id);
                 self.build_for_decl_keyword_gap(decl, declarator.span.start, id_doc)
             }
             // `for ((async) of x)` keeps parens around the bare `async` identifier

@@ -963,10 +963,9 @@ and the extra pointer-chases that size-minimization adds on hot traversal paths 
 more than the cache-density they buy. (The arena allocation itself is the win; the
 node *layout* favors traversal locality over byte size.)
 
-**The one deliberate exception is a density rule, and it is worth stating precisely,
-because an enum's width is the ELEMENT width of everything that holds one.** An
-`Expression` slot is paid on both of a `Property`'s key and value, on a
-`VariableDeclarator`'s id and init, and on every element of every `&[Expression]`; a
+**The deliberate exceptions are two density rules, and both are worth stating
+precisely, because an enum's width is the ELEMENT width of everything that holds
+one.** An `Expression` slot is paid on every element of every `&[Expression]`; a
 `Statement` slot on every element of every statement slice and every
 `?`-propagation copy out of the parser. So a variant wide enough to set its enum's
 size on its own taxes the whole tree, while a pointer chase is paid only where that
@@ -990,9 +989,30 @@ payload by `&'arena` reference:
 
 Both widths are pinned by `const` asserts in `ast/internal/mod.rs`, so a variant that
 widens either enum fails the build rather than silently fattening every slice element
-and lowering the nesting ceiling. **Rarity is the whole of the argument** — the same
-move on a common variant buys density and pays an allocation plus a pointer chase on
-the majority of the traffic.
+and lowering the nesting ceiling. **Rarity is the whole of the argument for this
+rule** — boxing a *common* variant buys density and pays an allocation plus a pointer
+chase on the majority of the traffic.
+
+**The second rule needs no rarity, because it adds no allocation at all: an inline
+slot whose value the producer already arena-allocated is a COPY OUT of the arena, not
+the place the node lives.** The expression parser threads `&'arena Expression`
+(`ParsedExpr`) all the way up its Pratt ladder, so a container field spelled
+`Expression` by value made the parser copy 72 B *out* of the node's own allocation
+into the container's slot — while an `&'arena Expression` field simply keeps the
+allocation the parser already made. Naming the slot by reference therefore *removes*
+work on 100% of the traffic instead of adding it. The two list-element containers
+whose own width was two such slots take it:
+
+- `Property` (an object literal's `key: value`, and a destructuring pattern's, which
+  reuses the same struct) is **32 B**, not 160 — so `ObjectProperty` is 32 and
+  `ObjectPatternProperty` 40 (its `RestElement` arm sets that one).
+- `VariableDeclarator` is **32 B**, not 160.
+
+`parse_expression_ref` / `parse_assignment_expression_ref` are the spine's
+ref-returning entry points these fields are filled from. The read side does pay one
+dependent load per `prop.key` / `decl.init`, which is why the trade is settled by
+measurement rather than by argument; measured, the parse-side copies removed and the
+5× narrower slice element dominate it.
 
 The fat inline nodes carry no by-value-return penalty in the **expression**
 recursion, either: each node is built in the arena and threaded up the recursive
