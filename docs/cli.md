@@ -149,26 +149,26 @@ host and the platform:
   is above the pool's own reservation, where the pool becomes the shallower route.
   `tsv parse` has no pool at all, so it took the inherited stack on every platform.
 - which recursion binds **depends on the shape**, and on parens — the shape the flat
-  figure below is quoted on — the two sides are level: `parse` reaches within ~0.01% of
-  `format` on the same input (37,411 vs 37,412 parens at 32 MiB). ⚠️ That does **not**
+  figure below is quoted on — the two sides are level: `parse` reaches the same depth as
+  `format` on the same input (37,329 parens at 32 MiB on both). ⚠️ That does **not**
   generalize. Wherever a **member chain** is involved the printer binds, and by a wide
-  margin: a nested memberish call (`a.f(a.f(…))`) parses to 27,566 levels and formats to
-  9,436, and a nested computed subscript (`a[a[…]]`) parses to 34,345 and formats to
-  11,574 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. The
+  margin: a nested memberish call (`a.f(a.f(…))`) parses to 27,506 levels and formats to
+  9,208, and a nested computed subscript (`a[a[…]]`) parses to 34,270 and formats to
+  11,613 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. The
   wire-JSON writer adds nothing on top of the parser on any shape measured.
 
 Measured on `const x = ((((…1…))));`, one nesting level costs ~0.88 KiB of stack in a
 release build (~16 KiB in a debug build, where frames are much larger), so the shipped
-CLI reaches ~37,400 levels on every route and every platform. For scale: the parsers tsv
+CLI reaches ~37,300 levels on every route and every platform. For scale: the parsers tsv
 stands in for stop earlier and on the same input — acorn + `@sveltejs/acorn-typescript`
 at 497 levels and prettier at 805, both through V8's own checked stack limit, which is
 why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the tsc
 corpus nests 69 levels; the exposure is generated and minified code.
 
 Parens are not the tightest shape, only the easiest to state. Per nesting level, in a
-release build: **nested arrow bodies (`() => {…}`) ~3.55 KiB** (the worst measured —
-~9,200 levels, which is the depth every shape clears), nested memberish calls
-(`a.f(a.f(…))`) ~3.47 a shade under it (~9,400 levels), nested computed subscripts
+release build: **nested arrow bodies (`() => {…}`) and nested memberish calls
+(`a.f(a.f(…))`) ~3.56 KiB** (the two worst measured, level with each other at
+~9,200 levels — the depth every shape clears), nested computed subscripts
 (`a[a[…]]`) ~2.8, TS object literals ~2.4, TS *types* ~2.35, statement nesting ~2.0,
 Svelte elements ~1.7, nested binary chains ~1.5, unary chains ~1.25, calls ~1.2, array
 literals ~1.14, parens ~0.88, ternary / assignment chains ~0.50, CSS rules ~0.4.
@@ -248,7 +248,7 @@ reservation does not reach them:**
 
 | surface | stack | depth |
 | --- | --- | --- |
-| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~37,400 |
+| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~37,300 |
 | N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~7,810 at 8 MiB |
 | N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~3,880 |
 | WASM, any host | the wasm shadow stack, 1 MiB by link default | ~2,510 |

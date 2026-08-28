@@ -760,10 +760,11 @@ pub struct DocArena {
     ///   way). `reset()` invalidates every node half in O(1) by bumping the
     ///   generation; the width half deliberately survives.
     ///
-    /// The address is a link-time constant, so the slot hash folds per call
-    /// site; a collision evict just re-measures and re-allocs (measured rare —
-    /// the unique-static population is ~180 on real corpora, ≪ the slot count,
-    /// and evicts are ≤0.7% of `text()` calls). `Cell` (no borrow flag) —
+    /// A collision evict just re-measures and re-allocs, and the eviction
+    /// *rate* is small — but the rate is the wrong statistic and the slot count
+    /// is sized against the *draw* instead: see [`STATIC_CACHE_SLOTS`], which
+    /// records what a bad draw costs and why the index is re-rolled on every
+    /// exec. `Cell` (no borrow flag) —
     /// probes never alias the `RefCell` stores. Inline by design: the arena
     /// lives on the stack or in a thread-local and is only ever borrowed,
     /// never moved after construction, so the array adds no per-use
@@ -890,18 +891,45 @@ impl StaticSlot {
     };
 }
 
-/// 512 slots (× 24 B on 64-bit = 12 KB inline). Kept in lockstep with the
-/// slot-hash shift — see the assert below; comfortably above the unique-static
-/// population (measured ~165–190 distinct statics across real corpora), so
-/// steady-state collisions are rare (evicts ≤0.7% of `text()` calls; a 1024-slot
-/// A/B only halved the colliding-slot count, not worth doubling the array).
-const STATIC_CACHE_SLOTS: usize = 512;
+/// 2048 slots (× 24 B on 64-bit = 48 KB inline). Kept in lockstep with the
+/// slot-hash shift — see the assert below.
+///
+/// **Sized against the collision draw, not against the population.** The
+/// unique-static population is ~165–190 across real corpora and the *per
+/// document* working set is ~55, so a 512-slot table looks like ten times the
+/// room it needs — and the eviction rate it produces is genuinely small
+/// (≤0.7% of `text()` calls). That framing is what made 512 look sufficient,
+/// and it measures the wrong thing: the cost is not the *rate*, it is **which
+/// pair collides**. Two hot statics landing in one slot thrash — every call to
+/// either one misses, re-measures the width and allocates a fresh node — and a
+/// single such pair moves the whole run.
+///
+/// The index is a hash of the string's **runtime address**, so the draw is
+/// re-rolled by any change to the link layout (a one-line edit anywhere, a
+/// linker flag) and, under PIE + ASLR, **again on every exec**: whether two
+/// statics collide is decided by their offset *difference* — a link-time
+/// constant — but the pairs sitting near the hash's wraparound flip with the
+/// image base. Measured at 512 slots, one binary (`tsv_debug`) ran a 0.53%
+/// spread in `instructions:u` across 14 execs of the *same binary on the same
+/// input*, bimodal, and its `DocArena` node population moved with it
+/// (`arena_stats` over 341 files: 18,669 `Static` nodes at the floor, up to
+/// 30,994 on a bad draw). At 2048 the same binary spreads 0.013% and the
+/// population is within 1.2% of the floor. The medians move
+/// **−0.36…−0.63%** (`profile` over fuz_app / zzz / gro / fuz_ui) against
+/// parse-only boards — which build no docs — at +0.000%.
+///
+/// So the array is sized to make the draw stop mattering: 1024 already
+/// recovers the medians (−0.50…−0.62%) but keeps a 0.15% tail; 2048 removes
+/// the tail; 4096 is worth a further −0.01% and is not worth 96 KB. 48 KB sits
+/// on a 32 MiB format-worker stack (`cli::stack::STACK_SIZE`) and in one
+/// per-thread arena per binding, never per file.
+const STATIC_CACHE_SLOTS: usize = 2048;
 
-// The slot index is the TOP 9 BITS of the 64-bit multiplicative hash
-// (`>> 55` in `static_width`), which is provably `< 512` — that both elides
+// The slot index is the TOP 11 BITS of the 64-bit multiplicative hash
+// (`>> 53` in `text`), which is provably `< 2048` — that both elides
 // the array bounds check and hard-couples the shift to the slot count. This
 // assert makes changing one without the other a compile error.
-const _: () = assert!(STATIC_CACHE_SLOTS == 1 << 9);
+const _: () = assert!(STATIC_CACHE_SLOTS == 1 << 11);
 
 /// How one render-stack entry classifies for the flow-boundary look-ahead's welded-unit walk
 /// ([`DocArena::welded_entry`]; consumed by `flow_lookahead` in `arena_render_fill`).
@@ -921,6 +949,14 @@ pub(crate) enum WeldedEntry {
 
 impl DocArena {
     /// Create a new empty arena.
+    // `large_stack_arrays`: the 48 KB `static_cache` is inline **by design** —
+    // see [`STATIC_CACHE_SLOTS`] for why it is that size and the field doc for
+    // why it is not behind a pointer (the hot path indexes it off `&self` with
+    // no dependent load). Both constructors are per-thread, never per file, and
+    // the array is `[const { … }; N]`, so the initializer is materialized in
+    // place rather than copied from a temporary. Consumers that park the arena
+    // between calls already box it (`tsv_arena::with_doc_arena`).
+    #[allow(clippy::large_stack_arrays)]
     pub fn new() -> Self {
         Self {
             nodes: RefCell::new(Vec::new()),
@@ -970,6 +1006,8 @@ impl DocArena {
     /// is byte-identical; the win is the fresh-arena / first-file / WASM
     /// reservation, and the multi-file `reset()` reuse high-water is bounded by
     /// actual usage, so it can only drop.
+    // `large_stack_arrays`: see [`Self::new`].
+    #[allow(clippy::large_stack_arrays)]
     pub fn with_source_size_hint(source_len: usize) -> Self {
         let estimated_nodes = source_len * 2;
         let estimated_children = estimated_nodes / 2;
@@ -1116,7 +1154,10 @@ impl DocArena {
     /// **+179 KB of `.text`**; over the split shape it costs **+304 B**, for
     /// `instructions:u` **−0.038…−0.049%** across four real corpora against a
     /// parse+bind null control at −0.003%. A `4` arm on top of it is a
-    /// **+0.28% regression** — see `specialize_short_len!`'s ladder note.
+    /// **+0.33% regression** (`+0.328 / +0.332 / +0.336%` on fuz_app / zzz /
+    /// gro, min, mean and max all within 0.01 point of each other, against a
+    /// `.text` that goes *down* 924 B) — see `specialize_short_len!`'s ladder
+    /// note.
     ///
     /// ⚠️ The `2` arm is dead in the [`Self::concat_other`] copy — that caller has
     /// already routed two children to [`Self::concat_pair`] and returned on zero —
@@ -1155,19 +1196,26 @@ impl DocArena {
     /// a measured loss); fits queries answer from the node alone and
     /// `render_text`'s column advance skips its byte scan.
     ///
-    /// Hot path (92–95% of calls on real corpora): one slot load + ptr/len/gen
-    /// compare (the address is a link-time constant, so the slot hash folds
-    /// per call site). The miss path — first use this document, first
-    /// sighting ever, or collision evict — allocs and restamps in the cold
-    /// helper.
+    /// Hot path (92–95% of calls on real corpora): the slot hash, one slot
+    /// load, and a ptr/len/gen compare. ⚠️ **The hash does not fold.** The
+    /// tempting reading is that `s`'s address is a link-time constant, so a
+    /// folded call site should carry a literal index — but every shipped target
+    /// is PIE, where the address is `image_base + link_offset` and the base is
+    /// not known until `execve`. `objdump` shows the arithmetic emitted whole at
+    /// every one of the ~860 folded sites (`lea` the RIP-relative address,
+    /// `movabs` the constant, `imul`, `shr`), and the consequence is bigger than
+    /// four instructions: the slot index is **re-drawn on every exec**, which is
+    /// what [`STATIC_CACHE_SLOTS`] is sized against. The miss path — first use
+    /// this document, first sighting ever, or collision evict — allocs and
+    /// restamps in the cold helper.
     #[inline]
     pub fn text(&self, s: &'static str) -> DocId {
         let ptr = s.as_ptr() as usize;
         // Hash in u64: usize is 32-bit on wasm32, where the Fibonacci constant
-        // and the top-9-bit shift would overflow. The `>> 55` keeps the top 9
-        // bits ⇒ index < 512, locked to `STATIC_CACHE_SLOTS` by the assert at
+        // and the top-11-bit shift would overflow. The `>> 53` keeps the top 11
+        // bits ⇒ index < 2048, locked to `STATIC_CACHE_SLOTS` by the assert at
         // its definition (and eliding the bounds check below).
-        let slot_i = ((ptr as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 55) as usize;
+        let slot_i = ((ptr as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 53) as usize;
         let slot = self.static_cache[slot_i].get();
         if slot.ptr == ptr && slot.len as usize == s.len() && slot.node_gen == self.format_gen.get()
         {
