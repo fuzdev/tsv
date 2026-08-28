@@ -13,7 +13,7 @@ use commands::ignore_audit::IgnoreAuditCommand;
 use commands::swallow_audit::SwallowAuditCommand;
 use commands::width_audit::WidthAuditCommand;
 use commands::{
-    arena_stats::ArenaStatsCommand, ast_diff::AstDiffCommand,
+    arena_stats::ArenaStatsCommand, ast_census::AstCensusCommand, ast_diff::AstDiffCommand,
     authoring_audit::AuthoringAuditCommand, binding_audit::BindingAuditCommand,
     buffer_sizes::BufferSizesCommand, build_fanout_audit::BuildFanoutAuditCommand,
     canonical_compile::CanonicalCompileCommand, canonical_parse::CanonicalParseCommand,
@@ -36,7 +36,8 @@ use commands::{
     razor_audit::RazorAuditCommand, render_audit::RenderAuditCommand,
     render_compare::RenderCompareCommand, roundtrip_audit::RoundtripAuditCommand,
     scan_audit::ScanAuditCommand, test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
-    tsc_conformance::TscConformanceCommand, variant_audit::VariantAuditCommand,
+    tsc_conformance::TscConformanceCommand, type_sizes::TypeSizesCommand,
+    variant_audit::VariantAuditCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -84,6 +85,7 @@ pub struct TopLevel {
 pub enum Subcommand {
     Check(CheckCommand),
     ArenaStats(ArenaStatsCommand),
+    AstCensus(AstCensusCommand),
     AuthoringAudit(AuthoringAuditCommand),
     BindingAudit(BindingAuditCommand),
     BufferSizes(BufferSizesCommand),
@@ -154,6 +156,7 @@ pub enum Subcommand {
     Test262(Test262Command),
     TscConformance(TscConformanceCommand),
     TsFixtureAudit(TsFixtureAuditCommand),
+    TypeSizes(TypeSizesCommand),
     VariantAudit(VariantAuditCommand),
     WidthAudit(WidthAuditCommand),
 }
@@ -169,6 +172,7 @@ impl TopLevel {
         match self.nested {
             Subcommand::Check(c) => c.run(),
             Subcommand::ArenaStats(c) => c.run(),
+            Subcommand::AstCensus(c) => c.run(),
             Subcommand::AuthoringAudit(c) => c.run(),
             Subcommand::BindingAudit(c) => c.run(),
             Subcommand::BufferSizes(c) => c.run(),
@@ -221,6 +225,7 @@ impl TopLevel {
             Subcommand::Test262(c) => c.run(),
             Subcommand::TscConformance(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),
+            Subcommand::TypeSizes(c) => c.run(),
             Subcommand::VariantAudit(c) => c.run(),
             Subcommand::WidthAudit(c) => c.run(),
         }

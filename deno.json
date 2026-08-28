@@ -91,6 +91,8 @@
 		"idempotency:sweep": "deno run --allow-read --allow-env --allow-sys --allow-run=cargo --config benches/js/deno.json benches/js/idempotency_sweep.ts",
 		"audit:corpus": "deno run --allow-read --allow-env --allow-sys --allow-run=cargo --config benches/js/deno.json benches/js/corpus_audit.ts",
 		"metrics": "cargo run -p tsv_debug --quiet metrics",
+		"type-sizes": "cargo run -p tsv_debug --quiet type_sizes",
+		"ast-census": "cargo run --release -p tsv_debug --quiet -- ast_census",
 
 		"bench:install": "node benches/js/install_deps.ts",
 		"//bench": "The full refresh, and the one caller that composes TWICE — deliberately. `bench:perf` ends with `bench:compose` so it stands alone, but compose reads `report.conformance.node.json` for the combined report's `conformance_vintage`, and `bench:conformance` rewrites that file AFTER it. Without the trailing compose the combined report a full run publishes describes the PREVIOUS conformance run — stamping `stale: true` and an older commit at the exact moment both halves were just refreshed at the same one, and naming the wrong half in the remedy. The re-run reads four JSON files and writes two; the alternative (moving compose out of `bench:perf`, or chaining it onto `bench:conformance`) breaks a perf-only or conformance-only machine.",
