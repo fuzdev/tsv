@@ -383,7 +383,17 @@ impl<'a> Lexer<'a> {
 
     /// Advance the cursor past the current character (1 byte for ASCII, more for
     /// a multi-byte UTF-8 sequence). No-op at EOF.
-    #[inline]
+    ///
+    /// ⚠️ **`inline(always)`, not `inline`.** Five instructions in the lexer's
+    /// innermost loop, and the plain hint still left an out-of-line copy that
+    /// the scanners *called* — visible as its own board symbol. Forcing it in
+    /// measures `instructions:u` **−0.33…−0.39%** on the TS-heavy corpora and
+    /// −0.14% on pure `.svelte`, against a pure-CSS null control at **−0.000%**
+    /// (`tsv_css` lexes with its own scanner and never reaches this), and it
+    /// makes `.text` **528 B smaller** — the out-of-line copy and every call
+    /// site's argument setup both go away.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     fn advance(&mut self) {
         if let Some(&b) = self.bytes.get(self.position) {
             self.position += utf8_len(b);

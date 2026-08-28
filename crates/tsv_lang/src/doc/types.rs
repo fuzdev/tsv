@@ -511,7 +511,23 @@ pub enum CachedWidth {
 /// Panics if a SourceSpan is encountered but no `source` was provided. This
 /// indicates a bug — docs containing source spans must use resolved print
 /// functions (the ones threading the document source).
-#[inline]
+///
+/// ⚠️ **`inline(always)`, not `inline`, and the difference is measured.** The
+/// body reads as a four-arm match handing back a slice, but three of those arms
+/// index a `str` by range, and each range index carries two `is_char_boundary`
+/// probes plus an edge to `slice_error_fail` — so the code is an order of
+/// magnitude larger than the match, LLVM declined the plain `#[inline]` hint,
+/// and this was left out of line and **called**: once per rendered `Text` node
+/// from `render_text`, whose very next statement re-matches the same
+/// `DocText` for its cached width, and once per unmeasured identifier name from
+/// `text_flat_width`. Forcing it in measures `instructions:u` **−1.39…−1.58%**
+/// across five real corpora and **−0.96%** on pure CSS, against two
+/// provably-unreachable null controls at **±0.000%**, for **+640 B** of
+/// `.text`. The render write is the whole of it — forcing that site alone reads
+/// −1.514% where both together read −1.516% — so the fits walk keeps its inline
+/// resolve for uniformity, not for a share.
+#[expect(clippy::inline_always)]
+#[inline(always)]
 #[expect(clippy::expect_used)] // Intentional: SourceSpan without source is a programming error
 pub(super) fn resolve_text<'a>(
     text: &'a DocText,
