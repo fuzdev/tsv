@@ -128,7 +128,7 @@ fn each_node_item<'a, 'arena>(
         }
         FragmentNode::DeclarationTag(tag) => {
             for declarator in tag.declaration.declarations {
-                expr(&declarator.id)?;
+                expr(declarator.id)?;
                 if let Some(init) = &declarator.init {
                     expr(init)?;
                 }

@@ -478,6 +478,7 @@ fn build_snippet_prop<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Prop
     let key_span = key.span;
     let value = env.b.ident(name);
     init_property(
+        env.b.arena,
         Expression::Identifier(key),
         Expression::Identifier(value),
         true,
@@ -518,6 +519,7 @@ fn build_children_prop<'arena>(
     let block_span = env.b.here();
     let arrow = env.b.arrow_block(params, body, block_span);
     Ok(init_property(
+        arena,
         Expression::Identifier(key),
         arrow,
         false,
@@ -543,6 +545,7 @@ fn build_slots_prop<'arena>(
         let entry_key_span = entry_key.span;
         let entry_val = env.b.true_literal();
         inner_props.push(ObjectProperty::Property(init_property(
+            arena,
             Expression::Identifier(entry_key),
             entry_val,
             false,
@@ -555,7 +558,7 @@ fn build_slots_prop<'arena>(
         spread_trailing_comma: false,
         span: Span::new(obrace, cbrace),
     });
-    init_property(Expression::Identifier(key), inner, false, key_span)
+    init_property(arena, Expression::Identifier(key), inner, false, key_span)
 }
 
 /// Build one `key: value` object property from a component attribute. The key is
@@ -580,7 +583,7 @@ fn build_component_property<'arena>(
     let shorthand = key_is_ident
         && matches!(&value, Expression::Identifier(id)
             if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str()));
-    Ok(init_property(key, value, shorthand, key_span))
+    Ok(init_property(env.b.arena, key, value, shorthand, key_span))
 }
 
 /// Build a component attribute's prop value:

@@ -350,6 +350,7 @@ fn boundary_props<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Expressi
     let key = env.b.ident(name);
     let key_span = key.span;
     let property = init_property(
+        env.b.arena,
         Expression::Identifier(key),
         Expression::Identifier(env.b.ident(name)),
         true,
@@ -417,8 +418,8 @@ pub(crate) fn declaration_stmt<'arena>(
 ) -> Statement<'arena> {
     let span = Span::new(id.span().start, init.span().end);
     let declarator = VariableDeclarator {
-        id,
-        init: Some(init),
+        id: b.arena.alloc(id),
+        init: Some(b.arena.alloc(init)),
         definite: false,
         span,
     };
@@ -695,8 +696,8 @@ pub(crate) fn emit_each_block<'arena>(
     let zero = env.b.number(0.0);
     let index_span = Span::new(index_id.span().start, zero.span().end);
     let index_declarator = VariableDeclarator {
-        id: index_id,
-        init: Some(zero),
+        id: arena.alloc(index_id),
+        init: Some(arena.alloc(zero)),
         definite: false,
         span: index_span,
     };
@@ -705,8 +706,8 @@ pub(crate) fn emit_each_block<'arena>(
     let length_member = env.b.member_prop(arr_for_length, "length");
     let length_span = Span::new(length_id.span().start, length_member.span().end);
     let length_declarator = VariableDeclarator {
-        id: length_id,
-        init: Some(length_member),
+        id: arena.alloc(length_id),
+        init: Some(arena.alloc(length_member)),
         definite: false,
         span: length_span,
     };

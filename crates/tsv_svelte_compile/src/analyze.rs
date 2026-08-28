@@ -834,7 +834,7 @@ pub(crate) fn pattern_binding_names(
             for prop in obj.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
-                        pattern_binding_names(&p.value, source, out)?;
+                        pattern_binding_names(p.value, source, out)?;
                     }
                     ObjectPatternProperty::RestElement(rest) => {
                         pattern_binding_names(rest.argument, source, out)?;
@@ -848,7 +848,7 @@ pub(crate) fn pattern_binding_names(
             for prop in obj.properties {
                 match prop {
                     ObjectProperty::Property(p) => {
-                        pattern_binding_names(&p.value, source, out)?;
+                        pattern_binding_names(p.value, source, out)?;
                     }
                     ObjectProperty::SpreadElement(s) => {
                         pattern_binding_names(s.argument, source, out)?;
@@ -890,13 +890,13 @@ pub(crate) fn pattern_binds_unnameable_identifier(pattern: &Expression<'_>) -> b
     match pattern {
         Expression::Identifier(id) => id.escaped_name.is_some(),
         Expression::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
-            ObjectPatternProperty::Property(p) => pattern_binds_unnameable_identifier(&p.value),
+            ObjectPatternProperty::Property(p) => pattern_binds_unnameable_identifier(p.value),
             ObjectPatternProperty::RestElement(rest) => {
                 pattern_binds_unnameable_identifier(rest.argument)
             }
         }),
         Expression::ObjectExpression(obj) => obj.properties.iter().any(|prop| match prop {
-            ObjectProperty::Property(p) => pattern_binds_unnameable_identifier(&p.value),
+            ObjectProperty::Property(p) => pattern_binds_unnameable_identifier(p.value),
             ObjectProperty::SpreadElement(s) => pattern_binds_unnameable_identifier(s.argument),
         }),
         Expression::ArrayPattern(arr) => arr

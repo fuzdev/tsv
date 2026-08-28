@@ -731,10 +731,19 @@ impl PropertyKind {
     }
 }
 
+/// Object property: `{ key: value }` — and, reused verbatim, a destructuring
+/// pattern's property (`ObjectPatternProperty::Property`).
+///
+/// Both slots are `&'arena` references rather than inline `Expression`s, which
+/// takes the element every object literal and every object pattern moves from
+/// 160 B to 32. It costs no allocation: the parser's expression spine already
+/// returns an arena-allocated `&Expression` (`ParsedExpr`), so an inline slot
+/// was a copy *out of* the arena rather than the place the node lives — see the
+/// density note in `internal::mod` and `Parser::parse_assignment_expression_ref`.
 #[derive(Debug, Clone)]
 pub struct Property<'arena> {
-    pub key: Expression<'arena>,
-    pub value: Expression<'arena>,
+    pub key: &'arena Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
     pub kind: PropertyKind, // init, get, or set
     pub shorthand: bool,    // true for `{ prop }`, false for `{ prop: value }`
     pub computed: bool,     // true for `{ [expr]: value }`, false for `{ prop: value }`

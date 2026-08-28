@@ -244,7 +244,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // not walked at all, and the two that are walked go through
         // `walk_expression_guarded`, which sees a pattern as an expression and
         // takes the store-read exemption this `WalkCtx` enables.
-        refuse_dollar_binding_pattern(&declarator.id, source)?;
+        refuse_dollar_binding_pattern(declarator.id, source)?;
         let rune = declarator
             .init
             .as_ref()
@@ -260,7 +260,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             if props_id.is_some() {
                 return Err(unsupported(Refusal::DuplicatePropsId));
             }
-            let name = identifier_binding_name(&declarator.id, source)
+            let name = identifier_binding_name(declarator.id, source)
                 .ok_or_else(|| unsupported(Refusal::PropsIdBindingPattern))?;
             *props_id = Some(name);
             dropped_regions.push(declarator.span);
@@ -271,7 +271,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // (`destructure::expand_destructured_derived`), unlike an identifier
         // target's single rewrite.
         if matches!(rune, Some(RuneInit::Derived(_) | RuneInit::DerivedBy(_)))
-            && identifier_binding_name(&declarator.id, source).is_none()
+            && identifier_binding_name(declarator.id, source).is_none()
         {
             // A destructured `$derived` in a MULTI-declarator source (`let x = 1,
             // {a, b} = $derived(o)`) expands 1→N, but the oracle keeps only THAT
@@ -318,7 +318,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // identically to `$state` (the wrapper dropped); the two diverge only in the
         // leaf `initial` the binding table already assigned (snapshot never folds).
         if matches!(rune, Some(RuneInit::State(_) | RuneInit::StateSnapshot(_)))
-            && identifier_binding_name(&declarator.id, source).is_none()
+            && identifier_binding_name(declarator.id, source).is_none()
         {
             // A multi-declarator source (`let x = 1, {a, b} = $state(o)`) expands
             // 1→N, but the oracle keeps only THAT declarator's leaves joined while
@@ -367,7 +367,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // a `$bindable` left in any UNrecognized position survives the rewrite and
         // still refuses.
         if rune.is_none() {
-            walk_expression_guarded(&declarator.id, &mut ctx)?;
+            walk_expression_guarded(declarator.id, &mut ctx)?;
         }
         // A rune init rewrite drops the call's own syntax around the kept
         // argument — record the dropped region(s) so comments inside refuse.
@@ -399,7 +399,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             Some(RuneInit::Props) => {
                 *uses_props = true;
                 let (rewritten, entries) =
-                    rewrite_props_pattern(b, &declarator.id, source, has_comments, uses_slots)?;
+                    rewrite_props_pattern(b, declarator.id, source, has_comments, uses_slots)?;
                 if let Some(rewritten) = rewritten {
                     new_id = rewritten;
                 }
@@ -414,12 +414,9 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // Span-steal: the synthetic `$$props` takes the replaced
                 // `$props()` call's host span, so the declarator's `=`-gap
                 // comment windows stay exactly the authored ones.
-                let init_span = declarator
-                    .init
-                    .as_ref()
-                    .map_or(declarator.span, Expression::span);
+                let init_span = declarator.init.map_or(declarator.span, Expression::span);
                 let props_ident = b.ident_at("$$props", init_span);
-                Some(Expression::Identifier(props_ident))
+                Some(&*b.arena.alloc(Expression::Identifier(props_ident)))
             }
             // Handled above by `continue` — the declarator is skipped, never
             // rebuilt, so this arm is unreachable. Kept for match exhaustiveness.
@@ -427,7 +424,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             Some(RuneInit::State(arg)) => match arg {
                 Some(arg) => {
                     walk_expression_guarded(arg, &mut ctx)?;
-                    Some(arg.clone())
+                    Some(&*b.arena.alloc(arg.clone()))
                 }
                 None => {
                     if has_comments {
@@ -435,13 +432,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
                         // init windows would then sweep host comments.
                         return Err(unsupported(Refusal::CommentsWithArglessState));
                     }
-                    Some(b.void_zero())
+                    Some(&*b.arena.alloc(b.void_zero()))
                 }
             },
             // `$state.snapshot(x)` unwraps to `x` (like `$state`), guarding `x`.
             Some(RuneInit::StateSnapshot(arg)) => {
                 walk_expression_guarded(arg, &mut ctx)?;
-                Some(arg.clone())
+                Some(&*b.arena.alloc(arg.clone()))
             }
             Some(RuneInit::Derived(expr)) => {
                 // `$derived(d)` whose WHOLE body is a bare `$derived` read: the
@@ -468,15 +465,12 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // `$derived(...)` init's host span so a carried script comment's
                 // declarator/call windows stay empty (`derived_call`), the
                 // call-structure analog of the `$$props` span-steal above.
-                let anchor = declarator
-                    .init
-                    .as_ref()
-                    .map_or(declarator.span, Expression::span);
+                let anchor = declarator.init.map_or(declarator.span, Expression::span);
                 let argument = match unthunk_callee(expr) {
                     Some(callee) => callee,
                     None => &*b.arena.alloc(b.arrow_expr_at(anchor, expr)),
                 };
-                Some(b.derived_call(anchor, argument))
+                Some(&*b.arena.alloc(b.derived_call(anchor, argument)))
             }
             Some(RuneInit::DerivedBy(f)) => {
                 // `$derived.by(d)` passes `d` straight through as the compute
@@ -486,21 +480,18 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // needed (unlike the `$derived(d)` arm, whose `() => d()` the oracle
                 // collapses to `$.derived(d)`, a form the rewrite can't reproduce).
                 walk_expression_guarded(f, &mut ctx)?;
-                let anchor = declarator
-                    .init
-                    .as_ref()
-                    .map_or(declarator.span, Expression::span);
-                Some(b.derived_call(anchor, f))
+                let anchor = declarator.init.map_or(declarator.span, Expression::span);
+                Some(&*b.arena.alloc(b.derived_call(anchor, f)))
             }
             None => {
-                if let Some(init) = &declarator.init {
+                if let Some(init) = declarator.init {
                     walk_expression_guarded(init, &mut ctx)?;
                 }
-                declarator.init.clone()
+                declarator.init
             }
         };
         declarations.push(VariableDeclarator {
-            id: new_id,
+            id: b.arena.alloc(new_id),
             init: new_init,
             definite: declarator.definite,
             span: declarator.span,

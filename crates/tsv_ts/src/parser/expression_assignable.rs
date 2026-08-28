@@ -323,7 +323,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 Ok(ObjectPatternProperty::Property(Property {
                     key: p.key,
-                    value,
+                    value: self.alloc(value),
                     method: p.method,
                     shorthand: p.shorthand,
                     computed: p.computed,

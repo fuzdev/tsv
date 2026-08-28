@@ -408,15 +408,15 @@ impl<'a> Printer<'a> {
             // Assignment expressions need parens in computed keys: {[(a = b)]: c}
             let (doc, end) = self.build_computed_key_bracket_doc(
                 prop.span.start,
-                &prop.key,
+                prop.key,
                 Some(super::ParenContext::ComputedPropertyKey),
-                || self.build_computed_key_expr_doc(&prop.key),
+                || self.build_computed_key_expr_doc(prop.key),
             );
             key_region_end = end;
             doc
         } else {
             key_region_end = prop.key.span().end;
-            self.build_property_key_doc(&prop.key)
+            self.build_property_key_doc(prop.key)
         };
 
         // Add getter/setter prefix if applicable, preserving comments between
@@ -498,7 +498,7 @@ impl<'a> Printer<'a> {
                 d.concat(&parts)
             } else {
                 // Fallback for malformed AST
-                let value_doc = self.build_expression_doc(&prop.value);
+                let value_doc = self.build_expression_doc(prop.value);
                 d.concat(&[key_doc, d.text(": "), value_doc])
             }
         } else if prop.shorthand {
@@ -515,7 +515,7 @@ impl<'a> Printer<'a> {
             // is not parenthesized here: the shorthand form is the syntax.
             match &prop.value {
                 Expression::AssignmentExpression(_) | Expression::AssignmentPattern(_) => {
-                    self.build_expression_doc(&prop.value)
+                    self.build_expression_doc(prop.value)
                 }
                 _ => key_doc,
             }
@@ -528,21 +528,21 @@ impl<'a> Printer<'a> {
             // (canonical reference: build_params_doc_with_comments).
             if !has_comments {
                 let needs_parens =
-                    self.needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue);
+                    self.needs_parens(prop.value, super::ParenContext::ObjectPropertyValue);
                 return if needs_parens {
                     let value_doc = d.concat(&[
                         d.text("("),
-                        self.build_expression_doc(&prop.value),
+                        self.build_expression_doc(prop.value),
                         d.text(")"),
                     ]);
                     d.concat(&[key_doc, d.text(": "), value_doc])
                 } else {
-                    let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
+                    let is_short_key = self.is_short_property_key(prop.key, prop.computed);
                     // A comment-free object provably holds no directive either.
                     self.build_assignment_layout(
                         key_doc,
                         ":",
-                        &prop.value,
+                        prop.value,
                         is_short_key,
                         RhsCommentInfo::frozen_only(None),
                     )
@@ -562,9 +562,9 @@ impl<'a> Printer<'a> {
             // layout below; a glued block stays inline via the ordinary path.
             if self.comments_force_own_line_between(key_region_end, colon_pos) {
                 let value_doc = {
-                    let v = self.build_expression_doc(&prop.value);
+                    let v = self.build_expression_doc(prop.value);
                     let v = if self
-                        .needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue)
+                        .needs_parens(prop.value, super::ParenContext::ObjectPropertyValue)
                     {
                         d.concat(&[d.text("("), v, d.text(")")])
                     } else {
@@ -588,7 +588,7 @@ impl<'a> Printer<'a> {
 
             // Check if value needs parens (e.g., assignment expressions)
             let needs_parens =
-                self.needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue);
+                self.needs_parens(prop.value, super::ParenContext::ObjectPropertyValue);
 
             // A post-colon comment forces break-after-operator when it's a line
             // comment (extends to end of line), an *indentable* block (its reprint is
@@ -627,17 +627,17 @@ impl<'a> Printer<'a> {
                     // Build manually with parens
                     let value_doc = d.concat(&[
                         d.text("("),
-                        self.build_expression_doc(&prop.value),
+                        self.build_expression_doc(prop.value),
                         d.text(")"),
                     ]);
                     d.concat(&[key_doc, d.text(": "), value_doc])
                 } else {
                     // No parens needed: use unified assignment layout
-                    let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
+                    let is_short_key = self.is_short_property_key(prop.key, prop.computed);
                     self.build_assignment_layout(
                         key_doc,
                         ":",
-                        &prop.value,
+                        prop.value,
                         is_short_key,
                         RhsCommentInfo::frozen_only(value_frozen),
                     )
@@ -662,7 +662,7 @@ impl<'a> Printer<'a> {
                     // cast here reflows its comment→`(` break like any other value's.
                     // Without the mark the cast took the width-decided soft `line` and this
                     // arm's own hang then split the comment from its `(`.
-                    self.mark_jsdoc_cast_value_gap(&prop.value);
+                    self.mark_jsdoc_cast_value_gap(prop.value);
                     let comments_doc = self
                         .build_value_gap_comments_opt(colon_pos + 1, value_start)
                         .unwrap_or_else(|| d.empty());
@@ -671,8 +671,8 @@ impl<'a> Printer<'a> {
                         value_parts.push(d.text("("));
                     }
                     value_parts.push(match value_frozen {
-                        Some(frozen) => self.build_frozen_expression_doc(&prop.value, frozen),
-                        None => self.build_expression_doc(&prop.value),
+                        Some(frozen) => self.build_frozen_expression_doc(prop.value, frozen),
+                        None => self.build_expression_doc(prop.value),
                     });
                     if needs_parens {
                         value_parts.push(d.text(")"));
@@ -719,18 +719,18 @@ impl<'a> Printer<'a> {
                             parts.push(rc);
                         }
                         parts.push(d.text("("));
-                        parts.push(self.build_expression_doc(&prop.value));
+                        parts.push(self.build_expression_doc(prop.value));
                         parts.push(d.text(")"));
                         d.concat(&parts)
                     } else {
-                        let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
+                        let is_short_key = self.is_short_property_key(prop.key, prop.computed);
                         // `value_frozen` is provably `None` on this arm (an own-line
                         // directive is an own-line comment, which took the arm above);
                         // threaded rather than hardcoded so the two can't drift.
                         self.build_assignment_layout(
                             lhs_doc,
                             ":",
-                            &prop.value,
+                            prop.value,
                             is_short_key,
                             RhsCommentInfo {
                                 comments: rhs_comments,

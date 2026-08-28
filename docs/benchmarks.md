@@ -204,10 +204,10 @@ Things the published numbers measure that aren't quite what they look like.
   (c) Task return values are discarded uniformly for all impls; the FFI/WASM/async
   boundaries block dead-code elimination, so no impl's work is optimized away.
 - **`tsv_wasm` is measured on the full build.** The WASM bench loads
-  `pkg/all/deno` (the default both-features artifact, ~2.5 MB — what
+  `pkg/all/deno` (the default both-features artifact, ~2.7 MB — what
   `@fuzdev/tsv_wasm` ships) for _both_ parse and format, while subset consumers
-  ship the smaller `@fuzdev/tsv_format_wasm` (~2.2 MB, no convert layer) or
-  `@fuzdev/tsv_parse_wasm` (~0.9 MB, no printers). Same story natively: the perf
+  ship the smaller `@fuzdev/tsv_format_wasm` (~2.5 MB, no convert layer) or
+  `@fuzdev/tsv_parse_wasm` (~1.0 MB, no printers). Same story natively: the perf
   row loads the full `libtsv_ffi`, while the Binary Sizes table also lists the
   `tsv format (ffi)` / `tsv parse (ffi)` subset builds (no perf rows of their own
   — they exist only to size scope-matched against `oxfmt` and `oxc-parser`).

@@ -203,6 +203,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
             };
 
+            // The key is the `Property`'s by-reference slot from here on: the node
+            // lives in the arena and the property holds a pointer to it, so the
+            // 160 B element the `properties` vector moves is 32 B instead (see
+            // `Property`'s field docs).
+            let key: &'arena Expression<'arena> = arena.alloc(key);
+
             // Determine property kind, value, shorthand, and method flags
             let (kind, value, shorthand, method) = if let Some(accessor) = accessor_kind {
                 // Getter/setter: `get x() {}` or `set x(v) {}`
@@ -219,7 +225,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 )?;
                 (
                     accessor,
-                    Expression::FunctionExpression(arena.alloc(func_expr)),
+                    &*arena.alloc(Expression::FunctionExpression(arena.alloc(func_expr))),
                     false,
                     false,
                 )
@@ -232,7 +238,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let func_expr = self.parse_method_body(is_async_method, is_generator)?;
                 (
                     PropertyKind::Init,
-                    Expression::FunctionExpression(arena.alloc(func_expr)),
+                    &*arena.alloc(Expression::FunctionExpression(arena.alloc(func_expr))),
                     false,
                     true,
                 )
@@ -240,7 +246,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Use assignment_expression because comma separates properties
                 (
                     PropertyKind::Init,
-                    self.parse_assignment_expression()?,
+                    self.parse_assignment_expression_ref()?,
                     false,
                     false,
                 )
@@ -267,18 +273,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let assign_end = self.prev_token_end() as u32;
                     (
                         PropertyKind::Init,
-                        Expression::AssignmentExpression(AssignmentExpression {
+                        &*arena.alloc(Expression::AssignmentExpression(AssignmentExpression {
                             left: arena.alloc(key.clone()),
                             operator: AssignmentOperator::Assign,
                             right: arena.alloc(default_value),
                             span: Span::new(key.span().start, assign_end),
-                        }),
+                        })),
                         true,
                         false,
                     )
                 } else {
-                    // Plain shorthand `{ key }`: key is duplicated as value.
-                    (PropertyKind::Init, key.clone(), true, false)
+                    // Plain shorthand `{ key }`: key is duplicated as value — a
+                    // distinct node, not the key's own pointer, so every consumer
+                    // that keys a node on its address (`tsv_check`'s binder) still
+                    // sees two.
+                    (PropertyKind::Init, &*arena.alloc(key.clone()), true, false)
                 }
             };
 

@@ -125,7 +125,11 @@ fn build_class_directives_object<'arena>(
         let expr = env.erase(&directive.expression)?;
         let value = wrap_value_expr(env, expr)?[0].clone();
         properties.push(ObjectProperty::Property(init_property(
-            key, value, false, key_span,
+            env.b.arena,
+            key,
+            value,
+            false,
+            key_span,
         )));
     }
     let cbrace = env.b.mint("}").end;
@@ -183,7 +187,11 @@ pub(crate) fn build_spread_class_object<'arena>(
             (key, span)
         };
         properties.push(ObjectProperty::Property(init_property(
-            key, value, shorthand, key_span,
+            env.b.arena,
+            key,
+            value,
+            shorthand,
+            key_span,
         )));
     }
     let cbrace = env.b.mint("}").end;
@@ -406,7 +414,7 @@ fn build_style_property<'arena>(
         (key, span)
     };
 
-    Ok(init_property(key, value, shorthand, key_span))
+    Ok(init_property(env.b.arena, key, value, shorthand, key_span))
 }
 
 /// Build the directives (2nd) argument of `$.attr_style`: a plain object

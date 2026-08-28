@@ -137,7 +137,7 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
     w.raw(",\"computed\":");
     w.bool(prop.computed);
     w.raw(",\"key\":");
-    write_expression(w, &prop.key, ctx);
+    write_expression(w, prop.key, ctx);
     let getset = !matches!(prop.kind, internal::PropertyKind::Init);
     let generic_method = prop.method
         && matches!(&prop.value, internal::Expression::FunctionExpression(f)
@@ -165,7 +165,7 @@ fn write_property_value(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: 
         (internal::Expression::FunctionExpression(f), true) => {
             write_function_expression(w, f, ctx, true);
         }
-        _ => write_expression(w, &prop.value, ctx),
+        _ => write_expression(w, prop.value, ctx),
     }
 }
 

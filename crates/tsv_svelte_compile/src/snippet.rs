@@ -335,7 +335,7 @@ impl<'s> Collector<'s> {
             Expression::ObjectPattern(p) => {
                 for prop in p.properties {
                     if let ObjectPatternProperty::Property(prop) = prop {
-                        self.param_defaults(&prop.value);
+                        self.param_defaults(prop.value);
                     }
                 }
             }
@@ -556,7 +556,7 @@ impl<'s> Collector<'s> {
 
     fn var_decl(&mut self, decl: &VariableDeclaration<'_>) {
         for declarator in decl.declarations {
-            self.bind_pattern(&declarator.id);
+            self.bind_pattern(declarator.id);
             if let Some(init) = &declarator.init {
                 self.expr(init);
             }
@@ -605,9 +605,9 @@ impl<'s> Collector<'s> {
                     match prop {
                         ObjectProperty::Property(p) => {
                             if p.computed {
-                                self.expr(&p.key);
+                                self.expr(p.key);
                             }
-                            self.expr(&p.value);
+                            self.expr(p.value);
                         }
                         ObjectProperty::SpreadElement(s) => self.expr(s.argument),
                     }
@@ -651,9 +651,9 @@ impl<'s> Collector<'s> {
                     match prop {
                         ObjectPatternProperty::Property(prop) => {
                             if prop.computed {
-                                self.expr(&prop.key);
+                                self.expr(prop.key);
                             }
-                            self.expr(&prop.value);
+                            self.expr(prop.value);
                         }
                         ObjectPatternProperty::RestElement(rest) => self.expr(rest.argument),
                     }

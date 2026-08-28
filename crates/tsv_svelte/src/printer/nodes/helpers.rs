@@ -390,8 +390,8 @@ impl<'a> Printer<'a> {
             tsv_ts::ObjectPatternProperty::Property(p) => self.build_pattern_property_kv(
                 p.shorthand,
                 p.computed,
-                &p.key,
-                &p.value,
+                p.key,
+                p.value,
                 p.span.start,
             ),
             tsv_ts::ObjectPatternProperty::RestElement(r) => {
@@ -408,8 +408,8 @@ impl<'a> Printer<'a> {
             tsv_ts::ObjectProperty::Property(p) => self.build_pattern_property_kv(
                 p.shorthand,
                 p.computed,
-                &p.key,
-                &p.value,
+                p.key,
+                p.value,
                 p.span.start,
             ),
             tsv_ts::ObjectProperty::SpreadElement(s) => {

@@ -440,7 +440,7 @@ impl CandidateWalk<'_> {
             S::ExpressionStatement(s) => self.visit_expr(&s.expression),
             S::VariableDeclaration(d) => {
                 for decl in d.declarations {
-                    self.visit_expr(&decl.id);
+                    self.visit_expr(decl.id);
                     if let Some(init) = &decl.init {
                         self.visit_expr(init);
                     }
@@ -479,7 +479,7 @@ impl CandidateWalk<'_> {
                 match &s.init {
                     Some(ForInit::VariableDeclaration(d)) => {
                         for decl in d.declarations {
-                            self.visit_expr(&decl.id);
+                            self.visit_expr(decl.id);
                             if let Some(init) = &decl.init {
                                 self.visit_expr(init);
                             }
@@ -562,7 +562,7 @@ impl CandidateWalk<'_> {
         match left {
             ForInOfLeft::VariableDeclaration(d) => {
                 for decl in d.declarations {
-                    self.visit_expr(&decl.id);
+                    self.visit_expr(decl.id);
                     if let Some(init) = &decl.init {
                         self.visit_expr(init);
                     }
@@ -646,7 +646,7 @@ impl CandidateWalk<'_> {
             E::ObjectPattern(op) => {
                 for prop in op.properties {
                     match prop {
-                        ObjectPatternProperty::Property(pr) => self.visit_param(&pr.value),
+                        ObjectPatternProperty::Property(pr) => self.visit_param(pr.value),
                         ObjectPatternProperty::RestElement(r) => self.visit_param(r.argument),
                     }
                 }
@@ -738,8 +738,8 @@ impl CandidateWalk<'_> {
                 for prop in o.properties {
                     match prop {
                         ObjectProperty::Property(pr) => {
-                            self.visit_expr(&pr.key);
-                            self.visit_expr(&pr.value);
+                            self.visit_expr(pr.key);
+                            self.visit_expr(pr.value);
                         }
                         ObjectProperty::SpreadElement(s) => self.visit_expr(s.argument),
                     }
@@ -770,8 +770,8 @@ impl CandidateWalk<'_> {
                 for prop in op.properties {
                     match prop {
                         ObjectPatternProperty::Property(pr) => {
-                            self.visit_expr(&pr.key);
-                            self.visit_expr(&pr.value);
+                            self.visit_expr(pr.key);
+                            self.visit_expr(pr.value);
                         }
                         ObjectPatternProperty::RestElement(r) => self.visit_expr(r.argument),
                     }

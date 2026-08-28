@@ -459,8 +459,8 @@ impl SoaWalk {
 
     fn visit_property(&mut self, pr: &Property<'_>, parent: NodeId) {
         let id = self.add(NodeKind::Property, pr.span, Some(parent), addr_of(pr));
-        self.visit_expression(&pr.key, id);
-        self.visit_expression(&pr.value, id);
+        self.visit_expression(pr.key, id);
+        self.visit_expression(pr.value, id);
         self.close(id);
     }
 

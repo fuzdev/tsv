@@ -263,8 +263,8 @@ fn stem_declaration<'arena>(
                 // so it counts as declaring the stem (a safe over-refusal). Same
                 // for an escaped binding identifier, which
                 // `pattern_binding_names` skips outright.
-                let unnameable = pattern_binding_names(&declarator.id, source, &mut names).is_err()
-                    || pattern_binds_unnameable_identifier(&declarator.id);
+                let unnameable = pattern_binding_names(declarator.id, source, &mut names).is_err()
+                    || pattern_binds_unnameable_identifier(declarator.id);
                 if !unnameable && !names.iter().any(|n| n == stem) {
                     return Ok(());
                 }

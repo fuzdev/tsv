@@ -101,11 +101,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         let id_end = id.span().end_usize();
+        // Both slots are by-reference (see `VariableDeclarator`): the nodes live in
+        // the arena and the declarator holds pointers, so the element the
+        // declaration's vector moves is 32 B rather than 160.
+        let id: &'arena Expression<'arena> = self.alloc(id);
 
         // Check for initializer
         // Use assignment_expression because comma separates declarators
-        let init: Option<Expression<'arena>> = if self.eat(TokenKind::Equals) {
-            Some(self.parse_assignment_expression()?)
+        let init: Option<&'arena Expression<'arena>> = if self.eat(TokenKind::Equals) {
+            Some(self.parse_assignment_expression_ref()?)
         } else {
             None
         };

@@ -831,7 +831,7 @@ fn collect_module_declared(module_body: &[Statement<'_>], source: &str) -> Optio
             match decl {
                 ScriptDeclaration::Declarator { declarator, .. } => {
                     let mut names = Vec::new();
-                    if pattern_binding_names(&declarator.id, source, &mut names).is_err() {
+                    if pattern_binding_names(declarator.id, source, &mut names).is_err() {
                         opaque = true;
                     } else {
                         declared.extend(names);

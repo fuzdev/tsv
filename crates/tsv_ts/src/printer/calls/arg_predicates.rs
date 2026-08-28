@@ -334,7 +334,7 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
         // Objects: simple if all properties are non-computed and values are simple
         Expression::ObjectExpression(obj) => obj.properties.iter().all(|prop| match prop {
             internal::ObjectProperty::Property(p) => {
-                !p.computed && (p.shorthand || is_simple_call_argument(&p.value, depth - 1))
+                !p.computed && (p.shorthand || is_simple_call_argument(p.value, depth - 1))
             }
             // Spread properties are not simple
             internal::ObjectProperty::SpreadElement(_) => false,

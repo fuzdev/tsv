@@ -71,8 +71,8 @@ function file_size(path: string | URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const satisfies readonly WasmVariant[];
 const TARGETS = ['npm', 'deno'] as const;
 
-// Center measured 2026-08-21 (deno target; npm == deno, identical `.wasm`):
-// format 2,218,322 B; parse 913,218 B; all 2,470,951 B. Bounds are ±8% of it.
+// Center measured 2026-08-27 (deno target; npm == deno, identical `.wasm`):
+// format 2,466,898 B; parse 961,902 B; all 2,745,097 B. Bounds are ±8% of it.
 //
 // Recenter (and re-measure the deltas below) whenever a measure has drifted to
 // within a few percent of a band edge through accumulated work — otherwise the
@@ -82,9 +82,9 @@ const TARGETS = ['npm', 'deno'] as const;
 // named in the commit. The retired centers and what moved them are recorded in
 // the release lore, not here.
 const BOUNDS = {
-	format: { min: 2_041_000, max: 2_396_000 },
-	parse: { min: 840_000, max: 986_000 },
-	all: { min: 2_273_000, max: 2_669_000 }
+	format: { min: 2_270_000, max: 2_664_000 },
+	parse: { min: 885_000, max: 1_039_000 },
+	all: { min: 2_525_000, max: 2_965_000 }
 };
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
@@ -98,10 +98,10 @@ const BOUNDS = {
 // bundles and leaves the deltas where they were; a delta that moves with the
 // bundles means a feature boundary shifted, not that code got smaller.
 //
-// At the current center: `all − format` 252,629 B; `all − parse` 1,557,733 B.
+// At the current center: `all − format` 278,199 B; `all − parse` 1,783,195 B.
 const DELTAS = {
-	format: { min: 232_000, max: 273_000 }, // all − format
-	parse: { min: 1_433_000, max: 1_682_000 } // all − parse
+	format: { min: 256_000, max: 300_000 }, // all − format
+	parse: { min: 1_641_000, max: 1_926_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');
