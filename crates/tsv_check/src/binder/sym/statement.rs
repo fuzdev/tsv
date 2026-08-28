@@ -82,7 +82,7 @@ impl<'a> SymbolBinder<'a> {
             Statement::VariableDeclaration(decl) => {
                 let (includes, excludes, block_scoped) = var_flags(decl.kind);
                 for d in decl.declarations {
-                    self.bind_binding(&d.id, includes, excludes, block_scoped, mods, decl.span);
+                    self.bind_binding(d.id, includes, excludes, block_scoped, mods, decl.span);
                     if let Some(init) = &d.init {
                         self.visit_expression(init);
                     }
@@ -372,7 +372,7 @@ impl<'a> SymbolBinder<'a> {
         let (includes, excludes, block_scoped) = var_flags(decl.kind);
         for d in decl.declarations {
             self.bind_binding(
-                &d.id,
+                d.id,
                 includes,
                 excludes,
                 block_scoped,
@@ -593,7 +593,7 @@ impl<'a> SymbolBinder<'a> {
                     match prop {
                         ObjectPatternProperty::Property(pr) => {
                             self.bind_binding(
-                                &pr.value,
+                                pr.value,
                                 includes,
                                 excludes,
                                 block_scoped,

@@ -268,7 +268,7 @@ fn register_rune_binding<'arena>(
     initial: Initial<'arena>,
     unnameable: Refusal,
 ) -> Result<(), CompileError> {
-    match identifier_binding_name(&declarator.id, source) {
+    match identifier_binding_name(declarator.id, source) {
         Some(name) => {
             if kind == BindingKind::Derived {
                 derived_names.insert(name.clone());
@@ -283,7 +283,7 @@ fn register_rune_binding<'arena>(
             );
         }
         None => register_destructured_leaves(
-            &declarator.id,
+            declarator.id,
             source,
             bindings,
             derived_names,
@@ -322,7 +322,7 @@ fn analyze_declarator<'arena>(
             }
             *seen_props = true;
             let mut names = Vec::new();
-            pattern_binding_names(&declarator.id, source, &mut names)?;
+            pattern_binding_names(declarator.id, source, &mut names)?;
             for name in names {
                 bindings.insert(
                     name,
@@ -341,16 +341,13 @@ fn analyze_declarator<'arena>(
             // evaluates through the `$props.id()` call — the evaluator maps that
             // keypath to a STRING sentinel, so a `{id}` read never folds (matching
             // the oracle's `$.escape(id)`).
-            let name = identifier_binding_name(&declarator.id, source)
+            let name = identifier_binding_name(declarator.id, source)
                 .ok_or_else(|| unsupported(Refusal::PropsIdBindingPattern))?;
             bindings.insert(
                 name,
                 Binding {
                     kind: BindingKind::Normal,
-                    initial: declarator
-                        .init
-                        .as_ref()
-                        .map_or(Initial::None, Initial::Expr),
+                    initial: declarator.init.map_or(Initial::None, Initial::Expr),
                     updated: false,
                 },
             );
@@ -439,21 +436,18 @@ fn analyze_declarator<'arena>(
             // Plain declarator: an Identifier id gets its init as the
             // evaluation initial; destructured ids are Opaque (the oracle's
             // per-binding initial for those isn't modeled).
-            if let Some(name) = identifier_binding_name(&declarator.id, source) {
+            if let Some(name) = identifier_binding_name(declarator.id, source) {
                 bindings.insert(
                     name,
                     Binding {
                         kind: BindingKind::Normal,
-                        initial: declarator
-                            .init
-                            .as_ref()
-                            .map_or(Initial::None, Initial::Expr),
+                        initial: declarator.init.map_or(Initial::None, Initial::Expr),
                         updated: false,
                     },
                 );
             } else {
                 let mut names = Vec::new();
-                pattern_binding_names(&declarator.id, source, &mut names)?;
+                pattern_binding_names(declarator.id, source, &mut names)?;
                 for name in names {
                     bindings.insert(
                         name,

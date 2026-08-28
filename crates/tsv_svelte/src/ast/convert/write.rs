@@ -2024,7 +2024,7 @@ fn write_custom_element_field(
                         _ => continue,
                     };
                     if slot.is_none() {
-                        *slot = Some(&p.value);
+                        *slot = Some(p.value);
                     }
                 }
             }

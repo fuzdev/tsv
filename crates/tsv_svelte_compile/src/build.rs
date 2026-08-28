@@ -656,7 +656,7 @@ impl<'arena> Builder<'arena> {
         let id = Expression::Identifier(self.ident("$$store_subs"));
         let span = id.span();
         let declarator = VariableDeclarator {
-            id,
+            id: self.arena.alloc(id),
             init: None,
             definite: false,
             span,
@@ -735,14 +735,15 @@ impl<'arena> Builder<'arena> {
 /// use the key's own span, but `script_props`'s injected `$$slots`/`$$events`
 /// property spans key→value, and deriving it would silently change that one site.
 pub(crate) fn init_property<'arena>(
+    arena: &'arena Bump,
     key: Expression<'arena>,
     value: Expression<'arena>,
     shorthand: bool,
     span: Span,
 ) -> Property<'arena> {
     Property {
-        key,
-        value,
+        key: arena.alloc(key),
+        value: arena.alloc(value),
         kind: PropertyKind::Init,
         shorthand,
         computed: false,

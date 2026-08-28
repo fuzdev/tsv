@@ -101,7 +101,7 @@ impl<'a> FlowBuilder<'a> {
             Statement::ExpressionStatement(s) => self.visit_expression(&s.expression),
             Statement::VariableDeclaration(d) => {
                 for decl in d.declarations {
-                    self.visit_expression(&decl.id);
+                    self.visit_expression(decl.id);
                     if let Some(init) = &decl.init {
                         self.visit_expression(init);
                     }
@@ -132,7 +132,7 @@ impl<'a> FlowBuilder<'a> {
                 match &s.init {
                     Some(ForInit::VariableDeclaration(d)) => {
                         for decl in d.declarations {
-                            self.visit_expression(&decl.id);
+                            self.visit_expression(decl.id);
                             if let Some(init) = &decl.init {
                                 self.visit_expression(init);
                             }
@@ -233,7 +233,7 @@ impl<'a> FlowBuilder<'a> {
         match left {
             L::VariableDeclaration(d) => {
                 for decl in d.declarations {
-                    self.visit_expression(&decl.id);
+                    self.visit_expression(decl.id);
                     if let Some(init) = &decl.init {
                         self.visit_expression(init);
                     }
@@ -253,7 +253,7 @@ impl<'a> FlowBuilder<'a> {
     /// `Assignment` per declarator (tsv has no binding-element node — see the
     /// module scope note).
     fn bind_variable_declaration_flow(&mut self, decl: &VariableDeclarator<'_>) {
-        self.bind_binding_target(&decl.id);
+        self.bind_binding_target(decl.id);
         if let Some(init) = &decl.init {
             self.visit_expression(init);
         }
@@ -376,7 +376,7 @@ impl<'a> FlowBuilder<'a> {
         match left {
             ForInOfLeft::VariableDeclaration(d) => {
                 for decl in d.declarations {
-                    self.bind_binding_target(&decl.id);
+                    self.bind_binding_target(decl.id);
                     if let Some(init) = &decl.init {
                         self.visit_expression(init);
                     }
@@ -776,8 +776,8 @@ impl<'a> FlowBuilder<'a> {
                 for prop in op.properties {
                     match prop {
                         ObjectPatternProperty::Property(pr) => {
-                            self.visit_expression(&pr.key);
-                            self.bind_binding_target(&pr.value);
+                            self.visit_expression(pr.key);
+                            self.bind_binding_target(pr.value);
                         }
                         ObjectPatternProperty::RestElement(r) => {
                             self.bind_binding_target(r.argument);

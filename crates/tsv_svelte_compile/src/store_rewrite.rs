@@ -231,7 +231,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             Expression::MemberExpression(m) => self.pattern_targets_store(m.object),
             Expression::ParenthesizedExpression(p) => self.pattern_targets_store(p.expression),
             Expression::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
-                ObjectPatternProperty::Property(p) => self.pattern_targets_store(&p.value),
+                ObjectPatternProperty::Property(p) => self.pattern_targets_store(p.value),
                 ObjectPatternProperty::RestElement(rest) => {
                     self.pattern_targets_store(rest.argument)
                 }
@@ -616,8 +616,10 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             return Ok(None);
         }
         Ok(Some(tsv_ts::ast::internal::VariableDeclarator {
-            id: id.unwrap_or_else(|| declarator.id.clone()),
-            init: init.unwrap_or_else(|| declarator.init.clone()),
+            id: id.map_or(declarator.id, |id| &*self.b.arena.alloc(id)),
+            init: init.map_or(declarator.init, |init| {
+                init.map(|init| &*self.b.arena.alloc(init))
+            }),
             ..declarator.clone()
         }))
     }
@@ -1124,18 +1126,18 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         unshorthand_on_change: bool,
     ) -> Result<Option<Property<'arena>>, CompileError> {
         let key = if prop.computed {
-            self.expr(&prop.key)?
+            self.expr(prop.key)?
         } else {
             None
         };
-        let value = self.expr(&prop.value)?;
+        let value = self.expr(prop.value)?;
         if key.is_none() && value.is_none() {
             return Ok(None);
         }
         let shorthand = prop.shorthand && !(unshorthand_on_change && value.is_some());
         Ok(Some(Property {
-            key: key.unwrap_or_else(|| prop.key.clone()),
-            value: value.unwrap_or_else(|| prop.value.clone()),
+            key: key.map_or(prop.key, |key| &*self.b.arena.alloc(key)),
+            value: value.map_or(prop.value, |value| &*self.b.arena.alloc(value)),
             shorthand,
             ..prop.clone()
         }))

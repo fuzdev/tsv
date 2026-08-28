@@ -626,7 +626,13 @@ pub(crate) fn build_spread_object_property<'arena>(
     let shorthand = key_is_ident
         && matches!(&value, Expression::Identifier(id)
             if plain_identifier_name(id, env.source).as_deref() == Some(emit_name));
-    Ok(Some(init_property(key, value, shorthand, key_span)))
+    Ok(Some(init_property(
+        env.b.arena,
+        key,
+        value,
+        shorthand,
+        key_span,
+    )))
 }
 
 /// Collapse `[ \t\n\r\f]+` runs to one space without trimming (the mixed-value

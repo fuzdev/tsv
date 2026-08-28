@@ -227,8 +227,8 @@ impl<'a> Printer<'a> {
         //   const fn: (
         //     x: number,
         //   ) => void = (x) => {};
-        let has_complex_type_annotation = self.id_has_complex_type_annotation(&declarator.id);
-        let has_complex_destructuring = self.id_has_complex_destructuring(&declarator.id);
+        let has_complex_type_annotation = self.id_has_complex_type_annotation(declarator.id);
+        let has_complex_destructuring = self.id_has_complex_destructuring(declarator.id);
         let is_arrow_with_breakable_left =
             matches!(init, Expression::ArrowFunctionExpression(_)) && can_break_left;
 
@@ -877,7 +877,7 @@ impl<'a> Printer<'a> {
             }
 
             // Build id doc once for reuse and analysis
-            let id_doc = self.build_variable_binding_doc(&declarator.id, declarator.definite);
+            let id_doc = self.build_variable_binding_doc(declarator.id, declarator.definite);
 
             // Check if id doc can break (contains line elements like type annotations that wrap)
             // This matches Prettier's `canBreak(leftDoc)` check

@@ -392,7 +392,7 @@ fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
         S::VariableDeclaration(d) => d
             .declarations
             .iter()
-            .any(|decl| decl.init.as_ref().is_some_and(expr_contains_import_meta)),
+            .any(|decl| decl.init.is_some_and(expr_contains_import_meta)),
         S::ReturnStatement(s) => s.argument.as_ref().is_some_and(expr_contains_import_meta),
         S::ThrowStatement(s) => expr_contains_import_meta(&s.argument),
         S::BlockStatement(b) => b.body.iter().any(stmt_contains_import_meta),

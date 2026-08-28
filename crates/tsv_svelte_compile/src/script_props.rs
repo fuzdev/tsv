@@ -122,8 +122,8 @@ fn rewrite_bindable_default<'arena>(
         span: assign.span,
     });
     ObjectPatternProperty::Property(Property {
-        key: p.key.clone(),
-        value: new_value,
+        key: p.key,
+        value: b.arena.alloc(new_value),
         kind: p.kind,
         shorthand: p.shorthand,
         computed: p.computed,
@@ -301,6 +301,7 @@ fn slots_pattern_prop<'arena>(
     let value = b.ident("$$slots_");
     let span = Span::new(key.span.start, value.span.end);
     ObjectPatternProperty::Property(init_property(
+        b.arena,
         Expression::Identifier(key),
         Expression::Identifier(value),
         false,
@@ -317,6 +318,7 @@ fn shorthand_pattern_prop<'arena>(
     let ident = b.ident(name);
     let span = ident.span;
     ObjectPatternProperty::Property(init_property(
+        b.arena,
         Expression::Identifier(ident.clone()),
         Expression::Identifier(ident),
         true,

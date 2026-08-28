@@ -550,6 +550,7 @@ pub(crate) fn build_bind_object_property<'arena>(
             let shorthand = matches!(&value, Expression::Identifier(id)
                 if plain_identifier_name(id, env.source).as_deref() == Some(name));
             Ok(Some(init_property(
+                env.b.arena,
                 Expression::Identifier(key),
                 value,
                 shorthand,

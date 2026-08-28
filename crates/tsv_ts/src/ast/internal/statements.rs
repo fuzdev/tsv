@@ -391,11 +391,17 @@ pub struct VariableDeclaration<'arena> {
     pub span: Span,
 }
 
+/// One declarator of a variable declaration: `x`, `x = init`, `{a, b} = init`.
+///
+/// Both slots are `&'arena` references rather than inline `Expression`s, for the
+/// density reason on [`super::Property`] — 160 B → 32 on every element of every
+/// `declarations` slice, and no allocation added, because the parser's expression
+/// spine already hands back an arena reference.
 #[derive(Debug, Clone)]
 pub struct VariableDeclarator<'arena> {
     /// The binding pattern (Identifier, ArrayPattern, or ObjectPattern)
-    pub id: Expression<'arena>,
-    pub init: Option<Expression<'arena>>,
+    pub id: &'arena Expression<'arena>,
+    pub init: Option<&'arena Expression<'arena>>,
     /// Definite assignment assertion (`!` after identifier, e.g., `let x!: string;`)
     pub definite: bool,
     pub span: Span,

@@ -348,7 +348,7 @@ fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mu
                         // Best-effort: a malformed props pattern is refused later
                         // by the binding analysis; here we simply record what we
                         // can resolve.
-                        let _ = pattern_binding_names(&declarator.id, source, &mut names);
+                        let _ = pattern_binding_names(declarator.id, source, &mut names);
                         for name in names {
                             out.insert(name);
                         }
@@ -450,7 +450,7 @@ pub(crate) fn collect_constant_names(
                     // `analyze_declarator` refuses anyway, so nothing reaches a
                     // write gate unnamed.
                     let mut names = Vec::new();
-                    if pattern_binding_names(&declarator.id, source, &mut names).is_ok() {
+                    if pattern_binding_names(declarator.id, source, &mut names).is_ok() {
                         out.extend(names);
                     }
                 }
@@ -622,7 +622,7 @@ fn refuse_invalid_assign_target(target: &Expression<'_>, nc: &mut Nc<'_>, top: b
         Expression::ObjectPattern(pattern) => {
             for prop in pattern.properties {
                 if let ObjectPatternProperty::Property(p) = prop {
-                    refuse_invalid_assign_target(&p.value, nc, false);
+                    refuse_invalid_assign_target(p.value, nc, false);
                 }
             }
         }
@@ -765,7 +765,7 @@ fn hoist_block_consts(stmts: &[Statement<'_>], nc: &mut Nc<'_>) {
             && decl.kind == VariableDeclarationKind::Const
         {
             for declarator in decl.declarations {
-                declare_js_pattern(&declarator.id, nc, true);
+                declare_js_pattern(declarator.id, nc, true);
             }
         }
     }
@@ -1021,9 +1021,9 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
                 match prop {
                     ObjectProperty::Property(p) => {
                         if p.computed {
-                            walk_expr(&p.key, nc);
+                            walk_expr(p.key, nc);
                         }
-                        walk_expr(&p.value, nc);
+                        walk_expr(p.value, nc);
                     }
                     ObjectProperty::SpreadElement(s) => walk_expr(s.argument, nc),
                 }
@@ -1069,9 +1069,9 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
                         if prop.computed {
-                            walk_expr(&prop.key, nc);
+                            walk_expr(prop.key, nc);
                         }
-                        walk_expr(&prop.value, nc);
+                        walk_expr(prop.value, nc);
                     }
                     ObjectPatternProperty::RestElement(rest) => walk_expr(rest.argument, nc),
                 }
@@ -1153,10 +1153,10 @@ fn walk_var_decl(decl: &VariableDeclaration<'_>, nc: &mut Nc<'_>, shadow: bool) 
     let is_const = decl.kind == VariableDeclarationKind::Const;
     for declarator in decl.declarations {
         if shadow {
-            declare_js_pattern(&declarator.id, nc, is_const);
+            declare_js_pattern(declarator.id, nc, is_const);
         }
-        walk_expr(&declarator.id, nc);
-        walk_opt(declarator.init.as_ref(), nc);
+        walk_expr(declarator.id, nc);
+        walk_opt(declarator.init, nc);
     }
 }
 

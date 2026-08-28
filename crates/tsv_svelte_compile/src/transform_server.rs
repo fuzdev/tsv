@@ -623,7 +623,7 @@ fn analyze<'arena>(
                         .as_ref()
                         .and_then(|init| classify_rune_init(init, source)),
                     Some(RuneInit::State(_))
-                ) && let Some(name) = identifier_binding_name(&declarator.id, source)
+                ) && let Some(name) = identifier_binding_name(declarator.id, source)
                 {
                     state_names.insert(name);
                 }
@@ -1336,6 +1336,7 @@ fn build_bindable_object<'arena>(
             Expression::Identifier(b.ident(&entry.local))
         };
         properties.push(ObjectProperty::Property(init_property(
+            b.arena,
             Expression::Identifier(key),
             value,
             shorthand,

@@ -444,7 +444,7 @@ fn block_min_stmt(stmt: &Statement<'_>, min: &mut Option<u32>) {
 
 fn block_min_var_decl(decl: &VariableDeclaration<'_>, min: &mut Option<u32>) {
     for declarator in decl.declarations {
-        block_min_expr(&declarator.id, min);
+        block_min_expr(declarator.id, min);
         if let Some(init) = declarator.init.as_ref() {
             block_min_expr(init, min);
         }
@@ -536,9 +536,9 @@ fn block_min_expr(expr: &Expression<'_>, min: &mut Option<u32>) {
                 match prop {
                     ObjectProperty::Property(p) => {
                         if p.computed {
-                            block_min_expr(&p.key, min);
+                            block_min_expr(p.key, min);
                         }
-                        block_min_expr(&p.value, min);
+                        block_min_expr(p.value, min);
                     }
                     ObjectProperty::SpreadElement(s) => block_min_expr(s.argument, min),
                 }
@@ -584,9 +584,9 @@ fn block_min_expr(expr: &Expression<'_>, min: &mut Option<u32>) {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
                         if prop.computed {
-                            block_min_expr(&prop.key, min);
+                            block_min_expr(prop.key, min);
                         }
-                        block_min_expr(&prop.value, min);
+                        block_min_expr(prop.value, min);
                     }
                     ObjectPatternProperty::RestElement(rest) => block_min_expr(rest.argument, min),
                 }
