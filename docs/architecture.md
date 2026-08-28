@@ -977,21 +977,27 @@ payload by `&'arena` reference:
   Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
   next-widest variant is `CallExpression` at 64 B and it is 14–21% of expressions,
   which is where the ladder stops.
-- `Statement` is **104 B**, not 544 — its eight widest declaration heads
+- `TSType` is **80 B**, not 112 — `TSImportType`, `TSConstructorType` and
+  `TSInferType` are boxed. Here the width is paid less on slice elements than on the
+  `?`-propagation up the type parser's deep precedence ladder, which is why the rung
+  outperformed its slot-count estimate.
+- `Statement`'s rare declaration heads are boxed for the same reason
   (`TSTypeAliasDeclaration`, `ExportDefaultDeclaration`, `ClassDeclaration`,
   `FunctionDeclaration`, `TSInterfaceDeclaration`, `TSDeclareFunction`,
-  `ExportAllDeclaration`, `TSImportEqualsDeclaration`) are boxed, and one level down
-  `ForStatement`, `ForOfStatement`, `ForInStatement` and `TryStatement` hold their
-  heads as references. Each of the eight is ≤0.2% of statements on real source and a
-  classic `for (;;)` is 0.05–0.22%. The next-widest variants are `IfStatement` and
-  `SwitchStatement` at 96 B, and `IfStatement` is 3–6% of statements, which is where
-  the ladder stops.
+  `ExportAllDeclaration`, `TSImportEqualsDeclaration`, `TSEnumDeclaration`,
+  `TSModuleDeclaration`, `TSExportAssignment`), and one level down `ForStatement`,
+  `ForOfStatement`, `ForInStatement` and `TryStatement` hold their heads as
+  references. Each of those heads is ≤0.2% of statements on real source and a classic
+  `for (;;)` is 0.05–0.22%. Rarity carries the enum from 544 B down to 96; the last
+  step to **72 B** is the second rule below, plus its one deliberate exception.
 
-Both widths are pinned by `const` asserts in `ast/internal/mod.rs`, so a variant that
-widens either enum fails the build rather than silently fattening every slice element
-and lowering the nesting ceiling. **Rarity is the whole of the argument for this
-rule** — boxing a *common* variant buys density and pays an allocation plus a pointer
-chase on the majority of the traffic.
+All three widths are pinned by `const` asserts in `ast/internal/mod.rs`, so a variant
+that widens any of these enums fails the build rather than silently fattening every
+slice element and lowering the nesting ceiling. **Rarity is normally the whole of the
+argument for this rule** — boxing a *common* variant buys density and pays an
+allocation plus a pointer chase on the majority of the traffic, so it has to be
+measured rather than assumed (`Statement`'s last two heads are the one place it was,
+and paid).
 
 **The second rule needs no rarity, because it adds no allocation at all: an inline
 slot whose value the producer already arena-allocated is a COPY OUT of the arena, not
@@ -1007,6 +1013,25 @@ whose own width was two such slots take it:
   reuses the same struct) is **32 B**, not 160 — so `ObjectProperty` is 32 and
   `ObjectPatternProperty` 40 (its `RestElement` arm sets that one).
 - `VariableDeclarator` is **32 B**, not 160.
+- every `Expression`-holding `Statement` head takes it too: `ExpressionStatement`
+  88 → **24**, `IfStatement` / `SwitchStatement` / `SwitchCase` 96 → **32**,
+  `WhileStatement` / `DoWhileStatement` 88 → **24**, `ReturnStatement` /
+  `ThrowStatement` 80 → **16**. `CatchClause` is the one that does *not*: its `param`
+  is built by the parser as an owned value rather than through the spine, so a
+  reference there would add an allocation instead of removing a copy — and
+  `CatchClause` is reached only through `Option<&CatchClause>`, so its width sets
+  nothing.
+
+**The one exception to "rarity is the whole of the argument".** Once those heads
+narrowed, the only variants left setting `Statement`'s width were `ImportDeclaration`
+(6.8–11.7% of statements) and `ExportNamedDeclaration` (2.4–4.0%) — common, not rare.
+They are boxed anyway, because a boxed head's construction copies the same bytes into
+the arena that it would otherwise have moved into the enum, so the cost is one bump
+pointer and the return is 24 bytes off *every other* statement slot. That takes
+`Statement` to **72 B**; the next-widest inline variant is `TryStatement` at 64, which
+is where the ladder stops. The trade is settled by measurement, not by the rarity
+argument, and it is the only place in any of the three enums where that argument does
+not apply.
 
 `parse_expression_ref` / `parse_assignment_expression_ref` are the spine's
 ref-returning entry points these fields are filled from. The read side does pay one

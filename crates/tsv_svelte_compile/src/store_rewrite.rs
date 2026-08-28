@@ -271,7 +271,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     ) -> Result<Option<Statement<'arena>>, CompileError> {
         use tsv_ts::ast::internal as ast;
         Ok(match stmt {
-            Statement::ExpressionStatement(s) => self.expr(&s.expression)?.map(|expression| {
+            Statement::ExpressionStatement(s) => self.expr_ref(s.expression)?.map(|expression| {
                 Statement::ExpressionStatement(ast::ExpressionStatement {
                     expression,
                     ..s.clone()
@@ -285,8 +285,8 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     })
                 })
             }
-            Statement::ReturnStatement(s) => match s.argument.as_ref() {
-                Some(argument) => self.expr(argument)?.map(|argument| {
+            Statement::ReturnStatement(s) => match s.argument {
+                Some(argument) => self.expr_ref(argument)?.map(|argument| {
                     Statement::ReturnStatement(ast::ReturnStatement {
                         argument: Some(argument),
                         ..s.clone()
@@ -317,7 +317,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 }
             }
             Statement::IfStatement(s) => {
-                let test = self.expr(&s.test)?;
+                let test = self.expr_ref(s.test)?;
                 let consequent = self.statement_ref(s.consequent)?;
                 let alternate = match s.alternate {
                     Some(alt) => self.statement_ref(alt)?.map(Some),
@@ -327,7 +327,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     None
                 } else {
                     Some(Statement::IfStatement(ast::IfStatement {
-                        test: test.unwrap_or_else(|| s.test.clone()),
+                        test: test.unwrap_or(s.test),
                         consequent: consequent.unwrap_or(s.consequent),
                         alternate: alternate.unwrap_or(s.alternate),
                         span: s.span,
@@ -412,13 +412,13 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 }
             }
             Statement::WhileStatement(s) => {
-                let test = self.expr(&s.test)?;
+                let test = self.expr_ref(s.test)?;
                 let body = self.statement_ref(s.body)?;
                 if test.is_none() && body.is_none() {
                     None
                 } else {
                     Some(Statement::WhileStatement(ast::WhileStatement {
-                        test: test.unwrap_or_else(|| s.test.clone()),
+                        test: test.unwrap_or(s.test),
                         body: body.unwrap_or(s.body),
                         span: s.span,
                     }))
@@ -426,25 +426,25 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             }
             Statement::DoWhileStatement(s) => {
                 let body = self.statement_ref(s.body)?;
-                let test = self.expr(&s.test)?;
+                let test = self.expr_ref(s.test)?;
                 if body.is_none() && test.is_none() {
                     None
                 } else {
                     Some(Statement::DoWhileStatement(ast::DoWhileStatement {
                         body: body.unwrap_or(s.body),
-                        test: test.unwrap_or_else(|| s.test.clone()),
+                        test: test.unwrap_or(s.test),
                         span: s.span,
                     }))
                 }
             }
             Statement::SwitchStatement(s) => {
-                let discriminant = self.expr(&s.discriminant)?;
+                let discriminant = self.expr_ref(s.discriminant)?;
                 let cases = map_slice!(self, s.cases, switch_case);
                 if discriminant.is_none() && cases.is_none() {
                     None
                 } else {
                     Some(Statement::SwitchStatement(ast::SwitchStatement {
-                        discriminant: discriminant.unwrap_or_else(|| s.discriminant.clone()),
+                        discriminant: discriminant.unwrap_or(s.discriminant),
                         cases: cases.unwrap_or(s.cases),
                         span: s.span,
                     }))
@@ -474,7 +474,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     }))
                 }
             }
-            Statement::ThrowStatement(s) => self.expr(&s.argument)?.map(|argument| {
+            Statement::ThrowStatement(s) => self.expr_ref(s.argument)?.map(|argument| {
                 Statement::ThrowStatement(ast::ThrowStatement {
                     argument,
                     span: s.span,
@@ -547,8 +547,8 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         &mut self,
         case: &SwitchCase<'arena>,
     ) -> Result<Option<SwitchCase<'arena>>, CompileError> {
-        let test = match &case.test {
-            Some(test) => self.expr(test)?.map(Some),
+        let test = match case.test {
+            Some(test) => self.expr_ref(test)?.map(Some),
             None => None,
         };
         let consequent = self.statements(case.consequent)?;
@@ -556,7 +556,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             return Ok(None);
         }
         Ok(Some(SwitchCase {
-            test: test.unwrap_or_else(|| case.test.clone()),
+            test: test.unwrap_or(case.test),
             consequent: consequent.unwrap_or(case.consequent),
             span: case.span,
         }))

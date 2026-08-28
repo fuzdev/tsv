@@ -133,7 +133,7 @@ impl<'a> SymbolBinder<'a> {
                 self.with_block_scope(|bd| bd.bind_statement_list(b.body, true));
             }
             Statement::IfStatement(s) => {
-                self.visit_expression(&s.test);
+                self.visit_expression(s.test);
                 self.visit_statement(s.consequent, DeclMods::default(), false);
                 if let Some(alt) = s.alternate {
                     self.visit_statement(alt, DeclMods::default(), false);
@@ -151,12 +151,12 @@ impl<'a> SymbolBinder<'a> {
                 bd.visit_statement(s.body, DeclMods::default(), false);
             }),
             Statement::WhileStatement(s) => {
-                self.visit_expression(&s.test);
+                self.visit_expression(s.test);
                 self.visit_statement(s.body, DeclMods::default(), false);
             }
             Statement::DoWhileStatement(s) => {
                 self.visit_statement(s.body, DeclMods::default(), false);
-                self.visit_expression(&s.test);
+                self.visit_expression(s.test);
             }
             Statement::SwitchStatement(s) => self.bind_switch_statement(s),
             Statement::TryStatement(s) => self.bind_try_statement(s),
@@ -168,8 +168,8 @@ impl<'a> SymbolBinder<'a> {
                     self.visit_expression(a);
                 }
             }
-            Statement::ThrowStatement(s) => self.visit_expression(&s.argument),
-            Statement::ExpressionStatement(s) => self.visit_expression(&s.expression),
+            Statement::ThrowStatement(s) => self.visit_expression(s.argument),
+            Statement::ExpressionStatement(s) => self.visit_expression(s.expression),
             Statement::TSExportAssignment(ea) => self.bind_export_assignment_statement(ea),
             Statement::ExportAllDeclaration(_)
             | Statement::TSNamespaceExportDeclaration(_)
@@ -298,7 +298,7 @@ impl<'a> SymbolBinder<'a> {
 
     #[inline]
     fn bind_switch_statement(&mut self, s: &tsv_ts::ast::internal::SwitchStatement<'a>) {
-        self.visit_expression(&s.discriminant);
+        self.visit_expression(s.discriminant);
         self.with_block_scope(|bd| {
             for case in s.cases {
                 if let Some(t) = &case.test {

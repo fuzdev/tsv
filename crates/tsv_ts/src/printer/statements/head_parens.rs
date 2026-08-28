@@ -195,6 +195,6 @@ impl<'a> Printer<'a> {
         stmt: &internal::ExpressionStatement<'_>,
         in_program_or_block: bool,
     ) -> bool {
-        in_program_or_block && is_string_literal(&stmt.expression)
+        in_program_or_block && is_string_literal(stmt.expression)
     }
 }

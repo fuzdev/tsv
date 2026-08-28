@@ -388,16 +388,16 @@ fn is_external_module_indicator(stmt: &Statement<'_>) -> bool {
 fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
     use Statement as S;
     match stmt {
-        S::ExpressionStatement(s) => expr_contains_import_meta(&s.expression),
+        S::ExpressionStatement(s) => expr_contains_import_meta(s.expression),
         S::VariableDeclaration(d) => d
             .declarations
             .iter()
             .any(|decl| decl.init.is_some_and(expr_contains_import_meta)),
-        S::ReturnStatement(s) => s.argument.as_ref().is_some_and(expr_contains_import_meta),
-        S::ThrowStatement(s) => expr_contains_import_meta(&s.argument),
+        S::ReturnStatement(s) => s.argument.is_some_and(expr_contains_import_meta),
+        S::ThrowStatement(s) => expr_contains_import_meta(s.argument),
         S::BlockStatement(b) => b.body.iter().any(stmt_contains_import_meta),
         S::IfStatement(s) => {
-            expr_contains_import_meta(&s.test)
+            expr_contains_import_meta(s.test)
                 || stmt_contains_import_meta(s.consequent)
                 || s.alternate.is_some_and(stmt_contains_import_meta)
         }
@@ -412,15 +412,15 @@ fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
             expr_contains_import_meta(s.right) || stmt_contains_import_meta(s.body)
         }
         S::WhileStatement(s) => {
-            expr_contains_import_meta(&s.test) || stmt_contains_import_meta(s.body)
+            expr_contains_import_meta(s.test) || stmt_contains_import_meta(s.body)
         }
         S::DoWhileStatement(s) => {
-            expr_contains_import_meta(&s.test) || stmt_contains_import_meta(s.body)
+            expr_contains_import_meta(s.test) || stmt_contains_import_meta(s.body)
         }
         S::SwitchStatement(s) => {
-            expr_contains_import_meta(&s.discriminant)
+            expr_contains_import_meta(s.discriminant)
                 || s.cases.iter().any(|c| {
-                    c.test.as_ref().is_some_and(expr_contains_import_meta)
+                    c.test.is_some_and(expr_contains_import_meta)
                         || c.consequent.iter().any(stmt_contains_import_meta)
                 })
         }

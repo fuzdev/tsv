@@ -243,11 +243,15 @@ impl SoaWalk {
                 self.close(id);
             }
             TSType::Constructor(c) => {
+                // ⚠️ `addr_of(*c)`, not `addr_of(c)`: this variant is arena-boxed, so the
+                // binder is a `&&TSConstructorType` and a bare `addr_of` would key on the
+                // address of the ENUM's pointer slot. Same rule as the boxed `Expression`
+                // variants in `binder::expression_addr_kind`.
                 let id = self.add(
                     NodeKind::TSConstructorType,
                     c.span,
                     Some(parent),
-                    addr_of(c),
+                    addr_of(*c),
                 );
                 self.visit_type_params(c.type_parameters.as_ref(), id);
                 self.visit_params(c.params, id);
@@ -353,7 +357,8 @@ impl SoaWalk {
                 self.close(id);
             }
             TSType::Infer(inf) => {
-                let id = self.add(NodeKind::TSInferType, inf.span, Some(parent), addr_of(inf));
+                // Arena-boxed — deref before keying (see `TSType::Constructor` above).
+                let id = self.add(NodeKind::TSInferType, inf.span, Some(parent), addr_of(*inf));
                 self.visit_type_parameter(&inf.type_parameter, id);
                 self.close(id);
             }

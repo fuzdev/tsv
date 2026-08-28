@@ -753,7 +753,7 @@ impl<'s> Collector<'s> {
                 }
                 self.class_body(&c.body);
             }
-            Statement::ExpressionStatement(s) => self.expr(&s.expression),
+            Statement::ExpressionStatement(s) => self.expr(s.expression),
             Statement::ReturnStatement(s) => {
                 if let Some(arg) = &s.argument {
                     self.expr(arg);
@@ -761,7 +761,7 @@ impl<'s> Collector<'s> {
             }
             Statement::BlockStatement(s) => self.stmts(s.body),
             Statement::IfStatement(s) => {
-                self.expr(&s.test);
+                self.expr(s.test);
                 self.stmt(s.consequent);
                 if let Some(alt) = s.alternate {
                     self.stmt(alt);
@@ -792,15 +792,15 @@ impl<'s> Collector<'s> {
                 self.stmt(s.body);
             }
             Statement::WhileStatement(s) => {
-                self.expr(&s.test);
+                self.expr(s.test);
                 self.stmt(s.body);
             }
             Statement::DoWhileStatement(s) => {
                 self.stmt(s.body);
-                self.expr(&s.test);
+                self.expr(s.test);
             }
             Statement::SwitchStatement(s) => {
-                self.expr(&s.discriminant);
+                self.expr(s.discriminant);
                 for case in s.cases {
                     if let Some(test) = &case.test {
                         self.expr(test);
@@ -820,7 +820,7 @@ impl<'s> Collector<'s> {
                     self.stmts(finalizer.body);
                 }
             }
-            Statement::ThrowStatement(s) => self.expr(&s.argument),
+            Statement::ThrowStatement(s) => self.expr(s.argument),
             Statement::LabeledStatement(s) => self.stmt(s.body),
             // No reference-bearing children, or refused before emission.
             Statement::BreakStatement(_)

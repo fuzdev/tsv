@@ -584,7 +584,7 @@ pub(crate) fn emit_if_block<'arena>(
     for (test, cons) in cons_blocks.into_iter().rev() {
         let here = env.b.here();
         let if_stmt = IfStatement {
-            test,
+            test: arena.alloc(test),
             consequent: cons,
             alternate: Some(alternate),
             span: here,
@@ -800,7 +800,7 @@ pub(crate) fn emit_each_block<'arena>(
             .binary(len_cond, BinaryOperator::BangEqualsEquals, zero_cond);
         let if_here = env.b.here();
         let if_stmt = Statement::IfStatement(IfStatement {
-            test: cond,
+            test: arena.alloc(cond),
             consequent: if_branch,
             alternate: Some(else_branch),
             span: if_here,

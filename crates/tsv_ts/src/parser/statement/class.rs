@@ -143,14 +143,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     ExportKind::Value
                 };
                 let class_decl = Statement::ClassDeclaration(self.arena.alloc(class));
-                Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-                    declaration: Some(self.alloc(class_decl)),
-                    specifiers: &[],
-                    source: None,
-                    attributes: None,
-                    export_kind,
-                    span: Span::new(start as u32, end),
-                }))
+                Ok(Statement::ExportNamedDeclaration(self.arena.alloc(
+                    ExportNamedDeclaration {
+                        declaration: Some(self.alloc(class_decl)),
+                        specifiers: &[],
+                        source: None,
+                        attributes: None,
+                        export_kind,
+                        span: Span::new(start as u32, end),
+                    },
+                )))
             }
         } else {
             Ok(Statement::ClassDeclaration(self.arena.alloc(class)))

@@ -89,8 +89,8 @@ pub(crate) fn collect_script_comments(
     let survives = |stmt: &Statement<'_>| match stmt {
         Statement::ImportDeclaration(_) => false,
         Statement::ExpressionStatement(expr_stmt) => {
-            is_effect_call(&expr_stmt.expression, source).is_none()
-                && is_inspect_call(&expr_stmt.expression, source).is_none()
+            is_effect_call(expr_stmt.expression, source).is_none()
+                && is_inspect_call(expr_stmt.expression, source).is_none()
         }
         _ => true,
     };
@@ -333,16 +333,16 @@ fn block_min_stmt(stmt: &Statement<'_>, min: &mut Option<u32>) {
             block_min_stmts(f.body.body, min);
         }
         Statement::ClassDeclaration(c) => block_min_class_body(&c.body, min),
-        Statement::ExpressionStatement(s) => block_min_expr(&s.expression, min),
+        Statement::ExpressionStatement(s) => block_min_expr(s.expression, min),
         Statement::VariableDeclaration(d) => block_min_var_decl(d, min),
         Statement::ReturnStatement(s) => {
             if let Some(arg) = s.argument.as_ref() {
                 block_min_expr(arg, min);
             }
         }
-        Statement::ThrowStatement(s) => block_min_expr(&s.argument, min),
+        Statement::ThrowStatement(s) => block_min_expr(s.argument, min),
         Statement::IfStatement(s) => {
-            block_min_expr(&s.test, min);
+            block_min_expr(s.test, min);
             block_min_stmt(s.consequent, min);
             if let Some(alt) = s.alternate {
                 block_min_stmt(alt, min);
@@ -373,15 +373,15 @@ fn block_min_stmt(stmt: &Statement<'_>, min: &mut Option<u32>) {
             block_min_stmt(s.body, min);
         }
         Statement::WhileStatement(s) => {
-            block_min_expr(&s.test, min);
+            block_min_expr(s.test, min);
             block_min_stmt(s.body, min);
         }
         Statement::DoWhileStatement(s) => {
             block_min_stmt(s.body, min);
-            block_min_expr(&s.test, min);
+            block_min_expr(s.test, min);
         }
         Statement::SwitchStatement(s) => {
-            block_min_expr(&s.discriminant, min);
+            block_min_expr(s.discriminant, min);
             for case in s.cases {
                 if let Some(test) = case.test.as_ref() {
                     block_min_expr(test, min);

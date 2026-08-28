@@ -109,19 +109,32 @@ pub use expressions::{
 // for each is free, hold their payload by `&'arena` reference: `Expression`'s five
 // widest (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` /
 // `MetaProperty` / `TaggedTemplateExpression`, together ~3% of expressions, of which
-// the widest two are ~0.02%), `Statement`'s eight widest DECLARATION heads (each
-// ≤0.2% of statements) and its four loop / `try` heads one level down
-// (`internal::statements`).
+// the widest two are ~0.02%), `TSType`'s three widest (`TSImportType`,
+// `TSConstructorType`, `TSInferType`, taking it 112 → 80 — where the cost is mostly the
+// `?`-propagation up the type parser's deep precedence ladder rather than the slot
+// count), `Statement`'s DECLARATION heads and its four loop /
+// `try` heads one level down (`internal::statements`). Two of those declaration
+// heads — `ImportDeclaration` and `ExportNamedDeclaration` — are boxed despite NOT
+// being rare (6.8–11.7% and 2.4–4.0% of statements): they are simply the last two
+// rungs of the ladder, and a boxed head's construction copies the same bytes into
+// the arena that it would have moved into the enum, so the cost is one bump pointer
+// against 24 bytes off every other statement slot.
 //
-// The two LIST-ELEMENT containers whose own width was two inline `Expression`s —
-// `Property` (an object literal's `key: value`, and a destructuring pattern's) and
-// `VariableDeclarator` — instead hold both slots by reference, which is not the same
-// trade: the parser's expression spine (`ParsedExpr`) already returns an
-// arena-allocated `&Expression`, so an inline slot is a COPY OUT of the arena rather
-// than a place the node lives. Naming the slots by reference removes that copy
-// instead of adding an allocation, and takes the element every object-literal and
-// declarator list moves from 160 B to 32 (`ObjectPatternProperty` 40, its
-// `RestElement` arm setting it) — see `parse_expression_ref`.
+// The LIST-ELEMENT containers whose own width was inline `Expression`s —
+// `Property` (an object literal's `key: value`, and a destructuring pattern's),
+// `VariableDeclarator`, and every `Expression`-holding `Statement` head
+// (`ExpressionStatement` 24 B, `IfStatement` / `SwitchStatement` / `SwitchCase` 32,
+// `WhileStatement` / `DoWhileStatement` 24, `ReturnStatement` / `ThrowStatement` 16)
+// — instead hold those slots by reference, which is not the same trade: the parser's
+// expression spine (`ParsedExpr`) already returns an arena-allocated `&Expression`,
+// so an inline slot is a COPY OUT of the arena rather than a place the node lives.
+// Naming the slots by reference removes that copy instead of adding an allocation,
+// and takes the element every object-literal and declarator list moves from 160 B to
+// 32 (`ObjectPatternProperty` 40, its `RestElement` arm setting it) — see
+// `parse_expression_ref`. `CatchClause` keeps its inline `param` deliberately: that
+// one is built by the parser as an owned value rather than through the spine, so a
+// reference there would ADD an allocation, and `CatchClause` is reached only through
+// `Option<&CatchClause>` so its width sets nothing.
 //
 // Pinned so a variant that widens any of them shows up as a failed build rather
 // than as a silently lower nesting ceiling and a fatter element slot. 64-bit only:
@@ -129,7 +142,7 @@ pub use expressions::{
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Expression<'static>>() == 72);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<Statement<'static>>() == 104);
+const _: () = assert!(size_of::<Statement<'static>>() == 72);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Property<'static>>() == 32);
 #[cfg(target_pointer_width = "64")]
@@ -138,6 +151,10 @@ const _: () = assert!(size_of::<ObjectProperty<'static>>() == 32);
 const _: () = assert!(size_of::<ObjectPatternProperty<'static>>() == 40);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<VariableDeclarator<'static>>() == 32);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<SwitchCase<'static>>() == 32);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<TSType<'static>>() == 80);
 
 //
 // Foundational Types (defined here, used everywhere)

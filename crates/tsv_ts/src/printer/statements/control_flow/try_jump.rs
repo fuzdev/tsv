@@ -200,7 +200,7 @@ impl<'a> Printer<'a> {
             "throw",
             stmt.span.start,
             stmt.span.end,
-            &stmt.argument,
+            stmt.argument,
             clause_tail,
         )
     }

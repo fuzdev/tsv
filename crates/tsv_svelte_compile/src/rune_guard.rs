@@ -610,9 +610,9 @@ fn walk_statement(
     depth: usize,
 ) -> Result<(), CompileError> {
     match stmt {
-        Statement::ExpressionStatement(s) => walk_expression(&s.expression, ctx),
+        Statement::ExpressionStatement(s) => walk_expression(s.expression, ctx),
         Statement::VariableDeclaration(s) => walk_variable_declaration(s, ctx, depth),
-        Statement::ReturnStatement(s) => walk_opt(s.argument.as_ref(), ctx),
+        Statement::ReturnStatement(s) => walk_opt(s.argument, ctx),
         Statement::BlockStatement(s) => walk_statements(s.body, ctx, depth + 1),
         Statement::FunctionDeclaration(s) => {
             if let Some(id) = &s.id {
@@ -663,7 +663,7 @@ fn walk_statement(
             | ExportDefaultValue::TSInterfaceDeclaration(_) => Ok(()),
         },
         Statement::IfStatement(s) => {
-            walk_expression(&s.test, ctx)?;
+            walk_expression(s.test, ctx)?;
             walk_statement(s.consequent, ctx, depth + 1)?;
             match s.alternate {
                 Some(alt) => walk_statement(alt, ctx, depth + 1),
@@ -698,17 +698,17 @@ fn walk_statement(
             walk_statement(s.body, ctx, depth + 1)
         }
         Statement::WhileStatement(s) => {
-            walk_expression(&s.test, ctx)?;
+            walk_expression(s.test, ctx)?;
             walk_statement(s.body, ctx, depth + 1)
         }
         Statement::DoWhileStatement(s) => {
             walk_statement(s.body, ctx, depth + 1)?;
-            walk_expression(&s.test, ctx)
+            walk_expression(s.test, ctx)
         }
         Statement::SwitchStatement(s) => {
-            walk_expression(&s.discriminant, ctx)?;
+            walk_expression(s.discriminant, ctx)?;
             for case in s.cases {
-                walk_opt(case.test.as_ref(), ctx)?;
+                walk_opt(case.test, ctx)?;
                 walk_statements(case.consequent, ctx, depth + 1)?;
             }
             Ok(())
@@ -731,7 +731,7 @@ fn walk_statement(
             }
             Ok(())
         }
-        Statement::ThrowStatement(s) => walk_expression(&s.argument, ctx),
+        Statement::ThrowStatement(s) => walk_expression(s.argument, ctx),
         Statement::LabeledStatement(s) => walk_statement(s.body, ctx, depth + 1),
         // No expression-bearing children.
         Statement::BreakStatement(_)

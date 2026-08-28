@@ -38,8 +38,8 @@ impl<'a> FlowBuilder<'a> {
         }
         match stmt {
             Statement::ExpressionStatement(s) => {
-                self.visit_expression(&s.expression);
-                self.maybe_bind_expression_flow_if_call(&s.expression);
+                self.visit_expression(s.expression);
+                self.maybe_bind_expression_flow_if_call(s.expression);
             }
             Statement::VariableDeclaration(d) => {
                 for decl in d.declarations {
@@ -60,7 +60,7 @@ impl<'a> FlowBuilder<'a> {
             }
             Statement::ThrowStatement(s) => {
                 // `bindThrowStatement` (binder.go:1949).
-                self.visit_expression(&s.argument);
+                self.visit_expression(s.argument);
                 self.current_flow = self.unreachable_flow;
                 self.has_flow_effects = true;
             }
@@ -98,7 +98,7 @@ impl<'a> FlowBuilder<'a> {
     /// regions, so a function body stays reachable even in dead code.
     fn descend_children_generic(&mut self, stmt: &Statement<'_>) {
         match stmt {
-            Statement::ExpressionStatement(s) => self.visit_expression(&s.expression),
+            Statement::ExpressionStatement(s) => self.visit_expression(s.expression),
             Statement::VariableDeclaration(d) => {
                 for decl in d.declarations {
                     self.visit_expression(decl.id);
@@ -117,12 +117,12 @@ impl<'a> FlowBuilder<'a> {
                     self.visit_expression(a);
                 }
             }
-            Statement::ThrowStatement(s) => self.visit_expression(&s.argument),
+            Statement::ThrowStatement(s) => self.visit_expression(s.argument),
             Statement::BlockStatement(b) => self.visit_statement_list(b.body),
             // --- dead-path linear descent for the branching kinds (their real
             //     topology lives in `visit_statement`; reached only when dead) ---
             Statement::IfStatement(s) => {
-                self.visit_expression(&s.test);
+                self.visit_expression(s.test);
                 self.visit_statement(s.consequent);
                 if let Some(alt) = s.alternate {
                     self.visit_statement(alt);
@@ -160,15 +160,15 @@ impl<'a> FlowBuilder<'a> {
                 self.visit_statement(s.body);
             }
             Statement::WhileStatement(s) => {
-                self.visit_expression(&s.test);
+                self.visit_expression(s.test);
                 self.visit_statement(s.body);
             }
             Statement::DoWhileStatement(s) => {
                 self.visit_statement(s.body);
-                self.visit_expression(&s.test);
+                self.visit_expression(s.test);
             }
             Statement::SwitchStatement(s) => {
-                self.visit_expression(&s.discriminant);
+                self.visit_expression(s.discriminant);
                 for case in s.cases {
                     if let Some(t) = &case.test {
                         self.visit_expression(t);
@@ -272,7 +272,7 @@ impl<'a> FlowBuilder<'a> {
         let then_label = self.create_branch_label();
         let else_label = self.create_branch_label();
         let post_if = self.create_branch_label();
-        self.bind_condition(Some(&s.test), then_label, else_label, false);
+        self.bind_condition(Some(s.test), then_label, else_label, false);
         self.current_flow = self.finish_flow_label(then_label);
         self.visit_statement(s.consequent);
         self.add_antecedent(post_if, self.current_flow);
@@ -294,7 +294,7 @@ impl<'a> FlowBuilder<'a> {
         let post_while = self.create_branch_label();
         self.add_antecedent(pre_while, self.current_flow); // entry edge (first)
         self.current_flow = pre_while;
-        self.bind_condition(Some(&s.test), pre_body, post_while, false);
+        self.bind_condition(Some(s.test), pre_body, post_while, false);
         self.current_flow = self.finish_flow_label(pre_body);
         self.bind_iterative_statement(s.body, post_while, pre_while);
         self.add_antecedent(pre_while, self.current_flow); // back edge (after)
@@ -314,7 +314,7 @@ impl<'a> FlowBuilder<'a> {
         self.bind_iterative_statement(s.body, post_do, pre_condition);
         self.add_antecedent(pre_condition, self.current_flow);
         self.current_flow = self.finish_flow_label(pre_condition);
-        self.bind_condition(Some(&s.test), pre_do, post_do, false);
+        self.bind_condition(Some(s.test), pre_do, post_do, false);
         self.current_flow = self.finish_flow_label(post_do);
     }
 
@@ -501,7 +501,7 @@ impl<'a> FlowBuilder<'a> {
     /// saved/restored here, as in tsgo (it is not in the container save set).
     fn bind_switch_statement(&mut self, switch_id: NodeId, s: &SwitchStatement<'_>) {
         let post_switch = self.create_branch_label();
-        self.visit_expression(&s.discriminant);
+        self.visit_expression(s.discriminant);
         let save_break = self.current_break_target;
         let save_pre_switch = self.pre_switch_case_flow;
         self.current_break_target = Some(post_switch);
@@ -531,7 +531,7 @@ impl<'a> FlowBuilder<'a> {
     fn bind_case_block(&mut self, switch_id: NodeId, s: &SwitchStatement<'_>) {
         let clauses = s.cases;
         let is_narrowing_switch =
-            is_true_keyword(&s.discriminant) || is_narrowing_expression(&s.discriminant);
+            is_true_keyword(s.discriminant) || is_narrowing_expression(s.discriminant);
         let last = clauses.len().wrapping_sub(1);
         let mut fallthrough_flow = self.unreachable_flow;
         let mut i = 0;
