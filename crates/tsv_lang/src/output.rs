@@ -37,6 +37,33 @@ impl OutputBuffer {
         self.buffer.push_str(s);
     }
 
+    /// Borrow the backing string as a doc-render target, **or `None` if this
+    /// buffer already holds text**.
+    ///
+    /// The doc renderer appends into a caller-provided `String`, and its two trims
+    /// — `trim_trailing_whitespace` before every non-literal line break and the
+    /// final-line trim — walk backwards from the end with no floor. Handing them a
+    /// buffer that already holds text lets them strip bytes the doc never wrote
+    /// (a doc whose first command is a hard line break eats the indentation the
+    /// printer wrote imperatively before it), so a caller may render straight into
+    /// this buffer only while it is empty and must otherwise render into scratch
+    /// and [`Self::write`] the result.
+    ///
+    /// The emptiness test is **the return value**, not a debug assertion, so the
+    /// hazard is unreachable in release rather than merely documented — the caller
+    /// gets the buffer or it gets `None`. Callers:
+    /// `tsv_ts::printer::Printer::write_arena_doc`. The behaviour the refusal
+    /// exists for is pinned by `doc::arena_render`'s
+    /// `render_base_contract_tests`.
+    #[inline]
+    pub fn as_empty_render_target(&mut self) -> Option<&mut String> {
+        if self.buffer.is_empty() {
+            Some(&mut self.buffer)
+        } else {
+            None
+        }
+    }
+
     /// Remove the last character if it matches the given character
     #[inline]
     pub fn pop_if_ends_with(&mut self, ch: char) {

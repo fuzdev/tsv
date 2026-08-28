@@ -393,6 +393,15 @@ pub fn arena_measure_doc_flat_resolved(
 /// output `String` reuses one warm allocation instead of alloc/free per call.
 /// Reserves [`DocArena::estimated_output_capacity`] itself (a no-op once the
 /// pooled buffer is warm).
+///
+/// ⚠️ **Empty is a requirement, not a convention.** [`trim_trailing_whitespace`]
+/// (run before every non-literal line break) and the final-line trim walk
+/// backwards from the end with no floor, so text sitting in front of the doc's
+/// first byte is theirs to strip. Every other `output.len()` the render loop
+/// takes is a marker captured mid-render and is already relative, so an empty
+/// base is the whole of the invariant — which is what lets a printer whose
+/// buffer *is* empty pass that buffer directly and skip the copy back
+/// (`OutputBuffer::as_empty_render_target`).
 pub fn arena_print_doc_with_indent_resolved_into(
     arena: &DocArena,
     doc: DocId,
@@ -1589,5 +1598,109 @@ mod column_arithmetic_tests {
             "\t".repeat(7),
             "the embed offset must add levels, not replace them"
         );
+    }
+}
+
+#[cfg(test)]
+mod render_base_contract_tests {
+    //! The `*_into` entry points' "(empty) buffer" is a **requirement**, and this
+    //! is the executable form of it — the reason
+    //! [`crate::OutputBuffer::as_empty_render_target`] hands back `None` rather
+    //! than trusting its caller.
+    //!
+    //! **No corpus can grade this**, in either direction. Today's only in-place
+    //! caller (`tsv_ts`'s whole-program render) always arrives on a fresh printer,
+    //! so removing the refusal changes no output at all and every fixture, format
+    //! diff and wire diff stays green; the bug it prevents arrives with the *next*
+    //! caller, and arrives as text silently eaten from in front of the doc.
+    use super::{
+        arena_print_doc_with_indent_resolved_into,
+        arena_print_doc_with_indent_resolved_preserve_whitespace_into,
+    };
+    use crate::EmbedContext;
+    use crate::doc::arena::DocArena;
+
+    /// A doc whose first command is a hard line break — the shape that reaches the
+    /// trim before it has written anything of its own.
+    fn break_first_doc(d: &DocArena) -> crate::doc::arena::DocId {
+        let parts = [d.hardline(), d.text("b")];
+        d.concat(&parts)
+    }
+
+    #[test]
+    fn a_non_empty_base_lets_the_line_break_trim_reach_backwards() {
+        let d = DocArena::new();
+        let doc = break_first_doc(&d);
+        let embed = EmbedContext::default();
+
+        // The contract-honouring shape: render into an empty buffer, then append.
+        let mut scratch = String::new();
+        arena_print_doc_with_indent_resolved_into(&d, doc, &embed, 0, 0, "", &mut scratch);
+        let mut appended = String::from("x\t");
+        appended.push_str(&scratch);
+
+        // The same doc rendered into a buffer that already holds `"x\t"`.
+        let mut in_place = String::from("x\t");
+        arena_print_doc_with_indent_resolved_into(&d, doc, &embed, 0, 0, "", &mut in_place);
+
+        assert_eq!(appended, "x\t\nb");
+        assert_eq!(
+            in_place, "x\nb",
+            "`trim_trailing_whitespace` runs before the doc's first newline and \
+             has no floor, so it eats the tab the doc never wrote"
+        );
+        assert_ne!(
+            appended, in_place,
+            "if these ever agree, the trims have grown a floor and \
+             `as_empty_render_target`'s refusal can be widened"
+        );
+    }
+
+    #[test]
+    fn a_non_empty_base_also_loses_bytes_through_the_final_line_trim() {
+        // The preserve-whitespace entry point skips only the FINAL-line trim, so
+        // the interior trim above still bites there; the default entry point adds
+        // the final-line trim, which reaches back over an empty render outright.
+        let d = DocArena::new();
+        let empty_doc = d.text("");
+        let embed = EmbedContext::default();
+
+        let mut in_place = String::from("x\t");
+        arena_print_doc_with_indent_resolved_into(&d, empty_doc, &embed, 0, 0, "", &mut in_place);
+        assert_eq!(
+            in_place, "x",
+            "a doc that writes nothing still truncates a non-empty base"
+        );
+
+        let mut preserved = String::from("x\t");
+        arena_print_doc_with_indent_resolved_preserve_whitespace_into(
+            &d,
+            empty_doc,
+            &embed,
+            0,
+            0,
+            "",
+            &mut preserved,
+        );
+        assert_eq!(
+            preserved, "x\t",
+            "the preserve-whitespace entry point skips the final-line trim, so this \
+             one base survives — the interior trim is what the other test pins"
+        );
+    }
+
+    #[test]
+    fn an_empty_base_is_what_makes_rendering_in_place_byte_identical() {
+        // The positive half: with nothing in front of the doc's first byte, both
+        // shapes agree, which is the whole licence `write_arena_doc` takes.
+        let d = DocArena::new();
+        let embed = EmbedContext::default();
+        for doc in [break_first_doc(&d), d.text(""), d.text("b")] {
+            let mut scratch = String::new();
+            arena_print_doc_with_indent_resolved_into(&d, doc, &embed, 0, 0, "", &mut scratch);
+            let mut in_place = String::new();
+            arena_print_doc_with_indent_resolved_into(&d, doc, &embed, 0, 0, "", &mut in_place);
+            assert_eq!(scratch, in_place);
+        }
     }
 }
