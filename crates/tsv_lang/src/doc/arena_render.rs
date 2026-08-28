@@ -230,10 +230,29 @@ fn remaining_width(pos: usize, render: &RenderConfig, embed: &EmbedContext) -> i
 /// Trim trailing whitespace (spaces and tabs) from the end of the output buffer.
 /// Matches Prettier's `trim()` / `trimIndentation()` — called before each
 /// non-literal newline to strip trailing indentation/spaces from code lines.
+///
+/// One of the printer's hottest calls: every non-literal line break of every
+/// document reaches it (140,851 a fuz_app pass). So it is spelled as a guarded
+/// reverse **byte** scan rather than `str::trim_end_matches([' ', '\t'])`, which
+/// pays twice for what is usually a no-op — the array pattern searches backwards
+/// over `char_indices`, decoding UTF-8 that the two ASCII bytes it seeks can
+/// never be part of, and the `truncate` runs whether or not the length moved. A
+/// formatted line ends in content, so the common answer is "nothing to trim", and
+/// the guard turns that answer into one load and two compares.
 #[inline]
 pub(super) fn trim_trailing_whitespace(output: &mut String) {
-    let trimmed_len = output.trim_end_matches([' ', '\t']).len();
-    output.truncate(trimmed_len);
+    let bytes = output.as_bytes();
+    let Some(&last) = bytes.last() else { return };
+    if last != b' ' && last != b'\t' {
+        return;
+    }
+    // Only ASCII bytes are ever stepped over, so `end` lands exactly where a
+    // character ends — the same index `trim_end_matches` would have computed.
+    let mut end = bytes.len() - 1;
+    while end > 0 && matches!(bytes[end - 1], b' ' | b'\t') {
+        end -= 1;
+    }
+    output.truncate(end);
 }
 
 /// Render a line break.
