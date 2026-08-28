@@ -52,30 +52,36 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
     nodes
 }
 
+// The three typed entry points below fill a caller-owned `ChainNodeVec` — the `&mut` the
+// recursive walkers already take — rather than returning one. A `ChainNodeVec` is an inline
+// array of eight 56-byte `ChainNode`s and a chain holds ~3 (p50 = 3, mean 2.82 over 40,239
+// chains a fuz_app pass — `buffer_sizes`), so a by-value return copies the WHOLE array,
+// length-independently, into a second slot the caller reserves to receive it; the caller's
+// local is where the buffer has to live either way. That slot lands in
+// `build_expression_doc_dispatch`, on the expression recursion cycle, where every level pays.
+
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
-pub fn linearize_chain_from_call<'a>(
+pub fn linearize_chain_from_call_into<'a>(
     call: &'a internal::CallExpression<'_>,
     input: LinearizeInput<'_>,
-) -> ChainNodeVec<'a> {
-    let mut nodes = ChainNodeVec::new();
+    nodes: &mut ChainNodeVec<'a>,
+) {
     let mut paren_gaps = Vec::new();
-    linearize_call_callee(call, input, &mut nodes, &mut paren_gaps);
+    linearize_call_callee(call, input, nodes, &mut paren_gaps);
     nodes.push(ChainNode::call(call));
-    finalize_chain_nodes(&mut nodes, &paren_gaps, input.source);
-    nodes
+    finalize_chain_nodes(nodes, &paren_gaps, input.source);
 }
 
 /// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
-pub fn linearize_chain_from_member<'a>(
+pub fn linearize_chain_from_member_into<'a>(
     member: &'a internal::MemberExpression<'_>,
     input: LinearizeInput<'_>,
-) -> ChainNodeVec<'a> {
-    let mut nodes = ChainNodeVec::new();
+    nodes: &mut ChainNodeVec<'a>,
+) {
     let mut paren_gaps = Vec::new();
-    linearize_member_object(member, input, &mut nodes, &mut paren_gaps);
-    linearize_member_node(member, input.source, &mut nodes, &mut paren_gaps);
-    finalize_chain_nodes(&mut nodes, &paren_gaps, input.source);
-    nodes
+    linearize_member_object(member, input, nodes, &mut paren_gaps);
+    linearize_member_node(member, input.source, nodes, &mut paren_gaps);
+    finalize_chain_nodes(nodes, &paren_gaps, input.source);
 }
 
 /// Linearize starting from a TSNonNullExpression (avoids cloning to wrap in Expression)
@@ -85,16 +91,15 @@ pub fn linearize_chain_from_member<'a>(
 /// reached (a `//` there makes `needs_parens` true, a block comment takes its
 /// trailing-comment branch), so only the comment-free case arrives here. Nested
 /// non-nulls go through `linearize_recursive`'s own arm, which does gate.
-pub fn linearize_chain_from_non_null<'a>(
+pub fn linearize_chain_from_non_null_into<'a>(
     non_null: &'a internal::TSNonNullExpression<'_>,
     input: LinearizeInput<'_>,
-) -> ChainNodeVec<'a> {
-    let mut nodes = ChainNodeVec::new();
+    nodes: &mut ChainNodeVec<'a>,
+) {
     let mut paren_gaps = Vec::new();
-    linearize_recursive(non_null.expression, input, &mut nodes, &mut paren_gaps);
+    linearize_recursive(non_null.expression, input, nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null(non_null));
-    finalize_chain_nodes(&mut nodes, &paren_gaps, input.source);
-    nodes
+    finalize_chain_nodes(nodes, &paren_gaps, input.source);
 }
 
 /// Apply deferred paren gap extensions to member nodes.

@@ -46,13 +46,13 @@ mod types;
 
 // Re-export public API
 pub use analysis::{
-    LinearizeInput, chain_paren_leading_gap, group_chain_nodes, linearize_chain_from_call,
-    linearize_chain_from_member, linearize_chain_from_non_null,
+    LinearizeInput, chain_paren_leading_gap, group_chain_nodes, linearize_chain_from_call_into,
+    linearize_chain_from_member_into, linearize_chain_from_non_null_into,
 };
 pub(crate) use analysis::{call_callee_paren_leading_start, tag_paren_leading_start};
 pub use builder::build_chain_doc;
 pub(crate) use inline_lookups::{InlineLookups, resolve_inline_lookups};
 pub(crate) use printing::find_bracket_position;
-pub use types::{ChainCall, ChainNode};
 #[cfg(feature = "buffer_stats")]
-pub use types::{ChainGroupVec, ChainNodeVec};
+pub use types::ChainGroupVec;
+pub use types::{ChainCall, ChainNode, ChainNodeVec};

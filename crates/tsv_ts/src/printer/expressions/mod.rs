@@ -1295,7 +1295,12 @@ impl<'a> Printer<'a> {
             // When inner expression is a chain (member or call), use chain architecture
             // to properly handle breaking. This ensures the outer `!` is included
             // in the linearized chain for proper segment grouping.
-            let nodes = chain::linearize_chain_from_non_null(non_null_expr, self.linearize_input());
+            let mut nodes = chain::ChainNodeVec::new();
+            chain::linearize_chain_from_non_null_into(
+                non_null_expr,
+                self.linearize_input(),
+                &mut nodes,
+            );
             let groups = chain::group_chain_nodes(&nodes, self.comments);
             chain::build_chain_doc(&groups, non_null_expr.span, self)
         } else {

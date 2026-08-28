@@ -429,7 +429,8 @@ impl<'a> Printer<'a> {
             }
 
             // Use chain wrapping for chains (nested calls) or memberish callees
-            let nodes = chain::linearize_chain_from_call(call, self.linearize_input());
+            let mut nodes = chain::ChainNodeVec::new();
+            chain::linearize_chain_from_call_into(call, self.linearize_input(), &mut nodes);
             let (head_start, head_end) =
                 chain_head_comment_window(&nodes, call.callee, call.span.start);
             let groups = chain::group_chain_nodes(&nodes, self.comments);
@@ -458,7 +459,8 @@ impl<'a> Printer<'a> {
         }
 
         // Use chain-based implementation
-        let nodes = chain::linearize_chain_from_member(member, self.linearize_input());
+        let mut nodes = chain::ChainNodeVec::new();
+        chain::linearize_chain_from_member_into(member, self.linearize_input(), &mut nodes);
         let (head_start, head_end) =
             chain_head_comment_window(&nodes, member.object, member.span.start);
         let groups = chain::group_chain_nodes(&nodes, self.comments);
