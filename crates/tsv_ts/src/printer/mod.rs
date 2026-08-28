@@ -622,7 +622,10 @@ impl<'a> Printer<'a> {
     /// This handles the common pattern of:
     /// 1. Calculate current column with context offset
     /// 2. Print doc with indent-aware width calculations
-    /// 3. Write the result to the buffer
+    /// 3. Write the result to the buffer — in place when the buffer is empty
+    ///    (`print_program`, the whole-file render), otherwise through the
+    ///    arena-parked scratch, since the renderer's trims read backwards with
+    ///    no floor. See the two arms below.
     ///
     /// For width calculations, we account for outer context in two ways:
     /// - If `first_line_offset > 0`: expression is embedded inline (e.g., Svelte block), use it directly
@@ -638,9 +641,32 @@ impl<'a> Printer<'a> {
             self.embed.base_indent_offset * TAB_WIDTH
         };
         let current_col = self.current_column() + context_offset;
+        // An empty buffer *is* the render target, and `as_empty_render_target`
+        // hands it over only while it is one. The renderer's two trims
+        // (`trim_trailing_whitespace` at every non-literal break, the final-line
+        // trim) are the only things that read back past what the doc wrote, and
+        // with nothing in front of the doc's first byte they cannot reach text
+        // this render did not produce — every other `output.len()` the render
+        // loop takes is a marker captured mid-render, so it is already relative.
+        // Rendering in place is therefore byte-identical to rendering into the
+        // scratch and copying, and it retires the copy: `print_program` — today
+        // the sole caller, and always on a fresh printer — was moving one copy of
+        // every formatted byte of the file (637 calls / 5.6 MB on a fuz_app pass).
+        if let Some(output) = self.buffer.as_empty_render_target() {
+            doc::arena_print_doc_with_indent_resolved_into(
+                self.arena,
+                d,
+                &self.embed,
+                current_col,
+                self.indent_level,
+                self.source,
+                output,
+            );
+            return;
+        }
         // Render into the arena-parked scratch: one warm buffer across the
-        // file's renders (the whole program standalone; one per template
-        // expression when Svelte-embedded) instead of an alloc/free per call.
+        // file's renders (one per template expression when Svelte-embedded)
+        // instead of an alloc/free per call.
         let mut output = self.arena.take_render_scratch();
         // Pass the document source so `DocText::SourceSpan` nodes (verbatim
         // comment/literal slices) resolve at render without a `DocArena` lifetime.
