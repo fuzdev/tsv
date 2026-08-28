@@ -437,7 +437,7 @@ impl CandidateWalk<'_> {
     fn descend(&mut self, stmt: &Statement<'_>) {
         use Statement as S;
         match stmt {
-            S::ExpressionStatement(s) => self.visit_expr(&s.expression),
+            S::ExpressionStatement(s) => self.visit_expr(s.expression),
             S::VariableDeclaration(d) => {
                 for decl in d.declarations {
                     self.visit_expr(decl.id);
@@ -466,10 +466,10 @@ impl CandidateWalk<'_> {
                     self.visit_expr(a);
                 }
             }
-            S::ThrowStatement(s) => self.visit_expr(&s.argument),
+            S::ThrowStatement(s) => self.visit_expr(s.argument),
             S::BlockStatement(b) => self.visit_list(b.body),
             S::IfStatement(s) => {
-                self.visit_expr(&s.test);
+                self.visit_expr(s.test);
                 self.visit_list(std::slice::from_ref(s.consequent));
                 if let Some(alt) = s.alternate {
                     self.visit_list(std::slice::from_ref(alt));
@@ -507,15 +507,15 @@ impl CandidateWalk<'_> {
                 self.visit_list(std::slice::from_ref(s.body));
             }
             S::WhileStatement(s) => {
-                self.visit_expr(&s.test);
+                self.visit_expr(s.test);
                 self.visit_list(std::slice::from_ref(s.body));
             }
             S::DoWhileStatement(s) => {
                 self.visit_list(std::slice::from_ref(s.body));
-                self.visit_expr(&s.test);
+                self.visit_expr(s.test);
             }
             S::SwitchStatement(s) => {
-                self.visit_expr(&s.discriminant);
+                self.visit_expr(s.discriminant);
                 for case in s.cases {
                     if let Some(t) = &case.test {
                         self.visit_expr(t);

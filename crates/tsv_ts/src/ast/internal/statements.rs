@@ -19,35 +19,47 @@ use super::{
 pub enum Statement<'arena> {
     ExpressionStatement(ExpressionStatement<'arena>),
     VariableDeclaration(VariableDeclaration<'arena>),
-    // Arena-boxed, unlike every inline variant here: these eight are the widest
-    // declaration heads, and each is rare enough that the allocation is free —
-    // over four app corpora `TSDeclareFunction`, `ExportAllDeclaration` and
-    // `TSImportEqualsDeclaration` occur 0.000% of the time, `TSTypeAliasDeclaration`
-    // 0.019–0.028%, `ExportDefaultDeclaration` 0.016–0.047%, `ClassDeclaration`
-    // 0.000–0.194%, `FunctionDeclaration` 0.026–0.204% and `TSInterfaceDeclaration`
-    // 0.028–0.128%. Inline they would make a `Statement` 200 bytes instead of 104,
-    // and that width is paid on every `Statement` SLOT — every element of every
-    // `&[Statement]` body and every `?`-propagation — not just on the rare
-    // declaration that needs it. The next-widest variants are `IfStatement` and
-    // `SwitchStatement` at 96 bytes, and `IfStatement` is ~3–6% of statements, so
-    // the ladder stops here: boxing it would tax the common path for 8 bytes.
+    // Arena-boxed, unlike every inline variant here: these are the widest
+    // declaration heads, and their width would otherwise be paid on every
+    // `Statement` SLOT — every element of every `&[Statement]` body and every
+    // `?`-propagation — not just on the declaration that needs it.
+    //
+    // Most are boxed because they are RARE, so the allocation is free: over four
+    // app corpora `TSDeclareFunction`, `ExportAllDeclaration`,
+    // `TSImportEqualsDeclaration`, `TSEnumDeclaration` and `TSExportAssignment`
+    // occur 0.000% of the time, `TSModuleDeclaration` 0.007–0.019%,
+    // `TSTypeAliasDeclaration` 0.019–0.028%, `ExportDefaultDeclaration`
+    // 0.016–0.047%, `ClassDeclaration` 0.000–0.194%, `FunctionDeclaration`
+    // 0.026–0.204% and `TSInterfaceDeclaration` 0.028–0.128%.
+    //
+    // `ImportDeclaration` (6.8–11.7% of statements) and `ExportNamedDeclaration`
+    // (2.4–4.0%) are the exception: they are boxed because they are the CEILING,
+    // not because they are rare. Rarity is what makes boxing free, and it is not
+    // the only reason to box — the struct is copied into the arena instead of into
+    // the enum, so the copy volume is unchanged and the cost is one bump pointer,
+    // while all of the file's other statement slots get 24 bytes narrower. With
+    // both inline the enum is 96 bytes; boxed it is 72, which is what the
+    // `size_of` assert in this module's parent pins. The next-widest inline
+    // variant is `TryStatement` at 64, so the ladder stops here.
+    //
     // (The loop and `try` heads below hold their own heads by reference for the
-    // same reason, one level down.)
+    // same reason, one level down; the `Expression`-holding heads below hold
+    // theirs by reference for a different one — see `ExpressionStatement`.)
     TSTypeAliasDeclaration(&'arena TSTypeAliasDeclaration<'arena>),
     TSInterfaceDeclaration(&'arena TSInterfaceDeclaration<'arena>),
     TSDeclareFunction(&'arena TSDeclareFunction<'arena>),
-    TSEnumDeclaration(TSEnumDeclaration<'arena>),
-    TSModuleDeclaration(TSModuleDeclaration<'arena>),
+    TSEnumDeclaration(&'arena TSEnumDeclaration<'arena>),
+    TSModuleDeclaration(&'arena TSModuleDeclaration<'arena>),
     ReturnStatement(ReturnStatement<'arena>),
     BlockStatement(BlockStatement<'arena>),
     FunctionDeclaration(&'arena FunctionDeclaration<'arena>),
     ClassDeclaration(&'arena ClassDeclaration<'arena>),
-    ExportNamedDeclaration(ExportNamedDeclaration<'arena>),
+    ExportNamedDeclaration(&'arena ExportNamedDeclaration<'arena>),
     ExportDefaultDeclaration(&'arena ExportDefaultDeclaration<'arena>),
     ExportAllDeclaration(&'arena ExportAllDeclaration<'arena>),
-    TSExportAssignment(TSExportAssignment<'arena>),
+    TSExportAssignment(&'arena TSExportAssignment<'arena>),
     TSNamespaceExportDeclaration(TSNamespaceExportDeclaration<'arena>),
-    ImportDeclaration(ImportDeclaration<'arena>),
+    ImportDeclaration(&'arena ImportDeclaration<'arena>),
     TSImportEqualsDeclaration(&'arena TSImportEqualsDeclaration<'arena>),
     // Control flow statements
     IfStatement(IfStatement<'arena>),
@@ -107,9 +119,17 @@ impl<'arena> Statement<'arena> {
 }
 
 /// Expression statement: an expression used as a statement
+///
+/// The expression is an arena reference, not an inline value, and this is where
+/// every `Expression`-holding statement head takes the same shape. The expression
+/// parser threads a `ParsedExpr`, which already holds an `&'arena Expression` — so
+/// an inline slot is a 72-byte copy OUT of that allocation, leaving the arena copy
+/// dead. Naming the slot by reference removes the copy and adds nothing; it is not
+/// the rare-variant boxing trade above, and needs no rarity argument
+/// (`parse_expression_ref`).
 #[derive(Debug, Clone)]
 pub struct ExpressionStatement<'arena> {
-    pub expression: Expression<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
     /// True when this is a directive prologue entry — an unparenthesized
     /// string-literal statement in the leading run of a `Program` or function
@@ -135,7 +155,7 @@ pub struct BlockStatement<'arena> {
 /// The argument is optional for void returns.
 #[derive(Debug, Clone)]
 pub struct ReturnStatement<'arena> {
-    pub argument: Option<Expression<'arena>>,
+    pub argument: Option<&'arena Expression<'arena>>,
     pub span: Span,
 }
 
@@ -146,7 +166,7 @@ pub struct ReturnStatement<'arena> {
 /// If statement: `if (test) consequent` or `if (test) consequent else alternate`
 #[derive(Debug, Clone)]
 pub struct IfStatement<'arena> {
-    pub test: Expression<'arena>,
+    pub test: &'arena Expression<'arena>,
     pub consequent: &'arena Statement<'arena>,
     pub alternate: Option<&'arena Statement<'arena>>,
     pub span: Span,
@@ -176,6 +196,14 @@ pub struct ForStatement<'arena> {
 }
 
 /// For statement initialization - either a variable declaration or expression
+///
+/// The `Expression` arm stays INLINE, unlike the `Expression`-holding statement heads
+/// above: a for-head's expression comes back from `parse_expression_no_in` (and, for a
+/// for-in/of LHS, through the cover-grammar refinement `to_assignable`) as an owned
+/// value, not as the `&'arena Expression` the expression spine threads — so naming the
+/// slot by reference would ADD an allocation rather than remove a copy, which is the
+/// reverse of the trade `ExpressionStatement` takes. `ForInit` is itself reached only
+/// through `Option<&'arena ForInit>`, so its width sets nothing.
 #[derive(Debug, Clone)]
 pub enum ForInit<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>),
@@ -209,6 +237,9 @@ pub struct ForOfStatement<'arena> {
 }
 
 /// Left side of for-in/for-of: either a variable declaration or expression pattern
+///
+/// The `Pattern` arm stays inline for the reason on `ForInit`: its producer returns an
+/// owned `Expression`, and this enum is reached only through `&'arena ForInOfLeft`.
 #[derive(Debug, Clone)]
 pub enum ForInOfLeft<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>),
@@ -218,7 +249,7 @@ pub enum ForInOfLeft<'arena> {
 /// While statement: `while (test) body`
 #[derive(Debug, Clone)]
 pub struct WhileStatement<'arena> {
-    pub test: Expression<'arena>,
+    pub test: &'arena Expression<'arena>,
     pub body: &'arena Statement<'arena>,
     pub span: Span,
 }
@@ -227,14 +258,14 @@ pub struct WhileStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct DoWhileStatement<'arena> {
     pub body: &'arena Statement<'arena>,
-    pub test: Expression<'arena>,
+    pub test: &'arena Expression<'arena>,
     pub span: Span,
 }
 
 /// Switch statement: `switch (discriminant) { cases }`
 #[derive(Debug, Clone)]
 pub struct SwitchStatement<'arena> {
-    pub discriminant: Expression<'arena>,
+    pub discriminant: &'arena Expression<'arena>,
     pub cases: &'arena [SwitchCase<'arena>],
     pub span: Span,
 }
@@ -243,7 +274,7 @@ pub struct SwitchStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct SwitchCase<'arena> {
     /// Test expression, or None for `default:`
-    pub test: Option<Expression<'arena>>,
+    pub test: Option<&'arena Expression<'arena>>,
     pub consequent: &'arena [Statement<'arena>],
     pub span: Span,
 }
@@ -262,7 +293,12 @@ pub struct TryStatement<'arena> {
 /// Catch clause: `catch (param) { body }`
 #[derive(Debug, Clone)]
 pub struct CatchClause<'arena> {
-    /// Catch parameter, or None for `catch { }` (optional catch binding)
+    /// Catch parameter, or None for `catch { }` (optional catch binding).
+    ///
+    /// Inline for the reason on `ForInit`: the parser builds this one as an owned
+    /// value rather than through the expression spine, so a reference would add an
+    /// allocation instead of removing a copy — and a `CatchClause` is reached only
+    /// through `Option<&'arena CatchClause>`, so its width sets nothing.
     pub param: Option<Expression<'arena>>,
     pub body: BlockStatement<'arena>,
     pub span: Span,
@@ -271,7 +307,7 @@ pub struct CatchClause<'arena> {
 /// Throw statement: `throw argument`
 #[derive(Debug, Clone)]
 pub struct ThrowStatement<'arena> {
-    pub argument: Expression<'arena>,
+    pub argument: &'arena Expression<'arena>,
     pub span: Span,
 }
 

@@ -1115,7 +1115,7 @@ pub(crate) fn compile_server<'arena>(
         // from the expression, which is exactly the span this site must NOT
         // have.
         outer.push(Statement::ExpressionStatement(ExpressionStatement {
-            expression: call,
+            expression: env.b.arena.alloc(call),
             span: Span::new(0, env.b.buffer.len() as u32),
             is_directive: false,
         }));
@@ -1170,7 +1170,7 @@ pub(crate) fn compile_server<'arena>(
     // low-anchor→appendix window can sweep a host comment (the reason the import
     // and export programs stay separate).
     let mut import_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-    import_body.push(Statement::ImportDeclaration(import));
+    import_body.push(Statement::ImportDeclaration(arena.alloc(import)));
     for user_import in user_imports {
         import_body.push(user_import);
     }

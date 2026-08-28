@@ -30,7 +30,7 @@ impl SoaWalk {
             addr_of(stmt),
         );
         match stmt {
-            Statement::ExpressionStatement(s) => self.visit_expression(&s.expression, id),
+            Statement::ExpressionStatement(s) => self.visit_expression(s.expression, id),
             Statement::VariableDeclaration(decl) => self.visit_declarators(decl, id),
             Statement::FunctionDeclaration(f) => self.descend_function(f, id),
             Statement::ClassDeclaration(c) => self.descend_class(c, id),
@@ -104,7 +104,7 @@ impl SoaWalk {
             // statement is its own node whose body follows here.
             Statement::BlockStatement(block) => self.visit_statements(block.body, id),
             Statement::IfStatement(s) => {
-                self.visit_expression(&s.test, id);
+                self.visit_expression(s.test, id);
                 self.visit_statement(s.consequent, id);
                 if let Some(alt) = s.alternate {
                     self.visit_statement(alt, id);
@@ -137,15 +137,15 @@ impl SoaWalk {
                 self.visit_statement(s.body, id);
             }
             Statement::WhileStatement(s) => {
-                self.visit_expression(&s.test, id);
+                self.visit_expression(s.test, id);
                 self.visit_statement(s.body, id);
             }
             Statement::DoWhileStatement(s) => {
                 self.visit_statement(s.body, id);
-                self.visit_expression(&s.test, id);
+                self.visit_expression(s.test, id);
             }
             Statement::SwitchStatement(s) => {
-                self.visit_expression(&s.discriminant, id);
+                self.visit_expression(s.discriminant, id);
                 for case in s.cases {
                     self.visit_switch_case(case, id);
                 }
@@ -159,7 +159,7 @@ impl SoaWalk {
                     self.visit_statements(finalizer.body, id);
                 }
             }
-            Statement::ThrowStatement(s) => self.visit_expression(&s.argument, id),
+            Statement::ThrowStatement(s) => self.visit_expression(s.argument, id),
             Statement::BreakStatement(s) => {
                 if let Some(label) = &s.label {
                     self.visit_identifier(label, id);

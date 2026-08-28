@@ -265,7 +265,7 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocBuf {
         let (mut parts, paren_end) =
-            self.build_paren_condition_head("if", stmt.span.start, &stmt.test);
+            self.build_paren_condition_head("if", stmt.span.start, stmt.test);
         // The consequent is always one `adjustClause` indent in, and an `else`
         // CONTINUES on the line its tail flushes at (a block consequent ignores this).
         let body_ctx = ctx.clause_body(stmt.alternate.is_some(), true);

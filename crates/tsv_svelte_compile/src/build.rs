@@ -505,7 +505,7 @@ impl<'arena> Builder<'arena> {
     pub fn expression_statement(&self, expression: Expression<'arena>) -> Statement<'arena> {
         let span = expression.span();
         Statement::ExpressionStatement(ExpressionStatement {
-            expression,
+            expression: self.arena.alloc(expression),
             span,
             is_directive: false,
         })
@@ -681,7 +681,7 @@ impl<'arena> Builder<'arena> {
         let call_span = call.span();
         let consequent = self.arena.alloc(self.expression_statement(call));
         Statement::IfStatement(IfStatement {
-            test,
+            test: self.arena.alloc(test),
             consequent,
             alternate: None,
             span: Span::new(test_start, call_span.end),

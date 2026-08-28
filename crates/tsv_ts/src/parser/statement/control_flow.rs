@@ -23,7 +23,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse condition: (test)
         self.expect(&TokenKind::ParenOpen)?;
-        let test = self.parse_expression()?;
+        let test = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse consequent (can be any statement, including block)
@@ -322,7 +322,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse condition: (test)
         self.expect(&TokenKind::ParenOpen)?;
-        let test = self.parse_expression()?;
+        let test = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
@@ -358,7 +358,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse condition: (test)
         self.expect(&TokenKind::ParenOpen)?;
-        let test = self.parse_expression()?;
+        let test = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
         // A semicolon is automatically inserted after a do-while's `)`
@@ -390,7 +390,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse discriminant: (expr)
         self.expect(&TokenKind::ParenOpen)?;
-        let discriminant = self.parse_expression()?;
+        let discriminant = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse cases: { case ... }
@@ -418,7 +418,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for 'case' or 'default'
         let test = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Case)) {
             self.advance()?;
-            Some(self.parse_expression()?)
+            Some(self.parse_expression_ref()?)
         } else if matches!(
             self.current_kind(),
             TokenKind::Keyword(KeywordKind::Default)
@@ -590,7 +590,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_msg("Illegal newline after throw"));
         }
 
-        let argument = self.parse_expression()?;
+        let argument = self.parse_expression_ref()?;
         let end = self.semicolon_end()?;
 
         Ok(Statement::ThrowStatement(ThrowStatement {

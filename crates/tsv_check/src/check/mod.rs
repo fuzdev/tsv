@@ -73,7 +73,7 @@ impl<'a> CheckWalk<'a> {
 
     fn visit_statement(&mut self, stmt: &Statement<'_>) {
         match stmt {
-            Statement::ExpressionStatement(s) => self.visit_expression(&s.expression),
+            Statement::ExpressionStatement(s) => self.visit_expression(s.expression),
             Statement::VariableDeclaration(d) => self.visit_variable_declaration(d),
             Statement::FunctionDeclaration(f) => self.check_function_common(
                 f.type_parameters.as_ref(),
@@ -118,7 +118,7 @@ impl<'a> CheckWalk<'a> {
                 }
             }
             Statement::IfStatement(s) => {
-                self.visit_expression(&s.test);
+                self.visit_expression(s.test);
                 self.visit_statement(s.consequent);
                 if let Some(alt) = s.alternate {
                     self.visit_statement(alt);
@@ -150,15 +150,15 @@ impl<'a> CheckWalk<'a> {
                 self.visit_statement(s.body);
             }
             Statement::WhileStatement(s) => {
-                self.visit_expression(&s.test);
+                self.visit_expression(s.test);
                 self.visit_statement(s.body);
             }
             Statement::DoWhileStatement(s) => {
                 self.visit_statement(s.body);
-                self.visit_expression(&s.test);
+                self.visit_expression(s.test);
             }
             Statement::SwitchStatement(s) => {
-                self.visit_expression(&s.discriminant);
+                self.visit_expression(s.discriminant);
                 for case in s.cases {
                     if let Some(t) = &case.test {
                         self.visit_expression(t);
@@ -186,7 +186,7 @@ impl<'a> CheckWalk<'a> {
                     }
                 }
             }
-            Statement::ThrowStatement(s) => self.visit_expression(&s.argument),
+            Statement::ThrowStatement(s) => self.visit_expression(s.argument),
             Statement::LabeledStatement(s) => self.visit_statement(s.body),
             Statement::ExportNamedDeclaration(e) => {
                 if let Some(inner) = e.declaration {

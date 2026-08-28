@@ -66,14 +66,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         export_kind: ExportKind,
     ) -> Statement<'arena> {
         let end = declaration.span().end;
-        Statement::ExportNamedDeclaration(ExportNamedDeclaration {
+        Statement::ExportNamedDeclaration(self.arena.alloc(ExportNamedDeclaration {
             declaration: Some(self.alloc(declaration)),
             specifiers: &[],
             source: None,
             attributes: None,
             export_kind,
             span: Span::new(start as u32, end),
-        })
+        }))
     }
 
     pub(super) fn parse_export_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
@@ -98,10 +98,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?; // consume '='
                 let expression = self.parse_expression()?;
                 let end = self.semicolon_end()?;
-                Ok(Statement::TSExportAssignment(TSExportAssignment {
-                    expression,
-                    span: Span::new(start as u32, end),
-                }))
+                Ok(Statement::TSExportAssignment(self.arena.alloc(
+                    TSExportAssignment {
+                        expression,
+                        span: Span::new(start as u32, end),
+                    },
+                )))
             }
             // export import X = ... (TypeScript import-equals re-export). The only
             // valid `export import` form is import-equals, so the binding (after an
@@ -820,14 +822,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
-            declaration: None,
-            specifiers: specifiers.into_bump_slice(),
-            source,
-            attributes,
-            export_kind,
-            span: Span::new(start, end),
-        }))
+        Ok(Statement::ExportNamedDeclaration(self.arena.alloc(
+            ExportNamedDeclaration {
+                declaration: None,
+                specifiers: specifiers.into_bump_slice(),
+                source,
+                attributes,
+                export_kind,
+                span: Span::new(start, end),
+            },
+        )))
     }
 
     /// Parse an export specifier: `local`, `local as exported`, or `default`.
@@ -1008,14 +1012,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let attributes = self.parse_import_attributes()?;
             let end = self.semicolon_end()?;
 
-            return Ok(Statement::ImportDeclaration(ImportDeclaration {
-                specifiers: &[],
-                source,
-                attributes,
-                import_kind: ImportKind::Value,
-                phase,
-                span: Span::new(start as u32, end),
-            }));
+            return Ok(Statement::ImportDeclaration(self.arena.alloc(
+                ImportDeclaration {
+                    specifiers: &[],
+                    source,
+                    attributes,
+                    import_kind: ImportKind::Value,
+                    phase,
+                    span: Span::new(start as u32, end),
+                },
+            )));
         }
 
         // Check for `import type` (type-only import)
@@ -1232,14 +1238,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::ImportDeclaration(ImportDeclaration {
-            specifiers: specifiers.into_bump_slice(),
-            source,
-            attributes,
-            import_kind,
-            phase,
-            span: Span::new(start as u32, end),
-        }))
+        Ok(Statement::ImportDeclaration(self.arena.alloc(
+            ImportDeclaration {
+                specifiers: specifiers.into_bump_slice(),
+                source,
+                attributes,
+                import_kind,
+                phase,
+                span: Span::new(start as u32, end),
+            },
+        )))
     }
 
     /// Parse import attributes: `with { type: "json" }`.

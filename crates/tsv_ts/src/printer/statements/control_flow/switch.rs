@@ -46,7 +46,7 @@ impl<'a> Printer<'a> {
         // excludes `switch` from `shouldInlineCondition`, so a negated parenthesized
         // discriminant does not hug its `(`.
         let condition_group = self.build_condition_group_for_parens(
-            &stmt.discriminant,
+            stmt.discriminant,
             open_paren,
             close_paren,
             OpenParenLineBlockComment::JoinsRun,

@@ -26,10 +26,10 @@
 //! construction, takes [`STACK_SIZE`] directly.
 //!
 //! The value is chosen so that even the **debug** profile out-reaches the parsers tsv
-//! stands in for. Measured on `const x = ((((…1…))));`, the cost is ~0.94 KiB of stack
+//! stands in for. Measured on `const x = ((((…1…))));`, the cost is ~0.88 KiB of stack
 //! per nesting level in a release build and ~16 KiB in a debug build, where frames are
 //! far larger; acorn + `@sveltejs/acorn-typescript` give up at 497 levels and prettier
-//! at 805, both through V8's own checked stack limit. 32 MiB clears ~34,900 levels in
+//! at 805, both through V8's own checked stack limit. 32 MiB clears ~37,400 levels in
 //! release and ~2,070 in debug, so no profile of tsv dies before the tools it replaces
 //! do. Parens are the cheapest shape to state, not the tightest — a nested arrow body
 //! (`() => {…}`) costs ~3.9 KiB a level, so ~8,300 is the depth every shape

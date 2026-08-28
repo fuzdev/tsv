@@ -302,7 +302,7 @@ impl<'a> Printer<'a> {
         // assignments) OR to avoid a bare string statement being read as a
         // directive (recomputed fresh, not preserved from source).
         let mut needs_parens = self
-            .needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
+            .needs_parens(stmt.expression, ParenContext::ExpressionStatement)
             || self.needs_avoid_directive_parens(stmt, in_program_or_block);
 
         // When the whole expression isn't wrapped, a nested leftmost
@@ -311,7 +311,7 @@ impl<'a> Printer<'a> {
         let nested_paren = if needs_parens {
             None
         } else {
-            self.expr_stmt_nested_paren_target(&stmt.expression)
+            self.expr_stmt_nested_paren_target(stmt.expression)
         };
         // A frozen slice is verbatim, so the printer has no interior left to wrap:
         // the nested target's parens go around the WHOLE slice instead. Without the
@@ -338,7 +338,7 @@ impl<'a> Printer<'a> {
         // (non-consuming, span-matched) paren target and wraps itself; clear it
         // afterward so it can't leak into a sibling statement.
         let expr_doc = match frozen {
-            Some(span) => self.build_frozen_expression_doc(&stmt.expression, span),
+            Some(span) => self.build_frozen_expression_doc(stmt.expression, span),
             None => {
                 self.expr_stmt_paren_target.set(nested_paren);
                 self.is_expression_statement.set(true);
