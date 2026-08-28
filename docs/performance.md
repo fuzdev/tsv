@@ -921,6 +921,52 @@ libc nearly doubled. The prediction failed on the *benefit* side. So:
   not a local** — a per-call `[0; N]` is a memset LLVM cannot prove dead when
   only a dynamic prefix is read, and that alone can eat the win.
 
+### And the converse: a hot leaf that owns a symbol is a call
+
+`#[inline]` is a hint against LLVM's cost model, not an instruction, and that
+model prices *code*, not the hot path. Two of the format path's largest single
+levers were functions that already carried `#[inline]` and were emitted out of
+line anyway, then called from the innermost loop:
+
+- `tsv_lang::doc::types::resolve_text` reads as a four-arm match handing back a
+  `&str`. It compiles to roughly fifty instructions, because every `&s[a..b]` on
+  a `str` carries two `is_char_boundary` probes and an edge to
+  `slice_error_fail` — cold code the cost model still counts. It ran once per
+  rendered `Text` node. `#[inline(always)]` measured **−1.4..−1.6%
+  instructions** across five corpora.
+- `tsv_ts::lexer::core::Lexer::advance` is **67 bytes** of code — one bounds
+  probe and an add — in the lexer's innermost loop, and still had an out-of-line
+  copy. `#[inline(always)]` measured **−0.33..−0.39%**.
+
+The instrument is one command, run against the same binary the board came from:
+
+```bash
+# symbol sizes; cross these against the board's self column
+nm -C --print-size --size-sort target/profiling/tsv_debug | grep ' [tT] '
+```
+
+**Small *and* hot is the signal.** A function with a self column is a function
+being called; a small one is a call the caller could have absorbed. This is the
+positive use of the `nm` check that §`perf` recommends for the opposite reason
+(an inlining verdict expires — re-run it against the binary in front of you).
+
+⚠️ **The discriminator is what the bytes *are*, not how many.** A few loads
+wrapped in cold panic/bounds edges is a candidate; a byte scan is real work and
+is not — `is_single_param_arrow_start` is 218 bytes, but those bytes are
+`scan_identifier_then_arrow` already inlined into it. Read the callee's
+disassembly before believing it is small.
+
+⚠️ **The `.text` sign is neither predictable nor the verdict.** Forcing the
+five-instruction leaf in made the binary **528 B smaller** — the out-of-line copy
+and every call site's argument setup both went away — while the fifty-instruction
+one cost **+640 B**. Measure the size axis either way
+(§An instruction A/B is blind to code size).
+
+⚠️ **Per-symbol A/B, never a sweep.** `#[inline(always)]` has an i-cache U-curve,
+and the section directly above is the case where out-of-lining is the right
+answer. The two verdicts coexist: out-line when the win is work removed *inside*
+a body the caller was already calling, force in when the call *is* the cost.
+
 ## WASM bundle size
 
 The `tsv_wasm` crate produces three WASM binaries via the `format` +
