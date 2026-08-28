@@ -660,6 +660,16 @@ against the shape it replaced, over inputs chosen to hit every branch (the corpu
 will not) — then **corrupt it and watch the test fail**. An oracle you have never
 seen fail proves nothing.
 
+**A whitespace emitter is the same class, and its blind region is a *depth*.** The
+indent run at the head of every line is output a corpus grades in full — up to the
+depth real code stops at. Four app corpora never exceed **14 levels**, while the
+parser accepts nests thousands deep, so an emitter that specializes the first few
+depths and chunks a static run past them holds three code paths a 51,921-file
+byte-identity diff never reaches. `write_indentation`'s equivalence tests
+(`arena_render`'s `column_arithmetic_tests`) grade every depth to two full runs
+against a reference spelling, for each indent string the render config can carry,
+crossed with sub-tab alignment and the embed offset.
+
 **The same rule covers scans, with one extra axis: alignment.** A word-at-a-time
 rewrite of a byte scan fails on *where the pattern lands relative to the stride*,
 which a corpus samples arbitrarily. So grade a scan over every input length and

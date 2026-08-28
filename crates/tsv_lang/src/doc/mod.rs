@@ -60,6 +60,18 @@ pub use types::{CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolS
 /// `#[inline]` at many sites and affords exactly **one** — a second arm there
 /// crosses an inliner threshold and costs **+179 KB of `.text`**. Re-measure
 /// `.text` before adding one.
+///
+/// ⚠️ **The constant is the lever, not the call count.** `write_indentation`
+/// spells this mechanism by hand, and its ladder priced the difference: turning
+/// its per-level one-byte pushes into a single run-slice call — the change that
+/// removes the most *calls* — is worth ~0.03% of a run, while naming the short
+/// depths as constant-length arms on top of it is worth ~0.2%. A runtime-length
+/// copy costs about the same whether it moves one byte or four, so collapsing a
+/// per-byte loop buys little; the win is in the length becoming a constant. That
+/// site keeps its own `match` rather than calling this macro because its arms
+/// each need a *different* value (a tab run of the matched length), and the
+/// re-slice spelling this macro warns against stays worse even when the source
+/// string and the index are both compile-time constants.
 macro_rules! specialize_short_len {
 	($len:expr, [$($k:literal),* $(,)?], $copy:expr) => {
 		match $len {
