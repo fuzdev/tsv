@@ -1235,6 +1235,11 @@ pub(super) fn render_single_doc_inner(
 // Utilities
 //
 
+/// A run of the production indent, long enough that every indent a real document
+/// reaches is one slice of it (the deepest over four app corpora is 14 levels).
+/// Deeper runs chunk through it rather than falling back to a per-level push.
+const INDENT_RUN: &str = "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
+
 pub(super) fn write_indentation(
     output: &mut String,
     indent: RenderIndent,
@@ -1246,8 +1251,39 @@ pub(super) fn write_indentation(
     } else {
         0
     };
-    for _ in 0..(indent.tabs() + extra) {
-        output.push_str(render.indent);
+    let levels = indent.tabs() + extra;
+    // One append per line, not one per level. `String::push_str` lowers a
+    // runtime-length copy to an indirect `memcpy@plt`, so pushing the one-byte
+    // indent once per level paid a call per byte — 246 K calls to move 246 KB
+    // over a fuz_app pass, where 95% of lines indent four levels or fewer. A run
+    // of the production indent is one slice of [`INDENT_RUN`], and the short arms
+    // hand LLVM a constant length so those lines store the tabs inline with no
+    // call at all (the `specialize_short_len!` mechanism, at a site whose source
+    // is a constant too). The general arm stays for the `RenderConfig` seam's
+    // other indent strings, which only the doc-builder unit tests spell.
+    if render.indent.as_bytes() == b"\t" {
+        match levels {
+            0 => {}
+            1 => output.push('\t'),
+            2 => output.push_str("\t\t"),
+            3 => output.push_str("\t\t\t"),
+            4 => output.push_str("\t\t\t\t"),
+            5 => output.push_str("\t\t\t\t\t"),
+            6 => output.push_str("\t\t\t\t\t\t"),
+            7 => output.push_str("\t\t\t\t\t\t\t"),
+            8 => output.push_str("\t\t\t\t\t\t\t\t"),
+            mut left => {
+                while left > INDENT_RUN.len() {
+                    output.push_str(INDENT_RUN);
+                    left -= INDENT_RUN.len();
+                }
+                output.push_str(&INDENT_RUN[..left]);
+            }
+        }
+    } else {
+        for _ in 0..levels {
+            output.push_str(render.indent);
+        }
     }
     // Sub-tab alignment is literal spaces, so a closing delimiter stays under
     // its opener at any tab width (Prettier's `align` under `useTabs`).
@@ -1296,8 +1332,8 @@ mod column_arithmetic_tests {
     #[cfg(feature = "comment_check")]
     use super::RenderPurpose;
     use super::{
-        RenderIndent, effective_suffix_width, indent_str_width, indent_width, line_start_column,
-        update_pos_for_text,
+        INDENT_RUN, RenderIndent, effective_suffix_width, indent_str_width, indent_width,
+        line_start_column, update_pos_for_text, write_indentation,
     };
     use crate::EmbedContext;
     use crate::config::TAB_WIDTH;
@@ -1462,5 +1498,96 @@ mod column_arithmetic_tests {
         // pos < first_line_offset → nothing reserved yet.
         assert_eq!(effective_suffix_width(4, &embed), 0);
         assert_eq!(effective_suffix_width(0, &embed), 0);
+    }
+
+    // --- write_indentation: the emitted whitespace itself ---
+
+    /// The indentation a line starts with, spelled out independently of
+    /// [`write_indentation`]'s specialized arms: the indent string once per
+    /// level, then the sub-tab alignment as literal spaces.
+    fn indent_reference(
+        indent: RenderIndent,
+        render: &RenderConfig,
+        embed: &EmbedContext,
+    ) -> String {
+        let extra = if embed.first_line_offset > 0 {
+            embed.base_indent_offset
+        } else {
+            0
+        };
+        let mut s = render.indent.repeat(indent.tabs() + extra);
+        for _ in 0..indent.trailing_align_spaces() {
+            s.push(' ');
+        }
+        s
+    }
+
+    fn assert_indent_agrees(indent: RenderIndent, render: &RenderConfig, embed: &EmbedContext) {
+        let mut out = String::new();
+        write_indentation(&mut out, indent, render, embed);
+        assert_eq!(
+            out,
+            indent_reference(indent, render, embed),
+            "write_indentation disagrees with the reference at {} levels (indent {:?}, align {})",
+            indent.tabs(),
+            render.indent,
+            indent.trailing_align_spaces()
+        );
+    }
+
+    #[test]
+    fn write_indentation_agrees_with_the_reference_at_every_depth() {
+        // The emitter takes a run of the production indent from one static
+        // string, with the first few depths specialized to constant-length
+        // stores — so the arms, the slice past them, and the chunking loop that
+        // covers a depth deeper than the run are three separate code paths that
+        // no corpus reaches past ~14 levels (the deepest real indent measured),
+        // while the parser accepts nests thousands deep. Every depth up to two
+        // full runs is graded here, which is the only place either boundary is.
+        for render in [cfg("\t"), cfg("  "), cfg("")] {
+            for level in 0..=(2 * INDENT_RUN.len() + 3) {
+                assert_indent_agrees(
+                    RenderIndent::level(level),
+                    &render,
+                    &EmbedContext::default(),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn write_indentation_covers_alignment_and_the_embed_offset() {
+        let tab = cfg("\t");
+        let embed0 = EmbedContext::default();
+        // Sub-tab alignment follows the whole tabs, at every specialization arm
+        // and past them.
+        for level in [0usize, 1, 4, 8, 9, INDENT_RUN.len(), INDENT_RUN.len() + 1] {
+            for align in [0u32, 1, 3] {
+                assert_indent_agrees(RenderIndent::level(level).aligned(align), &tab, &embed0);
+            }
+        }
+        // `base_indent_offset` adds levels, but only when `first_line_offset` is
+        // set — the gate that decides whether an embedded context indents at all.
+        let gated = EmbedContext {
+            base_indent_offset: 5,
+            first_line_offset: 0,
+            ..EmbedContext::default()
+        };
+        let live = EmbedContext {
+            base_indent_offset: 5,
+            first_line_offset: 7,
+            ..EmbedContext::default()
+        };
+        for level in [0usize, 2, 30] {
+            assert_indent_agrees(RenderIndent::level(level), &tab, &gated);
+            assert_indent_agrees(RenderIndent::level(level), &tab, &live);
+        }
+        let mut out = String::new();
+        write_indentation(&mut out, RenderIndent::level(2), &tab, &live);
+        assert_eq!(
+            out,
+            "\t".repeat(7),
+            "the embed offset must add levels, not replace them"
+        );
     }
 }
