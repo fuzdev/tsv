@@ -356,6 +356,39 @@ mod arena_tests {
         assert_eq!(render_default(&a, doc), "hello world");
     }
 
+    /// The four arms of `concat` — empty, single, pair, and the general slice —
+    /// render identically to their contents, and the two degenerate ones return
+    /// an existing `DocId` rather than allocating a `Concat` node. The arms are
+    /// separate functions (an inlined dispatch over out-of-line allocating
+    /// arms), so the boundaries between them are worth pinning directly.
+    #[test]
+    fn test_arena_concat_arms() {
+        let a = DocArena::new();
+        let t = a.text("x");
+
+        assert_eq!(a.concat(&[]), a.empty());
+        assert_eq!(a.concat(&[t]), t);
+        assert_eq!(render_default(&a, a.concat(&[])), "");
+        assert_eq!(render_default(&a, a.concat(&[t])), "x");
+        assert_eq!(
+            render_default(&a, a.concat(&[a.text("a"), a.text("b")])),
+            "ab"
+        );
+        assert_eq!(
+            render_default(&a, a.concat(&[a.text("a"), a.text("b"), a.text("c")])),
+            "abc"
+        );
+
+        // A pair and a 3+ slice both allocate, and each child range resolves to
+        // its own children — the pair arm builds its slice itself, so a shared
+        // or mis-sized range would surface here and nowhere else in this crate.
+        let pair = a.concat(&[a.text("1"), a.text("2")]);
+        let triple = a.concat(&[a.text("3"), a.text("4"), a.text("5")]);
+        assert_ne!(pair, triple);
+        assert_eq!(render_default(&a, pair), "12");
+        assert_eq!(render_default(&a, triple), "345");
+    }
+
     #[test]
     fn test_arena_line_in_flat_mode_fits() {
         let a = DocArena::new();

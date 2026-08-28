@@ -967,6 +967,44 @@ and the section directly above is the case where out-of-lining is the right
 answer. The two verdicts coexist: out-line when the win is work removed *inside*
 a body the caller was already calling, force in when the call *is* the cost.
 
+### When the win is real and the uniform spelling is not: split the head
+
+A third instance of the shape above answers the question the first two did not
+have to: what to do when the callee is *hot, small, and called from everywhere*.
+`DocArena::concat` is the doc builders' widest chokepoint — over 1,200 call
+sites — and its 508 bytes are the canonical candidate profile: a length
+dispatch, two `RefCell` borrows and two `Vec` appends on the hot path, with the
+size coming from cold `panic_already_borrowed` / `do_reserve_and_handle` /
+`grow_one` edges and five callee-saved registers spilled to serve them.
+
+Forcing the whole body in works and is unaffordable: **−0.89% instructions** for
+**+349 KB of `.text` (+12.1%)**, with `cycles:u` turning positive — the U-curve,
+arriving on schedule. What ships instead keeps the *dispatch* inline and pushes
+both allocating arms out of line behind `#[inline(never)]`, with the
+two-children case taking its ids **by value** so a folded call site is a
+register handoff instead of a stack array. That recovers **−0.40…−0.50%** across
+four real corpora for **+9.7 KB** — 52% of the win at 2.8% of the size — and
+`cycles:u` goes negative with it.
+
+So the decision is not binary. Read it as three questions in order:
+
+- **Is the callee's hot path a few loads behind cold edges?** If not (a byte
+  scan, a loop), stop — `build_line_breaks_into` is 608 bytes at 1.14% self and
+  is a SWAR newline scan run once per document, not call overhead.
+- **How many call sites?** Cost is roughly (inlined body) × (sites). A handful
+  of sites makes the whole-body question moot; a thousand makes it the deciding
+  term.
+- **What part of the call is actually the cost?** Where argument marshalling and
+  a dispatch the caller already knows the answer to dominate, an
+  `#[inline(always)]` head over `#[inline(never)]` arms buys that half and
+  leaves the body's bytes in one place.
+
+⭐ This is also the clearest available argument for profile-guided
+optimization: the uniform-inline win is real and only its *distribution* is
+wrong, and choosing which call sites deserve an inline is exactly what a
+profile-guided inliner does automatically — a hand sweep down a candidate table
+is doing PGO's job one symbol at a time.
+
 ## WASM bundle size
 
 The `tsv_wasm` crate produces three WASM binaries via the `format` +
