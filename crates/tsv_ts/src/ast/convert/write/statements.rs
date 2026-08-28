@@ -75,7 +75,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
         internal::Statement::ExpressionStatement(expr_stmt) => {
             node_header(w, "ExpressionStatement", expr_stmt.span, ctx);
             w.raw(",\"expression\":");
-            write_expression(w, &expr_stmt.expression, ctx);
+            write_expression(w, expr_stmt.expression, ctx);
             if expr_stmt.is_directive {
                 // acorn stores the raw string contents without quotes. A
                 // directive is a string-literal expression, so its slice

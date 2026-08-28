@@ -27,7 +27,7 @@ fn create_flow_condition_ports_verbatim() {
             }
             _ => panic!("unexpected expression"),
         };
-        (&s.expression, id)
+        (s.expression, id)
     };
     let true_lit = expr_at(0);
     let false_lit = expr_at(1);
@@ -101,7 +101,7 @@ fn is_narrowable_reference_matches_tsgo_shape() {
     for stmt in program.body {
         if let Statement::ExpressionStatement(s) = stmt {
             assert!(
-                is_narrowable_reference(&s.expression),
+                is_narrowable_reference(s.expression),
                 "member/element access should be narrowable"
             );
         }

@@ -30,7 +30,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // No ASI - parse the return value expression
-        let argument = self.parse_expression()?;
+        let argument = self.parse_expression_ref()?;
         let end = self.semicolon_end()?;
 
         Ok(Statement::ReturnStatement(ReturnStatement {

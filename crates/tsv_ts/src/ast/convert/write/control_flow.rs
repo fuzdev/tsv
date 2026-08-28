@@ -15,7 +15,7 @@ pub(super) fn write_if_statement(
 ) {
     node_header(w, "IfStatement", if_stmt.span, ctx);
     w.raw(",\"test\":");
-    write_expression(w, &if_stmt.test, ctx);
+    write_expression(w, if_stmt.test, ctx);
     w.raw(",\"consequent\":");
     write_statement(w, if_stmt.consequent, ctx);
     w.raw(",\"alternate\":");
@@ -106,7 +106,7 @@ pub(super) fn write_while_statement(
 ) {
     node_header(w, "WhileStatement", while_stmt.span, ctx);
     w.raw(",\"test\":");
-    write_expression(w, &while_stmt.test, ctx);
+    write_expression(w, while_stmt.test, ctx);
     w.raw(",\"body\":");
     write_statement(w, while_stmt.body, ctx);
     close_node(w, "WhileStatement", while_stmt.span, ctx);
@@ -122,7 +122,7 @@ pub(super) fn write_do_while_statement(
     w.raw(",\"body\":");
     write_statement(w, do_while.body, ctx);
     w.raw(",\"test\":");
-    write_expression(w, &do_while.test, ctx);
+    write_expression(w, do_while.test, ctx);
     close_node(w, "DoWhileStatement", do_while.span, ctx);
 }
 
@@ -134,7 +134,7 @@ pub(super) fn write_switch_statement(
 ) {
     node_header(w, "SwitchStatement", switch_stmt.span, ctx);
     w.raw(",\"discriminant\":");
-    write_expression(w, &switch_stmt.discriminant, ctx);
+    write_expression(w, switch_stmt.discriminant, ctx);
     w.raw(",\"cases\":");
     // acorn initializes `consequent` before parsing `test`, so it serializes first.
     write_array(w, switch_stmt.cases, |w, case| {
@@ -184,7 +184,7 @@ pub(super) fn write_throw_statement(
 ) {
     node_header(w, "ThrowStatement", throw_stmt.span, ctx);
     w.raw(",\"argument\":");
-    write_expression(w, &throw_stmt.argument, ctx);
+    write_expression(w, throw_stmt.argument, ctx);
     close_node(w, "ThrowStatement", throw_stmt.span, ctx);
 }
 

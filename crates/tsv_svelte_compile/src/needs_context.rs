@@ -1199,11 +1199,11 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             }
             walk_class_body(&c.body, nc);
         }
-        Statement::ExpressionStatement(s) => walk_expr(&s.expression, nc),
-        Statement::ReturnStatement(s) => walk_opt(s.argument.as_ref(), nc),
+        Statement::ExpressionStatement(s) => walk_expr(s.expression, nc),
+        Statement::ReturnStatement(s) => walk_opt(s.argument, nc),
         Statement::BlockStatement(s) => walk_block(s.body, nc),
         Statement::IfStatement(s) => {
-            walk_expr(&s.test, nc);
+            walk_expr(s.test, nc);
             walk_stmt(s.consequent, nc, true);
             if let Some(alt) = s.alternate {
                 walk_stmt(alt, nc, true);
@@ -1238,15 +1238,15 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             js_scope_restore(nc, mark);
         }
         Statement::WhileStatement(s) => {
-            walk_expr(&s.test, nc);
+            walk_expr(s.test, nc);
             walk_stmt(s.body, nc, true);
         }
         Statement::DoWhileStatement(s) => {
             walk_stmt(s.body, nc, true);
-            walk_expr(&s.test, nc);
+            walk_expr(s.test, nc);
         }
         Statement::SwitchStatement(s) => {
-            walk_expr(&s.discriminant, nc);
+            walk_expr(s.discriminant, nc);
             // The oracle gives a `switch` ONE block scope shared by ALL its cases
             // (`phases/scope.js`: `SwitchStatement: create_block_scope`), so a
             // `const` in one case is in scope for a write in another and refuses.
@@ -1260,7 +1260,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
                 hoist_block_consts(case.consequent, nc);
             }
             for case in s.cases {
-                walk_opt(case.test.as_ref(), nc);
+                walk_opt(case.test, nc);
                 for stmt in case.consequent {
                     walk_stmt(stmt, nc, true);
                 }
@@ -1282,7 +1282,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
                 walk_block(finalizer.body, nc);
             }
         }
-        Statement::ThrowStatement(s) => walk_expr(&s.argument, nc),
+        Statement::ThrowStatement(s) => walk_expr(s.argument, nc),
         Statement::LabeledStatement(s) => walk_stmt(s.body, nc, true),
         Statement::ExportNamedDeclaration(s) => {
             if let Some(decl) = &s.declaration {

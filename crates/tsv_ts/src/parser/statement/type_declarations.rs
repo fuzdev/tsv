@@ -664,13 +664,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
-        Ok(Statement::TSEnumDeclaration(TSEnumDeclaration {
-            id,
-            members: members.into_bump_slice(),
-            r#const: is_const,
-            declare: is_declare,
-            span: Span::new(start as u32, end as u32),
-        }))
+        Ok(Statement::TSEnumDeclaration(self.arena.alloc(
+            TSEnumDeclaration {
+                id,
+                members: members.into_bump_slice(),
+                r#const: is_const,
+                declare: is_declare,
+                span: Span::new(start as u32, end as u32),
+            },
+        )))
     }
 
     /// Parse a single enum member: `A`, `A = 1`, `A = "value"`, `"computed" = 1`
@@ -808,14 +810,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (Some(block), end)
         };
 
-        Ok(Statement::TSModuleDeclaration(TSModuleDeclaration {
-            id,
-            body,
-            declare,
-            kind,
-            global: false,
-            span: Span::new(start as u32, end),
-        }))
+        Ok(Statement::TSModuleDeclaration(self.arena.alloc(
+            TSModuleDeclaration {
+                id,
+                body,
+                declare,
+                kind,
+                global: false,
+                span: Span::new(start as u32, end),
+            },
+        )))
     }
 
     /// Parse a global augmentation: `declare global { … }` / `global { … }`, or the
@@ -873,14 +877,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (None, self.semicolon_end()?)
         };
 
-        Ok(Statement::TSModuleDeclaration(TSModuleDeclaration {
-            id,
-            body,
-            declare,
-            kind: TSModuleDeclarationKind::Module, // TypeScript uses module kind for global
-            global: true,
-            span: Span::new(start as u32, end),
-        }))
+        Ok(Statement::TSModuleDeclaration(self.arena.alloc(
+            TSModuleDeclaration {
+                id,
+                body,
+                declare,
+                kind: TSModuleDeclarationKind::Module, // TypeScript uses module kind for global
+                global: true,
+                span: Span::new(start as u32, end),
+            },
+        )))
     }
 
     /// Parse nested module declaration: `namespace Outer.Inner { }`
@@ -899,14 +905,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested));
         let end = module_body_end(&body);
 
-        Ok(Statement::TSModuleDeclaration(TSModuleDeclaration {
-            id: TSModuleName::Identifier(outer_id),
-            body: Some(body),
-            declare,
-            kind,
-            global: false,
-            span: Span::new(start, end),
-        }))
+        Ok(Statement::TSModuleDeclaration(self.arena.alloc(
+            TSModuleDeclaration {
+                id: TSModuleName::Identifier(outer_id),
+                body: Some(body),
+                declare,
+                kind,
+                global: false,
+                span: Span::new(start, end),
+            },
+        )))
     }
 
     /// Inner helper for parsing nested module declarations

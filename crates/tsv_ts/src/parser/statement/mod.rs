@@ -326,7 +326,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// surrounding parens: `('hello');` → span starts at `(`, not `'`.
     fn parse_expression_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0 as u32;
-        let expr = self.parse_expression()?;
+        let expr = self.parse_expression_ref()?;
         let end = self.semicolon_end()?;
         Ok(Statement::ExpressionStatement(ExpressionStatement {
             expression: expr,

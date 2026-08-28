@@ -72,7 +72,7 @@ restore. So the pointer stays where the deep call left it and **every later call
 that instance throws the same error, in every language and on every entry point** —
 verified across `format_typescript` / `format_css` / `format_svelte` /
 `parse_typescript_json` after one deep `format_typescript`. Only a fresh instance
-recovers. The depth is ~2,230 nested parens at ~0.46 KiB of shadow stack per level, the
+recovers. The depth is ~2,510 nested parens at ~0.41 KiB of shadow stack per level, the
 lowest of any tsv surface — though above acorn's 497 and prettier's 805 — and unlike the
 native builds it does not move with the host, since the shadow stack is inside the
 module.

@@ -24,7 +24,7 @@ impl<'a> Printer<'a> {
         // The head every arm below shares, built once — the same one the `if` printer
         // takes, so the two paren-headed statements cannot drift apart.
         let (mut parts, paren_end) =
-            self.build_paren_condition_head("while", stmt.span.start, &stmt.test);
+            self.build_paren_condition_head("while", stmt.span.start, stmt.test);
 
         if let Statement::BlockStatement(block) = stmt.body {
             // Block body: while (cond) { ... }
@@ -155,7 +155,7 @@ impl<'a> Printer<'a> {
         // after `while (` stays in place, where prettier relocates it outside the parens
         // (`OpenParenLineBlockComment::Preserve`).
         parts.push(self.build_statement_condition_doc(
-            &stmt.test,
+            stmt.test,
             open_paren,
             close_paren,
             OpenParenLineBlockComment::Preserve,

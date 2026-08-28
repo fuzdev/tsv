@@ -508,7 +508,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         }
 
-        Ok(TSType::Infer(TSInferType {
+        Ok(TSType::Infer(self.arena.alloc(TSInferType {
             type_parameter: TSTypeParameter {
                 name,
                 constraint,
@@ -518,7 +518,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(name_start, end),
             },
             span: Span::new(start as u32, end),
-        }))
+        })))
     }
 
     /// Check if the peek token could start a type
@@ -630,7 +630,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'import'
         let import = self.parse_import_type_body(start)?;
-        Ok(TSType::Import(import))
+        Ok(TSType::Import(self.arena.alloc(import)))
     }
 
     /// Parse import type body after `import` keyword has been consumed.
@@ -1141,13 +1141,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let return_type = self.parse_return_type_inner(arrow_start)?;
         let end = return_type.span.end;
 
-        Ok(TSType::Constructor(TSConstructorType {
+        Ok(TSType::Constructor(self.arena.alloc(TSConstructorType {
             abstract_: is_abstract,
             type_parameters,
             params,
             return_type,
             span: Span::new(start as u32, end),
-        }))
+        })))
     }
 
     /// Parse function type parameters. The returned flag is whether any comma

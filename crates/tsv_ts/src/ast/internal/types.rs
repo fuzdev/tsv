@@ -25,6 +25,17 @@ pub struct TSTypeAnnotation<'arena> {
 /// Represents the various types in TypeScript's type system. Currently only
 /// primitive keyword types are implemented. Complex types (unions, intersections,
 /// generics, etc.) will be added incrementally.
+///
+/// Three variants are arena-boxed rather than inline — `Import`, `Constructor` and
+/// `Infer` — for the density reason `Statement` and `Expression` take: each is wide
+/// enough to set the enum's size on its own (`TSImportType` 112 B, `TSConstructorType`
+/// and `TSInferType` 80) and rare enough that the allocation is free, while the width
+/// is paid on every element of every `&[TSType]` and on every `?`-propagation copy up
+/// the type parser's precedence ladder — which is a deep one, so the propagation
+/// dominates the slot count. Boxed, `TSType` is 80 B rather than 112; the next-widest
+/// inline variants are `TSTypeReference` / `TSTypeQuery` / `TSMappedType` /
+/// `TSFunctionType` at 72, and `TSTypeReference` is the common case, so the ladder
+/// stops there.
 #[derive(Debug, Clone)]
 pub enum TSType<'arena> {
     /// Primitive type keywords (number, string, boolean, etc.)
@@ -44,7 +55,7 @@ pub enum TSType<'arena> {
     /// Function types: `(x: T) => U`
     Function(TSFunctionType<'arena>),
     /// Constructor types: `new () => T` or `abstract new <T>() => T`
-    Constructor(TSConstructorType<'arena>),
+    Constructor(&'arena TSConstructorType<'arena>),
     /// Tuple types: `[T, U]`
     Tuple(TSTupleType<'arena>),
     /// Parenthesized types: `(T)`
@@ -58,7 +69,7 @@ pub enum TSType<'arena> {
     /// Type operators: `keyof T`, `unique symbol`, `readonly T`
     TypeOperator(TSTypeOperator<'arena>),
     /// Import types: `import('module')` or `import('module').Foo<T>`
-    Import(TSImportType<'arena>),
+    Import(&'arena TSImportType<'arena>),
     /// Type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`
     TypeQuery(TSTypeQuery<'arena>),
     /// Indexed access types: `T[K]`, `Obj["key"]`, `T[keyof T]`
@@ -70,7 +81,7 @@ pub enum TSType<'arena> {
     /// Named tuple member: `label: T` or `label?: T`
     NamedTupleMember(TSNamedTupleMember<'arena>),
     /// Infer type: `infer U` (in conditional types)
-    Infer(TSInferType<'arena>),
+    Infer(&'arena TSInferType<'arena>),
     /// This type: `this` (in type position)
     ThisType(TSThisType),
 }

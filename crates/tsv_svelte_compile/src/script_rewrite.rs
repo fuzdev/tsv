@@ -166,7 +166,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // Statement-position effects are dropped (and force the wrapper); their
     // callback is still guard-walked so stray runes inside refuse.
     if let Statement::ExpressionStatement(expr_stmt) = stmt
-        && let Some(callback) = is_effect_call(&expr_stmt.expression, source)
+        && let Some(callback) = is_effect_call(expr_stmt.expression, source)
     {
         *has_effects = true;
         dropped_regions.push(stmt.span());
@@ -184,7 +184,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // which the oracle rejects) or a derived read refuses; the `$inspect` callee
     // itself is exempt at this recognized position.
     if let Statement::ExpressionStatement(expr_stmt) = stmt
-        && let Some(guarded) = is_inspect_call(&expr_stmt.expression, source)
+        && let Some(guarded) = is_inspect_call(expr_stmt.expression, source)
     {
         dropped_regions.push(stmt.span());
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
