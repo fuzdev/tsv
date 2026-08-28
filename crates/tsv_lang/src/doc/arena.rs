@@ -1909,15 +1909,63 @@ impl DocArena {
     /// node-kind check runs on every child slot while the savings accrue only
     /// on nested nodes, and inner concats average ~6 children, so the children
     /// vec grew +78%. Don't re-attempt without a new idea.
+    ///
+    /// ⚠️ **The head is `inline(always)` and the two allocating arms are
+    /// `inline(never)`, and the split is what makes that affordable.** This is
+    /// the doc builders' widest chokepoint — over 1,200 call sites, most of
+    /// them a literal array — so a call here is a stack array written, a
+    /// length passed, a length re-dispatched, and five callee-saved registers
+    /// spilled for cold edges the hot path never takes. Forcing the *whole*
+    /// body in erases all of that and measures `instructions:u` **−0.89%** on
+    /// `fuz_app`, but it copies the allocation and its grow/borrow edges to
+    /// every site: **+349 KB of `.text` (+12.1%)**, and `cycles:u` turns
+    /// **positive** there. Keeping the head alone inline recovers **−0.40…
+    /// −0.50%** across four real corpora (**−0.27%** on pure Svelte and on
+    /// pure CSS, which share the arena) for **+9.7 KB** of `.text` and
+    /// **+13.7 KB** of the `format` WASM bundle — the `parse` bundle is
+    /// byte-identical, since it links no doc builder at all. Two
+    /// provably-unreachable null controls (parse+bind, parse+wire-write) read
+    /// ±0.000%.
+    ///
+    /// The two-child arm earns its own entry point because a child range holds
+    /// exactly two ids in 65% of calls (see [`Self::alloc_children`]): taking
+    /// them by value makes the folded call site a register handoff with no
+    /// array to materialize.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub fn concat(&self, docs: &[DocId]) -> DocId {
         match docs {
-            [] => self.empty(),
             [single] => *single,
-            _ => {
-                let range = self.alloc_children(docs);
-                self.alloc(DocNode::Concat(range))
-            }
+            [a, b] => self.concat_pair(*a, *b),
+            _ => self.concat_other(docs),
         }
+    }
+
+    /// [`Self::concat`]'s two-child arm, taking its children by value so the
+    /// inlined head is a register handoff rather than a stack array.
+    ///
+    /// ⚠️ **The `inline(never)` is a guard, not a measured win — keep it
+    /// anyway.** Dropping it is `.text`-neutral to the byte: the cost model
+    /// declines to fold this body in on its own, the same refusal that left
+    /// `concat` out of line to begin with. But "the head is forced in *because*
+    /// the arms are not" is the whole design, the guard is free, and the
+    /// failure mode if that refusal ever changes is the +349 KB build the
+    /// head's doc describes. Same for [`Self::concat_other`].
+    #[inline(never)]
+    fn concat_pair(&self, a: DocId, b: DocId) -> DocId {
+        let range = self.alloc_children(&[a, b]);
+        self.alloc(DocNode::Concat(range))
+    }
+
+    /// [`Self::concat`]'s remaining arms — the empty short-circuit and three or
+    /// more children — kept out of line so a call site pays only the head.
+    #[inline(never)]
+    fn concat_other(&self, docs: &[DocId]) -> DocId {
+        if docs.is_empty() {
+            return self.empty();
+        }
+        let range = self.alloc_children(docs);
+        self.alloc(DocNode::Concat(range))
     }
 
     /// Create a fill doc for greedy line packing.
@@ -2155,6 +2203,18 @@ impl DocArena {
     /// The cold half of [`Self::will_break_memo`]: compute and cache whether a
     /// subtree forces a break. Runs at most once per node; recursion goes back
     /// through the inline probe so warm children never re-enter here.
+    ///
+    /// ⚠️ **`#[cold]` is a claim about the call, not about the total, and it is
+    /// still the right one.** This function carries ~5–6% self on a real-corpus
+    /// board — "once per node" is a small share of *calls* and a large share of
+    /// *time* — and `#[cold]` puts it under size-optimized codegen, visibly so:
+    /// it spills and immediately reloads four argument registers around the
+    /// `Concat` / `Fill` arm's recursion. Dropping the attribute removes exactly
+    /// that (the body shrinks by 14 bytes) and still measures `instructions:u`
+    /// **+0.02%** — the callers lose more from the un-hinted branch, since the
+    /// probe in [`Self::will_break_memo`] is inlined at every `will_break` site
+    /// and wants this call laid out away from its warm path. Measured; don't
+    /// re-try without a new idea.
     #[cold]
     #[inline(never)]
     fn will_break_fill(
