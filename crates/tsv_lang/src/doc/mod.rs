@@ -56,28 +56,34 @@ pub use types::{CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolS
 ///
 /// ⚠️ **The arm list is a size decision, per call site.** Arms multiply by the
 /// number of places the enclosing function is inlined into: the render write has
-/// two call sites and affords nine arms for +2.4 KB. `alloc_children` once
-/// afforded exactly **one** — a second arm crossed an inliner threshold and cost
-/// **+179 KB of `.text`** — because it was `#[inline]` into a `DocArena::concat`
-/// that was itself folded into 1,233 sites. Splitting `concat` into an inlined
-/// dispatch over `#[inline(never)]` arms retired that multiplier: `alloc_children`
-/// now folds into five bodies, all of them in `arena.rs`, and a `3` arm measures
-/// **+304 B**. Re-measure `.text` before adding one — the number moves with what
-/// the enclosing function's own inlining is doing, not with this list.
+/// two call sites and affords nine arms for +2.4 KB. `DocArena::alloc_children`
+/// once afforded exactly **one** — a second arm crossed an inliner threshold and
+/// cost **+179 KB of `.text`** — because it was `#[inline]` into a
+/// `DocArena::concat` that was itself folded into 1,233 sites. Splitting `concat`
+/// into an inlined dispatch over `#[inline(never)]` arms retired that multiplier.
+/// Re-measure `.text` before adding an arm — the number moves with what the
+/// enclosing function's own inlining is doing, not with this list.
 ///
-/// ⚠️ **And the instruction ladder is not monotonic — measure each rung.** At
-/// `alloc_children`, `[2, 3]` reads `instructions:u` **−0.038 / −0.040 / −0.046 /
-/// −0.054%** (fuz_ui / gro / fuz_app / zzz) against a parse+bind null control at
-/// **−0.003%**, while `[2, 3, 4]` reads **+0.328…+0.336%** — a regression, and one
-/// that arrives with `.text` going *down* (−924 B on the `-p tsv_debug -p tsv_cli`
-/// corpus build). Adding a rung is not a smaller version of the rung below it.
+/// ⚠️ **First ask whether the length still reaches the `match` at run time.**
+/// `alloc_children` carried a ladder to `[2, 3]` on a census saying 65% of child
+/// ranges hold two ids, and that same `concat` split then routed every two-child
+/// range through a caller that passes a **literal** `&[a, b]` — where the length
+/// is a compile-time constant and the arm folds whether or not it is written. The
+/// ladder was measuring dispatch overhead on the *remaining* callers. Removing it
+/// outright is `instructions:u` **−0.43…−0.52%** on four real corpora. A census of
+/// lengths is not a census of the lengths this `match` sees; take the second one,
+/// per caller, and re-take it after anything upstream re-routes.
 ///
-/// ⚠️ **Both rungs are quoted from a run where min, mean and max agree to three
-/// decimals**, which is what makes a −0.04% figure meaningful at all: the format
-/// board used to carry a ~0.4% per-exec collision lottery (see
-/// `arena::STATIC_CACHE_SLOTS`), under which a rung
-/// this small is unmeasurable. Print the per-side spread beside any rung you add
-/// — a real rung moves min, max and mean together.
+/// ⚠️ **An arm is an instruction claim, and instructions is the only channel that
+/// can grade it.** The ladder's earlier rungs were quoted as `cycles:u` wins that
+/// do not survive an instrument that samples **code layout** (four builds a side
+/// differing in the size of a function nothing calls — not four builds differing
+/// in a hash constant, which leaves layout untouched, and not a null of
+/// byte-identical copies, which shares one layout and so cannot fail). Under that
+/// instrument the whole `alloc_children` ladder is cycles-flat inside a ±0.2%
+/// resolution. Instructions, by contrast, are layout-invariant to **0.000%** and
+/// resolve to ~0.002%: quote a rung there, with its per-side spread, and treat any
+/// sub-1% cycles figure attached to an arm list as unmeasured.
 ///
 /// ⚠️ **The constant is the lever, not the call count.** `write_indentation`
 /// spells this mechanism by hand, and its ladder priced the difference: turning

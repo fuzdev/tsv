@@ -275,12 +275,22 @@ perf stat -r 4 -e instructions,cycles,branches,branch-misses \
   target/profiling/tsv_debug profile ../fuz_app/src/lib --iterations 30
 ```
 
-A near-flat instruction delta (e.g. ≤0.1%) paired with a larger, run-to-run-*variable*
-cycles delta and a drop in instructions-per-cycle is a code-placement / i-cache
-artifact, not a real cost — added code (a new monomorphization, more inlining)
-shifted hot functions across cache lines. For a printer-only edit, **parse is a
-built-in control**: its code is unchanged, so any instruction movement there is pure
-layout. A real algorithmic change instead shows up as more *instructions*.
+A near-flat instruction delta (e.g. ≤0.1%) paired with a larger cycles delta and a
+drop in instructions-per-cycle is usually read as a code-placement artifact — added
+code (a new monomorphization, more inlining) shifting hot functions across cache
+lines. That reading is often right, and **this recipe cannot establish it**: it
+compares one binary against one binary, and a build's code layout is worth
+~1.2–1.8% of cycles on its own (§Reading `cycles:u` below). Below that, the recipe
+reports a layout draw whichever way it comes out — a candidate that reads +1.2%
+cycles at flat instructions and a *baseline rebuilt against itself* are the same
+measurement. Resolve it with the layout-group protocol below; do not resolve it by
+assumption in either direction, and do not treat a single pair's IPC drop as
+evidence of anything.
+
+For a printer-only edit, **parse is a built-in control**: its code is unchanged, so
+any instruction movement there is pure layout. A real algorithmic change instead
+shows up as more *instructions* — but the converse does not hold, since a change
+that moves only bytes and cache lines shows up in neither.
 
 Anchor instruction counts on an **in-process corpus run** — `profile`
 (parse+format) or `json_profile` (parse + wire-JSON write) over a directory
@@ -789,11 +799,94 @@ Two practical rules:
 - **`perf annotate` before theorizing about a hot leaf.** A percentage tells you
   *where*; only the per-instruction breakdown tells you the cost is one store
   rather than the arithmetic around it.
-- **Cycles are far noisier than instructions** — on the reference machine the
-  same binary pair reads a ±2% band run to run, and a format-path control drifted
-  2.2–3.3 G for identical work. Use **best-of-N interleaved** (minimum cycles is
-  the least contaminated estimator), never a single pair, and keep a control
-  corpus the lever's code never runs.
+- **The two counters are independent below about 1%.** The cleanest demonstration
+  is the layout experiment below: four builds of one source, identical work, move
+  `instructions:u` by 0.000% and `cycles:u` across a 1.17% range. So a small lever
+  must be graded on the counter it actually claims to move — bytes moved, nodes
+  allocated and lines dirtied are cycles claims; ALU, branch and call overhead are
+  instruction claims. ⚠️ But the counters are not equally resolvable: instructions
+  resolve to ~0.002% on one binary pair, while a cycles claim below ~1% needs a
+  layout group per side and still only resolves to ~0.2%. A cycles number quoted
+  from a single binary pair — or from a group that shares one layout — measures
+  the draw, not the lever.
+
+### Reading `cycles:u`: the offset belongs to the binary, and it is CODE LAYOUT
+
+Cycles look like noise on a two-binary A/B, and the usual conclusion — "cycles are
+unusable, grade on instructions" — is wrong. But so is the first repair. Three
+terms are being added together, and only the third is the work:
+
+- **Run to run, with the binary fixed**, cycles are steady: two byte-identical
+  copies of one binary compare at a paired median of −0.08%.
+- **Build to build, at fixed code layout**, a binary carries a small offset from
+  whatever address-keyed state it holds. Rebuilding one source with a different
+  constant in `DocArena::text`'s slot hash — no behaviour change, +0.03%
+  instructions — moves cycles ~0.4%.
+- **Build to build, across code layouts**, the offset is ~**1.2–1.8%**, and it
+  swamps both of the above.
+
+The third term is the one that matters, and it is easy to miss because the obvious
+perturbations do not move it. Measured here: four builds of one source that differ
+only in the *size of a function that is never called* — identical work, identical
+`instructions:u` to **0.001%** — read cycles 1798.8M, 1817.3M, 1820.0M and 1824.5M,
+a **1.17% spread**, stable per binary and reproducible to 0.01 points across
+measurement sessions. Adding dead code re-lays every symbol emitted after it, and
+that is all it takes.
+
+⚠️ **So two "inert perturbation" recipes are traps.** Varying a *constant* — a
+different multiplier in a hot hash — leaves code layout untouched (a `movabs`
+immediate is the same length whatever its value), so four such builds are four
+samples of **one** layout. And a null group of byte-identical *copies* shares one
+layout by construction, so it is structurally blind to the very term it is meant
+to license: it cannot fail. Together they make a broken instrument look calibrated
+— a four-multiplier group of one source, compared against a four-layout group of
+that same source, reads a **0.79% gap** on identical work.
+
+**Sample the layout instead.** Build both sides three or four times with a
+perturbation that genuinely re-places code — the cheapest is an
+`#[inline(never)]` function that nothing calls, given a different body length per
+build and kept alive with a `#[used]` static function pointer — measure all of
+them interleaved with the sweep direction alternating between reps, and compare
+**group means**. Two things then make the result trustworthy:
+
+- a **null group that can fail**: a *second* set of layout draws of the baseline,
+  passed in the candidate positions. Four draws a side reads **+0.17%** here, and
+  that is the resolution — a group gap below ~0.2% is not a result. (Wider
+  resolution costs builds: the layout term averages down as `1/sqrt(n)`.)
+- **`task-clock` agrees and is cheaper to reason about.** Wall tracks cycles to
+  within 0.05–0.3 points through all of this, including the layout draw itself.
+  Run both; wall is the axis a user feels, and its agreement is the sanity check
+  that the cycles reading is not a counter artifact.
+
+⚠️ **A cycles verdict belongs to a (codegen profile × binary × entry point)
+triple, not to a source change.** All three have been observed to flip a sign
+here. The same arm-list change reads **+0.33% instructions** built `--profile
+corpus` (`lto = false, codegen-units = 16`) and **−0.11%** built `--release`
+(`lto = true, codegen-units = 1`); and a lever that reads −0.43% cycles on
+`tsv_debug profile` reads +0.50% on `tsv format --check` — two binaries, one
+source, opposite verdicts, because each drew its own layout. Grade in the world
+the artifact ships in, and re-read the baseline with the exact command the
+candidate used.
+
+⚠️ `.text` is not a shortcut for any of this. Of three spellings of one change, the
+one that grew the binary by **96 bytes** measured the *worst* cycles regression and
+the one that grew it by 5,344 bytes the mildest — an i-cache story has to be
+measured, never inferred from the size delta.
+
+⚠️ **And the cache counters do not disambiguate it either.** Two layout draws of one
+source, 0.80% apart in cycles at 0.000% difference in instructions, read L1
+d-cache misses flat, frontend stalls +0.8% (a quarter of the gap) and L1 **i-cache
+misses 24% LOWER on the slower binary**. A change that does nothing produces the
+full paradoxical signature, so reading that signature off an A/B and concluding
+"neither cache story survives, it must be something subtle" is a category error —
+what it identifies is a layout draw. Counters are for a gap you have already
+established with layout groups, never for deciding whether one is real.
+
+⭐ **`instructions:u` is the channel that survives all of this.** Across four
+layout draws of one source it moves by **0.000%**; across four hash draws, by
+≤0.03%. It is not a proxy for cycles (below ~1% the two are independent), but it
+is the only one of the two that a small lever can actually be resolved on without
+a build farm.
 
 ### A per-site precondition is only as cheap as its fold
 

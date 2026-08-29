@@ -27,7 +27,6 @@ use crate::printing::visual_width;
 use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
 
 use super::DocBuf;
-use super::specialize_short_len;
 #[cfg(feature = "swallow_check")]
 use super::swallow::swallow_check_enabled;
 use super::types::{
@@ -1143,28 +1142,32 @@ impl DocArena {
 
     /// Allocate a child range from a slice of DocIds.
     ///
-    /// A child range holds exactly **two** ids in 65% of calls (census over
-    /// three app corpora, stable within a point on each), so the append is
-    /// specialized on that length — see `specialize_short_len!` for why, and for
-    /// why the list here is two entries rather than the render write's nine.
+    /// ⚠️ **The append is deliberately NOT `specialize_short_len!`-specialized
+    /// here, and the reason is a caller, not a length distribution.** This site
+    /// carried a `[2]` arm and then a `[2, 3]` one, both justified by a census
+    /// saying a child range holds exactly two ids in 65% of calls. That census
+    /// is still true and no longer bears on this `match`: [`Self::concat`]
+    /// routes every two-child range to [`Self::concat_pair`], which calls this
+    /// function with the **literal** `&[a, b]`, so at the site that owns the 65%
+    /// the length is a compile-time constant and the arm folds away whether or
+    /// not it is written. What is left matching at run time is
+    /// [`Self::concat_other`] — reached only with **zero or three-plus**
+    /// children, so a `2` arm there can never fire — plus [`Self::fill`],
+    /// `conditional_group`'s expanded states and the line-removal rebuild.
+    /// Splitting `concat` moved the population out from under the ladder, and
+    /// the arms kept being added to it afterwards.
     ///
-    /// The `3` arm is the ≥3-child tail, and it only became affordable once
-    /// [`Self::concat`] was split: while this function was `#[inline]` into a
-    /// `concat` that was itself folded into 1,233 sites, a second arm cost
-    /// **+179 KB of `.text`**; over the split shape it costs **+304 B**, for
-    /// `instructions:u` **−0.038…−0.049%** across four real corpora against a
-    /// parse+bind null control at −0.003%. A `4` arm on top of it is a
-    /// **+0.33% regression** (`+0.328 / +0.332 / +0.336%` on fuz_app / zzz /
-    /// gro, min, mean and max all within 0.01 point of each other, against a
-    /// `.text` that goes *down* 924 B) — see `specialize_short_len!`'s ladder
-    /// note.
-    ///
-    /// ⚠️ The `2` arm is dead in the [`Self::concat_other`] copy — that caller has
-    /// already routed two children to [`Self::concat_pair`] and returned on zero —
-    /// and it is kept anyway, because the other three bodies this folds into
-    /// ([`Self::fill`], `conditional_group`'s expanded states, the line-removal
-    /// rebuild) can reach it. Splitting the list per caller costs a second copy of
-    /// the append to save one compare.
+    /// Measured by removing them, four builds a side sampling **code layout**
+    /// (see `specialize_short_len!`'s ladder note for why that and not a hash
+    /// constant): dropping `3` is `instructions:u` **−0.25…−0.31%** on four real
+    /// corpora, dropping both is **−0.43…−0.52%**, each against a parse+bind
+    /// null control at −0.001% and a within-group spread of 0.000–0.003%. On
+    /// `cycles:u` the ladder never paid: every rung reads neutral-to-favourable
+    /// on removal (−0.01…−0.53%, four corpora, against a same-source null of
+    /// +0.17%), and wall agrees at −0.29%. So the arms were not buying the
+    /// memory behaviour they were credited with. `.text` **−5,648 B**; the
+    /// `format` WASM bundle moves the other way by **+143 B**, and `parse` is
+    /// byte-identical, as it must be — it links no doc builder.
     #[inline]
     fn alloc_children(&self, ids: &[DocId]) -> ChildRange {
         if ids.is_empty() {
@@ -1173,7 +1176,7 @@ impl DocArena {
         let mut children = self.children.borrow_mut();
         let start = children.len() as u32;
         let len = ids.len() as u32;
-        specialize_short_len!(ids.len(), [2, 3], children.extend_from_slice(ids));
+        children.extend_from_slice(ids);
         ChildRange { start, len }
     }
 
@@ -1981,14 +1984,32 @@ impl DocArena {
     /// spilled for cold edges the hot path never takes. Forcing the *whole*
     /// body in erases all of that and measures `instructions:u` **−0.89%** on
     /// `fuz_app`, but it copies the allocation and its grow/borrow edges to
-    /// every site: **+349 KB of `.text` (+12.1%)**, and `cycles:u` turns
-    /// **positive** there. Keeping the head alone inline recovers **−0.40…
-    /// −0.50%** across four real corpora (**−0.27%** on pure Svelte and on
-    /// pure CSS, which share the arena) for **+9.7 KB** of `.text` and
-    /// **+13.7 KB** of the `format` WASM bundle — the `parse` bundle is
-    /// byte-identical, since it links no doc builder at all. Two
-    /// provably-unreachable null controls (parse+bind, parse+wire-write) read
-    /// ±0.000%.
+    /// every site: **+349 KB of `.text` (+12.1%)**. Keeping the head alone
+    /// inline costs **+9.7 KB** of `.text` and **+13.7 KB** of the `format`
+    /// WASM bundle — the `parse` bundle is byte-identical, since it links no
+    /// doc builder at all.
+    ///
+    /// ⚠️ **The split is right and the reason first recorded for it was not.**
+    /// It was landed on an `instructions:u` win of −0.40…−0.50%, measured
+    /// before the static-node cache was sized against its collision draw (see
+    /// [`STATIC_CACHE_SLOTS`]) — i.e. inside a 0.4–0.6% per-exec lottery of
+    /// exactly that magnitude. Re-measured on the fixed instrument, against the
+    /// un-split spelling built four times over, the split reads **+0.108%
+    /// instructions** — the opposite sign — for **−167 KB** of `.text`. The
+    /// un-split body is small enough that LLVM folds it whole at the
+    /// literal-array sites and constant-folds the dispatch, which is where its
+    /// instructions go and why its i-cache footprint explodes. **The split
+    /// stands on the 167 KB**, not on the instruction count, which reads it
+    /// backwards.
+    ///
+    /// ⚠️ The same re-grade also recorded **−1.29% cycles / −1.2% wall**, and
+    /// that half does *not* stand: those four builds a side were perturbed by a
+    /// constant in [`Self::text`]'s slot hash, which leaves code layout
+    /// untouched, so both groups sampled one layout apiece and the figure is a
+    /// layout draw of the size the effect was claimed to be. Re-measured with a
+    /// layout-sampling group it would be worth having; until then treat this
+    /// chokepoint as **cycles-unmeasured**. See `specialize_short_len!`'s ladder
+    /// note and `docs/performance.md` §Reading `cycles:u`.
     ///
     /// The two-child arm earns its own entry point because a child range holds
     /// exactly two ids in 65% of calls (see [`Self::alloc_children`]): taking
