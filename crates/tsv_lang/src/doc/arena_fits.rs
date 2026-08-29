@@ -330,7 +330,7 @@ pub(super) fn arena_fits_with_lookahead(
                 }
                 rest_idx -= 1;
                 let cmd = &rest_commands[rest_idx];
-                (cmd.doc, cmd.mode)
+                (cmd.doc, cmd.mode())
             }
         };
     }
@@ -370,11 +370,7 @@ pub(super) fn arena_fits_multi(
     let rest_commands: SmallVec<[ArenaCommand; 4]> = rest
         .iter()
         .rev()
-        .map(|&doc| ArenaCommand {
-            indent: RenderIndent::default(),
-            mode,
-            doc,
-        })
+        .map(|&doc| ArenaCommand::new(RenderIndent::default(), mode, doc))
         .collect();
     arena_fits_with_lookahead(
         arena,
