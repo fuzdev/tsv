@@ -432,7 +432,7 @@ impl<'a> Printer<'a> {
         class: TagClass,
     ) -> ElementParts<'e> {
         ElementParts {
-            name: self.d().source_span_ident(element.name_span),
+            name: self.d().source_span(element.name_span, self.source),
             kind: class.kind,
             is_void: class.is_void,
             // Components, foreign (SVG/MathML), and namespaced (`foo:bar`) elements may print
@@ -896,7 +896,7 @@ impl<'a> Printer<'a> {
         kind: ElementKind,
     ) -> DocId {
         let d = self.d();
-        let name_doc = d.source_span_ident(element.name_span);
+        let name_doc = d.source_span(element.name_span, self.source);
         let is_html = element.kind == internal::ElementKind::Html;
         let closing = d.concat(&[d.text("></"), name_doc, d.text(">")]);
 
@@ -954,7 +954,7 @@ impl<'a> Printer<'a> {
     /// Format: `<template lang="pug">\n{raw content}\n</template>`
     fn build_frozen_template_doc(&self, element: &internal::Element<'_>) -> DocId {
         let d = self.d();
-        let name_doc = d.source_span_ident(element.name_span);
+        let name_doc = d.source_span(element.name_span, self.source);
 
         // Opening tag: the ordinary one. What is frozen here is the element's CONTENT, which
         // tsv cannot format and so copies verbatim; the head above it is an attribute list like
@@ -1010,7 +1010,7 @@ impl<'a> Printer<'a> {
         attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
-        let name_doc = d.source_span_ident(element.name_span);
+        let name_doc = d.source_span(element.name_span, self.source);
         // The attr-keyed opening tag every other element path takes — a hand-rolled copy of
         // it here (same softline, same dedent, same indent) would be the two-copies-drift
         // this crate's `ElementParts` doc warns about, one tag lower down.

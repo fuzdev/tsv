@@ -439,9 +439,10 @@ pub enum DocText {
     Pooled(PoolSpan, u16),
     /// Verbatim source slice, resolved against `source` at print time. Second
     /// field is the precomputed visual width — always computed at build like
-    /// `Pooled` (a real width or [`TEXT_WIDTH_HAS_NEWLINE`]), except identifier
-    /// and element/attribute names (via `source_span_ident`), which defer to
-    /// on-demand measurement ([`TEXT_WIDTH_NOT_COMPUTED`]). Lets a printer emit
+    /// `Pooled` (a real width or [`TEXT_WIDTH_HAS_NEWLINE`]), identifier and
+    /// element/attribute names included: the eager policy has no exceptions
+    /// (rationale, and the measured cost of the deferral names used to take, on
+    /// the arena's `pooled_text_width`). Lets a printer emit
     /// verbatim source text (identifier/tag/attribute names, comments, template
     /// chunks, already-canonical literals) with **no allocation and no copy** —
     /// the lifetime-free alternative to a borrowed `&'src str` (which would force
@@ -495,8 +496,10 @@ pub enum CachedWidth {
     /// The text contains a newline — there is no single-line width; fits
     /// treats the line as ending inside this text.
     HasNewline,
-    /// Not precomputed (`source_span_ident` identifier names) — measure on
-    /// demand.
+    /// Not precomputed — measure on demand. No builder emits this today (the
+    /// eager width policy on the arena's `pooled_text_width` has no
+    /// exceptions); it is the mechanism a deferral would use, and what the
+    /// `arena_fits` on-demand oracle grades.
     NotComputed,
 }
 
