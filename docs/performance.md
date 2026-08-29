@@ -242,6 +242,28 @@ perf report --stdio -q -g none \
 *shape* (which source construct dominates), not the digits, and re-take it against your own
 binary. The two columns are children% and self%.
 
+⭐⭐ **When the top source line is a big `match`, go one instrument further down — to
+`objdump`.** A srcline board cannot tell four instructions from fourteen, so a dispatch line
+that reads "the jump table, nothing to do here" may be carrying real work. Get that line's
+instruction pointers out of `perf script` and disassemble around them:
+
+```bash
+perf script -i flat.data -F ip,sym,srcline \
+  | awk '/<symbol>/{ip=$1; getline; if ($0 ~ /<file>.rs:<line>/) print ip}' \
+  | sort | uniq -c | sort -rn        # the line's hot IPs (srcline prints on its own line)
+nm -C --print-size target/profiling/tsv_debug | grep '<symbol>'   # the symbol's file vaddr
+objdump -d --start-address=0x… --stop-address=0x… target/profiling/tsv_debug
+```
+
+The runtime IPs are PIE-relocated, so match them to the file by their low 12 bits (page offset
+is preserved by `mmap`) and confirm by the block's shape. **The whole basic block's sample total
+is sound, and it is an EV model**: block share ÷ instructions in the block = what one removed
+instruction is worth, computable before any code is written.
+
+⚠️ **Do not read the distribution *within* a basic block as instruction counts.** Straight-line
+instructions that execute the same number of times routinely draw wildly different sample counts
+— that is skid clustering after a long-latency operation, not work. Read the block total.
+
 Reach for `annotate` when the question is genuinely *per-instruction* — which
 store, which compare — and for that, cross-check it against this view: the two
 agreeing is what rules out a symbol-resolution artifact. `--sort=srcline` alone
