@@ -41,11 +41,11 @@ pub(super) fn render_fill_iterative(
         arena,
         render,
         embed,
-        source,
+        ..
     } = ctx;
 
     // Every fit question this loop asks is the same one — "does `doc` fit FLAT in `budget`, given
-    // what follows?" — and only the doc, the look-ahead and the budget ever vary. The other four
+    // what follows?" — and only the doc, the look-ahead and the budget ever vary. The other three
     // arguments are loop invariants, so binding them once keeps each measurement readable as the
     // question it is. Captures only `Copy` context (never the mutable render state, which stays in
     // registers per this function's contract).
@@ -57,7 +57,6 @@ pub(super) fn render_fill_iterative(
             lookahead,
             budget as isize,
             has_line_suffix,
-            source,
         )
     };
 
@@ -351,7 +350,6 @@ pub(super) fn render_fill_iterative(
             available,
             Mode::Flat,
             has_line_suffix,
-            source,
         );
 
         if both_fit {
@@ -748,7 +746,6 @@ fn hug_terminal_sep_mode(
             &[],
             ctx.render.print_width.saturating_sub(pos + 1) as isize,
             has_line_suffix,
-            ctx.source,
         )
     {
         Mode::Flat

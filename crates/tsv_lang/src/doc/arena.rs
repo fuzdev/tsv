@@ -31,7 +31,6 @@ use super::DocBuf;
 use super::swallow::swallow_check_enabled;
 use super::types::{
     CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan, TEXT_WIDTH_HAS_NEWLINE,
-    TEXT_WIDTH_NOT_COMPUTED,
 };
 
 /// Which **prettier operation** a line-flattening walk is emulating.
@@ -487,23 +486,63 @@ pub(super) type CmdStack = SmallVec<[ArenaCommand; 8]>;
 /// headroom at a 64-byte inline footprint, keeping even the rare suffix push off the heap.
 pub(super) type LineSuffixBuf = SmallVec<[ArenaCommand; 4]>;
 
-/// Sentinel cache values for the `arena_fits` flat-width fast-path. A cell holds
-/// either a real break-free flat width, or one of these two sentinels — the top
-/// two `u32` values, mirroring the `u16` text-width sentinels in `doc::types`
-/// (`TEXT_WIDTH_HAS_NEWLINE` / `TEXT_WIDTH_NOT_COMPUTED`). Packing the cache as
-/// `u32` (vs an 8-byte enum) halves its footprint — one `u32` per doc node, ~4
-/// nodes per source byte — which matters most for the memory-constrained WASM
-/// target. (A further `u16` narrowing was measured and rejected: instructions
-/// +0.26% on the fits-memo path, and WASM steady high-water +2 pages — the
-/// halved realloc-size sequence fragments under talc's binning.)
+/// Cell values for the per-node **subtree-layout cache** — the one memo behind
+/// both layout questions a doc subtree answers: *does it force a break*
+/// ([`DocArena::will_break`], asked at BUILD from the printers) and *how wide is
+/// it flat* (`arena_fits`'s fast path, asked at RENDER). One `u32` carries both,
+/// because the two answers are not independent: **a forced break implies no flat
+/// width**, by structural induction over every node kind — each arm of
+/// [`DocArena::subtree_layout_fill`] either reports no forced break, or reports
+/// one together with an absent flat width. So a cell is exactly one of
 ///
-/// A real width aliasing a sentinel would need a ~4 GB-wide break-free flat
-/// subtree, which is unreachable on real source; and even then it is
-/// correctness-safe, not wrong output — a `FLAT_WIDTH_BREAKS` alias just defers
-/// that node to the walk (which sums the same width), and a `FLAT_WIDTH_UNKNOWN`
-/// alias just recomputes it. So no cap on stored widths is needed.
-pub(super) const FLAT_WIDTH_UNKNOWN: u32 = u32::MAX;
-pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
+/// - [`LAYOUT_UNKNOWN`] — not computed yet;
+/// - [`LAYOUT_BREAKS_FORCED`] — no flat width, and `will_break` is **true**;
+/// - [`LAYOUT_BREAKS_SOFT`] — no flat width, `will_break` **false**: a line
+///   suffix, a suffix boundary, a flush-scoped break, an `if_break` whose flat
+///   arm breaks, a format-ignored verbatim slice. Nodes the fits walk must
+///   *visit* rather than summarize, and that force no break on their group;
+/// - anything `<=` [`LAYOUT_WIDTH_MAX`] — a break-free flat width, `will_break`
+///   false.
+///
+/// The ordering is load-bearing: the fits fast path's common case is one
+/// unsigned compare (`v <= LAYOUT_WIDTH_MAX`), and `will_break`'s is
+/// `v == LAYOUT_BREAKS_FORCED` once "computed" is established.
+///
+/// Packing as `u32` (vs an 8-byte enum) halves the footprint — one `u32` per doc
+/// node, ~4 nodes per source byte — which matters most for the memory-constrained
+/// WASM target. (A further `u16` narrowing was measured and rejected:
+/// instructions +0.26% on the fits-memo path, and WASM steady high-water +2 pages
+/// — the halved realloc-size sequence fragments under talc's binning.)
+///
+/// ⚠️ **A summed width is clamped to [`LAYOUT_WIDTH_MAX`], and here that is a
+/// CORRECTNESS requirement, not a nicety.** In the two-sentinel flat-width cache
+/// this replaces, a width aliasing a sentinel merely deferred the node to the
+/// walk or recomputed it — both benign. Now an alias of [`LAYOUT_BREAKS_FORCED`]
+/// would make `will_break` answer **true** for a subtree that does not break,
+/// which is wrong output. Reaching it needs a ~4 GB-wide break-free flat subtree,
+/// so the clamp costs nothing in practice: one `min` per *summing* node, never
+/// per child (`saturating_add` is monotone, so clamping the finished sum gives
+/// the same answer as clamping every addend). Leaf widths cannot reach it at all
+/// — they come from the `u16` text-width slot.
+pub(super) const LAYOUT_UNKNOWN: u32 = u32::MAX;
+pub(super) const LAYOUT_BREAKS_FORCED: u32 = u32::MAX - 1;
+pub(super) const LAYOUT_BREAKS_SOFT: u32 = u32::MAX - 2;
+pub(super) const LAYOUT_WIDTH_MAX: u32 = u32::MAX - 3;
+
+/// Downgrade a forced break to a soft one, keeping every other cell value.
+///
+/// The one place the two fused questions diverge: an `if_break`'s flat width is
+/// its flat arm's, but its forced-break verdict is `false` whatever that arm
+/// holds — so a [`LAYOUT_BREAKS_FORCED`] coming up from `flat_doc` must lose the
+/// break half and keep the "no flat width" half.
+#[inline]
+fn soften_forced_break(v: u32) -> u32 {
+    if v == LAYOUT_BREAKS_FORCED {
+        LAYOUT_BREAKS_SOFT
+    } else {
+        v
+    }
+}
 
 /// Longest slice [`pooled_text_width`] measures with its fused byte walk. Past
 /// it, the scan shape flips to the searcher-based one: `contains('\n')` and
@@ -528,28 +567,36 @@ const FUSED_WIDTH_SCAN_MAX: usize = 32;
 ///
 /// ⭐ Identifier names look like the obvious exception — high-frequency and
 /// newline-free — and they are the **wrong** one: a name span is ~15% of all
-/// doc nodes, and deferring its width does not avoid the scan, it only moves it
-/// into the two hottest functions on the board — `render_text`'s column advance (which
-/// every emitted name reaches) and `flat_width_fill`'s on-demand arm. Measuring
-/// eagerly instead, in a small builder function, costs one scan and retires up
-/// to two: `instructions:u` −1.45 / −1.38 / −1.34 / −1.19% on TS-heavy corpora
-/// and −0.96% on pure Svelte, with pure CSS — which emits no name spans — an
-/// exact **+0.000%** null, and `.text` −800 B. ⚠️ The ~+1.1% price tag a name
-/// deferral used to carry never described this policy: it was measured over a
-/// *bundle* — names together with `text()` statics and the since-deleted
+/// doc nodes, and deferring its width did not avoid the scan, it only moved it
+/// into the two hottest functions on the board — `render_text`'s column advance
+/// (which every emitted name reaches) and the fits path's own on-demand measure.
+/// Measuring eagerly instead, in a small builder function, costs one scan and
+/// retires both: `instructions:u` −1.20 / −1.14 / −1.11 / −1.02% on TS-heavy
+/// corpora and −0.81% on pure Svelte, with pure CSS — which emits no name spans
+/// — an exact **−0.000%** null, and `.text` −1,136 B. ⚠️ The ~+1.1% price tag a
+/// name deferral used to carry never described this policy: it was measured over
+/// a *bundle* — names together with `text()` statics and the since-deleted
 /// interner's symbols — before the static cache
 /// amortized one half of it and before both the build-time and on-demand
 /// measures were unified onto [`fused_ascii_width`]. Re-take a width-policy
 /// number against the current pair of measures; do not inherit one.
 ///
-/// The measured width is clamped below the sentinels. Unlike the `u32`
+/// ⭐ With no exception left the policy is **total**, and that is a structural
+/// property, not just a fast one: a width query cannot need the document source,
+/// so the whole fits walk answers from `nodes` + the width slot. The deferral
+/// mechanism it retired — a `TEXT_WIDTH_NOT_COMPUTED` sentinel, an on-demand
+/// measure in `arena_fits`'s `text_flat_width`, a re-scan arm in `render_text` —
+/// is deleted rather than kept unreached; re-introducing a deferral means
+/// re-introducing the `source` threading it forces on every fits caller.
+///
+/// The measured width is clamped below the sentinel. Unlike the `u32`
 /// flat-width cache above (where aliasing needs a ~4 GB subtree and is benign
-/// anyway), a `u16` alias is reachable — a single-line non-ASCII text ≥65,534
+/// anyway), a `u16` alias is reachable — a single-line non-ASCII text ≥65,535
 /// columns — and `as u16` alone would be wrong twice over: 65,535 aliases
 /// `TEXT_WIDTH_HAS_NEWLINE` (fits would treat the line as ending inside the
 /// text) and ≥65,536 wraps (a huge text cached as narrow → "always fits").
 /// Clamping is verdict-preserving: every fits comparison is against a print
-/// width orders of magnitude below the clamp, so "65,533" and the true width
+/// width orders of magnitude below the clamp, so "65,534" and the true width
 /// answer identically. The same holds for the other consumer, `render_text`'s
 /// column advance — the column only feeds threshold comparisons (print width,
 /// `first_line_offset`) far below the clamp, and resets at each newline.
@@ -578,7 +625,7 @@ const FUSED_WIDTH_SCAN_MAX: usize = 32;
 #[inline]
 fn pooled_text_width(s: &str) -> u16 {
     match fused_ascii_width(s) {
-        FusedWidth::Width(w) => w.min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16,
+        FusedWidth::Width(w) => w.min(TEXT_WIDTH_HAS_NEWLINE as usize - 1) as u16,
         FusedWidth::Newline => TEXT_WIDTH_HAS_NEWLINE,
         FusedWidth::Searcher => pooled_text_width_scanned(s),
     }
@@ -598,16 +645,16 @@ pub(super) enum FusedWidth {
     Searcher,
 }
 
-/// The one fused width walk, shared by the two measures:
-/// [`pooled_text_width`] (build-time, for every text the builders cache a width
-/// for) and the fits path's `NotComputed` arm (`arena_fits`'s
-/// `text_flat_width`, which no builder feeds today — see the eager policy on
-/// [`pooled_text_width`] — and which is the mechanism any future deferral would
-/// use). Both previously spelled the question their own way — the fits arm
-/// as `contains('\n')` then [`crate::printing::visual_width`], two searcher-driven
-/// passes over a slice whose median length is a handful of bytes — and only this
-/// one had the exhaustive oracle
-/// (`pooled_text_width_tests`). One walk, one oracle, one answer.
+/// The one fused width walk, behind [`pooled_text_width`] — the single
+/// build-time measure every doc text goes through under the eager policy above.
+/// It was shared with a second, on-demand measure in the fits path
+/// (`arena_fits`'s `text_flat_width`) until that policy lost its last exception
+/// and the on-demand arm lost its producer; the two had previously spelled the
+/// question different ways — the fits arm as `contains('\n')` then
+/// [`crate::printing::visual_width`], two searcher-driven passes over a slice
+/// whose median length is a handful of bytes — and only this one had the
+/// exhaustive oracle (`pooled_text_width_tests`). One walk, one oracle, one
+/// answer.
 ///
 /// See [`pooled_text_width`]'s doc for why one pass beats three searchers on a
 /// short slice, why the ASCII arm counts a control byte as one column (mirroring
@@ -649,7 +696,7 @@ fn pooled_text_width_scanned(s: &str) -> u16 {
     if s.contains('\n') {
         TEXT_WIDTH_HAS_NEWLINE
     } else {
-        visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
+        visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_HAS_NEWLINE as usize - 1) as u16
     }
 }
 
@@ -743,15 +790,21 @@ pub struct DocArena {
     /// rather than SipHash — the consumer only ever does `get`/`insert`/`clear`,
     /// never iterates, so the hasher is unobservable (see `hash`'s module docs).
     share_map_scratch: RefCell<FxHashMap<(usize, u8), DocId>>,
-    /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
-    /// match `nodes`; sound because nodes are append-only and the arena is
-    /// per-format, so a node's `will_break` value never changes once it exists.
-    will_break_cache: RefCell<Vec<Option<bool>>>,
-    /// Memoized flat-mode subtree widths for the `arena_fits` fast-path, indexed
-    /// by `DocId`. Lazily extended like `will_break_cache`; valid per-format
-    /// (depends only on the fixed `TAB_WIDTH` + the source, both fixed for a
-    /// render).
-    flat_width_cache: RefCell<Vec<u32>>,
+    /// Memoized per-subtree layout facts, indexed by `DocId` — the forced-break
+    /// verdict [`Self::will_break`] answers at BUILD and the flat width
+    /// `arena_fits` answers at RENDER, packed into one `u32` per node (the cell
+    /// encoding is on [`LAYOUT_UNKNOWN`]). Lazily extended to match `nodes`;
+    /// sound because nodes are append-only and the arena is per-format, so a
+    /// node's layout facts never change once it exists.
+    ///
+    /// ⭐ **One cache because one walk.** The two questions used to have a memo
+    /// and a recursive fill each, and the two fills traversed the same tree
+    /// twice — 144.9% of node-visits against a 75.9% union, with 98.9% of the
+    /// flat-width fills landing on a node the build-time break walk had already
+    /// visited. [`Self::subtree_layout_fill`] answers both in one pass, so the
+    /// second walk is a cache read; the caches merge because they now have
+    /// identical populations by construction.
+    layout_cache: RefCell<Vec<u32>>,
     /// Direct-mapped cache for [`Self::text`] statics, carrying two halves per
     /// slot with different lifetimes:
     ///
@@ -981,8 +1034,7 @@ impl DocArena {
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
             share_map_scratch: RefCell::new(FxHashMap::default()),
-            will_break_cache: RefCell::new(Vec::new()),
-            flat_width_cache: RefCell::new(Vec::new()),
+            layout_cache: RefCell::new(Vec::new()),
             static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
             format_gen: Cell::new(1),
             empty_node: Cell::new((0, DocId(0))),
@@ -1043,8 +1095,7 @@ impl DocArena {
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
-            will_break_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
-            flat_width_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
+            layout_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
             static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
             format_gen: Cell::new(1),
             empty_node: Cell::new((0, DocId(0))),
@@ -1119,8 +1170,7 @@ impl DocArena {
         self.nodes.get_mut().clear();
         self.children.get_mut().clear();
         self.text_pool.get_mut().clear();
-        self.will_break_cache.get_mut().clear();
-        self.flat_width_cache.get_mut().clear();
+        self.layout_cache.get_mut().clear();
         #[cfg(feature = "swallow_check")]
         self.line_comment_ids.get_mut().clear();
         #[cfg(feature = "comment_check")]
@@ -1296,7 +1346,7 @@ impl DocArena {
     pub fn multiline_text(&self, s: &str) -> DocId {
         let first = s.split('\n').next().unwrap_or("");
         let first_width =
-            visual_width(first, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16;
+            visual_width(first, TAB_WIDTH).min(TEXT_WIDTH_HAS_NEWLINE as usize - 1) as u16;
         let span = self.pool_push(s);
         self.alloc(DocNode::MultilineText { span, first_width })
     }
@@ -2283,48 +2333,77 @@ impl DocArena {
     /// attributing any doc-layer lever.
     #[inline]
     pub fn will_break(&self, id: DocId) -> bool {
-        if let Some(&Some(cached)) = self.will_break_cache.borrow().get(id.index()) {
-            return cached;
+        if let Some(&cached) = self.layout_cache.borrow().get(id.index())
+            && cached != LAYOUT_UNKNOWN
+        {
+            return cached == LAYOUT_BREAKS_FORCED;
         }
         self.will_break_cold(id)
     }
 
     /// The uncached half of [`Self::will_break`]: take the node and child slices,
     /// extend the memo to cover `id`, and compute. Recursion re-enters through
-    /// [`Self::will_break_memo`] on the slices, never back through the probe, so
-    /// the borrows are taken once per uncached root and not once per node.
+    /// [`Self::subtree_layout_memo`] on the slices, never back through the probe,
+    /// so the borrows are taken once per uncached root and not once per node.
+    ///
+    /// The fill it calls also computes the subtree's flat width, which is the
+    /// point: this build-time walk visits 98.9% of the nodes the render-time fits
+    /// walk later asks about, so filling both here turns that second traversal
+    /// into a cache read.
     #[cold]
     #[inline(never)]
     fn will_break_cold(&self, id: DocId) -> bool {
         let nodes = self.nodes.borrow();
         let children = self.children.borrow();
-        let mut cache = self.will_break_cache.borrow_mut();
+        let mut cache = self.layout_cache.borrow_mut();
         if cache.len() < nodes.len() {
-            cache.resize(nodes.len(), None);
+            cache.resize(nodes.len(), LAYOUT_UNKNOWN);
         }
-        Self::will_break_memo(id, &nodes, &children, cache.as_mut_slice())
+        Self::subtree_layout_memo(id, &nodes, &children, cache.as_mut_slice())
+            == LAYOUT_BREAKS_FORCED
     }
 
     /// Split into an inline cache probe over an outlined recursive fill: the
     /// same subtree is re-checked far more often than it is first computed, so
     /// the warm path is a load + compare at the call site instead of a full
     /// call.
+    ///
+    /// Returns the packed cell (see [`LAYOUT_UNKNOWN`]) — never
+    /// [`LAYOUT_UNKNOWN`] itself.
     #[inline]
-    fn will_break_memo(
+    pub(super) fn subtree_layout_memo(
         id: DocId,
         nodes: &[DocNode],
         children: &[DocId],
-        cache: &mut [Option<bool>],
-    ) -> bool {
-        if let Some(cached) = cache[id.index()] {
+        cache: &mut [u32],
+    ) -> u32 {
+        let cached = cache[id.index()];
+        if cached != LAYOUT_UNKNOWN {
             return cached;
         }
-        Self::will_break_fill(id, nodes, children, cache)
+        Self::subtree_layout_fill(id, nodes, children, cache)
     }
 
-    /// The cold half of [`Self::will_break_memo`]: compute and cache whether a
-    /// subtree forces a break. Runs at most once per node; recursion goes back
+    /// The cold half of [`Self::subtree_layout_memo`]: compute and cache a
+    /// subtree's layout facts — whether it forces a break, and if not, its
+    /// break-free flat width. Runs at most once per node; recursion goes back
     /// through the inline probe so warm children never re-enter here.
+    ///
+    /// ⭐ **This is the fusion of what were two identical traversals.** The
+    /// forced-break question is asked at BUILD (45 printer call sites, through
+    /// [`Self::will_break`]) and the flat-width question at RENDER (the
+    /// `arena_fits` fast path), and both walked the whole subtree with the same
+    /// per-kind dispatch — 144.9% of node-visits between them against a 75.9%
+    /// union, since 98.9% of the flat widths render asks for sit on a node the
+    /// build walk already visited. Answering both in one pass makes the render
+    /// walk a cache read. It is only expressible because **every arm below either
+    /// reports no forced break, or reports one together with an absent width** —
+    /// the induction the packed cell's encoding rests on.
+    ///
+    /// The two questions disagree in exactly one direction, and
+    /// [`LAYOUT_BREAKS_SOFT`] is that direction: a node with no flat width that
+    /// forces no break. Read the arms as answering "what does this subtree do to
+    /// a line?", where `BREAKS_SOFT` means "the fits walk has to look at me".
     ///
     /// ⚠️ **`#[cold]` is a claim about the call, not about the total, and it is
     /// still the right one.** This function carries ~5–6% self on a real-corpus
@@ -2334,68 +2413,148 @@ impl DocArena {
     /// `Concat` / `Fill` arm's recursion. Dropping the attribute removes exactly
     /// that (the body shrinks by 14 bytes) and still measures `instructions:u`
     /// **+0.02%** — the callers lose more from the un-hinted branch, since the
-    /// probe in [`Self::will_break_memo`] is inlined at every `will_break` site
-    /// and wants this call laid out away from its warm path. Measured; don't
-    /// re-try without a new idea.
+    /// probe in [`Self::subtree_layout_memo`] is inlined at every call site and
+    /// wants this call laid out away from its warm path. Measured; don't re-try
+    /// without a new idea.
     #[cold]
     #[inline(never)]
-    fn will_break_fill(
+    pub(super) fn subtree_layout_fill(
         id: DocId,
         nodes: &[DocNode],
         children: &[DocId],
-        cache: &mut [Option<bool>],
-    ) -> bool {
-        let result = match &nodes[id.index()] {
+        cache: &mut [u32],
+    ) -> u32 {
+        let result: u32 = match &nodes[id.index()] {
             // A format-ignored verbatim slice is layout-opaque: its embedded newlines are
-            // source layout, not a break the enclosing group must honor (prettier's
+            // *source* layout, not a break the enclosing group must honor (prettier's
             // printIgnored string is likewise invisible to willBreak). fits() still sees
-            // the newline sentinel via the shared width slot.
-            DocNode::Text(DocText::VerbatimSpan(..)) => false,
+            // the newline through the same width slot — hence SOFT, not FORCED: no
+            // single-line width, no forced break. Must precede the general `Text` arm,
+            // whose `HasNewline` reading is the opposite verdict.
+            //
+            // ⚠️ **Reading the width slot raw here is deliberate, and it is the third
+            // spelling tried.** All three were built and measured on fuz_app (16 execs a
+            // side, per-side spread 0.002%, so the gaps are real):
+            //
+            // | shape | Δ instr | `tsv` `.text` |
+            // | --- | --- | --- |
+            // | this one — raw slot here, `cached_width()` in the general arm | 0 | 2,895,621 |
+            // | one `Text` arm, `matches!(VerbatimSpan)` on the newline path | +0.023% | 2,895,605 |
+            // | this arm routed through `cached_width()` too | +0.070% | 2,895,445 |
+            //
+            // The single-seam shapes are the tidier ones and both cost instructions on the
+            // hottest fill on the board, so the duplicate decode stays — it is one
+            // comparison against the ONE sentinel this type has, and the policy that keeps
+            // it at one is on `pooled_text_width`.
+            DocNode::Text(DocText::VerbatimSpan(_, w)) => match *w {
+                TEXT_WIDTH_HAS_NEWLINE => LAYOUT_BREAKS_SOFT,
+                w => u32::from(w),
+            },
             // A newline-bearing Text (a line-continuation string) breaks the enclosing group,
-            // like `MultilineText` below — the width cache already flags it via `HasNewline`.
-            // `NotComputed` reads as no break, which is only sound while a deferring builder
-            // guarantees its slice is newline-free; none defers today (see the eager policy on
-            // `pooled_text_width`), so this arm is unreached rather than merely narrow.
-            DocNode::Text(t) => matches!(t.cached_width(), CachedWidth::HasNewline),
+            // like `MultilineText` below — the width cache already flags it via `HasNewline`,
+            // and under the eager policy (see `pooled_text_width`) that flag is always set at
+            // build, so this arm reads the answer rather than approximating it.
+            DocNode::Text(t) => match t.cached_width() {
+                CachedWidth::Width(w) => u32::from(w),
+                CachedWidth::HasNewline => LAYOUT_BREAKS_FORCED,
+            },
             // Contains hardlines → always breaks (like the `concat([…, hardline, …])` it replaces).
-            DocNode::MultilineText { .. } => true,
-            DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
+            DocNode::MultilineText { .. } => LAYOUT_BREAKS_FORCED,
+            DocNode::Line(kind) => match kind {
+                LineKind::Hard | LineKind::Literal => LAYOUT_BREAKS_FORCED,
+                LineKind::Soft => 0,
+                LineKind::Normal => 1,
+            },
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-                Self::will_break_memo(*inner, nodes, children, cache)
+                Self::subtree_layout_memo(*inner, nodes, children, cache)
             }
             DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
-                Self::will_break_memo(*contents, nodes, children, cache)
+                Self::subtree_layout_memo(*contents, nodes, children, cache)
             }
             DocNode::IndentIfBreak { contents, .. } => {
-                Self::will_break_memo(*contents, nodes, children, cache)
+                Self::subtree_layout_memo(*contents, nodes, children, cache)
             }
+            // A pre-broken group breaks and has no flat width, without consulting
+            // `contents` — the short-circuit both questions took separately.
             DocNode::Group {
                 contents,
                 should_break,
                 ..
-            } => *should_break || Self::will_break_memo(*contents, nodes, children, cache),
-            DocNode::IfBreak { .. } => false,
-            DocNode::Concat(range) | DocNode::Fill(range) => range
-                .resolve(children)
-                .iter()
-                .any(|&kid| Self::will_break_memo(kid, nodes, children, cache)),
-            DocNode::WithContext { doc, .. } => Self::will_break_memo(*doc, nodes, children, cache),
-            DocNode::LineSuffix(_) => false,
-            DocNode::LineSuffixBoundary => false,
-            DocNode::BreakParent => true,
+            } => {
+                if *should_break {
+                    LAYOUT_BREAKS_FORCED
+                } else {
+                    Self::subtree_layout_memo(*contents, nodes, children, cache)
+                }
+            }
+            // The one arm where the two questions genuinely part: an `if_break`
+            // never forces a break (its break arm is the *consequence* of one),
+            // but its flat width is its flat arm's — so a forced break inside
+            // `flat_doc` must be softened, not propagated.
+            DocNode::IfBreak { flat_doc, .. } => {
+                soften_forced_break(Self::subtree_layout_memo(*flat_doc, nodes, children, cache))
+            }
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let mut sum: u32 = 0;
+                let mut no_width = false;
+                let mut forced = false;
+                for &kid in range.resolve(children) {
+                    let v = Self::subtree_layout_memo(kid, nodes, children, cache);
+                    if v == LAYOUT_BREAKS_FORCED {
+                        // Both answers are settled: a forced break in a child
+                        // forces the parent and leaves it no flat width. This is
+                        // the `any()` short-circuit the break walk always had.
+                        forced = true;
+                        break;
+                    } else if v == LAYOUT_BREAKS_SOFT {
+                        // The width is settled (there is none) but the break
+                        // verdict is not — a later child may still force one, so
+                        // the scan continues. That is what the break walk did
+                        // anyway; only the width walk used to stop here.
+                        no_width = true;
+                    } else {
+                        sum = sum.saturating_add(v);
+                    }
+                }
+                if forced {
+                    LAYOUT_BREAKS_FORCED
+                } else if no_width {
+                    LAYOUT_BREAKS_SOFT
+                } else {
+                    sum.min(LAYOUT_WIDTH_MAX)
+                }
+            }
+            DocNode::WithContext { doc, context } => {
+                let v = Self::subtree_layout_memo(*doc, nodes, children, cache);
+                if v > LAYOUT_WIDTH_MAX {
+                    v
+                } else {
+                    v.saturating_add(u32::from(context.trailing_reserve()))
+                        .min(LAYOUT_WIDTH_MAX)
+                }
+            }
+            // Neither occupies a column, but both carry the `has_line_suffix` state
+            // the fits walk needs (a boundary with a suffix pending doesn't fit), and
+            // a memoized width would hide them from it. SOFT means "walk it", never
+            // "it breaks" — the walk's own arms charge them 0 columns.
+            DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => LAYOUT_BREAKS_SOFT,
+            DocNode::BreakParent => LAYOUT_BREAKS_FORCED,
             // Forces only the group its deferred run flushes in — decided by the
             // fits walk's pending-flush state, not by this subtree query, so a
-            // containing group is NOT unconditionally broken.
-            DocNode::FlushBreak => false,
-            DocNode::FlowProbeEnd => false,
+            // containing group is NOT unconditionally broken. Carries the pending
+            // state the walk needs, so it is SOFT rather than a width.
+            DocNode::FlushBreak => LAYOUT_BREAKS_SOFT,
+            // Render-only sentinel; zero columns, no layout effect.
+            DocNode::FlowProbeEnd => 0,
             // Transparent to contents (the probe is measure-only). As a
             // conditional-group state this is never asked through the group —
-            // a Group's `will_break` reads `contents` (state 0) alone.
+            // a Group's `will_break` reads `contents` (state 0) alone, and a
+            // fill's items are not states.
             DocNode::GatedState { contents, .. } => {
-                Self::will_break_memo(*contents, nodes, children, cache)
+                Self::subtree_layout_memo(*contents, nodes, children, cache)
             }
         };
-        cache[id.index()] = Some(result);
+        cache[id.index()] = result;
         result
     }
 
@@ -2416,7 +2575,7 @@ impl DocArena {
     /// The slice-threaded body of [`Self::can_break`] — `pub(super)` so the
     /// `arena_fits` walk's pending-flush veto asks it through the slices the
     /// walk already holds instead of re-borrowing per call (the threading
-    /// idiom of `will_break_fill` / `flat_width_fill`).
+    /// idiom of [`Self::subtree_layout_fill`]).
     pub(super) fn can_break_inner(id: DocId, nodes: &[DocNode], children: &[DocId]) -> bool {
         match &nodes[id.index()] {
             DocNode::Line(_) => true,
@@ -2469,7 +2628,7 @@ impl DocArena {
                 Self::can_break_inner(*contents, nodes, children)
             }
             DocNode::MultilineText { .. } => true,
-            // deliberately newline-blind, unlike `will_break_fill`: canBreak asks
+            // deliberately newline-blind, unlike `subtree_layout_fill`: canBreak asks
             // "is there a breakable `line` in here?", and a Text's embedded newline
             // (line-continuation string, verbatim slice) is content, not a break point
             DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
@@ -2915,10 +3074,10 @@ impl DocArena {
         self.line_breaks_scratch.set(breaks);
     }
 
-    /// Mutably borrow the flat-width cache for the `arena_fits` fast-path.
+    /// Mutably borrow the subtree-layout cache for the `arena_fits` fast-path.
     #[inline]
-    pub(super) fn borrow_flat_width_cache(&self) -> std::cell::RefMut<'_, Vec<u32>> {
-        self.flat_width_cache.borrow_mut()
+    pub(super) fn borrow_layout_cache(&self) -> std::cell::RefMut<'_, Vec<u32>> {
+        self.layout_cache.borrow_mut()
     }
 
     /// Estimate output buffer capacity (bytes) for a rendered string.
@@ -3084,7 +3243,7 @@ impl std::fmt::Write for PoolTextWriter<'_> {
 
 #[cfg(test)]
 mod pooled_text_width_tests {
-    use super::{TEXT_WIDTH_HAS_NEWLINE, TEXT_WIDTH_NOT_COMPUTED, pooled_text_width};
+    use super::{TEXT_WIDTH_HAS_NEWLINE, pooled_text_width};
     use crate::config::TAB_WIDTH;
     use crate::printing::visual_width;
 
@@ -3102,7 +3261,7 @@ mod pooled_text_width_tests {
         if s.contains('\n') {
             TEXT_WIDTH_HAS_NEWLINE
         } else {
-            visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
+            visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_HAS_NEWLINE as usize - 1) as u16
         }
     }
 
@@ -3166,10 +3325,10 @@ mod pooled_text_width_tests {
         // A single-line text wider than the u16 sentinels must clamp, not alias
         // TEXT_WIDTH_HAS_NEWLINE or wrap.
         for len in [
-            TEXT_WIDTH_NOT_COMPUTED as usize - 2,
-            TEXT_WIDTH_NOT_COMPUTED as usize - 1,
-            TEXT_WIDTH_NOT_COMPUTED as usize,
-            TEXT_WIDTH_NOT_COMPUTED as usize + 5,
+            TEXT_WIDTH_HAS_NEWLINE as usize - 2,
+            TEXT_WIDTH_HAS_NEWLINE as usize - 1,
+            TEXT_WIDTH_HAS_NEWLINE as usize,
+            TEXT_WIDTH_HAS_NEWLINE as usize + 5,
         ] {
             let ascii = "a".repeat(len);
             assert_agrees(&ascii);

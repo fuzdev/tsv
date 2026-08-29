@@ -385,13 +385,11 @@ impl DocContext {
     }
 }
 
-/// Sentinel value for cached_width: text contains a newline.
+/// Sentinel value for cached_width: text contains a newline. The **only**
+/// sentinel — every doc text carries a real width or this one, so the decode in
+/// [`DocText::cached_width`] is total and the fits walk never measures a slice.
 /// Used by fits to early-return without resolving the string.
 pub const TEXT_WIDTH_HAS_NEWLINE: u16 = u16::MAX;
-
-/// Sentinel value for cached_width: width not yet computed.
-/// Used for owned strings that may be expensive to measure upfront.
-pub const TEXT_WIDTH_NOT_COMPUTED: u16 = u16::MAX - 1;
 
 /// A slice into the [`super::arena::DocArena`]'s text pool — the arena-owned `String`
 /// holding every dynamically-built text body ([`DocText::Pooled`],
@@ -422,16 +420,15 @@ impl PoolSpan {
 pub enum DocText {
     /// Static string literal - no allocation, just stores pointer.
     /// Second field is the precomputed visual width (a real width or
-    /// [`TEXT_WIDTH_HAS_NEWLINE`], never [`TEXT_WIDTH_NOT_COMPUTED`]) —
-    /// amortized through the arena's static width cache, measured once per
-    /// unique string per arena rather than per node.
+    /// [`TEXT_WIDTH_HAS_NEWLINE`]) — amortized through the arena's static width
+    /// cache, measured once per unique string per arena rather than per node.
     Static(&'static str, u16),
     /// Dynamically generated text, stored in the arena's text pool — the
     /// drop-glue-free replacement for a per-node owned `String`. Resolved
     /// against the pool at render time (like `SourceSpan` against `source`).
     /// Second field is the precomputed visual width — **always** computed at
-    /// build (a real width or [`TEXT_WIDTH_HAS_NEWLINE`], never
-    /// [`TEXT_WIDTH_NOT_COMPUTED`]), so the fits walk never needs the pool:
+    /// build (a real width or [`TEXT_WIDTH_HAS_NEWLINE`]), so the fits walk
+    /// never needs the pool:
     /// width queries answer from the node alone, and only the render loop
     /// (which borrows the pool once per render) reads the bytes. Pooled text
     /// is rare (~1.4% of Text nodes), so the eager measure is off the hot
@@ -469,10 +466,15 @@ pub enum DocText {
 impl DocText {
     /// Get the cached visual width.
     ///
-    /// Decodes the stored `u16` (a real width or one of the two sentinel
-    /// values) into [`CachedWidth`], so callers can't mistake
-    /// [`TEXT_WIDTH_HAS_NEWLINE`] for an actual width — every consumer must
-    /// handle the newline case explicitly.
+    /// Decodes the stored `u16` (a real width or the newline sentinel) into
+    /// [`CachedWidth`], so callers can't mistake [`TEXT_WIDTH_HAS_NEWLINE`] for
+    /// an actual width — every consumer must handle the newline case
+    /// explicitly.
+    ///
+    /// The decode is **total**: the eager width policy has no exceptions (see
+    /// the arena's `pooled_text_width`), so there is no "not measured yet"
+    /// state to fall back from — which is what lets every width consumer answer
+    /// from the node alone, with no document source in hand.
     #[inline]
     pub const fn cached_width(&self) -> CachedWidth {
         match self {
@@ -480,7 +482,6 @@ impl DocText {
             | DocText::Pooled(_, w)
             | DocText::SourceSpan(_, w)
             | DocText::VerbatimSpan(_, w) => match *w {
-                TEXT_WIDTH_NOT_COMPUTED => CachedWidth::NotComputed,
                 TEXT_WIDTH_HAS_NEWLINE => CachedWidth::HasNewline,
                 w => CachedWidth::Width(w),
             },
@@ -496,11 +497,6 @@ pub enum CachedWidth {
     /// The text contains a newline — there is no single-line width; fits
     /// treats the line as ending inside this text.
     HasNewline,
-    /// Not precomputed — measure on demand. No builder emits this today (the
-    /// eager width policy on the arena's `pooled_text_width` has no
-    /// exceptions); it is the mechanism a deferral would use, and what the
-    /// `arena_fits` on-demand oracle grades.
-    NotComputed,
 }
 
 /// Resolve DocText to a string, against the document source if provided.
@@ -521,14 +517,18 @@ pub enum CachedWidth {
 /// probes plus an edge to `slice_error_fail` — so the code is an order of
 /// magnitude larger than the match, LLVM declined the plain `#[inline]` hint,
 /// and this was left out of line and **called**: once per rendered `Text` node
-/// from `render_text`, whose very next statement re-matches the same
-/// `DocText` for its cached width, and once per unmeasured identifier name from
-/// `text_flat_width`. Forcing it in measures `instructions:u` **−1.39…−1.58%**
+/// from `render_text`, whose very next statement re-matches the same `DocText`
+/// for its cached width. Forcing it in measures `instructions:u` **−1.39…−1.58%**
 /// across five real corpora and **−0.96%** on pure CSS, against two
-/// provably-unreachable null controls at **±0.000%**, for **+640 B** of
-/// `.text`. The render write is the whole of it — forcing that site alone reads
-/// −1.514% where both together read −1.516% — so the fits walk keeps its inline
-/// resolve for uniformity, not for a share.
+/// provably-unreachable null controls at **±0.000%**, for **+640 B** of `.text`.
+///
+/// ⚠️ **That figure was taken over TWO call sites and only one of them survives**
+/// — the second was the fits walk's on-demand measure of an unmeasured identifier
+/// name, retired with `CachedWidth::NotComputed`. It was never carrying the win:
+/// forcing the render site alone read −1.514% where both together read −1.516%,
+/// which is why the number stands unchanged. **Resolution is now a render-only
+/// question**: the fits walk answers widths from the node's own slot and never
+/// resolves at all.
 #[expect(clippy::inline_always)]
 #[inline(always)]
 #[expect(clippy::expect_used)] // Intentional: SourceSpan without source is a programming error

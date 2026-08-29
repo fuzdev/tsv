@@ -1,175 +1,45 @@
 //! Width fitting algorithms for arena-based doc trees.
 
-use crate::config::TAB_WIDTH;
-use crate::printing::visual_width;
 use smallvec::SmallVec;
 
 use super::arena::{
-    ArenaCommand, DocArena, DocId, DocNode, FLAT_WIDTH_BREAKS, FLAT_WIDTH_UNKNOWN, FusedWidth,
-    RenderIndent, fused_ascii_width,
+    ArenaCommand, DocArena, DocId, DocNode, LAYOUT_UNKNOWN, LAYOUT_WIDTH_MAX, RenderIndent,
 };
-use super::types::{CachedWidth, DocText, LineKind, Mode, resolve_text};
+use super::types::{LineKind, Mode};
 
-/// Flat width of a text node, or `None` when the text contains a newline (the
-/// line ends inside it, so it has no single-line width). The one definition of
-/// the cached-or-measure fallback, backing [`flat_width_fill`]'s `Text` arm —
-/// its only caller, since the fits walk's `Text` arm reaches it via the memo.
-#[inline]
-fn text_flat_width(t: &DocText, source: Option<&str>) -> Option<u32> {
-    match t.cached_width() {
-        CachedWidth::Width(w) => Some(u32::from(w)),
-        CachedWidth::HasNewline => None,
-        CachedWidth::NotComputed => {
-            // Only a `SourceSpan` can be `NotComputed` (`Pooled` and `Static`
-            // always precompute — see `pooled_text_width` / the arena's static
-            // width cache), so the resolve never needs the arena text pool; the
-            // empty pool passed here would panic loudly (slice OOB) if that
-            // invariant ever broke. No builder defers a width today, so this arm
-            // is unreached on real input — it is the deferral mechanism, and the
-            // oracle below is what keeps it honest.
-            //
-            // A deferred slice is expected to be short — the identifier names
-            // that used to arrive here measured a mean of 8.3 bytes over 176,801
-            // arrivals, 99.1% under the fused walk's length gate and **not one**
-            // holding a newline — so this asks the same fused
-            // walk the build-time measure asks (`fused_ascii_width`), for the same
-            // reason: `contains('\n')`'s searcher setup, paid whatever the length,
-            // and then a second pass for the width, IS the cost on a slice this
-            // size. The `Searcher` arm keeps the two-pass shape for the long or
-            // multibyte tail, where it still wins.
-            //
-            // ⚠️ Spell it as one expression, with no early `return` and nothing
-            // outlined. `text_flat_width` inlines into `flat_width_fill`, one of
-            // the hottest symbols on every board, and its codegen is sensitive out
-            // of proportion to this arm: a null control — HEAD's own body, byte-
-            // identical work, merely moved behind `#[inline(never)]` — measured
-            // **+0.185% instructions on a pure-CSS corpus and +0.40% on fuz_app**,
-            // and CSS never reaches this arm at all (only `tsv_ts` and `tsv_svelte`
-            // emit unmeasured name spans). An early `return` here costs the same
-            // corpus +0.20%. The shape below costs it +0.09%.
-            let s = resolve_text(t, source, "");
-            match fused_ascii_width(s) {
-                FusedWidth::Width(w) => Some(w as u32),
-                FusedWidth::Newline => None,
-                FusedWidth::Searcher if s.contains('\n') => None,
-                FusedWidth::Searcher => Some(visual_width(s, TAB_WIDTH) as u32),
-            }
-        }
-    }
-}
-
-/// Flat-mode width of a subtree for the `arena_fits` fast-path, memoized per
-/// `DocId`. `Some(w)` = break-free subtree occupying `w` columns flat; `None` =
-/// contains a forced break, so `arena_fits` must walk it. Mirrors the flat-mode
-/// arm of the fits loop exactly, so substituting `remaining -= w` for the walk
-/// is byte-identical.
+/// Flat-mode width of a subtree for the `arena_fits` fast-path, read out of the
+/// arena's subtree-layout memo. `Some(w)` = break-free subtree occupying `w`
+/// columns flat; `None` = the walk must visit it (it forces a break, or it
+/// carries state the walk needs). Mirrors the flat-mode arm of the fits loop
+/// exactly, so substituting `remaining -= w` for the walk is byte-identical.
 ///
-/// Split into an inline cache probe over an outlined recursive fill: the fits
-/// walk probes an already-warm slot far more often than it fills one, so the
-/// warm path is a load + compare at the call site instead of a full call.
+/// An inline probe over [`DocArena::subtree_layout_fill`]: the fits walk reads an
+/// already-warm slot far more often than it fills one — 98.9% of the fills are
+/// already done by the build-time `will_break` walk that shares this memo — so
+/// the warm path is a load and **one unsigned compare** at the call site
+/// (`LAYOUT_WIDTH_MAX` sits below both break sentinels and the unknown one
+/// precisely so that the common case is that single test).
 #[inline]
 fn flat_width_memo(
     id: DocId,
     nodes: &[DocNode],
     children: &[DocId],
     cache: &mut [u32],
-    source: Option<&str>,
 ) -> Option<u32> {
-    match cache[id.index()] {
-        FLAT_WIDTH_UNKNOWN => flat_width_fill(id, nodes, children, cache, source),
-        FLAT_WIDTH_BREAKS => None,
-        w => Some(w),
+    let v = cache[id.index()];
+    if v <= LAYOUT_WIDTH_MAX {
+        Some(v)
+    } else if v == LAYOUT_UNKNOWN {
+        layout_to_width(DocArena::subtree_layout_fill(id, nodes, children, cache))
+    } else {
+        None
     }
 }
 
-/// The cold half of [`flat_width_memo`]: compute and cache a subtree's flat
-/// width. Runs at most once per node; recursion goes back through the inline
-/// probe so warm children never re-enter here.
-#[cold]
-#[inline(never)]
-fn flat_width_fill(
-    id: DocId,
-    nodes: &[DocNode],
-    children: &[DocId],
-    cache: &mut [u32],
-    source: Option<&str>,
-) -> Option<u32> {
-    let result: Option<u32> = match &nodes[id.index()] {
-        DocNode::Text(t) => text_flat_width(t, source),
-        // Contains hardlines → no break-free flat width (like a newline-bearing
-        // `Text` or a `Line(Hard)`); force the `arena_fits` walk.
-        DocNode::MultilineText { .. } => None,
-        DocNode::Line(kind) => match kind {
-            LineKind::Hard | LineKind::Literal => None,
-            LineKind::Soft => Some(0),
-            LineKind::Normal => Some(1),
-        },
-        DocNode::Group {
-            contents,
-            should_break,
-            ..
-        } => {
-            if *should_break {
-                None
-            } else {
-                flat_width_memo(*contents, nodes, children, cache, source)
-            }
-        }
-        DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-            flat_width_memo(*inner, nodes, children, cache, source)
-        }
-        DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
-            flat_width_memo(*contents, nodes, children, cache, source)
-        }
-        DocNode::IndentIfBreak { contents, .. } => {
-            flat_width_memo(*contents, nodes, children, cache, source)
-        }
-        DocNode::IfBreak { flat_doc, .. } => {
-            flat_width_memo(*flat_doc, nodes, children, cache, source)
-        }
-        DocNode::Concat(range) | DocNode::Fill(range) => {
-            let kids = range.resolve(children);
-            let mut sum: u32 = 0;
-            let mut ok = true;
-            for &kid in kids {
-                match flat_width_memo(kid, nodes, children, cache, source) {
-                    Some(w) => sum = sum.saturating_add(w),
-                    None => {
-                        ok = false;
-                        break;
-                    }
-                }
-            }
-            if ok { Some(sum) } else { None }
-        }
-        DocNode::WithContext { doc, context } => {
-            flat_width_memo(*doc, nodes, children, cache, source)
-                .map(|w| w.saturating_add(context.trailing_reserve() as u32))
-        }
-        // Neither occupies a column, but both carry the `has_line_suffix` state
-        // the walk needs (a boundary with a suffix pending doesn't fit), and a
-        // memoized width would hide them from it. `None` here means "walk it",
-        // never "it breaks" — the walk's own arms charge them 0 columns.
-        DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => None,
-        DocNode::BreakParent => None,
-        // Carries the pending-flush state the walk needs (like the suffix pair
-        // above); a memoized width would hide it. `None` = "walk it".
-        DocNode::FlushBreak => None,
-        // Render-only sentinel; zero columns, no layout effect.
-        DocNode::FlowProbeEnd => Some(0),
-        // Transparent to `contents` — the width of a gated state is the width of
-        // what it would render; the probe is measure-only and never reaches output.
-        // (Unreachable in practice: a `GatedState` is only ever a conditional-group
-        // state, and a fill's items are not states.)
-        DocNode::GatedState { contents, .. } => {
-            flat_width_memo(*contents, nodes, children, cache, source)
-        }
-    };
-    cache[id.index()] = match result {
-        Some(w) => w,
-        None => FLAT_WIDTH_BREAKS,
-    };
-    result
+/// A packed layout cell as the fits walk reads it: a width, or "walk it".
+#[inline]
+fn layout_to_width(v: u32) -> Option<u32> {
+    if v <= LAYOUT_WIDTH_MAX { Some(v) } else { None }
 }
 
 /// Check if a doc fits in the remaining width, looking ahead at remaining commands.
@@ -194,7 +64,6 @@ pub(super) fn arena_fits_with_lookahead(
     rest_commands: &[ArenaCommand],
     remaining_width: isize,
     mut has_line_suffix: bool,
-    source: Option<&str>,
 ) -> bool {
     if remaining_width == isize::MAX {
         return true;
@@ -202,9 +71,9 @@ pub(super) fn arena_fits_with_lookahead(
 
     let nodes = arena.borrow_nodes();
     let children_vec = arena.borrow_children();
-    let mut flat_cache = arena.borrow_flat_width_cache();
-    if flat_cache.len() < nodes.len() {
-        flat_cache.resize(nodes.len(), FLAT_WIDTH_UNKNOWN);
+    let mut layout_cache = arena.borrow_layout_cache();
+    if layout_cache.len() < nodes.len() {
+        layout_cache.resize(nodes.len(), LAYOUT_UNKNOWN);
     }
     let mut remaining = remaining_width;
     if remaining < 0 {
@@ -248,8 +117,7 @@ pub(super) fn arena_fits_with_lookahead(
                 current_id,
                 &nodes,
                 &children_vec,
-                flat_cache.as_mut_slice(),
-                source,
+                layout_cache.as_mut_slice(),
             )
         {
             remaining -= w as isize;
@@ -257,14 +125,13 @@ pub(super) fn arena_fits_with_lookahead(
             match &nodes[current_id.index()] {
                 // Reached only in Break mode (the Flat-mode fast path above already
                 // consulted the memo). A text's flat width is mode-independent, so
-                // the memo applies here too — caching the resolve+measure that
-                // Break-mode visits would otherwise repeat per fits call.
+                // the memo applies here too — going through the cache keeps the
+                // node dispatch off the repeat Break-mode visits.
                 DocNode::Text(_) => match flat_width_memo(
                     current_id,
                     &nodes,
                     &children_vec,
-                    flat_cache.as_mut_slice(),
-                    source,
+                    layout_cache.as_mut_slice(),
                 ) {
                     Some(w) => remaining -= w as isize,
                     // Newline-bearing text ends the line — everything so far fit.
@@ -447,14 +314,8 @@ pub(super) fn arena_fits_with_lookahead(
 /// Internal callers that need look-ahead use [`arena_fits_with_lookahead`]
 /// directly. Build-time callers have no render loop and so no pending line
 /// suffix — hence `has_line_suffix: false`.
-pub fn arena_fits(
-    arena: &DocArena,
-    doc: DocId,
-    width: usize,
-    mode: Mode,
-    source: Option<&str>,
-) -> bool {
-    arena_fits_with_lookahead(arena, doc, mode, &[], width as isize, false, source)
+pub fn arena_fits(arena: &DocArena, doc: DocId, width: usize, mode: Mode) -> bool {
+    arena_fits_with_lookahead(arena, doc, mode, &[], width as isize, false)
 }
 
 /// Check if multiple docs fit sequentially in the remaining width.
@@ -471,7 +332,6 @@ pub(super) fn arena_fits_multi(
     width: usize,
     mode: Mode,
     has_line_suffix: bool,
-    source: Option<&str>,
 ) -> bool {
     if width == usize::MAX {
         return true;
@@ -495,97 +355,7 @@ pub(super) fn arena_fits_multi(
         &rest_commands,
         width as isize,
         has_line_suffix,
-        source,
     )
-}
-
-#[cfg(test)]
-mod text_flat_width_tests {
-    //! Oracle for [`text_flat_width`]'s on-demand `NotComputed` arm — the fits
-    //! path's own measure of an identifier name.
-    //!
-    //! It needs one for the same reason
-    //! [`super::super::arena`]'s `pooled_text_width_tests` does, and the doc there
-    //! spells it out: a width only changes the output once it crosses the print
-    //! width, so an arithmetic slip on a rare byte leaves every formatted file
-    //! byte-identical and sails through the fixtures and any size of format/wire
-    //! diff. This arm shares `fused_ascii_width` with the build-time measure, so a
-    //! defect inside the walk fires in both suites; what only this one grades is
-    //! the **composition** — the length gate, the non-ASCII handoff, and the
-    //! unclamped `Option<u32>` the flat-width cache wants where the other wants a
-    //! clamped `u16` sentinel.
-    use super::text_flat_width;
-    use crate::Span;
-    use crate::config::TAB_WIDTH;
-    use crate::doc::types::{DocText, TEXT_WIDTH_NOT_COMPUTED};
-    use crate::printing::visual_width;
-
-    /// The width, spelled out independently: probe for a newline, then measure.
-    fn reference(s: &str) -> Option<u32> {
-        if s.contains('\n') {
-            None
-        } else {
-            Some(visual_width(s, TAB_WIDTH) as u32)
-        }
-    }
-
-    fn assert_agrees(s: &str) {
-        // An unmeasured verbatim span over a source that is exactly the slice —
-        // the shape a width-deferring builder would produce.
-        let t = DocText::SourceSpan(
-            Span {
-                start: 0,
-                end: s.len() as u32,
-            },
-            TEXT_WIDTH_NOT_COMPUTED,
-        );
-        assert_eq!(
-            text_flat_width(&t, Some(s)),
-            reference(s),
-            "text_flat_width disagrees with the reference on {s:?}"
-        );
-    }
-
-    #[test]
-    fn agrees_on_exhaustive_short_strings() {
-        // Every string of length 0-3 over an alphabet spanning each arm: plain
-        // ASCII, the two special ASCII bytes, a control char, DEL, and multi-byte
-        // UTF-8 (including a combining mark and a ZWJ, the clusters that can cross
-        // an ASCII boundary and force the whole-slice re-measure).
-        let alphabet = [
-            "a", "Z", "0", "-", " ", "\t", "\n", "\r", "\x00", "\x1b", "\x7f", "é", "中", "🎉",
-            "\u{0301}", "\u{200d}", "\u{fe0f}", "\u{00a0}",
-        ];
-        assert_agrees("");
-        for a in alphabet {
-            assert_agrees(a);
-            for b in alphabet {
-                assert_agrees(&format!("{a}{b}"));
-                for c in alphabet {
-                    assert_agrees(&format!("{a}{b}{c}"));
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn agrees_across_the_length_gate() {
-        // `FUSED_WIDTH_SCAN_MAX` is the only speed switch here, so both arms must
-        // answer identically on either side of it — and on a tab or a newline
-        // landing just past it, where only the searcher arm sees them.
-        for len in [0, 1, 31, 32, 33, 63, 64, 65, 128, 1000] {
-            assert_agrees(&"x".repeat(len));
-            assert_agrees(&format!("{}\t{}", "x".repeat(len), "y".repeat(len)));
-            assert_agrees(&format!("{}\n{}", "x".repeat(len), "y".repeat(len)));
-            // A non-ASCII byte before a newline: the fused walk bails mid-slice
-            // and the searcher arm must still find the newline behind it.
-            assert_agrees(&format!("{}é\nafter", "x".repeat(len)));
-            // A combining mark on an ASCII base — the cluster starts on a byte
-            // the fused walk already counted, so the handoff must re-measure the
-            // whole slice, not the remainder.
-            assert_agrees(&format!("{}e\u{0301}x", "x".repeat(len)));
-        }
-    }
 }
 
 #[cfg(test)]
@@ -608,10 +378,9 @@ mod break_mode_fits_tests {
     use super::super::types::Mode;
     use super::arena_fits;
 
-    /// Fit `doc` in `width` columns in Break mode, no source (these docs use
-    /// only `Static`/`Pooled` text, never `SourceSpan`).
+    /// Fit `doc` in `width` columns in Break mode.
     fn fits_break(a: &DocArena, doc: DocId, width: usize) -> bool {
-        arena_fits(a, doc, width, Mode::Break, None)
+        arena_fits(a, doc, width, Mode::Break)
     }
 
     /// The doc fits at `w` but not at `w - 1`: any off-by-one in a width arm flips
