@@ -662,6 +662,60 @@ pub(super) const LAYOUT_BREAKS_FORCED: u32 = u32::MAX - 1;
 pub(super) const LAYOUT_BREAKS_SOFT: u32 = u32::MAX - 2;
 pub(super) const LAYOUT_WIDTH_MAX: u32 = u32::MAX - 3;
 
+/// The packed layout cell of a leaf `Text`, read straight off the node.
+///
+/// The one node kind whose layout answer needs no traversal, no children and no
+/// cache lookup beyond its own slot — which is why
+/// [`DocArena::subtree_layout_memo`] answers it inline rather than calling into
+/// [`DocArena::subtree_layout_fill`] for it.
+///
+/// ⚠️ **Only that probe does.** `arena_fits`'s `flat_width_memo` still calls in,
+/// which is why the fill keeps a `Text` arm of its own; both route through here
+/// so the rule below is stated once. Whether the fits probe should answer it too
+/// is unmeasured — 98.9% of its probes are already warm, so its miss path is
+/// thin.
+///
+/// ⚠️ **A format-ignored verbatim slice is layout-opaque, and that is the
+/// opposite verdict from every other newline-bearing text.** Its embedded
+/// newlines are *source* layout, not a break the enclosing group must honor
+/// (prettier's `printIgnored` string is likewise invisible to `willBreak`), so
+/// it reports [`LAYOUT_BREAKS_SOFT`] — no single-line width, no forced break —
+/// where a line-continuation string reports [`LAYOUT_BREAKS_FORCED`]. The fits
+/// walk still sees the newline through the same width slot.
+///
+/// ⚠️ **Reading the width slot raw for the verbatim case is deliberate, and it
+/// is the third spelling tried.** All three were built and measured on fuz_app
+/// (16 execs a side, per-side spread 0.002%, so the gaps are real):
+///
+/// | shape | Δ instr | `tsv` `.text` |
+/// | --- | --- | --- |
+/// | this one — raw slot here, `cached_width()` for the rest | 0 | 2,895,621 |
+/// | one `Text` arm, `matches!(VerbatimSpan)` on the newline path | +0.023% | 2,895,605 |
+/// | this case routed through `cached_width()` too | +0.070% | 2,895,445 |
+///
+/// The single-seam shapes are the tidier ones and both cost instructions on the
+/// hottest fill on the board, so the duplicate decode stays — it is one
+/// comparison against the ONE sentinel this type has, and the policy that keeps
+/// it at one is on [`pooled_text_width`].
+#[inline]
+fn text_subtree_layout(t: &DocText) -> u32 {
+    match t {
+        DocText::VerbatimSpan(_, w) => match *w {
+            TEXT_WIDTH_HAS_NEWLINE => LAYOUT_BREAKS_SOFT,
+            w => u32::from(w),
+        },
+        // A newline-bearing Text (a line-continuation string) breaks the
+        // enclosing group, like `MultilineText` — the width cache flags it via
+        // `HasNewline`, and under the eager `pooled_text_width` policy that flag
+        // is always set at build, so this reads the answer rather than
+        // approximating it.
+        _ => match t.cached_width() {
+            CachedWidth::Width(w) => u32::from(w),
+            CachedWidth::HasNewline => LAYOUT_BREAKS_FORCED,
+        },
+    }
+}
+
 /// Downgrade a forced break to a soft one, keeping every other cell value.
 ///
 /// The one place the two fused questions diverge: an `if_break`'s flat width is
@@ -2496,10 +2550,20 @@ impl DocArena {
             == LAYOUT_BREAKS_FORCED
     }
 
-    /// Split into an inline cache probe over an outlined recursive fill: the
-    /// same subtree is re-checked far more often than it is first computed, so
-    /// the warm path is a load + compare at the call site instead of a full
-    /// call.
+    /// Split into an inline probe over an outlined recursive fill: the same
+    /// subtree is re-checked far more often than it is first computed, so the
+    /// warm path is a load + compare at the call site instead of a full call.
+    ///
+    /// The probe answers **two** questions before it will call in, in this order
+    /// — and the order is the whole point:
+    ///
+    /// 1. a warm cache slot, which is the common case and stays first;
+    /// 2. a leaf `Text`, whose answer is a field of the node
+    ///    ([`text_subtree_layout`]) and which is 22% of a real corpus's nodes.
+    ///
+    /// The second only runs on a miss, so the hot path is unchanged, and it
+    /// keeps a leaf out of [`Self::subtree_layout_fill`]'s `#[cold]` frame
+    /// entirely. See that function's `#[cold]` note for what the frame costs.
     ///
     /// Returns the packed cell (see [`LAYOUT_UNKNOWN`]) — never
     /// [`LAYOUT_UNKNOWN`] itself.
@@ -2510,9 +2574,21 @@ impl DocArena {
         children: &[DocId],
         cache: &mut [u32],
     ) -> u32 {
-        let cached = cache[id.index()];
+        let slot = id.index();
+        let cached = cache[slot];
         if cached != LAYOUT_UNKNOWN {
             return cached;
+        }
+        // A leaf `Text`'s answer is one field of the node it is already about to
+        // load, so on a miss it is cheaper to give it here than to enter
+        // `Self::subtree_layout_fill` — whose `#[cold]` frame spills six
+        // callee-saved registers for the container arms a leaf never reaches.
+        // `Text` is 22% of a real corpus's nodes and this probe is the walk's
+        // own recursion, so the miss path takes it once per such node.
+        if let DocNode::Text(t) = &nodes[slot] {
+            let result = text_subtree_layout(t);
+            cache[slot] = result;
+            return result;
         }
         Self::subtree_layout_fill(id, nodes, children, cache)
     }
@@ -2520,7 +2596,8 @@ impl DocArena {
     /// The cold half of [`Self::subtree_layout_memo`]: compute and cache a
     /// subtree's layout facts — whether it forces a break, and if not, its
     /// break-free flat width. Runs at most once per node; recursion goes back
-    /// through the inline probe so warm children never re-enter here.
+    /// through the inline probe so warm children never re-enter here, and a leaf
+    /// `Text` reached through [`Self::subtree_layout_memo`] never enters at all.
     ///
     /// ⭐ **This is the fusion of what were two identical traversals.** The
     /// forced-break question is asked at BUILD (45 printer call sites, through
@@ -2539,7 +2616,7 @@ impl DocArena {
     /// a line?", where `BREAKS_SOFT` means "the fits walk has to look at me".
     ///
     /// ⚠️ **`#[cold]` is a claim about the call, not about the total, and it is
-    /// still the right one.** This function carries ~5–6% self on a real-corpus
+    /// still the right one.** This function carries ~6–8% self on a real-corpus
     /// board — "once per node" is a small share of *calls* and a large share of
     /// *time* — and `#[cold]` puts it under size-optimized codegen, visibly so:
     /// it spills and immediately reloads four argument registers around the
@@ -2549,6 +2626,13 @@ impl DocArena {
     /// probe in [`Self::subtree_layout_memo`] is inlined at every call site and
     /// wants this call laid out away from its warm path. Measured; don't re-try
     /// without a new idea.
+    ///
+    /// ⚠️ **That +0.02% was measured when `Text` still entered here**, and the
+    /// probe now answers it, so this function's input mix has lost 22% of its
+    /// calls and skews further toward the container arms `#[cold]` was chosen
+    /// for. The verdict should hold a fortiori — but it is a number about a
+    /// call mix that has since changed, so re-take it rather than quote it if
+    /// anything downstream re-routes again.
     #[cold]
     #[inline(never)]
     pub(super) fn subtree_layout_fill(
@@ -2558,39 +2642,12 @@ impl DocArena {
         cache: &mut [u32],
     ) -> u32 {
         let result: u32 = match &nodes[id.index()] {
-            // A format-ignored verbatim slice is layout-opaque: its embedded newlines are
-            // *source* layout, not a break the enclosing group must honor (prettier's
-            // printIgnored string is likewise invisible to willBreak). fits() still sees
-            // the newline through the same width slot — hence SOFT, not FORCED: no
-            // single-line width, no forced break. Must precede the general `Text` arm,
-            // whose `HasNewline` reading is the opposite verdict.
-            //
-            // ⚠️ **Reading the width slot raw here is deliberate, and it is the third
-            // spelling tried.** All three were built and measured on fuz_app (16 execs a
-            // side, per-side spread 0.002%, so the gaps are real):
-            //
-            // | shape | Δ instr | `tsv` `.text` |
-            // | --- | --- | --- |
-            // | this one — raw slot here, `cached_width()` in the general arm | 0 | 2,895,621 |
-            // | one `Text` arm, `matches!(VerbatimSpan)` on the newline path | +0.023% | 2,895,605 |
-            // | this arm routed through `cached_width()` too | +0.070% | 2,895,445 |
-            //
-            // The single-seam shapes are the tidier ones and both cost instructions on the
-            // hottest fill on the board, so the duplicate decode stays — it is one
-            // comparison against the ONE sentinel this type has, and the policy that keeps
-            // it at one is on `pooled_text_width`.
-            DocNode::Text(DocText::VerbatimSpan(_, w)) => match *w {
-                TEXT_WIDTH_HAS_NEWLINE => LAYOUT_BREAKS_SOFT,
-                w => u32::from(w),
-            },
-            // A newline-bearing Text (a line-continuation string) breaks the enclosing group,
-            // like `MultilineText` below — the width cache already flags it via `HasNewline`,
-            // and under the eager policy (see `pooled_text_width`) that flag is always set at
-            // build, so this arm reads the answer rather than approximating it.
-            DocNode::Text(t) => match t.cached_width() {
-                CachedWidth::Width(w) => u32::from(w),
-                CachedWidth::HasNewline => LAYOUT_BREAKS_FORCED,
-            },
+            // Reached only from the fits walk's own probe (`arena_fits`'s
+            // `flat_width_memo`); `Self::subtree_layout_memo` answers a leaf
+            // `Text` without calling in at all. Both defer to the one emitter,
+            // whose doc carries the verbatim-vs-newline rule and its measured
+            // spellings.
+            DocNode::Text(t) => text_subtree_layout(t),
             // Contains hardlines → always breaks (like the `concat([…, hardline, …])` it replaces).
             DocNode::MultilineText { .. } => LAYOUT_BREAKS_FORCED,
             DocNode::Line(kind) => match kind {
