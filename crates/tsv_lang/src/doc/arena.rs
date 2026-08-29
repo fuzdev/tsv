@@ -2257,7 +2257,37 @@ impl DocArena {
     ///
     /// Memoized per `DocId`: the same subtree is re-checked many times as ancestor
     /// groups test breaking, and the result is fixed once the node exists.
+    ///
+    /// The body is a warm cache probe over an outlined [`Self::will_break_cold`],
+    /// which is the shape the call pattern asks for: an ancestor group re-tests a
+    /// subtree far more often than the subtree is first visited, so the common
+    /// call reads one already-populated slot. Everything else the uncached path
+    /// needs — a `nodes` borrow, a `children` borrow, and the check that extends
+    /// the memo to cover `id` — is work the warm call was paying for a branch it
+    /// never took, across two cache lines of the arena header, behind the five
+    /// callee-saved pushes the resize edge's frame required.
+    ///
+    /// Worth `instructions:u` **−0.28…−0.35%** across four real corpora (per-side
+    /// spread ≤0.001%) for **+5,216 B** of `.text`, on a doc-arena-free
+    /// parse+bind control at +0.002%. ⚠️ A pure-CSS corpus moves **−0.090%** on
+    /// this change even though the CSS printer never calls `will_break` at all:
+    /// that is an incidental codegen shift, and it is the honest floor for
+    /// attributing any doc-layer lever.
+    #[inline]
     pub fn will_break(&self, id: DocId) -> bool {
+        if let Some(&Some(cached)) = self.will_break_cache.borrow().get(id.index()) {
+            return cached;
+        }
+        self.will_break_cold(id)
+    }
+
+    /// The uncached half of [`Self::will_break`]: take the node and child slices,
+    /// extend the memo to cover `id`, and compute. Recursion re-enters through
+    /// [`Self::will_break_memo`] on the slices, never back through the probe, so
+    /// the borrows are taken once per uncached root and not once per node.
+    #[cold]
+    #[inline(never)]
+    fn will_break_cold(&self, id: DocId) -> bool {
         let nodes = self.nodes.borrow();
         let children = self.children.borrow();
         let mut cache = self.will_break_cache.borrow_mut();

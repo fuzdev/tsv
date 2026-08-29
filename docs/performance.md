@@ -226,6 +226,23 @@ perf annotate -i flat.data --stdio > annotate.txt       # then slice the symbol 
 `perf annotate` may segfault after writing usable output; the already-written
 portion is still valid, so redirect to a file rather than piping to a reader.
 
+⭐ **For "which lines of THIS function are hot", prefer `perf report` over
+`annotate` entirely.** It answers in source lines rather than instruction
+addresses, needs no multi-megabyte dump and no slicing, and does not crash:
+
+```bash
+perf report --stdio -q -g none \
+  --symbols='tsv_lang::doc::arena_fits::flat_width_fill' --sort=srcline
+#   1.02%  arena_fits.rs:94    <- the `match &nodes[id.index()]` dispatch
+#   0.97%  arena_fits.rs:170
+#   0.36%  arena_fits.rs:131   <- the Concat/Fill child loop
+```
+
+Reach for `annotate` when the question is genuinely *per-instruction* — which
+store, which compare — and for that, cross-check it against this view: the two
+agreeing is what rules out a symbol-resolution artifact. `--sort=srcline` alone
+(no `--symbols`) ranks source lines across the whole profile.
+
 **A name on the board is not necessarily a function.** With debug info present,
 `perf` attributes samples to *inlined* frames too, so a symbol can top the report
 while having no out-of-line copy anywhere in the binary — its cost is the work of
@@ -671,6 +688,29 @@ count auto-vectorizes, so three vector passes beat one scalar walk. Gate the
 fused path on length and let the tail keep the vectorized shape — an ungated
 fusion won on CSS and *regressed* pure TS, whose text nodes run longer.
 
+### The structure you already keep is usually the census
+
+Before adding counters to a hot path, ask whether something the program already
+maintains records the answer as a side effect. Adding atomics to the very
+functions under study perturbs their codegen — the thing an instruction A/B is
+most sensitive to — so a probe that costs nothing at all is worth hunting for.
+
+A **memoization cache is the strongest instance**: a slot is populated *iff* that
+node was visited by that fill, so the cache's population, read once where it is
+cleared, is an exact visit census — no counters, no feature flag, no perturbation.
+The doc engine keeps two such caches for a document's lifetime
+(`will_break_cache`, `flat_width_cache`) and clears both in `DocArena::reset`, so
+a loop over the pair there answers "do these two passes walk the same tree?" to
+the node. It measured 97–99% overlap, and — by comparing the two *values* rather
+than just their presence — proved `will_break == true` implies a `BREAKS` flat
+width over 910K co-visited nodes while showing the prunable set was 0.4%: enough
+to retire a large planned refactor without building it. The same trick reads off
+an arena's node population (§7) and any dedup set or interning table.
+
+⚠️ **Check the ordering assumption before a bottom-up pass.** Deriving a
+per-subtree property by iterating ids upward is only valid because children are
+allocated before parents; state that, rather than relying on it silently.
+
 ### A corpus cannot grade arithmetic
 
 **Before trusting a green corpus diff, ask what it can physically see.** A width,
@@ -806,9 +846,9 @@ Two practical rules:
   allocated and lines dirtied are cycles claims; ALU, branch and call overhead are
   instruction claims. ⚠️ But the counters are not equally resolvable: instructions
   resolve to ~0.002% on one binary pair, while a cycles claim below ~1% needs a
-  layout group per side and still only resolves to ~0.2%. A cycles number quoted
-  from a single binary pair — or from a group that shares one layout — measures
-  the draw, not the lever.
+  layout group per side *and* several replicates of the whole sweep. A cycles
+  number quoted from a single binary pair, from a group that shares one layout, or
+  from a single run of a layout group, measures a draw rather than the lever.
 
 ### Reading `cycles:u`: the offset belongs to the binary, and it is CODE LAYOUT
 
@@ -850,13 +890,28 @@ them interleaved with the sweep direction alternating between reps, and compare
 **group means**. Two things then make the result trustworthy:
 
 - a **null group that can fail**: a *second* set of layout draws of the baseline,
-  passed in the candidate positions. Four draws a side reads **+0.17%** here, and
-  that is the resolution — a group gap below ~0.2% is not a result. (Wider
-  resolution costs builds: the layout term averages down as `1/sqrt(n)`.)
+  passed in the candidate positions. A group gap the null also produces is not a
+  result. (The layout term averages down as `1/sqrt(n)`, so a tighter bound on it
+  costs builds.)
+- **replicates of the whole sweep, not more execs inside one.** ⚠️ A single group
+  run does not resolve a sub-1% cycles claim however many draws a side it has:
+  re-running one twelve-binary sweep four times — same binaries, same corpus, same
+  eight execs each, minutes apart on a quiet machine — moved the candidate's cycles
+  delta across **−0.55% → +0.08%** (a **0.63-point** range) and the null's across
+  0.37 points. Replicate 1 alone would have licensed "−0.55%, four times the null";
+  replicate 2 alone says +0.08%. Run the sweep at least three times and pool. The
+  within-binary spread is already flat at eight execs — the residual term lives
+  *between* runs, so adding execs inside one buys nothing.
 - **`task-clock` agrees and is cheaper to reason about.** Wall tracks cycles to
-  within 0.05–0.3 points through all of this, including the layout draw itself.
-  Run both; wall is the axis a user feels, and its agreement is the sanity check
-  that the cycles reading is not a counter artifact.
+  within 0.05–0.3 points through all of this, including the layout draw itself, and
+  it is the tighter of the two across replicates (0.27 points against 0.63). Run
+  both; wall is the axis a user feels, and its agreement is the sanity check that
+  the cycles reading is not a counter artifact.
+- ⚠️ **Grade cycles on the largest corpus available.** The layout and run-level
+  terms are relatively larger on a shorter run: on 900-file pure-`.css` (187M
+  cycles) and pure-`.svelte` (516M) sets, the *null* read −0.70% and −0.44% —
+  larger than the effect under test, where the same null on a 1,810M-cycle corpus
+  averaged ~0.00%. A sub-1% cycles claim cannot be made on a 200M-cycle workload.
 
 ⚠️ **A cycles verdict belongs to a (codegen profile × binary × entry point)
 triple, not to a source change.** All three have been observed to flip a sign
