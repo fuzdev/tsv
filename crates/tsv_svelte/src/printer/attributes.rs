@@ -385,7 +385,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Span-identity attribute name (`source[name_span]`), reused across the
         // branches below.
-        let name_doc = d.source_span_ident(attr.name_span);
+        let name_doc = d.source_span(attr.name_span, self.source);
 
         if let Some(value_parts) = &attr.value {
             // Check for shorthand: {name}

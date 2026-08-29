@@ -139,14 +139,16 @@ fn render_text(
 
 /// Update position after rendering a text string, accounting for tab expansion.
 ///
-/// The overwhelmingly common input here is short ASCII with no newline — every
-/// span-identity identifier name (`source_span_ident`) reaches this via
-/// `render_text`'s uncached-width arm
-/// (statics carry an amortized cached width and skip it). For those the previous
-/// shape scanned the bytes three times (`rfind('\n')` + `visual_width`'s own
-/// `is_ascii` + tab count). The fast path below folds the newline reset, tab
-/// expansion, and width accumulation into a single forward byte pass, so no
-/// backward `memchr` scan runs. The first non-ASCII byte hands off to
+/// Reached only from `render_text`'s uncached-width arm, which **no builder
+/// feeds today**: every doc text caches a width at build (the eager policy on
+/// the arena's `pooled_text_width`). Identifier names used to arrive here, once
+/// per emitted name, and moving that scan to build time is what retired the
+/// deferral — this scan was over half of what it cost. The expected input is
+/// therefore still short ASCII with no newline. The fast path below folds the
+/// newline reset, tab expansion, and width accumulation into a single forward
+/// byte pass, so no backward `memchr` scan runs (the shape it replaced scanned
+/// the bytes three times: `rfind('\n')` + `visual_width`'s own `is_ascii` +
+/// tab count). The first non-ASCII byte hands off to
 /// `update_pos_for_text_unicode` (cold-outlined to keep this fast path lean and
 /// inlinable, mirroring `skip_trivia` / `skip_trivia_scan`). Byte-identical to
 /// the prior implementation by construction.

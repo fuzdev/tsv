@@ -20,15 +20,18 @@ fn text_flat_width(t: &DocText, source: Option<&str>) -> Option<u32> {
         CachedWidth::Width(w) => Some(u32::from(w)),
         CachedWidth::HasNewline => None,
         CachedWidth::NotComputed => {
-            // Only `SourceSpan` identifier names can be `NotComputed` (`Pooled`
-            // and `Static` always precompute — see `pooled_text_width` / the
-            // arena's static width cache), so the resolve never needs the arena
-            // text pool; the empty pool passed here would panic loudly (slice
-            // OOB) if that invariant ever broke.
+            // Only a `SourceSpan` can be `NotComputed` (`Pooled` and `Static`
+            // always precompute — see `pooled_text_width` / the arena's static
+            // width cache), so the resolve never needs the arena text pool; the
+            // empty pool passed here would panic loudly (slice OOB) if that
+            // invariant ever broke. No builder defers a width today, so this arm
+            // is unreached on real input — it is the deferral mechanism, and the
+            // oracle below is what keeps it honest.
             //
-            // An identifier name is short — a corpus census over 176,801 arrivals
-            // here put the mean at 8.3 bytes, 99.1% under the fused walk's length
-            // gate and **not one** holding a newline — so this asks the same fused
+            // A deferred slice is expected to be short — the identifier names
+            // that used to arrive here measured a mean of 8.3 bytes over 176,801
+            // arrivals, 99.1% under the fused walk's length gate and **not one**
+            // holding a newline — so this asks the same fused
             // walk the build-time measure asks (`fused_ascii_width`), for the same
             // reason: `contains('\n')`'s searcher setup, paid whatever the length,
             // and then a second pass for the width, IS the cost on a slice this
@@ -528,7 +531,7 @@ mod text_flat_width_tests {
 
     fn assert_agrees(s: &str) {
         // An unmeasured verbatim span over a source that is exactly the slice —
-        // the shape `source_span_ident` produces.
+        // the shape a width-deferring builder would produce.
         let t = DocText::SourceSpan(
             Span {
                 start: 0,

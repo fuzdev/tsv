@@ -517,19 +517,30 @@ pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 /// answer identically, and one oracle grades them.
 const FUSED_WIDTH_SCAN_MAX: usize = 32;
 
-/// The eager width-cache policy for doc text: pool-stored text
-/// ([`DocText::Pooled`], `MultilineText` first lines), verbatim source slices
-/// ([`DocArena::source_span`]), and `text()` statics (amortized through the
-/// arena's static cache — measured once per unique string, not per
-/// node) **always** cache a real width or the newline sentinel at build — so
-/// every width query (the fits walk, `render_text`'s column advance) answers
-/// from the node alone, the fits path never borrows the pool, and render's
-/// per-text byte scan is skipped. The one exception is the name slices
-/// ([`DocArena::source_span_ident`]): high-frequency,
-/// newline-free, and rarely fits-measured, so for them a per-node build-time
-/// scan costs more than it saves (measured both ways — eager per-ident width
-/// was ~+1.1% on identifier-dense corpora; eager everything-else was
-/// −0.6..−0.8% on every mixed corpus).
+/// The eager width-cache policy for doc text, and it has **no exceptions**:
+/// pool-stored text ([`DocText::Pooled`], `MultilineText` first lines),
+/// verbatim source slices ([`DocArena::source_span`], identifier names
+/// included), and `text()` statics (amortized through the arena's static cache
+/// — measured once per unique string, not per node) **always** cache a real
+/// width or the newline sentinel at build. So every width query (the fits
+/// walk, `render_text`'s column advance) answers from the node alone, the fits
+/// path never borrows the pool, and render's per-text byte scan is skipped.
+///
+/// ⭐ Identifier names look like the obvious exception — high-frequency and
+/// newline-free — and they are the **wrong** one: a name span is ~15% of all
+/// doc nodes, and deferring its width does not avoid the scan, it only moves it
+/// into the two hottest functions on the board — `render_text`'s column advance (which
+/// every emitted name reaches) and `flat_width_fill`'s on-demand arm. Measuring
+/// eagerly instead, in a small builder function, costs one scan and retires up
+/// to two: `instructions:u` −1.45 / −1.38 / −1.34 / −1.19% on TS-heavy corpora
+/// and −0.96% on pure Svelte, with pure CSS — which emits no name spans — an
+/// exact **+0.000%** null, and `.text` −800 B. ⚠️ The ~+1.1% price tag a name
+/// deferral used to carry never described this policy: it was measured over a
+/// *bundle* — names together with `text()` statics and the since-deleted
+/// interner's symbols — before the static cache
+/// amortized one half of it and before both the build-time and on-demand
+/// measures were unified onto [`fused_ascii_width`]. Re-take a width-policy
+/// number against the current pair of measures; do not inherit one.
 ///
 /// The measured width is clamped below the sentinels. Unlike the `u32`
 /// flat-width cache above (where aliasing needs a ~4 GB subtree and is benign
@@ -587,11 +598,12 @@ pub(super) enum FusedWidth {
     Searcher,
 }
 
-/// The one fused width walk, shared by the two on-demand measures:
-/// [`pooled_text_width`] (build-time, for pool-stored and verbatim-span text) and
-/// the fits path's `NotComputed` arm (`arena_fits`'s `text_flat_width`, for the
-/// identifier names [`DocArena::source_span_ident`] deliberately leaves
-/// unmeasured). Both previously spelled the question their own way — the fits arm
+/// The one fused width walk, shared by the two measures:
+/// [`pooled_text_width`] (build-time, for every text the builders cache a width
+/// for) and the fits path's `NotComputed` arm (`arena_fits`'s
+/// `text_flat_width`, which no builder feeds today — see the eager policy on
+/// [`pooled_text_width`] — and which is the mechanism any future deferral would
+/// use). Both previously spelled the question their own way — the fits arm
 /// as `contains('\n')` then [`crate::printing::visual_width`], two searcher-driven
 /// passes over a slice whose median length is a handful of bytes — and only this
 /// one had the exhaustive oracle
@@ -1337,9 +1349,20 @@ impl DocArena {
     /// sentinel, so fits and render never re-scan the text) and is **not**
     /// retained — the span lives in the lifetime-less arena and is re-resolved
     /// at render against the document source threaded through the render entry
-    /// points (`resolve_text`). Identifier names use
-    /// [`Self::source_span_ident`] instead (deferred width — the opposite
-    /// tradeoff).
+    /// points (`resolve_text`). Identifier names come through here too — see the
+    /// eager width-cache policy on [`pooled_text_width`] for why the deferral
+    /// they once had is gone.
+    ///
+    /// ⚠️ At its current call-site count LLVM **declines** this `#[inline]` and
+    /// emits it as a real symbol (2.3% self on a fuz_app board), so a name
+    /// emission — ~15% of all doc nodes — pays a call. Two shapes buy that back
+    /// and neither is taken: `#[inline(always)]` here recovers `instructions:u`
+    /// −1.20% → −1.51% for **+7,264 B** of `.text` (perf's own inline threshold
+    /// is a U-curve this codebase already sits at the minimum of, so pushing it
+    /// up is a cycles risk), and a second entry point with a **duplicated** body
+    /// reaches −1.45% for +336 B but splits one width computation across two
+    /// sites that nothing keeps in agreement. A profile-guided build makes this
+    /// choice per call site without either cost.
     #[inline]
     pub fn source_span(&self, span: Span, source: &str) -> DocId {
         let w = pooled_text_width(span.extract(source));
@@ -1356,21 +1379,6 @@ impl DocArena {
     pub fn verbatim_source_span(&self, span: Span, source: &str) -> DocId {
         let w = pooled_text_width(span.extract(source));
         self.alloc(DocNode::Text(DocText::VerbatimSpan(span, w)))
-    }
-
-    /// [`Self::source_span`] for a slice the caller guarantees is newline-free
-    /// (identifier names): skips the width precompute entirely — no source read
-    /// at build. Width is measured on demand at the first `fits()` touch
-    /// (memoized) — the deferral kept only for identifier names
-    /// (high-frequency, rarely fits-measured); a non-ASCII name measures the
-    /// same value lazily as eagerly, so output is unaffected. Do NOT use for
-    /// text that can contain `\n` — the newline sentinel would be missed.
-    #[inline]
-    pub fn source_span_ident(&self, span: Span) -> DocId {
-        self.alloc(DocNode::Text(DocText::SourceSpan(
-            span,
-            TEXT_WIDTH_NOT_COMPUTED,
-        )))
     }
 
     /// Verbatim-source-slice form of [`Self::line_comment_text_pooled`]: emits a
@@ -2344,8 +2352,10 @@ impl DocArena {
             // the newline sentinel via the shared width slot.
             DocNode::Text(DocText::VerbatimSpan(..)) => false,
             // A newline-bearing Text (a line-continuation string) breaks the enclosing group,
-            // like `MultilineText` below — the width cache already flags it via `HasNewline`;
-            // `NotComputed` is identifier-only (contractually newline-free), so reads as no break.
+            // like `MultilineText` below — the width cache already flags it via `HasNewline`.
+            // `NotComputed` reads as no break, which is only sound while a deferring builder
+            // guarantees its slice is newline-free; none defers today (see the eager policy on
+            // `pooled_text_width`), so this arm is unreached rather than merely narrow.
             DocNode::Text(t) => matches!(t.cached_width(), CachedWidth::HasNewline),
             // Contains hardlines → always breaks (like the `concat([…, hardline, …])` it replaces).
             DocNode::MultilineText { .. } => true,
