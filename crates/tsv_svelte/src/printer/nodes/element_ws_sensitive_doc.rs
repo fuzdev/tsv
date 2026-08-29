@@ -63,7 +63,7 @@ impl<'a> Printer<'a> {
             emission,
         } = attrs;
         let d = self.d();
-        let name_doc = d.source_span_ident(element.name_span);
+        let name_doc = d.source_span(element.name_span, self.source);
 
         // A void element has no closing tag — that is a fact about the TAG, not about the
         // surrounding layout, so whitespace-sensitivity has no say in it. Without this the

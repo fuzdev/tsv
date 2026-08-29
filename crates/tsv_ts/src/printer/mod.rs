@@ -1849,10 +1849,11 @@ impl<'a> Printer<'a> {
     }
 
     /// Emit an identifier-name doc node — the doc-side name-emission seam.
-    /// Span-identity names render as verbatim source (`DocText::SourceSpan`
-    /// with deferred width — identifier names are newline-free, and the lazy
-    /// measure matches the zero build-time cost); the rare escaped name copies
-    /// its decoded `&str` into the doc text pool (`DocText::Pooled`).
+    /// Span-identity names render as verbatim source (`DocText::SourceSpan`,
+    /// width measured at build like every other doc text — the deferral names
+    /// once had cost more than it saved, see `DocArena::source_span`); the rare
+    /// escaped name copies its decoded `&str` into the doc text pool
+    /// (`DocText::Pooled`).
     pub(in crate::printer) fn ident_name_doc(
         &self,
         name: internal::IdentName<'_>,
@@ -1861,7 +1862,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match name.escaped {
             Some(s) => d.text_pooled(s),
-            None => d.source_span_ident(Span::new(name_start, name_start + name.raw_len as u32)),
+            None => d.source_span(
+                Span::new(name_start, name_start + name.raw_len as u32),
+                self.source,
+            ),
         }
     }
 
