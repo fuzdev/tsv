@@ -184,11 +184,7 @@ pub(super) fn render_fill_iterative(
                 } else {
                     SmallVec::new()
                 };
-                with_sep.push(ArenaCommand {
-                    indent,
-                    mode: Mode::Flat,
-                    doc: parts[offset + 1],
-                });
+                with_sep.push(ArenaCommand::new(indent, Mode::Flat, parts[offset + 1]));
                 let budget = if final_with_rest {
                     remaining
                 } else {
@@ -320,11 +316,7 @@ pub(super) fn render_fill_iterative(
                 // (`!is_first`) text→element boundary; a first-child text leaves the element bare,
                 // which keeps hugging.
                 let mut rest_with_sep = boundary_lookahead(arena, context, rest_commands);
-                rest_with_sep.push(ArenaCommand {
-                    indent,
-                    mode: Mode::Flat,
-                    doc: separator,
-                });
+                rest_with_sep.push(ArenaCommand::new(indent, Mode::Flat, separator));
                 fits_flat(content, &rest_with_sep, remaining)
             } else {
                 content_fits
@@ -625,19 +617,12 @@ fn flow_lookahead(arena: &DocArena, rest_commands: &[ArenaCommand]) -> SmallVec<
     }
     for cmd in &deeper[first..] {
         match arena.welded_entry(cmd.doc) {
-            WeldedEntry::Atom(a) => out.push(ArenaCommand {
-                doc: a,
-                mode: Mode::Flat,
-                ..*cmd
-            }),
+            WeldedEntry::Atom(a) => out.push(cmd.with_mode(Mode::Flat, a)),
             _ => out.push(*cmd),
         }
     }
-    out.push(ArenaCommand {
-        doc: arena.welded_atom(el_cmd.doc).unwrap_or(el_cmd.doc),
-        mode: Mode::Flat,
-        ..el_cmd
-    });
+    let el_atom = arena.welded_atom(el_cmd.doc).unwrap_or(el_cmd.doc);
+    out.push(el_cmd.with_mode(Mode::Flat, el_atom));
     out
 }
 

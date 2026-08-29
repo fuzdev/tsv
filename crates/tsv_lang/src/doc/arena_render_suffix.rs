@@ -79,15 +79,15 @@ pub(super) fn flush_line_suffix(
     let mut pending_line_comment = false;
     for (i, suffix_cmd) in std::mem::take(line_suffix).into_iter().enumerate() {
         let separated =
-            pending_line_comment && push_run_separator(ctx, &suffix_cmd, run_indent, output, pos);
+            pending_line_comment && push_run_separator(ctx, suffix_cmd, run_indent, output, pos);
         let content_start = output.len();
         render_single_doc_inner(
             ctx,
             suffix_cmd.doc,
             output,
             pos,
-            suffix_cmd.indent,
-            suffix_cmd.mode,
+            suffix_cmd.indent(),
+            suffix_cmd.mode(),
             None,
             should_remeasure,
         );
@@ -98,7 +98,7 @@ pub(super) fn flush_line_suffix(
         // case — never walks a doc at all.
         pending_line_comment = i + 1 < queued
             && with_doc_store(ctx, |docs| {
-                docs.ends_in_line_comment(suffix_cmd.doc, suffix_cmd.mode)
+                docs.ends_in_line_comment(suffix_cmd.doc, suffix_cmd.mode())
             });
     }
 }
@@ -113,19 +113,19 @@ pub(super) fn flush_line_suffix(
 /// loop's obligation, untouched here.
 fn push_run_separator(
     ctx: &RenderCtx<'_>,
-    suffix_cmd: &ArenaCommand,
+    suffix_cmd: ArenaCommand,
     run_indent: RenderIndent,
     output: &mut String,
     pos: &mut usize,
 ) -> bool {
     if with_doc_store(ctx, |docs| {
-        docs.opens_its_own_line(suffix_cmd.doc, suffix_cmd.mode)
+        docs.opens_its_own_line(suffix_cmd.doc, suffix_cmd.mode())
     }) {
         return false;
     }
     render_line_break(
         LineKind::Hard,
-        suffix_cmd.mode,
+        suffix_cmd.mode(),
         run_indent,
         output,
         pos,

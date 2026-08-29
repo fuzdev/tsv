@@ -336,7 +336,7 @@ fn process_indent_if_break(
     contents: DocId,
     group_id: GroupId,
     group_mode_map: Option<&GroupModeMap>,
-    cmd: &ArenaCommand,
+    cmd: ArenaCommand,
 ) -> ArenaCommand {
     let group_mode = group_mode_map
         .and_then(|map| map.get(group_id))
@@ -753,7 +753,7 @@ fn render_doc_core<P: RenderPolicy>(
     // The loop's termination condition is `commands` draining back to empty,
     // so the caller-provided (pooled or local) stack must start empty.
     debug_assert!(commands.is_empty());
-    let mut cmd = ArenaCommand { indent, mode, doc };
+    let mut cmd = ArenaCommand::new(indent, mode, doc);
 
     // Pre-intern the flow-probe sentinel BEFORE taking the loop-long node borrow below —
     // interning allocates into the node store, which must not happen mid-render (the
@@ -886,8 +886,8 @@ fn render_doc_core<P: RenderPolicy>(
                     render_line_node(
                         ctx,
                         LineKind::Hard,
-                        cmd.mode,
-                        cmd.indent,
+                        cmd.mode(),
+                        cmd.indent(),
                         output,
                         pos,
                         policy.tracking_suffix(),
@@ -908,8 +908,8 @@ fn render_doc_core<P: RenderPolicy>(
                 render_line_node(
                     ctx,
                     kind,
-                    cmd.mode,
-                    cmd.indent,
+                    cmd.mode(),
+                    cmd.indent(),
                     output,
                     pos,
                     policy.tracking_suffix(),
@@ -1002,9 +1002,13 @@ fn render_doc_core<P: RenderPolicy>(
                             for &state in &states[..last] {
                                 // A gated state whose probe fits is inadmissible —
                                 // see `admissible_group_state`.
-                                let Some(state) =
-                                    admissible_group_state(ctx, nodes, state, cmd.indent, commands)
-                                else {
+                                let Some(state) = admissible_group_state(
+                                    ctx,
+                                    nodes,
+                                    state,
+                                    cmd.indent(),
+                                    commands,
+                                ) else {
                                     continue;
                                 };
                                 let state_fits = arena_fits_with_lookahead(
@@ -1026,7 +1030,7 @@ fn render_doc_core<P: RenderPolicy>(
                     }
                 } else if should_break || arena.will_break(contents) {
                     (Mode::Break, contents)
-                } else if cmd.mode == Mode::Flat && !*should_remeasure {
+                } else if cmd.mode() == Mode::Flat && !*should_remeasure {
                     // Prettier's printGroup flat pass-through (printer.js
                     // `mode === MODE_FLAT && !shouldRemeasure`): a group reached in
                     // flat mode sits inside a subtree some enclosing fits approval
@@ -1075,7 +1079,7 @@ fn render_doc_core<P: RenderPolicy>(
                             .unwrap_or(Mode::Flat)
                             == Mode::Break
                     }
-                    None => cmd.mode == Mode::Break,
+                    None => cmd.mode() == Mode::Break,
                 };
                 let chosen = if broke { *break_doc } else { *flat_doc };
                 cmd = cmd.with_doc(chosen);
@@ -1085,7 +1089,7 @@ fn render_doc_core<P: RenderPolicy>(
             DocNode::IndentIfBreak { contents, group_id } => {
                 let contents = *contents;
                 let group_id = *group_id;
-                cmd = process_indent_if_break(contents, group_id, policy.group_mode_map(), &cmd);
+                cmd = process_indent_if_break(contents, group_id, policy.group_mode_map(), cmd);
                 continue;
             }
 
@@ -1096,7 +1100,7 @@ fn render_doc_core<P: RenderPolicy>(
                     parts,
                     output,
                     pos,
-                    cmd.indent,
+                    cmd.indent(),
                     &DocContext::default(),
                     commands,
                     !line_suffix.is_empty(),
@@ -1136,7 +1140,7 @@ fn render_doc_core<P: RenderPolicy>(
                             ctx,
                             *kind,
                             Mode::Break,
-                            cmd.indent,
+                            cmd.indent(),
                             output,
                             pos,
                             policy.tracking_suffix(),
@@ -1156,7 +1160,7 @@ fn render_doc_core<P: RenderPolicy>(
                             parts,
                             output,
                             pos,
-                            cmd.indent,
+                            cmd.indent(),
                             &context,
                             policy.with_context_fill_rest(commands),
                             !line_suffix.is_empty(),
@@ -1194,8 +1198,8 @@ fn render_doc_core<P: RenderPolicy>(
                     render_line_node(
                         ctx,
                         LineKind::Hard,
-                        cmd.mode,
-                        cmd.indent,
+                        cmd.mode(),
+                        cmd.indent(),
                         output,
                         pos,
                         policy.tracking_suffix(),
