@@ -260,6 +260,17 @@ const _: () = assert!(!std::mem::needs_drop::<DocNode>());
 // it alone held the whole node store at 32 B), why its layout flags are one packed `u16`, and why
 // `DocContext` carries its own size assert with the exact threshold. Check that one first when
 // this pin moves.
+//
+// ⚠️ **The packing that buys 24 B is also charged at every `match` over a `DocNode`, and that
+// cost is invisible to a profile board.** `Text` is the niche-carrying variant, so `DocText`'s
+// four sub-tags own `DocNode` discriminant values 0..=3 — which means a switch over the node
+// kind cannot index its jump table until it has folded those four back into one arm, four ALU
+// ops per visit (`lea`/`cmp`/`mov`/`cmovb`). It hides inside the one source line every board
+// attributes to "the dispatch", so only a disassembly shows it. `render_doc_iterative` and
+// `arena_fits_with_lookahead` both peel it off with an `if let` ahead of the dispatch, where the
+// `Text` test IS the fold; see the comments there for the measurements, and for why the same
+// peel is a REGRESSION in `subtree_layout_fill`, whose commonest kind sits ABOVE the fold. The
+// rule is that a peel pays only where the peeled kind is the fold's own range.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<DocNode>() == 24);
 #[cfg(target_pointer_width = "32")]

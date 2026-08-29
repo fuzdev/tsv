@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 use super::arena::{
     ArenaCommand, DocArena, DocId, DocNode, LAYOUT_UNKNOWN, LAYOUT_WIDTH_MAX, RenderIndent,
 };
-use super::types::{LineKind, Mode};
+use super::types::{CachedWidth, LineKind, Mode};
 
 /// Flat-mode width of a subtree for the `arena_fits` fast-path, read out of the
 /// arena's subtree-layout memo. `Some(w)` = break-free subtree occupying `w`
@@ -106,12 +106,42 @@ pub(super) fn arena_fits_with_lookahead(
     let (mut current_id, mut current_mode) = (doc, mode);
 
     loop {
-        // Fast path: a break-free subtree in flat mode contributes a fixed,
-        // memoized width — identical to walking it (the walk would only sum the
-        // same width with no early return). Bypassed while a flush-scoped break
-        // is pending: the memo summarizes a `Line(Normal)` as width 1, hiding
-        // exactly the node the pending state must veto on.
-        if current_mode == Mode::Flat
+        let node = &nodes[current_id.index()];
+
+        // A leaf `Text` is answered from the node, ahead of both the memo and the
+        // kind dispatch, and the two reasons are independent.
+        //
+        // The width is IN the node (the eager policy on `pooled_text_width` has no
+        // exception), so there is no resolve and no measure left for a memo to
+        // cache: `flat_width_memo` would load a second cache line, compare, and
+        // possibly store, to reproduce a `u16` sitting in the `DocNode` already
+        // loaded here. The answer is also mode-independent — a flat width and "the
+        // line ends inside this text" are the same two outcomes the memo path
+        // produced in either mode, so this arm replaces BOTH the Flat fast path's
+        // and the Break arm's handling of a text.
+        //
+        // And `Text` is the [`DocText`] niche: its four sub-tags own `DocNode`
+        // discriminant values 0..=3, so testing it first is exactly the `tag < 4`
+        // fold the residual switch would otherwise have to compute before indexing
+        // its jump table — the same peel `render_doc_iterative`'s loop makes, and
+        // for the same reason.
+        //
+        // Both effects together, measured against the render-loop peel already in
+        // place: `instructions:u` **−0.249 / −0.248 / −0.305 / −0.467%** on the four
+        // real corpora, per-side spread 0.001–0.010%, min ≈ mean ≈ max.
+        //
+        // ⚠️ The peel pays here and in the render loop because in BOTH the peeled
+        // kind is the fold's own range. It is a measured **regression** in
+        // `DocArena::subtree_layout_fill`, whose commonest kind is the container,
+        // whose tag sits above the fold — so do not treat this as a pattern to roll
+        // out to every `match` over a `DocNode`.
+        if let DocNode::Text(t) = node {
+            match t.cached_width() {
+                CachedWidth::Width(w) => remaining -= w as isize,
+                // Newline-bearing text ends the line — everything so far fit.
+                CachedWidth::HasNewline => return true,
+            }
+        } else if current_mode == Mode::Flat
             && !pending_flush
             && let Some(w) = flat_width_memo(
                 current_id,
@@ -120,23 +150,21 @@ pub(super) fn arena_fits_with_lookahead(
                 layout_cache.as_mut_slice(),
             )
         {
+            // Fast path: a break-free subtree in flat mode contributes a fixed,
+            // memoized width — identical to walking it (the walk would only sum
+            // the same width with no early return). Bypassed while a flush-scoped
+            // break is pending: the memo summarizes a `Line(Normal)` as width 1,
+            // hiding exactly the node the pending state must veto on.
             remaining -= w as isize;
         } else {
-            match &nodes[current_id.index()] {
-                // Reached only in Break mode (the Flat-mode fast path above already
-                // consulted the memo). A text's flat width is mode-independent, so
-                // the memo applies here too — going through the cache keeps the
-                // node dispatch off the repeat Break-mode visits.
-                DocNode::Text(_) => match flat_width_memo(
-                    current_id,
-                    &nodes,
-                    &children_vec,
-                    layout_cache.as_mut_slice(),
-                ) {
-                    Some(w) => remaining -= w as isize,
-                    // Newline-bearing text ends the line — everything so far fit.
-                    None => return true,
-                },
+            match node {
+                // Answered by the probe above, which is total (it either consumes
+                // width or returns). Stated rather than omitted so the match stays
+                // exhaustive, and asserted so a future edit that narrows the probe
+                // fails the debug test run instead of silently mislaying a node kind.
+                DocNode::Text(_) => {
+                    debug_assert!(false, "text is answered by the probe above");
+                }
 
                 DocNode::MultilineText { first_width, .. } => {
                     // Equivalent to walking `[Text(first_line), Line(Hard), …]`: the

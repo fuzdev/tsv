@@ -787,14 +787,83 @@ fn render_doc_core<P: RenderPolicy>(
             comment_ledger::record_emitted_keyed(key, span);
         }
 
-        match &nodes[cmd.doc.index()] {
-            DocNode::Text(t) => {
-                #[cfg(feature = "swallow_check")]
-                if policy.swallow_enabled() {
-                    let s = resolve_text(t, source, pool);
-                    policy.swallow_on_text(arena.is_line_comment(cmd.doc), s, output);
+        let node = &nodes[cmd.doc.index()];
+
+        // The two probes below are peeled off the kind dispatch, and that is a
+        // codegen decision rather than a taste one. A [`DocText`]'s four
+        // sub-tags are niche-packed into `DocNode`'s discriminant space — the
+        // packing that holds a `DocNode` at 24 B — so a single switch over the
+        // node kind cannot index its jump table until it has folded tags 0..=3
+        // back together, and LLVM spends four ALU ops per visit doing that.
+        // Answering the two commonest kinds first replaces the fold with the
+        // branches they already owed and leaves the residual switch dense over
+        // the non-`Text` tags. Measured alone on fuz_app, the largest corpus to
+        // hand: `cycles` **−1.65%** and wall **−1.66%** against a second-draw
+        // layout null of −0.18% / −0.14% (twelve binaries, eight execs each,
+        // three pooled replicates), at `instructions:u` −0.042%. The
+        // instruction channel barely moves on any corpus (−0.04 to −0.13% on
+        // the four real ones, +0.02% on pure CSS) because this is a
+        // dependency-chain lever, not an instruction-count one: what comes off
+        // the critical path is a jump-table load feeding an indirect jump. (The
+        // same peel in `arena_fits_with_lookahead` is a separate, additive
+        // lever; the two together measure cycles −2.09% / wall −1.82% /
+        // `instructions:u` −0.291% against a −0.04% / +0.06% null.)
+        //
+        // ⚠️ The same peel measured **+0.19% instructions / +0.95% cycles** in
+        // `DocArena::subtree_layout_fill` and was reverted: the kind it wants to
+        // answer first there is the container, whose tag sits *above* the fold,
+        // so LLVM computes the fold anyway and tests the folded index. The win
+        // is available only where the peeled kind is `Text` itself — the peel
+        // has to BE the fold, not precede it.
+        //
+        // `Concat` goes first because it is the most common node kind by a
+        // factor of two (50.4% of a real corpus's nodes), so it is the one
+        // worth answering in two comparisons rather than four. Measured, not
+        // assumed: swapping the two probes costs `instructions:u` **+0.040%**
+        // on fuz_app and **+0.032%** on zzz, at a per-side spread of 0.002%.
+        if let DocNode::Concat(range) = node {
+            let kids = range.resolve(children_vec);
+            if let Some((&first, rest)) = kids.split_first() {
+                for &child in rest.iter().rev() {
+                    commands.push(cmd.with_doc(child));
                 }
-                render_text(t, output, pos, source, pool);
+                cmd = cmd.with_doc(first);
+            } else {
+                match commands.pop() {
+                    Some(next) => cmd = next,
+                    None => break,
+                }
+            }
+            continue;
+        }
+
+        // `Text` second, and it is the probe that removes the fold: its test is
+        // exactly the `tag < 4` the switch would have had to compute.
+        if let DocNode::Text(t) = node {
+            #[cfg(feature = "swallow_check")]
+            if policy.swallow_enabled() {
+                let s = resolve_text(t, source, pool);
+                policy.swallow_on_text(arena.is_line_comment(cmd.doc), s, output);
+            }
+            render_text(t, output, pos, source, pool);
+            match commands.pop() {
+                Some(next) => cmd = next,
+                None => break,
+            }
+            continue;
+        }
+
+        match node {
+            // Answered by the probes above, both of which are total (each ends
+            // in a `continue` or a `break`), so control never reaches these two
+            // arms. Stated rather than omitted so the match stays exhaustive,
+            // and asserted so a future edit that narrows a probe fails the
+            // debug test run instead of silently mislaying a node kind.
+            DocNode::Concat(_) => {
+                debug_assert!(false, "concat is answered by the probe above");
+            }
+            DocNode::Text(_) => {
+                debug_assert!(false, "text is answered by the probe above");
             }
 
             DocNode::MultilineText { span, .. } => {
@@ -1018,17 +1087,6 @@ fn render_doc_core<P: RenderPolicy>(
                 let group_id = *group_id;
                 cmd = process_indent_if_break(contents, group_id, policy.group_mode_map(), &cmd);
                 continue;
-            }
-
-            DocNode::Concat(range) => {
-                let kids = range.resolve(children_vec);
-                if let Some((&first, rest)) = kids.split_first() {
-                    for &child in rest.iter().rev() {
-                        commands.push(cmd.with_doc(child));
-                    }
-                    cmd = cmd.with_doc(first);
-                    continue;
-                }
             }
 
             DocNode::Fill(range) => {
