@@ -289,36 +289,102 @@ const _: () = assert!(size_of::<DocNode>() == 16);
 /// delimiter — renders as literal spaces. `pending_aligns` tracks that pending
 /// run so the round-up is exact.
 ///
-/// All three fields are `u16` — real indent depth and align width never
-/// approach 65535, and saturating arithmetic makes the cap fail safe rather than
-/// wrap. This makes `RenderIndent` 6 bytes, shrinking `ArenaCommand` to 12 bytes
-/// (from 16 with the prior `usize` level) on the native target and holding it
-/// there on wasm32, so the hot `CmdStack` inline footprint does not grow.
+/// The three counts are packed into **one `u32`, using 31 of its bits** — 12 for
+/// the tab depth, 7 for the pending-align count, 12 for the align columns — and
+/// every update saturates at its field's width rather than wrapping, so the cap
+/// fails safe exactly as the previous all-`u16` spelling did. The caps
+/// (4095 / 127 / 4095) sit orders of magnitude above anything a document can
+/// reach: the print width is 100 columns and the recursion-depth guard caps
+/// nesting far below 4095.
+///
+/// The packing is what holds [`ArenaCommand`] at **8 bytes**, and that size is
+/// the point. `Mode` is one bit and `DocId` is a `u32`, so a 6-byte indent plus
+/// a mode byte padded out to a 12-byte command — a third of it alignment, and
+/// most of the rest counts that never leave two digits. With the three counts in
+/// a `u32` the spare 32nd bit takes the mode and a command is exactly two words,
+/// so the render loop's command stack writes ONE 8-byte store per push instead
+/// of four stores and a shift, reads ONE load per pop instead of four loads and
+/// two stack spills, and scales its index in the addressing mode instead of a
+/// `lea ×3`. `instructions:u` **−2.377 / −2.519 / −2.418 / −2.313%** on fuz_app /
+/// gro / zzz / fuz_ui, **−2.215%** on pure `.svelte`, **−1.111%** on pure `.css`
+/// and **−2.336%** at the product entry point (`tsv format --check --jobs 1`);
+/// per-side spread ≤0.022%, min ≈ mean ≈ max throughout, against a
+/// `profile --bind` structural control (parse + lower/bind, no doc arena) of
+/// **−0.004%**. On the twelve-binary layout group with three pooled replicates:
+/// cycles **−1.038%** and wall **−0.987%** against a second-draw null of
+/// **+0.104% / +0.183%**. `.text` **−1,968 B**.
+///
+/// ⚠️ The cycles win is under half the instruction win, which is the shape to
+/// expect from a **density** lever and the mirror image of the niche peel above
+/// it: what comes off here is retired stores and loads that were mostly L1 hits,
+/// not a dependency chain. Grade a density change on `instructions:u` — its
+/// cycles number follows, at its own rate.
 ///
 /// The representation is fully encapsulated — the render emitter reads it through
 /// [`tabs`](RenderIndent::tabs) / [`trailing_align_spaces`](RenderIndent::trailing_align_spaces)
-/// / [`column`](RenderIndent::column), never the raw fields.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct RenderIndent {
-    /// Committed whole indent levels (each rendered as one tab).
-    tabs: u16,
-    /// Number of `align(n)` offsets in the current trailing run — the count of
-    /// tabs they collapse to when flushed by a following `indent`.
-    pending_aligns: u16,
-    /// Sum of the trailing run's `align(n)` widths, in columns — rendered as
-    /// literal spaces when the run is not flushed by a following `indent`.
-    align_spaces: u16,
+/// / [`column`](RenderIndent::column), never the raw bits.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub struct RenderIndent(u32);
+
+/// Width of [`RenderIndent`]'s committed-tab-depth field, in bits.
+const INDENT_TABS_BITS: u32 = 12;
+/// Width of [`RenderIndent`]'s pending-align-count field, in bits.
+const INDENT_ALIGNS_BITS: u32 = 7;
+/// Width of [`RenderIndent`]'s align-columns field, in bits.
+const INDENT_SPACES_BITS: u32 = 12;
+// The shifts and saturation caps the three widths above imply.
+const INDENT_TABS_MAX: u32 = (1 << INDENT_TABS_BITS) - 1;
+const INDENT_ALIGNS_SHIFT: u32 = INDENT_TABS_BITS;
+const INDENT_ALIGNS_MAX: u32 = (1 << INDENT_ALIGNS_BITS) - 1;
+const INDENT_SPACES_SHIFT: u32 = INDENT_TABS_BITS + INDENT_ALIGNS_BITS;
+const INDENT_SPACES_MAX: u32 = (1 << INDENT_SPACES_BITS) - 1;
+
+// The three fields must leave the top bit free: [`ArenaCommand`] stores its
+// `Mode` there, which is what makes the command 8 bytes rather than 12.
+const _: () = assert!(INDENT_TABS_BITS + INDENT_ALIGNS_BITS + INDENT_SPACES_BITS == 31);
+
+impl std::fmt::Debug for RenderIndent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RenderIndent")
+            .field("tabs", &self.raw_tabs())
+            .field("pending_aligns", &self.raw_pending_aligns())
+            .field("align_spaces", &self.raw_align_spaces())
+            .finish()
+    }
 }
 
 impl RenderIndent {
+    /// The committed tab depth, unwidened.
+    #[inline]
+    fn raw_tabs(self) -> u32 {
+        self.0 & INDENT_TABS_MAX
+    }
+
+    /// The pending-align count, unwidened.
+    #[inline]
+    fn raw_pending_aligns(self) -> u32 {
+        (self.0 >> INDENT_ALIGNS_SHIFT) & INDENT_ALIGNS_MAX
+    }
+
+    /// The trailing align run's column sum, unwidened.
+    #[inline]
+    fn raw_align_spaces(self) -> u32 {
+        (self.0 >> INDENT_SPACES_SHIFT) & INDENT_SPACES_MAX
+    }
+
+    /// Pack three already-capped field values into the bit layout.
+    #[inline]
+    fn pack(tabs: u32, pending_aligns: u32, align_spaces: u32) -> Self {
+        debug_assert!(tabs <= INDENT_TABS_MAX);
+        debug_assert!(pending_aligns <= INDENT_ALIGNS_MAX);
+        debug_assert!(align_spaces <= INDENT_SPACES_MAX);
+        Self(tabs | (pending_aligns << INDENT_ALIGNS_SHIFT) | (align_spaces << INDENT_SPACES_SHIFT))
+    }
+
     /// A pure whole-tab indent at `level`, with no pending sub-tab alignment.
     #[inline]
     pub fn level(level: usize) -> Self {
-        Self {
-            tabs: level.min(u16::MAX as usize) as u16,
-            pending_aligns: 0,
-            align_spaces: 0,
-        }
+        Self::pack(level.min(INDENT_TABS_MAX as usize) as u32, 0, 0)
     }
 
     /// Push one indent level (Prettier's `makeIndent`). Any pending align run is
@@ -326,14 +392,11 @@ impl RenderIndent {
     /// discarded — then this level adds its own tab.
     #[inline]
     pub(super) fn indented(self) -> Self {
-        Self {
-            tabs: self
-                .tabs
-                .saturating_add(self.pending_aligns)
-                .saturating_add(1),
-            pending_aligns: 0,
-            align_spaces: 0,
-        }
+        Self::pack(
+            (self.raw_tabs() + self.raw_pending_aligns() + 1).min(INDENT_TABS_MAX),
+            0,
+            0,
+        )
     }
 
     /// Pop one indent level, purely on whole tabs.
@@ -351,26 +414,32 @@ impl RenderIndent {
     #[inline]
     pub(super) fn dedented(self) -> Self {
         debug_assert_eq!(
-            self.pending_aligns, 0,
+            self.raw_pending_aligns(),
+            0,
             "dedent across a sub-tab align run is unsupported"
         );
-        Self {
-            tabs: self.tabs.saturating_sub(1),
-            ..self
-        }
+        Self::pack(
+            self.raw_tabs().saturating_sub(1),
+            self.raw_pending_aligns(),
+            self.raw_align_spaces(),
+        )
     }
 
     /// Add a sub-tab `align(n)` offset (Prettier's numeric `makeAlign`): extend
     /// the trailing align run by `n` columns of spaces.
     #[inline]
     pub(super) fn aligned(self, n: u32) -> Self {
-        Self {
-            pending_aligns: self.pending_aligns.saturating_add(1),
-            align_spaces: self
-                .align_spaces
-                .saturating_add(n.min(u32::from(u16::MAX)) as u16),
-            ..self
-        }
+        // The count increments from a value the layout already caps, so a plain
+        // `+ 1` cannot overflow; `n` is caller-supplied and unbounded, so the
+        // column sum needs `saturating_add` BEFORE the cap or it would wrap past
+        // it. The asymmetry is load-bearing — do not unify the two spellings.
+        Self::pack(
+            self.raw_tabs(),
+            (self.raw_pending_aligns() + 1).min(INDENT_ALIGNS_MAX),
+            self.raw_align_spaces()
+                .saturating_add(n)
+                .min(INDENT_SPACES_MAX),
+        )
     }
 
     /// Set an absolute whole-tab level (Prettier's `align` root reset — tsv's
@@ -384,76 +453,130 @@ impl RenderIndent {
     /// Committed whole indent levels (each one tab wide).
     #[inline]
     pub fn tabs(self) -> usize {
-        self.tabs as usize
+        self.raw_tabs() as usize
     }
 
     /// Visual column at the start of a line at this indent (tabs at `tab_width`
     /// columns each, plus the trailing align spaces).
     #[inline]
     pub fn column(self, tab_width: usize) -> usize {
-        self.tabs as usize * tab_width + self.align_spaces as usize
+        self.raw_tabs() as usize * tab_width + self.raw_align_spaces() as usize
     }
 
     /// The trailing sub-tab alignment, in literal spaces (written after the
     /// whole tabs by the render indentation emitter).
     #[inline]
     pub fn trailing_align_spaces(self) -> usize {
-        self.align_spaces as usize
+        self.raw_align_spaces() as usize
     }
 }
 
 /// A command in the printer's command stack.
 ///
 /// Holds a `DocId` index, making it `Copy` with no lifetime parameter.
-#[derive(Debug, Clone, Copy)]
+///
+/// **Two words, and deliberately so.** The indent's three counts occupy 31 bits
+/// of [`RenderIndent`] (see its doc), leaving the 32nd for the one bit a [`Mode`]
+/// carries — so a command is `{u32, u32}` and the hot stack moves it with a
+/// single load or store. The mode and indent are read back through
+/// [`mode`](Self::mode) and [`indent`](Self::indent); only `doc`, which every
+/// dispatch reads first, stays a plain field.
+#[derive(Clone, Copy)]
 pub struct ArenaCommand {
-    pub indent: RenderIndent,
-    pub mode: Mode,
+    /// [`RenderIndent`]'s 31 packed bits, with `Mode::Break` in bit 31.
+    indent_mode: u32,
     pub doc: DocId,
 }
+
+/// Bit 31 of [`ArenaCommand::indent_mode`]: set for [`Mode::Break`].
+const COMMAND_MODE_BREAK: u32 = 1 << 31;
 
 // The hot `CmdStack` (`SmallVec<[ArenaCommand; 8]>`) is spun up per render; its
 // inline footprint is `8 × size_of::<ArenaCommand>()`, so the per-command size is
 // load-bearing. All fields are fixed-width (no pointers), so the size is
-// target-independent — pin it at 12 bytes (a 96-byte inline stack), which the
-// all-`u16` [`RenderIndent`] holds to on both native and wasm32.
-const _: () = assert!(size_of::<ArenaCommand>() == 12);
+// target-independent — pin it at 8 bytes (a 64-byte inline stack), which the
+// packed [`RenderIndent`] plus the mode bit holds to on both native and wasm32.
+const _: () = assert!(size_of::<ArenaCommand>() == 8);
+
+// `indent_mode` is printed as the two logical values it packs, so the derived
+// lint's "field is unused" is exactly wrong here: nothing about the value is hidden.
+#[allow(clippy::missing_fields_in_debug)]
+impl std::fmt::Debug for ArenaCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ArenaCommand")
+            .field("indent", &self.indent())
+            .field("mode", &self.mode())
+            .field("doc", &self.doc)
+            .finish()
+    }
+}
 
 impl ArenaCommand {
+    /// Assemble a command from its three logical parts.
+    #[inline]
+    pub fn new(indent: RenderIndent, mode: Mode, doc: DocId) -> Self {
+        Self {
+            indent_mode: indent.0 | Self::mode_bit(mode),
+            doc,
+        }
+    }
+
+    /// The mode's packed bit.
+    #[inline]
+    fn mode_bit(mode: Mode) -> u32 {
+        match mode {
+            Mode::Flat => 0,
+            Mode::Break => COMMAND_MODE_BREAK,
+        }
+    }
+
+    /// This command's render indentation state.
+    #[inline]
+    pub fn indent(&self) -> RenderIndent {
+        RenderIndent(self.indent_mode & !COMMAND_MODE_BREAK)
+    }
+
+    /// This command's layout mode.
+    #[inline]
+    pub fn mode(&self) -> Mode {
+        if self.indent_mode & COMMAND_MODE_BREAK == 0 {
+            Mode::Flat
+        } else {
+            Mode::Break
+        }
+    }
+
     /// Create a command with the same context but a different doc.
     #[inline]
     pub fn with_doc(&self, doc: DocId) -> Self {
         Self { doc, ..*self }
     }
 
+    /// Replace the indent, keeping the mode.
+    #[inline]
+    fn with_indent(self, indent: RenderIndent, doc: DocId) -> Self {
+        Self {
+            indent_mode: indent.0 | (self.indent_mode & COMMAND_MODE_BREAK),
+            doc,
+        }
+    }
+
     /// Create a command with one more indent level.
     #[inline]
     pub fn indented(&self, doc: DocId) -> Self {
-        Self {
-            indent: self.indent.indented(),
-            doc,
-            ..*self
-        }
+        self.with_indent(self.indent().indented(), doc)
     }
 
     /// Create a command with one fewer indent level.
     #[inline]
     pub fn dedented(&self, doc: DocId) -> Self {
-        Self {
-            indent: self.indent.dedented(),
-            doc,
-            ..*self
-        }
+        self.with_indent(self.indent().dedented(), doc)
     }
 
     /// Create a command with an added sub-tab `align(n)` offset.
     #[inline]
     pub fn aligned(&self, n: u32, doc: DocId) -> Self {
-        Self {
-            indent: self.indent.aligned(n),
-            doc,
-            ..*self
-        }
+        self.with_indent(self.indent().aligned(n), doc)
     }
 
     /// Create a command with the indent reset to an absolute whole-tab level
@@ -461,17 +584,16 @@ impl ArenaCommand {
     /// [`RenderIndent::reset_to_level`].
     #[inline]
     pub fn reset_to_level(&self, level: usize, doc: DocId) -> Self {
-        Self {
-            indent: self.indent.reset_to_level(level),
-            doc,
-            ..*self
-        }
+        self.with_indent(self.indent().reset_to_level(level), doc)
     }
 
     /// Create a command with a specific mode.
     #[inline]
     pub fn with_mode(&self, mode: Mode, doc: DocId) -> Self {
-        Self { mode, doc, ..*self }
+        Self {
+            indent_mode: (self.indent_mode & !COMMAND_MODE_BREAK) | Self::mode_bit(mode),
+            doc,
+        }
     }
 }
 
@@ -483,7 +605,7 @@ impl ArenaCommand {
 /// per-call high-water distribution (≈89% of CSS top-level renders and ≈99.7%
 /// of the high-frequency single-doc sub-renders stay inline — measured
 /// before the tail-continuation rewrite, which only lowered stack transit, so
-/// the knee holds a fortiori); its 96-byte inline footprint (a 12-byte
+/// the knee holds a fortiori); its 64-byte inline footprint (an 8-byte
 /// `ArenaCommand`) stays within the fits stack and `DocBuf` convention. Top-level
 /// renders additionally borrow
 /// the arena-pooled instance (`borrow_render_commands_scratch`) so their spill
