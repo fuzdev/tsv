@@ -99,15 +99,17 @@ fn admissible_group_state(
         rest_commands,
         remaining_width(fresh_pos, ctx.render, ctx.embed),
         false,
-        ctx.source,
     );
     (!probe_fits).then_some(*contents)
 }
 
 /// Render text content and update position.
 ///
-/// Uses cached width when available to skip `visual_width()` for the common
-/// no-newline case. Still needs `resolve_text()` to get the actual string for output.
+/// The column advance is a cached-width load, never a scan: under the eager
+/// width policy (the arena's `pooled_text_width`) every doc text carries a real
+/// width or the newline sentinel from build time, so only the newline case walks
+/// the bytes. `resolve_text()` is still needed to get the actual string for
+/// output — that is the one thing the width slot cannot answer.
 ///
 /// `inline(always)`: plain `#[inline]` left this outlined (a measured ~4%
 /// standalone symbol paying call overhead once per `Text` node — the most
@@ -133,18 +135,18 @@ fn render_text(
     match text.cached_width() {
         CachedWidth::Width(w) => *pos += w as usize, // Common path: no visual_width call
         CachedWidth::HasNewline => update_pos_for_text_unicode(pos, s),
-        CachedWidth::NotComputed => update_pos_for_text(pos, s),
     }
 }
 
 /// Update position after rendering a text string, accounting for tab expansion.
 ///
-/// Reached only from `render_text`'s uncached-width arm, which **no builder
-/// feeds today**: every doc text caches a width at build (the eager policy on
-/// the arena's `pooled_text_width`). Identifier names used to arrive here, once
-/// per emitted name, and moving that scan to build time is what retired the
-/// deferral — this scan was over half of what it cost. The expected input is
-/// therefore still short ASCII with no newline. The fast path below folds the
+/// Reached only from the `MultilineText` render arm, which writes a pool-stored
+/// body one line at a time and advances the column per line — the one place a
+/// rendered slice has no width slot of its own. (`render_text` used to reach it
+/// too, through a deferred-width arm; identifier names arrived there once per
+/// emitted name, and moving that scan to build time is what retired the deferral
+/// — this scan was over half of what it cost.) The expected input is a single
+/// line of mostly-ASCII text with no newline. The fast path below folds the
 /// newline reset, tab expansion, and width accumulation into a single forward
 /// byte pass, so no backward `memchr` scan runs (the shape it replaced scanned
 /// the bytes three times: `rfind('\n')` + `visual_width`'s own `is_ascii` +
@@ -916,7 +918,6 @@ fn render_doc_core<P: RenderPolicy>(
                             commands,
                             remaining,
                             !line_suffix.is_empty(),
-                            source,
                         );
 
                         if contents_fit {
@@ -944,7 +945,6 @@ fn render_doc_core<P: RenderPolicy>(
                                     commands,
                                     remaining,
                                     !line_suffix.is_empty(),
-                                    source,
                                 );
                                 if state_fits {
                                     *should_remeasure = false;
@@ -978,7 +978,6 @@ fn render_doc_core<P: RenderPolicy>(
                         commands,
                         remaining_width(*pos, render, embed),
                         !line_suffix.is_empty(),
-                        source,
                     );
                     if fits {
                         *should_remeasure = false;

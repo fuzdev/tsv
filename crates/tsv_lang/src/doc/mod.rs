@@ -204,16 +204,16 @@ mod arena_tests {
             t.cached_width()
         };
 
-        const MAX_CACHEABLE: u16 = u16::MAX - 2; // one below TEXT_WIDTH_NOT_COMPUTED
+        const MAX_CACHEABLE: u16 = u16::MAX - 1; // one below TEXT_WIDTH_HAS_NEWLINE
 
-        // Width 65,533 (32,766 CJK × 2 + 1): the widest exactly-cacheable text.
-        assert_eq!(
-            cached(&("中".repeat(32_766) + "x")),
-            CachedWidth::Width(MAX_CACHEABLE)
-        );
-        // Width 65,534 would alias TEXT_WIDTH_NOT_COMPUTED; must clamp.
+        // Width 65,534 (32,767 CJK × 2): the widest exactly-cacheable text.
         assert_eq!(
             cached(&"中".repeat(32_767)),
+            CachedWidth::Width(MAX_CACHEABLE)
+        );
+        // Width 65,535 would alias TEXT_WIDTH_HAS_NEWLINE; must clamp.
+        assert_eq!(
+            cached(&("中".repeat(32_767) + "x")),
             CachedWidth::Width(MAX_CACHEABLE)
         );
         // Width 65,536+ would wrap under a bare `as u16` (→ "always fits");
@@ -227,7 +227,7 @@ mod arena_tests {
     }
 
     // `MultilineText::first_width` precomputes the first line's visual width with
-    // the same `.min(TEXT_WIDTH_NOT_COMPUTED - 1)` clamp as `pooled_text_width`
+    // the same `.min(TEXT_WIDTH_HAS_NEWLINE - 1)` clamp as `pooled_text_width`
     // (arena.rs `multiline_text`). No corpus reaches the clamp — it needs a
     // ~65k-column first line — so this is the only gate over that arm (mutation
     // survivor: the `- 1` in the clamp).
@@ -245,19 +245,19 @@ mod arena_tests {
             *first_width
         };
 
-        const MAX_CACHEABLE: u16 = u16::MAX - 2; // one below TEXT_WIDTH_NOT_COMPUTED
+        const MAX_CACHEABLE: u16 = u16::MAX - 1; // one below TEXT_WIDTH_HAS_NEWLINE
 
         // Ordinary first lines carry their exact visual width (tabs = TAB_WIDTH).
         assert_eq!(first_width("abcd\ntail"), 4);
         assert_eq!(first_width("a\tb\ntail"), 4);
-        // First line 65,533 cols (32,766 CJK × 2 + 1): the widest exactly cacheable.
-        assert_eq!(
-            first_width(&("中".repeat(32_766) + "x\ntail")),
-            MAX_CACHEABLE
-        );
-        // First line 65,534 cols would alias TEXT_WIDTH_NOT_COMPUTED; must clamp.
+        // First line 65,534 cols (32,767 CJK × 2): the widest exactly cacheable.
         assert_eq!(
             first_width(&("中".repeat(32_767) + "\ntail")),
+            MAX_CACHEABLE
+        );
+        // First line 65,535 cols would alias TEXT_WIDTH_HAS_NEWLINE; must clamp.
+        assert_eq!(
+            first_width(&("中".repeat(32_767) + "x\ntail")),
             MAX_CACHEABLE
         );
         // Only the first line is measured; a wide continuation line is irrelevant.
@@ -279,8 +279,8 @@ mod arena_tests {
         };
 
         let mut a = DocArena::new();
-        // Statics always carry a real cached width (never NOT_COMPUTED) —
-        // first sighting (cache miss) and repeat (cache hit) agree.
+        // Statics always carry a real cached width — first sighting (cache miss)
+        // and repeat (cache hit) agree.
         assert_eq!(cached_static(&a, ",="), CachedWidth::Width(2));
         assert_eq!(cached_static(&a, ",="), CachedWidth::Width(2));
         // A newline-bearing static routes to the sentinel through the same
@@ -1326,11 +1326,15 @@ mod arena_tests {
     // pin each per-variant arm: a future desync (a miscounted width, or a Some/None
     // that shortcuts a subtree that actually breaks) flips one of these assertions
     // rather than silently producing wrong layout.
+    //
+    // ⚠️ The memo is shared with `DocArena::will_break` (`subtree_layout_fill`),
+    // so each arm below pins BOTH answers: a break verdict that leaked into a
+    // width cell, or a width arm that softened a genuine forced break, shows up
+    // here as a flipped fit.
 
-    /// Fit `doc` in `width` columns in Flat mode, with no source (the docs here
-    /// use only `Static`/`Pooled` text, never `SourceSpan`).
+    /// Fit `doc` in `width` columns in Flat mode.
     fn fits_flat(a: &DocArena, doc: DocId, width: usize) -> bool {
-        arena_fits(a, doc, width, Mode::Flat, None)
+        arena_fits(a, doc, width, Mode::Flat)
     }
 
     /// Assert the memoized flat width of `doc` is exactly `w`: it fits in `w` but
@@ -1600,6 +1604,37 @@ mod arena_tests {
     }
 
     #[test]
+    fn test_if_break_flat_arm_break_is_not_a_forced_break() {
+        // The ONE place the two fused layout answers diverge, and the only arm
+        // of `subtree_layout_fill` that has to actively separate them.
+        //
+        // An `if_break`'s flat width is its FLAT arm's, so a hardline inside that
+        // arm leaves the node with no flat width — but it must NOT make the node
+        // force a break: an `if_break` is the *consequence* of a break decision,
+        // never its cause (prettier's `willBreak` does not descend into either
+        // arm). Since the two answers share one packed cell, the forced-break
+        // half has to be softened on the way up. Drop that softening and this
+        // test's `will_break` flips to true while every width assertion stays
+        // green — which is exactly why it is pinned here and not left to the
+        // corpus.
+        let a = DocArena::new();
+        let doc = a.if_break(a.text("BREAK"), a.concat(&[a.text("x"), a.hardline()]));
+        assert!(
+            !a.will_break(doc),
+            "an if_break must not force a break, whatever its flat arm holds"
+        );
+        // The width half is unchanged: the hardline still denies the node a flat
+        // width, so the fits walk visits it rather than summarizing it — "x"
+        // costs its column and the hardline then ends the line.
+        assert!(!fits_flat(&a, doc, 0));
+        assert!(fits_flat(&a, doc, 1));
+        // A group around it therefore stays flat.
+        assert!(!a.will_break(a.group(a.concat(&[a.text("a"), doc]))));
+        // Control: the same hardline NOT behind an if_break does force a break.
+        assert!(a.will_break(a.concat(&[a.text("x"), a.hardline()])));
+    }
+
+    #[test]
     fn test_flush_break_is_invisible_to_will_break_and_render() {
         let a = DocArena::new();
         // No particular group is forced by the subtree query (the fits walk
@@ -1635,8 +1670,9 @@ mod arena_tests {
         // cache), contains '\n' → walk returns true.
         assert!(fits_flat(&a, a.text("a\nb"), 0));
         // Pooled newline text: cached as HAS_NEWLINE → same early-true path.
-        // Both cases pin the eager width policy (never NOT_COMPUTED), which is
-        // what lets fits answer without borrowing the text pool.
+        // Both cases pin the eager width policy — the newline sentinel is set at
+        // build, which is what lets fits answer without borrowing the text pool
+        // and without the document source.
         assert!(fits_flat(&a, a.text_pooled("café\nx"), 0));
         assert!(fits_flat(&a, a.text_pooled("a\nb"), 0));
     }

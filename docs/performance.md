@@ -193,7 +193,7 @@ perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ../zzz/src/
 perf report --stdio
 
 # Line-level hotspots within a specific function (exact demangled name from perf report)
-perf annotate --stdio -s 'tsv_lang::doc::arena::DocArena::will_break_fill'
+perf annotate --stdio -s 'tsv_lang::doc::arena::DocArena::subtree_layout_fill'
 
 # Collapsed stacks (greppable text, one line per unique stack; cargo install inferno)
 perf script | inferno-collapse-perf > stacks.txt
@@ -232,11 +232,15 @@ addresses, needs no multi-megabyte dump and no slicing, and does not crash:
 
 ```bash
 perf report --stdio -q -g none \
-  --symbols='tsv_lang::doc::arena_fits::flat_width_fill' --sort=srcline
-#   1.02%  arena_fits.rs:94    <- the `match &nodes[id.index()]` dispatch
-#   0.97%  arena_fits.rs:170
-#   0.36%  arena_fits.rs:131   <- the Concat/Fill child loop
+  --symbols='tsv_lang::doc::arena::DocArena::subtree_layout_fill' --sort=srcline
+#   7.67%  arena.rs:2502   <- the Concat/Fill child loop's recursive call
+#   3.42%  arena.rs:2427   <- the `match &nodes[id.index()]` dispatch
+#   1.70%  arena.rs:2559
 ```
+
+⚠️ The line numbers in that sample are from one build and go stale on the next edit — read the
+*shape* (which source construct dominates), not the digits, and re-take it against your own
+binary. The two columns are children% and self%.
 
 Reach for `annotate` when the question is genuinely *per-instruction* — which
 store, which compare — and for that, cross-check it against this view: the two
@@ -698,14 +702,17 @@ most sensitive to — so a probe that costs nothing at all is worth hunting for.
 A **memoization cache is the strongest instance**: a slot is populated *iff* that
 node was visited by that fill, so the cache's population, read once where it is
 cleared, is an exact visit census — no counters, no feature flag, no perturbation.
-The doc engine keeps two such caches for a document's lifetime
-(`will_break_cache`, `flat_width_cache`) and clears both in `DocArena::reset`, so
-a loop over the pair there answers "do these two passes walk the same tree?" to
-the node. It measured 97–99% overlap, and — by comparing the two *values* rather
-than just their presence — proved `will_break == true` implies a `BREAKS` flat
-width over 910K co-visited nodes while showing the prunable set was 0.4%: enough
-to retire a large planned refactor without building it. The same trick reads off
-an arena's node population (§7) and any dedup set or interning table.
+The doc engine used to keep two such caches for a document's lifetime — one for
+the build-time forced-break verdict, one for the render-time flat width — and
+cleared both in `DocArena::reset`, so a loop over the pair there answered "do
+these two passes walk the same tree?" to the node. It measured 97–99% overlap,
+and — by comparing the two *values* rather than just their presence — showed that
+`will_break == true` implies a `BREAKS` flat width over 910K co-visited nodes.
+That census is why there is now **one** cache and one walk (`layout_cache` /
+`DocArena::subtree_layout_fill`): the implication turned out to be provable by
+induction over the node kinds, so the two answers pack into one `u32` and the
+second traversal became a cache read. The same trick reads off an arena's node
+population (§7) and any dedup set or interning table.
 
 ⚠️ **Check the ordering assumption before a bottom-up pass.** Deriving a
 per-subtree property by iterating ids upward is only valid because children are
