@@ -1332,6 +1332,65 @@ peel existed.
   other end — a probe ahead of a switch is only free when the switch was going
   to compute it anyway.
 
+### A RARE arm of a hot switch is priced on every path through it
+
+`render_doc_core`'s dispatch is the hottest `match` in the formatter. Its
+`MultilineText` arm is taken a few thousand times a run against millions of
+`Text` / `Concat` visits, and its body is a loop with its own locals — a first
+line, a remainder iterator, a per-line hardline call. Folded into the switch,
+those locals are part of the register allocator's problem on **every** path
+through it, including the ones that never reach the arm.
+
+Three spellings of the same body, measured on `instructions:u`:
+
+| spelling | pure CSS | fuz_app/src |
+| --- | --- | --- |
+| inline in the arm | **+0.124%** | −0.493% |
+| `#[inline(never)]` | +0.046% | −0.773% |
+| `#[cold] #[inline(never)]` | **+0.001%** | −0.758% |
+
+- **The control is a document that never takes the arm.** A CSS file has no
+  multi-line text node at all, so its column cannot be reporting the arm's own
+  work — only the arm's effect on its neighbours. That is what makes +0.124%
+  legible as register pressure rather than noise, and what grades the fix. Look
+  for the input class that provably skips the code you are editing; it is a
+  sharper control than any second phase of the same run.
+- **Holding the body out is worth more than the body contains.** The same edit
+  that removes the arm's own work (a `str::split('\n')` → `printing::next_lf`)
+  measures −0.493% inline and −0.773% outlined: the outlining is not overhead
+  paid back, it is a second, larger lever on the *caller*.
+- `#[cold]` on top costs 0.015 points where the arm is taken and buys the last
+  0.045 back where it is not. Take it when the arm is genuinely rare — this is
+  the mirror of §Where a peel's SET boundary lands: there the unpriced path is a
+  branch the peel does not take, here it is a *register* the arm does not need.
+
+### A per-line `memchr` is mostly not a word scan
+
+`str::split('\n')` re-enters `core::slice::memchr` once per line, and that
+function is only word-at-a-time in its middle: it computes an alignment offset,
+walks the unaligned prefix a byte at a time, runs a two-word body loop only
+while `offset <= len - 16`, then walks the remainder a byte at a time again. On
+a block-comment body — ten lines averaging forty-five bytes, measured over
+`fuz_app/src` — about half of what the search retires is that byte loop, and the
+per-line setup is paid ten times over a stretch one continuous scan crosses. The
+`char` pattern adds its own layer on top: two bounds-checked subslices per hit
+and a re-verification of the found bytes against the needle re-encoded as UTF-8,
+for a one-byte ASCII needle.
+
+`printing::next_lf` is the answer — the LF-only member of this module's SWAR
+scan family, entered once per line but with no setup to redo. `split_lf` wears
+it as the iterator the call sites want; the comment builder skips even that and
+takes offsets directly, since it never wanted a `str` per line.
+
+- **The win scales with how comment-dense the document is, and it is not small:**
+  `instructions:u` −0.25 to −0.76% across the arc's corpora, **−7.4%** on a
+  documentation-heavy file set, **−23.5%** where the comment lines are short.
+- **The line-length axis is the one to check, and it comes back clean.** A
+  hand-rolled one-word loop retires more per byte than `memchr`'s two-word body,
+  so a document whose comment lines are hundreds of bytes long is where the
+  trade could invert. Built and measured (400-byte comment lines): **−0.241%**.
+  The per-line setup dominates even there.
+
 ## WASM bundle size
 
 The `tsv_wasm` crate produces three WASM binaries via the `format` +

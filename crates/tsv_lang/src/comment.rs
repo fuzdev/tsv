@@ -185,7 +185,7 @@ impl Comment {
 pub fn is_indentable_block(source: &str, comment: &Comment) -> bool {
     comment.is_block
         && comment.multiline
-        && printing::is_indentable_block_comment(comment.content(source).split('\n'))
+        && printing::is_indentable_block_comment(printing::split_lf(comment.content(source)))
 }
 
 //

@@ -21,7 +21,7 @@ use crate::hash::FxHashMap;
 
 use crate::Span;
 use crate::config::TAB_WIDTH;
-use crate::printing::visual_width;
+use crate::printing::{next_lf, visual_width};
 
 #[cfg(feature = "comment_check")]
 use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
@@ -1562,7 +1562,7 @@ impl DocArena {
     /// borrowing the pool.
     #[inline]
     pub fn multiline_text(&self, s: &str) -> DocId {
-        let first = s.split('\n').next().unwrap_or("");
+        let first = &s[..next_lf(s.as_bytes(), 0)];
         let first_width =
             visual_width(first, TAB_WIDTH).min(TEXT_WIDTH_HAS_NEWLINE as usize - 1) as u16;
         let span = self.pool_push(s);
