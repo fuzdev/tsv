@@ -81,8 +81,7 @@ use tsv_lang::{
     },
     has_comments_to_emit_in_range, has_line_comments_in_range, printing,
     source_scan::{
-        TriviaProfile, has_newline_before_position, is_regex_start_after, operand_end_after,
-        skip_regex_literal, skip_trivia, trivia_ends_operand,
+        OperandAnchor, TriviaProfile, has_newline_before_position, skip_regex_literal, skip_trivia,
     },
 };
 
@@ -1668,15 +1667,14 @@ impl<'a> Printer<'a> {
         let end = (end as usize).min(source.len());
         let mut depth = 0;
         let mut i = start as usize;
-        // Just past the last significant byte — the anchor `is_regex_start_after`
-        // reads. A skipped string ends an operand; a comment leaves it alone.
-        let mut operand_end = start as usize;
+        // The regex-vs-division anchor, rebuilt where a `/` asks for it rather than
+        // maintained per byte; `OperandAnchor` owns the rule, including which kinds
+        // of skipped trivia end an operand.
+        let mut anchor = OperandAnchor::new(start as usize);
 
         while i < end {
             if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
-                if trivia_ends_operand(source, i) {
-                    operand_end = past;
-                }
+                anchor.skipped_trivia(source, i, past);
                 i = past;
                 continue;
             }
@@ -1697,15 +1695,14 @@ impl<'a> Printer<'a> {
                 // paren. The scan reaches the literal's OPENING `/` first, whose
                 // next byte is never `/` or `*`, so `skip_trivia` can't claim it.
                 b'/' => {
-                    if is_regex_start_after(source, operand_end, start as usize) {
+                    if anchor.starts_regex(source, i, start as usize) {
                         i = skip_regex_literal(source, i, end);
-                        operand_end = i;
+                        anchor.skipped_operand(i);
                         continue;
                     }
                 }
                 _ => {}
             }
-            operand_end = operand_end_after(source, i, operand_end);
             i += 1;
         }
         None
