@@ -2,7 +2,7 @@
 
 use crate::EmbedContext;
 use crate::config::TAB_WIDTH;
-use crate::printing::visual_width;
+use crate::printing::{split_lf, visual_width};
 use smallvec::SmallVec;
 
 use super::arena::{ArenaCommand, CmdStack, DocArena, DocId, DocNode, LineSuffixBuf, RenderIndent};
@@ -328,6 +328,67 @@ fn render_line_node(
     // A real newline ends the comment's line → clears the pending swallow, inside
     // `render_line_break` itself.
     render_line_break(kind, mode, indent, output, pos, ctx.render, ctx.embed);
+}
+
+/// Render one `MultilineText` body: `[text(line0), hardline, text(line1), hardline, …]`
+/// from one pool-stored string — the first line at the current column, each subsequent line
+/// preceded by the hardline arm ([`render_line_node`] with `Hard`: remeasure arming, suffix
+/// flush, break). Byte- and position-identical to the per-line concat it replaces.
+///
+/// ⚠️ **`#[cold] #[inline(never)]` is the measured spelling, and pure CSS is what measures
+/// it.** This is a rare arm of a very hot switch — a few thousand visits against millions of
+/// `Text` / `Concat` ones — so folded into [`render_doc_core`] its locals are priced by the
+/// register allocator on every path through that switch, including the ones that never
+/// reach it. A CSS document renders no multi-line text at all, which makes it the control
+/// that can only be reporting the arm's effect on its neighbours: the same three
+/// spellings read `instructions:u` **+0.124%** (inline in the arm) / **+0.046%**
+/// (`#[inline(never)]`) / **+0.001%** (this one) there, while the corpus that does take the
+/// arm reads -0.493 / -0.773 / -0.758%. Holding the body out is worth more than the work it
+/// contains, and `#[cold]` is what makes the arm's neighbours whole.
+// Same unbundled render state as `render_line_node` above.
+#[expect(clippy::too_many_arguments)]
+#[cold]
+#[inline(never)]
+fn render_multiline_text<P: RenderPolicy>(
+    ctx: &RenderCtx<'_>,
+    body: &str,
+    mode: Mode,
+    indent: RenderIndent,
+    output: &mut String,
+    pos: &mut usize,
+    policy: &mut P,
+    line_suffix: &mut LineSuffixBuf,
+    should_remeasure: &mut bool,
+) {
+    let mut lines = split_lf(body);
+    if let Some(first) = lines.next() {
+        #[cfg(feature = "swallow_check")]
+        if policy.swallow_enabled() {
+            // Block-comment text is never a `//` line comment.
+            policy.swallow_on_text(false, first, output);
+        }
+        output.push_str(first);
+        update_pos_for_text(pos, first);
+    }
+    for line in lines {
+        render_line_node(
+            ctx,
+            LineKind::Hard,
+            mode,
+            indent,
+            output,
+            pos,
+            policy.tracking_suffix(),
+            line_suffix,
+            should_remeasure,
+        );
+        #[cfg(feature = "swallow_check")]
+        if policy.swallow_enabled() {
+            policy.swallow_on_text(false, line, output);
+        }
+        output.push_str(line);
+        update_pos_for_text(pos, line);
+    }
 }
 
 /// Process an IndentIfBreak node.
@@ -867,40 +928,17 @@ fn render_doc_core<P: RenderPolicy>(
             }
 
             DocNode::MultilineText { span, .. } => {
-                // Render `[text(line0), hardline, text(line1), hardline, …]` from
-                // one pool-stored body: the first line at the current column, each
-                // subsequent line preceded by the hardline arm (`render_line_node`
-                // with `Hard`: remeasure arming, suffix flush, break). Byte- and
-                // position-identical to the per-line concat it replaces.
-                let mut lines = span.slice(pool).split('\n');
-                if let Some(first) = lines.next() {
-                    #[cfg(feature = "swallow_check")]
-                    if policy.swallow_enabled() {
-                        // Block-comment text is never a `//` line comment.
-                        policy.swallow_on_text(false, first, output);
-                    }
-                    output.push_str(first);
-                    update_pos_for_text(pos, first);
-                }
-                for line in lines {
-                    render_line_node(
-                        ctx,
-                        LineKind::Hard,
-                        cmd.mode(),
-                        cmd.indent(),
-                        output,
-                        pos,
-                        policy.tracking_suffix(),
-                        line_suffix,
-                        should_remeasure,
-                    );
-                    #[cfg(feature = "swallow_check")]
-                    if policy.swallow_enabled() {
-                        policy.swallow_on_text(false, line, output);
-                    }
-                    output.push_str(line);
-                    update_pos_for_text(pos, line);
-                }
+                render_multiline_text(
+                    ctx,
+                    span.slice(pool),
+                    cmd.mode(),
+                    cmd.indent(),
+                    output,
+                    pos,
+                    policy,
+                    line_suffix,
+                    should_remeasure,
+                );
             }
 
             DocNode::Line(kind) => {

@@ -59,15 +59,21 @@ impl<'a> Printer<'a> {
                 // so emit it as a source slice (no allocation).
                 d.source_span(comment.span, self.source)
             } else {
-                // One `split('\n')` pass fills the arena-parked line-offset
-                // scratch (capacity retained across comments and files); the
-                // classifier and builder then iterate the lines slice-cheap
-                // with no per-comment line buffer.
+                // One `next_lf` pass fills the arena-parked line-offset scratch
+                // (capacity retained across comments and files); the classifier
+                // and builder then iterate the lines slice-cheap with no
+                // per-comment line buffer. The scan answers in offsets, which is
+                // all this loop ever wanted — no line is materialized as a `str`
+                // here, so none is bounds- and boundary-checked into existence.
                 let mut line_spans = d.borrow_line_spans_scratch();
-                let mut start = 0u32;
-                for line in content.split('\n') {
-                    let end = start + line.len() as u32;
-                    line_spans.push((start, end));
+                let bytes = content.as_bytes();
+                let mut start = 0usize;
+                loop {
+                    let end = printing::next_lf(bytes, start);
+                    line_spans.push((start as u32, end as u32));
+                    if end == bytes.len() {
+                        break;
+                    }
                     start = end + 1; // step over the '\n'
                 }
                 let lines = line_spans.iter().map(|span| line_slice(content, *span));

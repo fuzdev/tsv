@@ -825,6 +825,83 @@ fn line_terminator_candidate_tail(bytes: &[u8], from: usize) -> usize {
 /// multi-byte line terminators, spelled once for the scan and its scalar tail.
 const LINE_SEPARATOR_LEAD: u8 = 0xE2;
 
+/// Index of the first `\n` at or after `from` in `bytes`, or `bytes.len()`.
+///
+/// The LF-only member of this module's scan family — the question a *body split* asks,
+/// where `\r` and `<LS>` / `<PS>` are ordinary content rather than line ends. Every
+/// parse-then-format entry point folds `\r` away before it parses
+/// ([`normalize_carriage_returns`]), and the doc pool's multi-line text is joined with
+/// `\n` by construction, so a body's lines are its `\n`-separated runs and nothing else.
+///
+/// It exists because `str::split('\n')` is not this scan. `core`'s `CharSearcher` restarts
+/// `memchr` at every line — an alignment offset, an unaligned prefix walked a byte at a
+/// time and a sub-word tail walked the same way — and then re-verifies each hit against the
+/// needle re-encoded as UTF-8, all for a one-byte ASCII needle. A block-comment body
+/// averages ten lines and forty-five bytes a line, so that setup is paid ten times over a
+/// stretch one continuous word loop crosses; the byte-at-a-time prefix and tail alone are
+/// about half of what the search retires.
+///
+/// Reach for it where a body is split into lines on a hot path. A cold site splitting a
+/// handful of lines gains nothing worth an inlined copy of this loop, and `str::split('\n')`
+/// stays perfectly good there.
+#[inline]
+pub fn next_lf(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let w = u64::from_le_bytes(*chunk);
+        let hits = zero_lanes(w ^ splat(b'\n'));
+        if hits != 0 {
+            return i + (hits.trailing_zeros() / 8) as usize;
+        }
+        i += 8;
+    }
+    while i < bytes.len() && bytes[i] != b'\n' {
+        i += 1;
+    }
+    i
+}
+
+/// `s.split('\n')` over [`next_lf`] — the same sequence, scanned a word at a time.
+///
+/// # Example
+/// ```
+/// use tsv_lang::printing::split_lf;
+///
+/// assert_eq!(split_lf("a\nb").collect::<Vec<_>>(), ["a", "b"]);
+/// assert_eq!(split_lf("a\n").collect::<Vec<_>>(), ["a", ""]); // trailing empty line
+/// assert_eq!(split_lf("").collect::<Vec<_>>(), [""]);          // one empty line
+/// ```
+#[inline]
+pub fn split_lf(s: &str) -> SplitLf<'_> {
+    SplitLf { rest: Some(s) }
+}
+
+/// [`split_lf`]'s iterator.
+#[derive(Debug, Clone)]
+pub struct SplitLf<'a> {
+    /// The un-yielded remainder. `Some("")` and `None` are different states, and that
+    /// distinction is the whole trailing-line rule: `"a\n"` yields a final empty line
+    /// where `"a"` does not.
+    rest: Option<&'a str>,
+}
+
+impl<'a> Iterator for SplitLf<'a> {
+    type Item = &'a str;
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a str> {
+        let rest = self.rest?;
+        let end = next_lf(rest.as_bytes(), 0);
+        if end == rest.len() {
+            self.rest = None;
+            Some(rest)
+        } else {
+            self.rest = Some(&rest[end + 1..]);
+            Some(&rest[..end])
+        }
+    }
+}
+
 /// The first ECMAScript line terminator at or after `from`, as `(start, len)` — `None` if the
 /// rest of `bytes` holds none.
 ///
@@ -970,7 +1047,7 @@ pub fn strip_comment_indentation(
 /// comments are preserved verbatim instead.
 ///
 /// `lines` iterates the comment body *without* the `/*` / `*/` delimiters,
-/// split on `'\n'` (typically `content.split('\n')` fed directly) — no line
+/// split on `'\n'` (typically [`split_lf`] fed directly) — no line
 /// buffer is materialized, so classification never heap-allocates. Returns
 /// `false` for single-line content. Mirrors prettier's `isIndentableBlockComment`.
 ///
@@ -984,9 +1061,9 @@ pub fn strip_comment_indentation(
 ///
 /// # Example
 /// ```
-/// use tsv_lang::printing::is_indentable_block_comment;
+/// use tsv_lang::printing::{is_indentable_block_comment, split_lf};
 ///
-/// let lines = |s: &'static str| s.split('\n');
+/// let lines = |s: &'static str| split_lf(s);
 /// assert!(is_indentable_block_comment(lines("*\n * text\n ")));     // /** … */
 /// assert!(is_indentable_block_comment(lines("\n * text\n ")));      // /* * … */
 /// assert!(is_indentable_block_comment(lines("*\n *\n * text\n "))); // blank `*` line
@@ -1519,6 +1596,77 @@ mod tests {
             }
         }
         breaks
+    }
+
+    /// [`next_lf`] graded against a byte-at-a-time reference, at every length and
+    /// alignment across the word stride.
+    ///
+    /// Its callers cannot grade its tail: [`split_lf`] and the comment builder both step a
+    /// byte past each hit and re-enter, so a scan that gave up at the last short chunk
+    /// would degrade into the callers' own walk and yield the same lines. The alphabet
+    /// holds a non-ASCII lead and a continuation byte because the scan reads BYTES — a
+    /// truncated UTF-8 sequence can sit at the very end of the slice, and `0x0A` never
+    /// appears inside one.
+    #[test]
+    fn lf_scan_matches_the_scalar_reference_exhaustive() {
+        const ALPHABET: [u8; 5] = [b'\n', b'\r', 0xE2, 0xA8, b'a'];
+        fn reference(bytes: &[u8], from: usize) -> usize {
+            let mut i = from;
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            i
+        }
+        let mut buf = Vec::new();
+        for align in 0..=16usize {
+            for len in 0..=4usize {
+                for mut code in 0..5usize.pow(len as u32) {
+                    buf.clear();
+                    buf.resize(align, b'x');
+                    for _ in 0..len {
+                        buf.push(ALPHABET[code % 5]);
+                        code /= 5;
+                    }
+                    for from in 0..=buf.len() {
+                        assert_eq!(
+                            next_lf(&buf, from),
+                            reference(&buf, from),
+                            "align {align}, from {from}, bytes {buf:02x?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// [`split_lf`] is `str::split('\n')` — the oracle is the thing it replaces, and the
+    /// only interesting cases are the empty-line ones the `Option<&str>` state exists for.
+    ///
+    /// Strings rather than raw bytes here, since that is the type the iterator hands back;
+    /// the multi-byte characters make a boundary bug in the slicing visible.
+    #[test]
+    fn split_lf_matches_str_split_exhaustive() {
+        const ALPHABET: [&str; 5] = ["\n", "a", "\r", "字", "🙂"];
+        let mut s = String::new();
+        for align in 0..=9usize {
+            for len in 0..=4usize {
+                for mut code in 0..5usize.pow(len as u32) {
+                    s.clear();
+                    for _ in 0..align {
+                        s.push('x');
+                    }
+                    for _ in 0..len {
+                        s.push_str(ALPHABET[code % 5]);
+                        code /= 5;
+                    }
+                    assert_eq!(
+                        split_lf(&s).collect::<Vec<_>>(),
+                        s.split('\n').collect::<Vec<_>>(),
+                        "align {align}, s {s:?}"
+                    );
+                }
+            }
+        }
     }
 
     /// [`next_line_terminator_candidate`] graded DIRECTLY, at every length and alignment.
