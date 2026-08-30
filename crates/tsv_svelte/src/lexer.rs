@@ -1,9 +1,8 @@
 use std::fmt;
-use std::str::Chars;
 // Shared lexer-error constructor: used by the unterminated/unexpected sites in `next_token`.
 use tsv_lang::{ParseError, lex_err, source_scan};
 
-use crate::whitespace::{brace_interior_start, is_svelte_ws};
+use crate::whitespace::{brace_interior_start, char_at, is_svelte_ws, skip_svelte_ws};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
@@ -91,9 +90,17 @@ const _: () = assert!(size_of::<Token>() == 12);
 
 pub struct Lexer<'a> {
     source: &'a str,
-    chars: Chars<'a>,
+    /// The cursor, as a byte offset into `source` — always on a character boundary.
+    ///
+    /// ⚠️ **The only cursor, and it is a BYTE cursor.** Every construct this lexer
+    /// recognises opens with an ASCII byte and UTF-8 is self-synchronising, so the dispatch
+    /// ([`Lexer::cur_byte`]) and every needle scan read raw bytes; where a *character* class
+    /// is the question (Svelte whitespace, a Unicode name char) the byte is tested first and
+    /// [`char_at`] decodes only past U+007F — the discipline that helper exists for, and
+    /// `tsv_ts`'s lexer's too. A second cursor carrying a decoded `char` alongside this one
+    /// charges every byte of the document a UTF-8 decode and a `len_utf8` to answer a
+    /// question the byte already answers: don't reintroduce one.
     position: usize,
-    current: Option<char>,
     pub inside_tag: bool,    // Track if we're inside <...>
     initial_position: usize, // Position after BOM skip (0 or 3)
     /// Byte offset of `source` within the document this lexer's ERRORS are rendered
@@ -194,23 +201,18 @@ impl<'a> Lexer<'a> {
     /// whenever it jumps the cursor, so after any such jump a zero-offset lexer reports
     /// every error in the coordinates of that slice rather than the component's.
     pub fn at_offset(source: &'a str, base_offset: usize) -> Self {
-        let mut chars = source.chars();
-        let mut current = chars.next();
-        let mut position = 0;
-
         // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
         // Position starts after BOM so token spans reflect actual file bytes.
-        if current == Some('\u{feff}') {
-            position = '\u{feff}'.len_utf8();
-            current = chars.next();
-        }
+        let position = if source.starts_with('\u{feff}') {
+            '\u{feff}'.len_utf8()
+        } else {
+            0
+        };
 
         Self {
             source,
-            chars,
             position,
-            current,
             inside_tag: false,
             initial_position: position,
             base_offset,
@@ -234,11 +236,30 @@ impl<'a> Lexer<'a> {
         self.initial_position
     }
 
+    /// The byte at the cursor, or `None` at end of input.
+    ///
+    /// The dispatch primitive: every token this lexer recognises opens with an ASCII byte,
+    /// so the common path never decodes. A caller whose question is a *character* class
+    /// tests the byte first and reaches for [`char_at`] only past U+007F.
+    #[inline]
+    fn cur_byte(&self) -> Option<u8> {
+        self.source.as_bytes().get(self.position).copied()
+    }
+
+    /// The character at the cursor, or `None` at end of input — for the non-ASCII branches
+    /// alone ([`char_at`] itself is ASCII-fast, so this costs a decode only where one is
+    /// genuinely owed).
+    #[inline]
+    fn cur_char(&self) -> Option<char> {
+        char_at(self.source, self.position).map(|(c, _)| c)
+    }
+
+    /// Advance the cursor past the character at the cursor — one byte for ASCII, its full
+    /// UTF-8 width otherwise. No-op at end of input.
     #[inline]
     fn advance(&mut self) {
-        if let Some(ch) = self.current {
-            self.position += ch.len_utf8();
-            self.current = self.chars.next();
+        if let Some((_, width)) = char_at(self.source, self.position) {
+            self.position += width;
         }
     }
 
@@ -261,13 +282,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        while let Some(ch) = self.current {
-            if is_svelte_ws(ch) {
-                self.advance();
-            } else {
-                break;
-            }
-        }
+        self.position = self.peek_past_whitespace();
     }
 
     /// Move the cursor to byte offset `pos`, which must be a char boundary at or after the
@@ -277,8 +292,6 @@ impl<'a> Lexer<'a> {
     #[inline]
     fn seek_to(&mut self, pos: usize) {
         debug_assert!(pos >= self.position && self.source.is_char_boundary(pos));
-        self.chars = self.source[pos..].chars();
-        self.current = self.chars.next();
         self.position = pos;
     }
 
@@ -287,15 +300,26 @@ impl<'a> Lexer<'a> {
     /// follow-up `skip_whitespace()` lands exactly here.
     #[inline]
     fn peek_past_whitespace(&self) -> usize {
-        let mut pos = self.position;
-        for ch in self.source[self.position..].chars() {
-            if is_svelte_ws(ch) {
-                pos += ch.len_utf8();
-            } else {
+        // The ASCII half of `is_svelte_ws` inline, the rest delegated. This runs once per
+        // in-tag token over a mean of well under one byte of whitespace, so a plain
+        // `skip_svelte_ws(self.source, self.position)` — which is what this is, and reads
+        // better — spends most of its time on a per-CHARACTER call into that scan:
+        // `instructions:u` +0.294% on a 1,695-file Svelte corpus, and it loses cycles in
+        // every replicate of the layout group. The CLASS is still the one definition —
+        // only its ASCII arm is peeled, and the first byte at or above U+007F hands the
+        // rest of the run straight back to `skip_svelte_ws`.
+        let bytes = self.source.as_bytes();
+        let mut i = self.position;
+        while let Some(&b) = bytes.get(i) {
+            if b >= 0x80 {
+                return skip_svelte_ws(self.source, i);
+            }
+            if !is_svelte_ws(b as char) {
                 break;
             }
+            i += 1;
         }
-        pos
+        i
     }
 
     /// Skip everything until we hit a special character (<, {)
@@ -304,12 +328,88 @@ impl<'a> Lexer<'a> {
     /// during expression tag parsing. This allows '}' in text (e.g., after {'{'}text})
     /// to be treated as plain text, matching Svelte's parser behavior.
     fn skip_to_special_char(&mut self) {
-        while let Some(ch) = self.current {
-            match ch {
-                '<' | '{' => break,
-                _ => self.advance(),
+        // Both needles are ASCII and UTF-8 is self-synchronising — every byte of a
+        // multi-byte character is at or above 0x80 — so a byte scan stops exactly where a
+        // character scan stops, and every stop is a character boundary. The step is an
+        // unconditional `+= 1`, which is the point: a width that depends on the byte's value
+        // puts the loop's own cursor downstream of the load.
+        let bytes = self.source.as_bytes();
+        let mut i = self.position;
+        while let Some(&b) = bytes.get(i) {
+            if b == b'<' || b == b'{' {
+                break;
+            }
+            i += 1;
+        }
+        self.position = i;
+    }
+
+    /// Advance past the continuation characters of a tag/attribute name, the cursor
+    /// already past the name's first character.
+    ///
+    /// Svelte's `read_tag` name run, and the one place its character class is spelled —
+    /// both name-opening arms of [`Lexer::next_token_local`] (ASCII-led and non-ASCII-led)
+    /// reach it, so the class cannot drift between them. ⚠️ Not the *unquoted numeric value*
+    /// run, which that function scans inline: a narrower class (`is_alphanumeric`, `_`, `-`)
+    /// answering to HTML's unquoted-attribute-value grammar rather than to `read_tag`.
+    ///
+    /// NOTE: for attribute/directive *names* this is only the LEADING run — the parser's
+    /// `attribute_name_run_end` extends it past special chars (`a%b`) to Svelte's
+    /// `read_tag` terminator set (`[\s=/>"']`), which differs from the tag-name set.
+    /// Widen attribute-name coverage there, not this char class.
+    fn scan_name_run(&mut self) {
+        let bytes = self.source.as_bytes();
+        let mut i = self.position;
+        while let Some(&b) = bytes.get(i) {
+            // The overwhelmingly common name char, and disjoint from every
+            // terminator below — so taking it first keeps the whitespace guard
+            // off the hot path without changing what the loop accepts.
+            if b.is_ascii_alphanumeric() {
+                i += 1;
+                continue;
+            }
+            if b < 0x80 {
+                // The rest of the ASCII name class, and the whole of it: the two
+                // Unicode classes below add nothing under U+0080, since
+                // `char::is_alphanumeric` agrees with `is_ascii_alphanumeric`
+                // there and `is_pcen_char`'s only other ASCII members are `-`,
+                // `.` and `_`. So every other ASCII byte ends the run — Svelte
+                // whitespace included, which is what the guard below states for
+                // the characters that still reach it.
+                if matches!(b, b'_' | b'$' | b'-' | b':' | b'|' | b'.') {
+                    i += 1;
+                    continue;
+                }
+                break;
+            }
+            let Some((ch, width)) = char_at(self.source, i) else {
+                break;
+            };
+            // Whitespace ends a name run before any name-char test, mirroring
+            // `read_until(regex)`, where the terminator wins over what the name
+            // grammar would otherwise admit. Not redundant with the classes below:
+            // PCENChar spans `[#xFDF0-#xFFFD]`, which contains U+FEFF — the one
+            // character that is both Svelte whitespace and a custom-element name
+            // char. Without this guard `</div\u{feff}>` lexes as the name
+            // `div\u{feff}` and fails to close its `div`.
+            if is_svelte_ws(ch) {
+                break;
+            }
+            // `is_alphanumeric` covers the non-ASCII Unicode *letters* the fast
+            // path above leaves (so `<my-café>` works); `is_pcen_char` adds the
+            // non-alphanumeric members of the HTML custom-element name grammar
+            // (`·`, ZWNJ/ZWJ, astral emoji) so a whole custom-element name stays in
+            // one token. Both are asked only past U+007F, which is the whole of
+            // what either adds. Over-admitting (e.g. a PCENChar with no preceding
+            // hyphen) is harmless — the parser's `is_valid_tag_name` gate rejects any
+            // name that isn't valid.
+            if ch.is_alphanumeric() || tsv_html::is_pcen_char(ch) {
+                i += width;
+            } else {
+                break;
             }
         }
+        self.position = i;
     }
 
     /// The lexer's one fallible entry point — so the error path is lifted into host
@@ -331,31 +431,25 @@ impl<'a> Lexer<'a> {
 
         let start = self.position;
 
-        match self.current {
+        match self.cur_byte() {
             None => Ok(Token {
                 kind: TokenKind::Eof,
                 start: start as u32,
                 end: start as u32,
             }),
-            Some('<') => {
+            Some(b'<') => {
                 // Check for HTML comment: <!--
                 if self.starts_with(b"<!--") {
-                    // Consume "<!--"
-                    self.advance(); // <
-                    self.advance(); // !
-                    self.advance(); // -
-                    self.advance(); // -
+                    self.position += b"<!--".len();
 
-                    // Scan until "-->"
-                    while self.current.is_some() {
+                    // Scan until "-->". An ASCII needle again, so the scan steps a byte at
+                    // a time and still cannot stop inside a character.
+                    while self.position < self.source.len() {
                         if self.starts_with(b"-->") {
-                            // Consume "-->"
-                            self.advance();
-                            self.advance();
-                            self.advance();
+                            self.position += b"-->".len();
                             return Ok(self.make_token(TokenKind::Comment, start));
                         }
-                        self.advance();
+                        self.position += 1;
                     }
 
                     // Unterminated comment
@@ -366,16 +460,16 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 Ok(self.make_token(TokenKind::LeftAngle, start))
             }
-            Some('>') => {
+            Some(b'>') => {
                 self.inside_tag = false; // Exit tag mode, back to template mode
                 self.advance();
                 Ok(self.make_token(TokenKind::RightAngle, start))
             }
-            Some('/') => {
+            Some(b'/') => {
                 self.advance();
                 Ok(self.make_token(TokenKind::Slash, start))
             }
-            Some('{') => {
+            Some(b'{') => {
                 self.advance();
                 // Check for block tokens: {#, {:, {/, {@ — Svelte's `tag()` runs
                 // `allow_whitespace()` right after `{`, so the marker may be separated
@@ -418,15 +512,15 @@ impl<'a> Lexer<'a> {
                     _ => Ok(self.make_token(TokenKind::LeftBrace, start)),
                 }
             }
-            Some('}') => {
+            Some(b'}') => {
                 self.advance();
                 Ok(self.make_token(TokenKind::RightBrace, start))
             }
-            Some('=') => {
+            Some(b'=') => {
                 self.advance();
                 Ok(self.make_token(TokenKind::Equals, start))
             }
-            Some(quote @ '\'' | quote @ '"') => {
+            Some(quote @ (b'\'' | b'"')) => {
                 // Quoted attribute value. Only two things matter here: the closing quote,
                 // and any `{expr}` tag — whose interior is JS, where the attribute's quote
                 // character is just an ordinary byte (`title="{a['\"']}"`).
@@ -467,12 +561,12 @@ impl<'a> Lexer<'a> {
                 let source = self.source;
                 let bytes = source.as_bytes();
 
-                while let Some(ch) = self.current {
-                    if ch == quote {
-                        self.advance(); // consume closing quote
+                while let Some(&b) = bytes.get(self.position) {
+                    if b == quote {
+                        self.position += 1; // consume closing quote
                         return Ok(self.make_token(TokenKind::String, start));
                     }
-                    if ch == '{' && !sequence_is_invalid {
+                    if b == b'{' && !sequence_is_invalid {
                         if BlockOrTagMarker::in_sequence_at(source, self.position).is_some() {
                             sequence_is_invalid = true;
                         } else {
@@ -493,12 +587,15 @@ impl<'a> Lexer<'a> {
                     // matching Svelte's parser. Treating `\` as an escape here read `\"` as
                     // an escaped quote and ran past the close → "Unterminated string
                     // literal" (an over-rejection of valid Svelte; the `fuzz` gate).
-                    self.advance();
+                    //
+                    // Both needles are ASCII, so — as in `skip_to_special_char` — stepping
+                    // one byte cannot stop inside a character.
+                    self.position += 1;
                 }
                 // Unterminated string
                 Err(lex_err("Unterminated string literal in template", start))
             }
-            Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' || ch == '-' || ch == '!' => {
+            Some(b) if b.is_ascii_alphabetic() || matches!(b, b'_' | b'$' | b'-' | b'!') => {
                 // Tag names and identifiers.
                 // NOTE: for attribute/directive *names* this token is only the LEADING run —
                 // the parser's `attribute_name_run_end` extends it past special chars (`a%b`)
@@ -509,59 +606,47 @@ impl<'a> Lexer<'a> {
                 // and -- for CSS custom properties (style:--custom)
                 // and . for dot notation components (ns.Comp)
                 // and ! for <!DOCTYPE> (Svelte treats !DOCTYPE as the element name)
-                // Advance past first char — ! is a valid start but not a continuation char
-                self.advance();
-                while let Some(ch) = self.current {
-                    // The overwhelmingly common name char, and disjoint from every
-                    // terminator below — so taking it first keeps the whitespace guard
-                    // off the hot path without changing what the loop accepts.
-                    if ch.is_ascii_alphanumeric() {
-                        self.advance();
-                        continue;
-                    }
-                    // Whitespace ends a name run before any name-char test, mirroring
-                    // `read_until(regex)`, where the terminator wins over what the name
-                    // grammar would otherwise admit. Not redundant with the classes below:
-                    // PCENChar spans `[#xFDF0-#xFFFD]`, which contains U+FEFF — the one
-                    // character that is both Svelte whitespace and a custom-element name
-                    // char. Without this guard `</div\u{feff}>` lexes as the name
-                    // `div\u{feff}` and fails to close its `div`.
-                    if is_svelte_ws(ch) {
-                        break;
-                    }
-                    // `is_alphanumeric` covers the non-ASCII Unicode *letters* the fast
-                    // path above leaves (so `<my-café>` works); `is_pcen_char` adds the
-                    // non-alphanumeric members of the HTML custom-element name grammar
-                    // (`·`, ZWNJ/ZWJ, astral emoji) so a whole custom-element name stays in
-                    // one token. It sits last, and ASCII never reaches it. Over-admitting
-                    // (e.g. a PCENChar with no preceding hyphen) is harmless — the parser's
-                    // `is_valid_tag_name` gate rejects any name that isn't valid.
-                    if ch.is_alphanumeric()
-                        || ch == '_'
-                        || ch == '$'
-                        || ch == '-'
-                        || ch == ':'
-                        || ch == '|'
-                        || ch == '.'
-                        || tsv_html::is_pcen_char(ch)
-                    {
-                        self.advance();
-                    } else {
-                        break;
-                    }
-                }
+                // Advance past first char — ! is a valid start but not a continuation char.
+                // One byte: this arm matched an ASCII one (the non-ASCII-led name arm below
+                // steps its first character whole).
+                self.position += 1;
+                self.scan_name_run();
                 Ok(self.make_token(TokenKind::Identifier, start))
             }
-            Some(ch) if ch.is_ascii_digit() => {
+            Some(b) if b.is_ascii_digit() => {
                 // Unquoted numeric attribute values (e.g., data-count=123)
                 // HTML allows unquoted values that are alphanumeric
-                while let Some(ch) = self.current {
-                    if ch.is_alphanumeric() || ch == '_' || ch == '-' {
-                        self.advance();
+                let bytes = self.source.as_bytes();
+                let mut i = self.position;
+                while let Some(&b) = bytes.get(i) {
+                    if b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-') {
+                        i += 1;
+                        continue;
+                    }
+                    if b < 0x80 {
+                        break;
+                    }
+                    // `_` and `-` are ASCII, so past U+007F the class is `is_alphanumeric`
+                    // alone.
+                    let Some((ch, width)) = char_at(self.source, i) else {
+                        break;
+                    };
+                    if ch.is_alphanumeric() {
+                        i += width;
                     } else {
                         break;
                     }
                 }
+                self.position = i;
+                Ok(self.make_token(TokenKind::Identifier, start))
+            }
+            // A non-ASCII letter opens a name run too (`<café>`, `<Ωmega>`). This arm and
+            // the ASCII-led one above are the two halves of a single `is_alphabetic` test,
+            // split on U+007F so the common path never decodes; everything else past U+007F
+            // is a single-character Identifier, per the arm below.
+            Some(b) if b >= 0x80 && self.cur_char().is_some_and(char::is_alphabetic) => {
+                self.advance();
+                self.scan_name_run();
                 Ok(self.make_token(TokenKind::Identifier, start))
             }
             // Any other char inside a tag is a name char per Svelte's `read_tag`
