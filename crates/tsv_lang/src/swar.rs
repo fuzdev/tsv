@@ -52,6 +52,35 @@ pub(crate) const fn zero_lanes(v: u64) -> u64 {
     v.wrapping_sub(LOW_BITS) & !v & HIGH_BITS
 }
 
+/// Lane mask of the bytes in `v` that are zero **or** have their high bit set —
+/// [`zero_lanes`] with its `& !v` term dropped.
+///
+/// That term is the whole cost of [`zero_lanes`]'s precision: without it a lane
+/// still flags whenever the borrow leaves its high bit set, which is every lane
+/// at or above `0x80`. So this kernel answers "zero, or non-ASCII" for the price
+/// of "zero" minus an operation, and a caller that was going to look for a
+/// non-ASCII byte anyway gets that needle for free.
+///
+/// ⚠️ **Same lowest-lane guarantee as [`zero_lanes`], and the same reading
+/// rule.** A zero lane flags itself (`0 - 1` is `0xFF`, and a borrow-in only
+/// deepens it), a lane at or above `0x80` flags itself through the `| v`, and a
+/// lane in `0x01..=0x7F` can only flag on a borrow-in — which requires a genuine
+/// zero below it. Read with `trailing_zeros`, never a popcount.
+///
+/// ⚠️ **The non-ASCII lanes are FALSE POSITIVES to the caller's own needle**, so
+/// only a caller that can tell them apart afterwards may use this.
+/// `crate::printing`'s line terminator scan is the shape: it takes two of these
+/// where three [`zero_lanes`] used to stand — seven operations against fourteen,
+/// with `<LS>` / `<PS>`'s own `0xE2` lead inside the loose class for free — and
+/// hands the word that fired to the exact kernel when it holds a non-ASCII byte
+/// at all. **That fallback is not optional**: handing a loose hit straight to the
+/// caller measures `-0.354%` on real source and `+20%` on a document that is 98%
+/// non-ASCII, where every byte becomes a hit to step over.
+#[inline]
+pub(crate) const fn zero_or_high_lanes(v: u64) -> u64 {
+    (v.wrapping_sub(LOW_BITS) | v) & HIGH_BITS
+}
+
 /// Lane mask of the bytes in `v` that are less than `n`, for `n <= 0x80`.
 ///
 /// ⚠️ **Same lowest-lane guarantee as [`zero_lanes`], and the same reason.** A

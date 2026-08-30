@@ -5,7 +5,7 @@
 
 use crate::acorn_prefix::AcornPrefix;
 use crate::escapes::swap_quote_escaping;
-use crate::swar::{splat, zero_lanes};
+use crate::swar::{high_bit_lanes, splat, zero_lanes, zero_or_high_lanes};
 use crate::whitespace::is_js_whitespace;
 use std::borrow::Cow;
 use unicode_segmentation::UnicodeSegmentation;
@@ -718,18 +718,80 @@ fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) {
 /// The same word-at-a-time shape, and the same reason, as `location`'s
 /// `next_ecmascript_terminator`: terminators are sparse (~1 per 30–40 source bytes), so a
 /// per-byte compare spends nearly all of its work confirming misses, and this table is
-/// built once over the whole source in every `format_in`. The third needle is what
-/// `location`'s does not need — that one runs inside a run already proven ASCII, where no
-/// `<LS>` / `<PS>` can occur; this one runs over the raw source, so it must not skip the
-/// `0xE2` lead. `line_terminator_len` then classifies the hit, since most `0xE2` bytes
-/// begin some other character.
+/// built once over the whole source in every `format_in`. The `0xE2` lead is what
+/// `location`'s does not look for — that one runs inside a run already proven ASCII, where
+/// no `<LS>` / `<PS>` can occur; this one runs over the raw source, so it must not skip it.
+/// `line_terminator_len` then classifies the hit, since most `0xE2` bytes begin some other
+/// character.
+///
+/// ⭐ **The steady-state word test asks a WIDER question than the answer, because the
+/// wider one is cheaper: `\n`, `\r`, or any non-ASCII byte.**
+/// [`crate::swar::zero_or_high_lanes`] is [`crate::swar::zero_lanes`] with its `& !v` term
+/// dropped, and that term is the only thing that excluded the non-ASCII lanes — so two
+/// loose needles cost seven operations where three exact ones cost fourteen, and `<LS>` /
+/// `<PS>`'s `0xE2` lead is inside the loose class for free. The word that fires is then
+/// asked the exact question, so **the function's own class is unchanged** and no caller
+/// sees the difference.
+///
+/// ⚠️ **The exact re-ask is what makes a non-ASCII-dense document affordable, and it is
+/// not optional.** Returning the loose candidate to the caller instead reads `-0.354%` on
+/// real source and **+20%** on a document that is 98% non-ASCII, because every such byte
+/// becomes a hit the caller classifies and steps over one at a time. Re-asking keeps the
+/// stride at eight bytes through a run of CJK or emoji, and it costs real source nothing:
+/// a hit is only re-asked when its own word holds a non-ASCII byte at all.
 ///
 /// `from_le_bytes` puts byte 0 in the low lane, so the lowest set bit is the earliest
-/// match, and OR-ing the three masks preserves [`crate::swar::zero_lanes`]'s lowest-lane
-/// guarantee: a spurious lane in any one mask is preceded by a genuine one in that same
-/// mask.
+/// match, and OR-ing masks preserves the kernels' lowest-lane guarantee: a spurious lane in
+/// any one mask is preceded by a genuine one in that same mask. The loose mask is a
+/// superset of the exact one lane for lane — every `\n`, `\r` and `0xE2` is `\n`, `\r` or
+/// non-ASCII — so the exact answer can never sit BELOW the loose lane the byte test
+/// rejected.
 #[inline]
 fn next_line_terminator_candidate(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let w = u64::from_le_bytes(*chunk);
+        let loose = zero_or_high_lanes(w ^ splat(b'\n')) | zero_or_high_lanes(w ^ splat(b'\r'));
+        if loose != 0 {
+            if high_bit_lanes(w) == 0 {
+                // An all-ASCII word, which is what nearly every hit is: with no lane at or
+                // above `0x80` the loose mask IS the exact one, lane for lane, because the
+                // `& !v` term `zero_or_high_lanes` drops is all-ones exactly there.
+                return i + (loose.trailing_zeros() / 8) as usize;
+            }
+            // The word holds a non-ASCII byte, so the hit may be the loose class's own
+            // false positive — and a non-ASCII byte rarely comes alone. Hand the rest of
+            // this hop to the exact scan rather than re-asking word by word.
+            return exact_line_terminator_candidate(bytes, i);
+        }
+        i += 8;
+    }
+    line_terminator_candidate_tail(bytes, i)
+}
+
+/// [`next_line_terminator_candidate`]'s answer, computed with three EXACT needles — the
+/// scan the loose one approximates from above, and the fallback it hands a non-ASCII
+/// stretch to.
+///
+/// Same class, same result, ~20 instructions a word against the loose loop's 15. It exists
+/// because the loose loop's false positives are exactly the non-ASCII bytes, which come in
+/// runs: a `<LS>`-free stretch of CJK or emoji would otherwise leave the loose loop once
+/// per byte. Handing it the whole rest of the hop keeps that document at the cost it had
+/// before the loose loop existed, and real source reaches this call once per few hundred
+/// words.
+///
+/// ⚠️⚠️ **`#[inline(never)]` here IS the lever, not a refinement of it.** Marked
+/// `#[inline]` instead, this body is folded into [`next_line_terminator_candidate`] — and
+/// that grown body then loses ITS `#[inline]`, so the whole scan is emitted out of line and
+/// every hop pays a call. The measurement collapses from **`-0.300%`** to **`-0.003%`**:
+/// the lever is gone, not reduced. **The tell is free and it is the counter-intuitive
+/// one** — inlining more source made `tsv`'s `.text` 160 bytes SMALLER (2,895,893 against
+/// 2,896,053), because three inlined copies of the scan collapsing into one outweighs the
+/// body this attribute adds. Check `objcopy -O binary --only-section=.text` before
+/// believing any spelling of this pair.
+#[cold]
+#[inline(never)]
+fn exact_line_terminator_candidate(bytes: &[u8], from: usize) -> usize {
     let mut i = from;
     while let Some(chunk) = bytes[i..].first_chunk::<8>() {
         let w = u64::from_le_bytes(*chunk);
@@ -741,6 +803,18 @@ fn next_line_terminator_candidate(bytes: &[u8], from: usize) -> usize {
         }
         i += 8;
     }
+    line_terminator_candidate_tail(bytes, i)
+}
+
+/// The candidate class asked a byte at a time, over the fewer-than-eight bytes both word
+/// loops above stop short of.
+///
+/// One spelling, because it is the class ITSELF and the two loops reach it by different
+/// routes — and because a scan whose tail disagrees with its word loop by one arm is the
+/// bug no corpus finds: the tail runs only over a buffer's last seven bytes.
+#[inline]
+fn line_terminator_candidate_tail(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
     while i < bytes.len() && !matches!(bytes[i], b'\n' | b'\r' | LINE_SEPARATOR_LEAD) {
         i += 1;
     }
@@ -1511,6 +1585,36 @@ mod tests {
                         actual,
                         reference_line_breaks(&buf),
                         "align {align}, bytes {buf:02x?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The same equivalence over inputs whose non-ASCII bytes fill WHOLE WORDS, which is
+    /// the only shape that iterates `exact_line_terminator_candidate`'s loop: the alphabet
+    /// tests above pad with ASCII, so their non-ASCII bytes never span eight bytes and the
+    /// fallback always answers from the first word it is handed.
+    ///
+    /// Every run length across the stride, with a terminator placed at every offset inside
+    /// the run and immediately after it — a `<LS>` inside a CJK run is exactly the case the
+    /// loose scan cannot see and the fallback exists for.
+    #[test]
+    fn swar_line_break_scan_matches_the_scalar_reference_through_non_ascii_runs() {
+        for run in 0..24usize {
+            for terminator in ["\n", "\r\n", "\r", "\u{2028}", "\u{2029}", "\u{2603}"] {
+                for cut in 0..=run {
+                    let mut src = String::from("const x = 'start");
+                    src.push_str(&"中".repeat(cut));
+                    src.push_str(terminator);
+                    src.push_str(&"中".repeat(run - cut));
+                    src.push_str("end';\nlet y = 1;\n");
+                    let mut actual = Vec::new();
+                    build_line_breaks_bytes(src.as_bytes(), &mut actual);
+                    assert_eq!(
+                        actual,
+                        reference_line_breaks(src.as_bytes()),
+                        "run {run}, cut {cut}, terminator {terminator:?}"
                     );
                 }
             }
