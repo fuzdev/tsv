@@ -1444,6 +1444,54 @@ bottleneck.
   mostly the SWAR masks themselves; the remaining candidates all trade chain length for
   operation count, which is the trade that just failed.
 
+### The complement: a per-byte value almost nobody reads should be derived on demand
+
+The two sections above both restructure a *loop*. This one deletes a *value*, and it is the
+cheaper question to ask first: **what does this loop compute on every byte that its
+consumers ask for almost never?**
+
+The depth-tracking source scans — the printer's paren scan, the Svelte brace matcher, the TS
+arrow-vs-paren lookahead — each carried an `operand_end` anchor, the position just past the
+last significant non-whitespace byte, so that a `/` could be told from a division. They
+maintained it eagerly: an `is_ascii_whitespace` test and a select on every significant byte.
+The anchor is read only where the scan meets a `/`, which in real source is rare — so the
+maintenance ran hundreds of times per read.
+
+`OperandAnchor` carries instead the two facts the value can be rebuilt from — its value as
+of the last boundary the scan crossed, and where the run of significant bytes since that
+boundary began — and walks backward from the `/` when one is actually reached. Both fields
+move only at a boundary, so the per-byte cost is nothing at all.
+
+**The backward walk is sound precisely because it is bounded.** An unbounded lookback from
+the `/` is the hazard `is_regex_start_after`'s own doc warns about: a block comment before
+the slash puts the `/` of its `*/` in the lookback slot. This walk stops at the run's start,
+so every byte it reads is one the forward scan already classified as significant, and the
+comment case is answered by the stored boundary value rather than by looking at all.
+
+**It converts far beyond its instruction count, which is the point worth keeping.**
+`instructions:u` reads **−0.058 to −0.171%** across every real corpus — and a pure-CSS
+corpus, which reaches none of these scans, reads exactly **+0.000%**. Twelve binaries over
+three pooled replicates put cycles at **−0.451** points against the null and wall at
+**−0.594**, every replicate negative on both channels: roughly seven times the instruction
+saving. L1d misses are flat and IPC *rises* (1.940 → 1.958), the mirror image of the widened
+scan above, where IPC fell with the instruction count. The eager anchor was a loop-carried
+dependency holding a register; deleting it shortens the recurrence rather than the operation
+count.
+
+⚠️ **It is a trade, not a free win, and the axis is density.** The cost moves from per byte
+scanned to per anchor read, so the break-even sits at roughly three or four scanned bytes per
+`/` or comment inside a scanned region. Ordinary code is far above that — a division-heavy
+geometry module still reads **−0.058%** — but a document contrived to pack several divisions
+and inline block comments into one parenthesized expression reads **+0.9%**, and widening the
+whitespace runs between them takes that to **+6.6%**. The realistic worst case found was
+division-dense Svelte template expressions, whose brace regions are short: **+0.021%**.
+
+**The instrument that finds this shape costs nothing.** `perf report -g
+--symbol-filter=<symbol>` shows a hot symbol's *inlined children* — which is where the eager
+anchor was, running per byte under a function whose own source lines said nothing about it.
+A flat srcline board does not name it, and neither does the symbol board. Run that view over
+the top of the board and ask of each loop: **who reads what this computes, and how often?**
+
 ## WASM bundle size
 
 The `tsv_wasm` crate produces three WASM binaries via the `format` +

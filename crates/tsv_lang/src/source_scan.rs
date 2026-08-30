@@ -11,6 +11,10 @@
 // here is the common single-byte case; the depth-tracking and keyword scanners in
 // the language printers inline the loop with their own per-byte logic.
 //
+// The one piece of state such a scan carries beyond its own depth counters is the
+// regex-vs-division anchor, and it carries it as an `OperandAnchor` — which derives
+// the answer where a `/` asks for it instead of maintaining it on every byte.
+//
 // Used by the AST conversion layer (acorn comment duplication) and the printers.
 
 /// Which trivia kinds a scan skips over.
@@ -435,24 +439,116 @@ pub fn rfind_keyword(
 /// rule once here is what keeps a scanner from silently treating a skipped
 /// string as if it were a comment.
 #[inline]
-pub fn trivia_ends_operand(bytes: &[u8], i: usize) -> bool {
+fn trivia_ends_operand(bytes: &[u8], i: usize) -> bool {
     matches!(bytes[i], b'"' | b'\'' | b'`')
 }
 
-/// The operand-end anchor after a scan consumes the significant byte at `i` —
-/// unchanged when that byte is whitespace, which ends no operand.
+/// The `operand_end` anchor [`is_regex_start_after`] reads, derived **on demand**
+/// instead of maintained per byte.
 ///
-/// The whitespace case is the whole reason this is a named helper rather than a
-/// bare `operand_end = i + 1`: an anchor advanced over the space *after* a
-/// comment sits above the comment's own bytes, which is precisely the position a
-/// backward reader must never be handed.
-#[inline]
-#[must_use]
-pub fn operand_end_after(bytes: &[u8], i: usize, operand_end: usize) -> usize {
-    if bytes[i].is_ascii_whitespace() {
-        operand_end
-    } else {
-        i + 1
+/// A depth-tracking scan needs the anchor only where it meets a `/`, which is a rare
+/// byte — but stated as a running variable it charges every *significant* byte an
+/// `is_ascii_whitespace` test and a select to keep current. This carries the two
+/// facts the anchor can be rebuilt from instead: its value as of the last boundary
+/// the scan crossed, and where the run of significant bytes since that boundary
+/// began. Both move only at a boundary, so the per-byte cost is nothing at all.
+///
+/// **The backward walk is sound because it never leaves that run.** Every byte in
+/// `segment_start..pos` is one the scan already classified as significant, so the
+/// walk cannot wander into a comment — which is precisely the hazard
+/// [`is_regex_start_after`]'s doc warns a naive lookback falls into (`fn() /* c */ /
+/// bb` puts the `/` of the `*/` in the lookback slot). It stops at `segment_start`,
+/// and the boundary value answers whenever the whole run is whitespace.
+/// Deliberately NOT `Copy`: this is a scan's live cursor, not a config value like
+/// [`TriviaProfile`], and a silent fork of it would advance one copy while a stale
+/// one answered.
+#[derive(Debug)]
+pub struct OperandAnchor {
+    /// The anchor as of the last boundary crossed — already resolved, never lazy.
+    at_boundary: usize,
+    /// Where the current run of significant bytes begins; the backward walk's floor.
+    segment_start: usize,
+}
+
+impl OperandAnchor {
+    /// A scan that begins at `start` with nothing significant consumed yet.
+    #[inline]
+    #[must_use]
+    pub fn new(start: usize) -> Self {
+        Self {
+            at_boundary: start,
+            segment_start: start,
+        }
+    }
+
+    /// A scan whose loop begins at `segment_start` with the anchor already resolved
+    /// to `at_boundary` — the shape of a caller that consumes an opening delimiter
+    /// and skips the leading trivia itself before entering its loop, so the bytes
+    /// between the two are not the walk's to cross.
+    #[inline]
+    #[must_use]
+    pub fn resumed(at_boundary: usize, segment_start: usize) -> Self {
+        Self {
+            at_boundary,
+            segment_start,
+        }
+    }
+
+    /// Record a [`skip_trivia`] span that opened at `i` and ended at `past`.
+    ///
+    /// A string or template ends an operand, so the anchor lands past it; a comment
+    /// is transparent, so the operand *before* it still governs — and that pending
+    /// lazy answer must be resolved here, while the run it belongs to is still
+    /// reachable.
+    ///
+    /// ⚠️ **The two assignments below are ordered**: resolving the comment case reads
+    /// `segment_start`, so moving the floor first would resolve it against the wrong
+    /// run and report the anchor from before the *previous* boundary — `abc /* c */
+    /// /x/` would then read its division as a regex.
+    #[inline]
+    pub fn skipped_trivia(&mut self, bytes: &[u8], i: usize, past: usize) {
+        self.at_boundary = if trivia_ends_operand(bytes, i) {
+            past
+        } else {
+            self.at(bytes, i)
+        };
+        self.segment_start = past;
+    }
+
+    /// Record a span that both **ends an operand** and is opaque to the backward
+    /// walk — a regex literal or a template literal — ending at `past`.
+    #[inline]
+    pub fn skipped_operand(&mut self, past: usize) {
+        self.at_boundary = past;
+        self.segment_start = past;
+    }
+
+    /// The anchor at `pos`: just past the last significant non-whitespace byte the
+    /// scan consumed before it.
+    ///
+    /// Private on purpose: [`Self::starts_regex`] is the only question this answers,
+    /// and routing every caller through it is what keeps a scan from reconstructing
+    /// the eager anchor by hand.
+    #[inline]
+    #[must_use]
+    fn at(&self, bytes: &[u8], pos: usize) -> usize {
+        let mut j = pos;
+        while j > self.segment_start && bytes[j - 1].is_ascii_whitespace() {
+            j -= 1;
+        }
+        if j > self.segment_start {
+            j
+        } else {
+            self.at_boundary
+        }
+    }
+
+    /// Whether the `/` at `pos` starts a regex literal — [`is_regex_start_after`]
+    /// over the anchor this rebuilds, so a caller never handles the two separately.
+    #[inline]
+    #[must_use]
+    pub fn starts_regex(&self, bytes: &[u8], pos: usize, lower_bound: usize) -> bool {
+        is_regex_start_after(bytes, self.at(bytes, pos), lower_bound)
     }
 }
 
@@ -466,28 +562,34 @@ pub fn operand_end_after(bytes: &[u8], i: usize, operand_end: usize) -> usize {
 /// division; after anything else — or with nothing significant before it — it is
 /// a regex. `lower_bound` bounds both walks.
 ///
-/// The anchor is read directly — there is no backward walk, which is the point:
-/// `bytes[operand_end - 1]` is a byte the caller's scan already classified as
-/// significant, so no reader here can wander into a comment. Callers maintain it
-/// with [`operand_end_after`] and [`trivia_ends_operand`].
+/// The anchor is **handed in, never derived here by looking backward from the `/`** —
+/// which is the point: `bytes[operand_end - 1]` is a byte the caller's scan already
+/// classified as significant, so neither this function nor the reserved-word walk it
+/// delegates to can wander into a comment. (Those walks exist and are what
+/// `lower_bound` bounds; what does *not* exist is a search for the anchor itself.)
+/// Callers derive the anchor with [`OperandAnchor`], whose own walk is bounded by the
+/// last boundary its scan crossed and is sound for exactly the same reason.
 ///
 /// This is the one piece of `/`-disambiguation the trivia cursor deliberately
 /// leaves out of [`skip_trivia`]/[`TriviaProfile`]: it needs previous-**token**
 /// context, which a stateless forward scan can't carry as a flag. So the
 /// depth-tracking scanners that sit at a regex boundary (the printer's paren
-/// scan, Svelte's brace matcher, the TS arrow-vs-paren lookahead) thread the
-/// anchor themselves — updating it past every significant byte, past a skipped
+/// scan, Svelte's brace matcher, the TS arrow-vs-paren lookahead) carry the
+/// anchor themselves, as an [`OperandAnchor`] — which moves past a skipped
 /// regex or template, and past a skipped string but **not** a comment
 /// ([`trivia_ends_operand`]).
 ///
-/// ⚠️ It takes the anchor rather than the `/`'s own position because deriving
-/// one by walking *backward* cannot see trivia: a block comment before the
+/// ⚠️ It takes the anchor rather than the `/`'s own position because an
+/// **unbounded** backward walk cannot see trivia: a block comment before the
 /// slash (`fn() /* c */ / bb`) puts the `/` of its `*/` in the lookback slot,
 /// which ends no operand, so the division read as a regex and the scan ran on
 /// to some unrelated delimiter — losing the `)` a paren scan was looking for,
-/// and rejecting a Svelte `{…}` tag outright.
+/// and rejecting a Svelte `{…}` tag outright. [`OperandAnchor`]'s walk is not
+/// that walk: it stops at the last boundary the scan crossed, so the bytes it
+/// reads are only ones the scan already called significant, and the comment
+/// case is answered by the stored boundary value instead of by looking.
 #[inline]
-pub fn is_regex_start_after(bytes: &[u8], operand_end: usize, lower_bound: usize) -> bool {
+fn is_regex_start_after(bytes: &[u8], operand_end: usize, lower_bound: usize) -> bool {
     // Nothing significant before it (start of the scanned region) → regex.
     if operand_end <= lower_bound {
         return true;
@@ -659,25 +761,23 @@ pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> usize {
 pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Option<usize> {
     let mut depth: u32 = 1;
     let mut i = scan_start;
-    // Just past the last significant byte — the anchor `is_regex_start_after`
-    // reads. A template literal ends an operand, as does a skipped regex.
-    let mut operand_end = scan_start;
+    // The anchor `is_regex_start_after` reads, rebuilt where a `/` asks for it. A
+    // template literal ends an operand, as does a skipped regex.
+    let mut anchor = OperandAnchor::new(scan_start);
     while i < end {
         if bytes[i] == b'`' {
             i = skip_template_literal(bytes, i, end);
-            operand_end = i;
+            anchor.skipped_operand(i);
             continue;
         }
         if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
-            if trivia_ends_operand(bytes, i) {
-                operand_end = past;
-            }
+            anchor.skipped_trivia(bytes, i, past);
             i = past;
             continue;
         }
-        if bytes[i] == b'/' && i + 1 < end && is_regex_start_after(bytes, operand_end, scan_start) {
+        if bytes[i] == b'/' && i + 1 < end && anchor.starts_regex(bytes, i, scan_start) {
             i = skip_regex_literal(bytes, i, end);
-            operand_end = i;
+            anchor.skipped_operand(i);
             continue;
         }
         match bytes[i] {
@@ -690,7 +790,6 @@ pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Op
             }
             _ => {}
         }
-        operand_end = operand_end_after(bytes, i, operand_end);
         i += 1;
     }
     None
@@ -937,10 +1036,78 @@ mod tests {
                 i = past;
                 continue;
             }
-            operand_end = operand_end_after(bytes, i, operand_end);
+            // The EAGER rule, stated here rather than borrowed from production: an
+            // anchor advances past every significant byte that is not whitespace,
+            // and whitespace leaves it alone. `OperandAnchor` rebuilds the same
+            // value lazily, so this loop is its independent oracle.
+            if !bytes[i].is_ascii_whitespace() {
+                operand_end = i + 1;
+            }
             i += 1;
         }
         is_regex_start_after(bytes, operand_end, lower_bound)
+    }
+
+    /// The lazy anchor must agree with the eager rule at every `/` in a source —
+    /// the property the per-byte maintenance used to make true by construction.
+    #[test]
+    fn operand_anchor_matches_the_eager_rule_at_every_slash() {
+        let sources = [
+            "(a) / b",
+            "(a /* c */ / b)",
+            "(a // c\n / b)",
+            "('s' / b)",
+            "(`t` / b)",
+            "(   /re/ )",
+            "(a = /\\)/)",
+            "(a) /* x */ /re/",
+            "(/* c */ /re/)",
+            "(a /*c*/ /*d*/ / b)",
+            "(a\n\t/ b)",
+            "(f(x) / y)",
+            "(x++ / y)",
+            "()/re/",
+            "(`${a}` / b)",
+        ];
+        for src in sources {
+            let bytes = src.as_bytes();
+            let end = bytes.len();
+            let mut anchor = OperandAnchor::new(0);
+            let mut eager = 0usize;
+            let mut i = 0usize;
+            while i < end {
+                if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+                    assert_eq!(
+                        anchor.at(bytes, i),
+                        eager,
+                        "{src:?}: anchor disagrees before trivia at {i}"
+                    );
+                    if trivia_ends_operand(bytes, i) {
+                        eager = past;
+                    }
+                    anchor.skipped_trivia(bytes, i, past);
+                    i = past;
+                    continue;
+                }
+                if bytes[i] == b'/' {
+                    assert_eq!(
+                        anchor.at(bytes, i),
+                        eager,
+                        "{src:?}: anchor disagrees at the `/` at {i}"
+                    );
+                    if is_regex_start_after(bytes, eager, 0) {
+                        i = skip_regex_literal(bytes, i, end);
+                        eager = i;
+                        anchor.skipped_operand(i);
+                        continue;
+                    }
+                }
+                if !bytes[i].is_ascii_whitespace() {
+                    eager = i + 1;
+                }
+                i += 1;
+            }
+        }
     }
 
     #[test]
