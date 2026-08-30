@@ -24,7 +24,7 @@ and rsvelte additionally has a compiler and linter/typechecker integration
 
 tsv prioritizes, in order:
 
-1. correctness (Svelte and TypeScript conformance, spec adherence for HTML/CSS/JS)
+1. correctness (Svelte and TypeScript adherence, spec conformance for HTML/CSS/JS)
 2. speed
 3. binary size and memory usage
 4. extensibility, modularity, reusability
