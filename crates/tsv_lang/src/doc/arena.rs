@@ -95,6 +95,22 @@ impl ChildRange {
 /// Arena-allocated document node.
 ///
 /// Stores children as `DocId` indices and child lists as `ChildRange` ranges.
+///
+/// ⚠️ **VARIANT ORDER IS LOAD-BEARING, and no test can pin it.** Two separate
+/// mechanisms read the discriminants as a range:
+///
+/// - [`DocText`]'s four sub-tags own tags 0..=3 (the niche that holds a
+///   `DocNode` at 24 B), so `Text` is the fold every `match` here computes —
+///   which is why probing `Text` ahead of a dispatch is free and probing a kind
+///   above the fold is not (see `docs/architecture.md`).
+/// - [`DocArena::subtree_layout_memo`] peels the run **immediately above** that
+///   niche — `MultilineText` through `Group` — so its second test is one
+///   unsigned compare and a `Concat` falls through on a direct branch. A set
+///   with a hole in it lowers to a jump table and charges that fall-through an
+///   indirect jump: measured, the same lever is −0.173% instead of −0.377%.
+///
+/// So moving a variant is a performance change with no other signal. Re-measure
+/// all three doc walks (render, fits, layout) before reordering.
 #[derive(Debug, Clone)]
 pub enum DocNode {
     /// Text content to output (static, pooled, or source-span)
@@ -713,6 +729,21 @@ fn text_subtree_layout(t: &DocText) -> u32 {
             CachedWidth::Width(w) => u32::from(w),
             CachedWidth::HasNewline => LAYOUT_BREAKS_FORCED,
         },
+    }
+}
+
+/// The layout answer for a `Line`, as both halves of the fused walk read it.
+///
+/// Companion to [`text_subtree_layout`]: one emitter for a kind
+/// [`DocArena::subtree_layout_memo`] answers inline and
+/// [`DocArena::subtree_layout_fill`] still reaches from the fits walk's own
+/// probe.
+#[inline]
+fn line_subtree_layout(kind: LineKind) -> u32 {
+    match kind {
+        LineKind::Hard | LineKind::Literal => LAYOUT_BREAKS_FORCED,
+        LineKind::Soft => 0,
+        LineKind::Normal => 1,
     }
 }
 
@@ -2554,20 +2585,46 @@ impl DocArena {
     /// subtree is re-checked far more often than it is first computed, so the
     /// warm path is a load + compare at the call site instead of a full call.
     ///
-    /// The probe answers **two** questions before it will call in, in this order
-    /// — and the order is the whole point:
+    /// The probe answers **three** questions before it will call in, in this
+    /// order — and the order is the whole point:
     ///
     /// 1. a warm cache slot, which is the common case and stays first;
     /// 2. a leaf `Text`, whose answer is a field of the node
-    ///    ([`text_subtree_layout`]) and which is 22% of a real corpus's nodes.
+    ///    ([`text_subtree_layout`]) and which is 22% of a real corpus's nodes;
+    /// 3. a kind that answers from the node alone (`MultilineText`, `Line`, a
+    ///    pre-broken `Group`) or forwards ONE child's value verbatim (`Indent`,
+    ///    `Dedent`, `Align`, `AlignRoot`, a plain `Group`) — a third of every
+    ///    first visit between them.
     ///
-    /// The second only runs on a miss, so the hot path is unchanged, and it
-    /// keeps a leaf out of [`Self::subtree_layout_fill`]'s `#[cold]` frame
+    /// Only the miss path runs 2 and 3, so the hot path is unchanged, and they
+    /// keep those kinds out of [`Self::subtree_layout_fill`]'s `#[cold]` frame
     /// entirely. See that function's `#[cold]` note for what the frame costs.
+    ///
+    /// ⭐ **The peel set is a contiguous run of discriminants adjacent to
+    /// `Text`'s, and that is not a coincidence — it is what makes the residual
+    /// path free.** `DocText`'s four sub-tags own `DocNode` tags 0..=3
+    /// (the niche), and question 3's kinds are the tags immediately above them, so
+    /// two tests are `tag < 4` and one further unsigned compare; a `Concat` —
+    /// 64% of what still reaches the fill — falls through both on direct,
+    /// well-predicted branches. An earlier shape peeled `IndentIfBreak` and
+    /// `GatedState` too, whose tags sit above a hole, and LLVM lowered the
+    /// resulting set to a jump table: the fall-through then paid an INDIRECT
+    /// jump on every container, and the whole lever measured **−0.173%** where
+    /// this one measures **−0.377%**.
+    ///
+    /// ⚠️ **`inline(always)`, not `inline`, and the difference is the whole
+    /// lever.** With the peel added, plain `#[inline]` was declined: LLVM
+    /// outlined the probe (it appears on a board as a 4.29% symbol of its own)
+    /// and every one of its ~1.6 M calls — the warm ones included — paid a real
+    /// call, for `instructions:u` **+2.085%**. Forcing it back inline turns the
+    /// same source into a win. The attribute alone, without the peel, rebuilds
+    /// `.text` **byte-identical**, so it is buying inlining that was already
+    /// happening at the smaller body — not a layout draw.
     ///
     /// Returns the packed cell (see [`LAYOUT_UNKNOWN`]) — never
     /// [`LAYOUT_UNKNOWN`] itself.
-    #[inline]
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub(super) fn subtree_layout_memo(
         id: DocId,
         nodes: &[DocNode],
@@ -2579,25 +2636,103 @@ impl DocArena {
         if cached != LAYOUT_UNKNOWN {
             return cached;
         }
+        let node = &nodes[slot];
         // A leaf `Text`'s answer is one field of the node it is already about to
         // load, so on a miss it is cheaper to give it here than to enter
         // `Self::subtree_layout_fill` — whose `#[cold]` frame spills six
         // callee-saved registers for the container arms a leaf never reaches.
         // `Text` is 22% of a real corpus's nodes and this probe is the walk's
         // own recursion, so the miss path takes it once per such node.
+        if let DocNode::Text(t) = node {
+            let result = text_subtree_layout(t);
+            cache[slot] = result;
+            return result;
+        }
+        // The same argument, one kind-group along: every arm below answers from
+        // the node alone or forwards ONE child's value verbatim, so entering the
+        // `#[cold]` frame for it buys the prologue and nothing else.
+        let child = match node {
+            DocNode::MultilineText { .. } => {
+                cache[slot] = LAYOUT_BREAKS_FORCED;
+                return LAYOUT_BREAKS_FORCED;
+            }
+            DocNode::Line(kind) => {
+                let result = line_subtree_layout(*kind);
+                cache[slot] = result;
+                return result;
+            }
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => *inner,
+            DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => *contents,
+            DocNode::Group {
+                contents,
+                should_break,
+                ..
+            } => {
+                if *should_break {
+                    cache[slot] = LAYOUT_BREAKS_FORCED;
+                    return LAYOUT_BREAKS_FORCED;
+                }
+                *contents
+            }
+            _ => return Self::subtree_layout_fill(id, nodes, children, cache),
+        };
+        let result = Self::subtree_layout_forwarded(child, nodes, children, cache);
+        cache[slot] = result;
+        result
+    }
+
+    /// The answer for a node reached as a forwarding node's child — this probe
+    /// with its own forwarding peel removed, so the recursion is one level deep
+    /// rather than a loop.
+    ///
+    /// That is the whole shape of the peel above: a pass-through chain is one
+    /// node deep 81% of the time and two 19%, and three 0.02%, so a deeper tail
+    /// goes back through [`Self::subtree_layout_fill`] — whose forwarding arms
+    /// re-enter the probe — rather than costing every call site a loop and a
+    /// backfill.
+    ///
+    /// ⚠️ **`inline(always)`, and the tell that it is needed is that `.text`
+    /// SHRANK without it.** Under plain `#[inline]` this body is outlined and
+    /// the binary loses 160 bytes — the peel's call sites collapsing into one
+    /// copy — which is the same signature, in miniature, as the caller's own
+    /// note above. Forced in, the build is `.text` **byte-identical** to the
+    /// one-function spelling this was factored out of, so the split is
+    /// presentation only and ships on that spelling's measurements.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    fn subtree_layout_forwarded(
+        child: DocId,
+        nodes: &[DocNode],
+        children: &[DocId],
+        cache: &mut [u32],
+    ) -> u32 {
+        let slot = child.index();
+        let cached = cache[slot];
+        if cached != LAYOUT_UNKNOWN {
+            return cached;
+        }
         if let DocNode::Text(t) = &nodes[slot] {
             let result = text_subtree_layout(t);
             cache[slot] = result;
             return result;
         }
-        Self::subtree_layout_fill(id, nodes, children, cache)
+        Self::subtree_layout_fill(child, nodes, children, cache)
     }
 
     /// The cold half of [`Self::subtree_layout_memo`]: compute and cache a
     /// subtree's layout facts — whether it forces a break, and if not, its
-    /// break-free flat width. Runs at most once per node; recursion goes back
-    /// through the inline probe so warm children never re-enter here, and a leaf
-    /// `Text` reached through [`Self::subtree_layout_memo`] never enters at all.
+    /// break-free flat width. Runs at most once per node, and recursion goes
+    /// back through the inline probe, so warm children never re-enter here.
+    ///
+    /// ⚠️ **Nine of the arms below are unreachable through that probe**, which
+    /// peels them: `Text`, `MultilineText`, `Line`, `Indent`, `Dedent`,
+    /// `Align`, `AlignRoot` and both halves of `Group`. They are kept, and must
+    /// stay in sync with the peel, because the fits walk's own probe
+    /// (`arena_fits`'s `flat_width_memo`) calls this function **directly** —
+    /// it is a second entry point, not a second caller of the memo. Where an
+    /// arm is more than a constant it is factored into one emitter the peel
+    /// also calls ([`text_subtree_layout`], [`line_subtree_layout`]); the rest
+    /// are one token each, and duplicating a token is cheaper than a call.
     ///
     /// ⭐ **This is the fusion of what were two identical traversals.** The
     /// forced-break question is asked at BUILD (45 printer call sites, through
@@ -2628,11 +2763,11 @@ impl DocArena {
     /// without a new idea.
     ///
     /// ⚠️ **That +0.02% was measured when `Text` still entered here**, and the
-    /// probe now answers it, so this function's input mix has lost 22% of its
-    /// calls and skews further toward the container arms `#[cold]` was chosen
-    /// for. The verdict should hold a fortiori — but it is a number about a
-    /// call mix that has since changed, so re-take it rather than quote it if
-    /// anything downstream re-routes again.
+    /// probe has since taken `Text` and then the leaf-and-forwarding kinds, so
+    /// this function's input mix has lost half its calls and is now 96%
+    /// `Concat` — exactly the recursive arm `#[cold]` was chosen for. The
+    /// verdict should hold a fortiori, but it is a number about a call mix that
+    /// has changed twice, so re-take it rather than quote it.
     #[cold]
     #[inline(never)]
     pub(super) fn subtree_layout_fill(
@@ -2650,11 +2785,7 @@ impl DocArena {
             DocNode::Text(t) => text_subtree_layout(t),
             // Contains hardlines → always breaks (like the `concat([…, hardline, …])` it replaces).
             DocNode::MultilineText { .. } => LAYOUT_BREAKS_FORCED,
-            DocNode::Line(kind) => match kind {
-                LineKind::Hard | LineKind::Literal => LAYOUT_BREAKS_FORCED,
-                LineKind::Soft => 0,
-                LineKind::Normal => 1,
-            },
+            DocNode::Line(kind) => line_subtree_layout(*kind),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 Self::subtree_layout_memo(*inner, nodes, children, cache)
             }
