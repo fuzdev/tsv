@@ -1696,8 +1696,18 @@ impl<'a> Printer<'a> {
         arrow: &internal::ArrowFunctionExpression<'_>,
         sig: DocId,
     ) -> DocId {
-        let sig_end = self.arrow_signature_end(arrow);
         let arrow_pos = arrow.arrow_token;
+        // The gap this prints starts at the signature end, and locating that costs a
+        // depth-tracked `)` scan ([`Self::arrow_params_end`]) — for a bound that is only
+        // ever the floor of this emptiness test, which almost always answers "nothing
+        // here". Nothing can sit in the gap without also sitting in the arrow's own span,
+        // so an empty WIDER range settles it and the scan never runs; the exact floor is
+        // derived only once a comment is known to be somewhere ahead of `=>`. Same axis
+        // on both queries, so the widening can only over-approximate.
+        if !self.has_comments_to_emit_between(arrow.span.start, arrow_pos) {
+            return sig;
+        }
+        let sig_end = self.arrow_signature_end(arrow);
         if !self.has_comments_to_emit_between(sig_end, arrow_pos) {
             return sig;
         }
