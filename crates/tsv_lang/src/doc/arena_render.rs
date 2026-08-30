@@ -742,11 +742,11 @@ fn render_doc_iterative(
         #[cfg(feature = "swallow_check")]
         swallow: SwallowTracker::begin_render(),
     };
-    // Borrow the arena-pooled work buffers for the duration of this top-level
-    // render: their spill capacity warms once per arena instead of
-    // re-allocating per rendered piece. Sub-renders (fill segments,
-    // line-suffix flushes) use their own inline locals, never these.
-    let mut commands = arena.borrow_render_commands_scratch();
+    // Borrow the arena-parked work buffers for the duration of this top-level
+    // render: their capacity warms once per arena instead of re-allocating per
+    // rendered piece. Nested renders (fill segments, line-suffix flushes) take
+    // their own parked stack, never these — see `DocArena::sub_render_stack`.
+    let mut commands = arena.borrow_top_render_stack();
     let mut line_suffix = arena.borrow_line_suffix_scratch();
     let mut should_remeasure = false;
 
@@ -783,9 +783,9 @@ fn render_doc_iterative(
 /// that forward to exactly one child (Indent, Group, Concat's first child,
 /// …) assign `cmd` and `continue` instead of pushing it — the pushed-last
 /// command would be popped right back on the next iteration (LIFO), so this
-/// skips that stack round trip (SmallVec spill checks both ways plus the
-/// reload feeding the dispatch load chain). Traversal order is identical,
-/// and `commands` holds the same pending set at every fits/fill lookahead
+/// skips that stack round trip (a store and a load, plus the reload feeding the
+/// dispatch load chain). Traversal order is identical, and `commands` holds the
+/// same pending set at every fits/fill lookahead
 /// (those run before the continuation would have been pushed). Only
 /// terminal arms (Text, Line, Fill, …) fall through to the pop at the
 /// bottom of the loop.
@@ -1276,6 +1276,14 @@ fn render_doc_core<P: RenderPolicy>(
 }
 
 /// Render a single doc with specified mode (helper for Fill).
+///
+/// ⚠️ **`#[inline]` is load-bearing.** LTO folded this wrapper into
+/// `render_fill_iterative` on its own until the sub-render's command stack
+/// became a parked one — the two extra calls grew the body past the threshold
+/// and it was emitted out of line, one call per fill segment. Same signature as
+/// every other case of it in this arc: `.text` moving the wrong way for the
+/// source change.
+#[inline]
 pub(super) fn render_single_doc(
     ctx: &RenderCtx<'_>,
     doc: DocId,
@@ -1333,10 +1341,10 @@ pub(super) fn render_single_doc_inner(
     let mut dummy_suffix: LineSuffixBuf = SmallVec::new();
     let line_suffix = suffix_buffer.unwrap_or(&mut dummy_suffix);
 
-    // Sub-renders keep a local inline stack (measured allocation-free — the
-    // common single-doc render never spills) rather than borrowing the pooled
-    // one, which the enclosing top-level render already holds.
-    let mut commands: CmdStack = SmallVec::new();
+    // Sub-renders take their own parked stack rather than borrowing the
+    // top-level one, which the enclosing render already holds — see
+    // `DocArena::take_sub_render_stack`.
+    let mut commands = ctx.arena.take_sub_render_stack();
     render_doc_core(
         ctx,
         doc,
@@ -1349,6 +1357,7 @@ pub(super) fn render_single_doc_inner(
         line_suffix,
         should_remeasure,
     );
+    ctx.arena.return_sub_render_stack(commands);
 }
 
 //
