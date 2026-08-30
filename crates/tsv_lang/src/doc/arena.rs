@@ -2716,6 +2716,22 @@ impl DocArena {
     /// re-enter the probe — rather than costing every call site a loop and a
     /// backfill.
     ///
+    /// ⚠️ **A second peel level is measured and loses, at every set size — the
+    /// one-level shape is the answer, not a first instalment.** The population is
+    /// real: 18.6% of chains are two deep, and 38,216 of a real corpus's 537,315
+    /// calls into the fill forward one child and do nothing else. But capturing
+    /// them costs a second kind test on the ~68% of calls that reach a container,
+    /// and that tax exceeds the frames it saves — `instructions:u` **+0.13…
+    /// +0.21%** repeating the whole peel set, **+0.07…+0.13%** narrowed to
+    /// `Indent`/`Dedent` alone. Half the wide set's cost is a lowering effect:
+    /// inlined into [`Self::subtree_layout_fill`] the probe is compiled in that
+    /// function's `#[cold]`, size-optimized world, where the set becomes a **jump
+    /// table** instead of the compare chain it forms elsewhere, so every
+    /// container fall-through pays an indirect jump (nine new tables, one per
+    /// inlined site). The narrow set is a compare chain, adds no table, and still
+    /// loses. The deeper peel is worth −0.10…−0.14% with that attribute removed
+    /// — which is not an available shape, for the reason its own note gives.
+    ///
     /// ⚠️ **`inline(always)`, and the tell that it is needed is that `.text`
     /// SHRANK without it.** Under plain `#[inline]` this body is outlined and
     /// the binary loses 160 bytes — the peel's call sites collapsing into one
@@ -2776,23 +2792,20 @@ impl DocArena {
     /// a line?", where `BREAKS_SOFT` means "the fits walk has to look at me".
     ///
     /// ⚠️ **`#[cold]` is a claim about the call, not about the total, and it is
-    /// still the right one.** This function carries ~6–8% self on a real-corpus
-    /// board — "once per node" is a small share of *calls* and a large share of
-    /// *time* — and `#[cold]` puts it under size-optimized codegen, visibly so:
-    /// it spills and immediately reloads four argument registers around the
-    /// `Concat` / `Fill` arm's recursion. Dropping the attribute removes exactly
-    /// that (the body shrinks by 14 bytes) and still measures `instructions:u`
-    /// **+0.02%** — the callers lose more from the un-hinted branch, since the
-    /// probe in [`Self::subtree_layout_memo`] is inlined at every call site and
-    /// wants this call laid out away from its warm path. Measured; don't re-try
-    /// without a new idea.
-    ///
-    /// ⚠️ **That +0.02% was measured when `Text` still entered here**, and the
-    /// probe has since taken `Text` and then the leaf-and-forwarding kinds, so
-    /// this function's input mix has lost half its calls and is now 96%
-    /// `Concat` — exactly the recursive arm `#[cold]` was chosen for. The
-    /// verdict should hold a fortiori, but it is a number about a call mix that
-    /// has changed twice, so re-take it rather than quote it.
+    /// emphatically the right one.** This function carries ~6–8% self on a
+    /// real-corpus board — "once per node" is a small share of *calls* and a
+    /// large share of *time* — and `#[cold]` puts it under size-optimized
+    /// codegen, visibly so: it spills and immediately reloads four argument
+    /// registers around the `Concat` / `Fill` arm's recursion. Dropping the
+    /// attribute removes exactly that — this body and two of its callers shrink,
+    /// 103 bytes between them, with no symbol outlined — and measures
+    /// `instructions:u` **+0.332%** on real corpora. The callers lose far more
+    /// from the un-hinted branch than the body saves, since the probe in
+    /// [`Self::subtree_layout_memo`] is inlined at every call site and wants this
+    /// call laid out away from its warm path. Measured against the current call
+    /// mix, which is half the original calls and now 96% `Concat` — exactly the
+    /// recursive arm the attribute was chosen for. Don't re-try without a new
+    /// idea.
     #[cold]
     #[inline(never)]
     pub(super) fn subtree_layout_fill(
