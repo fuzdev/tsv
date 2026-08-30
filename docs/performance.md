@@ -778,6 +778,44 @@ of the lowest) were caught only there. See the same rule applied to CSS keyword 
 [`crates/tsv_css/CLAUDE.md`](../crates/tsv_css/CLAUDE.md), and to text width in
 [`crates/tsv_lang/CLAUDE.md`](../crates/tsv_lang/CLAUDE.md).
 
+### A candidate scan can ask a wider question than its answer
+
+`tsv_lang::printing`'s line-terminator scan is a *candidate* scan: it reports a
+position and `line_terminator_len` classifies it, so a false positive costs a
+classification and a byte step, not a wrong answer. That licence is worth half the
+scan's operations. Its three exact SWAR needles (`\n`, `\r`, and the `0xE2` lead
+of `<LS>` / `<PS>`) cost fourteen ALU operations a word; two **loose** ones cost
+seven and cover the same class, because dropping `zero_lanes`'s `& !v` term admits
+every non-ASCII lane — and `0xE2` is non-ASCII, so the third needle is subsumed
+rather than spelled. The loop goes from twenty instructions per eight bytes to
+fifteen.
+
+Two rules come out of it, and the second is the one that decides the shape:
+
+- **The lowest-lane guarantee is what survives the dropped term, so check it
+  first.** A zero lane flags itself, a lane at or above `0x80` flags itself
+  through the `| v`, and a lane in `0x01..=0x7F` flags only on a borrow-in —
+  which requires a genuine zero below it. `crate::swar::zero_or_high_lanes`
+  carries the argument; the exhaustive alignment test grades the caller against
+  the class it always exported.
+- **A loose class is a per-document tax, and no standing corpus varies the
+  property it keys on.** Handing the loose candidate straight to the caller is
+  the cheapest possible shape and measures a clean win on real source, which is
+  0.03–0.32% non-ASCII — and roughly **+20%** on a document that is 98%
+  non-ASCII, where every byte becomes a hit to step over. So the scan keeps its
+  exported class exact: an all-ASCII word makes the loose mask identical to the
+  exact one lane for lane, and only a word that holds a non-ASCII byte falls back
+  to the three-needle scan. **Build the adversarial document from the mechanism
+  before choosing between shapes** — here the file that decided it was not the
+  98% blob but an ordinary i18n message table at 62%.
+
+⚠️ The fallback is `#[cold] #[inline(never)]` and that is not a tuning detail:
+inlining it grows the scan past the inline threshold, the *scan* is then emitted
+out of line, and the whole win disappears. The free tell is the counter-intuitive
+one — inlining more source makes `.text` **smaller**, because several inlined
+copies collapse into one. Screen every candidate with `objcopy -O binary
+--only-section=.text` and explain the sign before measuring.
+
 Two harness rules that fall out of the same skepticism, both of which have faked
 a result here:
 
@@ -1215,8 +1253,14 @@ four real corpora for **+9.7 KB** — 52% of the win at 2.8% of the size — and
 So the decision is not binary. Read it as three questions in order:
 
 - **Is the callee's hot path a few loads behind cold edges?** If not (a byte
-  scan, a loop), stop — `build_line_breaks_into` is 608 bytes at 1.14% self and
-  is a SWAR newline scan run once per document, not call overhead.
+  scan, a loop), stop — `build_line_breaks_into` is a SWAR newline scan run once
+  per document, ~1.2% of cycles and ~2% of retired instructions on a real-corpus
+  board, and its cost is work rather than call overhead. ⚠️ That answers the
+  *inlining* question only, and answering it is not the same as clearing the
+  symbol. A scan whose cost is work is attacked by asking for less of it — see
+  [§A candidate scan can ask a wider question than its
+  answer](#a-candidate-scan-can-ask-a-wider-question-than-its-answer), where this
+  same function's mask lost half its operations.
 - **How many call sites?** Cost is roughly (inlined body) × (sites). A handful
   of sites makes the whole-body question moot; a thousand makes it the deciding
   term.
