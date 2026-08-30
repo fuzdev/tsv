@@ -72,7 +72,11 @@ fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> 
 /// this same walker: a child starting *later* than its parent (a `NewExpression` callee, a
 /// parenthesized inner) means the parent prints something ahead of it, so nothing below it
 /// leads the value.
-fn leading_jsdoc_cast<'x>(expr: &'x Expression<'x>) -> Option<&'x internal::JsdocCast<'x>> {
+///
+/// ⚠️ The **unguarded** walk. Every caller goes through [`Printer::leading_jsdoc_cast`],
+/// which carries the document-level short-circuit; this half exists only so that
+/// short-circuit has exactly one spelling.
+fn leading_jsdoc_cast_walk<'x>(expr: &'x Expression<'x>) -> Option<&'x internal::JsdocCast<'x>> {
     let start = expr.span().start;
     let mut node = expr;
     loop {
@@ -88,13 +92,35 @@ fn leading_jsdoc_cast<'x>(expr: &'x Expression<'x>) -> Option<&'x internal::Jsdo
 }
 
 impl<'a> Printer<'a> {
+    /// The [`internal::JsdocCast`] that leads `value`, or `None` — [`leading_jsdoc_cast_walk`]
+    /// behind this document's owned-comment presence flag.
+    ///
+    /// **The short-circuit belongs here, not at the call sites.** A cast's comment is always
+    /// owned ([`internal::JsdocCast`] is minted only for `/** … */ (expr)`), so a document
+    /// carrying no owned comment carries no cast and the left-spine walk cannot find one —
+    /// which is ~every document. That is a fact about the DOCUMENT, so every caller owes it,
+    /// and stating it once here is what makes it unforgettable: the cannot-hang marks below
+    /// run the walk once per Svelte braced head, so a caller reaching past this method pays
+    /// the spine walk on every `{expr}` in the template. A caller that ALSO tests the flag
+    /// does so for its own further work (a position lookup, a comment-body read), not for
+    /// this walk.
+    fn leading_jsdoc_cast<'x>(
+        &self,
+        value: &'x Expression<'x>,
+    ) -> Option<&'x internal::JsdocCast<'x>> {
+        if !self.has_owned_comments {
+            return None;
+        }
+        leading_jsdoc_cast_walk(value)
+    }
+
     /// Record that `value` sits in a gap that answers a leading cast's break by rule and
     /// **cannot hang** — a Svelte braced head (`EmbedContext::jsdoc_cast_cannot_hang`) —
     /// so the cast it LEADS with reflows its comment→`(` break to a space in every
     /// authoring, the own-line hardline arm included
     /// ([`Printer::jsdoc_cast_cannot_hang_target`]).
     ///
-    /// The mark lands on the value's [`leading_jsdoc_cast`] — the left-spine walk the TS
+    /// The mark lands on the value's [`Self::leading_jsdoc_cast`] — the left-spine walk the TS
     /// hang predicates use — because a braced head's bug is exactly the hang's absence:
     /// wherever a TS value gap would answer the cast's hardline by ending the operator's
     /// line, a braced head has no operator line, so the reflow must reach every cast the
@@ -108,7 +134,7 @@ impl<'a> Printer<'a> {
     /// their build in [`Printer::with_jsdoc_cast_cannot_hang_gap`] instead.
     pub(in crate::printer) fn mark_jsdoc_cast_cannot_hang_gap(&self, value: &Expression<'_>) {
         self.jsdoc_cast_cannot_hang_target
-            .set(leading_jsdoc_cast(value).map(|cast| cast.span));
+            .set(self.leading_jsdoc_cast(value).map(|cast| cast.span));
     }
 
     /// Build `value`'s doc under a cannot-hang mark, restoring the previous mark after —
@@ -126,7 +152,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let saved = self.jsdoc_cast_cannot_hang_target.get();
         self.jsdoc_cast_cannot_hang_target
-            .set(leading_jsdoc_cast(value).map(|cast| cast.span));
+            .set(self.leading_jsdoc_cast(value).map(|cast| cast.span));
         let doc = build();
         self.jsdoc_cast_cannot_hang_target.set(saved);
         doc
@@ -373,12 +399,12 @@ impl<'a> Printer<'a> {
         // comment and its `(` on exactly the shape `jsdoc_cast_comment_is_own_line`
         // describes, and a hang without that hardline strands the `(` (see that
         // function's doc — it is the single source of truth for both). The cast is resolved
-        // through [`leading_jsdoc_cast`] rather than matched because it may lead the value
+        // through [`Self::leading_jsdoc_cast`] rather than matched because it may lead the value
         // from the LEFTMOST LEAF rather than from `expr` itself, a position the lookup below
         // cannot ask about. (That lookup would otherwise find an own-line cast's comment —
         // it takes ownership's UNION glue — so the early return above is also what keeps the
         // general arm from answering for a shape whose hang rule is the cast's.)
-        let is_cast = if let Some(cast) = leading_jsdoc_cast(expr) {
+        let is_cast = if let Some(cast) = self.leading_jsdoc_cast(expr) {
             if jsdoc_cast_comment_is_own_line(cast, self.source) {
                 return Some(OwnedCommentEffect::Hangs);
             }
@@ -417,13 +443,11 @@ impl<'a> Printer<'a> {
     /// — where tsv matches it (`member_init_multiline_block_comment`). Only the cast's own
     /// hardline makes the hang structural rather than a layout preference, which is why those
     /// two sites take this test and the declarator keeps the wide one. Both read the same cast
-    /// off [`leading_jsdoc_cast`], so the pair cannot disagree about WHICH cast leads a value.
+    /// off [`Self::leading_jsdoc_cast`], so the pair cannot disagree about WHICH cast leads a
+    /// value — and both take that lookup's document-level short-circuit.
     pub(crate) fn is_own_line_jsdoc_cast(&self, value: &Expression<'_>) -> bool {
-        // Document-level short-circuit: a cast's comment is always owned, so no owned comment
-        // anywhere means no cast — and the spine walk below is skipped for ~every document.
-        self.has_owned_comments
-            && leading_jsdoc_cast(value)
-                .is_some_and(|cast| jsdoc_cast_comment_is_own_line(cast, self.source))
+        self.leading_jsdoc_cast(value)
+            .is_some_and(|cast| jsdoc_cast_comment_is_own_line(cast, self.source))
     }
 
     /// **on page**: where `expr`'s printed content begins in source — the start of the owned
@@ -451,10 +475,10 @@ impl<'a> Printer<'a> {
         // It must: `JsdocCast::span` covers the `(`…`)` only — the comment sits *outside* it —
         // so the lookup below can only ever find the cast's comment when the cast is `expr`'s
         // own left edge, and it is asked at a POSITION, which cannot walk.
-        // Resolved down the left spine ([`leading_jsdoc_cast`]): the comment leads the value
+        // Resolved down the left spine ([`Self::leading_jsdoc_cast`]): the comment leads the value
         // from its leftmost leaf too, and a bound taken past it drops an authored blank line
         // (`[a,⏎⏎/** @type {A} */⏎(x).b]`) — the loss this function exists to prevent.
-        if let Some(cast) = leading_jsdoc_cast(expr) {
+        if let Some(cast) = self.leading_jsdoc_cast(expr) {
             return Some(cast.comment.span.start);
         }
         self.owned_leading_comment_at(expr.span().start)
@@ -468,7 +492,7 @@ impl<'a> Printer<'a> {
     /// so the lookup takes their union and `owned_by_node` decides (see that function). A
     /// JSDoc cast's comment therefore IS found here even from the line above its `(` — the
     /// three callers that must not print it twice each resolve the cast off the node first
-    /// ([`leading_jsdoc_cast`], which also walks the left spine this position cannot).
+    /// ([`Self::leading_jsdoc_cast`], which also walks the left spine this position cannot).
     fn owned_leading_comment_at(&self, start: u32) -> Option<&'a internal::Comment> {
         tsv_lang::owned_leading_comment_at(self.source, self.comments, start)
     }
