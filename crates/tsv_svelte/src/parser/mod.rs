@@ -363,10 +363,32 @@ fn find_tag_close(
     allow_ws_before_gt: bool,
 ) -> Option<usize> {
     let bytes = source.as_bytes();
+    // Every caller anchors `from` just past a `>`, so it is a char boundary; the hop below
+    // then only ever lands on `<`, which is ASCII. Stated as an assert because the `?` on
+    // the re-slice would turn a mid-character `from` into a silent "no close tag" instead
+    // of a panic.
+    debug_assert!(source.is_char_boundary(from));
     let mut i = from;
-    while i < bytes.len() {
-        if bytes[i] == b'<'
-            && bytes.get(i + 1) == Some(&b'/')
+    // Hop to each `<` rather than testing every byte. A single-`char` pattern lowers to
+    // `memchr`, and the run between two `<`s in a raw-text body is long — a real
+    // component averages one per ~1.2-1.5 KB of `<script>`/`<style>` body — so the
+    // per-byte test this loop used to run was paying its whole cost on bytes that cannot
+    // begin a close tag. `i` only ever sits on `from` (a tag boundary) or on a `<`, both
+    // ASCII, so the re-slice is always on a char boundary; an `i` past the end answers
+    // `None`, which is this scan's own "no close tag" result.
+    //
+    // ⚠️ It trades a per-BYTE cost for a per-`<` one, so it has a density axis: measured
+    // `instructions:u` **−2.45%** on a 1,695-file Svelte corpus and **−1.40%** on a
+    // synthetic body carrying a `<` every 42 bytes, but **+0.91%** at one every 15.
+    // Break-even is near one `<` per ~25 bytes, and the densest body in that whole real
+    // corpus is 28.8 — so the tax needs a script an order of magnitude more
+    // angle-bracket-dense than anything real. Re-entering `find` per candidate (rather
+    // than holding one `match_indices` searcher across them) is what buys the mainline
+    // case: the searcher form is ~0.14 points worse there and ~0.1-0.3 better on the
+    // dense shapes, and the mainline is where every measured document sits.
+    while let Some(rel) = source.get(i..)?.find('<') {
+        i += rel;
+        if bytes.get(i + 1) == Some(&b'/')
             && bytes.get(i + 2..).is_some_and(|rest| rest.starts_with(tag))
         {
             // `</` + an ASCII tag name, so this is a char boundary — safe to decode from.

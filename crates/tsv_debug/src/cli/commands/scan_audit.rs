@@ -86,6 +86,12 @@ const DEFERRED_BUG: &str = "delimiter-deferred-bug";
 /// - `at-rule-range` — connector keyword in a normalized CSS at-rule range prelude.
 /// - `attr-name` — Svelte attribute-name `:` split (directive prefix).
 /// - `jsdoc-tag` — scans a value/comment string for `@type`/`@satisfies` cast tags.
+/// - `raw-text-close` — the `<` hop inside a raw-text close scan (`</script>` /
+///   `</style>`). Comment/string blindness is this scan's **contract**, not an
+///   oversight: it ports Svelte's own `read_until(regex_closing_script_tag)`, so a
+///   literal `"</script>"` in the body closes the block for both parsers. Routing it
+///   onto the trivia-aware cursor would introduce a parser divergence, so this
+///   category is migrate-**never**, unlike `delimiter-latent` below.
 ///
 /// Tracked delimiter-over-source scans (the real "Comment-Aware Delimiter Scans"
 /// class):
@@ -151,6 +157,11 @@ const ALLOW: &[Allow] = &[
         "tsv_svelte/src/parser/attribute.rs",
         "&& let Some(colon_idx) = name_str.find(':')",
         "attr-name",
+    ),
+    (
+        "tsv_svelte/src/parser/mod.rs",
+        "while let Some(rel) = source.get(i..)?.find('<') {",
+        "raw-text-close",
     ),
     // ── tsv_ts ───────────────────────────────────────────────────────────────
     (
