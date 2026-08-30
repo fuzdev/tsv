@@ -1231,6 +1231,63 @@ wrong, and choosing which call sites deserve an inline is exactly what a
 profile-guided inliner does automatically — a hand sweep down a candidate table
 is doing PGO's job one symbol at a time.
 
+### And the trap on the other side: an edit that GROWS an inlined probe can un-inline it
+
+The two sections above are about a callee LLVM declined to inline in the first
+place. The nastier version is a callee it *was* inlining, until your edit made
+it bigger — because the sign flips and nothing announces it.
+
+The fused layout walk's memo probe (`DocArena::subtree_layout_memo`) is a cache
+load, a compare, and a peel for the kinds it can answer itself. Adding a second
+peel to its miss path pushed it past the cost model's threshold: the probe was
+emitted out of line, appeared on the next board as **its own 4.29% symbol**, and
+every one of its ~1.6 M calls — the warm ones, which are the whole reason the
+probe exists — paid a real call. `instructions:u` **+2.085%**, for an edit whose
+intent was a −0.4% win. `#[inline(always)]` on identical source: **−0.377%**.
+
+- ⭐ **The tell is free and it is counter-intuitive: `.text` went DOWN.** A perf
+  edit that adds source and *shrinks* the binary by 320 B has outlined something
+  — the nine inlined copies collapsing into one costs more than the new code
+  adds. Take `objcopy -O binary --only-section=.text` + `stat -c%s` on every
+  candidate; a shrink you cannot explain is this.
+- ⭐ **Confirm the attribute is buying inlining, not luck.** Applying
+  `#[inline(always)]` to the *un-grown* probe rebuilt `.text` **byte-identical**
+  to the baseline — proof the small body was already being inlined everywhere,
+  so the attribute on the grown body is restoring the old behaviour rather than
+  contributing a layout draw of its own. That control costs one build and no
+  measurement.
+- ⚠️ Then re-check the size axis anyway: the shipped shape is +1,968 B of
+  `.text` and +2,081 B of WASM, nine copies of a bigger probe.
+
+### Where a peel's SET boundary lands decides the cost of the path it does NOT take
+
+The same lever, built twice over different kind sets, measures −0.173% and
+−0.377%. The difference is not what was peeled — both peel the same dominant
+kinds — but whether the peeled set is a **contiguous run of discriminants**.
+
+`DocNode`'s tags run `Text` 0..=3 (the niche), then `MultilineText`, `Line`,
+`Indent`, `Dedent`, `AlignRoot`, `Align`, `Group`, `IfBreak`, `IndentIfBreak`,
+`Concat`, … The first attempt peeled the *semantic* set — every kind that
+forwards one child's value — which reaches over `IfBreak` to take
+`IndentIfBreak` and `GatedState`. That set has holes, so LLVM lowers it to a
+**jump table**, and the fall-through — `Concat`, 64% of the calls that still
+reach the outlined fill — pays a table load and an **indirect jump** before
+landing on the default. Dropping the two outliers and adding the constant-answer
+kinds that sit inside the range instead (`MultilineText`, `Line`, a pre-broken
+`Group`) makes the set `tag <= Group`: one unsigned compare, a direct
+well-predicted branch, and a residual path that costs the same as before the
+peel existed.
+
+- **Price the fall-through, not just the peel.** The peel fires on a quarter of
+  the calls; the fall-through fires on the rest, so a 4-instruction indirect
+  jump there outweighs a 25-instruction frame saved here.
+- **Variant declaration order is therefore a performance surface**, and one that
+  no test can pin. Where a hot `match` peels a prefix, note it on the enum.
+- Companion to §A per-site precondition is only as cheap as its fold, and to the
+  niche-fold rule in `docs/architecture.md`: both say the same thing from the
+  other end — a probe ahead of a switch is only free when the switch was going
+  to compute it anyway.
+
 ## WASM bundle size
 
 The `tsv_wasm` crate produces three WASM binaries via the `format` +
