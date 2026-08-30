@@ -889,7 +889,14 @@ counter that matches what it *moves*:
 | --- | --- |
 | work (fewer operations) | `instructions:u` |
 | bytes, alignment, access width or ordering | `cycles:u` |
+| data-dependent branches removed | `branch-misses:u` |
 | code size | the WASM bounds (see above) |
+
+⚠️ **The third row is a diagnosis, not a verdict.** A branch-miss reduction is no more a
+cycles claim than an instruction reduction is: a scan rewrite that removed **2.4% of the
+whole program's branch misses** — essentially the entire share of the function it touched —
+still lost 0.45 points of cycles (§And the converse, below). Read that counter to learn
+whether the mechanism you believed in actually fired; grade on the one the change claims.
 
 The worked case is the direct sequel to the fixed-width-copy change described
 above. That copy loaded 16 bytes out of a stack scratch which the digit loop had
@@ -1390,6 +1397,52 @@ takes offsets directly, since it never wanted a `str` per line.
   so a document whose comment lines are hundreds of bytes long is where the
   trade could invert. Built and measured (400-byte comment lines): **−0.241%**.
   The per-line setup dominates even there.
+
+### And the converse: once a scan IS a word loop, widening it does not pay
+
+The section above is a byte-at-a-time scan becoming word-at-a-time, and it converts. The
+same module's line-terminator scan — already word-at-a-time, and the board's top
+branch-miss outlier at **2.5% of the program's branch misses against 1.5% of its
+instructions** — was widened two independent ways, and neither did:
+
+- **Two words per bound check and per branch.** Mask both, OR the masks, and ask which
+  word fired only once one has.
+- **Answer every flagged lane before leaving the block.** A "where is the NEXT candidate"
+  entry point gets re-entered at the byte after each hit, so a caller that wants *every*
+  terminator re-loads and re-masks words it has already read, once per line. Draining the
+  mask in place asks each word exactly once.
+
+Both are real instruction savings — `instructions:u` **−0.166 to −0.191%** across seven
+corpora at a per-side spread of 0.001% — and the first also removes **2.4% of the whole
+program's branch misses**, essentially the entire share of the function it touched. Both
+**lost on cycles**: twelve binaries, three pooled replicates, **+0.45** and **+0.29** points
+against the null, wall agreeing at **+0.52** and **+0.21**, every replicate positive on both
+channels. L1d misses and frontend stalls were flat across all of them; IPC fell with the
+instruction count.
+
+**The scan is latency-bound on its per-hit chain, not throughput-bound on its word loop.**
+That chain is `trailing_zeros` → the hit offset → the load that classifies the byte → the
+sequence length → the next hop's start address, and the machine was already running the word
+loop several iterations ahead of it. Halving the loop's own bookkeeping buys nothing it was
+waiting on — and widening *lengthens* the chain: a select over which of two words fired sits
+ahead of the `trailing_zeros`, and a drain adds a compare and a `max` between the classify
+and the next block's address.
+
+So the direction that converts is **byte → word**, which removes iterations *and* shortens
+the chain. **Word → wider word** only halves an overhead the machine was already hiding.
+Name the per-hit chain before widening a scan, and ask whether the loop was ever the
+bottleneck.
+
+- **Two shapes, two adversarial documents, opposite rankings — and neither column alone
+  would have chosen.** Widening taxes short LINES, because a hop shorter than the block
+  still masks the whole block: the blocked scan is neutral (**−0.009%**) on real files
+  averaging seventeen bytes a line, exactly where the drain is at its best (**−0.302%**).
+  The drain taxes non-ASCII DENSITY, because it routes the exact-needle fallback per block
+  rather than per word: **+0.094%** on a 62%-non-ASCII message table, where the blocked scan
+  reads **−0.126%**.
+- **What the residual looks like when you stop.** The scan's own instruction cost is now
+  mostly the SWAR masks themselves; the remaining candidates all trade chain length for
+  operation count, which is the trade that just failed.
 
 ## WASM bundle size
 

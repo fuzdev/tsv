@@ -688,6 +688,19 @@ pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) {
 
 /// [`build_line_breaks_into`]'s walk, over bytes and without the capacity reserve — the
 /// shape the exhaustive equivalence test grades against its byte-at-a-time reference.
+///
+/// ⛔ **It re-enters [`next_line_terminator_candidate`] per line ON PURPOSE, and the obvious
+/// repair was measured and refused.** That entry point answers "where is the NEXT candidate",
+/// so this walk re-loads and re-masks the words holding each hit, once per line. Draining a
+/// block's mask in place instead — answering every flagged lane before leaving the block —
+/// removes exactly that, and it does show up: `instructions:u` **−0.191%** on the largest
+/// corpus and **−0.302%** on a short-line one. It then **lost on cycles** (+0.29 points
+/// against the null over twelve binaries and three pooled replicates, wall +0.21), for the
+/// reason stated on the scan itself: this walk is latency-bound on the per-hit chain, and a
+/// drain adds a compare and a `max` between the byte's classification and the next block's
+/// address. It also taxed a 62%-non-ASCII document by +0.094%, because the exact-needle
+/// fallback then routes per block rather than per word. **The per-line re-entry is the
+/// cheaper shape; leave it.**
 fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) {
     let mut i = 0;
     while i < bytes.len() {
@@ -746,6 +759,26 @@ fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) {
 /// superset of the exact one lane for lane — every `\n`, `\r` and `0xE2` is `\n`, `\r` or
 /// non-ASCII — so the exact answer can never sit BELOW the loose lane the byte test
 /// rejected.
+///
+/// ⛔⛔ **Do not widen this loop. Eight bytes a word is where it stops paying, and that has
+/// been measured twice.** Two words per bound check and per branch, and a variant that
+/// drains every flagged lane before leaving a sixteen-byte block, each read `instructions:u`
+/// **−0.166…−0.191%** across seven corpora at a per-side spread of 0.001% — and the blocked
+/// one also removed **2.4% of the whole program's branch misses**, which is essentially this
+/// function's entire share of them. **Both lost on cycles**: twelve binaries with three
+/// pooled replicates, +0.45 and +0.29 points against the null, wall agreeing at +0.52 and
+/// +0.21, every replicate positive. L1d misses and frontend stalls flat; IPC fell with the
+/// instruction count.
+///
+/// The reason is the shape of the work, not the spelling of the fix: **the scan is
+/// latency-bound on its per-hit chain, not throughput-bound on this loop.** That chain is
+/// `trailing_zeros` → the hit offset → the load that classifies the byte → the sequence
+/// length → the next hop's start address, and the machine already runs this loop several
+/// iterations ahead of it. A wider block only halves bookkeeping that was being hidden, and
+/// it *lengthens* the chain — a select over which word fired lands ahead of the
+/// `trailing_zeros`. **byte → word** converts (see [`next_lf`]); **word → wider word** does
+/// not. A short-line document makes it worse again: a hop shorter than the block still pays
+/// for the whole block.
 #[inline]
 fn next_line_terminator_candidate(bytes: &[u8], from: usize) -> usize {
     let mut i = from;
