@@ -6,11 +6,15 @@
 
 tsv is a toolchain for TypeScript/JS, CSS, and Svelte in Rust.
 It ships a formatter that closely follows [Prettier](https://prettier.io/) +
-[prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte)
-(but with settings hardcoded to Svelte's Prettier config),
-and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
+[prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
+and a drop-in for [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
+
+tsv aims to simplify its covered domains and stay lean, and so it makes opinionated choices.
+The formatter has a single non-configurable style, using Svelte's Prettier config.
+Among other benefits this means tsv doesn't require a JS runtime,
+which it would need to resolve configs like Prettier.
 
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not an extensible language platform,
 so the focus is Web standards + Svelte and there's no support for JSX/SCSS/etc.
@@ -24,7 +28,7 @@ and rsvelte additionally has a compiler and linter/typechecker integration
 
 tsv prioritizes, in order:
 
-1. correctness (Svelte and TypeScript adherence, spec conformance for HTML/CSS/JS)
+1. correctness (spec conformance for HTML/CSS/JS, Svelte and TypeScript adherence)
 2. speed
 3. binary size and memory usage
 4. extensibility, modularity, reusability
