@@ -507,11 +507,12 @@ pub struct ArenaCommand {
 /// Bit 31 of [`ArenaCommand::indent_mode`]: set for [`Mode::Break`].
 const COMMAND_MODE_BREAK: u32 = 1 << 31;
 
-// The hot `CmdStack` (`SmallVec<[ArenaCommand; 8]>`) is spun up per render; its
-// inline footprint is `8 × size_of::<ArenaCommand>()`, so the per-command size is
-// load-bearing. All fields are fixed-width (no pointers), so the size is
-// target-independent — pin it at 8 bytes (a 64-byte inline stack), which the
-// packed [`RenderIndent`] plus the mode bit holds to on both native and wasm32.
+// The hot [`CmdStack`] is pushed and popped around once per rendered doc node —
+// millions of times per corpus — so the per-command size is the render loop's
+// memory traffic, one load and one store each. Eight bytes is a single aligned
+// word: widen it and every push, pop and look-ahead read costs two. All fields
+// are fixed-width (no pointers), so the size is target-independent, and the
+// packed [`RenderIndent`] plus the mode bit holds to 8 on native and wasm32.
 const _: () = assert!(size_of::<ArenaCommand>() == 8);
 
 // `indent_mode` is printed as the two logical values it packs, so the derived
@@ -613,20 +614,32 @@ impl ArenaCommand {
     }
 }
 
-/// Inline-backed render work-list. The renderers run many times per file (CSS
-/// per declaration/value, Svelte per template expression), each spinning up a
-/// fresh command stack from empty — so a `SmallVec` keeps the common small
-/// sub-render fully on the stack (no heap allocation), mirroring the fits path's
-/// `SmallVec<[(DocId, Mode); 16]>`. `N = 8` is the measured knee of the
-/// per-call high-water distribution (≈89% of CSS top-level renders and ≈99.7%
-/// of the high-frequency single-doc sub-renders stay inline — measured
-/// before the tail-continuation rewrite, which only lowered stack transit, so
-/// the knee holds a fortiori); its 64-byte inline footprint (an 8-byte
-/// `ArenaCommand`) stays within the fits stack and `DocBuf` convention. Top-level
-/// renders additionally borrow
-/// the arena-pooled instance (`borrow_render_commands_scratch`) so their spill
-/// capacity warms once per arena instead of re-allocating per rendered piece.
-pub(super) type CmdStack = SmallVec<[ArenaCommand; 8]>;
+/// Render work-list — a plain `Vec`, and the parked-allocation policy that is
+/// what makes a plain `Vec` affordable.
+///
+/// ⭐ **A `SmallVec` here cost ~1% of a format run.** Its inline-or-spilled union
+/// is re-selected on every `push` and every `pop` — a capacity load, a spill
+/// test, a second data-pointer source — and this stack is pushed and popped
+/// around once per rendered doc node, millions of times per corpus. The
+/// top-level stack is always spilled after warmup, so that test never once
+/// answered "inline" there. Dropping to a `Vec` measured `instructions:u`
+/// **−0.917 / −0.973 / −0.980 / −1.041%** on four app corpora, **−0.925%** on
+/// pure Svelte, **−0.598%** on pure CSS and **−0.955%** at the product entry
+/// point.
+///
+/// What the `SmallVec` bought was the *sub*-renders: the renderers run many
+/// times per file (CSS per declaration/value, Svelte per template expression),
+/// each from empty, and the inline capacity kept those off the heap. A `Vec`
+/// grown from nothing at each of them hands most of the win straight back — a
+/// fuz_ui pass reads **−0.078%** unparked against **−0.917%** parked — so every
+/// render takes a warm allocation instead of building one: the top-level render
+/// borrows [`DocArena::borrow_top_render_stack`], and the nested renders
+/// take [`DocArena::take_sub_render_stack`].
+///
+/// The fits walk's own `SmallVec<[(DocId, Mode); 16]>` is deliberately NOT the
+/// same call: it is spun up per *call* rather than per node, never spills, and
+/// parking it the same way measured **+0.12 / +0.27%**.
+pub(super) type CmdStack = Vec<ArenaCommand>;
 
 /// Inline-backed pending `line_suffix` buffer. Line suffixes are sparse — a flush
 /// carries one in the overwhelming majority of cases, and two where a construct's
@@ -955,16 +968,26 @@ pub struct DocArena {
     /// (fresh-fallback, so re-entrancy costs an alloc but stays correct).
     /// Survives `reset()` (always empty between uses; only capacity persists).
     render_scratch: Cell<String>,
-    /// Pooled top-level render work buffers: the render loop's pending-command
-    /// stack and its deferred line-suffix buffer, borrowed for the duration of
-    /// one top-level render (`render_doc_iterative`) so their spill capacity
-    /// warms once per arena instead of re-allocating per rendered piece.
-    /// Sub-renders (fill segments, line-suffix flushes) construct their own
-    /// inline `SmallVec`s — measured allocation-free — and never borrow these,
-    /// so the held `RefMut` is exclusive by construction (a violated nesting
-    /// assumption panics loudly rather than corrupting). Cleared at each
+    /// The top-level render's pending-command stack, borrowed for the duration of
+    /// one `render_doc_iterative` so its capacity warms once per arena instead of
+    /// re-allocating per rendered piece. A `RefCell` rather than a `Cell` on
+    /// purpose: only the top-level render borrows it, so the held `RefMut` makes
+    /// that exclusivity a checked claim — a violated nesting assumption panics
+    /// loudly instead of silently handing out an empty stack. Cleared at each
     /// borrow; capacity survives `reset()`.
-    render_commands_scratch: RefCell<CmdStack>,
+    top_render_stack: RefCell<CmdStack>,
+    /// The nested renders' command stack — see [`Self::take_sub_render_stack`].
+    ///
+    /// ⚠️ **Deliberately a SECOND slot, and merging it with `top_render_stack`
+    /// would undo most of the lever that created it.** A sub-render runs inside
+    /// the top-level one, so with a single slot the top-level render holds it for
+    /// the whole render and every sub-render grows a fresh `Vec` from nothing —
+    /// which is exactly the unparked shape, measured at −0.078% against this
+    /// one's −0.917% on fuz_ui. Two slots keep both warm.
+    sub_render_stack: Cell<CmdStack>,
+    /// The top-level render's deferred line-suffix buffer — the
+    /// [`LineSuffixBuf`] companion of `top_render_stack`, on the same borrow
+    /// discipline. Sub-renders take a caller-provided buffer instead.
     line_suffix_scratch: RefCell<LineSuffixBuf>,
     /// Parked line-offset scratch for the multi-line block-comment builders:
     /// one `split('\n')` pass per comment fills it with each body line's
@@ -1246,7 +1269,8 @@ impl DocArena {
             text_pool: RefCell::new(String::new()),
             pool_scratch: Cell::new(String::new()),
             render_scratch: Cell::new(String::new()),
-            render_commands_scratch: RefCell::new(SmallVec::new()),
+            top_render_stack: RefCell::new(Vec::new()),
+            sub_render_stack: Cell::new(Vec::new()),
             line_suffix_scratch: RefCell::new(SmallVec::new()),
             line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
@@ -1304,7 +1328,8 @@ impl DocArena {
             text_pool: RefCell::new(String::with_capacity(source_len / 8)),
             pool_scratch: Cell::new(String::new()),
             render_scratch: Cell::new(String::new()),
-            render_commands_scratch: RefCell::new(SmallVec::new()),
+            top_render_stack: RefCell::new(Vec::new()),
+            sub_render_stack: Cell::new(Vec::new()),
             line_suffix_scratch: RefCell::new(SmallVec::new()),
             line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
@@ -3359,18 +3384,47 @@ impl DocArena {
         scratch
     }
 
-    /// Borrow the pooled top-level render command stack (cleared here). Held
-    /// for the duration of one top-level render; sub-renders use their own
-    /// inline locals and never take this borrow.
+    /// Borrow the parked top-level render command stack (cleared here). Held for
+    /// the duration of one top-level render; nested renders take
+    /// [`Self::take_sub_render_stack`] and never take this borrow.
     #[inline]
-    pub(super) fn borrow_render_commands_scratch(&self) -> std::cell::RefMut<'_, CmdStack> {
-        let mut scratch = self.render_commands_scratch.borrow_mut();
-        scratch.clear();
-        scratch
+    pub(super) fn borrow_top_render_stack(&self) -> std::cell::RefMut<'_, CmdStack> {
+        let mut stack = self.top_render_stack.borrow_mut();
+        stack.clear();
+        stack
+    }
+
+    /// Take a command stack for a sub-render, warm if the park holds one.
+    ///
+    /// The companion of [`Self::borrow_top_render_stack`] for the renders
+    /// that nest: a fill segment and a line-suffix flush both render inside an
+    /// enclosing render, which is already holding the parked top-level stack, so
+    /// they cannot borrow it — and sub-renders outnumber top-level renders four
+    /// to one on a real corpus (zzz: 6,418 against 1,463), so growing a fresh
+    /// `Vec` from nothing at each of them is a measurable tax: 0.84 points of a
+    /// fuz_ui pass, and 0.24 of a pure-CSS one.
+    ///
+    /// A [`Cell`] rather than a [`RefCell`] free list, and the nesting falls out
+    /// of `take` on its own: the taker leaves an empty `Vec` behind, so a render
+    /// nested inside this one gets that empty stack and grows its own. The
+    /// innermost render parks first and the outermost parks last, so the slot
+    /// ends up holding the largest of them — which is the one worth keeping.
+    /// A stack lost to an unwind is simply not parked.
+    #[inline]
+    pub(super) fn take_sub_render_stack(&self) -> CmdStack {
+        let mut stack = self.sub_render_stack.take();
+        stack.clear();
+        stack
+    }
+
+    /// Park a sub-render's command stack — see [`Self::take_sub_render_stack`].
+    #[inline]
+    pub(super) fn return_sub_render_stack(&self, stack: CmdStack) {
+        self.sub_render_stack.set(stack);
     }
 
     /// Borrow the pooled top-level line-suffix buffer (cleared here) — the
-    /// companion of [`Self::borrow_render_commands_scratch`].
+    /// companion of [`Self::borrow_top_render_stack`].
     #[inline]
     pub(super) fn borrow_line_suffix_scratch(&self) -> std::cell::RefMut<'_, LineSuffixBuf> {
         let mut scratch = self.line_suffix_scratch.borrow_mut();
