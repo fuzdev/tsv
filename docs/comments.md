@@ -2,7 +2,7 @@
 
 > The full doctrine for tsv's comment model — the `Comment` type, ownership, the three lookup axes, the hazards, and the leading-comment emitter rules. The always-loaded summary lives in [CLAUDE.md §Comment Handling](../CLAUDE.md#comment-handling-detached-model); read **this** doc before changing comment handling in any printer. The lookup API itself is documented in [`crates/tsv_lang/CLAUDE.md` §Comment Utilities](../crates/tsv_lang/CLAUDE.md#comment-utilities).
 
-Comments are stored **separately from AST nodes** in a flat `Comment` array at the root level (`Program.comments` — an arena slice — plus `CssStyleSheet.comments` and `Root.comments`, which are `Vec`s). The printer finds comments via O(log n) binary search on span positions.
+Comments are stored **separately from AST nodes** in a flat `Comment` array at the root level (`Program.comments` — an arena slice — plus `CssStyleSheet.comments` and `Root.comments`, which are `Vec`s). The printer finds comments by span position, always through the one physical entry point `find_first_comment_from`: a thread-local one-entry hint in front of an O(log n) `partition_point`. The hint is **verified against the array on every read** — a hint left by another document, or by an array rebuilt at the same address, fails the two bracket compares and falls through to the search — so it needs no owner, no invalidation and no reset, and staleness costs two compares rather than correctness.
 
 **Core type** (`tsv_lang/src/comment.rs`):
 

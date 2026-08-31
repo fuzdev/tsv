@@ -791,7 +791,9 @@ each comment's content start so derivation never has to re-guess delimiter width
 
 ### Lookup Functions
 
-The `tsv_lang::comment` module provides O(log n) lookup via binary search. **Every
+The `tsv_lang::comment` module provides O(log n) lookup, funnelled through the single
+physical entry point `find_first_comment_from` (a verified one-entry hint over a
+`partition_point` — see [comments.md](./comments.md)). **Every
 range lookup names the axis it answers on** — there is deliberately no axis-less
 `comments_in_range`, because the three questions differ in whether an *owned*
 comment counts, and a caller that doesn't say which it means is the bug. The axis
