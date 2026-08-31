@@ -22,18 +22,42 @@
 
 use crate::swar::{lanes_less_than, splat, zero_lanes};
 
-/// `00`,`01`,…,`99` — the two-digit-pair table behind the integer emitters
-/// ([`JsonWriter::u32`] and its wide arm), halving their divisions.
-const DEC_PAIRS: [u8; 200] = {
-    let mut t = [0u8; 200];
+/// `00`,`01`,…,`99` — the two-digit-pair table behind every integer emitter,
+/// halving their divisions. Read it through [`dec_pair`], never directly.
+///
+/// Each entry holds its pair **already packed**, tens digit in the low byte, so
+/// a lookup is one 16-bit load rather than two byte loads and a shift. The
+/// packing is arithmetic, not a reinterpretation, so it is the same table on
+/// either endianness; the byte order a caller wants back is spelled by
+/// `to_le_bytes`.
+///
+/// Sized to the next power of two above the hundred live entries so
+/// [`dec_pair`] can bound its index by masking rather than by a compare — see
+/// there for why a compare is not affordable here.
+const DEC_PAIRS: [u16; 128] = {
+    let mut t = [0u16; 128];
     let mut i = 0;
     while i < 100 {
-        t[i * 2] = b'0' + (i / 10) as u8;
-        t[i * 2 + 1] = b'0' + (i % 10) as u8;
+        t[i] = (b'0' + (i / 10) as u8) as u16 | ((b'0' + (i % 10) as u8) as u16) << 8;
         i += 1;
     }
     t
 };
+
+/// [`DEC_PAIRS`] at an index the caller has already bounded to `0..100`.
+///
+/// ⚠️ The mask is a **codegen** requirement, not defensive coding. Every caller
+/// divides a value it knows the range of, but nothing in a signature says so,
+/// so a bare index compiles to a compare and a panic edge — and those edges are
+/// what push [`JsonWriter::stage_u32`] past the inliner's threshold, which
+/// costs the staged header its register residency and ~5% of the parse→JSON
+/// path. Masking to the table's own width makes the bound a property of the
+/// type. `debug_assert` is where the precondition is actually held.
+#[inline]
+const fn dec_pair(k: u32) -> u16 {
+    debug_assert!(k < 100);
+    DEC_PAIRS[(k as usize) & (DEC_PAIRS.len() - 1)]
+}
 
 /// Decimal digits in `u64::MAX` — the width of the wide arm's scratch, and the
 /// constant length of the copy that appends it.
@@ -48,13 +72,18 @@ const WORD_DIGITS: usize = 8;
 const MAX_U32_DIGITS: usize = 10;
 
 /// Decimal digit count of a `u32` (`0` is one digit) — the [`decimal_width`]
-/// sibling for the hot path.
+/// sibling for the `u32` path.
 ///
 /// Same ascending-compare rationale, on the narrower type. The whole point of
 /// the `u32` path is that every division in it is 32-bit: a `u64 / 100` lowers
 /// to a full 64×64→128 multiply (`mul %rcx` + two shifts), a `u32 / 100` to a
 /// single widening `imul`. Taking a `u64` here would sink the argument back
 /// into 64-bit arithmetic and undo it.
+///
+/// Reached only from [`digit_word`]'s five-digits-and-up arm, which has
+/// already established `n >= 10_000` — so the first four compares fold away
+/// there, and the ladder answers only the widths that arm actually sees. The
+/// widths below it are named by the arm that generated them.
 #[inline]
 const fn decimal_width_u32(n: u32) -> usize {
     if n < 10 {
@@ -144,33 +173,41 @@ const fn decimal_width(n: u64) -> usize {
     w
 }
 
-/// `n`'s decimal digits packed into one `u64` of ASCII, most significant digit
-/// at byte 0 — the arithmetic core both integer emitters share
+/// `n`'s decimal digits packed into one `u64` of ASCII — most significant
+/// digit at byte 0 — **with the width that says how many of those bytes are
+/// live**. The arithmetic core both integer emitters share
 /// ([`JsonWriter::u32`] and [`JsonWriter::stage_u32`]), so there is one
-/// implementation and one oracle. `digits` must be `decimal_width_u32(n)` and
-/// at most [`WORD_DIGITS`]; the wide arms handle anything larger.
+/// implementation and one oracle.
+///
+/// A width past [`WORD_DIGITS`] comes back with a meaningless word: the value
+/// is one no offset, line or column in a real document reaches, and each
+/// caller hands it to its own wide arm.
 ///
 /// Two-digit-pair formatting (itoa's approach) halves the divisions, and the
 /// writers emit several integers per node, so this is hot.
 ///
 /// ⚠️ The digits are generated **into a register**, never into a stack scratch,
 /// and that is a codegen constraint. A constant-length copy out of a scratch
-/// array the pair loop just filled with 2-byte stores cannot be
-/// store-forwarded past those narrow stores, and the store writes the
-/// scratch's full width (20 bytes to keep ~3). Measured, that single store was
-/// **71% of the emitter's self time and ~22% of the whole parse→JSON run**.
-/// Packing into a `u64` removes both: nothing round-trips through memory, and
-/// the store is one word instead of two vectors.
+/// array a pair loop just filled with 2-byte stores cannot be store-forwarded
+/// past those narrow stores, and the store writes the scratch's full width
+/// (20 bytes to keep ~3). Measured, that single store was **71% of the
+/// emitter's self time and ~22% of the whole parse→JSON run**. Packing into a
+/// `u64` removes both: nothing round-trips through memory, and the store is one
+/// word instead of two vectors.
 ///
-/// The accumulation runs least-significant pair first and shifts each earlier
-/// pair **up**, so in little-endian byte order the most significant digit
-/// lands at index 0 — the caller's write is then a plain prefix.
+/// ⚠️ **The width is derived by the same test that picks the arm, not by a
+/// separate ladder ahead of it.** Asking for the width first and then
+/// generating that many digits states the value's magnitude twice, and LLVM
+/// resolves the second statement by specializing a pair loop per digit count —
+/// which is a *cross product* of the ladder and the loop, big enough that the
+/// staged emitter stops being inlined. Since a magnitude test is what an arm is
+/// selected on anyway, the arm returns the width it already knows: each one
+/// generates its whole span unconditionally, zero-padded, and shifts the
+/// padding off by a constant.
 ///
-/// ⚠️ The pair loop is driven by the remaining **width**, not by the remaining
-/// value. Driving on `n >= 100` leaves LLVM unable to correlate the trip count
-/// with `digits`, so it must assume `i -= 2` can underflow; `while i >= 2`
-/// makes non-underflow syntactic. The only indexing left is
-/// `DEC_PAIRS[(n % 100) * 2]`, provably in bounds.
+/// Padding shifts **off the low end**, because the accumulation puts the most
+/// significant digit at byte 0 (little-endian byte order) so the caller's write
+/// is a plain prefix; the bytes past the width are therefore zero.
 ///
 /// ⚠️ `inline`, and that is a **performance** constraint that costs binary
 /// size. Out-of-lining it is +5.5% instructions on the parse→JSON path
@@ -179,22 +216,40 @@ const fn decimal_width(n: u64) -> usize {
 /// per integer forces them back to the stack. The size it buys — the parse
 /// WASM bundle carries ~12 inlined copies — is the deliberate trade.
 #[inline]
-fn digit_word(n: u32, digits: usize) -> u64 {
-    debug_assert!(digits == decimal_width_u32(n) && digits <= WORD_DIGITS);
-    let mut word = 0u64;
-    let mut i = digits;
-    let mut n = n;
-    while i >= 2 {
-        let pair = (n % 100) as usize * 2;
-        n /= 100;
-        i -= 2;
-        word = (word << 16) | u64::from(DEC_PAIRS[pair]) | (u64::from(DEC_PAIRS[pair + 1]) << 8);
+fn digit_word(n: u32) -> (u64, usize) {
+    if n < 100 {
+        let pair = dec_pair(n) as u64;
+        return if n < 10 { (pair >> 8, 1) } else { (pair, 2) };
     }
-    if i == 1 {
-        // Odd digit count: the leading digit is whatever the pair loop left.
-        word = (word << 8) | u64::from(b'0' + n as u8);
+    if n < 10_000 {
+        let word = four_digit_word(n);
+        return if n < 1_000 { (word >> 8, 3) } else { (word, 4) };
     }
-    word
+    // Five digits and up: rare enough that one variable shift is cheaper than
+    // four more arms, and the wide values fall out of the same width.
+    let digits = decimal_width_u32(n);
+    if digits > WORD_DIGITS {
+        return (0, digits);
+    }
+    // `hi` carries `digits - 4` digits, `lo` exactly four (zero-padded).
+    let hi = four_digit_word(n / 10_000);
+    let lo = four_digit_word(n % 10_000);
+    (
+        (hi >> ((8 - digits) * 8)) | (lo << ((digits - 4) * 8)),
+        digits,
+    )
+}
+
+/// `n < 10_000` as four ASCII digits packed into one `u64`, most significant
+/// digit at byte 0, zero-padded — the flat core [`digit_word`] cuts its arms
+/// around.
+///
+/// Two independent lookups off one division: nothing here is carried from one
+/// pair to the next, which is the whole difference from a pair loop.
+#[inline]
+const fn four_digit_word(n: u32) -> u64 {
+    debug_assert!(n < 10_000);
+    dec_pair(n / 100) as u64 | (dec_pair(n % 100) as u64) << 16
 }
 
 /// Does `bytes` contain a byte JSON must escape?
@@ -352,15 +407,26 @@ impl JsonWriter {
     /// the direct path: the scratch always has `WORD_DIGITS` bytes of room, so
     /// the full word is stored and `stage_len` advances by the real digit
     /// count — no `truncate`.
-    #[inline]
+    ///
+    /// ⚠️ `inline(always)`, and it is the **same performance constraint
+    /// [`digit_word`] carries** — stated here because this is where the
+    /// inliner's cost model reads it. The whole point of a staged run is that
+    /// `stage_len` and the scratch base stay in registers across the header;
+    /// an opaque call per integer spills them, and that is worth ~5% of the
+    /// parse→JSON path. Ten call sites, all in one writer, so the size this
+    /// costs is small — and it is a *pin*, not a change of policy: plain
+    /// `inline` bought the same decision until the body shrank enough for the
+    /// cost model to start declining it.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub fn stage_u32(&mut self, n: u32) {
-        let digits = decimal_width_u32(n);
+        let (word, digits) = digit_word(n);
         if digits > WORD_DIGITS {
             self.stage_u32_wide(n, digits);
             return;
         }
         let at = self.stage_len;
-        self.stage[at..at + WORD_DIGITS].copy_from_slice(&digit_word(n, digits).to_le_bytes());
+        self.stage[at..at + WORD_DIGITS].copy_from_slice(&word.to_le_bytes());
         self.stage_len = at + digits;
     }
 
@@ -374,11 +440,10 @@ impl JsonWriter {
         let mut i = digits;
         let mut n = n;
         while i >= 2 {
-            let pair = (n % 100) as usize * 2;
+            let pair = n % 100;
             n /= 100;
             i -= 2;
-            tmp[i] = DEC_PAIRS[pair];
-            tmp[i + 1] = DEC_PAIRS[pair + 1];
+            tmp[i..i + 2].copy_from_slice(&dec_pair(pair).to_le_bytes());
         }
         if i == 1 {
             tmp[0] = b'0' + n as u8;
@@ -390,7 +455,12 @@ impl JsonWriter {
 
     /// Append a `usize` to the staged run — the line/column channel, which
     /// narrows to the `u32` worker exactly as [`JsonWriter::usize`] does.
-    #[inline]
+    ///
+    /// `inline(always)` for [`JsonWriter::stage_u32`]'s reason: it is a
+    /// two-line narrowing in front of that worker, so out-of-lining it would
+    /// re-introduce exactly the call the worker's own attribute removes.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub fn stage_usize(&mut self, n: usize) {
         match u32::try_from(n) {
             Ok(n) => self.stage_u32(n),
@@ -408,11 +478,10 @@ impl JsonWriter {
         let mut i = digits;
         let mut n = n as u64;
         while i >= 2 {
-            let pair = (n % 100) as usize * 2;
+            let pair = n % 100;
             n /= 100;
             i -= 2;
-            tmp[i] = DEC_PAIRS[pair];
-            tmp[i + 1] = DEC_PAIRS[pair + 1];
+            tmp[i..i + 2].copy_from_slice(&dec_pair(pair as u32).to_le_bytes());
         }
         if i == 1 {
             tmp[0] = b'0' + n as u8;
@@ -523,14 +592,13 @@ impl JsonWriter {
         // 1–3 bytes it moves. (The staged path pays no such copy at all: its
         // destination is the writer's scratch, which always has room for the
         // full word, so it just advances by `digits`.)
-        let digits = decimal_width_u32(n);
+        let (word, digits) = digit_word(n);
         if digits > WORD_DIGITS {
             self.u64_wide(u64::from(n), digits);
             return;
         }
         let len = self.buf.len();
-        self.buf
-            .extend_from_slice(&digit_word(n, digits).to_le_bytes());
+        self.buf.extend_from_slice(&word.to_le_bytes());
         self.buf.truncate(len + digits);
     }
 
@@ -557,11 +625,10 @@ impl JsonWriter {
         let mut i = digits;
         let mut n = n;
         while i >= 2 {
-            let pair = (n % 100) as usize * 2;
+            let pair = n % 100;
             n /= 100;
             i -= 2;
-            tmp[i] = DEC_PAIRS[pair];
-            tmp[i + 1] = DEC_PAIRS[pair + 1];
+            tmp[i..i + 2].copy_from_slice(&dec_pair(pair as u32).to_le_bytes());
         }
         if i == 1 {
             tmp[0] = b'0' + n as u8;

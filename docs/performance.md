@@ -899,8 +899,8 @@ still lost 0.45 points of cycles (§And the converse, below). Read that counter 
 whether the mechanism you believed in actually fired; grade on the one the change claims.
 
 The worked case is the direct sequel to the fixed-width-copy change described
-above. That copy loaded 16 bytes out of a stack scratch which the digit loop had
-just filled with **2-byte stores** — a narrow-store → wide-load pattern that
+above. That copy loaded 16 bytes out of a stack scratch which the digit
+generation had just filled with **2-byte stores** — a narrow-store → wide-load pattern that
 **never store-forwards** — and it wrote the scratch's full width (20 bytes to
 keep ~3). One store instruction ended up carrying **71% of that function's
 self-time, ~22% of the whole parse→JSON run.** Packing the digits into a register
@@ -1282,11 +1282,11 @@ wrong, and choosing which call sites deserve an inline is exactly what a
 profile-guided inliner does automatically — a hand sweep down a candidate table
 is doing PGO's job one symbol at a time.
 
-### And the trap on the other side: an edit that GROWS an inlined probe can un-inline it
+### And the trap on the other side: an edit that RE-SHAPES an inlined probe can un-inline it
 
 The two sections above are about a callee LLVM declined to inline in the first
-place. The nastier version is a callee it *was* inlining, until your edit made
-it bigger — because the sign flips and nothing announces it.
+place. The nastier version is a callee it *was* inlining, until your edit
+changed it — because the sign flips and nothing announces it.
 
 The fused layout walk's memo probe (`DocArena::subtree_layout_memo`) is a cache
 load, a compare, and a peel for the kinds it can answer itself. Adding a second
@@ -1309,6 +1309,55 @@ intent was a −0.4% win. `#[inline(always)]` on identical source: **−0.377%**
   measurement.
 - ⚠️ Then re-check the size axis anyway: the shipped shape is +1,968 B of
   `.text` and +2,081 B of WASM, nine copies of a bigger probe.
+- ⚠️ **It is not only about growing, and that is the part the heading used to get
+  wrong: the cost model turns on the body's SHAPE, not on its size alone.**
+  Re-cutting the wire writer's integer emitter from a compare ladder plus a pair
+  loop into three magnitude arms with a variable shift made `JsonWriter::stage_u32`
+  *smaller* — and LLVM declined it where it had honoured the bigger body, because
+  one linear fall-through chain estimates cheaper than branchy blocks. Left alone
+  it read `instructions:u` **−0.796% with cycles +5.802%**: fewer instructions, far
+  more time, which is the signature of a staged emitter losing the register
+  residency it exists for. `#[inline(always)]` on the same source: **−3.964%**. Two
+  of those blocks were `panic_bounds_check` edges from a table index the compiler
+  could not prove in range — so **a bounds check on a hot leaf is an inlining
+  hazard, not just an instruction**, and masking the index to a power-of-two table
+  was worth 3.0% of the path on its own.
+
+### An inline constant-width copy is the BASELINE target's; libc's `memcpy` is the machine's
+
+`JsonWriter::stage_flush` appends a ~118-byte node header with a **runtime**-length
+`Vec::extend_from_slice`, which reaches libc `memmove` and is the biggest single
+row on the parse→JSON board. Making the length a constant looks free — it deletes
+a call and four size compares — and it costs **+2.204% of cycles** (instructions
+−0.075%; Δmin and Δmax moved with the mean, so not a layout draw).
+
+`objdump` names it in one line. LLVM lowers the constant copy for the build's
+**baseline** target: x86-64 baseline is SSE2, so it emitted **eight 16-byte
+`movups` load/store pairs**. glibc's `memmove` is an **IFUNC** — the dynamic
+linker resolves it at load time to `__memmove_avx_unaligned_erms`, which moves the
+same 128 bytes in **four 32-byte `vmovdqu` pairs**. On a portable binary, inlining
+a copy trades a call for a *wider but worse* instruction sequence.
+
+- ⭐ **Any "inline this `memcpy`" idea owes `objdump -d | grep -c movups` before it
+  owes an A/B.** One command, and it answers the question. The argument does not
+  touch a copy small enough to be scalar — `JsonWriter::u32` blits 8 bytes, one
+  `mov`, no vector question — and it does not touch WASM, where there is no IFUNC
+  and `simd128` is in the target features.
+- ⭐⭐ **And the row was mostly not the call anyway — price a copy row with a probe
+  that removes the CALL and keeps the COPY.** That `memmove` is 10.96% of the whole
+  parse→JSON run when bucketed by its first tsv caller frame, which reads like a
+  redesign waiting to happen (buffer the writer, flush once per few KB instead of
+  once per node). Its **ceiling** was measured first, for one build: raise the
+  scratch, flush on a high-water mark, make `stage_flush` a no-op. That probe's
+  output is deliberately scrambled — the writer's other appends still go straight
+  to the buffer — but the byte *volume* is identical, and checking that is what
+  makes the number mean something. Ceiling: **instructions −0.810%, cycles
+  −0.547%**. So ~93% of the row is the bytes moving, which every batching or
+  single-copy scheme still pays. **A fold-by-caller attributes a cost to a site; it
+  does not say the cost is the site's to remove.**
+- ⭐ **A deliberately-wrong probe is a legitimate instrument when the wrongness is
+  in the ORDER and not in the WORK.** State the invariant it must still satisfy,
+  check it, then read the number as a ceiling and nothing else.
 
 ### Where a peel's SET boundary lands decides the cost of the path it does NOT take
 
