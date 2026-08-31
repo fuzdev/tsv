@@ -390,12 +390,21 @@ impl JsonWriter {
     /// that crate's node header and read as its private business for long
     /// enough that `tsv_svelte`'s writer emitted every integer through the
     /// out-of-line [`JsonWriter::u32`] instead, which cost it ~1.6% of the
-    /// wire path. Today `tsv_ts`'s `node_header_impl` and `tsv_svelte`'s
-    /// `name_loc` field + `Attribute`/element/`Text` headers stage;
-    /// `tsv_css`'s writer does not, and has not been measured. **A burst of
-    /// fixed fragments and integers in any of the three belongs here** — the
-    /// bar is frequency, since each staged emitter inlines at its site and so
-    /// costs bundle bytes.
+    /// wire path. Today `tsv_ts`'s `node_header_impl`, `tsv_svelte`'s
+    /// `name_loc` field + `Attribute`/element/`Text` headers, and `tsv_css`'s
+    /// three trailing `start`/`end` bursts all stage.
+    ///
+    /// ⚠️ **The bar is not frequency alone — a run's STATIC fragments are
+    /// copied twice**, once into the scratch and once through the flush, so the
+    /// trade is (appends removed) against (static bytes in the run), and a run
+    /// that is mostly long static fragments can be a net loss. `tsv_css`'s
+    /// *head* bursts (`{"type":"Block","start":` … `,"children":`) are the
+    /// measured counter-example: same five appends and same two integers as the
+    /// tails, ~50 bytes of static fragment against ~17, and staging them
+    /// removes 2.6× more instructions while running ~1.05 points slower. Read
+    /// the paragraph above about amortizing over "enough bytes" as being about
+    /// the appends a run *removes*, not its width. Each staged emitter also
+    /// inlines at its site and so costs bundle bytes. Grade on `cycles`.
     #[inline]
     pub fn stage_begin(&mut self) {
         self.stage_len = 0;

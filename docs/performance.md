@@ -754,14 +754,36 @@ inlines its staged twin at each new run — so every adopted site costs bundle
 bytes. Price the bundle beside `.text`
 (§[An instruction A/B is blind to code size](#an-instruction-ab-is-blind-to-code-size)).
 
-⚠️ **A staged run's width is a real question, and it is measurable rather than
-arguable.** The run trades N appends for one runtime-length `memmove` that reads
-back bytes it just stored narrowly, so a short run might not amortize. Building
-two scopes — one ~110-byte run, and that run plus three ~45-byte ones — and
-grading **both in a single layout group** priced the short runs' marginal
-directly at 0.60× conversion, better than the whole lever's 0.51×. Two candidate
-scopes in one group cost four extra builds and share the same nulls and
-replicates; two separate groups compare across draws.
+⚠️ **A staged run's width is a real question, it is measurable rather than
+arguable, and the answer is the opposite of the intuition the machinery was
+built on.** The run trades N appends for one runtime-length `memmove`, which the
+substrate's own doc justifies by the run being wide enough to amortize the
+dispatch. But the staged bytes are copied **twice** — once narrowly into the
+scratch, once by the flush — while the benefit is a property of the run's
+*arity*, so the trade is **(appends removed) against (static bytes in the run)**.
+`tsv_css`'s writer is the controlled experiment: its head burst
+(`{"type":"SelectorList","start":` N `,"end":` M `,"children":`) and its tail
+burst (`,"start":` N `,"end":` M) remove the same five appends and inline the
+same two integer calls, differing only in static width — ~50 bytes against ~17 —
+and staging the tails is **−1.27 points** of cycles where staging the heads is
+**+0.03**.
+
+⚠️⚠️ **So grade the SCOPE, and put every candidate scope in one layout group —
+the instruction and cycles channels can rank them in opposite order.** Four
+scopes of that one adoption, 24 binaries, five pooled replicates: all seven
+bursts **−2.262%** instructions for −0.219 points of cycles; the four heads
+−1.374% for **+0.031**; the three tails **−0.865% — the smallest instruction
+removal of the four — for −1.268**. The winner removes 2.6× fewer instructions
+than the biggest scope and is about a point faster than it. A *pair* of nested
+scopes is not enough when they are not monotone: the natural pair here reports
+"take the bigger one" at a tenth of the available win. **When a two-scope group
+suggests the increment is carrying the lever, build the increment by itself.**
+
+⚠️ **A mechanism that explains a ranking does not license an untested point on
+it.** If the doubled static copy is the cost, then keeping the long prefix as a
+plain `raw` and staging only from the first integer should beat both — built, it
+is the *worst* of the four scopes (write phase +0.68%), because splitting a burst
+pays the buffer reload *and* the scratch setup.
 
 ### Grading a change that touches the `format` worker pool
 
@@ -1200,6 +1222,40 @@ What to do about it:
   parse column that *improves* on a printer-only change is the same artifact as
   one that regresses, and taking the flattering half is how a layout win gets
   banked as an optimization.
+
+`json_profile`'s `parse_us`/`write_us` split behaves the same way, and there the
+temptation is sharper because a wire-writer change *is* confined to one column by
+construction. It moved the **parse** column −1.06% for a writer-only change whose
+instruction count is identical to ±0.001% on every non-writer corpus — the two
+phases alternate per file and share cache state. **A second counter in the same
+loop is a sanity check; a second entry point is a control.**
+
+Grading the write phase is still worth doing — it is often the only instrument
+that can see the lever at all. On CSS the split is 73.5% parse / 26.5% write, so
+a writer-confined change reaches the whole-run cycles channel at about a quarter
+strength: a phase-resolved group separated four candidate scopes cleanly where
+the whole-run channel put three of them inside the null. Take both, and headline
+the whole-run number.
+
+### Run the negative control through the whole layout group
+
+A negative control is normally one A/B pair on an entry point the change cannot
+reach, read on `instructions:u` to prove the work is identical — and, since
+`ab2.sh` prints it anyway, read on `cycles:u` to size that binary's code-layout
+draw (§[Reading `cycles:u`](#reading-cyclesu-the-offset-belongs-to-the-binary-and-it-is-code-layout)).
+
+Pointing the *entire* layout group at the control entry point costs one more
+sweep and proves something strictly larger: that the lever is confined **on the
+channel the verdict is stated in**. For a wire-writer change the control is the
+`format` path, which never enters the writer and where every group retires
+byte-identical instructions (±0.000%). The candidate reading −1.268 points on the
+wire path read **−0.003 against the null** there — so the win is not the
+candidate binaries' layout draw, and no argument is needed to say so.
+
+⚠️ **Read the control group against the null, not against the baseline group.**
+On that same run the null itself read −0.625 against baseline on provably
+identical work, so measured against baseline every group — candidates and null
+alike — looked comfortably fast.
 
 ### A cache keyed on an address makes `instructions:u` re-draw on every exec
 
