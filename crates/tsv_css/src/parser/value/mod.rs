@@ -153,10 +153,35 @@ pub(crate) fn parse_single_value<'arena>(
         return Some(val);
     }
 
-    // Function call or color function. Byte-position scan for the ASCII `(` — a
-    // hot per-value-token path where `str::find(char)`'s CharSearcher state machine
-    // outweighs a direct byte loop (equivalent: `(` is ASCII, self-synchronising).
-    if let Some(paren_pos) = s.as_bytes().iter().position(|&b| b == b'(')
+    // Function call or color function.
+    //
+    // The last byte decides whether either scan below can pay off at all:
+    // `extract_function_parts` accepts a value as a function only when the matching `)` is
+    // its final byte — the same postcondition the printer's argument-list bounds are read
+    // off — so a value ending in anything else has no function to find, and the two walks
+    // that would establish that (the search for the opening `(`, then the matching-paren
+    // scan from it) answer a question one byte comparison has already answered. Most of a
+    // stylesheet's leaves — `red`, `0`, `1px`, `#fff` — end in something else. It is the
+    // same kind of pre-filter the vocabulary sets put in front of their hash
+    // (`crate::keyword_set`): it refuses only what cannot match, so it can skip work but
+    // never change an answer.
+    //
+    // The refusal is graded by the scan it skips, so every CSS fixture re-proves it.
+    let bytes = s.as_bytes();
+    debug_assert!(
+        bytes.last() == Some(&b')')
+            || bytes
+                .iter()
+                .position(|&b| b == b'(')
+                .and_then(|paren_pos| extract_function_parts(s, paren_pos))
+                .is_none(),
+        "a value not ending in `)` was read as a function: {s:?}"
+    );
+    // The search for the `(` is a byte-position scan rather than `str::find(char)`, whose
+    // CharSearcher state machine outweighs a direct byte loop on this hot per-value-token
+    // path (equivalent: `(` is ASCII, self-synchronising).
+    if bytes.last() == Some(&b')')
+        && let Some(paren_pos) = bytes.iter().position(|&b| b == b'(')
         && let Some((name, args)) = extract_function_parts(s, paren_pos)
     {
         // Try color function first
@@ -206,7 +231,9 @@ pub(crate) fn parse_single_value<'arena>(
 ///
 /// `Some` means the whole of `s` is the function — the matching close paren is its last
 /// byte — which is what lets the printer bound the argument list at `span.end - 1`
-/// (`build_value_function_doc`'s closing-comma read).
+/// (`build_value_function_doc`'s closing-comma read). It is also why the sole caller can
+/// refuse on `s`'s last byte alone: the close paren this returns on *is* that byte, so a
+/// value ending in anything else is never a function.
 fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
     let name_part = s[..paren_pos].trim();
 
