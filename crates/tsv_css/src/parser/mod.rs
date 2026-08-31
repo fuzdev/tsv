@@ -16,6 +16,7 @@ use bumpalo::collections::Vec as BumpVec;
 use decl_scan::{TerminatorKind, ValueFacts};
 use std::cell::Cell;
 use tsv_lang::{ParseError, Span};
+use value::lists::ValueSeparator;
 
 pub(crate) struct CssParser<'a, 'arena> {
     source: &'a str,
@@ -52,7 +53,7 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// start offset so a stale entry — e.g. from a custom-property declaration that bypasses
     /// the scan — can never be mistaken for the current value's facts. `Cell` because the
     /// scan runs behind `&CssParser` (the disambiguation is a read-only lookahead).
-    speculative_value_facts: Cell<Option<(usize, ValueFacts)>>,
+    speculative_value_facts: Cell<Option<(usize, ValueFacts, Option<ValueSeparator>)>>,
 }
 
 impl<'a, 'arena> CssParser<'a, 'arena> {
@@ -86,7 +87,10 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
     /// Record (or clear) the value facts the disambiguation scan produced for the
     /// declaration it just settled — see [`take_value_facts`](Self::take_value_facts).
-    pub(in crate::parser) fn stash_value_facts(&self, facts: Option<(usize, ValueFacts)>) {
+    pub(in crate::parser) fn stash_value_facts(
+        &self,
+        facts: Option<(usize, ValueFacts, Option<ValueSeparator>)>,
+    ) {
         self.speculative_value_facts.set(facts);
     }
 
@@ -94,9 +98,12 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// `value_start` — the guard that makes reuse safe. Offsets increase monotonically
     /// through the parse, so a stale entry (a smaller start) never matches; a match means the
     /// disambiguation scan and this declaration are looking at the same value.
-    pub(in crate::parser) fn take_value_facts(&self, value_start: usize) -> Option<ValueFacts> {
+    pub(in crate::parser) fn take_value_facts(
+        &self,
+        value_start: usize,
+    ) -> Option<(ValueFacts, Option<ValueSeparator>)> {
         match self.speculative_value_facts.take() {
-            Some((start, facts)) if start == value_start => Some(facts),
+            Some((start, facts, class)) if start == value_start => Some((facts, class)),
             _ => None,
         }
     }
