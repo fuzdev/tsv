@@ -699,6 +699,70 @@ census says which node kinds the fixture tree never exercises.
 4. **Check the size axis if the change shrank a hot function** — see
    [An instruction A/B is blind to code size](#an-instruction-ab-is-blind-to-code-size); no `check` gate covers it
 
+### A board is one cell of (entry point × corpus)
+
+`tsv_debug` exposes several entry points — `profile` (parse + format),
+`json_profile` (parse + wire-JSON write), `profile --bind` (parse + lower/bind),
+`compile_profile` — and the shipped CLI is a fourth shape. Cross those against
+the corpora (TypeScript, Svelte, CSS) and a board is a **cell**, not a summary.
+Two rules follow, and it is easy to spend one while believing you have spent both:
+
+- **Enumerate the entry points.** `profile` never calls `convert_ast_json_bytes`,
+  so no format board can see the wire writer at all.
+- **Enumerate the corpora.** A repo of `.ts` puts `tsv_svelte`'s parser and
+  printer at a rounding error, and CSS lives inside `<style>` blocks, so a
+  standalone-`.css` corpus may have to be *built* before its surface is visible.
+
+**A cell is not a blend of its neighbours.** The wire writer's out-of-line
+integer emitter (`JsonWriter::u32`) is a 3.3%-self symbol on the Svelte wire
+board and appears on no other board in the project — on a TypeScript wire board
+~86% of the wire's integers take the *staged* emitter instead, so the
+out-of-line one never rises. The same code, a different call-site mix, a
+different verdict.
+
+So: when a board reads dry, ask which cell you took before concluding the
+surface is mined out. Taking another is one `board.sh` invocation with
+`BOARD_CMD` set.
+
+### Ask whether a shared substrate's other consumer adopted its optimization
+
+A substrate with more than one consumer is a place where an optimization can be
+half-applied indefinitely: it is written *by* the consumer that needed it,
+lives in the shared crate, and nothing ever tells the sibling it exists.
+`tsv_lang::JsonWriter`'s staged-run machinery (see
+[An `inline(never)` leaf's real cost is paid by its
+caller](#an-inlinenever-leafs-real-cost-is-paid-by-its-caller)) was built for
+`tsv_ts`'s node header. `tsv_svelte`'s writer used **none of it** — every
+integer through the out-of-line emitter, every fragment through the plain
+append — for as long as both existed.
+
+The census is one line per consumer:
+
+```bash
+# who uses the optimized spelling, and who uses the plain one
+grep -rc '\.stage_u32(\|\.stage_usize(' crates/tsv_*/src/ast/convert/
+grep -rc '\.u32(\|\.usize(\|\.u64('    crates/tsv_*/src/ast/convert/
+```
+
+**The discriminator is not "is this code hot" but "does this call site use the
+API its sibling uses".** A profile shows the symbol; only the call-site census
+shows that a cheaper spelling of the same call already ships in the tree.
+
+⚠️ **Adoption is not free where the substrate traded size for speed.** The
+integer emitter is `#[inline(never)]` as a *WASM size* constraint, and staging
+inlines its staged twin at each new run — so every adopted site costs bundle
+bytes. Price the bundle beside `.text`
+(§[An instruction A/B is blind to code size](#an-instruction-ab-is-blind-to-code-size)).
+
+⚠️ **A staged run's width is a real question, and it is measurable rather than
+arguable.** The run trades N appends for one runtime-length `memmove` that reads
+back bytes it just stored narrowly, so a short run might not amortize. Building
+two scopes — one ~110-byte run, and that run plus three ~45-byte ones — and
+grading **both in a single layout group** priced the short runs' marginal
+directly at 0.60× conversion, better than the whole lever's 0.51×. Two candidate
+scopes in one group cost four extra builds and share the same nulls and
+replicates; two separate groups compare across draws.
+
 ### Grading a change that touches the `format` worker pool
 
 Two traps specific to the parallel path, both of which produce confident wrong numbers.
