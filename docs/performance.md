@@ -64,14 +64,43 @@ scratch directory and profile that.
 `../fuz_css/src` is a CSS *framework*, but by bytes it is ~92% TypeScript —
 profiling it measures the TS path and reads a CSS change as noise, which is
 exactly how a real CSS win gets mistaken for a placement artifact (and a CSS
-*regression* gets missed). Build a genuine `.css`-only corpus instead: run
-`deno task bench:harvest:svelte-styles` to extract real `<style>` blocks into
-`benches/js/.cache/svelte_styles/`, and add the authored stylesheets scattered
-across the ecosystem and the spec checkouts (`fuz_css/src/lib/{theme,style}.css`,
-`../csswg-drafts`, `../wpt/css`). That lands ~1 MB of real CSS, enough to hold a
-sub-percent read steady. For attribution in the other direction, a **pure-`.ts`**
-corpus (no `.svelte` — a `.svelte` file's `<style>` block routes through the CSS
-parser) is the control that must read ~0.000% for a CSS-only change.
+*regression* gets missed).
+
+**Build a genuine `.css`-only corpus, from authored CSS, in four steps.** This is
+the recipe that produced the ~1.1 MB / 638-file corpus the CSS numbers below are
+taken on — enough to hold a sub-percent read steady:
+
+1. **Extract every `<style>` body from a `.svelte` corpus.** This is where the
+   ecosystem's CSS actually lives, and the size is itself worth knowing: 1,695
+   components yield **560 blocks totalling only 265 KB**, so real app CSS is a
+   small fraction even of a Svelte repo. (Skip a body containing `${` — that is a
+   `<style>` inside a JS template literal, not CSS.)
+2. **Add every standalone `.css` that `tsv format --list` finds** across the
+   ecosystem repos — the product's own gitignore-aware scope rule, never a bare
+   `find`, which pulls in minified build bundles.
+3. **Add `benches/js/.cache/svelte_styles/`** (`deno task
+   bench:harvest:svelte-styles`), whose per-repo concatenations cover repos that
+   may not be checked out.
+4. **Add vendored-but-authored stylesheets** — icon fonts, map widgets,
+   `fuz_css/dist/{theme,style}.css`.
+
+⚠️ **Three exclusions, each of which measurably distorts the result.**
+**(a) `*.min.css`**: a minified bundle is comment-free and newline-free, so one
+file can dominate a 1 MB corpus and re-weight every share on the board — the same
+mechanism by which a handful of hashed SvelteKit bundles once made a lever read
+four times too small. **(b) The spec and test checkouts** (`../csswg-drafts`,
+`../wpt`): `../wpt` alone contributes ~390 files of CSS test data, and it is the
+*same* data as the `wpt_css` grading cache, so a board built from it double-counts
+the corpus the change is graded against. **(c) `tests/` inside this repo**, which
+holds encoding and charset fixture data rather than authored CSS.
+
+`benches/js/.cache/wpt_css` remains the right corpus for **grammar breadth and
+byte-identity sweeps** — 22,310 files — but not for a board: at a 246-byte median
+it measures per-file setup rather than the printer.
+
+For attribution in the other direction, a **pure-`.ts`** corpus (no `.svelte` — a
+`.svelte` file's `<style>` block routes through the CSS parser) is the control
+that must read ~0.000% for a CSS-only change.
 
 ## Tooling
 
@@ -1322,6 +1351,54 @@ intent was a −0.4% win. `#[inline(always)]` on identical source: **−0.377%**
   could not prove in range — so **a bounds check on a hot leaf is an inlining
   hazard, not just an instruction**, and masking the index to a power-of-two table
   was worth 3.0% of the path on its own.
+- ⚠️⚠️ **The tell runs BOTH ways, so screen `.text` in both directions: a rise on
+  an edit that DELETES code is a function collapsing into its callers.** Removing
+  one conjunct from `tsv_css`'s `Printer::has_blank_line_between` took `.text`
+  **up 592 B**, and `nm --print-size` between the two profiling builds showed
+  *exactly three* symbols changed: `has_blank_line_between` **262 B → 0, gone**,
+  with `print_css_nodes` (+838 B) and `print_css_block_children` (+176 B)
+  absorbing it. That inlining event was **half the lever** — see the next section.
+  An unexplained `.text` *fall* on an addition is an outlining event; an
+  unexplained *rise* on a deletion is an inlining one; both are worth more than
+  the source change that caused them.
+
+### A conjunct's cheap half may IMPLY its expensive half — and then deleting beats reordering
+
+`tsv_css`'s `Printer::has_blank_line_between` asked an O(log n) `partition_point`
+over the document's whole line-break table AND-ed with the byte walk that actually
+answers the question, with the search placed *first* as a fast negative gate. On a
+CSS board that one `partition_point` was **1.59% of the whole run** at a single
+`core::hint` srcline.
+
+The gate could never fire. The walk's terminator class `{<LF>, <CR>, <CR><LF>}` is
+a **subset** of the table's ECMAScript class, so the table refuses nothing the walk
+accepts — and the function's own doc comment already said so, as a *correctness*
+argument. **A comment justifying a filter's soundness is worth re-reading as a
+claim about whether the filter does anything at all.**
+
+- ⭐ **Census both answers per call, and their disagreements in each direction.**
+  Temporary counters over eight corpora — ~330 K calls, including the 22,310-file
+  WPT CSS set and this repo's own fixture tree — found **zero disagreements either
+  way**. That is what licenses deleting a conjunct rather than reordering it.
+- ⭐⭐ **Reordering — the edit that owes no soundness argument at all — was
+  measurably worthless here.** Putting the cheap walk first skips the search on the
+  87% of calls it rejects: `instructions:u` **−0.496%** and cycles *exactly at the
+  null* over five replicates. Deleting the search outright: **−0.758%** and cycles
+  **−0.740 points**. Removing 87% of the searches bought nothing; removing 100%
+  bought 0.74 points.
+- ⭐⭐ **A non-linearity like that is a codegen event, not a cost model, and it owes
+  an `nm` diff before it owes a theory.** Only the deletion shrinks the body past
+  the inline threshold, so the shipped lever removes the **call frame at four
+  sites** as well as the search. The reorder keeps two predicates and a branch, so
+  the function stays outlined — it even *grows*, 262 → 305 B.
+- ⚠️ **The obvious mechanism was measured and refuted.** A rarely-true cheap test
+  in front of a long dependent chain ought to turn a predictable unconditional
+  search into a mispredicted conditional one — but branch misses moved +0.861% for
+  the reorder and +0.576% for the deletion, the same tiny amount. A channel that
+  fails to *separate* two candidates does not explain either.
+- ⭐ **Keep the implication under test rather than in prose.** The surviving
+  relation is a `debug_assert`, so every `cargo test` run re-proves it across the
+  whole fixture corpus; a `.text` `cmp` confirms it is release-inert.
 
 ### An inline constant-width copy is the BASELINE target's; libc's `memcpy` is the machine's
 

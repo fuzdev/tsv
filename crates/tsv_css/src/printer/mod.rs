@@ -129,8 +129,8 @@ impl<'a> Printer<'a> {
         printing::is_same_line_fast(self.line_breaks, prev_end, curr_start)
     }
 
-    /// Is there a blank line between two positions? — O(log n) binary search over the shared
-    /// table, then confirmed against the **formatter oracle's** rule.
+    /// Is there a blank line between two positions? — the **formatter oracle's** rule, read
+    /// straight off the source bytes.
     ///
     /// ⚠️ The oracle here is prettier, not css-syntax-3. A blank line is cosmetic, so the
     /// question is "what does the printer that owns this decision do", and prettier's answer
@@ -155,15 +155,23 @@ impl<'a> Printer<'a> {
     /// [conformance_prettier_css.md](../../../../docs/conformance_prettier_css.md) §CSS:
     /// Comments and whitespace.
     ///
-    /// Excluding `<LS>` / `<PS>` is also what makes the fast gate SOUND rather than
-    /// accidentally right: `{<LF>, <CR>, <CR><LF>}` really is a subset of the shared table's
-    /// ECMAScript class, so no terminator pair here can hide from it, and the byte scan runs
-    /// only where the table already found two. `is_same_line` deliberately keeps the shared
-    /// class: it decides whether a comment TRAILS a node, where the wider reading is the
-    /// conservative one (its own line) and nothing is regenerated beside it.
+    /// ⚠️ **The shared `line_breaks` table cannot answer this and is deliberately not asked.**
+    /// It counts terminators of the ECMAScript class anywhere in the gap, where this rule needs
+    /// the first two things the walk meets, so it accepts strictly more — and `{<LF>, <CR>,
+    /// <CR><LF>}` is a subset of its class, so it can refuse nothing the walk accepts. Consulting
+    /// it as a pre-filter is therefore a `partition_point` — a branchless, and so serially
+    /// dependent, probe chain over a whole-file table — bought ahead of a walk that reads a
+    /// handful of bytes and rejects ~87% of the time on its own. The `debug_assert` is what keeps
+    /// the subset relation under test rather than merely asserted here. `is_same_line`
+    /// deliberately keeps the shared class: it decides whether a comment TRAILS a node, where the
+    /// wider reading is the conservative one (its own line) and nothing is regenerated beside it.
     pub(crate) fn has_blank_line_between(&self, prev_end: u32, curr_start: u32) -> bool {
-        printing::has_blank_line_between_fast(self.line_breaks, prev_end, curr_start)
-            && css_blank_line_between(self.source, prev_end, curr_start)
+        let blank = css_blank_line_between(self.source, prev_end, curr_start);
+        debug_assert!(
+            !blank || printing::has_blank_line_between_fast(self.line_breaks, prev_end, curr_start),
+            "the positional rule accepted a gap the shared line-break table holds no pair for"
+        );
+        blank
     }
 
     /// Check if a declaration has value comments (comments inside the value, not property name)
