@@ -1417,6 +1417,42 @@ no correctness argument owed and nothing designed yet.
   declining arm. Modelling the opaque regions took it to **0.31%** — 99.4% of value
   bytes carry a class.
 
+### A function's stated POSTCONDITION is a free precondition for its caller
+
+`ValueParser::build_leaf` was the third-largest symbol on the CSS board, and its
+hottest line was the matching-paren byte loop inside `extract_function_parts` — the
+walk that decides whether a leaf value like `var(--x)` is a function at all. That
+function's own doc already said what it returns on: *"`Some` means the whole of `s` is
+the function — the matching close paren is its last byte."*
+
+Read as a claim about the **input**, that sentence is a gate: a value whose last byte
+is not `)` cannot possibly be a function, so both walks — the search for the opening
+`(` and the matching-paren scan from it — are answering a question one byte comparison
+has already answered. A census over 638 files of real CSS put **71.4%** of the calls
+(27,740 of 38,845) and **81%** of the search's bytes on exactly those values: `red`,
+`0`, `1px`, `#fff`, the ordinary contents of a stylesheet. Gating on
+`s.as_bytes().last()` is `instructions:u` **−0.567%**, cycles **−0.329 pts** and wall
+**−0.368 pts** against a twelve-binary layout group's null, 3/3 signs in both.
+
+- ⭐⭐ **This is the mirror of §A conjunct's cheap half may IMPLY its expensive half.**
+  There, a comment justifying a filter's *correctness* turned out to say the filter
+  could never refuse anything. Here, a comment stating a function's *postcondition*
+  turned out to describe a precondition the caller can test in one instruction. **Both
+  are prose that nobody had read as a claim about cost** — re-read a hot leaf's doc
+  comments before you re-read its disassembly.
+- ⭐⭐ **Hold the implication with a `debug_assert`, not with prose.** The gate's
+  soundness is "if `s` does not end in `)`, the scan would have returned `None`", and
+  that is checkable by *running the scan* in debug builds — the same oracle rule as
+  §Price a redundant pass by RUNNING IT TWICE. Every CSS fixture then re-proves the
+  gate on every `cargo test` run.
+- ⚠️ **The same reading does NOT extend to the walk that remains**, and the reason is
+  worth knowing before anyone tries. The obvious next step is to donate the matching
+  paren's offset from `fast_scan`, which already tracks paren depth over the same
+  bytes — but the two models disagree: `fast_scan`'s depth is quote-aware and
+  `extract_function_parts`'s is not, so `url("a(b")` is a function to one and an opaque
+  identifier to the other. That is a **behaviour** difference, not a fusion, so it
+  cannot ride a perf change.
+
 ### A conjunct's cheap half may IMPLY its expensive half — and then deleting beats reordering
 
 `tsv_css`'s `Printer::has_blank_line_between` asked an O(log n) `partition_point`
