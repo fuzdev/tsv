@@ -54,6 +54,28 @@
 //! within a node exactly as acorn's appended keys place them, and the walk's
 //! child-visit order IS the emitted field order.
 //!
+//! **Staged runs.** Four fixed-shape bursts here — the `name_loc` field
+//! ([`write_name_loc_field`]) and the `Attribute` / element / `Text` node
+//! headers — assemble in the writer's scratch and reach the buffer as one
+//! append (`JsonWriter::stage_begin`), the shape `tsv_ts`'s `node_header_impl`
+//! already uses. Written directly, a burst pays `Vec`'s append protocol per
+//! fragment *and* re-loads the buffer's pointer, length and capacity after
+//! every integer, because `JsonWriter::u32` is deliberately `inline(never)`
+//! (a size constraint — see its comment). A run stops at its first
+//! `w.string(…)`: escaping is dynamic, so the value cannot be staged. Staging
+//! these four is `instructions:u` **−1.64%** on the wire path over 1,695 real
+//! components, cycles **−0.84 pts** and wall **−0.89 pts** against a layout
+//! null.
+//!
+//! **Four, because a run is earned by frequency.** Those bursts emit 4.6–14.1
+//! times per KB of source, and each staged emitter is *inlined at its site* —
+//! so a rare burst buys nothing and still costs `@fuzdev/tsv_parse_wasm` bytes.
+//! `ExpressionTag`, `write_text`'s raw-content arm, `write_text_sequence` and
+//! the directive heads are deliberately left on the plain appends.
+//! ⚠️ It is the *staged emitters* that pay, not the `stage_flush` copy — grade
+//! any change here on `cycles:u`, since the run's narrow stores feed a
+//! `memmove` that reads them back.
+//!
 //! **Byte-identity**: the wire JSON is a faithful emission of the Svelte
 //! parser's JSON (its acorn `<script>` shape plus `parseCss` `<style>` shape) —
 //! the shape the canonical Svelte parser's `expected.json` records.
@@ -750,24 +772,40 @@ fn write_braced_island(
     write_generic_island(w, expr, window.start, window.end, ctx);
 }
 
-/// The shared `NameLocation` shape: `start`/`end` each `{line, column, character}`
-/// (all three, always). Char-space via one fused translation per endpoint.
-fn write_name_loc(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
+/// The `,"name_loc":` field and the shared `NameLocation` shape it holds:
+/// `start`/`end` each `{line, column, character}` (all three, always). Char-space
+/// via one fused translation per endpoint.
+///
+/// Emitted as a **staged run** (`JsonWriter::stage_begin`) — the fixed-shape burst
+/// that machinery exists for, and the same shape as `tsv_ts`'s node header: six
+/// integers between seven static fragments, no dynamic string and no branch, ~110
+/// bytes wide. Written directly it pays `Vec`'s append protocol thirteen times and,
+/// because `JsonWriter::u32` is deliberately `inline(never)`, forces the buffer's
+/// pointer, length and capacity back out of registers after each of the six.
+///
+/// The field **key is inside the run** rather than a `raw` at the four call sites:
+/// every caller emits the same key, and a byte added to a staged run costs a store
+/// where a separate `raw` costs the whole append protocol. That is also why the
+/// callers name this `_field` — it emits the key, so it may not be spliced into a
+/// position where some other key precedes the object.
+fn write_name_loc_field(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
     let ((start_char, start_pos), (end_char, end_pos)) =
         ctx.loc.span_positions(span.start, span.end);
-    w.raw("{\"start\":{\"line\":");
-    w.usize(start_pos.line);
-    w.raw(",\"column\":");
-    w.usize(start_pos.column);
-    w.raw(",\"character\":");
-    w.u32(start_char);
-    w.raw("},\"end\":{\"line\":");
-    w.usize(end_pos.line);
-    w.raw(",\"column\":");
-    w.usize(end_pos.column);
-    w.raw(",\"character\":");
-    w.u32(end_char);
-    w.raw("}}");
+    w.stage_begin();
+    w.stage_raw(",\"name_loc\":{\"start\":{\"line\":");
+    w.stage_usize(start_pos.line);
+    w.stage_raw(",\"column\":");
+    w.stage_usize(start_pos.column);
+    w.stage_raw(",\"character\":");
+    w.stage_u32(start_char);
+    w.stage_raw("},\"end\":{\"line\":");
+    w.stage_usize(end_pos.line);
+    w.stage_raw(",\"column\":");
+    w.stage_usize(end_pos.column);
+    w.stage_raw(",\"character\":");
+    w.stage_u32(end_char);
+    w.stage_raw("}}");
+    w.stage_flush();
 }
 
 /// Emits a `RegularElement` (HTML) or `Component` node.
@@ -776,17 +814,19 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
         internal::ElementKind::Component => "Component",
         internal::ElementKind::Html => "RegularElement",
     };
-    w.raw("{\"type\":\"");
-    w.raw(node_type);
-    w.raw("\",\"start\":");
-    w.u32(ctx.pos(elem.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(elem.span.end));
-    w.raw(",\"name\":");
+    // Staged burst; ends at the dynamic `name` (module doc, Staged runs).
+    w.stage_begin();
+    w.stage_raw("{\"type\":\"");
+    w.stage_raw(node_type);
+    w.stage_raw("\",\"start\":");
+    w.stage_u32(ctx.pos(elem.span.start));
+    w.stage_raw(",\"end\":");
+    w.stage_u32(ctx.pos(elem.span.end));
+    w.stage_raw(",\"name\":");
+    w.stage_flush();
     w.string(elem.name(ctx.source));
     if ctx.emit_loc {
-        w.raw(",\"name_loc\":");
-        write_name_loc(w, elem.name_span, ctx);
+        write_name_loc_field(w, elem.name_span, ctx);
     }
     w.raw(",\"attributes\":");
     write_array(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
@@ -821,8 +861,7 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     // serde string-escape scan.
     w.token(elem.kind.tag_name());
     if ctx.emit_loc {
-        w.raw(",\"name_loc\":");
-        write_name_loc(w, elem.name_span, ctx);
+        write_name_loc_field(w, elem.name_span, ctx);
     }
     w.raw(",\"attributes\":");
     write_array(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
@@ -917,7 +956,9 @@ fn write_shorthand_expression_tag(
 /// Raw-content element text (`TextDecoding::Raw` — a nested `<script>`/
 /// `<style>`) comes from a different canonical construction site whose
 /// literal leads with the positions and puts `data` first:
-/// `{start, end, type, data, raw}`.
+/// `{start, end, type, data, raw}`. Only the fragment arm stages its header —
+/// the raw arm is one text node per nested `<script>`/`<style>`, far too rare
+/// to earn a staged run's inlined emitters (module doc, Staged runs).
 fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     if matches!(text.decoding, internal::TextDecoding::Raw) {
         w.raw("{\"start\":");
@@ -932,11 +973,14 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
         w.raw("}");
         return;
     }
-    w.raw("{\"type\":\"Text\",\"start\":");
-    w.u32(ctx.pos(text.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(text.span.end));
-    w.raw(",\"raw\":");
+    // Staged burst; ends at the dynamic `raw` (module doc, Staged runs).
+    w.stage_begin();
+    w.stage_raw("{\"type\":\"Text\",\"start\":");
+    w.stage_u32(ctx.pos(text.span.start));
+    w.stage_raw(",\"end\":");
+    w.stage_u32(ctx.pos(text.span.end));
+    w.stage_raw(",\"raw\":");
+    w.stage_flush();
     w.string(text.raw(ctx.source));
     w.raw(",\"data\":");
     let data = text.data(ctx.source);
@@ -1449,15 +1493,17 @@ fn write_attribute_node(w: &mut JsonWriter, node: &internal::AttributeNode<'_>, 
 
 /// Emits an `Attribute` node.
 fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"Attribute\",\"start\":");
-    w.u32(ctx.pos(attr.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(attr.span.end));
-    w.raw(",\"name\":");
+    // Staged burst; ends at the dynamic `name` (module doc, Staged runs).
+    w.stage_begin();
+    w.stage_raw("{\"type\":\"Attribute\",\"start\":");
+    w.stage_u32(ctx.pos(attr.span.start));
+    w.stage_raw(",\"end\":");
+    w.stage_u32(ctx.pos(attr.span.end));
+    w.stage_raw(",\"name\":");
+    w.stage_flush();
     w.string(attr.name(ctx.source));
     if ctx.emit_loc {
-        w.raw(",\"name_loc\":");
-        write_name_loc(w, attr.name_span, ctx);
+        write_name_loc_field(w, attr.name_span, ctx);
     }
     w.raw(",\"value\":");
     write_attribute_value_field(w, attr.value, ctx);
@@ -1571,8 +1617,7 @@ fn write_directive_head(
     w.raw("\",\"name\":");
     w.string(name_span.extract(ctx.source));
     if ctx.emit_loc {
-        w.raw(",\"name_loc\":");
-        write_name_loc(w, head_span, ctx);
+        write_name_loc_field(w, head_span, ctx);
     }
 }
 

@@ -385,6 +385,17 @@ impl JsonWriter {
     /// Runs do not nest and are not reentrant: `stage_begin` resets the
     /// scratch, so every one must reach its `stage_flush` before the next
     /// begins.
+    ///
+    /// ⚠️ **This is substrate, not `tsv_ts` machinery** — it was written for
+    /// that crate's node header and read as its private business for long
+    /// enough that `tsv_svelte`'s writer emitted every integer through the
+    /// out-of-line [`JsonWriter::u32`] instead, which cost it ~1.6% of the
+    /// wire path. Today `tsv_ts`'s `node_header_impl` and `tsv_svelte`'s
+    /// `name_loc` field + `Attribute`/element/`Text` headers stage;
+    /// `tsv_css`'s writer does not, and has not been measured. **A burst of
+    /// fixed fragments and integers in any of the three belongs here** — the
+    /// bar is frequency, since each staged emitter inlines at its site and so
+    /// costs bundle bytes.
     #[inline]
     pub fn stage_begin(&mut self) {
         self.stage_len = 0;
