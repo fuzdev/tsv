@@ -198,7 +198,13 @@ the two crates.
 
 Shared:
 
-- `find_first_comment_from()` — Binary-search index of first comment with `span.start >= pos`
+- `find_first_comment_from()` — index of the first comment with `span.start >= pos`, and the
+  **one physical entry point** all three axes funnel through. A thread-local one-entry hint
+  answers the overwhelming majority of asks without searching (the printers walk a document
+  in step) and falls back to a `partition_point`; the hint is **verified against the array on
+  every read**, so a hint left by another document — or by an array rebuilt at the same
+  address — is a miss and never a wrong answer, which is what lets it live unowned with no
+  invalidation protocol and no reset
 - Every *range* lookup short-circuits a range too narrow to hold a whole comment
   (`Comment::MIN_SPAN_LEN`, guarded at the three parsers' construction sites) without
   probing the array at all — the printers ask about token-sized gaps by the hundred

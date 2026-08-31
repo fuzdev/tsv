@@ -876,7 +876,9 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 
 Comments are stored **separately from AST nodes** in a flat `Comment` array at the root
 level (`Program.comments`, `CssStyleSheet.comments`, `Root.comments`); the printer finds
-them via O(log n) binary search on span positions. `Comment` (`tsv_lang/src/comment.rs`)
+them by span position through one physical entry point, `find_first_comment_from` — a
+thread-local one-entry hint over an O(log n) search, verified against the array on every
+read so a stale hint is a miss and never a wrong answer. `Comment` (`tsv_lang/src/comment.rs`)
 is a `Copy` POD of spans + flags — text is recovered on demand via
 `Comment::content(source)`, never stored owned. **The full model — fields, ownership
 doctrine, the three lookup axes, the five hazards, and every emitter rule — is
