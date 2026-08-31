@@ -14,6 +14,7 @@ pub mod strings;
 
 use crate::ast::internal::CssValue;
 use crate::escapes::{trim_end_preserving_escape, trim_start_css};
+use crate::parser::value::lists::ValueSeparator;
 use bumpalo::Bump;
 use tsv_lang::Span;
 
@@ -37,10 +38,15 @@ pub use strings::parse_string_literal;
 /// * `source` - The CSS source text (may be a substring of the full document)
 /// * `source_relative_span` - The span of the value relative to `source` (positions within source)
 /// * `base_offset` - Offset to add to spans for absolute positions in full document
+/// * `class` - The value's top-level separator class if the declaration's boundary scan
+///   already derived it (`crate::parser::decl_scan`), which lets `ValueParser` skip its own
+///   classifying pass over the very same bytes. `None` means "not known", never "no
+///   separator" — that is `Some(ValueSeparator::None)`.
 pub fn parse_value_from_source<'arena>(
     source: &str,
     source_relative_span: Span,
     base_offset: u32,
+    class: Option<ValueSeparator>,
     arena: &'arena Bump,
 ) -> CssValue<'arena> {
     let value_str = source_relative_span.extract(source);
@@ -65,9 +71,19 @@ pub fn parse_value_from_source<'arena>(
         end: start + trimmed.len() as u32,
     };
 
+    // The class was derived over the span the declaration scan measured, so it describes
+    // this text only when the trim took nothing off either end. It normally does not (a real
+    // stylesheet puts no whitespace at a value's ends, and the scan's own `value_end` is
+    // already trimmed); when it does, the class is dropped and the fused pass runs as usual.
+    let class = if leading == 0 && trimmed.len() == value_str.len() {
+        class
+    } else {
+        None
+    };
+
     // ValueParser re-parses the same source text, so nested value spans stay
     // accurate through its same-source recursion.
-    parser::ValueParser::new(trimmed, absolute_span).parse(arena)
+    parser::ValueParser::new(trimmed, absolute_span).parse_classified(arena, class)
 }
 
 /// A value's text with its surrounding **CSS** whitespace removed, and how many
@@ -242,7 +258,7 @@ mod value_span_tests {
     /// The span `parse_value_from_source` gives the value it parsed.
     fn value_span(source: &str, start: u32, end: u32) -> Span {
         let arena = Bump::new();
-        parse_value_from_source(source, Span { start, end }, 0, &arena).span()
+        parse_value_from_source(source, Span { start, end }, 0, None, &arena).span()
     }
 
     /// The already-trimmed fast path must agree with the trimming path on where

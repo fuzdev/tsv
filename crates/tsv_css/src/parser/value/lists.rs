@@ -13,7 +13,7 @@ use crate::parser::value::scan::{comment_end, is_comment_start};
 /// "Top level" means not inside parentheses, quotes, or block comments. Commas
 /// take priority over whitespace (a value with both is comma-separated), so the
 /// variants are ordered by that precedence.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueSeparator {
     /// At least one top-level comma — parse as a comma-separated list.
     Comma,
