@@ -31,6 +31,38 @@
 //! across the crate (`write_block`/`write_atrule` de-inlined) and measured
 //! +0.45% instructions on the CSS parse-JSON path. CSS nodes are small enough
 //! that per-node call structure is visible; keep the literals inline.
+//!
+//! # Staged runs
+//!
+//! Every node here ends with the same burst — `,"start":` N `,"end":` M, then a
+//! `}` or a constant `metadata` payload — and the three emitters that carry ~37%
+//! of the corpus's nodes (`write_rule`, `write_relative_selector`,
+//! `write_named_selector`) assemble it through [`JsonWriter::stage_begin`]
+//! instead of five separate appends. Two of those five are calls to
+//! `JsonWriter::u32`, which is deliberately `inline(never)` for WASM size, so
+//! each one forces the output buffer's pointer/length/capacity out of registers
+//! at every surrounding append; the staged form keeps the scratch base fixed,
+//! its bound a compile-time constant, and `stage_len` in a register, and reaches
+//! the buffer once.
+//!
+//! ⚠️ **Only the trailing burst stages, and that is a measured boundary, not an
+//! unfinished migration.** The *head* bursts have the same shape
+//! (`{"type":"Block","start":` N `,"end":` M `,"children":`) and staging them is
+//! a **loss**: on the four head emitters it moved the write phase −0.2% where
+//! the three tails moved it −1.0%, and staging both together was *worse* than
+//! the tails alone (−0.87% vs −1.04%, three replicates of a 24-binary layout
+//! group). A head run's static fragments are ~50 bytes against a tail's ~17, and
+//! a staged run copies them twice — once into the scratch, once through the
+//! flush. Splitting the difference by keeping the prefix a plain `raw` and
+//! staging only from the first integer is worse still (+0.68% on the same
+//! instrument). **Grade any change to this on `cycles`/wall, never on
+//! instructions**: staging all seven bursts removes 2.6× more instructions than
+//! staging the three and is ~1.05 points slower.
+//!
+//! The remaining unstaged tails (combinator, the pseudo selectors, `Nth`,
+//! `Percentage`, `CSSComment`, the synthesized selector lists) are ~8% of nodes
+//! across ten sites — below the floor at which a ratio can be measured, and each
+//! staged emitter inlines at its site and costs `@fuzdev/tsv_parse_wasm` bytes.
 
 use super::super::internal;
 use super::{
@@ -218,6 +250,10 @@ fn write_node(
 
 /// Emits a `Rule` node. Field order: `type`, `prelude`, `block`, `start`,
 /// `end`, then `metadata` (standalone only).
+///
+/// The trailing `start`/`end` burst is a staged run (module doc, §Staged runs);
+/// it stops before `metadata`, whose payload is a long constant that would be
+/// copied a second time for nothing.
 fn write_rule(
     w: &mut JsonWriter,
     rule: &internal::CssRule<'_>,
@@ -228,10 +264,12 @@ fn write_rule(
     write_selector_list(w, &rule.selector, ctx);
     w.raw(",\"block\":");
     write_block(w, rule.block_span, rule.declarations, ctx, comments);
-    w.raw(",\"start\":");
-    w.u32(ctx.pos(rule.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(rule.span.end));
+    w.stage_begin();
+    w.stage_raw(",\"start\":");
+    w.stage_u32(ctx.pos(rule.span.start));
+    w.stage_raw(",\"end\":");
+    w.stage_u32(ctx.pos(rule.span.end));
+    w.stage_flush();
     if ctx.has_metadata {
         w.raw(RULE_META);
     }
@@ -481,6 +519,9 @@ fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>,
 
 /// Emits a `RelativeSelector` node. `combinator` is `null` (no skip) when
 /// absent; field order is `combinator`, `selectors`, `start`, `end`, `metadata`.
+///
+/// The trailing `start`/`end` burst is a staged run, stopping before `metadata`
+/// for `write_rule`'s reason (module doc, §Staged runs).
 fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"RelativeSelector\",\"combinator\":");
     match (&r.combinator, &r.combinator_span) {
@@ -489,10 +530,12 @@ fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_
     }
     w.raw(",\"selectors\":");
     write_array(w, r.selectors, |w, s| write_simple_selector(w, s, ctx));
-    w.raw(",\"start\":");
-    w.u32(ctx.pos(r.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(r.span.end));
+    w.stage_begin();
+    w.stage_raw(",\"start\":");
+    w.stage_u32(ctx.pos(r.span.start));
+    w.stage_raw(",\"end\":");
+    w.stage_u32(ctx.pos(r.span.end));
+    w.stage_flush();
     if ctx.has_metadata {
         w.raw(RELATIVE_META);
     }
@@ -694,6 +737,9 @@ fn wq_name_start(source: &str, prefix: Span, limit: u32) -> usize {
 }
 
 /// The shared `{type, name, start, end}` shape (Type/Universal/Class/Id/Nesting).
+///
+/// The trailing `start`/`end`/`}` burst is a staged run (module doc, §Staged
+/// runs) — this node carries no `metadata`, so the closing brace joins it.
 fn write_named_selector(
     w: &mut JsonWriter,
     node_type: &str,
@@ -705,11 +751,13 @@ fn write_named_selector(
     w.raw(node_type);
     w.raw("\",\"name\":");
     w.string(name);
-    w.raw(",\"start\":");
-    w.u32(ctx.pos(span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(span.end));
-    w.raw("}");
+    w.stage_begin();
+    w.stage_raw(",\"start\":");
+    w.stage_u32(ctx.pos(span.start));
+    w.stage_raw(",\"end\":");
+    w.stage_u32(ctx.pos(span.end));
+    w.stage_raw("}");
+    w.stage_flush();
 }
 
 /// Emit a functional pseudo-class's or pseudo-element's args (an `Nth` node, a
