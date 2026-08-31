@@ -1230,6 +1230,14 @@ instruction count is identical to ±0.001% on every non-writer corpus — the tw
 phases alternate per file and share cache state. **A second counter in the same
 loop is a sanity check; a second entry point is a control.**
 
+The mirror case is worse, and it is the one to expect: a **parser**-only change
+(a CSS byte scan the writer never enters) moved the **write** column **−2.7%**,
+four times what it moved the parse column it actually lives in, and a variant
+that *adds* instructions to the parser moved it **−3.3%**. Read together with
+the case above, the rule is not "the neighbouring column drifts a little" — it
+is that **neither column is attributable**, in either direction, at magnitudes
+that dwarf the effect being measured.
+
 Grading the write phase is still worth doing — it is often the only instrument
 that can see the lever at all. On CSS the split is 73.5% parse / 26.5% write, so
 a writer-confined change reaches the whole-run cycles channel at about a quarter
@@ -1828,6 +1836,66 @@ division-dense Svelte template expressions, whose brace regions are short: **+0.
 anchor was, running per byte under a function whose own source lines said nothing about it.
 A flat srcline board does not name it, and neither does the symbol board. Run that view over
 the top of the board and ask of each loop: **who reads what this computes, and how often?**
+
+### A two-target byte scan compiles BRANCHLESS, and branchless costs thirteen instructions a byte
+
+`bytes[p] != quote && bytes[p] != b'\\'` reads like two compares that short-circuit. LLVM
+compiles it as neither: it emits a `setne` per target, a `test` to fold them, and the loop's
+own step — **about thirteen instructions per byte, one branch**. It does not vectorize
+either, because the escape arm makes the stride data-dependent, so the "the compiler
+auto-vectorizes this" comment such loops attract is worth checking against `objdump` before
+it is believed. **Audited across the repo's seven such claims** (count `pcmpeqb` / `pmovmskb`
+/ `psadbw` per symbol in the profiling build, which keeps the symbols the release binary
+folds away): `printing::visual_width` and `doc::arena::pooled_text_width_scanned` do
+vectorize; `tsv_css::lexer::comments::read_comment`, `tsv_ts::lexer::comments::read_block_comment`
+and `tsv_ts::lexer::core::Lexer::scan_string_into` retire **zero** vector instructions and
+their comments are wrong. The predictor is structural: **a single-byte inner run nested in an
+outer loop that can RESUME it — a comment's `*/` re-check, a string's escape step — does not
+vectorize; a straight-line count with no early exit does.** The 256-entry skip table this crate's value scanners already use asks the
+same question in one L1 load and **six** instructions, at the same branch count.
+
+That is a factor of two on whatever share the scan holds, and it is worth finding because
+the share can be large and invisible at the symbol level: CSS's string scan is inlined into
+the declaration-boundary walk and the value parser, so no board row is named for it. The
+per-**FILE** aggregate (`agg.py`) is what sees it — `lexer/strings.rs` **1.17%** of the wire
+run's instructions plus `parser/value/strings.rs` **1.06%**, neither of which owns a symbol.
+
+- **Two spellings of one grammar cost twice, and the second one is the cheaper place to
+  look.** The value parser had its own three-arm `match` loop asking "does this string close
+  at the last byte?" — which is `string_end`'s question with its answer compared against the
+  end. Delegating deleted the loop.
+- ⚠️ **The dedupe ALONE is a regression, and only the pair pays.** Pointed at the *old*
+  branchless `string_end`, the delegation reads `instructions:u` **+0.133%**: the three-arm
+  loop it replaced was cheaper than the callee it now calls. With the table loop underneath
+  it, the same delegation is worth **−0.256** points more than the table loop alone. **A
+  substitution's two halves do not decompose additively** — measure the pair, and measure
+  each half alone, in one layout group.
+- **Shape, not instruction count, decided the cycles ranking.** The branchy rewrite of the
+  same loop (explicit early returns, one branch per target) removes **−0.403%** of
+  instructions with the delegation; the table removes **−0.700%**. On a 24-binary group the
+  branchy one sits **at the null** (+0.02 pts) and the table one reads **−1.03**. Two shapes
+  of one lever, ranked by cycles in the same order as by instructions here — but with a
+  fivefold gap the instruction channel does not predict.
+
+### The same instructions removed convert differently at different ENTRY POINTS
+
+A verdict belongs to a (codegen profile x binary x entry point) triple, and the sharpest
+demonstration is a lever whose *absolute* work removal is provably identical across two of
+them. The CSS string-scan change removes **0.998 M instructions per pass** on `json_profile`
+(parse -> wire JSON) and **0.998 M per pass** on `profile` (parse + format) — the same parse,
+the same functions, the same corpus, agreeing to three digits. Same 24 binaries, same
+protocol:
+
+| entry point | `instructions:u` | cycles vs null | wall vs null |
+| --- | --- | --- | --- |
+| `json_profile cssbig` | −0.700% | **−1.031** | **−0.872** |
+| `profile cssbig` | −0.515% | +0.213 (not resolved) | — |
+
+Both runs are throughput-shaped (IPC 3.16 and 2.97). The percentages differ only because the
+denominators do; the *cycles* do not follow. **Do not carry a conversion ratio from one entry
+point to another even when the removed work is byte-identical** — report the surface each
+number belongs to, and check the shipped one rather than assuming it inherits.
+
 
 ## WASM bundle size
 
