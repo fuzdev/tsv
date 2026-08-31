@@ -1362,6 +1362,61 @@ intent was a −0.4% win. `#[inline(always)]` on identical source: **−0.377%**
   unexplained *rise* on a deletion is an inlining one; both are worth more than
   the source change that caused them.
 
+### Price a redundant pass by RUNNING IT TWICE
+
+`tsv_css` walks a declaration's value text more than once by design — the boundary
+scan (`parser/decl_scan.rs`) finds its extent, then `ValueParser::fast_scan`
+classifies its top-level separators over the very same bytes. Fusing the two owes a
+model-agreement argument across two scanners whose nesting rules differ, which is
+hours of design before a single number exists.
+
+**So make the code run the pass a second time and measure that.** `ValueParser::parse`
+was made to call `fast_scan` twice and use the second result — output-identical by
+construction (the one arm with side effects keeps the first result), with
+`std::hint::black_box` on an argument so LTO cannot CSE the pair. One build:
+`instructions:u` **+6.402%**, cycles **+5.481%** — the entire cost of one pass, with
+no correctness argument owed and nothing designed yet.
+
+- ⭐⭐ **It beats a board row for this question.** A board says what a symbol costs
+  *including* work the fusion would not remove — its prologue, its other arms, its
+  callees. The doubling probe measures precisely the work that would be deleted. It
+  is the deliberately-wrong-probe idea (§A cache keyed on an address…, and the
+  batched-writer ceiling below) with the wrongness in the **repetition** rather than
+  the order: state the invariant the wrongness must still satisfy — here, identical
+  output — and read the number as a ceiling.
+- ⭐⭐ **It hands over the conversion ratio of the work you are about to delete.** The
+  probe read cycles ÷ instructions of **0.856**, where a scan-shaped lever in this
+  repo usually converts near 0.4. The shipped lever landed at **1.54×**, so the probe
+  *under*-reports cycles — its second call runs cache- and predictor-warm and the real
+  one does not — which is the safe direction for a go/no-go.
+- ⚠️⚠️ **Divide the probe by your census and compare the quotient to the
+  disassembly.** The probe's +6.402% over the first census's population worked out to
+  **24.5 instructions per byte** for a loop `objdump` shows is six. The census was
+  wrong, not the probe: it had enumerated the entry points into the *program* and
+  missed a second constructor of the hot type — `parse_function_arguments` builds a
+  fresh `ValueParser` per function argument list, so `var(--x)` and `rgb(…)` re-enter
+  the recursion. **Enumerate the entry points into the FUNCTION**, i.e. `grep` every
+  constructor of the type it hangs off, not just the function's own name. The
+  corrected population halved the reachable share, 80% of calls → 44%, and the lever
+  landed at −1.884% against a corrected ceiling of ~2.7%.
+- ⭐⭐ **The oracle for a replaced computation is the computation it replaces.** The
+  new fact could have joined a struct whose debug oracle is a full token walk, which
+  would have meant implementing the classification a second time — in the harder
+  dialect — to grade the first. Carried *beside* that struct instead, it is graded by
+  a `debug_assert` against the skipped function itself, and every CSS fixture
+  re-proves it. That works only because the arms taking the shortcut do not recurse;
+  the one that does still runs the real pass.
+- ⭐ **A withheld answer needs its own spelling.** `Option<ValueSeparator>`, where
+  `None` is *cannot say* and `Some(ValueSeparator::None)` is *no separator*. A `bool`
+  merges them silently, and every construct the donating scan steps over **whole**
+  while the replaced one walks it byte by byte — here an unquoted `url(…)`, whose
+  interior can hold a `(`, a quote or a `/*` — becomes a wrong answer.
+- ⭐ **Census the decline the way the code declines.** A first eligibility pass
+  excluded every value containing a `\` and read 18.19% ineligible; but strings are
+  consumed opaquely by `string_end`, so a backslash inside one never reaches the
+  declining arm. Modelling the opaque regions took it to **0.31%** — 99.4% of value
+  bytes carry a class.
+
 ### A conjunct's cheap half may IMPLY its expensive half — and then deleting beats reordering
 
 `tsv_css`'s `Printer::has_blank_line_between` asked an O(log n) `partition_point`

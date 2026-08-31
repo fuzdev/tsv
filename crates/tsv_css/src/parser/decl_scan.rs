@@ -38,6 +38,8 @@ use crate::lexer::{
     IDENT_CONTINUE_LUT, Lexer, TokenKind, is_ascii_css_whitespace, string_end, url_arg_is_quoted,
     url_token_close,
 };
+use crate::parser::value::lists::ValueSeparator;
+use crate::parser::value::scan::is_value_separator;
 use tsv_lang::ParseError;
 
 /// The token that closes a declaration's value. Exactly three can, so the scan reports
@@ -91,9 +93,11 @@ pub(super) struct ValueFacts {
 ///
 /// That is every ASCII byte except the ones it must inspect — the nesting and terminator
 /// punctuation (`( ) { } [ ] ;`), the quote and comment introducers (`" ' /`), the `!` of
-/// `!important`, and the `\` escape introducer (which it declines on). Whitespace is
-/// skippable too: it moves no state, and the two places its position matters (the value's
-/// end, and the roll-back before a `!`) are recovered afterwards by a trim.
+/// `!important`, the `\` escape introducer (which it declines on), and the comma and ASCII
+/// whitespace the value's separator **class** turns on ([`is_value_separator`]). Those last
+/// two move no state — the two places their position matters for the *extent* (the value's
+/// end, and the roll-back before a `!`) are recovered afterwards by a trim — so they take a
+/// short arm of their own rather than the state machine's.
 ///
 /// Identifier letters, digits, `-`, `#`, `%`, `.` — the overwhelming bulk of a value's
 /// text — all land here, so a whole `var(--fuz_color_a_5)` costs one L1 load per byte.
@@ -119,11 +123,18 @@ const SKIP: [bool; 256] = {
 /// match**: a byte named here but unhandled there is merely slow, but a byte handled there and
 /// *missing* here is skipped by the table and its arm goes dead — a silent misparse. (The
 /// debug oracle would catch it; this exists so it never gets that far.)
+///
+/// [`is_value_separator`] is here for the value's **class** rather than for its extent: a
+/// comma and an ASCII whitespace move none of this scan's own state, and they are inspected
+/// only so the scan can report what a top-level one of each would make of the value (see
+/// `scan_value_core`'s separator arm, which is the "match arm" the lockstep rule means for
+/// them). The vertical tab stays skipped — it is CSS whitespace to the lexer and value
+/// content to the class, and `is_value_separator` is the side that decides here.
 const fn value_scan_inspects(b: u8) -> bool {
     matches!(
         b,
         b'(' | b')' | b'{' | b'}' | b'[' | b']' | b';' | b'"' | b'\'' | b'/' | b'!' | b'\\'
-    )
+    ) || is_value_separator(b)
 }
 
 /// An ASCII byte that lexes to a token none of these scans ever looks at: it can neither
@@ -173,6 +184,7 @@ enum Disambiguation {
     Declaration {
         value_start: usize,
         facts: ValueFacts,
+        class: Option<ValueSeparator>,
     },
 }
 
@@ -216,7 +228,11 @@ fn scan_rule_or_declaration_and_value_bytes(source: &str, from: usize) -> Option
 
     match scan_value_core::<true>(source, value_start)? {
         ValueScanOutcome::Rule => Some(Disambiguation::Rule),
-        ValueScanOutcome::Value(facts) => Some(Disambiguation::Declaration { value_start, facts }),
+        ValueScanOutcome::Value(facts, class) => Some(Disambiguation::Declaration {
+            value_start,
+            facts,
+            class,
+        }),
     }
 }
 
@@ -242,7 +258,10 @@ pub(super) fn scan_rule_or_declaration(
                     "rule-or-declaration byte scan disagreed with the token walk at {from}: \
                      scan said {is_rule}, walk said {expected:?}"
                 );
-                if let Disambiguation::Declaration { value_start, facts } = &outcome {
+                if let Disambiguation::Declaration {
+                    value_start, facts, ..
+                } = &outcome
+                {
                     let expected_facts =
                         scan_value_tokens(source, parser.base_offset(), *value_start);
                     assert!(
@@ -255,7 +274,11 @@ pub(super) fn scan_rule_or_declaration(
                 }
             }
             parser.stash_value_facts(match outcome {
-                Disambiguation::Declaration { value_start, facts } => Some((value_start, facts)),
+                Disambiguation::Declaration {
+                    value_start,
+                    facts,
+                    class,
+                } => Some((value_start, facts, class)),
                 Disambiguation::Rule => None,
             });
             Ok(is_rule)
@@ -354,13 +377,17 @@ pub(super) fn peek_significant_kind(parser: &CssParser<'_, '_>) -> Result<TokenK
 /// Byte scan first, reference token walk on decline. In debug builds the reference *also*
 /// runs behind a successful byte scan and must agree fact for fact, so every value in
 /// every fixture and every unit test re-proves the equivalence.
+///
+/// The second element is the value's separator **class**, which is not one of the facts and
+/// has a different oracle: the reference walk never classifies, so a declined value gets
+/// `None` and the value parser derives its own as it always did. See `scan_value_core`.
 pub(super) fn scan_value(
     parser: &CssParser<'_, '_>,
     value_start: usize,
-) -> Result<ValueFacts, ParseError> {
+) -> Result<(ValueFacts, Option<ValueSeparator>), ParseError> {
     let source = parser.source();
     match scan_value_bytes(source, value_start) {
-        Some(facts) => {
+        Some((facts, class)) => {
             #[cfg(debug_assertions)]
             {
                 // An `Err` here fails the assert too, and must: it would mean the byte scan
@@ -372,18 +399,23 @@ pub(super) fn scan_value(
                      {value_start}: scan said {facts:?}, walk said {expected:?}"
                 );
             }
-            Ok(facts)
+            Ok((facts, class))
         }
-        None => scan_value_tokens(source, parser.base_offset(), value_start),
+        // The token walk answers for the value's extent only — it never classifies — so a
+        // declined value simply reaches the value parser's own fused pass, as it always did.
+        None => scan_value_tokens(source, parser.base_offset(), value_start).map(|f| (f, None)),
     }
 }
 
 /// The fast path. `None` = "I decline" — hand the value to `scan_value_tokens`.
-fn scan_value_bytes(source: &str, value_start: usize) -> Option<ValueFacts> {
+fn scan_value_bytes(
+    source: &str,
+    value_start: usize,
+) -> Option<(ValueFacts, Option<ValueSeparator>)> {
     // `WANT_VERDICT == false` compiles out the verdict latch, the only path that yields
     // `Rule`, so only `Value` can arrive; a `Rule` (which cannot) safely declines.
     match scan_value_core::<false>(source, value_start) {
-        Some(ValueScanOutcome::Value(facts)) => Some(facts),
+        Some(ValueScanOutcome::Value(facts, class)) => Some((facts, class)),
         _ => None,
     }
 }
@@ -395,8 +427,10 @@ enum ValueScanOutcome {
     /// produced when `WANT_VERDICT` is set (the disambiguation caller); the plain value scan
     /// never asks the question and never sees it.
     Rule,
-    /// The value ran to its terminator; here are its facts.
-    Value(ValueFacts),
+    /// The value ran to its terminator; here are its facts, and what
+    /// [`ValueParser::fast_scan`](crate::parser::value::parser::ValueParser) would make of
+    /// the value's own text (`None` when this scan cannot say — see `scan_value_core`).
+    Value(ValueFacts, Option<ValueSeparator>),
 }
 
 /// The value byte-scan loop, from `value_start` (the value's first byte). Shared by the
@@ -424,6 +458,18 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     let mut brace: u32 = 0;
     let mut bracket: u32 = 0;
     let mut has_comment = false;
+    // The value's separator CLASS, in the two positions it is decided from: the first
+    // paren-depth-0 comma and the first paren-depth-0 ASCII whitespace, as
+    // `ValueParser::fast_scan` would see them. `usize::MAX` is "none seen" — the walk runs
+    // past the value proper (over the trailing whitespace and any `!important`, neither of
+    // which is the value's own), so both are filtered against `value_end` below, and the
+    // FIRST is the one that survives that filter whenever any does.
+    let mut top_comma = usize::MAX;
+    let mut top_ws = usize::MAX;
+    // A construct whose interior this scan steps over WHOLE but `fast_scan` walks byte by
+    // byte, so the two cannot be shown to agree: the class is not stated for it. Today that
+    // is the url-token alone (a string is opaque to both, and a comment is `has_comment`).
+    let mut class_unstated = false;
     // The *last* `!` at content position, at any depth. `!important` must be the value's
     // final two tokens, so only the last `!` can possibly open it; a `!` nested in parens
     // (or followed by anything but `important`) is rejected by the forward check below.
@@ -439,8 +485,24 @@ fn scan_value_core<const WANT_VERDICT: bool>(
         if i >= len {
             break (len, TerminatorKind::Eof);
         }
-        let at_top = paren == 0 && brace == 0 && bracket == 0;
         let b = bytes[i];
+        // A separator moves none of this scan's state — it is inspected only for the value's
+        // class — so it takes its own short arm ahead of the depth computation, the verdict
+        // latch and the match, none of which it could reach anyway. `paren == 0` (not
+        // `at_top`) is deliberately `fast_scan`'s notion of top level: that scanner treats
+        // `[]` and `{}` as ordinary content and nests on parens alone.
+        if is_value_separator(b) {
+            if paren == 0 {
+                if b == b',' {
+                    top_comma = top_comma.min(i);
+                } else {
+                    top_ws = top_ws.min(i);
+                }
+            }
+            i += 1;
+            continue;
+        }
+        let at_top = paren == 0 && brace == 0 && bracket == 0;
         // Verdict latch (paren-only, walk1's model): the first paren-depth-0 structural byte
         // decides rule vs declaration. A `{` there is a rule; a `;`/`}` fixes a declaration
         // and the loop reads on for the value terminator (`[]`/`{}` may push it further).
@@ -478,7 +540,14 @@ fn scan_value_core<const WANT_VERDICT: bool>(
             // A `url(…)` is ONE opaque token (css-syntax §4.3.6), so its parens are content,
             // not nesting — an interior `;` or `)` must not be seen. Any other `(` nests.
             b'(' => match url_token_end(source, bytes, value_start, i) {
-                Some(end) => i = end,
+                Some(end) => {
+                    // Opaque here, walked there: a url-token's interior can hold a `(`, a
+                    // quote or a `/*`, each of which moves `fast_scan`'s state and none of
+                    // which this scan sees. Rare enough (0.3% of real declaration values)
+                    // that declining the class outright beats modelling the interior.
+                    class_unstated = true;
+                    i = end;
+                }
                 None => {
                     paren += 1;
                     i += 1;
@@ -532,14 +601,33 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     // Empty = no tokens besides whitespace, comments, and the `!important`.
     let is_empty = crate::comments::skip_trivia_forward(bytes, value_start, span_end) >= span_end;
 
-    Some(ValueScanOutcome::Value(ValueFacts {
-        terminator,
-        terminator_kind,
-        value_end,
-        important_end,
-        has_comment,
-        is_empty,
-    }))
+    // The class the value parser would have derived for itself, over `[value_start,
+    // value_end)` — the text `parse_value_from_source` hands its `ValueParser`. A separator
+    // at or past `value_end` sits in the trailing whitespace or the `!important` and is not
+    // the value's own (`color: red !important` is a leaf, not a whitespace list). A comment
+    // is unstated because `fast_scan` refuses a commented value outright and defers to the
+    // comment-aware two-pass path, which classifies differently.
+    let class = if has_comment || class_unstated {
+        None
+    } else if top_comma < value_end {
+        Some(ValueSeparator::Comma)
+    } else if top_ws < value_end {
+        Some(ValueSeparator::Whitespace)
+    } else {
+        Some(ValueSeparator::None)
+    };
+
+    Some(ValueScanOutcome::Value(
+        ValueFacts {
+            terminator,
+            terminator_kind,
+            value_end,
+            important_end,
+            has_comment,
+            is_empty,
+        },
+        class,
+    ))
 }
 
 /// If the `(` at `open` closes a `url` **identifier token**, the end of the opaque
@@ -724,4 +812,106 @@ fn scan_value_tokens(
         has_comment,
         is_empty,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The value's separator class, for the declaration `source` holds.
+    ///
+    /// `Err(())` is the scan declining outright (an escape, a non-ASCII byte at content
+    /// position, a bad string) — a different answer from `Ok(None)`, which is the scan
+    /// running to the end and refusing to state the class.
+    fn class_of(source: &str) -> Result<Option<ValueSeparator>, ()> {
+        let bytes = source.as_bytes();
+        let colon = source.find(':').expect("test source needs a `:`");
+        let mut value_start = colon + 1;
+        while is_ascii_css_whitespace(bytes[value_start]) {
+            value_start += 1;
+        }
+        scan_value_bytes(source, value_start)
+            .map(|(_, class)| class)
+            .ok_or(())
+    }
+
+    /// The class is a claim about the value's OWN text — `[value_start, value_end)` — while
+    /// the scan runs on past it, over the trailing whitespace and any `!important`. A
+    /// separator out there belongs to neither, so these are the cases the `< value_end`
+    /// filter exists for: `red !important` is a leaf, not a two-element whitespace list.
+    #[test]
+    fn separators_past_the_value_are_not_the_values_own() {
+        assert_eq!(
+            class_of("a{color: red !important;}"),
+            Ok(Some(ValueSeparator::None))
+        );
+        assert_eq!(class_of("a{color: red ;}"), Ok(Some(ValueSeparator::None)));
+        assert_eq!(class_of("a{color: red}"), Ok(Some(ValueSeparator::None)));
+        assert_eq!(
+            class_of("a{margin: 0 auto !important;}"),
+            Ok(Some(ValueSeparator::Whitespace))
+        );
+        assert_eq!(
+            class_of("a{font-family: a, b !important;}"),
+            Ok(Some(ValueSeparator::Comma))
+        );
+    }
+
+    /// "Top level" is the value parser's, which nests on parens and quotes ALONE — `[]` and
+    /// `{}` are ordinary content there, even though this scan tracks them for the value's
+    /// terminator.
+    #[test]
+    fn top_level_is_parens_and_quotes_only() {
+        assert_eq!(
+            class_of("a{width: calc(1px + 2px);}"),
+            Ok(Some(ValueSeparator::None))
+        );
+        assert_eq!(
+            class_of("a{transform: translate(1px, 2px);}"),
+            Ok(Some(ValueSeparator::None))
+        );
+        assert_eq!(
+            class_of("a{content: 'a b';}"),
+            Ok(Some(ValueSeparator::None))
+        );
+        assert_eq!(
+            class_of("a{content: 'a,b';}"),
+            Ok(Some(ValueSeparator::None))
+        );
+        assert_eq!(
+            class_of("a{--x: [a b];}"),
+            Ok(Some(ValueSeparator::Whitespace))
+        );
+        assert_eq!(
+            class_of("a{grid-template: 'a a' 1fr;}"),
+            Ok(Some(ValueSeparator::Whitespace))
+        );
+        // A comma anywhere at top level wins over whitespace, wherever each sits.
+        assert_eq!(
+            class_of("a{font: a b, c;}"),
+            Ok(Some(ValueSeparator::Comma))
+        );
+    }
+
+    /// The two constructs whose interior this scan steps over WHOLE but the value parser
+    /// walks byte by byte: the class is withheld rather than guessed.
+    #[test]
+    fn opaque_interiors_withhold_the_class() {
+        assert_eq!(class_of("a{background: url(a.png);}"), Ok(None));
+        assert_eq!(class_of("a{color: /* c */ red;}"), Ok(None));
+        assert_eq!(class_of("a{color: red /* c */;}"), Ok(None));
+        // A QUOTED url argument is a function token, not a url-token — nothing is hidden.
+        assert_eq!(
+            class_of("a{background: url('a.png') no-repeat;}"),
+            Ok(Some(ValueSeparator::Whitespace))
+        );
+    }
+
+    /// A declining scan states nothing at all, which is not the same as stating "no
+    /// separator" — the value parser must fall back to its own pass, not to a leaf.
+    #[test]
+    fn a_declining_scan_is_not_a_leaf_verdict() {
+        assert_eq!(class_of("a{content: a\\ b;}"), Err(()));
+        assert_eq!(class_of("a{font-family: \u{e9}x;}"), Err(()));
+    }
 }

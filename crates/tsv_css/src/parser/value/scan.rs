@@ -16,6 +16,23 @@ pub(crate) const fn is_value_structural(b: u8) -> bool {
     matches!(b, b'\\' | b'(' | b')' | b'\'' | b'"' | b'/')
 }
 
+/// The bytes a value's **separator class** turns on: the comma that makes it a
+/// comma list, and the ASCII whitespace that makes it a whitespace list.
+///
+/// One spelling, two scanners. [`super::parser::ValueParser::fast_scan`] classifies on
+/// these directly; the declaration boundary scan
+/// (`crate::parser::decl_scan::scan_value_core`) records the same two facts while it walks
+/// the value for its terminator, so the class is already known when the value parser
+/// starts. Those two answers must agree byte for byte — the boundary scan's is used *in
+/// place of* the fused pass — so the set is named here rather than spelled twice.
+///
+/// ⚠️ `u8::is_ascii_whitespace`, **not** the lexer's `is_ascii_css_whitespace`: the
+/// vertical tab is CSS whitespace to `parseCss` but is value *content* to this
+/// classification, and both scanners must read it the same way.
+pub(crate) const fn is_value_separator(b: u8) -> bool {
+    b == b',' || b.is_ascii_whitespace()
+}
+
 // The comment-extent primitives live at the crate root ([`crate::comments`]), beside
 // [`crate::escapes::escape_len`] — the two answer the same "how far does this reach"
 // question for the two constructs a value scanner must step over whole. Re-exported here

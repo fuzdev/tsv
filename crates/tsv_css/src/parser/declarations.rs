@@ -232,21 +232,22 @@ pub(crate) fn parse_declaration<'arena>(
     // reuse them rather than walk a second time. The stash is absent for a custom property
     // (which bypasses the disambiguation) or when the byte scan declined; then scan now.
     let value_start_raw = parser.current_start;
-    let facts = match parser.take_value_facts(value_start_raw) {
-        Some(facts) => {
+    let (facts, value_class) = match parser.take_value_facts(value_start_raw) {
+        Some(reused) => {
             #[cfg(debug_assertions)]
             {
                 // The reused facts must equal a fresh scan at the parser's own value start —
                 // proving the disambiguation located the value identically to the parser's
-                // positioning here.
+                // positioning here. The separator class rides the same comparison, so the
+                // fused walk and the plain one are held to one answer.
                 let fresh = super::decl_scan::scan_value(parser, value_start_raw);
                 debug_assert!(
-                    fresh.as_ref().is_ok_and(|fresh| *fresh == facts),
+                    fresh.as_ref().is_ok_and(|fresh| *fresh == reused),
                     "reused value facts disagreed with a fresh scan at {value_start_raw}: \
-                     reused {facts:?}, fresh {fresh:?}"
+                     reused {reused:?}, fresh {fresh:?}"
                 );
             }
-            facts
+            reused
         }
         None => super::decl_scan::scan_value(parser, value_start_raw)?,
     };
@@ -302,6 +303,7 @@ pub(crate) fn parse_declaration<'arena>(
             parser.source(),
             source_relative_span,
             base,
+            value_class,
             parser.arena,
         )
     };

@@ -6,7 +6,9 @@
 use crate::ast::internal::CssValue;
 use crate::parser::value::cursor::ValueCursor;
 use crate::parser::value::lists::{ValueSeparator, classify_separators};
-use crate::parser::value::scan::{comment_run_end, is_comment_start, value_skip_table};
+use crate::parser::value::scan::{
+    comment_run_end, is_comment_start, is_value_separator, value_skip_table,
+};
 use crate::whitespace::is_css_whitespace;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
@@ -14,14 +16,14 @@ use tsv_lang::Span;
 
 /// [`ValueParser::fast_scan`]'s skip table. Beyond the structural set — which already
 /// carries the comment introducer (`/`) — it must see both separators it classifies on,
-/// the comma and ASCII whitespace.
+/// [`is_value_separator`]'s comma and ASCII whitespace.
 ///
 /// The exhaustiveness argument, which is what makes the skip byte-identical: a skipped
 /// byte reaches no arm of the loop. It is not `/` (comment probe), not `\` (escape
 /// probe), not a paren or quote (nesting), not `,` and not whitespace (the separators)
 /// — and the one remaining arm, the in-quote close (`b == quote_char`), can't match it
 /// either, because `quote_char` only ever holds `'` or `"`, both structural.
-const FAST_SCAN_SKIP: [bool; 256] = value_skip_table!(|b| b == b',' || b.is_ascii_whitespace());
+const FAST_SCAN_SKIP: [bool; 256] = value_skip_table!(|b| is_value_separator(b));
 
 /// Skip table for the comma-list split's delimiter, `|c| c == ','`.
 const COMMA_SKIP: [bool; 256] = value_skip_table!(|b| b == b',');
@@ -204,6 +206,30 @@ impl<'a> ValueParser<'a> {
     /// produce) while a non-ASCII space (NBSP, em space) is kept as leaf content,
     /// never dropped.
     pub fn parse<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
+        self.parse_classified(arena, None)
+    }
+
+    /// [`Self::parse`], with the value's separator class supplied instead of derived.
+    ///
+    /// A declaration's value is walked for its **extent** before it is parsed at all — the
+    /// boundary scan in `crate::parser::decl_scan` runs the `;`/`}` terminator, the
+    /// `!important` roll-back and the comment flag out of one byte pass. That pass crosses
+    /// the same bytes [`Self::fast_scan`] does and tracks the same paren nesting, so it
+    /// records the two facts the classification turns on ([`is_value_separator`]) as it
+    /// goes, and the fused pass here is skipped for the value it already answered — the
+    /// third walk of one value's text becoming the second. `None` means the scan could not
+    /// say (it declined, the value holds a comment, or a url-token hid bytes from it), never
+    /// that there is no separator.
+    ///
+    /// Only the two comma-free outcomes take the shortcut. A comma list still runs
+    /// `fast_scan`, whose comma arm splits the elements *inline* — knowing the class in
+    /// advance would save that walk only by handing the split back to the two-pass path the
+    /// fused one replaced, so the class is derived for all three and spent on two.
+    pub(crate) fn parse_classified<'arena>(
+        &self,
+        arena: &'arena Bump,
+        class: Option<ValueSeparator>,
+    ) -> CssValue<'arena> {
         let text = self.text();
         let bytes = text.as_bytes();
 
@@ -220,6 +246,28 @@ impl<'a> ValueParser<'a> {
             && !is_trim_boundary_ws(first)
             && !is_trim_boundary_ws(last)
         {
+            // The scan's answer, where it has one. `debug_assert` grades it against the
+            // pass it replaces — the strongest oracle available, since it is the very
+            // function whose answer is being reused, and every CSS fixture re-proves it.
+            // Neither arm recurses, so running it twice in debug costs one extra walk.
+            match class {
+                Some(ValueSeparator::None) => {
+                    debug_assert!(
+                        matches!(self.fast_scan(text, arena), FastScan::Leaf),
+                        "boundary scan called {text:?} separator-free, fast_scan disagreed"
+                    );
+                    return self.build_leaf(text, arena);
+                }
+                Some(ValueSeparator::Whitespace) => {
+                    debug_assert!(
+                        matches!(self.fast_scan(text, arena), FastScan::Whitespace),
+                        "boundary scan called {text:?} whitespace-separated, fast_scan disagreed"
+                    );
+                    return self.parse_space_separated(arena);
+                }
+                Some(ValueSeparator::Comma) | None => {}
+            }
+
             match self.fast_scan(text, arena) {
                 FastScan::Comma(values) => {
                     return CssValue::CommaSeparated {
