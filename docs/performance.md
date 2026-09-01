@@ -1435,9 +1435,9 @@ positive use of the `nm` check that §`perf` recommends for the opposite reason
 
 ⚠️ **The discriminator is what the bytes *are*, not how many.** A few loads
 wrapped in cold panic/bounds edges is a candidate; a byte scan is real work and
-is not — `is_single_param_arrow_start` is 218 bytes, but those bytes are
-`scan_identifier_then_arrow` already inlined into it. Read the callee's
-disassembly before believing it is small.
+is not — `Printer::find_char_outside_comments` reads as a 184-byte adapter over
+one `source_scan` call, and those 184 bytes *are* `find_char_skipping_comments`
+inlined into it. Read the callee's disassembly before believing it is small.
 
 ⚠️ **The `.text` sign is neither predictable nor the verdict.** Forcing the
 five-instruction leaf in made the binary **528 B smaller** — the out-of-line copy
