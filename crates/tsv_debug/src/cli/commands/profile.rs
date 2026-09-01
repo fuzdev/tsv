@@ -81,6 +81,9 @@ impl ProfileCommand {
             print_table(&results, self.iterations, skipped);
         }
 
+        // Session perf counters, when built with `--features census` (no-op otherwise).
+        tsv_lang::census::report();
+
         // Peak resident set (VmHWM), printed once — the checker's memory anchor.
         if self.bind {
             #[allow(clippy::cast_precision_loss)]

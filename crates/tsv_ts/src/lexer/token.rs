@@ -510,7 +510,7 @@ const _: () = assert!(size_of::<Token>() == 16);
 /// against, **test-only**. Production recognition is the per-length compare arms
 /// in [`keyword_swar`] (length ≤ 8) and [`keyword_swar_long`] (length 9/10); there
 /// is no runtime keyword table. The unit tests cross-check those arms — plus
-/// [`KEYWORD_MIN_LEN`]/[`KEYWORD_MAX_LEN`] and [`KEYWORD_FIRST_LETTER_MASK`] —
+/// [`KEYWORD_MIN_LEN`]/[`KEYWORD_MAX_LEN`] and [`KEYWORD_LENGTHS_BY_FIRST_LETTER`] —
 /// against this list, so adding a keyword to one without the other fails the suite.
 #[cfg(test)]
 static KEYWORDS: &[(&str, KeywordKind)] = &[
@@ -592,29 +592,71 @@ static KEYWORDS: &[(&str, KeywordKind)] = &[
 const KEYWORD_MIN_LEN: usize = 2;
 const KEYWORD_MAX_LEN: usize = 10;
 
-/// Bit `b - b'a'` is set when some reserved word begins with lowercase-ASCII letter `b`.
-/// Kept exactly in sync with `KEYWORDS` by `prefilter_admits_every_keyword`.
-const KEYWORD_FIRST_LETTER_MASK: u32 = {
-    const fn bit(b: u8) -> u32 {
-        1 << (b - b'a')
+/// [`KEYWORD_LENGTHS_BY_FIRST_LETTER`] is indexed by first letter and **shifted by the
+/// identifier's length**, so every admitted length must be a valid `u16` shift. The
+/// length gate in [`keyword_at`] is what guarantees it — this pins the two together, so
+/// adding a longer reserved word fails the build here rather than silently wrapping the
+/// shift in release and rejecting the new word.
+const _: () = assert!(KEYWORD_MAX_LEN < u16::BITS as usize);
+
+/// Bit `len` of entry `b - b'a'` is set when some reserved word begins with
+/// lowercase-ASCII letter `b` **and** is `len` bytes long — the pre-filter's whole
+/// question in one `u16`, since a keyword's length and first letter are both free
+/// at the call site (the length is the identifier's span, the first byte is already
+/// loaded to compute the index).
+///
+/// ⭐ **The length half is what earns the table.** A first-letter-only mask admits
+/// every 9- or 10-byte identifier starting with one of seventeen letters into the
+/// long path, and a 6-byte one starting with `f` into the length-6 compare arm — both
+/// are then rejected one whole compare chain later. Keying on the pair rejects
+/// **39.8%** of the identifiers that reach here on a TypeScript corpus (163,833 of
+/// 411,775 per pass) and **82.6%** of the ones that would otherwise take the length-9/10
+/// path, for the same four instructions the letter-only test cost: the `u16` load
+/// replaces a register-materialized immediate, and a letter with no reserved words at
+/// all still rejects at every length (its entry is zero).
+///
+/// Kept exactly in sync with `KEYWORDS` by `prefilter_admits_every_keyword`, which
+/// re-derives every entry.
+#[rustfmt::skip]
+const KEYWORD_LENGTHS_BY_FIRST_LETTER: [u16; 26] = {
+    /// The reserved-word lengths for one first letter, as a bit per length.
+    const fn lens(lengths: &[usize]) -> u16 {
+        let mut m = 0u16;
+        let mut i = 0;
+        while i < lengths.len() {
+            m |= 1 << lengths[i];
+            i += 1;
+        }
+        m
     }
-    bit(b'a')
-        | bit(b'b')
-        | bit(b'c')
-        | bit(b'd')
-        | bit(b'e')
-        | bit(b'f')
-        | bit(b'i')
-        | bit(b'l')
-        | bit(b'n')
-        | bit(b'o')
-        | bit(b'r')
-        | bit(b's')
-        | bit(b't')
-        | bit(b'u')
-        | bit(b'v')
-        | bit(b'w')
-        | bit(b'y')
+    [
+        lens(&[2, 3, 5]),       // a: as, any, await/async
+        lens(&[5, 6, 7]),       // b: break, bigint, boolean
+        lens(&[4, 5, 8]),       // c: case, const/class/catch, continue
+        lens(&[2, 6, 7, 8]),    // d: do, delete, default, debugger
+        lens(&[4, 6, 7]),       // e: else/enum, export, extends
+        lens(&[3, 4, 5, 7, 8]), // f: for, from, false, finally, function
+        0,                      // g
+        0,                      // h
+        lens(&[2, 6, 10]),      // i: in/if, import, instanceof
+        0,                      // j
+        0,                      // k
+        lens(&[3]),             // l: let
+        0,                      // m
+        lens(&[3, 4, 5, 6]),    // n: new, null, never, number
+        lens(&[6]),             // o: object
+        0,                      // p
+        0,                      // q
+        lens(&[6]),             // r: return
+        lens(&[5, 6, 9]),       // s: super, string/symbol/switch, satisfies
+        lens(&[3, 4, 5, 6]),    // t: try, true/this, throw, typeof
+        lens(&[7, 9]),          // u: unknown, undefined
+        lens(&[3, 4]),          // v: var, void
+        lens(&[4, 5]),          // w: with, while
+        0,                      // x
+        lens(&[5]),             // y: yield
+        0,                      // z
+    ]
 };
 
 /// Encode up to 8 ASCII bytes of `s` as a little-endian `u64` — the SWAR key for a
@@ -870,8 +912,24 @@ fn read_keyword_word(bytes: &[u8], start: usize, len: usize) -> u64 {
 
 /// Pack `bytes[start..start+len]` (an identifier, `len` ∈ 9..=10) into a little-endian
 /// `u128` keyword key — the wide counterpart of [`read_keyword_word`] for the
-/// length-9/10 path. A plain byte loop (no 8-byte fast load): only the three long
-/// keywords reach here, so this path is cold.
+/// length-9/10 path. A plain byte loop, no 8-byte fast load.
+///
+/// ⚠️ **This loop is not free, and the sentence that used to stand here — "only the
+/// three long keywords reach here, so this path is cold" — is why nobody noticed.**
+/// That is true of how often it MATCHES and false of how often it RUNS: only
+/// `undefined`/`satisfies`/`instanceof` match, but every 9- or 10-byte identifier the
+/// pre-filter admits is packed here first, and the loop lowers to a bounds-checked
+/// `shld`/`shl`/`cmov` pair per byte (~14 instructions × 9). Before
+/// [`KEYWORD_LENGTHS_BY_FIRST_LETTER`] took the length into the pre-filter it ran
+/// **32,668 times per pass** on a TypeScript corpus against **2,757** matches, and its
+/// loop body was the hottest line in this file (0.207% / 0.234% of the format and
+/// wire boards). The length key now rejects **82.6%** of those calls, which is what
+/// makes the remaining ones cheap enough to leave on a byte loop — ⛔ rewriting it
+/// off a `u64` head was measured **on top of** that pre-filter and came out *worse*
+/// on every channel, the residue being smaller than the rewrite's own tail branches.
+///
+/// ⭐ The general form: a "this path is cold" comment names a RATE, and the rate it
+/// names is usually the success rate while the cost follows the call rate.
 #[inline]
 fn read_keyword_word_wide(bytes: &[u8], start: usize, len: usize) -> u128 {
     let mut w = 0u128;
@@ -885,8 +943,10 @@ fn read_keyword_word_wide(bytes: &[u8], start: usize, len: usize) -> u128 {
 
 /// Reserved-word lookup for the identifier `bytes[start..start+len]`
 /// (`len = end - start`). The lexer's single keyword entry point: it applies a cheap
-/// pre-filter (length 2..=10 + keyword first-letter, rejecting PascalCase /
-/// `_`/`$`-led / non-keyword-letter names without further work), then recognizes the
+/// pre-filter (length 2..=10, then the reserved-word LENGTHS for that first letter —
+/// see [`KEYWORD_LENGTHS_BY_FIRST_LETTER`] — rejecting PascalCase / `_`/`$`-led /
+/// non-keyword-letter names *and* every name whose length no keyword of that letter
+/// has, all before a single compare arm runs), then recognizes the
 /// keyword entirely via SWAR — the 49 keywords of length ≤ 8 through [`keyword_swar`]
 /// (`u64` key) and the three length-9/10 keywords
 /// (`undefined`/`satisfies`/`instanceof`) through [`keyword_swar_long`] (`u128` key).
@@ -901,7 +961,7 @@ pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind>
         return None;
     }
     let idx = bytes[start].wrapping_sub(b'a');
-    if idx >= 26 || (KEYWORD_FIRST_LETTER_MASK >> idx) & 1 == 0 {
+    if idx >= 26 || (KEYWORD_LENGTHS_BY_FIRST_LETTER[idx as usize] >> len) & 1 == 0 {
         return None;
     }
     if len <= 8 {
@@ -922,7 +982,7 @@ mod tests {
     /// that shifts either invariant fails here instead of silently corrupting tokenization.
     #[test]
     fn prefilter_admits_every_keyword() {
-        let mut derived_mask = 0u32;
+        let mut derived = [0u16; 26];
         for &(kw, kind) in KEYWORDS {
             assert_eq!(
                 keyword_at(kw.as_bytes(), 0, kw.len()),
@@ -940,16 +1000,70 @@ mod tests {
                 first.is_ascii_lowercase(),
                 "reserved word `{kw}` does not start lowercase-ASCII"
             );
-            derived_mask |= 1u32 << (first - b'a');
+            derived[(first - b'a') as usize] |= 1u16 << len;
         }
         assert_eq!(
-            derived_mask, KEYWORD_FIRST_LETTER_MASK,
-            "KEYWORD_FIRST_LETTER_MASK is out of sync with the keyword set"
+            derived, KEYWORD_LENGTHS_BY_FIRST_LETTER,
+            "KEYWORD_LENGTHS_BY_FIRST_LETTER is out of sync with the keyword set"
         );
     }
 
     /// Non-keywords the gate should reject (most without hashing): PascalCase, sigil-led
     /// and single-char names, and contextual words deliberately absent from `KEYWORDS`.
+    /// The pre-filter is a **membership test that decides whether a compare chain
+    /// runs at all**, so its class is a failure surface of its own: narrowing it
+    /// wrongly turns a reserved word into a plain identifier, and no corpus of
+    /// formatted code is obliged to contain the shape that separates the class from
+    /// its complement. Grade it against the `KEYWORDS` oracle over generated
+    /// near-misses rather than against a spot list — every one-byte substitution at
+    /// every position of every reserved word, every proper prefix, and every
+    /// one-character extension, over the ASCII identifier alphabet.
+    #[test]
+    fn keyword_at_matches_the_oracle_on_every_near_miss() {
+        fn oracle(s: &str) -> Option<KeywordKind> {
+            KEYWORDS
+                .iter()
+                .find(|(kw, _)| *kw == s)
+                .map(|&(_, kind)| kind)
+        }
+        let alphabet: Vec<u8> = (b'a'..=b'z')
+            .chain(b'A'..=b'Z')
+            .chain(b'0'..=b'9')
+            .chain([b'_', b'$'])
+            .collect();
+        let mut cases = 0_u32;
+        let check = |s: &str| {
+            assert_eq!(
+                keyword_at(s.as_bytes(), 0, s.len()),
+                oracle(s),
+                "keyword_at disagrees with the KEYWORDS oracle on `{s}`"
+            );
+        };
+        for &(kw, _) in KEYWORDS {
+            check(kw);
+            for position in 0..kw.len() {
+                for &byte in &alphabet {
+                    let mut bytes = kw.as_bytes().to_vec();
+                    bytes[position] = byte;
+                    check(std::str::from_utf8(&bytes).unwrap());
+                    cases += 1;
+                }
+            }
+            for cut in 1..kw.len() {
+                check(&kw[..cut]);
+            }
+            for &byte in &alphabet {
+                let mut extended = kw.to_string();
+                extended.push(byte as char);
+                check(&extended);
+            }
+        }
+        assert!(
+            cases > 15_000,
+            "the near-miss sweep collapsed to {cases} cases"
+        );
+    }
+
     #[test]
     fn prefilter_rejects_non_keywords() {
         for s in [
