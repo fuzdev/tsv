@@ -332,6 +332,19 @@ impl<'a> ValueParser<'a> {
             // Most of a value's bytes are inert content, which no arm below can act
             // on (see `FAST_SCAN_SKIP`). One L1 load retires them ahead of the whole
             // comment/escape/nesting/separator branch chain.
+            //
+            // ⛔ The table is the right rung HERE, and the word-at-a-time hop the lexers'
+            // token-body scans took (`tsv_lang::swar::next_byte_of`'s shape) was built two
+            // ways and refused on `instructions:u`, with a ±0.000% control: as a complete
+            // hop with its own scalar tail it costs **+1.05%** of the CSS wire run (+0.77%
+            // format), and hopping only while a whole word still fits in the value, handing
+            // the remainder back to this table, **+0.45%** (+0.33%). The inert runs are the
+            // wrong shape for it. Its class is seven needles plus a whitespace range — ~31
+            // instructions a word even vectorized, plus ~13 per hop — so it breaks even near
+            // thirteen inert bytes, while 78% of these runs are under eight (36% are empty)
+            // and a value averages under four words, so every value's last word is a tail.
+            // Half the BYTES do sit in runs of 13+ (mean 25), which bounds what any tuning
+            // could recover here at a few tenths of a percent.
             if FAST_SCAN_SKIP[b as usize] {
                 i += 1;
                 continue;

@@ -77,6 +77,9 @@ impl JsonProfileCommand {
             print_report(&aggregates, self.iterations, parse_errors, skipped);
         }
 
+        // Session perf counters, when built with `--features census` (no-op otherwise).
+        tsv_lang::census::report();
+
         Ok(())
     }
 }

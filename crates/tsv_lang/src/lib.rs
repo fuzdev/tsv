@@ -9,6 +9,7 @@
 //! - `config` - hardcoded formatter settings (`PRINT_WIDTH` / `TAB_WIDTH` / `INDENT`)
 //! - `Comment` - shared comment type
 //! - `acorn_prefix` - what acorn saw ahead of one embedded Svelte parse
+//! - `census` - opt-in perf census counters (`census` feature)
 //! - `comment_ledger` - print-once comment ledger (`comment_check` feature)
 //! - `doc` - document builder primitives for prettier-compatible formatting
 //! - `escapes` - escape sequence utilities for printers
@@ -20,6 +21,7 @@
 //!   wire-JSON escape prescan, and the lexers' token-body scans
 
 mod acorn_prefix;
+pub mod census;
 mod comment;
 #[cfg(feature = "comment_check")]
 pub mod comment_ledger;

@@ -32,6 +32,12 @@ comment_check = [
 # `swallow_check` — the record hooks sit in the chain printer's hot analysis
 # path. Without it, `buffer_sizes` reports its parse-time metrics only.
 buffer_stats = ["tsv_ts/buffer_stats"]
+# Opt-in: compiles tsv_lang's perf census counters into this binary, so the
+# `census::add` call sites a perf session places in the language crates become real
+# and `profile` / `json_profile` print their report. Off by default — a default
+# `tsv_debug` perf build must measure production-shaped code, and with the feature off
+# every counter and every call site compiles away to nothing. See tsv_lang/src/census.rs.
+census = ["tsv_lang/census"]
 # Umbrella that compiles both diagnostic seams into one binary and enables all five
 # gated subcommands: `swallow_audit` plus the ledger-driven `comment_audit` /
 # `gap_audit` / `blank_audit` / `ignore_audit`. EVERY audit deno task passes
