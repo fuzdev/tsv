@@ -71,6 +71,48 @@ impl TriviaProfile {
     };
 }
 
+/// The four bytes that can open trivia — the set [`skip_trivia`] tests before it
+/// commits to a scan, and therefore the set every *hopping* scan must also stop
+/// at. A scan that walks byte by byte gets this for free by asking `skip_trivia`
+/// at every position; one that hops to its next significant byte does not, and a
+/// hop whose needles omit an opener steps straight over a string or comment and
+/// reads its body as significant.
+///
+/// Pair every hop's needle array with [`covers_trivia_openers`] in a `const _`, so
+/// adding a fifth opener here is a compile error at each hop rather than a silent
+/// misparse.
+pub const TRIVIA_OPENERS: [u8; 4] = [b'"', b'\'', b'`', b'/'];
+
+/// Whether `needles` stops at every [`TRIVIA_OPENERS`] byte — the precondition for
+/// hopping past bytes instead of asking [`skip_trivia`] about each one.
+///
+/// `const`-evaluable so a hop can prove it at compile time:
+///
+/// ```
+/// # use tsv_lang::source_scan::{covers_trivia_openers, TRIVIA_OPENERS};
+/// const NEEDLES: [u8; 6] = [b'{', b'}', b'"', b'\'', b'`', b'/'];
+/// const _: () = assert!(covers_trivia_openers(&NEEDLES));
+/// ```
+#[must_use]
+pub const fn covers_trivia_openers(needles: &[u8]) -> bool {
+    let mut opener = 0;
+    while opener < TRIVIA_OPENERS.len() {
+        let mut found = false;
+        let mut k = 0;
+        while k < needles.len() {
+            if needles[k] == TRIVIA_OPENERS[opener] {
+                found = true;
+            }
+            k += 1;
+        }
+        if !found {
+            return false;
+        }
+        opener += 1;
+    }
+    true
+}
+
 /// If `bytes[i]` begins a trivia span (a comment or string per `profile`), return
 /// the position just past it; otherwise `None` — the byte is significant.
 ///
@@ -82,11 +124,18 @@ impl TriviaProfile {
 pub fn skip_trivia(bytes: &[u8], i: usize, end: usize, profile: TriviaProfile) -> Option<usize> {
     // Hot path: almost every byte is significant, so reject anything that can't
     // open trivia with a cheap compare and keep this small enough to inline into
-    // the per-byte finder loops. Only the four openers (`"` `'` `` ` `` `/`) can
-    // begin a string/comment; their scans live in the `#[cold]`
-    // `skip_trivia_scan` below, kept out of line so the rare branch can't bloat
-    // the callers — the scan loops made the old single function too big to
-    // inline, leaving its call/return overhead the bulk of its `perf` self-time.
+    // the per-byte finder loops. Only the four [`TRIVIA_OPENERS`] can begin a
+    // string/comment; their scans live in the `#[cold]` `skip_trivia_scan` below,
+    // kept out of line so the rare branch can't bloat the callers — the scan loops
+    // made the old single function too big to inline, leaving its call/return
+    // overhead the bulk of its `perf` self-time.
+    //
+    // ⚠️ Left as the bare compare chain, deliberately: spelling it through
+    // [`TRIVIA_OPENERS`] (or as a `matches!`) is semantically identical and moves
+    // this function's codegen — 112 bytes of `.text` across the ~20 scans it
+    // inlines into — for no functional gain. The const names the set for the
+    // *hopping* scans, which cannot ask this function at all;
+    // `covers_trivia_openers` is what keeps those honest.
     let b = bytes[i];
     if b != b'"' && b != b'\'' && b != b'`' && b != b'/' {
         return None;
@@ -746,6 +795,13 @@ pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> usize {
     end
 }
 
+/// The bytes [`scan_to_matching_brace`] hops between: its own braces, plus every
+/// [`TRIVIA_OPENERS`] byte (`` ` `` doubles as the template-literal opener).
+const HOP_NEEDLES: [u8; 6] = [b'{', b'}', b'"', b'\'', b'`', b'/'];
+
+/// A hop may only skip bytes that cannot open trivia — see [`covers_trivia_openers`].
+const _: () = assert!(covers_trivia_openers(&HOP_NEEDLES));
+
 /// Scan from `scan_start` — the first byte inside an already-open `{` (counted as
 /// depth 1) — to that brace's matching `}`, returning the `}`'s offset, or `None`
 /// if the braces don't balance before `end`.
@@ -765,6 +821,29 @@ pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Op
     // template literal ends an operand, as does a skipped regex.
     let mut anchor = OperandAnchor::new(scan_start);
     while i < end {
+        // Only `HOP_NEEDLES` can move this scan; every other byte reaches the
+        // `_ => {}` arm below and is stepped over one at a time, so the walk hops
+        // between them a word at a time instead of reading each one. That is the
+        // byte-scan ladder's top rung (`swar::next_byte_of`), chosen because the
+        // *inert* fraction picks a rung — not whether the loop is spelled as a
+        // search. Across the Svelte corpus this crosses a mean run of 14.8 bytes
+        // with 92% of them in runs of eight or more, and only 8.1% of its hops are
+        // adjacent — too few for the one-byte pre-test that pays at `tsv_css`'s
+        // `string_end`, whose runs are half empty.
+        //
+        // The hop is invisible to `anchor`, which is why it is sound: an eager
+        // per-byte anchor could not be skipped past, but `OperandAnchor` resolves
+        // lazily and *backwards* from the `/` that asks, and its `skipped_*` calls
+        // fire only at positions a hop lands on. The bytes crossed here were never
+        // its to see.
+        //
+        // Bounded at `end`, not `bytes.len()`: callers routinely pass an `end` far
+        // short of the source end, and a full-slice hop could land on a needle past
+        // the bound that this loop must never reach.
+        i = crate::swar::next_byte_of(&bytes[..end], i, HOP_NEEDLES);
+        if i >= end {
+            break;
+        }
         if bytes[i] == b'`' {
             i = skip_template_literal(bytes, i, end);
             anchor.skipped_operand(i);
