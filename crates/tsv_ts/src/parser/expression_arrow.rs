@@ -9,7 +9,7 @@ use tsv_lang::{ParseError, Span};
 use super::Parser;
 use super::expression::ParsedExpr;
 use super::expression_lookahead::{
-    scan_angle_brackets, scan_identifier_then_arrow, scan_parens_then_arrow,
+    scan_angle_brackets, scan_arrow_after_identifier, scan_parens_then_arrow,
 };
 use super::scan::skip_whitespace_and_comments;
 
@@ -50,7 +50,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Scans ahead looking for pattern: `identifier` `=>`
     pub(super) fn is_single_param_arrow_start(&self) -> bool {
-        scan_identifier_then_arrow(self.source.as_bytes(), self.current.start as usize)
+        // The current token IS the identifier, so its end is already known — see
+        // `scan_arrow_after_identifier`, which no longer re-walks the name to find it.
+        // Slice-relative like `self.source`, matching the byte slice this indexes.
+        scan_arrow_after_identifier(self.source.as_bytes(), self.current.end as usize)
     }
 
     /// Check if current position starts a generic arrow function: `<T>() =>`
