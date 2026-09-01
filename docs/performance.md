@@ -1971,6 +1971,49 @@ cycles**. What it removes is per-*run* latency at each call's head, which no per
 can see. **A census gives a numerator on the instruction channel; it does not tell you what
 the machine is paying for.**
 
+### The ladder applies to any loop whose bytes are mostly INERT, not only to scans
+
+Every rung above was measured on something spelled as a scan — a string extent, a comment
+run, a lexer skip. The classification that actually decides the rung is **what fraction of
+the bytes read can move the loop's state**, and a loop can fail that test while looking
+nothing like a search.
+
+`tsv_css`'s `extract_function_parts` is the case: a paren-depth counter over a value's
+bytes, with a wide `_ => {}` fall-through and no early-exit-on-hit.
+
+```rust
+for (i, &b) in s.as_bytes()[paren_pos..].iter().enumerate() {
+    match b { b'(' => depth += 1, b')' => { depth -= 1; /* ... */ } _ => {} }
+}
+```
+
+Censused over 638 real stylesheets it reads **452,835 bytes per pass** and acts on
+**24,186** of them — 5%, at a mean of **18.7 bytes between parens**, with 83% of the hops
+past the word loop's 3–4-byte break-even. Its measured cost was **10.8 instructions per
+byte**, the compare rung. Hopping instead — `swar::next_byte_of(bytes, i + 1, [b'(',
+b')'])` at each step — is `instructions:u` **−2.068%** of the CSS wire run and −1.514% of
+the format run, with cycles **−0.836** (wire) and **−1.210** (format) against the null,
+6/6 signs, offset-corrected against a control that opposed the candidate.
+
+- **Every wide `_ => {}` arm over a byte loop is a rung candidate.** Depth counters,
+  state-machine fall-throughs, copy-until-delimiter loops: all of them are "index of the
+  next byte in this small set" in other clothes. Census the loop's *inert* fraction rather
+  than its total bytes.
+- **The per-symbol board will not name it.** This lever is inlined into `build_leaf`, a
+  7.56% symbol whose own share never distinguished it; the per-**line** aggregate
+  (`--sort=srcline,sym`) put two of its lines at 1.74% and 1.63%.
+
+⚠️ **The one-byte pre-test of the previous section pays in proportion to the share of runs
+that are EMPTY, and does not transfer for free.** `string_end`'s runs are ~50% empty, which
+is what made two ALU compares in front of the word loop worth 0.44–0.70 points of cycles
+there. On this hop the empty case (`()`, `))`) is **8.6%**: built as a second candidate in
+the same 24-binary group, it removed 0.05 points *fewer* instructions and did not separate
+on cycles on any surface (0.07–0.09 points better on the wire path, 0.19 worse on the format
+path, against a 0.098-point difference in the two groups' own layout offsets). **Read the
+census's zero bucket before adding the rung.** The same census refused the adjacent scan
+outright: the search for the opening `(` walks a mean of **4.4 bytes**, at or below
+break-even.
+
 ### The same instructions removed convert differently at different ENTRY POINTS
 
 A verdict belongs to a (codegen profile x binary x entry point) triple, and the sharpest
@@ -1989,6 +2032,25 @@ Both runs are throughput-shaped (IPC 3.16 and 2.97). The percentages differ only
 denominators do; the *cycles* do not follow. **Do not carry a conversion ratio from one entry
 point to another even when the removed work is byte-identical** — report the surface each
 number belongs to, and check the shipped one rather than assuming it inherits.
+
+⚠️⚠️ **And the direction is not a property of the lever family.** The CSS matching-paren hop
+of the section above removes **2.893 M instructions per pass** on `json_profile` and
+**2.8925 M** on `profile` — the same four-digit agreement — and converts the other way:
+
+| entry point | `instructions:u` | cycles freed per pass | cycles vs null |
+| --- | --- | --- | --- |
+| `json_profile cssbig` | −2.068% | 0.299 M | −0.679 (−0.836 corrected) |
+| `profile cssbig` | −1.514% | **0.679 M** | **−1.053 (−1.210 corrected)** |
+
+Two byte-scan levers in one crate, opposite signs on the same pair of entry points. **Measure
+both surfaces; never predict one from the other, and never from a sibling lever.**
+
+✓ **The tell that a deleted loop's cost was OVERLAPPED rather than paid** is that its
+apparent instructions-per-cycle on the surface where it converts poorly exceeds the machine's
+issue width — 9.7 on the wire path here. A well-predicted throughput loop hiding under
+another phase's stalls gives back its instructions and not its cycles, which is the standing
+explanation for why this arc's scan levers keep reading a far larger instruction win than
+cycles win.
 
 
 ## WASM bundle size

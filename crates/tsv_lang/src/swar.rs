@@ -149,6 +149,28 @@ pub(crate) const fn lanes_less_than(v: u64, n: u8) -> u64 {
 /// ⚠️ Escalating after a longer *bounded* prefix does NOT work: the bound's own
 /// bookkeeping costs about what the entry does, so the two cancel.
 ///
+/// ⚠️ **That pre-test is conditional on the EMPTY-RUN share, and is not free to
+/// add.** It pays where empty runs dominate; at `tsv_css`'s
+/// `extract_function_parts` hop, where the adjacent-paren case is 8.6% of the
+/// runs against `string_end`'s ~50%, the same two compares cost instructions
+/// and bought no measurable cycles. Read the census's zero bucket before
+/// reaching for it, the same way the density note above asks for the mean.
+///
+/// ⭐ **A caller need not be spelled as a scan.** What decides whether this
+/// primitive fits is the fraction of bytes that can move the caller's state —
+/// `extract_function_parts` is a paren-depth counter with a wide `_ => {}` arm
+/// that acts on 5% of the bytes it reads (mean 18.7 between hits), and it sits
+/// on this rung for exactly the reason a lexer's string run does.
+///
+/// ⚠️ **The per-byte cost above is an `N` = 1–2 figure: the lane work is LINEAR
+/// in the needle count** (each needle adds an xor, a `zero_lanes`, and the OR —
+/// about six instructions a word), so a wide class erodes the advantage and by
+/// roughly eight needles this meets a 256-entry skip table's flat six per byte.
+/// A caller whose class is genuinely wide — a bracket matcher that must also
+/// stop at every trivia opener, say — belongs on the table rung, not here. The
+/// rung is chosen by run length **and** alphabet width, not by run length
+/// alone.
+///
 /// The tail loop is a compare chain, but it runs only within eight bytes of the
 /// **slice's** end, not the run's: callers pass the whole source, so even a
 /// two-byte run is answered by the word loop everywhere but the last word of the
