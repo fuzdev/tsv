@@ -68,7 +68,7 @@ pub fn parse_string_literal<'arena>(
 /// and no ASCII byte appears inside a multi-byte UTF-8 code point, so nothing can
 /// false-match a delimiter and no per-char decode is owed. Two spellings of one
 /// grammar also cost twice — this walk was a per-byte match arm chain over the same
-/// bytes `string_end`'s table walks.
+/// bytes `string_end` scans a word at a time.
 fn quoted_string_spans_all(bytes: &[u8]) -> bool {
     matches!(crate::lexer::string_end(bytes, 0), Ok(end) if end == bytes.len())
 }
