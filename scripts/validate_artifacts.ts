@@ -79,8 +79,8 @@ const TARGETS = ['npm', 'deno'] as const;
 // next release discovers it as a publish failure instead of as a visible size
 // move. A real size step (a cut or a regression traceable to one change) is what
 // the tight band exists to surface; recenter on it deliberately, with the cause
-// named in the commit. The retired centers and what moved them are recorded in
-// the release lore, not here.
+// named in the commit. The retired centers and what moved them are recorded
+// elsewhere, not here.
 const BOUNDS = {
 	format: { min: 2_270_000, max: 2_664_000 },
 	parse: { min: 885_000, max: 1_039_000 },
