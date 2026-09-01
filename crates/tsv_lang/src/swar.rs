@@ -138,6 +138,17 @@ pub(crate) const fn lanes_less_than(v: u64, n: u8) -> u64 {
 /// files — so the tax is bounded by a shape no corpus contains. Census the run
 /// length before adding a caller whose construct is routinely empty.
 ///
+/// ⭐ **A caller whose runs are routinely EMPTY should test the first byte
+/// itself rather than skip this.** The entry costs about fifteen instructions,
+/// and two ASCII compares retire an empty run for two — `tsv_css`'s
+/// `string_end` is the shape (half its runs are the `\` of an icon-font escape
+/// sitting against the opening quote), and spelling that pre-test as a
+/// 256-entry skip table instead measured **0.44 to 0.70 points of cycles
+/// slower** on two corpora and two entry points, because a table puts a
+/// dependent L1 load on the branch's critical path where a compare does not.
+/// ⚠️ Escalating after a longer *bounded* prefix does NOT work: the bound's own
+/// bookkeeping costs about what the entry does, so the two cancel.
+///
 /// The tail loop is a compare chain, but it runs only within eight bytes of the
 /// **slice's** end, not the run's: callers pass the whole source, so even a
 /// two-byte run is answered by the word loop everywhere but the last word of the

@@ -1913,7 +1913,8 @@ Measured on synthetic documents that are nothing but one construct: a string lit
 even at **3–4 content bytes** (`''` **+1.11%**, 16 bytes −2.25%, 64 bytes −9.88%), a block
 comment at **~3** (`/**/` **+0.57%**, 120 bytes −12.45%). Real source is far past both — mean
 string body 17.3 bytes, mean block comment 259 across that corpus — so census the run length
-before adding a caller, and prefer the table where the run is short and the call frequent.
+before adding a caller, and prefer the table where the *run* is short and the call frequent.
+For a test of a **single byte** the ranking inverts again; see the section after next.
 
 ⚠️⚠️ **Census that run length by BYTE MASS, not by run count — the two can point opposite
 ways.** The CSS string scan is the case: on a 638-file corpus its runs are
@@ -1922,7 +1923,53 @@ runs, 243,396 of 282,832 — embedded data URIs). "The runs are short" is true o
 false of the bytes, and a lever paid per byte is sized by the bytes. The tell is a mean that
 sits between the modes (11.7 here, against a median well under 8): bucket twice, count and
 mass. It is two extra counters in a census already being run. ⚠️ A win that lives in such a
-tail rests on a **corpus** feature rather than a language one — say which.
+tail rests on a **corpus** feature rather than a language one — say which, and grade it on a
+population that removes the tail. Doing so for this scan did not confirm the risk; it moved
+the lever, which is the next section.
+
+### A skip table is a THROUGHPUT shape: for a one-byte test, two compares beat it
+
+The three sections above rank a compare chain (~13 instructions a byte), a 256-entry skip
+table (6) and a SWAR word loop (1.4). All three answer a question about a **run**. The other
+end of the ladder — what tests a **single** byte — ranks the other way, because the table's
+cost there is not its instruction count but a **dependent L1 load on the branch's critical
+path**, against two ALU compares at about a cycle.
+
+`tsv_css`'s `string_end` needs both ends at once. Half its runs are empty — a stylesheet's
+strings are dominated by the icon-font escape (`content: "\e901"`), whose `\` sits against
+the opening quote — so it tests one byte before it scans a run at all. Two spellings
+identical but for that pre-test, in one 24-binary layout group at **8 layout draws per
+candidate**:
+
+| first-byte test | `instructions:u` | cycles vs null (with tail / without) |
+| --- | --- | --- |
+| `string_skip_table` load | −0.623% | −1.817 / −0.933 |
+| **two compares** | −0.598% | **−2.517 / −1.366** |
+
+The table removes marginally *more* instructions and is **0.44 to 0.70 points of cycles
+slower**, on both populations and both entry points. It was deleted: `.rodata` fell 512 B, and
+the binary came out both smaller and faster.
+
+- **The ladder, complete: one byte → compare; short run → table; long run → word loop.** A
+  single site can want two rungs at once, and this one beat every single-rung spelling of
+  itself.
+- **A hybrid pays only if the escalation TEST is cheaper than the escalation.** The obvious
+  one — walk the table for a word, then hand off — is the **worst of four candidates on
+  instructions**: its per-run prologue is ~15 instructions (the `.min`, a trip-count setup,
+  a post-test) against the ~15 the word loop's entry costs, and on a distribution of 0–3-byte
+  runs those cancel. One byte is cheap enough to escalate on; one word is not.
+- **Check what the compiler already hoisted before designing around it.** A hand-rolled word
+  loop with the splats lifted per call was a planned candidate until `objdump` showed LLVM
+  already emits the splat *before* the loop head the escape restart returns to. The per-run
+  splat cost is zero; the disassembly retired the candidate unbuilt.
+
+⭐ **And the axis lesson, which is the durable half.** This lever was designed off a byte-mass
+census and it is **not paid in bytes**. Graded on the same 638 files with the data-URI bodies
+rewritten — so calls (12,477) and runs (24,141) are *identical* and only the mass moves,
+282,832 → 43,596 bytes — it **adds 0.34% of instructions and still wins 1.37 points of
+cycles**. What it removes is per-*run* latency at each call's head, which no per-byte census
+can see. **A census gives a numerator on the instruction channel; it does not tell you what
+the machine is paying for.**
 
 ### The same instructions removed convert differently at different ENTRY POINTS
 
