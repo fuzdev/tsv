@@ -334,12 +334,20 @@ pub(crate) fn line_bounds_at(source: &str, position: usize) -> (usize, usize, us
 }
 
 /// Whether `text` holds any ECMAScript line terminator ([`line_terminator_len`]).
+///
+/// The 0xE2 lead rides the same pass as `\n` / `\r`, since a separate scan would
+/// cost a second walk. ⚠️ It is a **scalar** pass — measured, against a comment
+/// here that used to assert otherwise: inlined into [`is_same_line`] the loop is
+/// ten instructions and four branches a byte and retires no vector instruction,
+/// because the early exit makes the stride data-dependent. Both callers ask about
+/// an inter-token gap, so the walk is a handful of bytes and the site is below the
+/// sampling floor on the format *and* the wire board; the word-at-a-time form
+/// ([`crate::swar::next_byte_of`], which the lexers' longer runs use) would be
+/// paying its per-call setup for nothing here. Re-measure before changing it —
+/// the reason this stays scalar is the gap LENGTH, not the codegen.
 #[inline]
 fn contains_line_terminator(text: &str) -> bool {
     let bytes = text.as_bytes();
-    // `\n` and `\r` are the overwhelmingly common cases and `memchr`-free
-    // `iter().position()` over them auto-vectorizes; the 0xE2 lead is checked in
-    // the same pass since a separate scan would cost a second walk.
     (0..bytes.len()).any(|i| line_terminator_len(bytes, i).is_some())
 }
 

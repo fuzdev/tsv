@@ -1848,8 +1848,9 @@ it is believed. **Audited across the repo's seven such claims** (count `pcmpeqb`
 / `psadbw` per symbol in the profiling build, which keeps the symbols the release binary
 folds away): `printing::visual_width` and `doc::arena::pooled_text_width_scanned` do
 vectorize; `tsv_css::lexer::comments::read_comment`, `tsv_ts::lexer::comments::read_block_comment`
-and `tsv_ts::lexer::core::Lexer::scan_string_into` retire **zero** vector instructions and
-their comments are wrong. The predictor is structural: **a single-byte inner run nested in an
+and `tsv_ts::lexer::core::Lexer::scan_string_into` retired **zero** vector instructions and
+their comments were wrong (all three are the word loop of the next section now). The
+predictor is structural: **a single-byte inner run nested in an
 outer loop that can RESUME it — a comment's `*/` re-check, a string's escape step — does not
 vectorize; a straight-line count with no early exit does.** The 256-entry skip table this crate's value scanners already use asks the
 same question in one L1 load and **six** instructions, at the same branch count.
@@ -1876,6 +1877,52 @@ run's instructions plus `parser/value/strings.rs` **1.06%**, neither of which ow
   branchy one sits **at the null** (+0.02 pts) and the table one reads **−1.03**. Two shapes
   of one lever, ranked by cycles in the same order as by instructions here — but with a
   fivefold gap the instruction channel does not predict.
+
+### The word loop beats the skip table on the same scans, once the run is long enough
+
+The section above ends at the skip table, which is where CSS's short string scan stopped.
+Taken to the four `tsv_ts` scans and `tsv_css`'s comment scan — the same non-vectorizing
+resume shape, on corpora where strings and comments are far denser — the table is **not** the
+best answer available: `tsv_lang::swar::next_byte_of` asks "which of these `N` bytes comes
+first" of **eight bytes at once**, and beats it on every channel that separated them.
+
+The five scans, in one 24-binary layout group on `json_profile tsbig` (1,666 real `.ts`),
+5 pooled replicates:
+
+| scope | `instructions:u` | cycles vs null | wall vs null |
+| --- | --- | --- | --- |
+| the three comment scans | −1.453% | −0.846 | −0.783 |
+| the string + template scans | −0.764% | −0.370 | −0.360 |
+| **all five, word loop** | **−2.217%** | **−1.334** (5/5) | **−1.378** (5/5) |
+| all five, string + template as a skip table | −2.153% | −1.157 | −1.065 |
+
+- **The halves decompose additively here** (−1.453 + −0.764 = −2.217, against the pair's
+  −2.217), unlike the substitution the previous section describes. A decomposition is a fact
+  about the particular lever, not about levers; measure it either way.
+- **The shape gap is smaller on instructions than on cycles, and it points the same way**:
+  0.064 points of instructions separate the word loop from the table, and 0.18 points of
+  cycles. On the *format* path the two are indistinguishable (−0.737 vs −0.741 vs the null) —
+  the entry-point rule below, again.
+- **It converts on both entry points**, which the CSS lever did not: `profile tsbig` reads
+  −1.450% instructions and **−0.737** points of cycles against the null, 5/5 signs. Ratios are
+  0.60x (wire) and 0.51x (format).
+
+⚠️ **The word loop has a density axis and the table does not.** Its splats are paid per
+*call* and its word per *eight bytes*, so a construct that is routinely near-empty loses.
+Measured on synthetic documents that are nothing but one construct: a string literal breaks
+even at **3–4 content bytes** (`''` **+1.11%**, 16 bytes −2.25%, 64 bytes −9.88%), a block
+comment at **~3** (`/**/` **+0.57%**, 120 bytes −12.45%). Real source is far past both — mean
+string body 17.3 bytes, mean block comment 259 across that corpus — so census the run length
+before adding a caller, and prefer the table where the run is short and the call frequent.
+
+⚠️⚠️ **Census that run length by BYTE MASS, not by run count — the two can point opposite
+ways.** The CSS string scan is the case: on a 638-file corpus its runs are
+**98.3% under 8 bytes** (23,740 of 24,141) and its **bytes are 86.1% in runs of ≥ 128** (160
+runs, 243,396 of 282,832 — embedded data URIs). "The runs are short" is true of the runs and
+false of the bytes, and a lever paid per byte is sized by the bytes. The tell is a mean that
+sits between the modes (11.7 here, against a median well under 8): bucket twice, count and
+mass. It is two extra counters in a census already being run. ⚠️ A win that lives in such a
+tail rests on a **corpus** feature rather than a language one — say which.
 
 ### The same instructions removed convert differently at different ENTRY POINTS
 

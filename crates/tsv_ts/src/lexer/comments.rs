@@ -1,3 +1,4 @@
+use super::ES_LINE_TERMINATOR_LEADS;
 use super::is_es_line_terminator_at;
 use super::lex_err;
 use super::token::{Token, TokenKind};
@@ -25,17 +26,21 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
     // cannot drift apart again. Byte-at-a-time is sound: none of its bytes ever appears
     // as a UTF-8 continuation byte, so the peek always lands on a char boundary.
     //
-    // The hand-rolled predecessor was held back on a *suspected* vectorization advantage
-    // that no measurement had ever graded. Settled by codegen, not wall clock: under the
-    // `corpus` profile this function is 139 bytes where the hand-rolled loop was 152, the
-    // per-byte hot path is the same nine instructions either way, and **neither**
-    // spelling vectorizes. The saving is in the rare `0xE2` arm — the old form tested
-    // `p + 2 < len` against a hoisted local, so LLVM could not fold the `bytes[p + 1]`
-    // bounds check and kept a panic landing pad; the helper compares against
-    // `bytes.len()` directly and both checks fold away. Sharing the production is the
-    // cheaper spelling, not a concession.
+    // The scan runs word-at-a-time over the class's LEADS
+    // ([`ES_LINE_TERMINATOR_LEADS`]) and re-tests each hit against the exact production,
+    // resuming on a `0xE2` that opens some other character —
+    // [`tsv_lang::swar::next_byte_of`]'s loose-class-plus-exact-fallback shape, so the
+    // terminator rule is still stated once. Asking the exact predicate per byte, as the
+    // loop reads, costs ten instructions and four branches a byte and vectorizes at
+    // none of them; the word loop asks it of eight bytes at one branch.
     let mut p = start + 2; // skip //
-    while p < len && !is_es_line_terminator_at(bytes, p) {
+    loop {
+        p = tsv_lang::swar::next_byte_of(bytes, p, ES_LINE_TERMINATOR_LEADS);
+        if p >= len || is_es_line_terminator_at(bytes, p) {
+            break;
+        }
+        // A `0xE2` that leads some character other than `<LS>` / `<PS>` — comment
+        // content, so the run resumes past it.
         p += 1;
     }
     *pos = p;
@@ -63,15 +68,16 @@ pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token,
     let len = bytes.len();
 
     // Scan to the closing `*/` over raw bytes — the content is recovered on demand
-    // as a source slice (`[start + 2, end - 2)`), never copied here. The inner
-    // `!= b'*'` run is a single-byte search the compiler auto-vectorizes; `*`
-    // (`0x2a`) is ASCII and never a UTF-8 continuation byte, so byte-at-a-time is
-    // sound (vs the former per-char `chars().next()` decode).
+    // as a source slice (`[start + 2, end - 2)`), never copied here. `*` (`0x2a`) is
+    // ASCII and never a UTF-8 continuation byte, so a byte scan is sound (vs the former
+    // per-char `chars().next()` decode) — but a `*` that opens no `*/` resumes the run,
+    // which is why the compare-chain spelling stayed scalar: LLVM fused the run with
+    // the resume test and emitted ten instructions and three branches a byte, and a
+    // JSDoc block hits that resume on every line. [`tsv_lang::swar::next_byte_of`]
+    // asks the same question of eight bytes at once.
     let mut p = start + 2; // skip /*
     loop {
-        while p < len && bytes[p] != b'*' {
-            p += 1;
-        }
+        p = tsv_lang::swar::next_byte_of(bytes, p, [b'*']);
         if p >= len {
             return Err(lex_err("Unterminated block comment", start));
         }
