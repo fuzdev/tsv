@@ -806,7 +806,14 @@ broken link in either passing. The crate is therefore one lib, with `main.rs` a 
 which also keeps the shared modules from compiling twice under two roots. The second
 hole is `#[cfg(feature)]`: five `audit` submodules sit behind `comment_check`, so a default-feature
 build cannot resolve a link that names them — hence `--all-features`, which reaches gated code in
-every crate, not only this one. Both holes fail the same way, which is the thing to remember about
+every crate, not only this one. A **third** hole is `#[cfg(test)]`: rustdoc does not document test items under any feature
+set, so **every doc link inside a `#[cfg(test)] mod tests` is ungated** — including the ones on
+test-only `static`s and helpers, which is where a codebase like this one parks its oracles. A
+rename that leaves a back-reference in a test module's docs is invisible here and is caught only
+by reading the diff. (Found in `tsv_ts::lexer::token`, where the `KEYWORDS` oracle's doc still
+named a `const` that a perf change had replaced.)
+
+All three holes fail the same way, which is the thing to remember about
 this gate: **absent code is indistinguishable from clean code**, so its coverage is a claim about
 what got compiled, not about what is in the tree.
 

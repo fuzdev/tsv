@@ -11,6 +11,11 @@ description = "Language-agnostic foundation primitives for tsv"
 # no `DocArena` side-set field, no render-loop hook. `tsv_debug` forwards this
 # feature (off by default there too) to drive `swallow_audit`. See src/doc/swallow.rs.
 swallow_check = []
+# Opt-in perf census counters (diagnostic). Off by default so every production
+# artifact and every default `tsv_debug` perf build compiles the counters — and the
+# session call sites that feed them — out entirely. `tsv_debug` forwards it. See
+# src/census.rs.
+census = []
 # Opt-in print-once comment ledger (diagnostic): every comment a document parses must
 # be emitted exactly once. Off by default, same reasoning as `swallow_check` — no
 # registration in the format entry points, no record hook in the printers' comment

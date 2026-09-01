@@ -736,6 +736,52 @@ ranking two rungs a slot census puts close together.
 The same query answers a non-perf question: pointed at `tests/fixtures`, the
 census says which node kinds the fixture tree never exercises.
 
+### 11. `tsv_lang::census` — instrumented counters behind a cargo feature
+
+The question a board cannot answer: **how often does this loop run, how long are
+its runs, and how often does this predicate return true?** A board row says where
+the samples land; only a counter says what the code did to earn them. This is the
+harness for that, and it exists because five separate sessions hand-rolled the
+same thing before it was promoted.
+
+`tsv_lang::census` is `add(index, n)` / `hit(index)` / `hit_if(index, cond)` over
+64 static `AtomicU64` counters, plus `report()`, which `tsv_debug profile` and
+`tsv_debug json_profile` call after their tables. A session adds call sites at the
+code it is pricing, names them in the `LABELS` slice in `census.rs`, and reads
+`census,<name>,<value>` lines off stderr:
+
+```bash
+# in the crate being priced:
+#   tsv_lang::census::add(0, 1);                 // one call
+#   tsv_lang::census::add(1, run_len as u64);    // its bytes
+#   tsv_lang::census::hit_if(2, matched);        // and whether it found anything
+
+cargo run --release --features census -p tsv_debug -- profile <corpus> 2>&1 >/dev/null \
+  | grep '^census,'
+```
+
+**The feature gate is the point.** With `census` off (the default, and what every
+production artifact and every perf build uses) each entry point is an empty
+`#[inline]` function and `LABELS` is empty, so an instrumented tree is inert — the
+census and the measurement can share one working tree instead of the
+revert-before-measuring dance. Prove it the way this file already prescribes for
+any post-measurement edit: `objcopy -O binary --only-section=.text` on both, then
+`cmp`. Unlabelled non-zero counters still print as `c<index>`, so a forgotten
+label loses a name and never a number.
+
+⚠️ **A census sizes the instruction channel, never cycles.** It says how much work
+a site does; an out-of-order machine hides much of it. Find with a census, size
+with the layout group.
+
+⚠️ **Census the axis the transformation's cost actually runs on.** For a scan that
+means the run-length distribution *with the byte mass per bucket* and the region's
+trailing run — a mean hides a bimodal population, and an exit histogram cannot see
+the run from the last exit to the region's end at all. For a predicate it means the
+**success rate**, not just the call count: a predicate that never fires is pure
+cost, and — the sharper case — a path documented as "cold" is usually cold in its
+success rate while its cost follows its call rate. Both rules were learned by
+getting them wrong.
+
 ## Measurement Process
 
 ### Before an optimization
