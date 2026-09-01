@@ -113,6 +113,92 @@ pub const fn covers_trivia_openers(needles: &[u8]) -> bool {
     true
 }
 
+/// [`TRIVIA_OPENERS`] plus one caller-supplied significant byte — the hop needle
+/// set for a scan whose own byte is not a compile-time constant (a keyword's
+/// first byte).
+///
+/// A hop with a const needle array states its coverage with a
+/// [`covers_trivia_openers`] assert; this one satisfies the same obligation *by
+/// construction*, and it is built by copying `TRIVIA_OPENERS` rather than
+/// restating its members, so a fifth opener widens every array built here
+/// instead of silently escaping one.
+///
+/// `pub` for the same reason [`TRIVIA_OPENERS`] and [`covers_trivia_openers`] are,
+/// though the only callers today are in this module: the hop's precondition is a
+/// contract the *other* crates' scans have to satisfy, and the filed follow-up
+/// sites are in `tsv_svelte`. ⚠️ One of those — `match_bracket` — takes **two**
+/// runtime bytes (`open`/`close`), which this shape does not cover; widen it there
+/// rather than open-coding an array that restates the openers.
+///
+/// ⚠️ The runtime byte costs about four more instructions a word than a
+/// compile-time one — `!(v ^ splat) & HIGH_BITS` folds to a single shared `!v &
+/// HIGH_BITS` only for constants below `0x80` (see [`crate::swar::next_byte_of`]).
+/// That is a rounding error against the ~15 instructions a byte the walk it
+/// replaces costs, not a reason to specialize per keyword.
+#[must_use]
+pub const fn trivia_hop_needles(significant: u8) -> [u8; TRIVIA_OPENERS.len() + 1] {
+    let mut out = [significant; TRIVIA_OPENERS.len() + 1];
+    let mut k = 0;
+    while k < TRIVIA_OPENERS.len() {
+        out[k + 1] = TRIVIA_OPENERS[k];
+        k += 1;
+    }
+    out
+}
+
+/// Tautological while the constructor above copies [`TRIVIA_OPENERS`] — which is the
+/// point: it is the tripwire on a rewrite that stops copying it.
+const _: () = assert!(covers_trivia_openers(&trivia_hop_needles(b'k')));
+
+/// The bytes a paren-depth scan hops between: its own parens, plus every
+/// [`TRIVIA_OPENERS`] byte. Shared by the two such scans in `tsv_ts` — the
+/// printer's `find_closing_paren` and the parser's `scan_parens_then_arrow` —
+/// which ask one question of one byte class and must not drift apart in it.
+pub const PAREN_HOP_NEEDLES: [u8; 6] = [b'(', b')', b'"', b'\'', b'`', b'/'];
+
+/// A hop may only skip bytes that cannot open trivia — see [`covers_trivia_openers`].
+const _: () = assert!(covers_trivia_openers(&PAREN_HOP_NEEDLES));
+
+/// Whether `b` is one of `needles` — the byte-scan ladder's BOTTOM rung, in front
+/// of a hop whose runs are routinely empty.
+///
+/// [`crate::swar::next_byte_of`]'s entry costs about fifteen instructions and an
+/// empty run saves none of them, so a site whose hops are mostly adjacent pays
+/// the entry to learn what one compare already knew. Branchless by construction
+/// (an OR-fold, not a short-circuit chain), and derived from the same array the
+/// hop passes, so the two cannot drift.
+///
+/// ⚠️ Conditional on the EMPTY-RUN share, and not free to add: at 8.6% adjacency
+/// (`tsv_css`'s `extract_function_parts`) the same test cost instructions and
+/// bought no cycles. Read the census's zero bucket first.
+///
+/// **The width of the test is not what decides it, because the width is not what
+/// gets emitted.** At the two `tsv_ts` paren scans this is a SIX-byte membership
+/// test — not the two compares the rung was first priced at — and `objdump` shows
+/// LLVM lowering it to a 63-wide window check plus one bit test:
+/// `add $-0x22` / `cmp $0x3e` / `ja` / `bt %rax, $0x40000000000020e1` / `jae`.
+/// Every byte class in this module fits that shape (`skip_trivia`'s own four
+/// openers are `$0x4000000000002021` at the same base), so **a membership test
+/// over punctuation costs about five instructions regardless of how many members
+/// it has** — check the span before pricing one by its arity.
+///
+/// Measured, at 74–80% adjacency the pre-test is worth `instructions:u` −0.13
+/// points of the TypeScript format run *on top of* the hop, which without it is
+/// worth **nothing at all** there. The two axes (run length, needle count) do not
+/// trade off against each other the way the per-word cost table suggests; the
+/// empty-run share dominates both.
+#[inline]
+#[must_use]
+pub fn is_hop_needle<const N: usize>(b: u8, needles: [u8; N]) -> bool {
+    let mut hit = false;
+    let mut k = 0;
+    while k < N {
+        hit |= needles[k] == b;
+        k += 1;
+    }
+    hit
+}
+
 /// If `bytes[i]` begins a trivia span (a comment or string per `profile`), return
 /// the position just past it; otherwise `None` — the byte is significant.
 ///
@@ -389,7 +475,8 @@ fn is_identifier_byte(b: u8) -> bool {
 }
 
 /// Find the **first** whole-word occurrence of `keyword` in `bytes[start..end]`,
-/// skipping trivia per `profile`. Returns the keyword's start position, or `None`.
+/// skipping trivia per `profile`. Returns the keyword's start position, or `None`
+/// — including for an empty `keyword`, which has no occurrence to find.
 ///
 /// The trivia skip is what makes this safe against a keyword that appears inside
 /// a comment or string (e.g. `@dec /* class */ class C {}` finds the real
@@ -402,9 +489,17 @@ pub fn find_keyword(
     keyword: &[u8],
     profile: TriviaProfile,
 ) -> Option<usize> {
+    let &first = keyword.first()?;
     let kw_len = keyword.len();
+    let needles = trivia_hop_needles(first);
     let mut i = start;
     while i + kw_len <= end {
+        // Hop to the next byte that can matter — see the note on
+        // [`rfind_keyword`], which shares this loop's shape and its census.
+        i = crate::swar::next_byte_of(&bytes[..end], i, needles);
+        if i + kw_len > end {
+            break;
+        }
         if let Some(past) = skip_trivia(bytes, i, end, profile) {
             i = past;
             continue;
@@ -446,7 +541,8 @@ pub fn find_keyword_ascii_case_insensitive(
 }
 
 /// Find the **last** whole-word occurrence of `keyword` in `bytes[start..end]`,
-/// skipping trivia per `profile`. Returns its start position, or `None`.
+/// skipping trivia per `profile`. Returns its start position, or `None` —
+/// including for an empty `keyword`, which has no occurrence to find.
 ///
 /// The forward scan with skip-trivia gives the rightmost match that is **not**
 /// inside a comment or string, so it both (a) skips a keyword buried in a
@@ -462,10 +558,37 @@ pub fn rfind_keyword(
     keyword: &[u8],
     profile: TriviaProfile,
 ) -> Option<usize> {
+    let &first = keyword.first()?;
     let kw_len = keyword.len();
+    let needles = trivia_hop_needles(first);
     let mut found = None;
     let mut i = start;
     while i + kw_len <= end {
+        // A byte that is neither the keyword's first byte nor a trivia opener can
+        // do nothing here: `whole_word_at` compares `keyword` from `i`, so it
+        // cannot match, and `skip_trivia` cannot claim the position. So the walk
+        // hops between the bytes that *can* act, a word at a time, instead of
+        // asking about each one — the byte-scan ladder's top rung
+        // ([`crate::swar::next_byte_of`]), chosen on the INERT fraction rather
+        // than on whether the loop reads as a search.
+        //
+        // This scan has the family's longest runs by a wide margin, because it
+        // never exits early: it wants the LAST match, so every call walks its
+        // whole range. Per pass it crosses a mean run of 14.6 bytes over 1,666
+        // TypeScript files (10.8 over 1,695 Svelte ones), with 85% of those bytes
+        // in runs of eight or more and under 1% of its hops adjacent — far too
+        // few for the one-byte pre-test that pays where a construct is routinely
+        // empty (`tsv_css`'s `string_end`).
+        //
+        // Bounded at `end` for COST, not for correctness — the guard below retires
+        // any landing past the window either way. A printer scan routinely passes
+        // an `end` a few tokens ahead of `start` while `bytes` is the whole
+        // document, and a full-slice hop over a needle-free window would read to
+        // the end of the file to learn what `end` already said.
+        i = crate::swar::next_byte_of(&bytes[..end], i, needles);
+        if i + kw_len > end {
+            break;
+        }
         if let Some(past) = skip_trivia(bytes, i, end, profile) {
             i = past;
             continue;
@@ -837,9 +960,12 @@ pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Op
         // fire only at positions a hop lands on. The bytes crossed here were never
         // its to see.
         //
-        // Bounded at `end`, not `bytes.len()`: callers routinely pass an `end` far
-        // short of the source end, and a full-slice hop could land on a needle past
-        // the bound that this loop must never reach.
+        // Bounded at `end` for COST, not for correctness: the `i >= end` guard
+        // below retires a landing past the window either way (the two hops agree
+        // wherever a needle exists inside it, and disagree only above `end`).
+        // Callers routinely pass an `end` far short of the source end, and a
+        // full-slice hop over a needle-free window would read to the end of the
+        // file to learn what `end` already said.
         i = crate::swar::next_byte_of(&bytes[..end], i, HOP_NEEDLES);
         if i >= end {
             break;
