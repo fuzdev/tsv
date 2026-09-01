@@ -389,6 +389,50 @@ sudo sysctl kernel.perf_event_paranoid=2  # persist via a drop-in in /etc/sysctl
 ```
 
 
+**Counting a loop's cost exactly — `objdump`.** A sampling profiler prices a loop
+against a denominator; a disassembly prices it per iteration, with no sampling
+error and no corpus dependence. This is how the byte-scan ladder's rungs are
+known: a two-target compare chain is ~13 instructions a byte, a 256-entry skip
+table 6 (with two branches and **two dependent loads**), and `swar::next_byte_of`
+1.5–4.5 depending on needle count.
+
+```bash
+cargo build --profile profiling -p tsv_cli -p tsv_debug
+objdump -d -l --no-show-raw-insn -C target/profiling/tsv_debug > /tmp/prof.dis
+# every inlined copy of a primitive, keyed on the -l source annotations
+grep -n 'swar.rs:' /tmp/prof.dis | sed 's/.*swar.rs:/swar.rs:/' | sort | uniq -c
+```
+
+The loop body is the largest backward branch whose target is inside the same
+region. Read its instruction count, divide by the bytes it consumes per
+iteration, and compare rungs **on one binary** — a figure carried across builds or
+sessions is not comparable, since inlining context changes it (the same primitive
+reads 12 instructions a word in one caller and 20 in another under register
+pressure).
+
+⚠️ `-l` annotations are essential and `-C` (demangle) makes the enclosing symbol
+readable; without them an inlined primitive has no name to grep for.
+
+⚠️ Two traps when disassembling a primitive in **isolation** rather than at its
+call sites. `#[unsafe(no_mangle)]` is denied by the workspace lints, so probe
+functions keep mangled names; and an rlib built under `lto = true` holds only
+bitcode, so `objdump` on `target/profiling/deps/lib*.rlib` prints nothing — a
+probe must be reached from a real binary before it is codegen'd at all.
+
+**Proving an edit is codegen-neutral.** A comment, `debug_assert`, or const-only
+change must leave `.text` byte-identical, which also proves that measurements
+taken before it still describe the shipping binary:
+
+```bash
+objcopy -O binary --only-section=.text target/release/tsv /tmp/a.bin
+objcopy -O binary --only-section=.text <the-binary-measured> /tmp/b.bin
+cmp /tmp/a.bin /tmp/b.bin
+```
+
+⚠️ `.text` belongs to a **cargo invocation**: `-p tsv_cli` and
+`-p tsv_debug -p tsv_cli` differ by ~160 B on identical source through feature
+unification. Pin the invocation the way you pin the profile.
+
 ### 5. `heaptrack` — allocation-site profiling
 
 When `perf` shows time inside malloc/free internals, it can't say _which_
