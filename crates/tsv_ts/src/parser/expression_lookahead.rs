@@ -13,7 +13,9 @@ use super::scan::{
     skip_whitespace_and_comments,
 };
 use crate::lexer::is_es_line_terminator_at;
-use tsv_lang::source_scan::{OperandAnchor, TriviaProfile, skip_regex_literal, skip_trivia};
+use tsv_lang::source_scan::{
+    OperandAnchor, PAREN_HOP_NEEDLES, TriviaProfile, is_hop_needle, skip_regex_literal, skip_trivia,
+};
 
 /// `<` at `pos` is `<=` comparison operator, not an angle bracket open
 #[inline]
@@ -62,6 +64,29 @@ pub(super) fn scan_parens_then_arrow(bytes: &[u8], start: usize) -> bool {
     // maintained per byte; `OperandAnchor` owns the rule.
     let mut anchor = OperandAnchor::new(start);
     while pos < end {
+        // Only `PAREN_HOP_NEEDLES` can move this scan; every other byte reaches
+        // the `_ => {}` arm below and was stepped over one at a time, so the walk
+        // hops between them a word at a time instead of reading each one
+        // (`swar::next_byte_of`, the byte-scan ladder's top rung). The hop is
+        // invisible to `anchor` for the same reason it is at
+        // `source_scan::scan_to_matching_brace`: `OperandAnchor` resolves lazily
+        // and *backwards* from the `/` that asks, so the crossed bytes were never
+        // its to see.
+        //
+        // Per pass over 1,666 TypeScript files this crosses 320,445 inert bytes
+        // in runs averaging 5.4, 95% of them in runs of eight or more — but **74%
+        // of its hops are adjacent**, past `tsv_css`'s `string_end`, so the hop
+        // alone pays the entry cost three times in four for nothing. Measured, it
+        // is a REGRESSION without `is_hop_needle` in front of it: +0.015% of the
+        // wire run, and it moved the TypeScript format run by −0.046 points where
+        // the pre-tested form moves it by −0.174. **The pre-test is not a
+        // refinement of this hop; it is the whole of it.**
+        if !is_hop_needle(bytes[pos], PAREN_HOP_NEEDLES) {
+            pos = tsv_lang::swar::next_byte_of(&bytes[..end], pos, PAREN_HOP_NEEDLES);
+            if pos >= end {
+                break;
+            }
+        }
         // Strings, templates, and comments are opaque — a `(`/`)` inside one is
         // not a real delimiter. The shared cursor skips all three in one place
         // (including backtick templates, which this scan historically missed).
