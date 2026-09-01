@@ -275,6 +275,18 @@ pub(crate) fn is_es_line_terminator_at(bytes: &[u8], pos: usize) -> bool {
     }
 }
 
+/// The lead bytes of [`is_es_line_terminator_at`]'s class — the loose superset a
+/// word-at-a-time scan searches for, one byte per production: `<LF>`, `<CR>`, and
+/// the `0xE2` that opens `<LS>` / `<PS>`.
+///
+/// A hit on `0xE2` is a **candidate**, not a terminator, so every caller re-tests it
+/// with [`is_es_line_terminator_at`] and resumes the scan when it fails — the
+/// loose-class-plus-exact-fallback shape `tsv_lang::swar` documents. The pair lives
+/// here, next to the exact class, because a second spelling of either is how the three
+/// hand-rolled `<LS>` / `<PS>` peeks drifted apart before; the relation is asserted by
+/// a test beside them.
+pub(crate) const ES_LINE_TERMINATOR_LEADS: [u8; 3] = [b'\n', b'\r', 0xE2];
+
 impl<'a> Lexer<'a> {
     /// A lexer over `source`, which sits at `base_offset` in the document its errors will
     /// be rendered against — `0` when that document *is* `source`, the island start for a
@@ -784,10 +796,12 @@ impl<'a> Lexer<'a> {
     /// `_into` write-through of the other large scanners.
     ///
     /// The inner run skips everything that is none of the close quote, a backslash, and the
-    /// two raw line terminators a `StringLiteral` may not contain — a 4-byte search the
-    /// compiler auto-vectorizes. Byte-at-a-time is sound: all four are ASCII (`< 0x80`) and
-    /// so never appear as a UTF-8 continuation byte. `has_escapes` gates the (rare) decode
-    /// pass.
+    /// two raw line terminators a `StringLiteral` may not contain — a 4-byte search, run
+    /// word-at-a-time through [`tsv_lang::swar::next_byte_of`]. A byte-at-a-time form is
+    /// sound (all four are ASCII, so none can appear as a UTF-8 continuation byte) and
+    /// costs twelve instructions and five branches per byte, vectorizing at none of them
+    /// — the escape arm resumes the run, which makes the stride data-dependent.
+    /// `has_escapes` gates the (rare) decode pass.
     fn scan_string_into(
         &mut self,
         start: usize,
@@ -802,14 +816,7 @@ impl<'a> Lexer<'a> {
         let mut p = content_start;
         let mut has_escapes = false;
         loop {
-            while p < len
-                && bytes[p] != quote
-                && bytes[p] != b'\\'
-                && bytes[p] != b'\n'
-                && bytes[p] != b'\r'
-            {
-                p += 1;
-            }
+            p = tsv_lang::swar::next_byte_of(bytes, p, [quote, b'\\', b'\n', b'\r']);
             // Unterminated: the source ran out, or a raw `<LF>` / `<CR>` ended the line the
             // literal opened on. `StringLiteral` excludes a raw LineTerminator (the character
             // reaches one only as an escape), and acorn rejects both — skipping them would
@@ -1311,7 +1318,9 @@ impl<'a> Lexer<'a> {
     /// is left at the end.
     ///
     /// The inner run skips everything that is not `` ` `` / `$` / `\` — a 3-byte
-    /// search the compiler auto-vectorizes. Byte-at-a-time is sound: all three are
+    /// search, run word-at-a-time through [`tsv_lang::swar::next_byte_of`]; a lone `$`
+    /// and an escape both resume it, which is what keeps the compare-chain spelling
+    /// scalar. Byte-at-a-time is sound: all three are
     /// ASCII (`< 0x80`) and so never appear as a UTF-8 continuation byte. A `\`
     /// skips itself plus the next full char (a multibyte escaped char resumes the
     /// scan on a char boundary); the escape is validated later when the segment is
@@ -1322,9 +1331,7 @@ impl<'a> Lexer<'a> {
         let mut p = content_start;
         let mut has_escapes = false;
         loop {
-            while p < len && bytes[p] != b'`' && bytes[p] != b'$' && bytes[p] != b'\\' {
-                p += 1;
-            }
+            p = tsv_lang::swar::next_byte_of(bytes, p, [b'`', b'$', b'\\']);
             if p >= len {
                 self.position = p;
                 return (p, TemplateStop::Eof, has_escapes);
@@ -1686,5 +1693,34 @@ mod tests {
                 "id_continue mismatch at byte {b:#x}"
             );
         }
+    }
+
+    // `ES_LINE_TERMINATOR_LEADS` is the loose class a word-at-a-time scan searches
+    // for, and the scans that use it only ever re-test a HIT. So it must be a
+    // superset of the exact production's first bytes: a terminator whose lead is
+    // missing from the array is skipped silently, and no corpus carries `<LS>` /
+    // `<PS>` to show it. (The reverse — a lead that is not always a terminator —
+    // is the point, and `0xE2` is exactly that.)
+    #[test]
+    fn line_terminator_leads_cover_every_first_byte_of_the_exact_class() {
+        // Every ASCII byte, then the two non-ASCII terminators and a `0xE2` lead
+        // that is not one, each as the whole source.
+        for b in 0u8..0x80 {
+            let bytes = [b];
+            assert!(
+                !is_es_line_terminator_at(&bytes, 0) || ES_LINE_TERMINATOR_LEADS.contains(&b),
+                "byte {b:#x} terminates a line but is not a scan lead"
+            );
+        }
+        for s in ["\u{2028}", "\u{2029}", "\u{2014}"] {
+            let bytes = s.as_bytes();
+            assert!(
+                !is_es_line_terminator_at(bytes, 0) || ES_LINE_TERMINATOR_LEADS.contains(&bytes[0]),
+                "{s:?} terminates a line but its lead is not a scan lead"
+            );
+        }
+        // And the loose class is genuinely loose, which is what the callers' resume
+        // arm exists for.
+        assert!(!is_es_line_terminator_at("\u{2014}".as_bytes(), 0));
     }
 }
