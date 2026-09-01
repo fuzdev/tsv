@@ -13,12 +13,15 @@ pub(crate) fn read_comment(source: &str, pos: &mut usize) -> Result<Token, Parse
     // only scan targets are `*` and `/`. Both are ASCII, so neither can occur as a UTF-8
     // continuation byte: stepping a byte at a time through a multi-byte char lands on
     // bytes >= 0x80, which fail the `*` test and advance exactly as the former per-char
-    // decode did. The inner run is a single-byte search the compiler auto-vectorizes.
+    // decode did.
+    //
+    // The run to the next `*` is [`tsv_lang::swar::next_byte_of`] rather than the byte
+    // loop it reads as. A `*` that opens no `*/` resumes the run, and LLVM fuses the two
+    // into one scalar loop at ten instructions and three branches a byte — the word loop
+    // asks the same question of eight bytes at one branch.
     let mut p = start + 2; // past `/*`
     loop {
-        while p < len && bytes[p] != b'*' {
-            p += 1;
-        }
+        p = tsv_lang::swar::next_byte_of(bytes, p, [b'*']);
         if p >= len {
             return Err(lex_err("Unterminated comment", start));
         }

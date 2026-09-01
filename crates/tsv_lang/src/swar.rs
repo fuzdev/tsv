@@ -1,6 +1,6 @@
 //! SWAR byte-search kernels — the word-at-a-time primitives the line scans
-//! ([`crate::location`]) and the wire-JSON escape prescan
-//! ([`crate::json_writer`]) share.
+//! ([`crate::location`]), the wire-JSON escape prescan
+//! ([`crate::json_writer`]) and the language lexers' token-body scans share.
 //!
 //! Every kernel here answers a question about the eight bytes packed in one
 //! `u64`. They exist as one module rather than one copy per caller because
@@ -8,6 +8,11 @@
 //! **across** lanes, so a lane's flag is not independently trustworthy. What
 //! *is* guaranteed — and what every caller relies on — is stated per kernel
 //! below. Read the guarantee before adding a caller.
+//!
+//! [`next_byte_of`] is the one **public** entry point, and the only item here
+//! that is a scan rather than a lane kernel: `tsv_ts` and `tsv_css` reach it from
+//! their lexers, which is what a language crate wants and what keeps a fourth
+//! hand-rolled word loop from being written. Its density caveat is stated on it.
 
 /// `0x01` in every lane — the borrow unit the has-zero / has-less kernels
 /// subtract.
@@ -98,9 +103,133 @@ pub(crate) const fn lanes_less_than(v: u64, n: u8) -> u64 {
     v.wrapping_sub(splat(n)) & !v & HIGH_BITS
 }
 
+/// Index of the first byte at or after `from` that equals any of `needles`, or
+/// `bytes.len()` when none does.
+///
+/// The word-at-a-time face of the byte scans a lexer is made of. A run of
+/// "everything that is not one of these `N` bytes" spelled as a compare chain
+/// costs about `2 + 2N` instructions and `N + 2` branches per byte and does not
+/// vectorize — the resume the caller does at a hit makes the stride
+/// data-dependent, so LLVM keeps the scalar loop. This asks the same question of
+/// eight bytes at once: one load, `5N` lane operations, and one branch per word.
+///
+/// ⚠️ **Read `hits` with `trailing_zeros` only** — the OR of several
+/// [`zero_lanes`] masks keeps that kernel's lowest-lane guarantee (a spurious
+/// lane in either mask is preceded by a genuine one in the same mask, and the
+/// OR's lowest set lane is therefore the lowest set lane of whichever mask holds
+/// it) but nothing stronger.
+///
+/// The needles are a `[u8; N]` rather than a slice so `N` is a constant at each
+/// call site: the lane loop unrolls and the splats hoist out of the word loop.
+/// A caller whose class is not a plain byte set passes the **leads** of the loose
+/// superset and re-tests the exact class at each hit — the shape
+/// [`zero_or_high_lanes`] documents, and the one `tsv_ts`'s line-comment scan
+/// uses for `<LS>` / `<PS>`.
+///
+/// ⚠️ **It has a density axis, because the splats are paid per CALL and the word
+/// is paid per eight bytes.** A run shorter than one word costs the setup and
+/// finds its hit in the first word anyway, so a caller entered many times for a
+/// near-empty run loses. Measured on synthetic documents that are nothing but one
+/// construct, `instructions:u` against the compare chain: a string literal breaks
+/// even at **3–4 content bytes** (`''` **+1.11%**, 4 bytes −0.11%, 16 bytes
+/// −2.25%, 64 bytes −9.88%) and a block comment at **~3** (`/**/` **+0.57%**, 16
+/// bytes −2.09%, 120 bytes −12.45%). Real source sits far past both — a mean
+/// string body of 17.3 bytes and a mean block comment of 259 across 1,666 `.ts`
+/// files — so the tax is bounded by a shape no corpus contains. Census the run
+/// length before adding a caller whose construct is routinely empty.
+///
+/// The tail loop is a compare chain, but it runs only within eight bytes of the
+/// **slice's** end, not the run's: callers pass the whole source, so even a
+/// two-byte run is answered by the word loop everywhere but the last word of the
+/// file.
+#[inline]
+pub fn next_byte_of<const N: usize>(bytes: &[u8], from: usize, needles: [u8; N]) -> usize {
+    let splats = needles.map(splat);
+    let mut i = from;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let w = u64::from_le_bytes(*chunk);
+        let mut hits = 0;
+        let mut k = 0;
+        while k < N {
+            hits |= zero_lanes(w ^ splats[k]);
+            k += 1;
+        }
+        if hits != 0 {
+            return i + (hits.trailing_zeros() / 8) as usize;
+        }
+        i += 8;
+    }
+    while i < bytes.len() && !needles.contains(&bytes[i]) {
+        i += 1;
+    }
+    i
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// [`next_byte_of`] against a plain scalar scan, over every needle count the
+    /// crate uses and every alignment of a hit within and across words — the
+    /// property the word loop's borrow behaviour could break silently.
+    ///
+    /// ⚠️ The **non-ASCII needle** is not decoration. Where every needle is below
+    /// `0x80`, `w ^ splat(needle)` has each lane's high bit unchanged, so LLVM is
+    /// free to fold [`zero_lanes`]'s `& !x` term against the *unxored* word — a
+    /// strength reduction it does take, and one that is wrong for a needle at or
+    /// above `0x80`. The `0xE2` case is `tsv_ts`'s line-comment scan, whose lead
+    /// class carries `<LS>` / `<PS>`'s first byte; nothing else here would fail if
+    /// that fold ever leaked.
+    #[test]
+    fn next_byte_of_matches_a_scalar_scan() {
+        fn scalar(bytes: &[u8], from: usize, needles: &[u8]) -> usize {
+            let mut i = from;
+            while i < bytes.len() && !needles.contains(&bytes[i]) {
+                i += 1;
+            }
+            i
+        }
+        // Filler bytes that exercise the borrow chain: zero, the sub-needle
+        // 0x01, ASCII, and the 0x80 axis a borrow must not cross.
+        let filler = [0x00u8, 0x01, b'a', 0x7f, 0x80, 0xff];
+        for &f in &filler {
+            for len in 0..40usize {
+                for hit in 0..=len {
+                    let mut v = vec![f; len];
+                    if hit < len {
+                        v[hit] = b'*';
+                    }
+                    for from in 0..=len {
+                        assert_eq!(
+                            next_byte_of(&v, from, [b'*']),
+                            scalar(&v, from, b"*"),
+                            "1 needle, filler {f:#x}, len {len}, hit {hit}, from {from}"
+                        );
+                        assert_eq!(
+                            next_byte_of(&v, from, [b'*', b'\\', b'\n', b'\r']),
+                            scalar(&v, from, b"*\\\n\r"),
+                            "4 needles, filler {f:#x}, len {len}, hit {hit}, from {from}"
+                        );
+                    }
+                }
+                // The same sweep with a NON-ASCII needle present and the hit
+                // landing on it, which is the case the `& !x` fold would break.
+                for hit in 0..=len {
+                    let mut v = vec![f; len];
+                    if hit < len {
+                        v[hit] = 0xE2;
+                    }
+                    for from in 0..=len {
+                        assert_eq!(
+                            next_byte_of(&v, from, [b'\n', b'\r', 0xE2]),
+                            scalar(&v, from, b"\n\r\xE2"),
+                            "0xE2 lead, filler {f:#x}, len {len}, hit {hit}, from {from}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     /// Grade `kernel`'s mask against a per-byte `oracle` over every word whose
     /// lanes are drawn from `alphabet` — exhaustively in the low four lanes,
