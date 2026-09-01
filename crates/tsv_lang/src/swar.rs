@@ -162,14 +162,34 @@ pub(crate) const fn lanes_less_than(v: u64, n: u8) -> u64 {
 /// that acts on 5% of the bytes it reads (mean 18.7 between hits), and it sits
 /// on this rung for exactly the reason a lexer's string run does.
 ///
-/// ⚠️ **The per-byte cost above is an `N` = 1–2 figure: the lane work is LINEAR
-/// in the needle count** (each needle adds an xor, a `zero_lanes`, and the OR —
-/// about six instructions a word), so a wide class erodes the advantage and by
-/// roughly eight needles this meets a 256-entry skip table's flat six per byte.
-/// A caller whose class is genuinely wide — a bracket matcher that must also
-/// stop at every trivia opener, say — belongs on the table rung, not here. The
-/// rung is chosen by run length **and** alphabet width, not by run length
-/// alone.
+/// ⚠️ **The per-byte cost above is an `N` = 1–2 figure — but the needle count is a
+/// far weaker axis than it looks, and a wide class does NOT hand the site back to
+/// the skip table.** Disassembled at every width (`objdump` over a ten-way probe,
+/// plus the seven live call sites), the word loop costs:
+///
+/// | `N` | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+/// | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+/// | insns/word | 12 | 16 | 20 | 20 | 24 | 28 | 32 | 28 | 32 | 36 |
+/// | insns/byte | 1.5 | 2.0 | 2.5 | 2.5 | 3.0 | 3.5 | 4.0 | 3.5 | 4.0 | 4.5 |
+///
+/// Two effects flatten it. Below `N` = 4 the marginal is **four** instructions a
+/// needle, not six, because `!(v ^ splat) & HIGH_BITS` folds to a single shared
+/// `!v & HIGH_BITS` for every needle below `0x80` — so all-ASCII needles share one
+/// `not`. (A needle that is non-ASCII or not a compile-time constant breaks that
+/// sharing and costs about four more: the live `[quote, b'\\', b'\n', b'\r']` site
+/// reads 29 where four ASCII constants read 20.) At `N` >= 4 LLVM **vectorizes the
+/// lane loop** — `pshufd`/`pxor`/`paddq`/`por`, two needles per XMM register — and
+/// the marginal halves again; the curve is not even monotone, `N` = 8 landing
+/// cheaper than `N` = 7.
+///
+/// So a ten-needle hop is **4.5** instructions a byte against a 256-entry skip
+/// table's flat **6** (measured on the same binary: `movzbl`, table `cmpb`, `inc`,
+/// bound `cmp`, two branches), and the instruction crossover is somewhere past
+/// `N` = 16, not at eight. On the other channels the two never converge at all —
+/// the word loop retires **two branches and one load per eight bytes** where the
+/// table pays two branches and two dependent loads per byte, which is the cost 0ap
+/// found dominating. **Choose the rung by run length; alphabet width, up to about
+/// ten, is not a reason to prefer the table.**
 ///
 /// The tail loop is a compare chain, but it runs only within eight bytes of the
 /// **slice's** end, not the run's: callers pass the whole source, so even a
