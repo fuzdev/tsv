@@ -419,6 +419,17 @@ functions keep mangled names; and an rlib built under `lto = true` holds only
 bitcode, so `objdump` on `target/profiling/deps/lib*.rlib` prints nothing — a
 probe must be reached from a real binary before it is codegen'd at all.
 
+⚠️ **A byte-class membership test does not cost what its arity suggests, so
+disassemble one before designing around it.** LLVM lowers a `matches!` (or an
+OR-fold) over ASCII punctuation to a **window check plus one bit test** whenever
+the members span 64 values or fewer — `add $-<base>` / `cmp` / `ja` /
+`bt %reg, $<mask>` / `jae`, about five instructions no matter how many members
+there are. `skip_trivia`'s four openers emit `$0x4000000000002021` based at
+`0x22`; the six-byte paren-hop pre-test beside it emits `$0x40000000000020e1` at
+the same base. Two consequences: **a wider byte class is usually free**, and a
+hand-written bitmask "optimization" of such a test is already there — check the
+disassembly before writing one.
+
 **Proving an edit is codegen-neutral.** A comment, `debug_assert`, or const-only
 change must leave `.text` byte-identical, which also proves that measurements
 taken before it still describe the shipping binary:
