@@ -776,11 +776,13 @@ fn soften_forced_break(v: u32) -> u32 {
 }
 
 /// Longest slice [`pooled_text_width`] measures with its fused byte walk. Past
-/// it, the scan shape flips to the searcher-based one: `contains('\n')` and
-/// `is_ascii` are SIMD and the tab count auto-vectorizes (it has no early exit),
-/// so on a long slice three vector passes beat one scalar walk — while on a
-/// short one their setup, paid regardless of length, is the entire cost. Text
-/// nodes are short (a CSS property name, a value chunk), but not uniformly: the
+/// it, the scan shape flips to the searcher-based one: `contains('\n')` inlines
+/// `memchr` and `is_ascii` calls out to one, both word-at-a-time rather than
+/// SIMD, and the tab count auto-vectorizes (it has no early exit, though into a
+/// byte-to-`usize` widening chain rather than a wide compare), so on a long slice
+/// three wide passes beat one scalar walk — while on a short one their setup,
+/// paid regardless of length, is the entire cost. Text nodes are short (a CSS
+/// property name, a value chunk), but not uniformly: the
 /// TS printer's tail runs long enough that an ungated fused walk measured a real
 /// regression on TS while CSS never noticed the gate at all. The crossover is
 /// broad and 32 sits in the flat middle of it. Only a *speed* switch — both arms
