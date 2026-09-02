@@ -5,7 +5,7 @@
 
 use crate::acorn_prefix::AcornPrefix;
 use crate::escapes::swap_quote_escaping;
-use crate::swar::{high_bit_lanes, splat, zero_lanes, zero_or_high_lanes};
+use crate::swar::{high_bit_lanes, lanes_less_than, splat, zero_lanes, zero_or_high_lanes};
 use crate::whitespace::is_js_whitespace;
 use std::borrow::Cow;
 use unicode_segmentation::UnicodeSegmentation;
@@ -1093,6 +1093,113 @@ pub(crate) fn next_width_relevant(bytes: &[u8], from: usize) -> usize {
     next_width_relevant_in(bytes, from, bytes.len())
 }
 
+/// Is `b` a **printable ASCII** byte — `0x20..=0x7e`?
+///
+/// The class [`next_non_printable_ascii`] scans for, asked of one byte, and the
+/// only class [`visual_width_mixed`] can count without looking at the byte at all:
+/// every member is exactly one column, so a stretch of them is as wide as it is
+/// long. Its complement is the three things that are not — a `\t`
+/// (`tab_width` columns), a control or `DEL` (**zero** columns, and this is the
+/// arm that differs from [`visual_width`]'s pure-ASCII fast path on purpose), and
+/// a non-ASCII byte (the grapheme walk's).
+///
+/// ⚠️ **Not [`is_width_relevant`]'s complement**, and the gap is the whole reason
+/// this class is spelled separately: that one admits every control but `\t` and
+/// `\n` as a one-column byte, because the caller it serves is a *span of source*,
+/// where a control cannot appear. Here the caller counts [`ascii_char_width`],
+/// which gives a control **0**, so a scan over the wider class would silently
+/// over-count every string holding one. The [`ascii_char_width`] agreement is
+/// proved below for every ASCII byte — the value that function is ever asked
+/// about — and the non-ASCII half is the lane test's, in the same block.
+#[inline]
+const fn is_printable_ascii(b: u8) -> bool {
+    b >= 0x20 && b < 0x7f
+}
+
+/// [`next_non_printable_ascii`]'s word test and [`is_printable_ascii`] must answer
+/// identically for every byte value, and [`is_printable_ascii`] must be exactly the
+/// bytes [`ascii_char_width`] gives a width of one — proved here rather than trusted.
+///
+/// The corpus cannot grade either claim: a 1,666-file TypeScript corpus holds
+/// **7** tabs and **zero** other controls inside the half-megabyte of ASCII runs
+/// this scan replaces, so a wrong class is a silent width error no real document
+/// would reveal. A uniform word makes the lane test directly comparable — with
+/// every lane holding the same byte no lane can borrow from a neighbour unless it
+/// is itself a match — and the mixed-word behaviour is graded by the runtime
+/// alignment sweep in `tests`.
+const _: () = {
+    let mut b = 0u16;
+    while b < 256 {
+        let byte = b as u8;
+        let w = u64::from_le_bytes([byte; 8]);
+        let hits = lanes_less_than(w, 0x20) | zero_or_high_lanes(w ^ splat(0x7f));
+        assert!((hits == 0) == is_printable_ascii(byte));
+        // [`ascii_char_width`] is only ever asked about an ASCII byte, so the
+        // agreement is pinned there; the non-ASCII half is the lane test above,
+        // which must flag every one of those bytes for the run to end on it. The
+        // tab width is irrelevant to the equivalence — any value but 1 shows a
+        // `\t` failing the class, which is the arm this exists to pin.
+        assert!(byte >= 0x80 || is_printable_ascii(byte) == (ascii_char_width(byte, 2) == 1));
+        b += 1;
+    }
+};
+
+/// Index of the first byte at or after `from` that is **not** printable ASCII, or
+/// `bytes.len()` when none is.
+///
+/// [`visual_width_mixed`]'s run counter: the bytes it steps over are one column
+/// each, so the scan that finds none has *finished* measuring them — `stop - i`
+/// is their width, with no accumulator and no per-byte select.
+///
+/// The per-byte fold it replaced cost **16 instructions a byte** against this word
+/// rung's ~2, over **524,232** bytes a TypeScript format pass. `objdump`, in full —
+/// the fold owes a width for every ASCII byte and leaves only on a non-ASCII one,
+/// so the three-way select is branchless and stays in the loop body:
+///
+/// ```text
+/// movzbl / test / js                                    the ASCII test and the exit
+/// cmp $0x20 / setae / cmp $0x7f / setne / and /
+///   cmp $0x9 / movzbl / cmove                           the width
+/// add / inc / mov / cmp / jne                           the accumulate and the loop
+/// ```
+///
+/// ⭐ **The class is two kernels, and the second one is free.** The controls come
+/// from [`lanes_less_than`] at `0x20`; `zero_or_high_lanes(w ^ splat(0x7f))` is
+/// `DEL` **and every non-ASCII byte** for the price of the `DEL` alone — and
+/// non-ASCII is exactly where the run has to stop anyway, so the loose kernel's
+/// usual false positives are the wanted answer here, the same way they are in
+/// [`next_width_relevant_in`].
+///
+/// ⚠️ Both kernels borrow, so only the **lowest** set lane is genuine, and the OR
+/// preserves that (a spurious lane in either mask is preceded by a genuine one in
+/// the same mask). Read with [`u64::trailing_zeros`] only.
+///
+/// Unlike [`next_width_relevant_in`] this takes no host buffer to borrow trailing
+/// bytes from: its caller holds a `&str`, not a span of a document. The scalar
+/// tail therefore runs within eight bytes of the string's end — affordable
+/// because the runs are long (a mean printable stretch of **31.8** bytes, with
+/// 496 KB of the 524 KB in stretches of 16 or more).
+#[inline]
+fn next_non_printable_ascii(bytes: &[u8], from: usize) -> usize {
+    let len = bytes.len();
+    let mut i = from;
+    while i < len {
+        let Some(chunk) = bytes[i..].first_chunk::<8>() else {
+            while i < len && is_printable_ascii(bytes[i]) {
+                i += 1;
+            }
+            return i;
+        };
+        let w = u64::from_le_bytes(*chunk);
+        let hits = lanes_less_than(w, 0x20) | zero_or_high_lanes(w ^ splat(0x7f));
+        if hits != 0 {
+            return i + (hits.trailing_zeros() / 8) as usize;
+        }
+        i += 8;
+    }
+    len
+}
+
 /// [`is_width_relevant`] widened by the one byte a printed string literal also has to
 /// know about: a `'`.
 ///
@@ -1451,6 +1558,14 @@ pub fn visual_width(s: &str, tab_width: usize) -> usize {
 /// - Run bytes use grapheme-path char semantics — printable 1, tab
 ///   `tab_width`, control/DEL 0 — NOT the pure-ASCII fast path's byte count
 ///   (which keeps its historical controls-count-as-1 behavior).
+///
+/// ⭐ **The run is counted by SEARCH, not by fold.** Every printable ASCII byte
+/// is one column, so a stretch of them is as wide as it is long and
+/// [`next_non_printable_ascii`] measures it by finding where it ends; only the
+/// byte that ended it needs a width of its own. That byte is rare — a
+/// 1,666-file TypeScript corpus stops **16,502** times over **524,232** run
+/// bytes, i.e. about once per run, and **7** of those stops are a tab and none
+/// is another control.
 pub(crate) fn visual_width_mixed(s: &str, tab_width: usize) -> usize {
     let bytes = s.as_bytes();
     let len = bytes.len();
@@ -1458,13 +1573,24 @@ pub(crate) fn visual_width_mixed(s: &str, tab_width: usize) -> usize {
     let mut i = 0usize;
     while i < len {
         if bytes[i].is_ascii() {
-            // Single pass: accumulate the run's width while finding its end.
-            while i < len && bytes[i].is_ascii() {
-                width += ascii_char_width(bytes[i], tab_width);
+            // The run is every ASCII byte from here, counted a printable stretch
+            // at a time. `i` advances at least once before the `break` (the byte
+            // that opened the run is ASCII: either the scan steps over it or the
+            // `ascii_char_width` arm does), so the step back below is in bounds.
+            loop {
+                let stop = next_non_printable_ascii(bytes, i);
+                width += stop - i;
+                i = stop;
+                if i == len {
+                    return width;
+                }
+                let b = bytes[i];
+                if !b.is_ascii() {
+                    break;
+                }
+                // A `\t` or a control/DEL: still in the run, but not one column.
+                width += ascii_char_width(b, tab_width);
                 i += 1;
-            }
-            if i == len {
-                return width;
             }
             // Non-ASCII follows: un-count the run's last char and hand it to
             // the grapheme walker (it may start a boundary-crossing cluster).
@@ -2051,6 +2177,93 @@ mod tests {
                                 next_width_relevant(&v, from),
                                 scalar(&v, from),
                                 "filler {f:#x}, hit {h:#x}, len {len}, at {at}, from {from}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// [`next_non_printable_ascii`] against a scalar scan of the same class, over
+    /// every alignment of a hit within and across words.
+    ///
+    /// ⚠️ The **fillers** are the point, exactly as in the sweep above: both
+    /// kernels borrow across lanes, so a lane's flag is trustworthy only as the
+    /// lowest set one. `0x00` and `0x1f` drive `lanes_less_than`'s borrow chain,
+    /// `0x7f` and `0x80` straddle the axis a borrow must not cross, and `0x20` is
+    /// the class boundary on the other side. Every byte of the class is graded as
+    /// the hit — including a non-ASCII one, which is a needle here and not a false
+    /// positive.
+    #[test]
+    fn next_non_printable_ascii_matches_a_scalar_scan() {
+        fn scalar(bytes: &[u8], from: usize) -> usize {
+            let mut i = from;
+            while i < bytes.len() && is_printable_ascii(bytes[i]) {
+                i += 1;
+            }
+            i
+        }
+        let filler = [b'a', b' ', 0x20u8, 0x7e];
+        let hits = [0x00u8, 0x09, 0x0a, 0x1f, 0x7f, 0x80, 0xc3, 0xff];
+        for &f in &filler {
+            for len in 0..40usize {
+                for at in 0..=len {
+                    for &h in &hits {
+                        let mut v = vec![f; len];
+                        if at < len {
+                            v[at] = h;
+                        }
+                        for from in 0..=len {
+                            assert_eq!(
+                                next_non_printable_ascii(&v, from),
+                                scalar(&v, from),
+                                "filler {f:#x}, hit {h:#x}, len {len}, at {at}, from {from}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// [`visual_width_mixed`] against its reference over the shapes **no corpus
+    /// holds**: a `\t` or a control at every alignment of a long ASCII run that
+    /// also carries a non-ASCII byte.
+    ///
+    /// ⚠️ This is the grader the run-counting scan actually needs. A 1,666-file
+    /// TypeScript corpus puts **7** tabs and **zero** other controls inside the
+    /// 524,232 ASCII-run bytes `visual_width_mixed` measures, and the exhaustive
+    /// triple product above never forms a word — so dropping a needle from
+    /// [`is_printable_ascii`]'s class would be caught by nothing else, and it is a
+    /// silent width error (it moves a fits verdict and no other observable).
+    #[test]
+    fn visual_width_mixed_matches_reference_with_specials_at_every_alignment() {
+        // One of each arm the run counter must not fold away, plus the two
+        // non-ASCII leads that end a run.
+        const SPECIALS: [char; 6] = ['\t', '\u{0}', '\u{1f}', '\u{7f}', '\r', '\n'];
+        for &special in &SPECIALS {
+            for len in 0..24usize {
+                for at in 0..len {
+                    for tail in ["", "é", "中", "🙂", "e\u{0301}"] {
+                        let mut s: String = "a".repeat(len);
+                        s.replace_range(at..=at, &special.to_string());
+                        s.push_str(tail);
+                        for tw in [2usize, 4] {
+                            assert_eq!(
+                                visual_width_mixed(&s, tw),
+                                visual_width_reference(&s, tw),
+                                "special {special:?}, len {len}, at {at}, tail {tail:?}, tw {tw}"
+                            );
+                        }
+                        // And with the non-ASCII LEADING, so the run the scan
+                        // walks starts mid-string rather than at byte 0.
+                        let lead = format!("{tail}{s}");
+                        for tw in [2usize, 4] {
+                            assert_eq!(
+                                visual_width_mixed(&lead, tw),
+                                visual_width_reference(&lead, tw),
+                                "lead {special:?}, len {len}, at {at}, tail {tail:?}, tw {tw}"
                             );
                         }
                     }
