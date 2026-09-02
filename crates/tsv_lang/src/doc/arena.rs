@@ -21,7 +21,9 @@ use crate::hash::FxHashMap;
 
 use crate::Span;
 use crate::config::TAB_WIDTH;
-use crate::printing::{next_lf, next_width_relevant, visual_width, visual_width_mixed};
+use crate::printing::{
+    next_lf, next_width_relevant, next_width_relevant_in, visual_width, visual_width_mixed,
+};
 
 #[cfg(feature = "comment_check")]
 use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
@@ -835,6 +837,12 @@ const fn clamp_text_width(w: usize) -> u16 {
 /// The measured width is clamped below the sentinel by
 /// [`clamp_text_width`], which carries that argument.
 ///
+/// ⚠️ **This is the SLICE form, and it is now the minority one.** A text that is
+/// a span of the document goes through [`source_span_width`] instead — 98% of the
+/// width measures in a format run — because a span can read its host's words where
+/// a slice has none to read. What follows is the argument both share; the span
+/// form's own doc carries what is different about it.
+///
 /// ⭐ **The width of a plain ASCII line IS its byte count, so the measure is a
 /// SEARCH, not a sum.** One [`crate::printing::next_width_relevant`] pass asks
 /// for the first byte that could make the answer anything else — a `\t`, a `\n`,
@@ -876,6 +884,83 @@ fn pooled_text_width(s: &str) -> u16 {
         return clamp_text_width(bytes.len());
     }
     pooled_text_width_cold(s, first)
+}
+
+/// [`pooled_text_width`] for a span of `source` — the form 98% of the width measures in a
+/// format run take, and the one that can answer a short text in a single word test.
+///
+/// ⭐ **A span is a region of a much longer buffer, so the scan has eight bytes to read
+/// wherever the span itself does not.** [`pooled_text_width`] hands its scan a *slice*,
+/// where a text under eight bytes has no word to form and falls to a scalar class test at
+/// **9 instructions a byte** — and 61% of the spans measured here are that short (390,799
+/// of 640,428 on a 1,666-file TypeScript corpus; only **72** of them sit within eight
+/// bytes of the document's end, where a word genuinely is not readable).
+/// [`next_width_relevant_in`] reads the host's word and ignores what falls past the span.
+///
+/// ⭐ **And the width question wants BYTES, not a `&str`.** `Span::extract` is a `str`
+/// index, so it pays [`str::is_char_boundary`] at both ends — two loads and four compares
+/// the measurement never asked for — and the slice it returns is then read as
+/// `as_bytes()` anyway. The `&str` is materialized only on the cold arm, which needs it
+/// for the grapheme walk.
+///
+/// ⚠️ **That does not weaken the boundary check on any span with content in it**, because
+/// a non-empty span that splits a multi-byte character always *contains* a byte at or
+/// above `0x80` and so always reaches the cold arm: if `end` is not a boundary the
+/// character's lead byte lies at or after `start`, and if `start` is not a boundary it is
+/// itself a continuation byte; either way the class scan hits it and the cold arm's
+/// `span.extract` panics exactly where it always did. The one case that changes is a
+/// **degenerate empty span at a non-boundary offset**, which now measures 0 instead of
+/// panicking here — and still panics at render, where `resolve_text` re-slices the same
+/// span out of the same document.
+///
+/// ⚠️ **`#[inline(always)]` is load-bearing and is a MEASURED choice, not a hint.** Left
+/// to itself LLVM outlines this and folds `source_span`'s allocation into its 38 callers
+/// — the opposite split from the one the `str`-slicing shape got, where measure and
+/// allocation were one outlined function. That split costs **+0.301%** of a TypeScript
+/// format run (~10 instructions of call and marshalling per span, measured as its own
+/// variant), which is more than the scan it was paying for.
+///
+/// ⚠️ Both attributes here and on [`DocArena::source_span`] describe a **threshold**, so a
+/// toolchain bump can move them: re-check that `source_span` is still one outlined symbol
+/// (`objdump -C | grep 'DocArena::source_span>:'`) before trusting a width-path number
+/// taken after one.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn source_span_width(span: Span, source: &str) -> u16 {
+    let bytes = source.as_bytes();
+    let start = span.start as usize;
+    let end = span.end as usize;
+    if start > end || end > bytes.len() {
+        // A malformed span: hand it to the `str` index so it fails where it always did.
+        return source_span_width_invalid(span, source);
+    }
+    let first = next_width_relevant_in(bytes, start, end);
+    if first == end {
+        return clamp_text_width(end - start);
+    }
+    source_span_width_cold(span, source, first - start)
+}
+
+/// The arm [`source_span_width`]'s scan hands a span to once it finds a byte the width
+/// depends on — **1.0%** of the spans a format run measures. It is the first point that
+/// needs the text as a `str`, so this is where the slice (and its char-boundary check)
+/// is taken.
+#[cold]
+#[inline(never)]
+fn source_span_width_cold(span: Span, source: &str, first: usize) -> u16 {
+    pooled_text_width_cold(span.extract(source), first)
+}
+
+/// A span outside its document, or inverted — where `span.extract`'s `str` index is
+/// what raises the panic, before the width is ever asked for. Spelled as a delegation
+/// rather than an `unreachable!` so it stays correct if the guard above is ever
+/// loosened, and outlined so the arm never widens [`source_span_width`] past what LLVM
+/// will fold back into its caller (the width measure and the node allocation are one
+/// function in the emitted code, as they were when the measure took the `str` slice).
+#[cold]
+#[inline(never)]
+fn source_span_width_invalid(span: Span, source: &str) -> u16 {
+    pooled_text_width(span.extract(source))
 }
 
 /// The arm [`pooled_text_width`]'s scan hands a slice to once it finds a byte the
@@ -1636,19 +1721,26 @@ impl DocArena {
     /// eager width-cache policy on [`pooled_text_width`] for why the deferral
     /// they once had is gone.
     ///
-    /// ⚠️ At its current call-site count LLVM **declines** this `#[inline]` and
-    /// emits it as a real symbol (2.3% self on a fuz_app board), so a name
-    /// emission — ~15% of all doc nodes — pays a call. Two shapes buy that back
-    /// and neither is taken: `#[inline(always)]` here recovers `instructions:u`
-    /// −1.20% → −1.51% for **+7,264 B** of `.text` (perf's own inline threshold
-    /// is a U-curve this codebase already sits at the minimum of, so pushing it
-    /// up is a cycles risk), and a second entry point with a **duplicated** body
-    /// reaches −1.45% for +336 B but splits one width computation across two
-    /// sites that nothing keeps in agreement. A profile-guided build makes this
-    /// choice per call site without either cost.
-    #[inline]
+    /// ⚠️ **`#[inline(never)]` here is a MEASURED choice, and it is the choice LLVM
+    /// made on its own for years** — at this call-site count it declined `#[inline]`
+    /// and emitted a real symbol (2.3% self on a fuz_app board), so a name emission —
+    /// ~15% of all doc nodes — has always paid a call. What changed is that
+    /// [`source_span_width`]'s body is small enough to tempt LLVM into the *opposite*
+    /// split: inline this and outline the width. That split costs **+0.301%** of a
+    /// TypeScript format run, so the attribute pins the old shape — one outlined
+    /// function per emission, measure and allocation together — and pinning it is worth
+    /// **0.126 points** and **−12,352 B** of `.text` against letting LLVM choose.
+    ///
+    /// ⚠️ Two shapes that would remove the call itself were measured and are still not
+    /// taken: `#[inline(always)]` here recovered `instructions:u` −1.20% → −1.51% for
+    /// **+7,264 B** of `.text` (perf's own inline threshold is a U-curve this codebase
+    /// already sits at the minimum of, so pushing it up is a cycles risk), and a second
+    /// entry point with a **duplicated** body reached −1.45% for +336 B but splits one
+    /// width computation across two sites that nothing keeps in agreement. A
+    /// profile-guided build makes this choice per call site without either cost.
+    #[inline(never)]
     pub fn source_span(&self, span: Span, source: &str) -> DocId {
-        let w = pooled_text_width(span.extract(source));
+        let w = source_span_width(span, source);
         self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
     }
 
@@ -1660,7 +1752,7 @@ impl DocArena {
     /// [`Self::source_span`] so it force-breaks.
     #[inline]
     pub fn verbatim_source_span(&self, span: Span, source: &str) -> DocId {
-        let w = pooled_text_width(span.extract(source));
+        let w = source_span_width(span, source);
         self.alloc(DocNode::Text(DocText::VerbatimSpan(span, w)))
     }
 
@@ -3788,6 +3880,153 @@ mod pooled_text_width_tests {
                 }
             }
         }
+    }
+}
+
+/// [`source_span_width`] must answer exactly what [`pooled_text_width`] answers for the
+/// same text — and the two reach it differently, so only a differential says so.
+///
+/// **The span form reads bytes it must not believe**, which is a failure surface the
+/// slice form does not have and no corpus can be trusted to cover: the word loop reads
+/// eight bytes of the *document* at every step, so a `\n` sitting one byte past the span
+/// (the single most common neighbour an identifier has) is in the register when the
+/// verdict is taken. Believing it turns a plain name's width into the newline sentinel,
+/// which changes a fits verdict and nothing else — no fixture, no format diff, no wire
+/// diff can see it. So the neighbour is enumerated here rather than sampled: every class
+/// byte at every distance past the span's end, at every alignment of the span's start.
+#[cfg(test)]
+mod source_span_width_tests {
+    use super::{pooled_text_width, source_span_width};
+    use crate::span::Span;
+
+    /// One representative per arm of the class, plus two bytes adjacent to the needles
+    /// in value order (`0x0b` and `0x7f` must NOT fire, `0x80` must).
+    const SPECIALS: [&str; 8] = ["\t", "\n", "\x0b", "\x7f", "\u{80}", "é", "中", "🎉"];
+
+    #[track_caller]
+    fn assert_agrees(host: &str, start: usize, end: usize) {
+        let span = Span::new(start as u32, end as u32);
+        assert_eq!(
+            source_span_width(span, host),
+            pooled_text_width(&host[start..end]),
+            "source_span_width disagrees on {:?} of {host:?}",
+            &host[start..end],
+        );
+    }
+
+    /// The neighbour test: a class byte just past the span, which the word read sees and
+    /// the answer must not. Every distance past the end from 0 (inside — a control, so
+    /// the width really does change) through 8 (a whole word away), at every start
+    /// alignment, so the byte visits every lane of the read.
+    #[test]
+    fn ignores_a_class_byte_past_the_span_end() {
+        for special in SPECIALS {
+            for align in 0..9usize {
+                for len in 0..=17usize {
+                    for gap in 0..=8usize {
+                        let host = format!(
+                            "{}{}{}{}{}",
+                            "a".repeat(align),
+                            "x".repeat(len),
+                            "b".repeat(gap),
+                            special,
+                            "c".repeat(9),
+                        );
+                        assert_agrees(&host, align, align + len);
+                    }
+                }
+            }
+        }
+    }
+
+    /// A class byte INSIDE the span, at every alignment — the mirror of the above, and
+    /// the case a too-eager `end` clamp would break.
+    #[test]
+    fn finds_a_class_byte_inside_the_span_at_every_alignment() {
+        for special in SPECIALS {
+            for align in 0..9usize {
+                for len in 1..=17usize {
+                    for at in 0..len {
+                        let host = format!(
+                            "{}{}{}{}{}",
+                            "a".repeat(align),
+                            "x".repeat(at),
+                            special,
+                            "y".repeat(len - 1 - at),
+                            "zzzzzzzzzzzz",
+                        );
+                        let end = align + at + special.len() + (len - 1 - at);
+                        assert_agrees(&host, align, end);
+                    }
+                }
+            }
+        }
+    }
+
+    /// A span ending at (or within eight bytes of) the document's end — the one place no
+    /// word is readable and the scalar class test still runs. `72` spans a 1,666-file
+    /// TypeScript run land here, so it is rare and must still be exact.
+    #[test]
+    fn agrees_within_a_word_of_the_documents_end() {
+        for special in SPECIALS {
+            for tail in 0..9usize {
+                for len in 0..=12usize {
+                    let host = format!("{}{}{}", "x".repeat(len), special, "y".repeat(tail),);
+                    let host_len = host.len();
+                    // Every span that reaches into the last word, including the empty
+                    // one at the very end.
+                    for start in 0..=len {
+                        assert_agrees(&host, start, host_len);
+                        assert_agrees(&host, start, len);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Spans long enough to run several whole words, so the loop's advance is graded
+    /// against the slice form and not only its first read.
+    #[test]
+    fn agrees_on_multi_word_spans() {
+        let host = format!(
+            "{}\t{}é{}\n{}",
+            "x".repeat(40),
+            "y".repeat(40),
+            "z".repeat(40),
+            "w".repeat(40),
+        );
+        let host_len = host.len();
+        for start in 0..host_len {
+            if !host.is_char_boundary(start) {
+                continue;
+            }
+            for end in [start, start + 1, start + 7, start + 8, start + 33, host_len] {
+                if end <= host_len && host.is_char_boundary(end) {
+                    assert_agrees(&host, start, end);
+                }
+            }
+        }
+    }
+
+    /// A non-empty span that splits a multi-byte character panics exactly where the `str`
+    /// index always did — it always contains a byte at or above `0x80`, so it reaches the
+    /// cold arm and its `span.extract`. Both ends are graded: a split `end` (the lead
+    /// byte is inside) and a split `start` (the start is itself a continuation byte).
+    #[test]
+    fn a_span_off_a_char_boundary_still_panics() {
+        for span in [Span::new(0, 1), Span::new(1, 3)] {
+            let caught = std::panic::catch_unwind(|| {
+                source_span_width(span, "é_padding_padding_padding");
+            });
+            assert!(caught.is_err(), "{span:?} should still panic");
+        }
+    }
+
+    /// A span past the document's end fails at the same `str` index it always did.
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn a_span_past_the_documents_end_still_panics() {
+        source_span_width(Span::new(1, 99), "short");
     }
 }
 

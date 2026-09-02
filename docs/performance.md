@@ -1772,6 +1772,87 @@ a copy trades a call for a *wider but worse* instruction sequence.
   in the ORDER and not in the WORK.** State the invariant it must still satisfy,
   check it, then read the number as a ceiling and nothing else.
 
+### A slice's scan is bounded by the slice; a SPAN's is not
+
+Making the width measure a search (§The width of a plain ASCII line IS its byte
+count) left it taking a `&str`, and the word rung has a floor the slice form
+cannot reach: `first_chunk::<8>()` fails on a seven-byte slice, so the whole
+measure falls to the scalar class test. `objdump` prices that at **9
+instructions a byte**:
+
+```
+movzbl (%rcx,%r8,1),%r9d
+test   %r9b,%r9b  /  js  →hit      # ≥ 0x80
+add    $0xf7,%r9b                  # b - 9
+cmp    $0x2,%r9b  /  jb  →hit      # b - 9 < 2  ⟺  b ∈ {'\t','\n'}
+inc    %r8  /  cmp %r8,%rax  /  jne
+```
+
+A neat compilation of the class — and still 4.7x the word rung's ~1.9. So **a
+seven-byte region cost more than a sixteen-byte one**, and a census says 61% of
+the 640,428 document spans a TypeScript format run measures are eight bytes or
+fewer (390,799 of them), running 2,308,904 scalar tail bytes a pass.
+
+⭐⭐⭐⭐ **But every one of those slices is a region cut from a much longer
+buffer.** `next_width_relevant_in(bytes, from, end)` takes the host and the
+region separately, reads whole words *of the host*, and refuses to believe a hit
+that falls past `end`:
+
+```rust
+if hits != 0 {
+    let at = i + (hits.trailing_zeros() / 8) as usize;
+    return if at < end { at } else { end };
+}
+```
+
+The soundness is one sentence. `zero_or_high_lanes` never *misses* a genuine
+match, so no class byte precedes the lowest set lane, and that lane is itself
+genuine — a first hit at or past `end` therefore **proves** the region holds
+none. Tail bytes fell to **16,805**, and only **72** spans in a pass sit within
+eight bytes of a document's end, where no word is readable at all.
+
+- ⭐⭐⭐ **A measure that wants bytes should not be handed a `&str`.**
+  `Span::extract` is a `str` index, so it pays `is_char_boundary` at both ends —
+  two loads and four compares, 16 instructions — for a question that reads
+  `as_bytes()` immediately afterwards. Take the `&str` on the cold arm only. The
+  boundary check is not lost: a **non-empty** span that splits a multi-byte
+  character always *contains* a byte at or above `0x80`, so it always reaches
+  that arm and panics exactly where it did before.
+- ⭐⭐⭐⭐ **Factoring the measure into its own function changes which half LLVM
+  outlines, and that alone cost +0.301%.** With the `str` slice, `source_span`
+  was one outlined symbol holding measure *and* allocation. With the smaller
+  byte-level body LLVM inlines the **allocation** into 38 callers and outlines
+  the **width** instead — about ten instructions of call and marshalling per
+  span, 640,428 times a pass. `#[inline(never)]` on the caller pins the original
+  split and is worth **0.126 points and −12,352 B of `.text`** for one attribute
+  — 0.428 points over the shape that lets LLVM split it both ways.
+  **Measure a refactor's extraction on its own before believing the number you
+  attribute to the algorithm inside it.**
+- ⚠️ **A cheaper inner loop can lose.** Hoisting the readability bound out of the
+  word loop really does cut it from 18 instructions an iteration to 16 — and
+  measured −0.308% where the un-hoisted shape measured −0.617%, because
+  computing the bound costs 6 instructions at entry and the average call runs
+  **1.81** iterations. Price a per-iteration saving against the iterations per
+  *call*.
+- ⭐⭐⭐ **The same census found the idiom's second, larger instance one module
+  away.** `update_pos_for_text`, the `MultilineText` render arm's column advance,
+  still ran the per-byte fold the width measure had just shed — 12 instructions a
+  byte over 1,867,568 bytes a pass, with 91.6% of its calls holding no class byte
+  at all. The column after a line of plain one-column ASCII is `pos + len`.
+  **When a rule retires a shape, grep for the shape, not for the function.**
+- ⚠️ **The new failure surface is the bytes read past the region**, and the byte
+  after an identifier is very often the newline that ends its line: believing it
+  turns a plain name's width into the newline sentinel, which moves a fits verdict
+  and nothing else — invisible to the fixtures and to any size of format or wire
+  diff. So the differential enumerates it: every class byte at every distance
+  0–8 past the span's end, at every start alignment, at every length.
+
+Measured together: `instructions:u` **−1.222%** of a TypeScript format run,
+−0.862% Svelte, −0.008% CSS — which sees 26,087 spans a pass against TypeScript's
+640,428 and no column advance at all — with −0.004% and −0.001% confinement
+controls; sixteen binaries × 5 replicates read cycles −1.127% and wall −0.745%,
+both 5/5. `.text` −2,912 B.
+
 ### The width of a plain ASCII line IS its byte count — so measure it with a SEARCH
 
 `pooled_text_width` — the doc engine's per-text-node width precompute, 642,179

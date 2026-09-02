@@ -937,34 +937,10 @@ const fn is_width_relevant(b: u8) -> bool {
     b == b'\n' || b == b'\t' || b >= 0x80
 }
 
-/// Index of the first byte at or after `from` that is **not** a plain one-column ASCII
-/// character — a `\t` (it is `tab_width` columns), a `\n` (it ends the line), or any
-/// non-ASCII byte (its width needs the grapheme walk) — or `bytes.len()`.
-///
-/// The question a width measure actually asks. A slice with no such byte has a width
-/// equal to its byte count, so the scan that finds none has *finished* the measurement —
-/// no accumulator, no per-byte add. That is why this is a scan and not a fold: the
-/// per-byte width sum it replaced cost **13 instructions a byte** (a load, two compares,
-/// a width select, the add and the loop) where this costs **~1.9**, and the sum was
-/// discarded in the same breath by the caller that only wanted `len`.
-///
-/// ⭐ **The steady-state word test asks a WIDER question than the answer, because the
-/// wider one is cheaper — and here the wider question IS the answer.**
-/// [`crate::swar::zero_or_high_lanes`] flags a lane that is zero *or* at or above `0x80`,
-/// so `zero_or_high_lanes(w ^ splat(b'\n'))` flags `\n` **and every non-ASCII byte**, for
-/// the price of the `\n` alone. Two of them are the whole class. Unlike
-/// [`next_line_terminator_candidate`], where the non-ASCII lanes are the loose mask's
-/// false positives and must be re-asked exactly, here they are wanted, so there is no
-/// exact re-ask and no non-ASCII-dense degradation to guard against: a hit is a hit.
-///
-/// `from_le_bytes` puts byte 0 in the low lane, so the lowest set bit is the earliest
-/// match, and OR-ing the two masks preserves the kernels' lowest-lane guarantee (a
-/// spurious lane in either mask is preceded by a genuine one in that same mask). Read the
-/// result with `trailing_zeros` only.
 /// The word loop's lane test and [`is_width_relevant`] must answer identically for every
 /// byte value — proved here rather than trusted, because a scan whose tail disagrees with
-/// its word loop by one arm is the bug no corpus finds (the tail runs only over a slice's
-/// last seven bytes, and a width error changes nothing but a fits verdict).
+/// its word loop by one arm is the bug no corpus finds (the tail runs only over a
+/// region's last seven bytes, and a width error changes nothing but a fits verdict).
 ///
 /// A uniform word makes the two directly comparable: with every lane holding the same
 /// byte, no lane can borrow from a neighbour unless it is itself a match, so `hits != 0`
@@ -981,21 +957,75 @@ const _: () = {
     }
 };
 
+/// Index of the first byte in `bytes[from..end]` that is **not** a plain one-column ASCII
+/// character — a `\t` (it is `tab_width` columns), a `\n` (it ends the line), or any
+/// non-ASCII byte (its width needs the grapheme walk) — or `end`.
+///
+/// The question a width measure actually asks. A region with no such byte has a width
+/// equal to its byte count, so the scan that finds none has *finished* the measurement —
+/// no accumulator, no per-byte add. That is why this is a scan and not a fold: the
+/// per-byte width sum it replaced cost **13 instructions a byte** (a load, two compares,
+/// a width select, the add and the loop) where this costs **~1.9**, and the sum was
+/// discarded in the same breath by the caller that only wanted `len`.
+///
+/// ⭐ **`bytes` is the HOST buffer and `[from, end)` is the region measured, and the gap
+/// between the two is the point.** The word loop reads eight bytes *of the host*, so a
+/// region shorter than eight bytes still gets one word test instead of falling to the
+/// scalar walk — and the scalar walk is where this scan is expensive (**9 instructions a
+/// byte** against the word rung's ~1.9, so a seven-byte region used to cost more than a
+/// sixteen-byte one). Most regions asked about here are short: 61% of the document spans
+/// a TypeScript format run measures are eight bytes or fewer, and only **72** of 640,428
+/// sit within eight bytes of the document's end, where no word is readable.
+///
+/// The bytes past `end` are read and then **not believed**. `zero_or_high_lanes` never
+/// misses a genuine match, so lanes below the lowest set one hold no class byte, and the
+/// lowest set lane is itself genuine. A first hit at or past `end` therefore *proves* the
+/// region holds none, and a hit before `end` is real. Reading the mask with
+/// [`u64::trailing_zeros`] alone — which the note below requires anyway — is exactly what
+/// that argument needs.
+///
+/// ⭐ **The steady-state word test asks a WIDER question than the answer, because the
+/// wider one is cheaper — and here the wider question IS the answer.**
+/// [`crate::swar::zero_or_high_lanes`] flags a lane that is zero *or* at or above `0x80`,
+/// so `zero_or_high_lanes(w ^ splat(b'\n'))` flags `\n` **and every non-ASCII byte**, for
+/// the price of the `\n` alone. Two of them are the whole class. Unlike
+/// [`next_line_terminator_candidate`], where the non-ASCII lanes are the loose mask's
+/// false positives and must be re-asked exactly, here they are wanted, so there is no
+/// exact re-ask and no non-ASCII-dense degradation to guard against: a hit is a hit.
+///
+/// `from_le_bytes` puts byte 0 in the low lane, so the lowest set bit is the earliest
+/// match, and OR-ing the two masks preserves the kernels' lowest-lane guarantee (a
+/// spurious lane in either mask is preceded by a genuine one in that same mask). Read the
+/// result with `trailing_zeros` only.
 #[inline]
-pub(crate) fn next_width_relevant(bytes: &[u8], from: usize) -> usize {
+pub(crate) fn next_width_relevant_in(bytes: &[u8], from: usize, end: usize) -> usize {
+    debug_assert!(from <= end && end <= bytes.len());
     let mut i = from;
-    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+    while i < end {
+        let Some(chunk) = bytes[i..].first_chunk::<8>() else {
+            // Within eight bytes of the HOST's end — the one place no word is
+            // readable, and so the only place the scalar class test still runs.
+            while i < end && !is_width_relevant(bytes[i]) {
+                i += 1;
+            }
+            return i;
+        };
         let w = u64::from_le_bytes(*chunk);
         let hits = zero_or_high_lanes(w ^ splat(b'\n')) | zero_or_high_lanes(w ^ splat(b'\t'));
         if hits != 0 {
-            return i + (hits.trailing_zeros() / 8) as usize;
+            let at = i + (hits.trailing_zeros() / 8) as usize;
+            return if at < end { at } else { end };
         }
         i += 8;
     }
-    while i < bytes.len() && !is_width_relevant(bytes[i]) {
-        i += 1;
-    }
-    i
+    end
+}
+
+/// [`next_width_relevant_in`] over a whole buffer — the form for a slice that has no
+/// host to borrow trailing bytes from (a pool-stored string, a `MultilineText` line).
+#[inline]
+pub(crate) fn next_width_relevant(bytes: &[u8], from: usize) -> usize {
+    next_width_relevant_in(bytes, from, bytes.len())
 }
 
 /// `s.split('\n')` over [`next_lf`] — the same sequence, scanned a word at a time.
