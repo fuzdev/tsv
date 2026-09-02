@@ -2748,10 +2748,12 @@ blank-line check walks 2.6 bytes, the newline check 3.2. A one-entry hint of the
 
 The scan forms (`printing::is_same_line_scan` and siblings) read the bytes from `prev_end`
 with the table's binary search kept as the fallback past a 64-byte cap, so a minified
-document never walks a whole line per ask. Measured `instructions:u` **−0.400% / −0.142% /
-−0.238%** (TS / Svelte / CSS format); cycles **−0.621%** pooled over a twelve-binary layout
-group (3/3 replicate signs, null −0.189%). Two things decided the shape, and the ladder had
-to find both:
+document never walks a whole line per ask. Measured `instructions:u` **−0.430% / −0.153% /
+−0.238%** (TS / Svelte / CSS format) and −0.430% on the shipped CLI; cycles **−0.621%**
+pooled over a twelve-binary layout group (3/3 replicate signs, null −0.189%), taken on the
+spelling one step before the table and its verdict were paired into `LineTable` (that pairing
+read 0.03 points better on instructions and was not re-grouped). Two things decided the
+shape, and the ladder had to find both:
 
 - ⭐⭐⭐⭐ **A census prices the WORK; only `objdump` prices the CALL.** The first rung walked
   the exact ECMAScript class (`\n`, `\r`, the `0xE2` lead of U+2028/2029) — one iteration, as
@@ -2776,7 +2778,7 @@ to find both:
   scalar tail lost on both axes (§A slice's scan is bounded by the slice, its factoring
   lesson, a third time).
 
-`.text` **+40.8 KB** — each site's ~90-byte inlined search became a ~300-byte inlined scan —
+`.text` **+44.8 KB** — each site's ~90-byte inlined search became a ~300-byte inlined scan —
 and the cycles group is where that cost would show; it did not. The Svelte and CSS printers'
 own asks are unchanged (the CSS number is the builder's new `\n`-first arm being cheaper than
 the terminator match on every line — a free rider on every corpus). The exhaustive test
@@ -2784,6 +2786,18 @@ beside the scan forms grades them against the table at every byte position, incl
 inside a multi-byte terminator and out of range, over every terminator shape at every cap,
 and a two-sided `debug_assert_eq!` grades every ask in every fixture — no corpus holds a
 document where the answer differs.
+
+⚠️ **Three cleanups of this code were then measured as rungs, and two were refused.**
+Pairing the table with its verdict as one `LineTable` value read 0.03 points *better* (the
+pair passes as one argument, and three structs can no longer carry the two apart). Replacing
+the `_capped` layer's runtime cap with a `const CAP` generic — one instantiation per public
+form, which looks like the obviously cleaner spelling — gave back **0.077 points** of the
+lever on the TypeScript cell. And folding the module's six hand-written word-loop copies onto
+one closure-parameterized walker cost **+0.17%** on the CSS cell, where only two of those
+copies run, and gave back the whole L86 win on the TypeScript one — the extraction lesson of
+§A slice's scan is bounded by the slice, a third time. The copies stay, each with its own
+compile-time class proof; a refactor that touches a hot function's spelling is a rung here,
+never tidying.
 
 ## WASM bundle size
 

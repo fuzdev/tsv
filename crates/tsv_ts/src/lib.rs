@@ -29,7 +29,7 @@ mod printer;
 use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
-use tsv_lang::printing::build_line_breaks_into;
+use tsv_lang::printing::{LineTable, build_line_breaks_into};
 pub use tsv_lang::{ParseError, Result};
 
 pub use acorn_loc::AcornSeed;
@@ -48,16 +48,15 @@ pub struct PrinterInputs<'a> {
     pub source: &'a str,
     /// Detached comment buffer for the document.
     pub comments: &'a [ast::Comment],
-    /// Precomputed newline offsets for O(log n) line/column lookup.
-    pub line_breaks: &'a [u32],
-    /// The builder's verdict on `line_breaks` (`tsv_lang::printing::build_line_breaks_into`):
-    /// every recorded byte is a `\n`, so the table is exactly the set of `\n` positions and
-    /// the printer's three line questions (`is_same_line` and siblings) read the source
-    /// bytes instead of searching it. False for a document holding a bare `\r` or a
-    /// U+2028 / U+2029 — which the format path's CR fold leaves only the latter of — where
-    /// the table search runs as before. A document-level fact like the two flags below:
-    /// computed once, by the walk that fills the table, never per island.
-    pub line_breaks_lf_only: bool,
+    /// The document's line-break table paired with its builder's verdict on it
+    /// (`tsv_lang::printing::build_line_breaks_into` returns the verdict): when every
+    /// recorded byte is a `\n` the table is exactly the set of `\n` positions and the
+    /// printer's three line questions (`is_same_line` and siblings) read the source bytes
+    /// instead of searching it; a document holding a bare `\r` or a U+2028 / U+2029 —
+    /// which the format path's CR fold leaves only the latter of — searches as before.
+    /// A document-level fact like the two flags below: computed once, by the walk that
+    /// fills the table, never per island.
+    pub line_table: LineTable<'a>,
     /// Whether any comment in this document is owned by a node (`owned_by_node`).
     /// A document-level presence flag that short-circuits the owned-leading-comment
     /// path (`prepend_owned_leading_comment` & siblings), which otherwise runs a byte
@@ -93,14 +92,12 @@ impl<'a> PrinterInputs<'a> {
     pub fn for_document(
         source: &'a str,
         comments: &'a [ast::Comment],
-        line_breaks: &'a [u32],
-        line_breaks_lf_only: bool,
+        line_table: LineTable<'a>,
     ) -> Self {
         PrinterInputs {
             source,
             comments,
-            line_breaks,
-            line_breaks_lf_only,
+            line_table,
             has_owned_comments: comments.iter().any(|c| c.owned_by_node),
             has_format_ignore: comments
                 .iter()
@@ -312,7 +309,11 @@ fn format_program_in(
 ) -> String {
     let mut line_breaks = arena.take_line_breaks_scratch();
     let lf_only = build_line_breaks_into(source, &mut line_breaks);
-    let inputs = PrinterInputs::for_document(source, program.comments, &line_breaks, lf_only);
+    let line_table = LineTable {
+        breaks: &line_breaks,
+        lf_only,
+    };
+    let inputs = PrinterInputs::for_document(source, program.comments, line_table);
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     if canonical {
         printer.set_canonical();
@@ -855,21 +856,17 @@ pub fn build_type_annotation_doc(
 /// Returns a DocId that can be rendered with the arena.
 /// Used when embedding TypeScript in other formats like Svelte's `<script>`.
 ///
-/// `line_breaks` must be the host document's whole-source newline table
-/// (spans are absolute, so a table built from an island slice is wrong), with
-/// `line_breaks_lf_only` the verdict its builder returned for it
-/// (`tsv_lang::printing::build_line_breaks_into`); `comments` stay island-local
-/// (taken from `program`).
+/// `line_table` must be the host document's whole-source newline table with its
+/// builder's verdict (spans are absolute, so a table built from an island slice is
+/// wrong); `comments` stay island-local (taken from `program`).
 pub fn build_program_doc(
     arena: &DocArena,
     program: &Program<'_>,
     source: &str,
-    line_breaks: &[u32],
-    line_breaks_lf_only: bool,
+    line_table: LineTable<'_>,
     embed: EmbedContext,
 ) -> DocId {
-    let inputs =
-        PrinterInputs::for_document(source, program.comments, line_breaks, line_breaks_lf_only);
+    let inputs = PrinterInputs::for_document(source, program.comments, line_table);
     let printer = make_doc_printer(arena, &inputs, embed);
     printer.build_program_doc(program)
 }

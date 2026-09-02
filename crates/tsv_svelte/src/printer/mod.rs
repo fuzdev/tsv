@@ -285,8 +285,10 @@ impl<'a> Printer<'a> {
         } = tsv_ts::PrinterInputs::for_document(
             source,
             comments,
-            &line_breaks,
-            line_breaks_lf_only,
+            tsv_lang::printing::LineTable {
+                breaks: &line_breaks,
+                lf_only: line_breaks_lf_only,
+            },
         );
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
@@ -767,6 +769,16 @@ impl<'a> Printer<'a> {
         self.source
     }
 
+    /// The document's line-break table paired with its builder's verdict — what every
+    /// embedded TypeScript island reads its line questions from (the table is the whole
+    /// document's; spans are absolute).
+    pub(crate) fn line_table(&self) -> tsv_lang::printing::LineTable<'_> {
+        tsv_lang::printing::LineTable {
+            breaks: &self.line_breaks,
+            lf_only: self.line_breaks_lf_only,
+        }
+    }
+
     /// Standard [`tsv_ts::PrinterInputs`] for embedding TypeScript: this
     /// document's source, comments, and line breaks. Call sites
     /// needing empty comments override via
@@ -775,8 +787,7 @@ impl<'a> Printer<'a> {
         tsv_ts::PrinterInputs {
             source: self.source,
             comments: self.comments,
-            line_breaks: &self.line_breaks,
-            line_breaks_lf_only: self.line_breaks_lf_only,
+            line_table: self.line_table(),
             // The document-level owned-comment flag, computed once at construction
             // (never here — this is called per `{expr}`; see the field's doc).
             has_owned_comments: self.has_owned_comments,

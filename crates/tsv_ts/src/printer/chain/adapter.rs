@@ -119,7 +119,7 @@ impl<'a> Printer<'a> {
     }
 
     pub(crate) fn get_layout_line_breaks(&self) -> &[u32] {
-        self.layout_line_breaks
+        self.layout_line_breaks.breaks
     }
 
     pub(crate) fn chain_has_comments(&self) -> bool {
@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
             self.comments,
             start,
             end,
-            self.comment_line_breaks,
+            self.comment_line_breaks.breaks,
         )
     }
 
