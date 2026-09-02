@@ -937,11 +937,14 @@ record came straight out of one:
   trimmed** (0 leading and 0 trailing whitespace bytes across 200K real
   declarations), so the trimming that recovered its offsets was computing zero.
 
-The histogram also sizes the fix. Fusing N scans into one byte pass is a
-**short-string** lever: on a long slice the searchers are SIMD and a plain byte
-count auto-vectorizes, so three vector passes beat one scalar walk. Gate the
-fused path on length and let the tail keep the vectorized shape — an ungated
-fusion won on CSS and *regressed* pure TS, whose text nodes run longer.
+The histogram also sizes the fix — and, later, retired it. Fusing N scans into one
+**byte** pass is a short-string lever, so it arrived under a length gate: past 32
+bytes the searchers came back, because a scalar per-byte walk was the only
+alternative on offer. Both halves of that dichotomy were false, and the census
+above is what says so: a slice whose bytes are all plain one-column ASCII has a
+width equal to its **length**, so the pass has nothing to accumulate and the
+question is a search, not a fold. See §The width of a plain ASCII line IS its byte
+count.
 
 ### The structure you already keep is usually the census
 
@@ -1769,6 +1772,105 @@ a copy trades a call for a *wider but worse* instruction sequence.
   in the ORDER and not in the WORK.** State the invariant it must still satisfy,
   check it, then read the number as a ceiling and nothing else.
 
+### The width of a plain ASCII line IS its byte count — so measure it with a SEARCH
+
+`pooled_text_width` — the doc engine's per-text-node width precompute, 642,179
+calls over 7.1 MB a pass on 1,666 `.ts` files — held **three** shapes at once,
+and all three were counting:
+
+```rust
+const FUSED_WIDTH_SCAN_MAX: usize = 32;         // the gate
+for &b in s.as_bytes() {                        // arm 1: the fused sum
+    match b { b'\n' => return Newline, b'\t' => width += TAB_WIDTH,
+              0x00..=0x7f => width += 1, _ => return Searcher }
+}
+// arm 2, past the gate or on a non-ASCII byte:
+if s.contains('\n') { SENTINEL } else { visual_width(s, TAB_WIDTH) }
+//                                      ^ is_ascii(), then a tab count
+```
+
+The gate was load-bearing and its comment said why: past 32 bytes "three wide
+passes beat one scalar walk". `objdump` grades both halves of that dichotomy and
+neither survives.
+
+- **The sum is 13 instructions a byte.** `movzbl`, `mov $2`, `cmp $9`, `je`,
+  `cmp $0xa`, `je`, `mov $1`, `test`, `jns`, then `add`, `inc`, `cmp`, `je` — a
+  width select and an accumulate wrapped around a three-way compare, with **124
+  inlined copies** in the binary. That is the same thirteen §A two-target byte
+  scan compiles BRANCHLESS measured on a different loop in a different crate:
+  **a per-byte classify-and-act body costs about thirteen instructions whatever
+  it is classifying**, so a count of them is a size estimate.
+- **The three passes are not three wide passes.** `contains('\n')` inlines
+  `memchr`, whose 16-byte word loop is 1.1 instructions a byte — behind a
+  byte-at-a-time alignment head and a byte-at-a-time tail of up to fifteen bytes
+  at five instructions each. `is_ascii` is an **out-of-line call** whose SSE2 loop
+  needs 32 bytes to engage, so at a mean slice of 56 bytes it runs once and then
+  spends the remainder in a 4-byte SSE tail (1.75/byte) and a byte tail (6/byte).
+  Only the tab count is genuinely vectorized, at **4.75 instructions a byte** —
+  the byte-to-`usize` widening chain of §"It auto-vectorizes" is not a reason.
+  Together, ~468 instructions for a 56-byte slice.
+
+⭐⭐⭐⭐ **But the lever was upstream of all of it: a slice of plain one-column
+ASCII has a width equal to its LENGTH, so there is nothing to accumulate and the
+measurement is a SEARCH.** One word-at-a-time pass asks for the first byte that
+could make the answer anything else — a `\t` (it is `tab_width` columns), a `\n`
+(it ends the line), or a non-ASCII byte (its width needs the grapheme walk) — and
+**finding none has finished the job**:
+
+```rust
+let hits = zero_or_high_lanes(w ^ splat(b'\n')) | zero_or_high_lanes(w ^ splat(b'\t'));
+```
+
+That is the entire class in ~15 instructions per eight bytes (**~1.9 a byte**),
+because `zero_or_high_lanes` flags a lane that is zero *or* at or above `0x80`:
+the non-ASCII arm rides along on the two needles for free. The census says
+**98.97%** of calls hold no class byte at all (6,624 of 642,179 do), so a cold arm
+takes the rest — resuming the same scan per tab, answering the newline question
+ahead of the width one, and handing a non-ASCII slice **whole** to the grapheme
+walk.
+
+- ⭐⭐⭐ **A length gate between two shapes is a claim that BOTH are right
+  somewhere.** This one had been re-measured and defended; what nobody re-asked
+  is whether a third shape retires both. It does, at every length: the fused arm
+  it replaced was the 94% case and owned **no board row at all** (inlined into
+  ~124 builder sites), while the arm that did own one read 0.64%.
+- ⭐⭐⭐ **`.text` went DOWN by 23,280 bytes.** A word loop plus a scalar tail is
+  *smaller* than a 13-instruction accumulating byte loop, 124 times over — so
+  this is the rare instruction lever that is also a size and I-cache lever. WASM
+  shrank too (format −1,003 B, all −965 B, parse unchanged).
+- ⚠️ **The class is the whole correctness surface and no corpus can see it.**
+  Drop `\t` from it and every tabbed text measures one column short per tab,
+  which changes a fits verdict and nothing else — invisible to the fixtures, to a
+  27,579-file format diff and to a 3,999-file wire diff. It is spelled once
+  (`printing::is_width_relevant`) so the word loop and its scalar tail cannot
+  drift — and a `const _` block proves that agreement **at compile time**, byte
+  by byte over all 256, because a uniform word makes the lane test and the
+  scalar predicate directly comparable (no lane can borrow from a neighbour
+  unless it is itself a match). Narrowing the tail's class is now a compile
+  error, not a silent misparse. The equivalence test beside the function then
+  walks a class byte across **every** alignment of every length to 40 (and two
+  class bytes across every pair of alignments to 20), because the pre-existing
+  exhaustive test topped out at three characters and never entered an eight-byte
+  word loop at all. Five mutations, five failures; the two that the length-0–3 test cannot see
+  are exactly the two that live in the word loop.
+- ⚠️ **`#[cold]` became right when the gate went away.** The arm this replaced
+  carried an explicit "**not** `#[cold]`: a long slice is a normal input here" —
+  true of a length gate, false of a class test, since the new arm is entered only
+  by a slice that actually holds one of those three bytes. Read what a refusal's
+  premise was a property OF before inheriting it.
+- ✓ **It converts on cycles, which this arc's scan levers usually do not.** Sixteen
+  binaries (base and candidate at eight layout draws each), five pooled
+  replicates: `instructions:u` **−2.638%** with a per-replicate spread of 0.001
+  points, `cycles:u` **−1.882%** and `task-clock` **−1.741%**, all 5/5 — against a
+  layout null (a second set of *baseline* draws in the candidate's pad positions)
+  of −0.001 / +0.122 / +0.094. The null is positive, so correcting makes the
+  result larger, not smaller. The mechanism predicts the conversion: what is
+  deleted is a per-byte dependent chain (a load, a width select, an accumulate)
+  the machine cannot hide behind anything, which is the arc's own standing test
+  for which instruction wins convert. The `json_profile` confinement control reads
+  +0.001% / +0.050% / +0.015% on the same sixteen binaries — flat on the channel
+  the verdict is stated in, not only on instructions.
+
 ### An eight-byte load stops being one load the moment one byte is used conditionally
 
 `read_keyword_word` packs an identifier's first eight bytes into a `u64`, behind a
@@ -2087,8 +2189,9 @@ either, because the escape arm makes the stride data-dependent, so the "the comp
 auto-vectorizes this" comment such loops attract is worth checking against `objdump` before
 it is believed. **Audited across the repo's seven such claims** (count `pcmpeqb` / `pmovmskb`
 / `psadbw` per symbol in the profiling build, which keeps the symbols the release binary
-folds away): `printing::visual_width` and `doc::arena::pooled_text_width_scanned` do
-vectorize; `tsv_css::lexer::comments::read_comment`, `tsv_ts::lexer::comments::read_block_comment`
+folds away): `printing::visual_width` does
+vectorize (and so did the doc arena's tab count, until the width measure stopped counting —
+§The width of a plain ASCII line IS its byte count); `tsv_css::lexer::comments::read_comment`, `tsv_ts::lexer::comments::read_block_comment`
 and `tsv_ts::lexer::core::Lexer::scan_string_into` retired **zero** vector instructions and
 their comments were wrong (all three are the word loop of the next section now). The
 predictor is structural: **a single-byte inner run nested in an

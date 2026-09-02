@@ -927,6 +927,77 @@ pub fn next_lf(bytes: &[u8], from: usize) -> usize {
     i
 }
 
+/// The class [`next_width_relevant`] scans for, asked of ONE byte.
+///
+/// One spelling, because the word loop and its scalar tail reach the same class by
+/// different routes — and a scan whose tail disagrees with its word loop by one arm is
+/// the bug no corpus finds: the tail runs only over a slice's last seven bytes.
+#[inline]
+const fn is_width_relevant(b: u8) -> bool {
+    b == b'\n' || b == b'\t' || b >= 0x80
+}
+
+/// Index of the first byte at or after `from` that is **not** a plain one-column ASCII
+/// character — a `\t` (it is `tab_width` columns), a `\n` (it ends the line), or any
+/// non-ASCII byte (its width needs the grapheme walk) — or `bytes.len()`.
+///
+/// The question a width measure actually asks. A slice with no such byte has a width
+/// equal to its byte count, so the scan that finds none has *finished* the measurement —
+/// no accumulator, no per-byte add. That is why this is a scan and not a fold: the
+/// per-byte width sum it replaced cost **13 instructions a byte** (a load, two compares,
+/// a width select, the add and the loop) where this costs **~1.9**, and the sum was
+/// discarded in the same breath by the caller that only wanted `len`.
+///
+/// ⭐ **The steady-state word test asks a WIDER question than the answer, because the
+/// wider one is cheaper — and here the wider question IS the answer.**
+/// [`crate::swar::zero_or_high_lanes`] flags a lane that is zero *or* at or above `0x80`,
+/// so `zero_or_high_lanes(w ^ splat(b'\n'))` flags `\n` **and every non-ASCII byte**, for
+/// the price of the `\n` alone. Two of them are the whole class. Unlike
+/// [`next_line_terminator_candidate`], where the non-ASCII lanes are the loose mask's
+/// false positives and must be re-asked exactly, here they are wanted, so there is no
+/// exact re-ask and no non-ASCII-dense degradation to guard against: a hit is a hit.
+///
+/// `from_le_bytes` puts byte 0 in the low lane, so the lowest set bit is the earliest
+/// match, and OR-ing the two masks preserves the kernels' lowest-lane guarantee (a
+/// spurious lane in either mask is preceded by a genuine one in that same mask). Read the
+/// result with `trailing_zeros` only.
+/// The word loop's lane test and [`is_width_relevant`] must answer identically for every
+/// byte value — proved here rather than trusted, because a scan whose tail disagrees with
+/// its word loop by one arm is the bug no corpus finds (the tail runs only over a slice's
+/// last seven bytes, and a width error changes nothing but a fits verdict).
+///
+/// A uniform word makes the two directly comparable: with every lane holding the same
+/// byte, no lane can borrow from a neighbour unless it is itself a match, so `hits != 0`
+/// is exactly "this byte is in the class". The mixed-word behaviour — the lowest set lane
+/// is the genuine one — is what the runtime alignment sweep in `tests` grades.
+const _: () = {
+    let mut b = 0u16;
+    while b < 256 {
+        let byte = b as u8;
+        let w = u64::from_le_bytes([byte; 8]);
+        let hits = zero_or_high_lanes(w ^ splat(b'\n')) | zero_or_high_lanes(w ^ splat(b'\t'));
+        assert!((hits != 0) == is_width_relevant(byte));
+        b += 1;
+    }
+};
+
+#[inline]
+pub(crate) fn next_width_relevant(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let w = u64::from_le_bytes(*chunk);
+        let hits = zero_or_high_lanes(w ^ splat(b'\n')) | zero_or_high_lanes(w ^ splat(b'\t'));
+        if hits != 0 {
+            return i + (hits.trailing_zeros() / 8) as usize;
+        }
+        i += 8;
+    }
+    while i < bytes.len() && !is_width_relevant(bytes[i]) {
+        i += 1;
+    }
+    i
+}
+
 /// `s.split('\n')` over [`next_lf`] — the same sequence, scanned a word at a time.
 ///
 /// # Example
@@ -1209,7 +1280,7 @@ pub fn visual_width(s: &str, tab_width: usize) -> usize {
 /// - Run bytes use grapheme-path char semantics — printable 1, tab
 ///   `tab_width`, control/DEL 0 — NOT the pure-ASCII fast path's byte count
 ///   (which keeps its historical controls-count-as-1 behavior).
-fn visual_width_mixed(s: &str, tab_width: usize) -> usize {
+pub(crate) fn visual_width_mixed(s: &str, tab_width: usize) -> usize {
     let bytes = s.as_bytes();
     let len = bytes.len();
     let mut width = 0usize;
@@ -1767,6 +1838,50 @@ mod tests {
                             reference(&buf, from),
                             "align {align}, from {from}, bytes {buf:02x?}"
                         );
+                    }
+                }
+            }
+        }
+    }
+
+    /// [`next_width_relevant`] against a scalar scan of the same class, over every
+    /// alignment of a hit within and across words.
+    ///
+    /// ⚠️ The **fillers** are the point. `zero_or_high_lanes` borrows across lanes, so a
+    /// lane's flag is only trustworthy as the lowest set one; `0x00` and `0x08` sit under
+    /// both needles and drive that borrow, and `0x7f` / `0x80` straddle the axis a borrow
+    /// must not cross. ⚠️ And a **non-ASCII hit is a needle here, not a false positive** —
+    /// the opposite of [`next_line_terminator_candidate`]'s loose class — so `0x80`,
+    /// `0xc3` and `0xff` are graded as hits rather than as bytes to step over.
+    #[test]
+    fn next_width_relevant_matches_a_scalar_scan() {
+        fn scalar(bytes: &[u8], from: usize) -> usize {
+            let mut i = from;
+            while i < bytes.len() && !is_width_relevant(bytes[i]) {
+                i += 1;
+            }
+            i
+        }
+        // Fillers that exercise the borrow chain across lanes (zero, the
+        // sub-needle 0x08, plain ASCII, the 0x7f/0x80 axis a borrow must not
+        // cross) and every byte of the class as the hit.
+        let filler = [0x00u8, 0x08, b'a', 0x7f, 0x80, 0xff];
+        let hits = [b'\n', b'\t', 0x80u8, 0xc3, 0xff];
+        for &f in &filler {
+            for len in 0..40usize {
+                for at in 0..=len {
+                    for &h in &hits {
+                        let mut v = vec![f; len];
+                        if at < len {
+                            v[at] = h;
+                        }
+                        for from in 0..=len {
+                            assert_eq!(
+                                next_width_relevant(&v, from),
+                                scalar(&v, from),
+                                "filler {f:#x}, hit {h:#x}, len {len}, at {at}, from {from}"
+                            );
+                        }
                     }
                 }
             }
