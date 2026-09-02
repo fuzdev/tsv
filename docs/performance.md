@@ -1772,6 +1772,122 @@ a copy trades a call for a *wider but worse* instruction sequence.
   in the ORDER and not in the WORK.** State the invariant it must still satisfy,
   check it, then read the number as a ceiling and nothing else.
 
+### The cheapest measure is one an earlier phase already took
+
+Two sessions made the doc-text width measure about as cheap as a measure gets: a
+word-at-a-time search for the first byte whose width is not one column (§The
+width of a plain ASCII line IS its byte count), reading the host document's
+words so a short span never falls to a scalar tail (§A slice's scan is bounded
+by the slice). Neither asked **who is calling it**.
+
+A census answers that in one line. On a 1,666-file TypeScript corpus, **74% of
+every width measure a format run makes is an identifier NAME** — 483,358 of the
+640,428 `DocArena::source_span` calls, 3,891,770 bytes at a mean of 8.05 — and
+of those, exactly **three** hold a byte at or above `0x80`. An identifier can
+hold no `\t` and no `\n` at all (`IdentifierPart`'s ASCII subset is
+`[A-Za-z0-9_$]`), so for all but three of them **the width IS the byte length**,
+and the search that establishes it finds nothing 99.9994% of the time.
+
+⭐⭐⭐⭐ **And the fact it establishes was computed one phase earlier.**
+`Lexer::scan_identifier_into` walks exactly those bytes: an ASCII fast path over
+`[A-Za-z0-9_$]`, a separate branch for a non-ASCII `IdentifierPart`, another for
+a `\u` escape. *Whether the non-ASCII branch was taken is the answer.* It
+reaches the printer as one `bool` in tail padding `IdentName` and `Identifier`
+both already had (`Expression` stays 72 B), and the printer routes a plain name
+to a `source_span_plain(span)` that takes no `source` at all.
+
+`objdump` prices both sides. `source_span`'s hot path is **71 instructions** for
+a one-word name — prologue 7, span guard 5, four SWAR constants and their setup
+7, the word loop 18, the clamp 4, the allocation 17, epilogue 8 — against about
+**25** with nothing to measure. Times 483,358 names over a 2.24 G-instruction
+pass that predicts **−1.17%** before any build; the printer half measured
+**−1.274%**.
+
+⭐⭐⭐⭐⭐ **Getting the answer from the lexer to the printer is a lever of its
+own, and its shape decided more than the scan did.** The printer half is the
+same in every row below; only the transport differs. Walked as a ladder
+(`rig/ladder.sh`, one binary a side, `instructions:u`, per-side spread ≤0.011%
+on `profile` and 0.000% on `json_profile`, the parse-only entry point):
+
+| transport | `profile tsbig` | `sveltebig` | `cssbig` | `json_profile tsbig` | `.text` |
+| --- | --- | --- | --- | --- | --- |
+| a per-identifier `bool`, snapshotted at every `advance` — plumbing only, printer untouched | +0.358% | +0.218% | −0.004% | +0.567% | +1,136 |
+| the same, plus the plain path | −0.916% | −0.555% | +0.000% | +0.567% | +6,400 |
+| the `bool` saved only where a lookahead clobbers it | −0.980% | −0.581% | −0.000% | +0.472% | +6,352 |
+| **the START of the last two NON-plain identifiers, written on the cold branches only** | **−1.327%** | **−0.790%** | +0.004% | **−0.040%** | +6,304 |
+
+The first three rows carry the bit forward as a *flag per identifier*: the lexer
+seeds it from the start char, keeps it live across the scan loop (a spill and a
+reload), stores it, and the parser copies it past its one-token lookahead. The
+parse path — `tsv parse`, `@fuzdev/tsv_parse_wasm`, the `parse/typescript` bench
+rows — runs all of that and never builds a name doc, so it paid **+0.47%** for
+nothing; attributed by deleting one piece at a time on `json_profile`, the
+lexer's write was 0.091 points, the save-slot write 0.019, the parser's
+`peek`-guarded read 0.189 (a four-instruction branchless select for the guard
+alone), and the third field written and copied through `IdentName` and
+`Identifier` 0.173. No piece dominated. **What retired all of them was keying
+the rare event instead of the common one**: the lexer records the start offset
+of an identifier only on the two branches that consume a non-ASCII char — three
+tokens in 483,358 on a real corpus — and the parser asks *"is `current.start`
+one of those?"* The hot path of the scan carries nothing, nothing is snapshotted,
+and the read is five branchless instructions. Two offsets rather than one,
+because the lexer is exactly one token ahead of the parser's `current` (a
+one-token peek, no rewind; every relex re-seats at a non-identifier token) and
+that one token may itself be non-plain — it takes the newer slot and the current
+name survives in the older. The shape is exact, not a hint: a recorded offset
+names bytes whose scan saw a non-ASCII char, and the same bytes scan the same
+way under any tokenization.
+
+That last row is also *below* the baseline on the parse path, not merely back
+at it: the shrunken name constructor inlines at 17 more call sites than it did
+before, which pays for the field writes with room to spare. A transport is a
+lever with its own entry point, its own attribution ladder, and its own
+verdict.
+
+⚠️⚠️ **The cost half and the gain half of a transport land on different entry
+points, and the two standard confinement controls sit on the wrong one.**
+`profile --bind` and `json_profile` both run the parser and never build a name
+doc, so each read the plumbing's cost for the candidate *and* for the
+plumbing-only rung alike — correcting a format verdict against either would
+subtract a real cost. The only neutral control here is `cssbig`, and it is
+neutral by census (**0** name spans *and* **0** parser advances), not by
+argument. What those two *can* do is price what they cannot null, and
+`json_profile` — at a 0.000% per-side spread — is the channel on which a
+transport's rungs resolve to 0.02 of a point.
+
+⚠️ **The attribute went the opposite way from the previous session's**, on a
+function one call away from it, and it was re-measured on the shipped
+transport rather than inherited from the one it was first read on. Pinning
+`source_span_plain` out of line **costs 0.240 points** and saves 4,240 B, where
+pinning `source_span` out of line had *gained* 0.126. A clamp plus an
+allocation is small enough that inlining it into the name seam deletes a call
+483,358 times a pass. `source_span`'s own pin is now inert — it lost 75% of its
+call sites and LLVM outlines the remainder unprompted, byte-identically — and is
+kept as a pin against the split it once prevented, not as a win. **Re-measure
+an attribute on the shape that ships; never inherit one from the sibling the
+last session tuned, or from the rung it was first read on.**
+
+⚠️⚠️ **A wrong bit is a silent width error in both directions**, so the seam
+asserts both. Over-claiming measures a non-ASCII name as one column a byte,
+moving a fits verdict and nothing else. Under-claiming is byte-identical and
+merely slow — which is how a plumbing site that stopped being reached would go
+unnoticed indefinitely. `debug_assert_eq!` at `ident_name_doc` grades the flag
+against the name's own bytes on every name in every fixture, and
+`tests/ident_name_plain_ascii.rs` drives it over what no corpus holds: non-ASCII
+names at every length and alignment, escaped names, names read through a
+lookahead, and two non-ASCII names lexed back to back in every adjacent-token
+shape the grammar allows — the case the second slot exists for, and the case
+that fails the moment the second slot is removed. Three names in 483,358 is all
+a real corpus offers.
+
+⚠️ **What it costs now.** The parse path pays nothing (`json_profile` −0.040%
+on the TypeScript corpus, −0.009% on the Svelte one, 0.000% spread). `.text`
+grows 6,304 B; the WASM bundles grow 0.09% (format +2,126 B, parse +898 B, all
++2,243 B); and two of fifteen recursion-depth shapes lose ~1.5% of their maximum
+nesting (`parens` 37,329 → 36,674, `array_literal` 28,636 → 28,249 — the wider
+`Identifier` frame, the same two shapes the flag transport moved), both still
+tens of thousands of levels deep.
+
 ### A slice's scan is bounded by the slice; a SPAN's is not
 
 Making the width measure a search (§The width of a plain ASCII line IS its byte

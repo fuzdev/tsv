@@ -1237,6 +1237,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let parameter = Identifier {
             escaped_name: param_name.escaped,
             name_len: param_name.raw_len,
+            name_plain_ascii: param_name.plain_ascii,
             optional: false,
             extra,
             span: Span::new(id_start as u32, param_end as u32),

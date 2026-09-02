@@ -216,6 +216,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         IdentName {
                             escaped: None,
                             raw_len: 0,
+                            // An empty name holds no byte, width-relevant or not.
+                            plain_ascii: true,
                         },
                         Span::new(start as u32, start as u32),
                     )

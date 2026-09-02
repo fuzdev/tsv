@@ -284,6 +284,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Expression::Identifier(Identifier {
                 escaped_name: name.escaped,
                 name_len: name.raw_len,
+                name_plain_ascii: name.plain_ascii,
                 optional: false,
                 extra,
                 span: Span::new(start as u32, id_end as u32),

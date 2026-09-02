@@ -915,6 +915,7 @@ mod tests {
         let ident_name = IdentName {
             escaped: Some(name),
             raw_len: 0,
+            plain_ascii: false,
         };
         Expression::Identifier(Identifier::simple(ident_name, Span::new(0, len)))
     }
@@ -929,6 +930,7 @@ mod tests {
         let prop_name = IdentName {
             escaped: Some(property_name),
             raw_len: 0,
+            plain_ascii: false,
         };
         let property_start = object_end + 1; // after the dot
         let span_end = property_start + property_name.len() as u32;
@@ -1121,6 +1123,7 @@ mod tests {
         let ident_name = IdentName {
             escaped: Some(name),
             raw_len: 0,
+            plain_ascii: false,
         };
         ChainNode::member(ident_name, false, object_end, property_start)
     }
