@@ -891,7 +891,8 @@ census the fast path's hit rate in the consumer that lacks it before porting.**
 `printing::optimal_string_quote` is `pub` for exactly one pattern, stated in its own
 doc — a caller can ask whether `format_string_literal` would change the quote and,
 when it would not, emit the verbatim source literal with no allocation.
-`tsv_ts::format_string_literal_from_ast` does that and returns `Cow::Borrowed`;
+`tsv_ts` does that (through the document-and-span form,
+`optimal_string_quote_in`, which answers the width question from the same pass);
 `tsv_css` never did, and seven of its sites allocate a `String` per string literal.
 That is this section's shape exactly, and it is not a lever: `format_string_literal`
 runs **4,299 times a pass** on a 638-file CSS corpus and only **294 (6.8%)** preserve
@@ -2171,6 +2172,47 @@ costs anyway. A vector register moved four bytes at a time.
 - ✓ **The counting arm keeps its sums** (it is 0.6% of calls) and is
   `#[cold] #[inline(never)]`, so the vectorized body stops being inlined into every
   string-literal site.
+
+### A "skip the measure" lever is worth what the PASS costs, not what the CALL costs
+
+The doc-text width policy measures every span at build (`DocArena::source_span`), and a
+caller that can PROVE its span is one column a byte skips it entirely
+(`source_span_plain`). String literals printed between the quotes they were written with
+are 54.0% of the width measures a TypeScript format run makes outside identifier names —
+84,771 of 157,073 on a 1,666-file corpus, 1.65 MB — so "let them skip it" reads like the
+whole lever. Decomposed, it is not:
+
+| rung | `instructions:u` |
+| --- | --- |
+| strings skip the measure, proving it with a SEPARATE width scan | **−0.021%** |
+| strings skip it, the proof taken from the quote scan they already run | **−0.294%** |
+
+⭐⭐⭐⭐⭐ **The skip is worth 0.021 points; deleting the second PASS is worth 0.273.** A
+proof obtained by scanning is not a saving — it re-runs the work it licenses skipping, and
+all that is left is one outlined call. What pays is that the quote choice already reads
+every content byte looking for a `'`, and whether that pass saw a `\t`, a raw line
+terminator or a byte at or above `0x80` **is** the width answer. Widening its word test by
+one `zero_or_high_lanes` (the `'` needle already flags every non-ASCII byte, so the wider
+question is nearly free) answers both in one pass.
+
+- ⭐⭐⭐⭐ **Ask which phase the earlier walk is in, because that is what the answer's
+  TRANSPORT costs.** The identifier-name form of this lever takes its proof from the
+  lexer, a phase earlier, and the plumbing to carry it measured **+0.358%** of a format
+  run on its own — a third of the gain, and a cost the parse path paid for nothing until
+  the transport was re-keyed on the rare event. Here the earlier walk is in the same
+  phase, so the transport is a return value, `tsv parse` reads an exact **−0.000%**, and
+  the whole gain survives.
+- ⭐⭐⭐ **A caller that needs no walk at all is a separate, smaller rung.** A numeric
+  literal is plain ASCII by grammar, so it claims without any scan or transport: 22.0% of
+  the same population, worth **−0.079%**, which is `source_span`'s call overhead alone
+  over spans of mean 1.5 bytes. It rides along; it does not explain the string number.
+- ⚠️ **The claim is unobservable in both directions, so the seam asserts it both ways.**
+  Over-claiming measures a tabbed or non-ASCII literal as one column a byte — a moved
+  fits verdict and nothing else. Under-claiming is byte-identical and merely slow, which
+  is how a seam that stopped being reached would go unnoticed. A mutation ledger over the
+  class's three needles and both directions of the claim is 6/6 caught, but only after a
+  generated differential was added: **no fixture holds a tab inside a string literal**, so
+  dropping that needle was caught by nothing else.
 
 ### `str::find(char)` is a CALL to a searcher that then calls `memchr`
 
