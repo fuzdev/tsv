@@ -1867,11 +1867,16 @@ impl<'a> Printer<'a> {
     }
 
     /// Emit an identifier-name doc node — the doc-side name-emission seam.
-    /// Span-identity names render as verbatim source (`DocText::SourceSpan`,
-    /// width measured at build like every other doc text — the deferral names
-    /// once had cost more than it saved, see `DocArena::source_span`); the rare
-    /// escaped name copies its decoded `&str` into the doc text pool
-    /// (`DocText::Pooled`).
+    /// Span-identity names render as verbatim source (`DocText::SourceSpan`, width
+    /// resolved at build like every other doc text — the deferral names once had cost
+    /// more than it saved, see `DocArena::source_span`); the rare escaped name copies
+    /// its decoded `&str` into the doc text pool (`DocText::Pooled`).
+    ///
+    /// ⭐ **A plain-ASCII name is not measured at all.** Its width IS its byte length,
+    /// which the lexer already established (`IdentName::plain_ascii`), so it goes to
+    /// `DocArena::source_span_plain` — and that is the majority of every width call a
+    /// format run makes, not a corner: 483,358 of 640,428 on a 1,666-file TypeScript
+    /// corpus, three of which hold a non-ASCII byte.
     pub(in crate::printer) fn ident_name_doc(
         &self,
         name: internal::IdentName<'_>,
@@ -1880,10 +1885,26 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match name.escaped {
             Some(s) => d.text_pooled(s),
-            None => d.source_span(
-                Span::new(name_start, name_start + name.raw_len as u32),
-                self.source,
-            ),
+            None => {
+                let span = Span::new(name_start, name_start + name.raw_len as u32);
+                // Graded BOTH ways on every name in every debug build, because both
+                // directions are load-bearing and neither is visible in the output:
+                // over-claiming is a silent width error, and under-claiming silently
+                // retires the lever the flag exists for.
+                debug_assert_eq!(
+                    name.plain_ascii,
+                    !span
+                        .extract(self.source)
+                        .bytes()
+                        .any(printing::is_width_relevant),
+                    "`IdentName::plain_ascii` disagrees with the name's own bytes"
+                );
+                if name.plain_ascii {
+                    d.source_span_plain(span)
+                } else {
+                    d.source_span(span, self.source)
+                }
+            }
         }
     }
 

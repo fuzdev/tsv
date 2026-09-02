@@ -1264,6 +1264,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(Expression::Identifier(Identifier {
             escaped_name: name.escaped,
             name_len: name.raw_len,
+            name_plain_ascii: name.plain_ascii,
             optional,
             extra,
             span: Span::new(id_start as u32, end),

@@ -605,6 +605,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.current_decoded
     }
 
+    /// Whether the current token's raw bytes are plain one-column ASCII. Asked of the
+    /// lexer by the token's start offset: the lexer keeps the starts of the last two
+    /// NON-plain identifier tokens, which is enough because it is never more than the
+    /// one `peek` token ahead of `current` — so nothing is snapshotted at `advance` and
+    /// nothing is saved when the peek is filled (see `Lexer::nonplain_ident_starts`).
+    #[inline]
+    fn current_name_plain_ascii(&self) -> bool {
+        self.lexer.ident_is_plain_ascii(self.current.start)
+    }
+
     /// The current identifier token's name channel — the canonical identifier
     /// name constructor. Span-identity (`escaped: None`, name = the raw token
     /// bytes) unless the token carries a decoded unicode escape
@@ -615,6 +625,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             IdentName {
                 escaped: Some(decoded),
                 raw_len: 0,
+                plain_ascii: false,
             }
         } else {
             self.current_raw_ident_name()
@@ -636,11 +647,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             IdentName {
                 escaped: Some(self.arena.alloc_str(value)),
                 raw_len: 0,
+                plain_ascii: false,
             }
         } else {
             IdentName {
                 escaped: None,
                 raw_len: len as u16,
+                plain_ascii: self.current_name_plain_ascii(),
             }
         }
     }

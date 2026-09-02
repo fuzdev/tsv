@@ -38,6 +38,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut param = Expression::Identifier(Identifier {
             escaped_name: name.escaped,
             name_len: name.raw_len,
+            name_plain_ascii: name.plain_ascii,
             optional,
             extra,
             span: Span::new(param_start as u32, id_end as u32),

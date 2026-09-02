@@ -710,6 +710,7 @@ impl<'a> Printer<'a> {
         let mut default_name = internal::IdentName {
             escaped: None,
             raw_len: 0,
+            plain_ascii: true,
         };
         let mut default_name_start = 0u32;
         let mut default_spec_start = 0u32;

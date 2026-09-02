@@ -282,17 +282,39 @@ impl<'arena> Literal<'arena> {
 pub struct IdentName<'arena> {
     pub escaped: Option<&'arena str>,
     pub raw_len: u16,
+    /// Whether the raw name is **plain one-column ASCII** — no byte at or above
+    /// `0x80`. Answered by the lexer, which walked those bytes anyway and records the
+    /// rare tokens that are NOT plain (`Lexer::nonplain_ident_starts`); the parser asks
+    /// it by the token's start offset. Like `raw_len`, it describes the *source slice*,
+    /// so it is meaningless (and unread) when `escaped` is `Some`; those sites write
+    /// `false` the way they write `raw_len: 0`.
+    ///
+    /// The claim it licenses: an identifier can hold no `\t` and no `\n`
+    /// (`IdentifierPart`'s ASCII subset is `[A-Za-z0-9_$]`), so a plain-ASCII name's
+    /// **visual width IS `raw_len`** and the printer's width scan has nothing to find
+    /// — see `DocArena::source_span_plain`. `false` is always safe: it costs the scan,
+    /// never a wrong width, so a site that cannot prove the property says `false`.
+    pub plain_ascii: bool,
 }
 
 impl<'arena> IdentName<'arena> {
     /// A verbatim name covering `span` exactly (keyword/synthetic sites where
     /// the token has already been consumed — the span is the name token).
+    ///
+    /// ⚠️ **`plain_ascii` is `true`, and that is a CONTRACT on the caller**: this
+    /// constructor is handed a span, not the bytes under it, so the span must cover a
+    /// reserved or contextual keyword — ASCII by the grammar. Every caller today is one
+    /// of the two meta-properties (`new.target`, `import.meta`). A caller whose span is
+    /// an arbitrary name must build the channel from the token instead
+    /// (`Parser::current_raw_ident_name`); the printer's name seam asserts the property
+    /// in debug builds, so a violation fails the suite rather than shifting a width.
     #[inline]
     pub fn from_span(span: Span) -> Self {
         debug_assert!(u16::try_from(span.end - span.start).is_ok());
         Self {
             escaped: None,
             raw_len: (span.end - span.start) as u16,
+            plain_ascii: true,
         }
     }
 
@@ -326,6 +348,10 @@ pub struct Identifier<'arena> {
     /// The [`IdentName`] channel's `raw_len`: the raw name-token byte length
     /// (the node span may extend past the name — `?` / `!` / `: Type`).
     pub name_len: u16,
+    /// The [`IdentName`] channel's `plain_ascii` — see it for what the flag claims and
+    /// who spends it. Flattened beside `name_len` for the same reason `escaped_name`
+    /// is, and free: it sits in tail padding the struct already had.
+    pub name_plain_ascii: bool,
     /// Whether this is an optional parameter (e.g., `a?` in `function fn(a?: number) {}`)
     pub optional: bool,
     /// Binding-only state (type annotation + parameter decorators), present only
@@ -368,6 +394,7 @@ impl<'arena> Identifier<'arena> {
         IdentName {
             escaped: self.escaped_name,
             raw_len: self.name_len,
+            plain_ascii: self.name_plain_ascii,
         }
     }
 
@@ -400,6 +427,7 @@ impl<'arena> Identifier<'arena> {
         Self {
             escaped_name: name.escaped,
             name_len: name.raw_len,
+            name_plain_ascii: name.plain_ascii,
             optional: false,
             extra: None,
             span,

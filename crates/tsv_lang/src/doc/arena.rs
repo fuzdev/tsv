@@ -1721,26 +1721,53 @@ impl DocArena {
     /// eager width-cache policy on [`pooled_text_width`] for why the deferral
     /// they once had is gone.
     ///
-    /// ⚠️ **`#[inline(never)]` here is a MEASURED choice, and it is the choice LLVM
-    /// made on its own for years** — at this call-site count it declined `#[inline]`
-    /// and emitted a real symbol (2.3% self on a fuz_app board), so a name emission —
-    /// ~15% of all doc nodes — has always paid a call. What changed is that
-    /// [`source_span_width`]'s body is small enough to tempt LLVM into the *opposite*
-    /// split: inline this and outline the width. That split costs **+0.301%** of a
-    /// TypeScript format run, so the attribute pins the old shape — one outlined
-    /// function per emission, measure and allocation together — and pinning it is worth
-    /// **0.126 points** and **−12,352 B** of `.text` against letting LLVM choose.
+    /// ⚠️ **`#[inline(never)]` here is a PIN, and on the current shape it is inert** —
+    /// removing it produces a byte-identical `.text` and an identical instruction
+    /// count. It is kept because LLVM has chosen differently before: when
+    /// [`source_span_width`]'s body first shrank, LLVM inlined this function into its
+    /// then ~50 callers and outlined the width instead, and that split cost **+0.301%**
+    /// of a TypeScript format run; the attribute was worth 0.126 points and −12,352 B
+    /// of `.text` against it at the time. Since then the identifier-name population —
+    /// three quarters of the calls — moved to [`Self::source_span_plain`], and with the
+    /// remaining call sites LLVM outlines this function unprompted. The pin costs nothing
+    /// now and holds the shape if a later change re-tempts the other split; re-measure
+    /// it, never assume it (an attribute is a rung, not a polish step).
     ///
-    /// ⚠️ Two shapes that would remove the call itself were measured and are still not
-    /// taken: `#[inline(always)]` here recovered `instructions:u` −1.20% → −1.51% for
-    /// **+7,264 B** of `.text` (perf's own inline threshold is a U-curve this codebase
-    /// already sits at the minimum of, so pushing it up is a cycles risk), and a second
-    /// entry point with a **duplicated** body reached −1.45% for +336 B but splits one
-    /// width computation across two sites that nothing keeps in agreement. A
-    /// profile-guided build makes this choice per call site without either cost.
+    /// ⚠️ Two shapes that would remove the call itself were measured on the pre-plain
+    /// call population and are still not taken: `#[inline(always)]` here recovered
+    /// `instructions:u` −1.20% → −1.51% for **+7,264 B** of `.text` (perf's own inline
+    /// threshold is a U-curve this codebase already sits at the minimum of, so pushing
+    /// it up is a cycles risk), and a second entry point with a **duplicated** body
+    /// reached −1.45% for +336 B but splits one width computation across two sites that
+    /// nothing keeps in agreement. A profile-guided build makes this choice per call
+    /// site without either cost.
     #[inline(never)]
     pub fn source_span(&self, span: Span, source: &str) -> DocId {
         let w = source_span_width(span, source);
+        self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
+    }
+
+    /// [`Self::source_span`] for a span the caller has already PROVED holds no byte
+    /// the width depends on — no `\t`, no `\n`, nothing at or above `0x80` — so its
+    /// visual width IS its byte length and there is nothing to measure. Renders
+    /// byte-identically to [`Self::source_span`]; it takes no `source` at all, which
+    /// is the contract stated in the signature.
+    ///
+    /// ⭐ **The caller this exists for is the identifier name**, and it is the single
+    /// largest population of width measures a format run makes: 483,358 of the 640,428
+    /// source-span widths on a 1,666-file TypeScript corpus (74% of every width call,
+    /// mean 8.05 bytes), of which **three** hold a non-ASCII byte. The proof is not a
+    /// scan but a fact the lexer already had: `IdentifierPart`'s ASCII subset is
+    /// `[A-Za-z0-9_$]`, so a name that took no non-ASCII branch is one column a byte
+    /// and can hold no line terminator or tab — see `IdentName::plain_ascii`.
+    ///
+    /// ⚠️ **A wrong claim here is a SILENT width error.** Nothing downstream re-derives
+    /// the width, so an over-claiming caller shifts a fits verdict and changes no other
+    /// observable — invisible to a byte-identity sweep on any corpus whose names are
+    /// ASCII, which is every corpus. The seam that calls this asserts the property in
+    /// debug builds; keep that assert wherever a new caller appears.
+    pub fn source_span_plain(&self, span: Span) -> DocId {
+        let w = clamp_text_width((span.end - span.start) as usize);
         self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
     }
 
@@ -3896,7 +3923,7 @@ mod pooled_text_width_tests {
 /// byte at every distance past the span's end, at every alignment of the span's start.
 #[cfg(test)]
 mod source_span_width_tests {
-    use super::{pooled_text_width, source_span_width};
+    use super::{clamp_text_width, pooled_text_width, source_span_width};
     use crate::span::Span;
 
     /// One representative per arm of the class, plus two bytes adjacent to the needles
@@ -3933,6 +3960,72 @@ mod source_span_width_tests {
                             "c".repeat(9),
                         );
                         assert_agrees(&host, align, align + len);
+                    }
+                }
+            }
+        }
+    }
+
+    /// [`DocArena::source_span_plain`] does not measure at all, so its claim is an
+    /// EQUATION and this is where it is checked: wherever the span holds no
+    /// width-relevant byte, the measured width and the clamped byte length must be the
+    /// same number. Walked at every length and every start alignment, with a class byte
+    /// on each side of the span so the equation is not read off an all-`x` document.
+    #[test]
+    fn the_plain_width_equals_the_measured_one_wherever_the_claim_holds() {
+        for special in SPECIALS {
+            for align in 0..9usize {
+                for len in 0..=17usize {
+                    let host = format!(
+                        "{special}{}{}{}{special}",
+                        "a".repeat(align),
+                        "x".repeat(len),
+                        "c".repeat(9),
+                    );
+                    let start = special.len() + align;
+                    let span = Span::new(start as u32, (start + len) as u32);
+                    assert_eq!(
+                        source_span_width(span, &host),
+                        clamp_text_width(len),
+                        "the plain width disagrees with the measured one on {:?}",
+                        &host[start..start + len],
+                    );
+                }
+            }
+        }
+    }
+
+    /// The mirror, and the one that makes the equation above a TEST rather than a
+    /// tautology: with a class byte inside the span the two answers must DIFFER, so a
+    /// caller that claims `plain_ascii` over such a span is claiming something false.
+    ///
+    /// Restricted to the members of the class — [`SPECIALS`] deliberately also carries
+    /// two neighbours in value order (`0x0b`, `0x7f`) that are one column each, and a
+    /// span holding one of those really does measure its own length.
+    #[test]
+    fn the_plain_width_differs_wherever_the_claim_fails() {
+        for special in SPECIALS {
+            if !special.bytes().any(crate::printing::is_width_relevant) {
+                continue;
+            }
+            for align in 0..9usize {
+                for len in 1..=17usize {
+                    for at in 0..len {
+                        let host = format!(
+                            "{}{}{special}{}{}",
+                            "a".repeat(align),
+                            "x".repeat(at),
+                            "y".repeat(len - 1 - at),
+                            "zzzzzzzzzzzz",
+                        );
+                        let end = align + at + special.len() + (len - 1 - at);
+                        let span = Span::new(align as u32, end as u32);
+                        assert_ne!(
+                            source_span_width(span, &host),
+                            clamp_text_width(end - align),
+                            "the plain width would have been right on {:?}",
+                            &host[align..end],
+                        );
                     }
                 }
             }

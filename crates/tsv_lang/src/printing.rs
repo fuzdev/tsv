@@ -932,8 +932,12 @@ pub fn next_lf(bytes: &[u8], from: usize) -> usize {
 /// One spelling, because the word loop and its scalar tail reach the same class by
 /// different routes — and a scan whose tail disagrees with its word loop by one arm is
 /// the bug no corpus finds: the tail runs only over a slice's last seven bytes.
+///
+/// Public for the same reason: a caller that SKIPS the scan (see
+/// [`crate::doc::arena::DocArena::source_span_plain`]) owes a debug-build assertion that its
+/// claim holds, and that assertion must ask this class rather than restate it.
 #[inline]
-const fn is_width_relevant(b: u8) -> bool {
+pub const fn is_width_relevant(b: u8) -> bool {
     b == b'\n' || b == b'\t' || b >= 0x80
 }
 
