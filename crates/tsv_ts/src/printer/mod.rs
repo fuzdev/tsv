@@ -79,7 +79,8 @@ use tsv_lang::{
         self,
         arena::{DocArena, DocId},
     },
-    has_comments_to_emit_in_range, has_line_comments_in_range, printing,
+    has_comments_to_emit_in_range, has_line_comments_in_range,
+    printing::{self, LineTable},
     source_scan::{
         OperandAnchor, PAREN_HOP_NEEDLES, TriviaProfile, has_newline_before_position,
         is_hop_needle, skip_regex_literal, skip_trivia,
@@ -147,6 +148,7 @@ pub(crate) enum ArrowChainContext {
 }
 
 /// Printer state for building output
+#[allow(clippy::struct_excessive_bools)] // independent document-level facts, each read on its own seam
 pub struct Printer<'a> {
     /// Output buffer
     buffer: OutputBuffer,
@@ -189,14 +191,14 @@ pub struct Printer<'a> {
     /// being followed by a break and the next token is glued onto its line,
     /// swallowing content. The name is qualified precisely so the choice has to
     /// be conscious at every call site.
-    pub(crate) layout_line_breaks: &'a [u32],
+    pub(crate) layout_line_breaks: LineTable<'a>,
     /// Line breaks used exclusively for *comment* position classification
     /// (`is_same_line`, `classify_comment_fast`, `PartitionedComments`), kept
     /// real even in the canonical path so a comment's trailing/leading/own-line
     /// role stays correct and consecutive line comments never merge onto one
     /// output line. In the normal path this is the same table as
     /// `layout_line_breaks`; they diverge only under [`Self::set_canonical`].
-    pub(crate) comment_line_breaks: &'a [u32],
+    pub(crate) comment_line_breaks: LineTable<'a>,
     /// Whether this printer is producing the intent-erased *canonical* reprint
     /// (see [`crate::format_canonical`]).
     ///
@@ -517,11 +519,11 @@ impl<'a> Printer<'a> {
             comments: inputs.comments,
             has_owned_comments: inputs.has_owned_comments,
             has_format_ignore: inputs.has_format_ignore,
-            layout_line_breaks: inputs.line_breaks,
+            layout_line_breaks: inputs.line_table,
             // Normal path: comment classification shares the one real table. The
             // canonical path re-points `layout_line_breaks` at an empty table but
             // leaves this one real (see `set_canonical`).
-            comment_line_breaks: inputs.line_breaks,
+            comment_line_breaks: inputs.line_table,
             canonical: false,
             declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
@@ -708,14 +710,25 @@ impl<'a> Printer<'a> {
         printing::visual_width(&self.source[line_start..pos], TAB_WIDTH)
     }
 
-    /// Check if two positions are on the same line (O(log n) binary search).
+    /// Check if two positions are on the same line.
     ///
     /// Reads `comment_line_breaks` (not `line_breaks`) so comment position
     /// classification stays correct even when the canonical path has emptied the
     /// layout table. In the normal path the two tables are identical.
+    ///
+    /// Answered by a bounded scan of the source bytes with the table's binary search
+    /// as the fallback (`printing::is_same_line_scan`, gated on the table's `lf_only`
+    /// verdict): the first `\n` after `prev_end` is nearly always the
+    /// end of the line the question was asked on, a handful of bytes away, where the
+    /// search is `log2(lines)` dependent steps.
     #[inline]
     pub(crate) fn is_same_line(&self, prev_end: u32, curr_start: u32) -> bool {
-        printing::is_same_line_fast(self.comment_line_breaks, prev_end, curr_start)
+        printing::is_same_line_scan(
+            self.source.as_bytes(),
+            self.comment_line_breaks,
+            prev_end,
+            curr_start,
+        )
     }
 
     /// Switch this printer into the intent-erased *canonical* reprint mode.
@@ -743,26 +756,40 @@ impl<'a> Printer<'a> {
     /// table and it is handled; scan the source directly and you must gate it.
     pub(crate) fn set_canonical(&mut self) {
         self.canonical = true;
-        // `&[]` is `&'static`, which coerces to the field's `'a`.
-        self.layout_line_breaks = &[];
+        // `LineTable::EMPTY` is `'static`, which coerces to the field's `'a`; the scan
+        // forms treat an empty table as authoritative under either verdict.
+        self.layout_line_breaks = LineTable::EMPTY;
     }
 
-    /// Check if there's a blank line (2+ newlines) between two positions (O(log n) binary search)
+    /// Check if there's a blank line (2+ newlines) between two positions.
     ///
-    /// A *layout* read: erased in the canonical reprint (see [`Self::set_canonical`]).
+    /// A *layout* read: erased in the canonical reprint (see [`Self::set_canonical`]) —
+    /// the scan form honors the emptied table (an empty table is authoritative), so
+    /// routing through it keeps the erasure. See [`Self::is_same_line`] for the shape.
     #[inline]
     pub(crate) fn has_blank_line_between(&self, prev_end: u32, curr_start: u32) -> bool {
-        printing::has_blank_line_between_fast(self.layout_line_breaks, prev_end, curr_start)
+        printing::has_blank_line_between_scan(
+            self.source.as_bytes(),
+            self.layout_line_breaks,
+            prev_end,
+            curr_start,
+        )
     }
 
-    /// Check if there's any newline between two positions (O(log n) binary search)
+    /// Check if there's any newline between two positions.
     ///
-    /// A *layout* read: erased in the canonical reprint (see [`Self::set_canonical`]).
-    /// For comment adjacency use [`Self::comment_has_newline_between`] instead —
-    /// this one reports "no newline" for everything under `set_canonical`.
+    /// A *layout* read: erased in the canonical reprint (see [`Self::set_canonical`];
+    /// the scan form honors the emptied table). For comment adjacency use
+    /// [`Self::comment_has_newline_between`] instead — this one reports "no newline"
+    /// for everything under `set_canonical`. See [`Self::is_same_line`] for the shape.
     #[inline]
     pub(crate) fn has_newline_between(&self, start: u32, end: u32) -> bool {
-        printing::has_newline_between_fast(self.layout_line_breaks, start, end)
+        printing::has_newline_between_scan(
+            self.source.as_bytes(),
+            self.layout_line_breaks,
+            start,
+            end,
+        )
     }
 
     /// [`Self::has_newline_between`] against the *comment* line-break table.
@@ -776,7 +803,12 @@ impl<'a> Printer<'a> {
     /// to `has_newline_between` there.
     #[inline]
     pub(crate) fn comment_has_newline_between(&self, start: u32, end: u32) -> bool {
-        printing::has_newline_between_fast(self.comment_line_breaks, start, end)
+        printing::has_newline_between_scan(
+            self.source.as_bytes(),
+            self.comment_line_breaks,
+            start,
+            end,
+        )
     }
 
     /// Wrap content and closing line with declaration indent depth handling

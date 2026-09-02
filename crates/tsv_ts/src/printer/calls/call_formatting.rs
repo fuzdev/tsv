@@ -578,7 +578,7 @@ fn try_single_arg_comment_paths(
             .any(|c| {
                 !c.is_block
                     || !tsv_lang::printing::is_same_line_fast(
-                        printer.comment_line_breaks,
+                        printer.comment_line_breaks.breaks,
                         arg_end,
                         c.span.start,
                     )
@@ -607,7 +607,7 @@ fn try_single_arg_comment_paths(
         // §Comment relocation (Call open paren `(`).
         let gap_pc = PartitionedComments::new(
             printer.comments,
-            printer.comment_line_breaks,
+            printer.comment_line_breaks.breaks,
             paren_open,
             arg_start,
         );
@@ -983,7 +983,7 @@ fn build_call_with_arg_comments(
             .any(|c| {
                 c.is_block
                     && !tsv_lang::printing::is_same_line_fast(
-                        printer.comment_line_breaks,
+                        printer.comment_line_breaks.breaks,
                         search_start,
                         c.span.start,
                     )
@@ -1018,7 +1018,7 @@ fn build_call_with_arg_comments(
 
             let gap_pc = PartitionedComments::new(
                 printer.comments,
-                printer.comment_line_breaks,
+                printer.comment_line_breaks.breaks,
                 paren_open,
                 first_arg_start,
             );

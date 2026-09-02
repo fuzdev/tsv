@@ -575,7 +575,7 @@ impl<'a> Printer<'a> {
             // read off `paren_line` afterwards, since the join is chosen before the build.
             let paren_line_run = PartitionedComments::new(
                 self.comments,
-                self.comment_line_breaks,
+                self.comment_line_breaks.breaks,
                 paren_open,
                 new_expr.arguments[0].span().start,
             )
@@ -649,7 +649,7 @@ impl<'a> Printer<'a> {
             let first_arg_start = new_expr.arguments[0].span().start;
             let gap_pc = PartitionedComments::new(
                 self.comments,
-                self.comment_line_breaks,
+                self.comment_line_breaks.breaks,
                 paren_open,
                 first_arg_start,
             );

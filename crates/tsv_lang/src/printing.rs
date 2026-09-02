@@ -738,6 +738,287 @@ pub fn has_newline_between_fast(line_breaks: &[u32], start: u32, end: u32) -> bo
     line_breaks.get(idx).is_some_and(|&pos| pos < end)
 }
 
+/// A document's line-break table paired with its builder's verdict on it, so the two
+/// cannot drift apart across the printers that carry them.
+///
+/// `breaks` is one entry per line terminator's LAST byte ([`build_line_breaks_into`]);
+/// `lf_only` says every recorded byte is a `\n`, under which the table IS the set of `\n`
+/// positions and the scan forms of the three line questions ([`is_same_line_scan`] and
+/// siblings) may read the bytes instead of searching it. [`LineTable::EMPTY`] is the
+/// canonical reprint's erased layout table: an empty table is authoritative under either
+/// verdict (no terminator anywhere), which is what lets the erasure ride through the scan
+/// forms untouched.
+#[derive(Clone, Copy, Debug)]
+pub struct LineTable<'a> {
+    pub breaks: &'a [u32],
+    pub lf_only: bool,
+}
+
+impl LineTable<'_> {
+    /// No line breaks at all — the erased layout table, and a one-line document's.
+    pub const EMPTY: LineTable<'static> = LineTable {
+        breaks: &[],
+        lf_only: true,
+    };
+}
+
+//
+// The same three questions answered by a bounded SCAN of the source, with the table
+// as the fallback
+//
+
+/// How many bytes past `prev_end` the scan forms of the three line questions walk before
+/// handing the question to the table.
+///
+/// The table's binary search is `log2(lines)` dependent load-and-select steps — seven to
+/// eleven on real files — and the printers ask it ~400,000 times per 12 MB of TypeScript.
+/// The first terminator after `prev_end` is nearly always the end of the line the
+/// question was asked on: a census over that corpus puts the bytes a forward scan reads
+/// at a mean of **5.5** for `is_same_line` (82.7% within eight, 99.7% within 64), 2.6 for
+/// the blank-line check and 3.2 for the newline check — one host word answers almost every
+/// ask. Sixty-four keeps a pathological line (a minified document) from turning each ask
+/// into a walk of the whole line: past the cap the search runs exactly as before.
+const LINE_SCAN_CAP: usize = 64;
+
+/// [`next_lf_in`]'s and [`next_lf`]'s lane test and the byte compare their scalar tails run
+/// must agree on every byte value — proved here rather than trusted (a uniform word cannot
+/// borrow across lanes unless it is itself a match, so `hits != 0` is exactly the byte test).
+const _: () = {
+    let mut b = 0u16;
+    while b < 256 {
+        let byte = b as u8;
+        let hits = zero_lanes(u64::from_le_bytes([byte; 8]) ^ splat(b'\n'));
+        assert!((hits != 0) == (byte == b'\n'));
+        b += 1;
+    }
+};
+
+#[inline]
+fn next_lf_in(bytes: &[u8], from: usize, end: usize) -> usize {
+    debug_assert!(from <= end && end <= bytes.len());
+    let mut i = from;
+    while i < end {
+        let Some(chunk) = bytes[i..].first_chunk::<8>() else {
+            // Within eight bytes of the HOST's end — the one place no word is readable.
+            while i < end && bytes[i] != b'\n' {
+                i += 1;
+            }
+            return i;
+        };
+        let hits = zero_lanes(u64::from_le_bytes(*chunk) ^ splat(b'\n'));
+        if hits != 0 {
+            let at = i + (hits.trailing_zeros() / 8) as usize;
+            return if at < end { at } else { end };
+        }
+        i += 8;
+    }
+    end
+}
+
+/// How many `\n` bytes lie in `[prev_end, curr_start)` — the count an LF-only line-break
+/// table would give, read off the bytes instead: `Some(n)` with `n` saturated at `want`,
+/// or `None` when the walk hit `cap` bytes past `prev_end` before the answer was known.
+///
+/// Reaching `curr_start` (or the host's end, past which the table holds nothing) settles
+/// the count; only a walk stopped by the cap has no answer.
+#[inline]
+fn lf_count_in(
+    bytes: &[u8],
+    prev_end: usize,
+    curr_start: usize,
+    cap: usize,
+    want: u8,
+) -> Option<u8> {
+    let complete_at = curr_start.min(bytes.len());
+    let stop = complete_at.min(prev_end.saturating_add(cap));
+    let mut found = 0u8;
+    let mut i = prev_end;
+    while i < stop {
+        i = next_lf_in(bytes, i, stop);
+        if i >= stop {
+            break;
+        }
+        found += 1;
+        if found == want {
+            return Some(found);
+        }
+        i += 1;
+    }
+    (stop == complete_at).then_some(found)
+}
+
+/// [`is_same_line_fast`], answered by a bounded scan of `bytes` — the source the table
+/// was built from — with the table search as the fallback past [`LINE_SCAN_CAP`].
+///
+/// `table.lf_only` is the builder's own verdict ([`build_line_breaks_into`]): when it
+/// holds, the table IS the set of `\n` positions and a one-needle scan reads the same
+/// answer off the bytes; when it does not (a bare `\r`, a U+2028 / U+2029 — none of which
+/// the format path's CR fold leaves in a real document), the search runs as before. Same
+/// answer as the table form at every position (the exhaustive test beside it grades every
+/// position of every terminator shape at every cap), and **an empty table is
+/// authoritative**: the canonical reprint empties the layout table to erase authoring
+/// intent, and a scan that re-read the source would put it back.
+#[inline]
+pub fn is_same_line_scan(
+    bytes: &[u8],
+    table: LineTable<'_>,
+    prev_end: u32,
+    curr_start: u32,
+) -> bool {
+    let answer = is_same_line_scan_capped(bytes, table, prev_end, curr_start, LINE_SCAN_CAP);
+    debug_assert_eq!(
+        answer,
+        is_same_line_fast(table.breaks, prev_end, curr_start)
+    );
+    answer
+}
+
+/// [`has_blank_line_between_fast`], answered by a bounded scan of `bytes` — see
+/// [`is_same_line_scan`] for the contract.
+#[inline]
+pub fn has_blank_line_between_scan(
+    bytes: &[u8],
+    table: LineTable<'_>,
+    prev_end: u32,
+    curr_start: u32,
+) -> bool {
+    let answer =
+        has_blank_line_between_scan_capped(bytes, table, prev_end, curr_start, LINE_SCAN_CAP);
+    debug_assert_eq!(
+        answer,
+        has_blank_line_between_fast(table.breaks, prev_end, curr_start)
+    );
+    answer
+}
+
+/// [`has_newline_between_fast`], answered by a bounded scan of `bytes` — see
+/// [`is_same_line_scan`] for the contract.
+#[inline]
+pub fn has_newline_between_scan(bytes: &[u8], table: LineTable<'_>, start: u32, end: u32) -> bool {
+    let answer = has_newline_between_scan_capped(bytes, table, start, end, LINE_SCAN_CAP);
+    debug_assert_eq!(answer, has_newline_between_fast(table.breaks, start, end));
+    answer
+}
+
+// The table searches, outlined and cold, so the scan forms' hot unit holds ONE loop.
+//
+// ⚠️ Measured, not stylistic. With the searches inline, LLVM outlined each scan form as
+// one ~120-instruction unit carrying both fallback searches: a seven-register prologue,
+// the cap passed on the stack, and two 64-bit constants re-materialized INSIDE the word
+// loop — ~60 instructions an ask, exactly what the search it replaced cost, and the
+// lever read as a null (+0.036% of a TypeScript format run). The fallbacks run on 0.3%
+// of asks (the cap) and on documents the format path never produces (a bare `\r`, a
+// U+2028); they belong out of line.
+
+#[cold]
+#[inline(never)]
+fn is_same_line_table(line_breaks: &[u32], prev_end: u32, curr_start: u32) -> bool {
+    is_same_line_fast(line_breaks, prev_end, curr_start)
+}
+
+#[cold]
+#[inline(never)]
+fn has_blank_line_between_table(line_breaks: &[u32], prev_end: u32, curr_start: u32) -> bool {
+    has_blank_line_between_fast(line_breaks, prev_end, curr_start)
+}
+
+#[cold]
+#[inline(never)]
+fn has_newline_between_table(line_breaks: &[u32], start: u32, end: u32) -> bool {
+    has_newline_between_fast(line_breaks, start, end)
+}
+
+// `inline(always)` on the three `_capped` bodies, and it is a measured constraint, not a
+// preference: each has ONE caller in a release build (its cap-free public form), and
+// under plain `#[inline]` LLVM still outlined the blank-line body as a 148-instruction
+// unit with a seven-register prologue and the cap passed on the stack — ~60 instructions
+// an ask over 142,000 asks, the search's own price — while inlining the other two. The
+// public form is what inlines into the printers; this layer exists only so the exhaustive
+// test can grade every cap, and it must not cost a call. (A `const CAP` generic in its
+// place, one instantiation per public form, was measured at +0.047 points of the lever on
+// the TypeScript cell — the generic re-decided LLVM's inlining at the callers.)
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn is_same_line_scan_capped(
+    bytes: &[u8],
+    table: LineTable<'_>,
+    prev_end: u32,
+    curr_start: u32,
+    cap: usize,
+) -> bool {
+    if prev_end == curr_start {
+        return true;
+    }
+    if prev_end > curr_start {
+        return false;
+    }
+    // An empty table is authoritative (the canonical reprint's erased layout).
+    if table.breaks.is_empty() {
+        return true;
+    }
+    if !table.lf_only {
+        return is_same_line_table(table.breaks, prev_end, curr_start);
+    }
+    match lf_count_in(bytes, prev_end as usize, curr_start as usize, cap, 1) {
+        Some(found) => found == 0,
+        None => is_same_line_table(table.breaks, prev_end, curr_start),
+    }
+}
+
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn has_blank_line_between_scan_capped(
+    bytes: &[u8],
+    table: LineTable<'_>,
+    prev_end: u32,
+    curr_start: u32,
+    cap: usize,
+) -> bool {
+    if prev_end >= curr_start || table.breaks.is_empty() {
+        return false;
+    }
+    if !table.lf_only {
+        return has_blank_line_between_table(table.breaks, prev_end, curr_start);
+    }
+    match lf_count_in(bytes, prev_end as usize, curr_start as usize, cap, 2) {
+        Some(found) => found == 2,
+        None => has_blank_line_between_table(table.breaks, prev_end, curr_start),
+    }
+}
+
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn has_newline_between_scan_capped(
+    bytes: &[u8],
+    table: LineTable<'_>,
+    start: u32,
+    end: u32,
+    cap: usize,
+) -> bool {
+    if start >= end || table.breaks.is_empty() {
+        return false;
+    }
+    if !table.lf_only {
+        return has_newline_between_table(table.breaks, start, end);
+    }
+    match lf_count_in(bytes, start as usize, end as usize, cap, 1) {
+        Some(found) => found == 1,
+        None => has_newline_between_table(table.breaks, start, end),
+    }
+}
+
+/// Whether every entry of a line-break table is a `\n` byte of `bytes` — the condition
+/// under which the table is exactly the set of `\n` positions, so a one-needle scan of
+/// the bytes answers what the table answers. The builder reports it for free
+/// ([`build_line_breaks_into`]); this is the reference the test grades that report
+/// against. A `\r\n` qualifies (its recorded byte IS the `\n`); a bare `\r` or a
+/// U+2028 / U+2029 does not.
+pub fn line_breaks_are_lf_only(bytes: &[u8], line_breaks: &[u32]) -> bool {
+    line_breaks
+        .iter()
+        .all(|&p| bytes.get(p as usize) == Some(&b'\n'))
+}
+
 /// Build a line breaks table from source code.
 ///
 /// Scans the source string and records the byte offset of each newline character.
@@ -771,13 +1052,20 @@ pub fn build_line_breaks(source: &str) -> Vec<u32> {
 /// seam behind the arena-parked line-break scratch
 /// (`DocArena::take_line_breaks_scratch`), so multi-file drivers fill one warm
 /// table per file instead of allocating a fresh `Vec`.
-pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) {
+///
+/// Returns whether the table is **LF-only** — every recorded byte is a `\n`, so the
+/// table is exactly the set of `\n` positions and the scan forms of the three line
+/// questions ([`is_same_line_scan`] and siblings) may read the bytes instead of
+/// searching it. Answered by the walk that fills the table, on the branch it already
+/// takes per line; [`line_breaks_are_lf_only`] is the same fact re-derived from the
+/// finished table, for grading.
+pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) -> bool {
     // Pre-size to ~one newline per 32 bytes (average code lines run ~25–40
     // bytes), so typical files fill in one allocation instead of the doubling
     // chain (a no-op once the parked table is warm). Capacity-only — never
     // affects the recorded values.
     breaks.reserve(source.len() / 32);
-    build_line_breaks_bytes(source.as_bytes(), breaks);
+    build_line_breaks_bytes(source.as_bytes(), breaks)
 }
 
 /// [`build_line_breaks_into`]'s walk, over bytes and without the capacity reserve — the
@@ -795,12 +1083,22 @@ pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) {
 /// address. It also taxed a 62%-non-ASCII document by +0.094%, because the exact-needle
 /// fallback then routes per block rather than per word. **The per-line re-entry is the
 /// cheaper shape; leave it.**
-fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) {
+fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) -> bool {
+    let mut lf_only = true;
     let mut i = 0;
     while i < bytes.len() {
         i = next_line_terminator_candidate(bytes, i);
         if i >= bytes.len() {
             break;
+        }
+        // The `\n` arm first and alone: it is nearly every hit, and it is the one arm
+        // that says nothing about `lf_only` — the flag is a fact about the RARE arms, so
+        // it is written only there (a per-line `&=` on this arm measured as a per-line
+        // cost on every short-line corpus, for a value that never changes here).
+        if bytes[i] == b'\n' {
+            breaks.push(i as u32);
+            i += 1;
+            continue;
         }
         match line_terminator_len(bytes, i) {
             // The recorded offset is the sequence's LAST byte, which is what the
@@ -809,7 +1107,11 @@ fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) {
             // as "one entry per line ending", so a multi-byte sequence must push
             // exactly once — two entries for a `\r\n` would read as a blank line.
             Some(len) => {
-                breaks.push((i + len - 1) as u32);
+                let last = i + len - 1;
+                // The recorded byte is the `\n` for a `\r\n`; a bare `\r` or a
+                // `<LS>` / `<PS>` puts something else in the table.
+                lf_only &= bytes[last] == b'\n';
+                breaks.push(last as u32);
                 i += len;
             }
             // A `0xE2` lead that is not `<LS>` / `<PS>` — the candidate scan's only
@@ -817,6 +1119,7 @@ fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) {
             None => i += 1,
         }
     }
+    lf_only
 }
 
 /// Index of the first byte at or after `from` that could BEGIN a line terminator
@@ -2564,5 +2867,141 @@ mod tests {
                 "has_newline_between {p},{c}"
             );
         }
+    }
+
+    /// The scan forms answer exactly as the table forms at EVERY byte position — inside
+    /// a multi-byte terminator included — for every terminator shape at every alignment,
+    /// and at every cap (so both the walk and the table fallback are graded, at the
+    /// boundary where a terminator straddles the cap too). No corpus can grade this: a
+    /// wrong answer moves a blank line or a trailing-comment classification only on a
+    /// document that holds the shape, and the shapes that matter (a `\r` the format path
+    /// folds away, a U+2028) appear in none.
+    #[test]
+    fn line_break_scan_fns_agree_with_the_table_at_every_position_and_cap() {
+        // `\u{2000}` is an `0xE2`-led character that is NOT a terminator (the candidate
+        // scan's false positive); `é` a non-ASCII byte with a different lead.
+        let pieces = ["a", "\n", "\r", "\u{2028}", "\u{2029}", "\u{2000}", "é"];
+        let caps = [0usize, 1, 2, 3, 4, 7, 8, 9, 16, 64];
+        let mut checked = 0usize;
+        let mut lf_only_documents = 0usize;
+        let mut source = String::new();
+        // Every sequence of up to five pieces (7^5 = 16,807 documents).
+        for len in 0..=5 {
+            let mut counters = vec![0usize; len];
+            loop {
+                source.clear();
+                for &k in &counters {
+                    source.push_str(pieces[k]);
+                }
+                let bytes = source.as_bytes();
+                let mut breaks = Vec::new();
+                let lf_only = build_line_breaks_into(&source, &mut breaks);
+                // The builder's verdict is the table's own fact, re-derived.
+                assert_eq!(
+                    lf_only,
+                    line_breaks_are_lf_only(bytes, &breaks),
+                    "lf_only {source:?}"
+                );
+                if lf_only {
+                    lf_only_documents += 1;
+                }
+                let table = LineTable {
+                    breaks: &breaks,
+                    lf_only,
+                };
+                // Every position pair, out-of-range ones included (the table forms take
+                // any `u32`, so the scan forms must too).
+                for p in 0..=bytes.len() + 2 {
+                    for c in p.saturating_sub(1)..=bytes.len() + 2 {
+                        let (p, c) = (p as u32, c as u32);
+                        for &cap in &caps {
+                            assert_eq!(
+                                is_same_line_scan_capped(bytes, table, p, c, cap),
+                                is_same_line_fast(&breaks, p, c),
+                                "is_same_line {source:?} {p},{c} cap {cap}"
+                            );
+                            assert_eq!(
+                                has_blank_line_between_scan_capped(bytes, table, p, c, cap),
+                                has_blank_line_between_fast(&breaks, p, c),
+                                "has_blank_line_between {source:?} {p},{c} cap {cap}"
+                            );
+                            assert_eq!(
+                                has_newline_between_scan_capped(bytes, table, p, c, cap),
+                                has_newline_between_fast(&breaks, p, c),
+                                "has_newline_between {source:?} {p},{c} cap {cap}"
+                            );
+                            checked += 1;
+                        }
+                    }
+                }
+                // Advance the odometer.
+                let mut i = 0;
+                loop {
+                    if i == len {
+                        break;
+                    }
+                    counters[i] += 1;
+                    if counters[i] < pieces.len() {
+                        break;
+                    }
+                    counters[i] = 0;
+                    i += 1;
+                }
+                if i == len {
+                    break;
+                }
+            }
+        }
+        assert!(checked > 1_000_000, "{checked}");
+        // Both arms were reached: the LF-only scan and the table fallback.
+        assert!(lf_only_documents > 1_000, "{lf_only_documents}");
+        assert!(
+            checked > lf_only_documents * 10,
+            "{checked} {lf_only_documents}"
+        );
+
+        // An empty table is authoritative (the canonical reprint's erased layout), even
+        // over a source full of terminators — under either verdict.
+        let bytes = b"a\n\nb\n\nc";
+        for lf_only in [true, false] {
+            let empty = LineTable {
+                breaks: &[],
+                lf_only,
+            };
+            assert!(is_same_line_scan(bytes, empty, 0, 7));
+            assert!(!has_blank_line_between_scan(bytes, empty, 0, 7));
+            assert!(!has_newline_between_scan(bytes, empty, 0, 7));
+        }
+        assert!(is_same_line_scan(bytes, LineTable::EMPTY, 0, 7));
+
+        // The cap hands a long line to the table, and a `\n` straddling the cap is
+        // still counted once.
+        let long = format!("{}\n\n{}", "x".repeat(200), "y".repeat(200));
+        let mut breaks = Vec::new();
+        assert!(build_line_breaks_into(&long, &mut breaks));
+        let table = LineTable {
+            breaks: &breaks,
+            lf_only: true,
+        };
+        for p in 0..long.len() as u32 {
+            for c in [p, p + 1, 150, 201, 202, 250, long.len() as u32] {
+                assert_eq!(
+                    is_same_line_scan(long.as_bytes(), table, p, c),
+                    is_same_line_fast(&breaks, p, c)
+                );
+                assert_eq!(
+                    has_blank_line_between_scan(long.as_bytes(), table, p, c),
+                    has_blank_line_between_fast(&breaks, p, c)
+                );
+            }
+        }
+
+        // A `\r\n` document is LF-only (the recorded byte is the `\n`); a bare `\r` and
+        // a U+2028 are not.
+        let mut breaks = Vec::new();
+        assert!(build_line_breaks_into("a\r\nb\r\n", &mut breaks));
+        assert_eq!(breaks, vec![2, 5]);
+        assert!(!build_line_breaks_into("a\rb", &mut Vec::new()));
+        assert!(!build_line_breaks_into("a\u{2028}b\n", &mut Vec::new()));
     }
 }

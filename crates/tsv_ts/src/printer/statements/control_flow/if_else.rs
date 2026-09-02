@@ -392,7 +392,7 @@ mod tests {
         let inputs = PrinterInputs {
             source,
             comments: &[],
-            line_breaks: &[],
+            line_table: tsv_lang::printing::LineTable::EMPTY,
             has_owned_comments: false,
             has_format_ignore: false,
         };
