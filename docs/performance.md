@@ -2728,6 +2728,62 @@ another phase's stalls gives back its instructions and not its cycles, which is 
 explanation for why this arc's scan levers keep reading a far larger instruction win than
 cycles win.
 
+### A SORTED-TABLE search whose answer is a few bytes away is a scan — and the class belongs to the document, not the ask
+
+The printers ask the line-break table three questions by the hundred thousand — are two
+positions on the same line, is there a newline between them, a blank line — and each was a
+`partition_point` over the document's sorted newline offsets: `log2(lines)` dependent
+load-and-select steps, seven to eleven on real files. The by-LINE view of a fresh board found
+it where no symbol could: `core/src/hint.rs:832`, the `cmov` of the inlined branchless search,
+at **1.8%** of a TypeScript format run's cycles (1.4% of its instructions), 80% of the hottest
+owner's samples on one line.
+
+A census of the three predicates said what a scan would cost instead. The **gap** asked about
+is long (a mean of 405 bytes for `is_same_line` — `find_end_with_trailing_comments` asks about
+the first comment after a statement, wherever that is) but the **first terminator after
+`prev_end`** is the end of the line the question was asked on: **5.5 bytes** away on average,
+82.7% within eight, 99.7% within 64 — one word of the host answers almost every ask. The
+blank-line check walks 2.6 bytes, the newline check 3.2. A one-entry hint of the last answer
+(the shape `find_first_comment_from` uses) would hit under 20%: the asks jump between contexts.
+
+The scan forms (`printing::is_same_line_scan` and siblings) read the bytes from `prev_end`
+with the table's binary search kept as the fallback past a 64-byte cap, so a minified
+document never walks a whole line per ask. Measured `instructions:u` **−0.400% / −0.142% /
+−0.238%** (TS / Svelte / CSS format); cycles **−0.621%** pooled over a twelve-binary layout
+group (3/3 replicate signs, null −0.189%). Two things decided the shape, and the ladder had
+to find both:
+
+- ⭐⭐⭐⭐ **A census prices the WORK; only `objdump` prices the CALL.** The first rung walked
+  the exact ECMAScript class (`\n`, `\r`, the `0xE2` lead of U+2028/2029) — one iteration, as
+  censused — and read **+1.0%**. LLVM had outlined the three-needle walker as a
+  170-instruction unit: six pushes, five 64-bit constants loaded on every one of 176 call
+  sites, more than the search it replaced. The class was the lever. The format path folds
+  CR ahead of the parse, so nearly every table IS the set of `\n` positions, and the builder
+  that fills the table sees each terminator's last byte as it pushes it: it now returns that
+  verdict (`build_line_breaks_into` → `PrinterInputs::line_breaks_lf_only`), written only on
+  its rare non-`\n` arms, and the scan is one needle with two constants. **Classify the
+  document once, not the ask** — a document holding a bare `\r` or a U+2028 takes the search
+  exactly as before.
+- ⭐⭐⭐ **The scan must inline, and what keeps it from inlining is the fallback beside it.**
+  With the two table searches inline in each scan form, LLVM outlined every form as one
+  ~120-instruction unit — seven pushes, the cap on the stack, the needle constants
+  re-materialized inside the word loop — ~60 instructions an ask, the search's own price, and
+  the lever read as a null. `#[cold] #[inline(never)]` on the fallbacks is what let the hot
+  unit inline at its ~130 sites (42 instructions an ask against ~65). Both outlined forms
+  measured afterwards (the scan forms themselves; the printer's `&self` wrappers) gave back
+  more than half the win, and NOT because of the argument count: inlining lets the four
+  trivial arms fold into each caller and the constants hoist. Outlining just the seven-byte
+  scalar tail lost on both axes (§A slice's scan is bounded by the slice, its factoring
+  lesson, a third time).
+
+`.text` **+40.8 KB** — each site's ~90-byte inlined search became a ~300-byte inlined scan —
+and the cycles group is where that cost would show; it did not. The Svelte and CSS printers'
+own asks are unchanged (the CSS number is the builder's new `\n`-first arm being cheaper than
+the terminator match on every line — a free rider on every corpus). The exhaustive test
+beside the scan forms grades them against the table at every byte position, including
+inside a multi-byte terminator and out of range, over every terminator shape at every cap,
+and a two-sided `debug_assert_eq!` grades every ask in every fixture — no corpus holds a
+document where the answer differs.
 
 ## WASM bundle size
 

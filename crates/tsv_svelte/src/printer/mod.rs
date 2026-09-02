@@ -225,6 +225,9 @@ pub(crate) struct Printer<'a> {
     has_format_ignore: bool,
     /// Precomputed line break positions (byte offsets of '\n' in source)
     line_breaks: Vec<u32>,
+    /// The builder's verdict on `line_breaks` (`tsv_ts::PrinterInputs::line_breaks_lf_only`):
+    /// every recorded byte is a `\n`. Computed once at construction, copied per island.
+    line_breaks_lf_only: bool,
     /// Whether a wrapped block-tag head may dangle its `}` (and, later, expand its
     /// body) in the current context. True almost everywhere — including inside
     /// inline elements / components, where the body-expand is render-safe because a
@@ -271,14 +274,20 @@ impl<'a> Printer<'a> {
         // per island. Filled into the arena-parked scratch (one warm table
         // across a multi-file driver's files); `into_string` parks it back.
         let mut line_breaks = arena.take_line_breaks_scratch();
-        tsv_lang::printing::build_line_breaks_into(source, &mut line_breaks);
+        let line_breaks_lf_only =
+            tsv_lang::printing::build_line_breaks_into(source, &mut line_breaks);
         // The two document-level presence flags come from the one scan `tsv_ts` owns
         // (`PrinterInputs::for_document`); `ts_inputs()` copies them per island.
         let tsv_ts::PrinterInputs {
             has_owned_comments,
             has_format_ignore,
             ..
-        } = tsv_ts::PrinterInputs::for_document(source, comments, &line_breaks);
+        } = tsv_ts::PrinterInputs::for_document(
+            source,
+            comments,
+            &line_breaks,
+            line_breaks_lf_only,
+        );
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
@@ -289,6 +298,7 @@ impl<'a> Printer<'a> {
             has_owned_comments,
             has_format_ignore,
             line_breaks,
+            line_breaks_lf_only,
             block_dangle_allowed: Cell::new(true),
             root_inline_run_block_starts: RefCell::new(FxHashSet::default()),
         }
@@ -766,6 +776,7 @@ impl<'a> Printer<'a> {
             source: self.source,
             comments: self.comments,
             line_breaks: &self.line_breaks,
+            line_breaks_lf_only: self.line_breaks_lf_only,
             // The document-level owned-comment flag, computed once at construction
             // (never here — this is called per `{expr}`; see the field's doc).
             has_owned_comments: self.has_owned_comments,

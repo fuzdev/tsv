@@ -37,8 +37,9 @@ pub use goal::Goal;
 pub use parser::TopLevelAs;
 
 /// The per-document environment shared by every formatting entry point: the
-/// source the AST's spans index into, the comment buffer, and the precomputed
-/// line breaks. Bundling these keeps the printer constructor — and the
+/// source the AST's spans index into, the comment buffer, the precomputed
+/// line breaks and the three document-level flags computed beside them.
+/// Bundling these keeps the printer constructor — and the
 /// `tsv_svelte` embedding call sites — from re-threading the same values. The
 /// [`EmbedContext`] and the expression/program being printed vary per call, so
 /// they stay separate args.
@@ -49,6 +50,14 @@ pub struct PrinterInputs<'a> {
     pub comments: &'a [ast::Comment],
     /// Precomputed newline offsets for O(log n) line/column lookup.
     pub line_breaks: &'a [u32],
+    /// The builder's verdict on `line_breaks` (`tsv_lang::printing::build_line_breaks_into`):
+    /// every recorded byte is a `\n`, so the table is exactly the set of `\n` positions and
+    /// the printer's three line questions (`is_same_line` and siblings) read the source
+    /// bytes instead of searching it. False for a document holding a bare `\r` or a
+    /// U+2028 / U+2029 — which the format path's CR fold leaves only the latter of — where
+    /// the table search runs as before. A document-level fact like the two flags below:
+    /// computed once, by the walk that fills the table, never per island.
+    pub line_breaks_lf_only: bool,
     /// Whether any comment in this document is owned by a node (`owned_by_node`).
     /// A document-level presence flag that short-circuits the owned-leading-comment
     /// path (`prepend_owned_leading_comment` & siblings), which otherwise runs a byte
@@ -85,11 +94,13 @@ impl<'a> PrinterInputs<'a> {
         source: &'a str,
         comments: &'a [ast::Comment],
         line_breaks: &'a [u32],
+        line_breaks_lf_only: bool,
     ) -> Self {
         PrinterInputs {
             source,
             comments,
             line_breaks,
+            line_breaks_lf_only,
             has_owned_comments: comments.iter().any(|c| c.owned_by_node),
             has_format_ignore: comments
                 .iter()
@@ -300,8 +311,8 @@ fn format_program_in(
     canonical: bool,
 ) -> String {
     let mut line_breaks = arena.take_line_breaks_scratch();
-    build_line_breaks_into(source, &mut line_breaks);
-    let inputs = PrinterInputs::for_document(source, program.comments, &line_breaks);
+    let lf_only = build_line_breaks_into(source, &mut line_breaks);
+    let inputs = PrinterInputs::for_document(source, program.comments, &line_breaks, lf_only);
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     if canonical {
         printer.set_canonical();
@@ -845,16 +856,20 @@ pub fn build_type_annotation_doc(
 /// Used when embedding TypeScript in other formats like Svelte's `<script>`.
 ///
 /// `line_breaks` must be the host document's whole-source newline table
-/// (spans are absolute, so a table built from an island slice is wrong);
-/// `comments` stay island-local (taken from `program`).
+/// (spans are absolute, so a table built from an island slice is wrong), with
+/// `line_breaks_lf_only` the verdict its builder returned for it
+/// (`tsv_lang::printing::build_line_breaks_into`); `comments` stay island-local
+/// (taken from `program`).
 pub fn build_program_doc(
     arena: &DocArena,
     program: &Program<'_>,
     source: &str,
     line_breaks: &[u32],
+    line_breaks_lf_only: bool,
     embed: EmbedContext,
 ) -> DocId {
-    let inputs = PrinterInputs::for_document(source, program.comments, line_breaks);
+    let inputs =
+        PrinterInputs::for_document(source, program.comments, line_breaks, line_breaks_lf_only);
     let printer = make_doc_printer(arena, &inputs, embed);
     printer.build_program_doc(program)
 }

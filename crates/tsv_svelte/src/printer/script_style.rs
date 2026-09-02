@@ -53,6 +53,7 @@ impl<'a> Printer<'a> {
             &script.content,
             self.source(),
             &self.line_breaks,
+            self.line_breaks_lf_only,
             embed,
         );
 

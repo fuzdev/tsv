@@ -393,6 +393,7 @@ mod tests {
             source,
             comments: &[],
             line_breaks: &[],
+            line_breaks_lf_only: true,
             has_owned_comments: false,
             has_format_ignore: false,
         };
