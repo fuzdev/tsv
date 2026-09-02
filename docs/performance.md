@@ -886,6 +886,19 @@ plain `raw` and staging only from the first integer should beat both — built, 
 is the *worst* of the four scopes (write phase +0.68%), because splitting a burst
 pays the buffer reload *and* the scratch setup.
 
+⚠️⚠️ **And the mirror: an un-adopted optimization can be un-adopted CORRECTLY, so
+census the fast path's hit rate in the consumer that lacks it before porting.**
+`printing::optimal_string_quote` is `pub` for exactly one pattern, stated in its own
+doc — a caller can ask whether `format_string_literal` would change the quote and,
+when it would not, emit the verbatim source literal with no allocation.
+`tsv_ts::format_string_literal_from_ast` does that and returns `Cow::Borrowed`;
+`tsv_css` never did, and seven of its sites allocate a `String` per string literal.
+That is this section's shape exactly, and it is not a lever: `format_string_literal`
+runs **4,299 times a pass** on a 638-file CSS corpus and only **294 (6.8%)** preserve
+the quote, because CSS sources are overwhelmingly double-quoted and tsv normalizes to
+single. The two consumers' *populations* differ, not just their spellings — so this
+section tells you where to look, and a census tells you whether to move.
+
 ### Grading a change that touches the `format` worker pool
 
 Two traps specific to the parallel path, both of which produce confident wrong numbers.
@@ -1809,6 +1822,79 @@ if let Some(chunk) = bytes.get(start..).and_then(|tail| tail.first_chunk::<8>())
   `keyword_swar_ignores_lanes_past_len` re-reads every reserved word under all 256
   following bytes and a spread of wider fills, and is mutation-checked by deleting one
   arm's mask.
+
+### "It auto-vectorizes" is not a reason — a byte count into `usize` widens
+
+`optimal_string_quote` counted both quote kinds in one branchless pass, with a
+comment offering "the branchless sums auto-vectorize for long contents" as the
+reason to prefer it:
+
+```rust
+let mut single_count = 0usize;
+let mut double_count = 0usize;
+for &b in raw_content.as_bytes() {
+    single_count += usize::from(b == b'\'');
+    double_count += usize::from(b == b'"');
+}
+```
+
+It does vectorize, and the vectorization is worth nothing. `objdump` reads two
+`movzwl` **two-byte** loads per iteration and, per needle per load, a
+`pcmpeqb`/`punpcklbw`/`pshuflw`/`pshufd`/`pand`/`paddq` chain — the widening a
+`u8` compare needs before it can land in a 64-bit lane. Four chains plus the loop:
+**31 instructions for four bytes, ~7.75 a byte**, which is what a scalar loop
+costs anyway. A vector register moved four bytes at a time.
+
+- ⭐⭐⭐ **The accumulator's width, not the loop's shape, decides whether a count
+  vectorizes usefully.** Summing a byte predicate into `usize` asks LLVM to widen
+  8x before it can add, and the widening is the whole body. This shape is not
+  confined to one function: `visual_width`'s ASCII arm counts tabs the same way.
+- ⭐⭐⭐⭐ **The bigger win was not vectorizing the count better — it was noticing
+  the count was not the question.** `'"'` is returned only when double quotes are
+  **strictly** rarer, so a content with no `'` in it takes the single-quote answer
+  whatever its `"` count is. That is one needle on the word rung
+  (`swar::next_byte_of`, disassembled here at **11 instructions per eight bytes**,
+  1.375 a byte) and it answers **99.4%** of real calls — 541 of 86,410 string
+  contents hold a `'` across 1,666 `.ts` files (7 of 11,987 on `.svelte`, 41 of
+  4,299 on `.css`). Measured: `instructions:u` **−0.436%** of a TS format run,
+  −0.306% CSS, −0.207% Svelte, with a **±0.000%** confinement control.
+  **Read the return value's own condition before optimizing the loop under it**
+  — the cheapest count is the one that is never taken.
+- ⚠️ **A board row for this read 0.177%** as the mean of three draws, against a
+  measured −0.436%: the standing warning that an inlined helper's row undercounts
+  it, again. The arithmetic that sized it before any build was `objdump`
+  (7.75 instructions a byte) x a census (1,496,885 bytes a pass) over `perf stat`
+  (2.337 G instructions a pass) = ~0.48%.
+- ⚠️ **Grade this on the layout group, never on one binary.** The single-binary A/B
+  read cycles **+1.058%** on the very corpus where the sixteen-binary group reads
+  **−0.175%** with 5/5 replicate signs — 1.2 points of pure code layout, the
+  largest such gap recorded here.
+- ✓ **The counting arm keeps its sums** (it is 0.6% of calls) and is
+  `#[cold] #[inline(never)]`, so the vectorized body stops being inlined into every
+  string-literal site.
+
+### `str::find(char)` is a CALL to a searcher that then calls `memchr`
+
+Two comments in the tree said a single-`char` pattern "lowers to a `memchr`". For
+`contains(char)` that is exactly right — `core::slice::memchr`,
+`memchr_aligned::runtime`, `memchr_naive` and `contains_zero_byte` all **inline**
+into the caller, with no call at all. For the position-returning `find(char)` it is
+not: the disassembly is `call <CharSearcher as Searcher>::next_match`, an
+out-of-line searcher that builds its own state (the char's UTF-8 encoding, its last
+byte, a `bcmp` verification path for the multi-byte case) and then **calls**
+`core::slice::memchr::memchr_aligned`. Two calls and a setup around the thing the
+comment named.
+
+- ⭐⭐ **The boolean/positional split is the rule**: a search that returns an index
+  pays a searcher setup, a search that returns a bool does not. It holds for `&str`
+  and `[char; N]` patterns too, with different constants.
+- ⚠️ **`memchr_aligned` is itself word-at-a-time, not SIMD** — the same is true of
+  `core::slice::ascii::is_ascii`, which is also an out-of-line call. A comment
+  calling either "SIMD" is wrong in mechanism even where it is right in verdict.
+- ⭐ On a long haystack the searcher's setup amortizes and this is all fine. On a
+  scan re-entered per hop, or over a short slice, it is the entire cost — and the
+  arc's own `swar::next_byte_of` answers the same question at 12 instructions a word
+  with no call and no setup.
 
 ### Where a peel's SET boundary lands decides the cost of the path it does NOT take
 

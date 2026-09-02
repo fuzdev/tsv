@@ -20,14 +20,39 @@ use unicode_width::UnicodeWidthChar;
 /// output equals the verbatim source literal — no allocation needed).
 #[inline]
 pub fn optimal_string_quote(raw_content: &str) -> char {
-    // One fused byte pass counting both quote kinds. Both quotes are ASCII and
-    // UTF-8 continuation bytes are >= 0x80, so a byte compare cannot match
-    // inside a multi-byte sequence. String contents are typically short, where
-    // a per-pattern searcher setup dominates a plain counting loop; the
-    // branchless sums auto-vectorize for long contents.
+    // Double quotes win only when they are STRICTLY rarer, so a content holding
+    // no `'` at all takes the single-quote answer whatever its `"` count is —
+    // which makes the question "is there a `'` here?", not "how many of each?".
+    // That is one needle on the word-at-a-time rung ([`crate::swar::next_byte_of`],
+    // whose own table puts `N` = 1 at 12 instructions per eight bytes and which
+    // inlines here as 11) instead of a per-byte count, and it answers **99.4%** of
+    // real calls: over 1,666 `.ts` files only 541 of 86,410 string contents hold a
+    // `'` (7 of 11,987 on 1,695 `.svelte`, 41 of 4,299 on 638 `.css`). Both quotes
+    // are ASCII and UTF-8 continuation bytes are >= 0x80, so a byte compare cannot
+    // match inside a multi-byte sequence.
+    let bytes = raw_content.as_bytes();
+    if crate::swar::next_byte_of(bytes, 0, [b'\'']) == bytes.len() {
+        return '\'';
+    }
+    quote_minimizing_escapes(bytes)
+}
+
+/// [`optimal_string_quote`]'s counting arm, reached only by a content that holds
+/// at least one `'`.
+///
+/// Outlined because it is 0.6% of calls: the fused sums are the whole body of the
+/// function otherwise, and inlining them into every string-literal site pays for a
+/// path almost nothing takes. ⚠️ The sums do vectorize, and the vectorization is
+/// **not** a reason to prefer them — `objdump` reads four bytes per iteration
+/// through a byte-to-`u64` widening chain (`pcmpeqb`/`punpcklbw`/`pshuflw`/
+/// `pshufd`/`pand`/`paddq`, once per needle), about 7.75 instructions a byte,
+/// which is what put the scan above on the gate instead.
+#[cold]
+#[inline(never)]
+fn quote_minimizing_escapes(bytes: &[u8]) -> char {
     let mut single_count = 0usize;
     let mut double_count = 0usize;
-    for &b in raw_content.as_bytes() {
+    for &b in bytes {
         single_count += usize::from(b == b'\'');
         double_count += usize::from(b == b'"');
     }
@@ -47,8 +72,8 @@ pub fn optimal_string_quote(raw_content: &str) -> char {
 ///
 /// # Algorithm
 ///
-/// 1. Count single and double quotes in the content
-/// 2. Choose quote that appears less frequently (minimize escaping)
+/// 1. Pick the quote with [`optimal_string_quote`]
+/// 2. That is the one appearing less frequently inside (minimize escaping)
 /// 3. On tie, prefer single quotes (prettier default)
 /// 4. If quote changed, swap escape sequences
 /// 5. Return formatted string with quotes
@@ -1313,6 +1338,74 @@ mod tests {
         }
         for s in &cases {
             assert_eq!(optimal_string_quote(s), reference(s), "content {s:?}");
+        }
+    }
+
+    #[test]
+    fn optimal_string_quote_matches_reference_across_the_word_boundary() {
+        // The exhaustive test above tops out at three characters, so it grades
+        // only the tail compare chain: [`crate::swar::next_byte_of`]'s word loop
+        // engages at EIGHT bytes, and the `'` gate is what decides whether the
+        // counting arm runs at all. This sweeps contents long enough to cross
+        // several words with each quote at every byte alignment, which is where a
+        // lane-mask bug would live.
+        fn reference(raw_content: &str) -> char {
+            let single_count = raw_content.matches('\'').count();
+            let double_count = raw_content.matches('"').count();
+            if double_count < single_count {
+                '"'
+            } else {
+                '\''
+            }
+        }
+        for len in 0..=40usize {
+            // No `'` anywhere, `"` at every stride — the gate's own claim, and it
+            // is asserted against the CONSTANT rather than only against the
+            // reference, so a gate and a reference that were wrong together would
+            // still fail here.
+            for stride in 1..=len.max(1) {
+                let s: String = (0..len)
+                    .map(|i| if i % stride == 0 { '"' } else { 'a' })
+                    .collect();
+                assert_eq!(optimal_string_quote(&s), '\'', "no-single content {s:?}");
+                assert_eq!(optimal_string_quote(&s), reference(&s), "content {s:?}");
+            }
+            // A single `'` at every alignment, against a `"` at every other one —
+            // both sides of the strict-inequality tie-break, word-crossing.
+            for single_at in 0..len {
+                for double_at in 0..len {
+                    if double_at == single_at {
+                        continue;
+                    }
+                    let mut s: Vec<u8> = vec![b'a'; len];
+                    s[single_at] = b'\'';
+                    s[double_at] = b'"';
+                    let s = String::from_utf8(s).unwrap();
+                    assert_eq!(optimal_string_quote(&s), reference(&s), "content {s:?}");
+                }
+                // And the same alignment with no `"` at all, so the counting arm
+                // returns the OTHER quote and a gate that swallowed it is caught.
+                let mut s: Vec<u8> = vec![b'a'; len];
+                s[single_at] = b'\'';
+                let s = String::from_utf8(s).unwrap();
+                assert_eq!(optimal_string_quote(&s), '"', "single-only content {s:?}");
+            }
+        }
+        // Multi-byte fillers pushed past the word boundary: a continuation byte
+        // must never read as a quote lane. The quote goes both AFTER the fillers
+        // and BETWEEN them, so a word holds a needle beside a continuation byte
+        // rather than only past the last one.
+        for pad in 0..12usize {
+            for quotes in ["", "'", "\"", "'\"", "'''\""] {
+                let filler = "é✓".repeat(pad);
+                for s in [
+                    format!("{filler}{quotes}"),
+                    format!("{quotes}{filler}"),
+                    format!("{filler}{quotes}{filler}"),
+                ] {
+                    assert_eq!(optimal_string_quote(&s), reference(&s), "content {s:?}");
+                }
+            }
         }
     }
 

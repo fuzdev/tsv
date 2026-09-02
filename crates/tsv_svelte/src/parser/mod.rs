@@ -369,11 +369,12 @@ fn find_tag_close(
     // of a panic.
     debug_assert!(source.is_char_boundary(from));
     let mut i = from;
-    // Hop to each `<` rather than testing every byte. A single-`char` pattern lowers to
-    // `memchr`, and the run between two `<`s in a raw-text body is long — a real
-    // component averages one per ~1.2-1.5 KB of `<script>`/`<style>` body — so the
-    // per-byte test this loop used to run was paying its whole cost on bytes that cannot
-    // begin a close tag. `i` only ever sits on `from` (a tag boundary) or on a `<`, both
+    // Hop to each `<` rather than testing every byte. A single-`char` pattern reaches
+    // `memchr` — through `CharSearcher`, so it is an out-of-line `next_match` call plus
+    // that searcher's own setup around it, not a bare `memchr` — and the run between
+    // two `<`s in a raw-text body is long (a real component averages one per ~1.2-1.5 KB
+    // of `<script>`/`<style>` body), so the per-byte test this loop used to run was
+    // paying its whole cost on bytes that cannot begin a close tag. `i` only ever sits on `from` (a tag boundary) or on a `<`, both
     // ASCII, so the re-slice is always on a char boundary; an `i` past the end answers
     // `None`, which is this scan's own "no close tag" result.
     //
