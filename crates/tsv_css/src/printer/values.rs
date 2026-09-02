@@ -188,7 +188,7 @@ impl<'a> Printer<'a> {
     /// characteristics like leading zeros and signs. An already-canonical
     /// dimension (`10px`, `0.5rem`) borrows its source slice, so it emits a
     /// zero-allocation `source_span`; only a rewritten dimension allocates.
-    /// Mirrors the TS literal path (`normalized_literal_doc`).
+    /// Mirrors the TS literal path (`Printer::build_number_literal_doc`).
     fn build_dimension_doc(&self, span: Span) -> DocId {
         let raw = span.extract(self.source);
         match value_normalization::normalize_dimension_from_source(raw) {
