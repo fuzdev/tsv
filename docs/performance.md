@@ -2214,6 +2214,65 @@ question is nearly free) answers both in one pass.
   generated differential was added: **no fixture holds a tab inside a string literal**, so
   dropping that needle was caught by nothing else.
 
+### The same shape a third time — the grapheme path's ASCII runs, and why its class is DIFFERENT
+
+`printing::visual_width_mixed` is the arm a string holding non-ASCII lands on. It
+measures maximal ASCII runs by byte and grapheme-walks only the rest, and that run
+counter was the same fold one level down:
+
+```rust
+while i < len && bytes[i].is_ascii() {
+    // tab -> tab_width, control/DEL -> 0, printable -> 1
+    width += ascii_char_width(bytes[i], tab_width);
+    i += 1;
+}
+```
+
+`objdump` prices it at **sixteen** instructions a byte. The fold above could *return*
+from its rare arms; this one owes a width for every ASCII byte and only leaves the loop
+on a non-ASCII one, so the select is branchless and stays in the body:
+
+```
+movzbl / test / js          <- the ASCII test and the loop exit
+cmp $0x20 / setae / cmp $0x7f / setne / and / cmp $0x9 / movzbl / cmove   <- the width
+add / inc / mov / cmp / jne
+```
+
+Over **524,232** bytes in 16,495 runs a TypeScript format pass, that is **0.381%** of the
+run. ⚠️ It had been carried in the perf queue as "~0.25%" — the rate the *neighbouring*
+fold cost. **A carried-forward lead's own number is worth one `objdump` before it is
+believed to be under the floor.**
+
+**524,225 of those 524,232 bytes are printable ASCII** — 7 are tabs and none is another
+control — and a printable ASCII byte is exactly one column, so the fold is a search for
+the other two: `width += stop - i` measures everything between two hits, with no
+accumulator and no per-byte select. The scan stops 16,502 times over 16,495 runs, about
+once each, which is the run's own end.
+
+⚠️⚠️ **The search's class is the FOLD's, not the neighbouring scan's.** The scan above
+(`is_width_relevant`: `\t`, `\n`, non-ASCII) is right there and already proven, and
+reusing it here is a **silent over-count**: it treats every other control as one column,
+because *its* caller measures a span of source where none can appear, while
+`ascii_char_width` gives a control **zero**. The class here is `0x20..=0x7e`, spelled
+once as `is_printable_ascii`, and a `const _` proves it twice over all 256 byte values —
+against the word loop's lane test, and against `ascii_char_width` itself.
+
+That lane test is two kernels: `lanes_less_than(w, 0x20)` for the controls, and
+`zero_or_high_lanes(w ^ splat(0x7f))` for `DEL` **and every non-ASCII byte at the price
+of the `DEL` alone** — which is where the run has to stop anyway, so the loose kernel's
+usual false positives are the wanted answer, exactly as in §A slice's scan is bounded by
+the slice.
+
+Measured: `instructions:u` **−0.316% / −0.058% / −0.001%** (TS / Svelte / CSS format),
+−0.314% / −0.058% / −0.000% on the shipped CLI, and an exact **+0.000%** on
+`json_profile` — the walk and its caller are the same function, so unlike the identifier
+channel's there is no transport to pay for. `.text` +80 B.
+
+⚠️ **No corpus grades this class**: 7 tabs and no other control in half a megabyte, and
+the equivalence test beside the function is a three-character triple product, which never
+forms a word. The grader has to be generated — each special byte at every alignment of a
+0–23-byte ASCII run, with a non-ASCII tail and again with a non-ASCII lead.
+
 ### `str::find(char)` is a CALL to a searcher that then calls `memchr`
 
 Two comments in the tree said a single-`char` pattern "lowers to a `memchr`". For

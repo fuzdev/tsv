@@ -1,6 +1,7 @@
 //! SWAR byte-search kernels — the word-at-a-time primitives the line scans
-//! ([`crate::location`]), the wire-JSON escape prescan
-//! ([`crate::json_writer`]) and the language lexers' token-body scans share.
+//! ([`crate::location`]), the width and quote scans ([`crate::printing`]), the
+//! wire-JSON escape prescan ([`crate::json_writer`]) and the language lexers'
+//! token-body scans share.
 //!
 //! Every kernel here answers a question about the eight bytes packed in one
 //! `u64`. They exist as one module rather than one copy per caller because
@@ -97,7 +98,6 @@ pub(crate) const fn zero_or_high_lanes(v: u64) -> u64 {
 /// A lane at or above `0x80` — a UTF-8 continuation byte, say — is never
 /// flagged: `!v`'s high bit is clear there, and it can never underflow against
 /// an `n <= 0x80` either, so it neither reports nor propagates.
-#[cfg(feature = "json")]
 #[inline]
 pub(crate) const fn lanes_less_than(v: u64, n: u8) -> u64 {
     v.wrapping_sub(splat(n)) & !v & HIGH_BITS
