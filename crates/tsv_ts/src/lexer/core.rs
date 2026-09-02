@@ -192,6 +192,31 @@ pub struct Lexer<'a> {
     /// stale contents are inert.
     decode_scratch: String,
     has_decoded: bool,
+    /// The start offsets of the last two identifier-or-keyword tokens whose raw bytes
+    /// were NOT plain one-column ASCII — a byte at or above `0x80` somewhere in the
+    /// token — most recent first, `u32::MAX` (no token starts there) while unset.
+    /// Written only by [`Lexer::scan_identifier_into`], and only on the two branches
+    /// that consume a non-ASCII char, so the hot path of that walk records nothing.
+    /// Three names in 483,358 take those branches on a real corpus; carrying the same
+    /// fact as a per-identifier `bool` instead — seeded, kept live across the scan
+    /// loop, stored, and saved past the parser's lookahead — measured **+0.47%** of a
+    /// parse run for work the parse path never spends. Keying the RARE event makes the
+    /// record free.
+    ///
+    /// Read by [`Lexer::ident_is_plain_ascii`]: a token is plain iff its start is in
+    /// neither slot. Two slots, not one, because the parser reads a name while the lexer
+    /// may already have produced ONE further token (its single-token lookahead), and that
+    /// token may itself be non-plain — it takes slot 0 and the current name's start
+    /// survives in slot 1. The lexer is never more than one token ahead of the parser's
+    /// `current` (every relex re-seats it at a non-identifier token and clears or keeps
+    /// the one peek), which is the whole invariant. A stale offset is never wrong: a key
+    /// names a byte offset whose identifier scan saw a non-ASCII char, and the same bytes
+    /// scan the same way under any tokenization.
+    ///
+    /// The printer spends it: a plain-ASCII name has a visual width equal to its byte
+    /// length — an identifier can hold no `\t` or `\n` — so the width scan
+    /// `DocArena::source_span` runs for every other source slice is skipped entirely.
+    nonplain_ident_starts: [u32; 2],
     /// Byte offset of `source` within the document this lexer's ERRORS are rendered
     /// against — zero for a standalone file, the island start for a Svelte `<script>`.
     /// Token positions are unaffected (the parser shifts those itself when it builds
@@ -315,6 +340,7 @@ impl<'a> Lexer<'a> {
             had_line_terminator: false,
             decode_scratch: String::new(),
             has_decoded: false,
+            nonplain_ident_starts: [u32::MAX; 2],
             base_offset,
         }
     }
@@ -371,6 +397,30 @@ impl<'a> Lexer<'a> {
             Some(&self.decode_scratch)
         } else {
             None
+        }
+    }
+
+    /// Whether the raw bytes of the identifier-or-keyword token starting at `start`
+    /// (lexer-relative, as token spans are) are plain one-column ASCII. Exact for the
+    /// parser's current token and for its one lookahead token — see
+    /// `nonplain_ident_starts` for why two slots suffice and what would break it.
+    #[inline]
+    pub fn ident_is_plain_ascii(&self, start: u32) -> bool {
+        let [k0, k1] = self.nonplain_ident_starts;
+        start != k0 && start != k1
+    }
+
+    /// Record that the identifier scan starting at `start` consumed a non-ASCII char.
+    /// Idempotent per token: a token whose first char AND a later char are non-ASCII
+    /// calls this twice, and pushing it twice would evict the previous token's record
+    /// while the parser may still be reading that token's name.
+    #[cold]
+    #[inline(never)]
+    fn note_nonplain_ident(&mut self, start: usize) {
+        let start = start as u32;
+        if self.nonplain_ident_starts[0] != start {
+            self.nonplain_ident_starts[1] = self.nonplain_ident_starts[0];
+            self.nonplain_ident_starts[0] = start;
         }
     }
 
@@ -443,6 +493,9 @@ impl<'a> Lexer<'a> {
         let start = self.position;
         // None until an actual escape is decoded; `decoded.is_some()` ⇔ has-escapes.
         let mut decoded: Option<String> = None;
+        // Whether the raw token is plain ASCII is recorded on the two branches below
+        // that consume a non-ASCII char (`note_nonplain_ident`), and nowhere else: the
+        // hot path carries no flag, no register and no store for it.
 
         // Handle first character (already validated as valid identifier start)
         if first_char == '\\' {
@@ -477,6 +530,9 @@ impl<'a> Lexer<'a> {
                 if pos != self.position {
                     self.set_position(pos);
                 }
+            } else {
+                // A non-ASCII start char: the raw token is not plain ASCII.
+                self.note_nonplain_ident(start);
             }
         }
 
@@ -524,6 +580,7 @@ impl<'a> Lexer<'a> {
                 // IdentifierPart.
                 Some(_) => match self.cur_char() {
                     Some(ch) if is_id_continue(ch) => {
+                        self.note_nonplain_ident(start);
                         if let Some(d) = &mut decoded {
                             d.push(ch);
                         }

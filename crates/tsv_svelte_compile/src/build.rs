@@ -85,6 +85,7 @@ impl<'arena> Builder<'arena> {
         let ident_name = IdentName {
             escaped: Some(self.arena.alloc_str(name)),
             raw_len: 0,
+            plain_ascii: false,
         };
         Identifier::simple(ident_name, span)
     }
@@ -105,6 +106,7 @@ impl<'arena> Builder<'arena> {
         let ident_name = IdentName {
             escaped: Some(self.arena.alloc_str(name)),
             raw_len: 0,
+            plain_ascii: false,
         };
         Identifier::simple(ident_name, span)
     }
