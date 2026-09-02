@@ -659,6 +659,14 @@ const KEYWORD_LENGTHS_BY_FIRST_LETTER: [u16; 26] = {
     ]
 };
 
+/// Low-`len`-bytes mask for a `u64` SWAR key (`len` ∈ 1..=8) — `u64::MAX` at `len == 8`.
+/// Applied inside each [`keyword_swar`] arm, where `len` is a compile-time constant, so
+/// it lowers to one `and` with an immediate (or a narrower compare) rather than the
+/// `shl`/`shr` pair a runtime `len` needs.
+const fn keyword_low_mask(len: u32) -> u64 {
+    u64::MAX >> ((8 - len) * 8)
+}
+
 /// Encode up to 8 ASCII bytes of `s` as a little-endian `u64` — the SWAR key for a
 /// keyword of length ≤ 8. Used only inside `const { … }` so each keyword constant
 /// is materialized at compile time, never re-run at the call site.
@@ -688,11 +696,16 @@ const fn keyword_encode_wide(s: &str) -> u128 {
 }
 
 /// SWAR keyword recognition for identifiers of length **2..=8**: the caller packs
-/// the identifier's bytes into a little-endian `u64` (`word`, masked to `len`
-/// bytes — see `read_keyword_word`) and this matches it against the keyword
-/// constants of that length. Returns `None` for non-keywords and for `len` outside
-/// 2..=8 — the caller routes the three length-9/10 keywords
-/// (`undefined`/`satisfies`/`instanceof`) to [`keyword_swar_long`].
+/// the identifier's bytes into a little-endian `u64` (`word` — see
+/// `read_keyword_word`) and this matches it against the keyword constants of that
+/// length. Returns `None` for non-keywords and for `len` outside 2..=8 — the caller
+/// routes the three length-9/10 keywords (`undefined`/`satisfies`/`instanceof`) to
+/// [`keyword_swar_long`].
+///
+/// ⚠️ **`word`'s lanes at or past `len` are UNSPECIFIED** — on the reader's fast path
+/// they are whatever bytes follow the identifier. Each arm masks them off with
+/// [`keyword_low_mask`], which is a compile-time constant *here* and would be a
+/// variable `shl`/`shr` pair in the reader, in front of this dispatch.
 ///
 /// Recognizes the same length-≤8 reserved words as the `KEYWORDS` oracle, proven in
 /// `swar_matches_keyword_table`. Dispatching on `len` first keeps each per-length
@@ -701,11 +714,12 @@ const fn keyword_encode_wide(s: &str) -> u128 {
 #[inline]
 // `allow`, not `expect`: the lint fires without it, but the expectation never registers as
 // fulfilled — neither on the fn nor on the `use` item itself — so `expect` reads as dead.
-#[allow(clippy::enum_glob_use)] // 49 arms — the glob keeps the per-length tables readable
+#[allow(clippy::enum_glob_use)] // 50 arms — the glob keeps the per-length tables readable
 fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
     use KeywordKind::*;
     match len {
         2 => {
+            let word = word & const { keyword_low_mask(2) };
             if word == const { keyword_encode("in") } {
                 Some(In)
             } else if word == const { keyword_encode("if") } {
@@ -719,6 +733,7 @@ fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
             }
         }
         3 => {
+            let word = word & const { keyword_low_mask(3) };
             if word == const { keyword_encode("let") } {
                 Some(Let)
             } else if word == const { keyword_encode("var") } {
@@ -736,6 +751,7 @@ fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
             }
         }
         4 => {
+            let word = word & const { keyword_low_mask(4) };
             if word == const { keyword_encode("true") } {
                 Some(True)
             } else if word == const { keyword_encode("null") } {
@@ -759,6 +775,7 @@ fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
             }
         }
         5 => {
+            let word = word & const { keyword_low_mask(5) };
             if word == const { keyword_encode("const") } {
                 Some(Const)
             } else if word == const { keyword_encode("false") } {
@@ -788,6 +805,7 @@ fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
             }
         }
         6 => {
+            let word = word & const { keyword_low_mask(6) };
             if word == const { keyword_encode("number") } {
                 Some(Number)
             } else if word == const { keyword_encode("string") } {
@@ -815,6 +833,7 @@ fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
             }
         }
         7 => {
+            let word = word & const { keyword_low_mask(7) };
             if word == const { keyword_encode("boolean") } {
                 Some(Boolean)
             } else if word == const { keyword_encode("unknown") } {
@@ -830,6 +849,7 @@ fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
             }
         }
         8 => {
+            // No mask: at `len == 8` every lane is the identifier's own.
             if word == const { keyword_encode("continue") } {
                 Some(Continue)
             } else if word == const { keyword_encode("function") } {
@@ -875,30 +895,35 @@ fn keyword_swar_long(word: u128, len: usize) -> Option<KeywordKind> {
     }
 }
 
-/// Pack `bytes[start..start+len]` (an identifier, `len` ∈ 2..=8) into a
-/// little-endian `u64` keyword key. Fast path: a single 8-byte load when 8 bytes
-/// are in bounds (the common case — an identifier is rarely in the file's last 8
-/// bytes), masked to `len` bytes. Near EOF, assemble from the `len` identifier
-/// bytes (always in bounds: the identifier occupies `[start, start+len)`).
+/// Pack the identifier at `bytes[start..start+len]` (`len` ∈ 2..=8) into a
+/// little-endian `u64` keyword key for [`keyword_swar`]. Fast path: one 8-byte load
+/// when 8 bytes are in bounds — **99.99%** of the calls that reach here on a TypeScript
+/// corpus, since an identifier is rarely in the file's last 8 bytes. Near EOF, assemble
+/// from the `len` identifier bytes (always in bounds: the identifier occupies
+/// `[start, start+len)`).
+///
+/// **The result is only defined in its low `len` bytes.** The lanes above are the
+/// identifier's own trailing bytes on the fast path and zero near EOF, and
+/// [`keyword_swar`] masks them off per arm — masking here instead costs a
+/// `neg`/`shl`/`shr` dependency chain on a runtime `len`, in front of the length
+/// dispatch.
+///
+/// ⚠️ **The `first_chunk` spelling is what earns the single `movq`, and the obvious
+/// spelling does not.** An eight-element `from_le_bytes([bytes[start], …,
+/// bytes[start + 7]])` behind a `start + 8 <= bytes.len()` guard reads as one load
+/// and is not: because the eighth byte is consumed only on the `len == 8` arm, LLVM
+/// sinks that byte's load into the arm and assembles the other seven from **six
+/// `movzbl` + six `shl` + six `or`**, reusing the first byte the pre-filter already
+/// held. A borrowed `&[u8; 8]` has no such per-byte structure to sink, so the load
+/// stays whole and the mask is unconditional.
 #[inline]
 fn read_keyword_word(bytes: &[u8], start: usize, len: usize) -> u64 {
-    if start + 8 <= bytes.len() {
-        // Eight in-bounds bytes packed little-endian; lowers to one `movq`.
-        let word = u64::from_le_bytes([
-            bytes[start],
-            bytes[start + 1],
-            bytes[start + 2],
-            bytes[start + 3],
-            bytes[start + 4],
-            bytes[start + 5],
-            bytes[start + 6],
-            bytes[start + 7],
-        ]);
-        if len == 8 {
-            word
-        } else {
-            word & ((1u64 << (len * 8)) - 1)
-        }
+    if let Some(chunk) = bytes.get(start..).and_then(|tail| tail.first_chunk::<8>()) {
+        // Eight in-bounds bytes packed little-endian. The lanes at or past `len` are
+        // whatever follows the identifier; `keyword_swar`'s per-length arm masks them
+        // off with a CONSTANT, which is cheaper than the variable shift pair this
+        // would need here (`len` is a runtime value here and a compile-time one there).
+        u64::from_le_bytes(*chunk)
     } else {
         let mut w = 0u64;
         let mut i = 0;
@@ -912,7 +937,8 @@ fn read_keyword_word(bytes: &[u8], start: usize, len: usize) -> u64 {
 
 /// Pack `bytes[start..start+len]` (an identifier, `len` ∈ 9..=10) into a little-endian
 /// `u128` keyword key — the wide counterpart of [`read_keyword_word`] for the
-/// length-9/10 path. A plain byte loop, no 8-byte fast load.
+/// length-9/10 path. A plain byte loop where its sibling has an 8-byte load, and
+/// **deliberately so**: see the refusal below.
 ///
 /// ⚠️ **This loop is not free, and the sentence that used to stand here — "only the
 /// three long keywords reach here, so this path is cold" — is why nobody noticed.**
@@ -925,8 +951,12 @@ fn read_keyword_word(bytes: &[u8], start: usize, len: usize) -> u64 {
 /// loop body was the hottest line in this file (0.207% / 0.234% of the format and
 /// wire boards). The length key now rejects **82.6%** of those calls, which is what
 /// makes the remaining ones cheap enough to leave on a byte loop — ⛔ rewriting it
-/// off a `u64` head was measured **on top of** that pre-filter and came out *worse*
-/// on every channel, the residue being smaller than the rewrite's own tail branches.
+/// off a `u64` head (with the [`read_keyword_word`] fast path's own `first_chunk`
+/// spelling, so the head really was one load) was measured **on top of** that
+/// pre-filter and came out *worse* on every channel, the residue being smaller than
+/// the rewrite's own tail branches. The whole remaining path is **5,673 calls per
+/// pass** against 242,269 for the `len <= 8` one — a ceiling of about **0.03%** of the
+/// run, so no spelling of it can pay.
 ///
 /// ⭐ The general form: a "this path is cold" comment names a RATE, and the rate it
 /// names is usually the success rate while the cost follows the call rate.
@@ -947,7 +977,7 @@ fn read_keyword_word_wide(bytes: &[u8], start: usize, len: usize) -> u128 {
 /// see [`KEYWORD_LENGTHS_BY_FIRST_LETTER`] — rejecting PascalCase / `_`/`$`-led /
 /// non-keyword-letter names *and* every name whose length no keyword of that letter
 /// has, all before a single compare arm runs), then recognizes the
-/// keyword entirely via SWAR — the 49 keywords of length ≤ 8 through [`keyword_swar`]
+/// keyword entirely via SWAR — the 50 keywords of length ≤ 8 through [`keyword_swar`]
 /// (`u64` key) and the three length-9/10 keywords
 /// (`undefined`/`satisfies`/`instanceof`) through [`keyword_swar_long`] (`u128` key).
 /// No hashing on any path.
@@ -1125,15 +1155,21 @@ mod tests {
         }
     }
 
-    /// The production keyword encoders (`read_keyword_word`, a single 8-byte load + mask
-    /// or a byte-assembly near EOF, for length ≤ 8; `read_keyword_word_wide` for length
-    /// 9/10) must produce the same little-endian word as the compile-time
+    /// The production keyword encoders (`read_keyword_word`, one 8-byte load or a
+    /// byte-assembly near EOF, for length ≤ 8; `read_keyword_word_wide` for length 9/10)
+    /// must produce the same little-endian word as the compile-time
     /// `keyword_encode`/`keyword_encode_wide` the SWAR constants are built from.
     /// `swar_matches_keyword_table` feeds the compile-time encoders, so without this a
     /// divergence in the runtime readers — the byte order the lexer actually runs —
     /// would pass the unit suite and only surface in the integration gates. Covers the
     /// in-bounds fast path (padded source), the near-EOF assembly path (the keyword as
     /// the final bytes), and the wide length-9/10 reader.
+    ///
+    /// ⚠️ The reader's fast path leaves the lanes at or past `len` as whatever follows
+    /// the identifier, so what must equal `keyword_encode` is the **composition** the
+    /// production path performs — the reader under `keyword_low_mask(len)`, which is
+    /// where `keyword_swar` applies it. That is asserted here for both reader paths;
+    /// `keyword_swar_ignores_lanes_past_len` covers the masking itself.
     #[test]
     fn read_keyword_word_matches_keyword_encode() {
         for &(kw, _) in KEYWORDS {
@@ -1146,21 +1182,81 @@ mod tests {
                 );
                 continue;
             }
+            let mask = keyword_low_mask(kw.len() as u32);
             // Fast path: ≥ 8 bytes in bounds (trailing pad guarantees start + 8 <= len).
             let mut padded = kw.as_bytes().to_vec();
             padded.extend_from_slice(b"________");
             assert_eq!(
-                read_keyword_word(&padded, 0, kw.len()),
+                read_keyword_word(&padded, 0, kw.len()) & mask,
                 keyword_encode(kw),
                 "fast-path read_keyword_word disagrees with keyword_encode for `{kw}`"
             );
             // Near-EOF path: the keyword is the trailing bytes (start + 8 > len for
             // len < 8; the three len-8 keywords still exercise the fast branch here).
             assert_eq!(
-                read_keyword_word(kw.as_bytes(), 0, kw.len()),
+                read_keyword_word(kw.as_bytes(), 0, kw.len()) & mask,
                 keyword_encode(kw),
                 "EOF-path read_keyword_word disagrees with keyword_encode for `{kw}`"
             );
+        }
+    }
+
+    /// The reader's fast path hands `keyword_swar` eight source bytes, so for every
+    /// identifier shorter than eight the lanes past `len` carry **whatever follows the
+    /// identifier in the file** — and the arms' `keyword_low_mask` is the only thing
+    /// that stops those bytes from reaching a compare. No corpus can grade that: a
+    /// missing mask still matches wherever the trailing bytes happen to be zero, which
+    /// is exactly what a keyword at EOF looks like, so the shapes that separate the two
+    /// spellings must be generated. Every reserved word of length ≤ 8 is re-read with
+    /// every one of 256 following bytes and a spread of wider fills, and every
+    /// near-miss non-keyword with the same, through the real `keyword_at` entry point.
+    #[test]
+    fn keyword_swar_ignores_lanes_past_len() {
+        const FILLS: [u64; 6] = [
+            0,
+            u64::MAX,
+            0x5a5a_5a5a_5a5a_5a5a,
+            0xa5a5_a5a5_a5a5_a5a5,
+            0x0102_0304_0506_0708,
+            0x8080_8080_8080_8080,
+        ];
+        for &(kw, kind) in KEYWORDS {
+            if kw.len() > 8 {
+                continue;
+            }
+            let mask = keyword_low_mask(kw.len() as u32);
+            for fill in FILLS {
+                assert_eq!(
+                    keyword_swar(keyword_encode(kw) | (fill & !mask), kw.len()),
+                    Some(kind),
+                    "keyword_swar lost `{kw}` under trailing fill {fill:#x}"
+                );
+            }
+            // Through the entry point, over every possible following byte.
+            for trailing in 0u8..=255 {
+                let mut bytes = kw.as_bytes().to_vec();
+                bytes.extend_from_slice(&[trailing; 8]);
+                assert_eq!(
+                    keyword_at(&bytes, 0, kw.len()),
+                    Some(kind),
+                    "keyword_at lost `{kw}` followed by {trailing:#04x}"
+                );
+            }
+        }
+        // The other direction: a non-keyword must not become one because its trailing
+        // bytes complete a reserved word's encoding in the lanes past `len`.
+        for s in [
+            "value", "index", "props", "fromm", "iff", "clas", "functio", "co",
+        ] {
+            for trailing in 0u8..=255 {
+                let mut bytes = s.as_bytes().to_vec();
+                bytes.extend_from_slice(&[trailing; 8]);
+                assert_eq!(
+                    keyword_at(&bytes, 0, s.len()),
+                    None,
+                    "keyword_at promoted `{s}` followed by {trailing:#04x}"
+                );
+            }
         }
     }
 

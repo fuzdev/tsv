@@ -1756,6 +1756,60 @@ a copy trades a call for a *wider but worse* instruction sequence.
   in the ORDER and not in the WORK.** State the invariant it must still satisfy,
   check it, then read the number as a ceiling and nothing else.
 
+### An eight-byte load stops being one load the moment one byte is used conditionally
+
+`read_keyword_word` packs an identifier's first eight bytes into a `u64`, behind a
+`start + 8 <= bytes.len()` guard, with the natural spelling:
+
+```rust
+let word = u64::from_le_bytes([bytes[start], bytes[start + 1], /* … */ bytes[start + 7]]);
+if len == 8 { word } else { word & ((1u64 << (len * 8)) - 1) }
+```
+
+Its comment said "lowers to one `movq`". `objdump` said otherwise: **six `movzbl` +
+six `shl` + six `or`**, reusing the first byte the caller already held, then a
+conditional `movzbl` for byte 7 — plus a five-instruction `shl`/`not`/`and` for the
+mask. Eighteen instructions where one was claimed.
+
+The cause is the `if len == 8` arm, and the arm exists only because `1u64 << 64`
+overflows. Byte 7 contributes to the value on **one** path, so LLVM sinks that byte's
+load into that path — and once the array is no longer built from eight
+unconditionally-live loads, there is nothing to widen. Spelling the mask so it needs
+no arm (`u64::MAX >> ((8 - len) * 8)`, all-ones at `len == 8`) and borrowing the bytes
+as an array rather than listing them makes the whole thing one `mov`:
+
+```rust
+if let Some(chunk) = bytes.get(start..).and_then(|tail| tail.first_chunk::<8>()) {
+    u64::from_le_bytes(*chunk)   // one movq; the caller masks per length
+}
+```
+
+- ⭐⭐ **A comment that names a codegen outcome is a measurement with its instrument
+  discarded** — the same failure as a "this path is cold" comment naming a rate, and
+  `objdump` is the instrument, free to re-run. Grep for such claims and check them.
+- ⭐⭐ **A shift-overflow workaround can cost eighteen instructions.** `1u64 << (n * 8)`
+  needs an arm at `n == 8`; `u64::MAX >> ((8 - n) * 8)` does not, and the difference is
+  not the mask — it is what the arm does to every load feeding it.
+- ⭐⭐ **Mask on the constant side of a dispatch.** With a runtime `len` the mask is a
+  `neg`/`shl`/`shr` chain sitting in front of the length dispatch; moved into the
+  per-length arms it is one `and` with an immediate (or a narrower compare), off the
+  critical path and overlapping the dispatch. Measured separately: −0.175% of the TS
+  format run for the load alone, **−0.215%** with the mask moved, and 3× the cycles
+  delta in the single-binary A/B that chose between them.
+- ⚠️ **A board row for a small inlined helper undercounts it.** These srclines read
+  **0.090% / 0.097%** of the TS format and wire boards; removing them measured
+  **−0.215% / −0.327%**, two to three times the row. An inlined helper's instructions
+  are attributed to whatever lines the optimizer folded them into, so a sub-floor row on
+  one is an unsized lead rather than a refusal — size it by counting instructions per
+  call off `objdump` and multiplying by a census of calls per pass.
+- ⚠️ **The trailing lanes become a new failure surface, and no corpus can grade it.**
+  Handing the matcher eight source bytes means the lanes past `len` carry whatever
+  follows the identifier; a missing mask still matches wherever those bytes are zero,
+  which is what a keyword at EOF looks like. The oracle has to be generated —
+  `keyword_swar_ignores_lanes_past_len` re-reads every reserved word under all 256
+  following bytes and a spread of wider fills, and is mutation-checked by deleting one
+  arm's mask.
+
 ### Where a peel's SET boundary lands decides the cost of the path it does NOT take
 
 The same lever, built twice over different kind sets, measures −0.173% and
