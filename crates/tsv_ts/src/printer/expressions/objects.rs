@@ -763,8 +763,34 @@ impl<'a> Printer<'a> {
         let threshold = TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
 
         let base_width = match key {
-            // Prettier: cleanDoc reduces identifier keys to their name string
-            Expression::Identifier(id) => self.with_ident_name(id, |s| visual_width(s, TAB_WIDTH)),
+            // Prettier: cleanDoc reduces identifier keys to their name string.
+            //
+            // ⭐ **A plain-ASCII name is not measured at all.** An identifier holds no
+            // `\t` and no `\n`, so a plain-ASCII one is one column a byte and its width
+            // IS `raw_len` — the answer the lexer already recorded
+            // (`IdentName::plain_ascii`, the same claim `Printer::ident_name_doc`
+            // spends). Three quarters of every `visual_width` call a TypeScript format
+            // run makes are this arm (51,042 of 67,654 on a 1,666-file corpus, mean 7.3
+            // bytes — too short for either of `visual_width`'s vector loops to engage),
+            // and it asks only whether the width is under `threshold`.
+            Expression::Identifier(id) => {
+                let name = id.ident_name();
+                if name.escaped.is_none() && name.plain_ascii {
+                    // Graded on every key in every debug build: over-claiming is a silent
+                    // layout error (a key deemed short that is not), under-claiming
+                    // silently retires the lever.
+                    debug_assert_eq!(
+                        name.raw_len as usize,
+                        self.with_ident_name_at(name, id.span.start, |s| visual_width(
+                            s, TAB_WIDTH
+                        )),
+                        "a plain-ASCII key's `raw_len` disagrees with its measured width"
+                    );
+                    name.raw_len as usize
+                } else {
+                    self.with_ident_name_at(name, id.span.start, |s| visual_width(s, TAB_WIDTH))
+                }
+            }
             Expression::Literal(lit) => match &lit.value {
                 LiteralValue::String(cooked) => {
                     let content = cooked.resolve(lit.span, self.source);

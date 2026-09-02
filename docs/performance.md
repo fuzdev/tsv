@@ -2273,6 +2273,40 @@ the equivalence test beside the function is a three-character triple product, wh
 forms a word. The grader has to be generated — each special byte at every alignment of a
 0–23-byte ASCII run, with a non-ASCII tail and again with a non-ASCII lead.
 
+### A predicate that measures and then asks "under five?" — the flag was already the answer
+
+`is_short_property_key` decides whether an object key is short enough that breaking after
+the colon buys nothing (prettier's `isObjectPropertyWithShortKey`). For an identifier key
+it resolved the name, measured it with `visual_width`, and compared the width against
+`TAB_WIDTH + 3`. A caller census of `visual_width` put that one arm at **51,042 of the
+67,654 calls** a TypeScript format run makes (75.4%), mean **7.3 bytes** — and at seven
+bytes neither of `visual_width`'s two passes reaches its 32-byte SSE loop, so every call
+pays two scalar tails and an entry: `objdump` prices the arm at **39** instructions in the
+predicate itself (three pushes, the `is_char_boundary` checks at both ends of the `str`
+slice, the call) plus ~126 in `visual_width`.
+
+The answer was already on the node. An identifier can hold no `\t` and no `\n`, so a
+plain-ASCII name's width IS its byte length, and `IdentName::plain_ascii` — the flag the
+lexer records and `ident_name_doc` already spends to skip `DocArena`'s width measure — is
+exactly that claim. The arm now reads `raw_len` when the flag is set: **21** instructions,
+no call, no transport (the field exists and the printer already reads it). Measured
+`instructions:u` **−0.298% / −0.034% / +0.001%** (TS / Svelte / CSS format), −0.296% on the
+shipped CLI, and an exact **+0.000%** on `json_profile`. `.text` +32 B.
+
+- ⭐⭐⭐ **"Vectorize it" was the wrong question.** The lead was filed as a scan problem
+  because `visual_width` is a scan; the census of its *callers* showed three quarters of
+  the calls never needed a measure at all, and the population that retires a leaf is
+  found by asking who calls it, not by tuning it.
+- ⚠️ **The predicate's success rate does not matter to this lever** — it replaces the
+  measure on every call, true or false. (It answers TRUE 30.7% of the time on the
+  TypeScript corpus, 36.8% on the Svelte one.)
+- ⚠️ **A wrong flag is a silent layout error here too** — a key deemed short that is not
+  changes an assignment layout and nothing else — so the arm grades `raw_len` against the
+  measured width on every key in every debug build, the same two-sided rule
+  `ident_name_doc` and `verbatim_literal_doc` follow.
+- ✓ `#[inline]` on the predicate is inert (same `.text` size, 0.001 points): LLVM outlines
+  it at both rungs, so the outlining split did not flip when the function shrank.
+
 ### `str::find(char)` is a CALL to a searcher that then calls `memchr`
 
 Two comments in the tree said a single-`char` pattern "lowers to a `memchr`". For
