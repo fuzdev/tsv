@@ -909,7 +909,7 @@ impl<'a> Printer<'a> {
             self.comments,
             operand_end,
             gap_end,
-            self.comment_line_breaks,
+            self.comment_line_breaks.breaks,
         );
         // Same-line comments (blocks, then the at-most-one line comment) trail the
         // operand in source order; `build_trailing_comment_doc` keeps a block inline

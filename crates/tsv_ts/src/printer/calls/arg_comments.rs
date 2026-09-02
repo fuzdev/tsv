@@ -707,7 +707,7 @@ pub(super) fn emit_first_arg_leading_comments(
     let d = printer.d();
     let pc = PartitionedComments::new(
         printer.comments,
-        printer.comment_line_breaks,
+        printer.comment_line_breaks.breaks,
         paren_open,
         first_arg_start,
     );

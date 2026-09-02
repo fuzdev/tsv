@@ -106,7 +106,7 @@ fn build_inline_leading_comments(
     }
     let pc = PartitionedComments::new(
         printer.comments,
-        printer.comment_line_breaks,
+        printer.comment_line_breaks.breaks,
         paren_open,
         arg_start,
     );
@@ -617,7 +617,7 @@ fn build_chain_args_force_expand(
         if i == 0 && has_leading_comments {
             let first_pc = PartitionedComments::new(
                 printer.comments,
-                printer.comment_line_breaks,
+                printer.comment_line_breaks.breaks,
                 paren_open,
                 arg_start,
             );

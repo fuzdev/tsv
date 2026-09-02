@@ -52,7 +52,7 @@ impl<'a> Printer<'a> {
             self.d(),
             &script.content,
             self.source(),
-            &self.line_breaks,
+            self.line_table(),
             embed,
         );
 
