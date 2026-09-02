@@ -21,7 +21,9 @@ use crate::hash::FxHashMap;
 
 use crate::Span;
 use crate::config::TAB_WIDTH;
-use crate::printing::{next_lf, visual_width};
+use crate::printing::{
+    next_lf, next_width_relevant, next_width_relevant_in, visual_width, visual_width_mixed,
+};
 
 #[cfg(feature = "comment_check")]
 use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
@@ -775,19 +777,29 @@ fn soften_forced_break(v: u32) -> u32 {
     }
 }
 
-/// Longest slice [`pooled_text_width`] measures with its fused byte walk. Past
-/// it, the scan shape flips to the searcher-based one: `contains('\n')` inlines
-/// `memchr` and `is_ascii` calls out to one, both word-at-a-time rather than
-/// SIMD, and the tab count auto-vectorizes (it has no early exit, though into a
-/// byte-to-`usize` widening chain rather than a wide compare), so on a long slice
-/// three wide passes beat one scalar walk — while on a short one their setup,
-/// paid regardless of length, is the entire cost. Text nodes are short (a CSS
-/// property name, a value chunk), but not uniformly: the
-/// TS printer's tail runs long enough that an ungated fused walk measured a real
-/// regression on TS while CSS never noticed the gate at all. The crossover is
-/// broad and 32 sits in the flat middle of it. Only a *speed* switch — both arms
-/// answer identically, and one oracle grades them.
-const FUSED_WIDTH_SCAN_MAX: usize = 32;
+/// A measured width, clamped below [`TEXT_WIDTH_HAS_NEWLINE`] — the one spelling
+/// of the clamp every width producer goes through.
+///
+/// Unlike the `u32` flat-width cache above (where aliasing needs a ~4 GB subtree
+/// and is benign anyway), a `u16` alias is **reachable** — a single-line
+/// non-ASCII text of 65,535 columns — and `as u16` alone would be wrong twice
+/// over: 65,535 aliases [`TEXT_WIDTH_HAS_NEWLINE`] (fits would treat the line as
+/// ending inside the text) and 65,536 or more wraps (a huge text cached as narrow
+/// → "always fits").
+///
+/// Clamping is verdict-preserving: every fits comparison is against a print width
+/// orders of magnitude below the clamp, so "65,534" and the true width answer
+/// identically. The same holds for the other consumer, `render_text`'s column
+/// advance — the column only feeds threshold comparisons (print width,
+/// `first_line_offset`) far below the clamp, and resets at each newline.
+#[inline]
+const fn clamp_text_width(w: usize) -> u16 {
+    if w >= TEXT_WIDTH_HAS_NEWLINE as usize {
+        TEXT_WIDTH_HAS_NEWLINE - 1
+    } else {
+        w as u16
+    }
+}
 
 /// The eager width-cache policy for doc text, and it has **no exceptions**:
 /// pool-stored text ([`DocText::Pooled`], `MultilineText` first lines),
@@ -811,7 +823,7 @@ const FUSED_WIDTH_SCAN_MAX: usize = 32;
 /// a *bundle* — names together with `text()` statics and the since-deleted
 /// interner's symbols — before the static cache
 /// amortized one half of it and before both the build-time and on-demand
-/// measures were unified onto [`fused_ascii_width`]. Re-take a width-policy
+/// measures were unified onto this one. Re-take a width-policy
 /// number against the current pair of measures; do not inherit one.
 ///
 /// ⭐ With no exception left the policy is **total**, and that is a structural
@@ -822,114 +834,176 @@ const FUSED_WIDTH_SCAN_MAX: usize = 32;
 /// is deleted rather than kept unreached; re-introducing a deferral means
 /// re-introducing the `source` threading it forces on every fits caller.
 ///
-/// The measured width is clamped below the sentinel. Unlike the `u32`
-/// flat-width cache above (where aliasing needs a ~4 GB subtree and is benign
-/// anyway), a `u16` alias is reachable — a single-line non-ASCII text ≥65,535
-/// columns — and `as u16` alone would be wrong twice over: 65,535 aliases
-/// `TEXT_WIDTH_HAS_NEWLINE` (fits would treat the line as ending inside the
-/// text) and ≥65,536 wraps (a huge text cached as narrow → "always fits").
-/// Clamping is verdict-preserving: every fits comparison is against a print
-/// width orders of magnitude below the clamp, so "65,534" and the true width
-/// answer identically. The same holds for the other consumer, `render_text`'s
-/// column advance — the column only feeds threshold comparisons (print width,
-/// `first_line_offset`) far below the clamp, and resets at each newline.
+/// The measured width is clamped below the sentinel by
+/// [`clamp_text_width`], which carries that argument.
 ///
-/// One forward byte pass decides all three facts the width needs — is there a
-/// newline, is the slice ASCII, how many tabs does it hold — because three
-/// separate searchers cost more in *setup* (paid regardless of length) than one
-/// walk costs in total on the short slice that actually arrives here. Slices
-/// past [`FUSED_WIDTH_SCAN_MAX`] take the searcher shape instead.
+/// ⚠️ **This is the SLICE form, and it is now the minority one.** A text that is
+/// a span of the document goes through [`source_span_width`] instead — 98% of the
+/// width measures in a format run — because a span can read its host's words where
+/// a slice has none to read. What follows is the argument both share; the span
+/// form's own doc carries what is different about it.
+///
+/// ⭐ **The width of a plain ASCII line IS its byte count, so the measure is a
+/// SEARCH, not a sum.** One [`crate::printing::next_width_relevant`] pass asks
+/// for the first byte that could make the answer anything else — a `\t`, a `\n`,
+/// or a non-ASCII byte — and finding none *is* the measurement: `s.len()`, with
+/// nothing accumulated along the way. That is what retired the three shapes this
+/// function used to hold at once (a per-byte width sum under a length gate, then
+/// `contains('\n')` + `is_ascii` + a tab count, three passes over the same
+/// bytes): the sum cost **13 instructions a byte** and every caller of it threw
+/// the sum away, and the searcher trio cost about ten more per byte on top of
+/// an out-of-line call. The scan is **~1.9 instructions a byte** and 98.97% of
+/// slices never leave it.
+///
+/// ⚠️ The `\t` / `\n` / non-ASCII class is not decoration and is not free to
+/// narrow: drop `\t` and every tabbed text measures one column short per tab,
+/// which changes a fits verdict and nothing else — invisible to the fixtures and
+/// to any size of format or wire diff. The class is spelled once
+/// (`printing::is_width_relevant`) for the word loop's tail, and
+/// [`pooled_text_width_cold`] re-asks it per hit.
 ///
 /// Answers identically to probing `contains('\n')` and then
-/// [`crate::printing::visual_width`]: on an all-ASCII slice the
-/// loop accumulates `1` per byte and `TAB_WIDTH` per tab, which is exactly that
-/// function's ASCII fast path, `len + tabs * (TAB_WIDTH - 1)`; a `\n` seen before
-/// any non-ASCII byte yields the same sentinel the `contains` probe would have;
-/// and the first non-ASCII byte hands the **whole** slice to the searcher arm, so
-/// a newline sitting *after* that byte is still found.
+/// [`crate::printing::visual_width`]: on an all-ASCII slice the width is
+/// `len + tabs * (TAB_WIDTH - 1)`, which is exactly that function's ASCII fast
+/// path; a `\n` anywhere yields the sentinel the `contains` probe would have;
+/// and the first non-ASCII byte hands the **whole** slice to the grapheme walk,
+/// with a `\n` sitting *after* that byte still found first.
 ///
 /// ⚠️ It mirrors that **ASCII fast path**, where a control character counts as
 /// one column — deliberately *not* `printing::ascii_char_width`, which counts it
 /// as zero and which only the grapheme-walking path uses (see
-/// `visual_width_mixed`). The two disagree on purpose; a fused walk that reached
+/// `visual_width_mixed`). The two disagree on purpose; a walk that reached
 /// for the "obvious" shared helper would silently change every width holding a
 /// control byte. The exhaustive equivalence test grades this arm with `\x00`,
 /// `\x1b` and `\x7f` precisely because no corpus does.
 #[inline]
 fn pooled_text_width(s: &str) -> u16 {
-    match fused_ascii_width(s) {
-        FusedWidth::Width(w) => w.min(TEXT_WIDTH_HAS_NEWLINE as usize - 1) as u16,
-        FusedWidth::Newline => TEXT_WIDTH_HAS_NEWLINE,
-        FusedWidth::Searcher => pooled_text_width_scanned(s),
+    let bytes = s.as_bytes();
+    let first = next_width_relevant(bytes, 0);
+    if first == bytes.len() {
+        return clamp_text_width(bytes.len());
     }
+    pooled_text_width_cold(s, first)
 }
 
-/// [`fused_ascii_width`]'s verdict for one slice.
-pub(super) enum FusedWidth {
-    /// Single-line, all-ASCII: the slice's visual width, unclamped.
-    Width(usize),
-    /// A `\n` was reached before any non-ASCII byte, so the slice has no
-    /// single-line width.
-    Newline,
-    /// The walk declined: the slice is past [`FUSED_WIDTH_SCAN_MAX`], or it holds a
-    /// non-ASCII byte. Either way the caller measures the **whole** slice with the
-    /// searcher shape — a grapheme cluster can start on an ASCII byte the walk
-    /// already counted, so the accumulated width is discarded, not resumed.
-    Searcher,
-}
-
-/// The one fused width walk, behind [`pooled_text_width`] — the single
-/// build-time measure every doc text goes through under the eager policy above.
-/// It was shared with a second, on-demand measure in the fits path
-/// (`arena_fits`'s `text_flat_width`) until that policy lost its last exception
-/// and the on-demand arm lost its producer; the two had previously spelled the
-/// question different ways — the fits arm as `contains('\n')` then
-/// [`crate::printing::visual_width`], two searcher-driven passes over a slice
-/// whose median length is a handful of bytes — and only this one had the
-/// exhaustive oracle (`pooled_text_width_tests`). One walk, one oracle, one
-/// answer.
+/// [`pooled_text_width`] for a span of `source` — the form 98% of the width measures in a
+/// format run take, and the one that can answer a short text in a single word test.
 ///
-/// See [`pooled_text_width`]'s doc for why one pass beats three searchers on a
-/// short slice, why the ASCII arm counts a control byte as one column (mirroring
-/// `visual_width`'s ASCII fast path, **not** `printing::ascii_char_width`), and
-/// why the non-ASCII handoff re-measures from the start. The length gate is
-/// **inside** rather than at each caller: it is part of the answer this function
-/// owns (`Searcher` means "the fused walk declines", for either reason), so the
-/// two callers cannot drift apart on where the crossover sits.
-#[inline]
-pub(super) fn fused_ascii_width(s: &str) -> FusedWidth {
-    if s.len() > FUSED_WIDTH_SCAN_MAX {
-        return FusedWidth::Searcher;
+/// ⭐ **A span is a region of a much longer buffer, so the scan has eight bytes to read
+/// wherever the span itself does not.** [`pooled_text_width`] hands its scan a *slice*,
+/// where a text under eight bytes has no word to form and falls to a scalar class test at
+/// **9 instructions a byte** — and 61% of the spans measured here are that short (390,799
+/// of 640,428 on a 1,666-file TypeScript corpus; only **72** of them sit within eight
+/// bytes of the document's end, where a word genuinely is not readable).
+/// [`next_width_relevant_in`] reads the host's word and ignores what falls past the span.
+///
+/// ⭐ **And the width question wants BYTES, not a `&str`.** `Span::extract` is a `str`
+/// index, so it pays [`str::is_char_boundary`] at both ends — two loads and four compares
+/// the measurement never asked for — and the slice it returns is then read as
+/// `as_bytes()` anyway. The `&str` is materialized only on the cold arm, which needs it
+/// for the grapheme walk.
+///
+/// ⚠️ **That does not weaken the boundary check on any span with content in it**, because
+/// a non-empty span that splits a multi-byte character always *contains* a byte at or
+/// above `0x80` and so always reaches the cold arm: if `end` is not a boundary the
+/// character's lead byte lies at or after `start`, and if `start` is not a boundary it is
+/// itself a continuation byte; either way the class scan hits it and the cold arm's
+/// `span.extract` panics exactly where it always did. The one case that changes is a
+/// **degenerate empty span at a non-boundary offset**, which now measures 0 instead of
+/// panicking here — and still panics at render, where `resolve_text` re-slices the same
+/// span out of the same document.
+///
+/// ⚠️ **`#[inline(always)]` is load-bearing and is a MEASURED choice, not a hint.** Left
+/// to itself LLVM outlines this and folds `source_span`'s allocation into its 38 callers
+/// — the opposite split from the one the `str`-slicing shape got, where measure and
+/// allocation were one outlined function. That split costs **+0.301%** of a TypeScript
+/// format run (~10 instructions of call and marshalling per span, measured as its own
+/// variant), which is more than the scan it was paying for.
+///
+/// ⚠️ Both attributes here and on [`DocArena::source_span`] describe a **threshold**, so a
+/// toolchain bump can move them: re-check that `source_span` is still one outlined symbol
+/// (`objdump -C | grep 'DocArena::source_span>:'`) before trusting a width-path number
+/// taken after one.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn source_span_width(span: Span, source: &str) -> u16 {
+    let bytes = source.as_bytes();
+    let start = span.start as usize;
+    let end = span.end as usize;
+    if start > end || end > bytes.len() {
+        // A malformed span: hand it to the `str` index so it fails where it always did.
+        return source_span_width_invalid(span, source);
     }
-    let mut width = 0usize;
-    for &b in s.as_bytes() {
-        match b {
-            b'\n' => return FusedWidth::Newline,
-            b'\t' => width += TAB_WIDTH,
-            0x00..=0x7f => width += 1,
-            _ => return FusedWidth::Searcher,
-        }
+    let first = next_width_relevant_in(bytes, start, end);
+    if first == end {
+        return clamp_text_width(end - start);
     }
-    FusedWidth::Width(width)
+    source_span_width_cold(span, source, first - start)
 }
 
-/// The searcher-based arm of [`pooled_text_width`]: the whole-slice shape, for a
-/// slice too long for the fused walk or holding a non-ASCII byte. Outlined to
-/// keep that walk lean and inlinable, mirroring the split in
-/// `arena_render::update_pos_for_text` — but, unlike that one's helper,
-/// **not `#[cold]`**: a long slice is a normal input here, not a rare one (the TS
-/// printer's text nodes run past the gate often enough that marking this arm cold
-/// would mispredict against the corpus that needs it most).
-///
-/// Takes the whole slice, not the scanned remainder — a grapheme cluster can
-/// start on the ASCII byte *before* the first non-ASCII one, so only measuring
-/// from the beginning is cluster-correct.
+/// The arm [`source_span_width`]'s scan hands a span to once it finds a byte the width
+/// depends on — **1.0%** of the spans a format run measures. It is the first point that
+/// needs the text as a `str`, so this is where the slice (and its char-boundary check)
+/// is taken.
+#[cold]
 #[inline(never)]
-fn pooled_text_width_scanned(s: &str) -> u16 {
-    if s.contains('\n') {
-        TEXT_WIDTH_HAS_NEWLINE
-    } else {
-        visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_HAS_NEWLINE as usize - 1) as u16
+fn source_span_width_cold(span: Span, source: &str, first: usize) -> u16 {
+    pooled_text_width_cold(span.extract(source), first)
+}
+
+/// A span outside its document, or inverted — where `span.extract`'s `str` index is
+/// what raises the panic, before the width is ever asked for. Spelled as a delegation
+/// rather than an `unreachable!` so it stays correct if the guard above is ever
+/// loosened, and outlined so the arm never widens [`source_span_width`] past what LLVM
+/// will fold back into its caller (the width measure and the node allocation are one
+/// function in the emitted code, as they were when the measure took the `str` slice).
+#[cold]
+#[inline(never)]
+fn source_span_width_invalid(span: Span, source: &str) -> u16 {
+    pooled_text_width(span.extract(source))
+}
+
+/// The arm [`pooled_text_width`]'s scan hands a slice to once it finds a byte the
+/// width depends on — a `\t`, a `\n`, or a non-ASCII one. `first` is that byte's
+/// index, so the scan is never restarted from zero.
+///
+/// **`#[cold]` is right here and was not right for what this replaced.** The arm
+/// it grew out of was entered by every slice past a 32-byte length gate — a
+/// normal input, and the gate's doc said so — where this one is entered only by a
+/// slice that actually holds one of those three bytes: **1.03% of calls** on a
+/// 1,666-file TypeScript corpus (6,624 of 642,179 — 1,414 short slices holding a
+/// tab, 4,330 holding a non-ASCII byte, 880 long ASCII ones holding a tab), and
+/// the `\n` case is **1 call in 642,179**. The premise the old refusal rested on is gone with the gate.
+///
+/// The tab arm keeps scanning rather than falling to a count: only 2,294 of the
+/// 642,179 calls hold a tab at all (0.36%), so the loop it re-enters is expected
+/// to run once.
+/// The non-ASCII arm must still answer the newline question first — a `\n` after
+/// the first non-ASCII byte outranks the width — and it hands
+/// `visual_width_mixed` the **whole** slice, since a grapheme cluster can begin on
+/// the ASCII byte before the one that fired.
+#[cold]
+#[inline(never)]
+fn pooled_text_width_cold(s: &str, first: usize) -> u16 {
+    let bytes = s.as_bytes();
+    let mut i = first;
+    let mut tabs = 0usize;
+    loop {
+        match bytes[i] {
+            b'\n' => return TEXT_WIDTH_HAS_NEWLINE,
+            b'\t' => tabs += 1,
+            _ => {
+                return if next_lf(bytes, i) != bytes.len() {
+                    TEXT_WIDTH_HAS_NEWLINE
+                } else {
+                    clamp_text_width(visual_width_mixed(s, TAB_WIDTH))
+                };
+            }
+        }
+        i = next_width_relevant(bytes, i + 1);
+        if i == bytes.len() {
+            return clamp_text_width(bytes.len() + tabs * (TAB_WIDTH - 1));
+        }
     }
 }
 
@@ -1590,8 +1664,7 @@ impl DocArena {
     #[inline]
     pub fn multiline_text(&self, s: &str) -> DocId {
         let first = &s[..next_lf(s.as_bytes(), 0)];
-        let first_width =
-            visual_width(first, TAB_WIDTH).min(TEXT_WIDTH_HAS_NEWLINE as usize - 1) as u16;
+        let first_width = clamp_text_width(visual_width(first, TAB_WIDTH));
         let span = self.pool_push(s);
         self.alloc(DocNode::MultilineText { span, first_width })
     }
@@ -1648,19 +1721,26 @@ impl DocArena {
     /// eager width-cache policy on [`pooled_text_width`] for why the deferral
     /// they once had is gone.
     ///
-    /// ⚠️ At its current call-site count LLVM **declines** this `#[inline]` and
-    /// emits it as a real symbol (2.3% self on a fuz_app board), so a name
-    /// emission — ~15% of all doc nodes — pays a call. Two shapes buy that back
-    /// and neither is taken: `#[inline(always)]` here recovers `instructions:u`
-    /// −1.20% → −1.51% for **+7,264 B** of `.text` (perf's own inline threshold
-    /// is a U-curve this codebase already sits at the minimum of, so pushing it
-    /// up is a cycles risk), and a second entry point with a **duplicated** body
-    /// reaches −1.45% for +336 B but splits one width computation across two
-    /// sites that nothing keeps in agreement. A profile-guided build makes this
-    /// choice per call site without either cost.
-    #[inline]
+    /// ⚠️ **`#[inline(never)]` here is a MEASURED choice, and it is the choice LLVM
+    /// made on its own for years** — at this call-site count it declined `#[inline]`
+    /// and emitted a real symbol (2.3% self on a fuz_app board), so a name emission —
+    /// ~15% of all doc nodes — has always paid a call. What changed is that
+    /// [`source_span_width`]'s body is small enough to tempt LLVM into the *opposite*
+    /// split: inline this and outline the width. That split costs **+0.301%** of a
+    /// TypeScript format run, so the attribute pins the old shape — one outlined
+    /// function per emission, measure and allocation together — and pinning it is worth
+    /// **0.126 points** and **−12,352 B** of `.text` against letting LLVM choose.
+    ///
+    /// ⚠️ Two shapes that would remove the call itself were measured and are still not
+    /// taken: `#[inline(always)]` here recovered `instructions:u` −1.20% → −1.51% for
+    /// **+7,264 B** of `.text` (perf's own inline threshold is a U-curve this codebase
+    /// already sits at the minimum of, so pushing it up is a cycles risk), and a second
+    /// entry point with a **duplicated** body reached −1.45% for +336 B but splits one
+    /// width computation across two sites that nothing keeps in agreement. A
+    /// profile-guided build makes this choice per call site without either cost.
+    #[inline(never)]
     pub fn source_span(&self, span: Span, source: &str) -> DocId {
-        let w = pooled_text_width(span.extract(source));
+        let w = source_span_width(span, source);
         self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
     }
 
@@ -1672,7 +1752,7 @@ impl DocArena {
     /// [`Self::source_span`] so it force-breaks.
     #[inline]
     pub fn verbatim_source_span(&self, span: Span, source: &str) -> DocId {
-        let w = pooled_text_width(span.extract(source));
+        let w = source_span_width(span, source);
         self.alloc(DocNode::Text(DocText::VerbatimSpan(span, w)))
     }
 
@@ -3732,13 +3812,221 @@ mod pooled_text_width_tests {
     #[test]
     fn agrees_on_long_ascii_runs() {
         // The length range where the replaced shape's SIMD scans were at their
-        // best — the fused walk must still agree there.
+        // best — the word-at-a-time scan must still agree there.
         for len in [31, 32, 33, 63, 64, 65, 127, 128, 256, 1000] {
             assert_agrees(&"x".repeat(len));
             assert_agrees(&format!("{}\t{}", "x".repeat(len / 2), "y".repeat(len / 2)));
             assert_agrees(&format!("{}\n{}", "x".repeat(len / 2), "y".repeat(len / 2)));
             assert_agrees(&format!("{}é{}", "x".repeat(len / 2), "y".repeat(len / 2)));
         }
+    }
+
+    /// Every class byte at every alignment of a scan whose stride is **eight**.
+    ///
+    /// The exhaustive test above tops out at three characters, so it never entered
+    /// a word loop at all — and a word loop's failure modes are all positional: a
+    /// hit in the last lane, a hit one byte past the final whole word, a class byte
+    /// that only the scalar tail can see, a borrow crossing a lane. The lengths run
+    /// past three whole words and the special byte visits **every** index in each,
+    /// which is the only shape that grades the tail against the word loop and both
+    /// against the oracle.
+    #[test]
+    fn agrees_with_a_class_byte_at_every_alignment() {
+        // One representative per arm of the scan, plus the bytes adjacent to the
+        // needles in value order (0x09 / 0x0a are the needles; 0x0b and 0x7f must
+        // NOT fire, 0x80 must).
+        let specials = [
+            "\t", "\n", "\r", "\x0b", "\x00", "\x7f", "\u{80}", "é", "中", "🎉", "\u{0301}",
+        ];
+        for len in 0..=40usize {
+            for special in specials {
+                for at in 0..=len {
+                    let mut v = String::with_capacity(len + 4);
+                    v.push_str(&"x".repeat(at));
+                    v.push_str(special);
+                    v.push_str(&"y".repeat(len - at));
+                    assert_agrees(&v);
+                }
+            }
+        }
+    }
+
+    /// Two class bytes in one slice, at every pair of alignments across a word
+    /// boundary — the shape that grades the *resume*: the special arm re-enters the
+    /// scan at `i + 1` after a tab, and a second hit in the same word (or in the
+    /// scalar tail after a hit in the last word) is where an off-by-one lives.
+    #[test]
+    fn agrees_with_two_class_bytes_at_every_alignment() {
+        for len in 0..=20usize {
+            for (a, b) in [
+                ("\t", "\t"),
+                ("\t", "\n"),
+                ("\n", "\t"),
+                ("\t", "é"),
+                ("é", "\t"),
+                ("é", "\n"),
+                ("\t", "🎉"),
+            ] {
+                for i in 0..=len {
+                    for j in i..=len {
+                        let mut v = String::new();
+                        v.push_str(&"x".repeat(i));
+                        v.push_str(a);
+                        v.push_str(&"y".repeat(j - i));
+                        v.push_str(b);
+                        v.push_str(&"z".repeat(len - j));
+                        assert_agrees(&v);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// [`source_span_width`] must answer exactly what [`pooled_text_width`] answers for the
+/// same text — and the two reach it differently, so only a differential says so.
+///
+/// **The span form reads bytes it must not believe**, which is a failure surface the
+/// slice form does not have and no corpus can be trusted to cover: the word loop reads
+/// eight bytes of the *document* at every step, so a `\n` sitting one byte past the span
+/// (the single most common neighbour an identifier has) is in the register when the
+/// verdict is taken. Believing it turns a plain name's width into the newline sentinel,
+/// which changes a fits verdict and nothing else — no fixture, no format diff, no wire
+/// diff can see it. So the neighbour is enumerated here rather than sampled: every class
+/// byte at every distance past the span's end, at every alignment of the span's start.
+#[cfg(test)]
+mod source_span_width_tests {
+    use super::{pooled_text_width, source_span_width};
+    use crate::span::Span;
+
+    /// One representative per arm of the class, plus two bytes adjacent to the needles
+    /// in value order (`0x0b` and `0x7f` must NOT fire, `0x80` must).
+    const SPECIALS: [&str; 8] = ["\t", "\n", "\x0b", "\x7f", "\u{80}", "é", "中", "🎉"];
+
+    #[track_caller]
+    fn assert_agrees(host: &str, start: usize, end: usize) {
+        let span = Span::new(start as u32, end as u32);
+        assert_eq!(
+            source_span_width(span, host),
+            pooled_text_width(&host[start..end]),
+            "source_span_width disagrees on {:?} of {host:?}",
+            &host[start..end],
+        );
+    }
+
+    /// The neighbour test: a class byte just past the span, which the word read sees and
+    /// the answer must not. Every distance past the end from 0 (inside — a control, so
+    /// the width really does change) through 8 (a whole word away), at every start
+    /// alignment, so the byte visits every lane of the read.
+    #[test]
+    fn ignores_a_class_byte_past_the_span_end() {
+        for special in SPECIALS {
+            for align in 0..9usize {
+                for len in 0..=17usize {
+                    for gap in 0..=8usize {
+                        let host = format!(
+                            "{}{}{}{}{}",
+                            "a".repeat(align),
+                            "x".repeat(len),
+                            "b".repeat(gap),
+                            special,
+                            "c".repeat(9),
+                        );
+                        assert_agrees(&host, align, align + len);
+                    }
+                }
+            }
+        }
+    }
+
+    /// A class byte INSIDE the span, at every alignment — the mirror of the above, and
+    /// the case a too-eager `end` clamp would break.
+    #[test]
+    fn finds_a_class_byte_inside_the_span_at_every_alignment() {
+        for special in SPECIALS {
+            for align in 0..9usize {
+                for len in 1..=17usize {
+                    for at in 0..len {
+                        let host = format!(
+                            "{}{}{}{}{}",
+                            "a".repeat(align),
+                            "x".repeat(at),
+                            special,
+                            "y".repeat(len - 1 - at),
+                            "zzzzzzzzzzzz",
+                        );
+                        let end = align + at + special.len() + (len - 1 - at);
+                        assert_agrees(&host, align, end);
+                    }
+                }
+            }
+        }
+    }
+
+    /// A span ending at (or within eight bytes of) the document's end — the one place no
+    /// word is readable and the scalar class test still runs. `72` spans a 1,666-file
+    /// TypeScript run land here, so it is rare and must still be exact.
+    #[test]
+    fn agrees_within_a_word_of_the_documents_end() {
+        for special in SPECIALS {
+            for tail in 0..9usize {
+                for len in 0..=12usize {
+                    let host = format!("{}{}{}", "x".repeat(len), special, "y".repeat(tail),);
+                    let host_len = host.len();
+                    // Every span that reaches into the last word, including the empty
+                    // one at the very end.
+                    for start in 0..=len {
+                        assert_agrees(&host, start, host_len);
+                        assert_agrees(&host, start, len);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Spans long enough to run several whole words, so the loop's advance is graded
+    /// against the slice form and not only its first read.
+    #[test]
+    fn agrees_on_multi_word_spans() {
+        let host = format!(
+            "{}\t{}é{}\n{}",
+            "x".repeat(40),
+            "y".repeat(40),
+            "z".repeat(40),
+            "w".repeat(40),
+        );
+        let host_len = host.len();
+        for start in 0..host_len {
+            if !host.is_char_boundary(start) {
+                continue;
+            }
+            for end in [start, start + 1, start + 7, start + 8, start + 33, host_len] {
+                if end <= host_len && host.is_char_boundary(end) {
+                    assert_agrees(&host, start, end);
+                }
+            }
+        }
+    }
+
+    /// A non-empty span that splits a multi-byte character panics exactly where the `str`
+    /// index always did — it always contains a byte at or above `0x80`, so it reaches the
+    /// cold arm and its `span.extract`. Both ends are graded: a split `end` (the lead
+    /// byte is inside) and a split `start` (the start is itself a continuation byte).
+    #[test]
+    fn a_span_off_a_char_boundary_still_panics() {
+        for span in [Span::new(0, 1), Span::new(1, 3)] {
+            let caught = std::panic::catch_unwind(|| {
+                source_span_width(span, "é_padding_padding_padding");
+            });
+            assert!(caught.is_err(), "{span:?} should still panic");
+        }
+    }
+
+    /// A span past the document's end fails at the same `str` index it always did.
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn a_span_past_the_documents_end_still_panics() {
+        source_span_width(Span::new(1, 99), "short");
     }
 }
 
