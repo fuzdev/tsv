@@ -16,37 +16,60 @@ use std::borrow::Cow;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::printing::{format_string_literal, optimal_string_quote};
+use tsv_lang::printing::{format_string_literal, is_width_relevant, optimal_string_quote_in};
+
+/// Does this string literal print as its own source slice — and if so, is that
+/// slice one column a byte?
+///
+/// `Some(plain)` when the optimal quote is the one already in source: re-quoting
+/// would re-emit the content verbatim between the same quotes, i.e. exactly
+/// `literal.span`, so the printed text IS that span and `plain` is its width claim
+/// (see `DocArena::source_span_plain`). `None` when the quote swaps and the text
+/// has to be rebuilt by [`rebuild_string_literal`].
+///
+/// ⭐ **One function because the two callers ask one question.** The printer emits
+/// the span or the rebuilt text; `is_short_arg` wants the printed length. Both
+/// answers — and the width one the printer needs next — come out of a single pass
+/// over the document's own words ([`optimal_string_quote_in`], whose doc carries
+/// why the width answer is free there).
+fn string_literal_prints_verbatim(literal: &internal::Literal<'_>, source: &str) -> Option<bool> {
+    debug_assert!(
+        matches!(&literal.value, LiteralValue::String(_)),
+        "string_literal_prints_verbatim called on non-string literal"
+    );
+    // A string literal's source slice always includes both quote delimiters, so the
+    // span is at least two bytes and the content is it minus one byte at each end.
+    let (optimal, plain) = optimal_string_quote_in(
+        source,
+        literal.span.start as usize + 1,
+        literal.span.end as usize - 1,
+    );
+    // The quote char is recovered from source (the byte at the span start) rather
+    // than stored on the literal.
+    (optimal == literal.string_quote(source) as char).then_some(plain)
+}
+
+/// The printed text of a string literal whose quote swaps — the `None` arm of
+/// [`string_literal_prints_verbatim`], and the only path that allocates.
+fn rebuild_string_literal(literal: &internal::Literal<'_>, source: &str) -> String {
+    let raw_literal = literal.span.extract(source);
+    format_string_literal(
+        &raw_literal[1..raw_literal.len() - 1],
+        literal.string_quote(source) as char,
+    )
+}
 
 /// Format a string literal from the AST to its printed form.
 ///
-/// Extracts the raw string from source, strips quotes, and formats it
-/// according to the literal's quote style.
+/// The `Cow` face of [`string_literal_prints_verbatim`], for the caller that wants
+/// the printed *text* (its length, in `is_short_arg`) rather than a doc node.
 pub(crate) fn format_string_literal_from_ast<'s>(
     literal: &internal::Literal<'_>,
     source: &'s str,
 ) -> Cow<'s, str> {
-    let raw_literal = literal.span.extract(source);
-    // A string literal's source slice always includes both quote delimiters, so
-    // `raw_literal.len() >= 2` and stripping one byte from each end is in bounds.
-    let raw_content = &raw_literal[1..raw_literal.len() - 1];
-
-    debug_assert!(
-        matches!(&literal.value, LiteralValue::String(_)),
-        "format_string_literal_from_ast called on non-string literal"
-    );
-    // The quote char is recovered from source (the byte at the span start) rather
-    // than stored on the literal.
-    let quote = literal.string_quote(source) as char;
-
-    // When the optimal quote matches the original, `format_string_literal` would
-    // re-emit the content verbatim between the same quotes — i.e. exactly the
-    // source slice. Borrow it instead of rebuilding (callers map `Borrowed` to an
-    // allocation-free `source_span`).
-    if optimal_string_quote(raw_content) == quote {
-        Cow::Borrowed(raw_literal)
-    } else {
-        Cow::Owned(format_string_literal(raw_content, quote))
+    match string_literal_prints_verbatim(literal, source) {
+        Some(_) => Cow::Borrowed(literal.span.extract(source)),
+        None => Cow::Owned(rebuild_string_literal(literal, source)),
     }
 }
 
@@ -279,7 +302,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a Doc for a numeric or BigInt literal, borrowing the verbatim source
+    /// Build a Doc for a numeric or BigInt literal, emitting the verbatim source
     /// slice when `normalize_number_literal` is the identity (the literal is
     /// already canonical — any plain decimal integer, lowercase hex/radix, or
     /// canonical float) and allocating only when normalization rewrites it.
@@ -289,22 +312,48 @@ impl<'a> Printer<'a> {
         lit: &internal::Literal<'_>,
     ) -> DocId {
         let raw = lit.span.extract(self.source);
-        self.normalized_literal_doc(lit.span, normalize_number_literal(raw))
-    }
-
-    /// Emit a normalized literal value at `span`: a `Cow::Borrowed` means the
-    /// normalizer returned the source verbatim, so emit `span` as a
-    /// zero-allocation `source_span`; a `Cow::Owned` means it rewrote the text, so
-    /// emit that. Shared by the number and string literal builders.
-    fn normalized_literal_doc(&self, span: Span, value: Cow<'_, str>) -> DocId {
-        let d = self.d();
-        match value {
-            Cow::Borrowed(_) => d.source_span(span, self.source),
-            Cow::Owned(s) => d.text_pooled(&s),
+        match normalize_number_literal(raw) {
+            // ⭐ A numeric literal is plain ASCII **by grammar**, so the verbatim arm
+            // never measures: `NumericLiteral` admits digits, `.`, `_`, `e`/`E`, the
+            // radix letters `x`/`o`/`b`, the hex digits and a BigInt `n`, and nothing
+            // at or above `0x80` — nor a `\t` or a line terminator, which would end
+            // the token. 34,567 of the 157,073 non-name width measures a TypeScript
+            // format run makes are one of these (22.0%, mean 1.5 bytes).
+            Cow::Borrowed(_) => self.verbatim_literal_doc(lit.span, true),
+            Cow::Owned(s) => self.d().text_pooled(&s),
         }
     }
 
-    /// Build a Doc for a string literal, borrowing the verbatim source slice when
+    /// Emit a literal that prints as its own source slice — the doc-side width seam
+    /// the number and string literal builders share.
+    ///
+    /// `plain` is the caller's claim that the slice holds no byte the width depends
+    /// on (no `\t`, no `\n`, nothing at or above `0x80`), so its width IS its byte
+    /// length and `DocArena::source_span_plain` need not measure it at all. Both
+    /// callers know it for free, and neither learns it from a scan of its own: a
+    /// number is ASCII by grammar, and a string's quote choice has already read
+    /// every content byte (`printing::optimal_string_quote_in`).
+    ///
+    /// ⚠️ **A wrong claim is a SILENT width error** — nothing downstream re-derives
+    /// the width, so it moves a fits verdict and changes no other observable. It is
+    /// therefore graded BOTH ways on every verbatim literal in every debug build,
+    /// exactly as [`Printer::ident_name_doc`] grades the name channel's: over-claiming
+    /// is the silent error, and under-claiming silently retires the lever.
+    fn verbatim_literal_doc(&self, span: Span, plain: bool) -> DocId {
+        debug_assert_eq!(
+            plain,
+            !span.extract(self.source).bytes().any(is_width_relevant),
+            "a verbatim literal's `plain` claim disagrees with its own bytes"
+        );
+        let d = self.d();
+        if plain {
+            d.source_span_plain(span)
+        } else {
+            d.source_span(span, self.source)
+        }
+    }
+
+    /// Build a Doc for a string literal, emitting the verbatim source slice when
     /// the formatter wouldn't change it (no quote swap) and allocating only on the
     /// quote-swap path. Shared by string literal *values* and quoted object /
     /// import-attribute *keys*.
@@ -312,7 +361,12 @@ impl<'a> Printer<'a> {
         &self,
         lit: &internal::Literal<'_>,
     ) -> DocId {
-        self.normalized_literal_doc(lit.span, format_string_literal_from_ast(lit, self.source))
+        match string_literal_prints_verbatim(lit, self.source) {
+            Some(plain) => self.verbatim_literal_doc(lit.span, plain),
+            None => self
+                .d()
+                .text_pooled(&rebuild_string_literal(lit, self.source)),
+        }
     }
 
     /// Build a Doc for a private identifier

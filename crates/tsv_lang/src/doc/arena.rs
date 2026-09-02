@@ -1761,6 +1761,15 @@ impl DocArena {
     /// `[A-Za-z0-9_$]`, so a name that took no non-ASCII branch is one column a byte
     /// and can hold no line terminator or tab — see `IdentName::plain_ascii`.
     ///
+    /// ⭐ **The second caller class is the verbatim LITERAL, and it knows for two other
+    /// reasons — neither of them a scan of its own.** A number literal is plain ASCII by
+    /// grammar (34,567 calls, 22.0% of the non-name width measures on that corpus). A
+    /// string literal printed between the quotes it was written with is 54.0% of them
+    /// (84,771, of which 83,559 claim), and its quote choice has already read every
+    /// content byte looking for a `'` — so `printing::optimal_string_quote_in` hands the
+    /// width class out of that one pass for the price of one more lane kernel. Both
+    /// arrive through `Printer::verbatim_literal_doc`.
+    ///
     /// ⚠️ **A wrong claim here is a SILENT width error.** Nothing downstream re-derives
     /// the width, so an over-claiming caller shifts a fits verdict and changes no other
     /// observable — invisible to a byte-identity sweep on any corpus whose names are

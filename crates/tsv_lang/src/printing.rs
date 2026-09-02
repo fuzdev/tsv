@@ -18,6 +18,10 @@ use unicode_width::UnicodeWidthChar;
 /// Exposed so a caller can cheaply decide whether [`format_string_literal`]
 /// would change the quote (when this returns the original quote, the formatted
 /// output equals the verbatim source literal — no allocation needed).
+///
+/// ⭐ A caller that has the literal's DOCUMENT and span wants
+/// [`optimal_string_quote_in`] instead: same answer, read off the host's words rather
+/// than a slice's, and it returns the width class of the same content for free.
 #[inline]
 pub fn optimal_string_quote(raw_content: &str) -> char {
     // Double quotes win only when they are STRICTLY rarer, so a content holding
@@ -63,6 +67,63 @@ fn quote_minimizing_escapes(bytes: &[u8]) -> char {
     } else {
         '\''
     }
+}
+
+/// [`optimal_string_quote`] for a string literal's content **in its document**, with
+/// the width question the printer asks next answered by the same pass:
+/// `(optimal quote, plain)`, where `plain` is `true` when the content holds no byte
+/// the width depends on — no `\t`, no `\n`, nothing at or above `0x80` — and so
+/// measures one column a byte.
+///
+/// `from..end` is the CONTENT: the literal's span without its two quote delimiters.
+/// Both delimiters are plain one-column ASCII, so `plain` describes the whole literal
+/// span too — which is the span the caller emits.
+///
+/// ⭐ **The cheapest measure is one an earlier phase already took.** The quote choice
+/// reads every content byte looking for a `'`, and 99.4% of contents hold none (541 of
+/// 86,410 over 1,666 `.ts` files), so that walk visits the whole content — and whether
+/// it saw a `\t`, a raw line terminator or a non-ASCII byte *is* the width answer, one
+/// pass earlier in the same phase. Verbatim string literals are **54.0%** of the width
+/// measures a TypeScript format run makes outside identifier names (84,771 of 157,073
+/// on that corpus; 1.65 MB, mean 19.5 bytes), and this retires the second pass
+/// `DocArena::source_span` would make over the same bytes for the price of one more
+/// lane kernel per word.
+///
+/// ⭐ **And it reads the DOCUMENT's words, not the content's.** [`optimal_string_quote`]
+/// takes a slice, so a content under eight bytes has no word to form and falls to the
+/// scalar tail; this borrows the bytes on either side of the content and disbelieves
+/// any hit past `end`.
+///
+/// ⚠️ Both answers are **exact**, not conservative, so a caller may state the width
+/// claim two-sidedly — and must, because a wrong claim in either direction is a silent
+/// width error (`DocArena::source_span_plain`). The rare arm, taken by a content
+/// holding a `'` *or* a width-relevant byte, re-asks each question with the exact scan
+/// that owns it rather than inferring one answer from the other.
+#[inline]
+pub fn optimal_string_quote_in(source: &str, from: usize, end: usize) -> (char, bool) {
+    if next_width_relevant_or_single_quote_in(source.as_bytes(), from, end) == end {
+        // No `'` — so single quotes need no escaping and take the tie-break — and no
+        // byte the width depends on. Finding nothing is both answers at once.
+        return ('\'', true);
+    }
+    optimal_string_quote_in_cold(source, from, end)
+}
+
+/// [`optimal_string_quote_in`]'s arm for a content that holds a `'`, a `\t`, a line
+/// terminator or a non-ASCII byte — about **2.6%** of the string literals a
+/// TypeScript format run prints.
+///
+/// Outlined so the two exact scans, and [`optimal_string_quote`]'s own counting arm
+/// behind them, stay out of every string-literal call site. Which of the two bytes
+/// fired is not recorded, so both questions are simply re-asked here; each is a scan
+/// over a content the fast path has already shown to be rare.
+#[cold]
+#[inline(never)]
+fn optimal_string_quote_in_cold(source: &str, from: usize, end: usize) -> (char, bool) {
+    (
+        optimal_string_quote(&source[from..end]),
+        next_width_relevant_in(source.as_bytes(), from, end) == end,
+    )
 }
 
 /// Format a string literal with optimal quote selection
@@ -1030,6 +1091,82 @@ pub(crate) fn next_width_relevant_in(bytes: &[u8], from: usize, end: usize) -> u
 #[inline]
 pub(crate) fn next_width_relevant(bytes: &[u8], from: usize) -> usize {
     next_width_relevant_in(bytes, from, bytes.len())
+}
+
+/// [`is_width_relevant`] widened by the one byte a printed string literal also has to
+/// know about: a `'`.
+///
+/// The two questions such a literal asks — which quote does it print with, and is its
+/// width its byte length — read the same content bytes, and neither wants a position.
+/// The quote is single unless a `'` is in there ([`optimal_string_quote`]); the width
+/// is the byte count unless a width-relevant byte is. So finding no byte of the union
+/// *is* both answers.
+#[inline]
+const fn is_width_relevant_or_single_quote(b: u8) -> bool {
+    is_width_relevant(b) || b == b'\''
+}
+
+/// The union word test and [`is_width_relevant_or_single_quote`] must answer
+/// identically for every byte value — the same proof the width class's own word loop
+/// carries above, and for the same reason: the tail runs only over a region's last
+/// seven bytes, so a class its word loop disagrees with is the bug no corpus finds.
+const _: () = {
+    let mut b = 0u16;
+    while b < 256 {
+        let byte = b as u8;
+        let w = u64::from_le_bytes([byte; 8]);
+        let hits = zero_or_high_lanes(w ^ splat(b'\n'))
+            | zero_or_high_lanes(w ^ splat(b'\t'))
+            | zero_or_high_lanes(w ^ splat(b'\''));
+        assert!((hits != 0) == is_width_relevant_or_single_quote(byte));
+        b += 1;
+    }
+};
+
+/// [`next_width_relevant_in`] with a `'` added to its class — the one pass
+/// [`optimal_string_quote_in`] answers both of its questions from.
+///
+/// ⭐ The third needle is **one more lane kernel**, not a second pass over the bytes:
+/// `'` is ASCII, so `w ^ splat(b'\'')` is zero exactly at a quote and at or above
+/// `0x80` exactly at a non-ASCII byte — which the width class already wanted. As in
+/// [`next_width_relevant_in`], the loose kernel's non-ASCII lanes are not false
+/// positives here but part of the answer, so there is no exact re-ask.
+///
+/// Same host-buffer contract as [`next_width_relevant_in`] — `bytes` is the whole
+/// document and `[from, end)` the region asked about, so a region under eight bytes
+/// still gets one word test — and the same reading rule: `trailing_zeros` only, a hit
+/// at or past `end` proving the region holds none.
+///
+/// ⚠️ Unlike the sibling, whose caller uses the returned POSITION, the only caller here
+/// tests `== end` — so clamping a hit past `end` back to `end` is what keeps the fast
+/// arm REACHABLE, not what keeps the answer sound. It is load-bearing anyway: a
+/// double-quoted literal's own closing delimiter is not in the class, so the word
+/// straddling `end` routinely fires on the `\n` ending the statement, and returning
+/// that position unclamped would send an ordinary literal down the cold arm.
+#[inline]
+fn next_width_relevant_or_single_quote_in(bytes: &[u8], from: usize, end: usize) -> usize {
+    debug_assert!(from <= end && end <= bytes.len());
+    let mut i = from;
+    while i < end {
+        let Some(chunk) = bytes[i..].first_chunk::<8>() else {
+            // Within eight bytes of the HOST's end — the one place no word is
+            // readable, and so the only place the scalar class test still runs.
+            while i < end && !is_width_relevant_or_single_quote(bytes[i]) {
+                i += 1;
+            }
+            return i;
+        };
+        let w = u64::from_le_bytes(*chunk);
+        let hits = zero_or_high_lanes(w ^ splat(b'\n'))
+            | zero_or_high_lanes(w ^ splat(b'\t'))
+            | zero_or_high_lanes(w ^ splat(b'\''));
+        if hits != 0 {
+            let at = i + (hits.trailing_zeros() / 8) as usize;
+            return if at < end { at } else { end };
+        }
+        i += 8;
+    }
+    end
 }
 
 /// `s.split('\n')` over [`next_lf`] — the same sequence, scanned a word at a time.
