@@ -2954,6 +2954,58 @@ the machine was hiding; `.text` **−192 B** (2,887,061). Three things decided t
   deferral, a `DocBuf` for the deferred run and an `extend` of it back — to learn there was
   nothing to emit.
 
+### An empty deferred run is not a buffer
+
+After `concat_iter` the `SmallVec` file row still read 4.5–5.9% of the TS format board by FILE,
+`Extend::extend` 0.77% by symbol with 119 callers, and `insert_from_slice` 0.22–0.25% with every
+caller an inlined `extend_from_slice`. The per-site census (the patched crate copy, now with
+`#[track_caller]` on `SmallVec::new` / `Default::default` / `Extend::extend`, so every buffer
+minted and every `extend` carries the caller's `(file, line)` and the extend its added length)
+said what no board could: **171,849 of a tsbig pass's 254,857 `extend`s add nothing.** The
+comment emitters at the end of a statement, a member or a body minted a `DocBuf`, returned it
+empty, and the caller `extend`ed it away — 71,718 buffers a pass from
+`build_trailing_same_line_comment_docs` alone, 65,008 empty extends at the block walk's
+`body_parts.extend(trailing)`; a block body's `leading_content` parameter had one caller,
+passing `DocBuf::new()` (27 K buffers and 27 K empty extends for a feature nothing used); every
+plain arrow allocated a `Concat(empty, tail)` because the signature-head emitter pushed its
+flat separator unconditionally and the arrow's is `empty()`; a chain call's head travelled by
+value through four layout builders, empty on 57 K of 67 K calls; and a declaration's keyword
+words were a `SmallVec` + `extend_from_slice` — an outlined `insert_from_slice` — on every
+`const`.
+
+The shape is the codebase's own emitter idiom, applied to the trailing side: the emitters push
+into the caller's buffer and return what the caller needs instead of a buffer — the advanced
+cursor (`push_trailing_run`, `push_statement_trailing_run`, `push_member_trailing_run`) or
+whether anything was emitted (`push_trailing_closer_comments`, `push_trailing_body_comments`,
+`push_program_trailing_comments`); `push_gap_comments` takes the caller's `deferred` (its two
+binding bools folded into `GapBinding`), and the returning wrappers keep a local only where a
+caller emits later than it asks (the switch consequent builds the run ahead of the statement it
+follows). The dead parameter is gone; `build_member_with_semicolon_doc` pairs when nothing
+deferred; `append_signature_head_gap_comments` takes an `Option<DocId>` separator and the plain
+arrow signature — no `async`, no type parameters — IS its tail. A chain call's head is an
+`Option<DocId>` finished by `with_chain_head`, so each layout's own assembly is a literal
+`concat(&[…])` and the common tree is node-for-node the old one. A keyword's words are the
+kind's static slice; a buffer is assembled only under `declare`.
+
+`instructions:u` **−1.176% / −0.649% / −0.001%** (`profile` tsbig / sveltebig / cssbig),
+**−0.000%** on `json_profile`; cycles **−2.308% pooled over a twelve-binary layout group on the
+`profile` entry point, 3/3 replicate signs (−2.391 / −2.198 / −2.335), against a null group at
+−0.068% (2/3: −0.222 / +0.096 / −0.078)** — ~1.96x the instruction share; `.text` **−6,176 B**
+(2,880,885). Two things the ladder taught:
+
+- ⭐⭐⭐ **An `empty()` child is not free — it is the price of every walk that follows.** The
+  deletion rung (the plain arrow's early return alone removed) read −0.850% against −1.176%:
+  0.326 points for ~25 K `Concat(empty, tail)` nodes a pass, ~280 instructions each, against a
+  paper ~0.08 for the buffer and the pair. The rest is the extra node's visit in
+  `subtree_layout_fill`, in every `fits` that reaches the signature, and in the render loop. A
+  separator that may be nothing is an `Option<DocId>`, never a pushed `d.empty()`.
+- ⭐⭐⭐ **Census the extend SITES, not the extend symbol.** `Extend::extend` names a library;
+  only `#[track_caller]` on the patched crate's own method — which resolves the tsv site through
+  a trait impl for a statically dispatched call — could rank 119 callers by how often each added
+  nothing and name the callee that minted the buffer. `collect` stays invisible to it (core's
+  `Iterator::collect` is the frame between), so that population is read off `from_iter`'s own
+  `new` row.
+
 ## WASM bundle size
 
 The `tsv_wasm` crate produces three WASM binaries via the `format` +

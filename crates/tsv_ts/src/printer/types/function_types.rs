@@ -345,7 +345,7 @@ impl<'a> Printer<'a> {
         self.append_signature_head_gap_comments(
             parts,
             self.type_params_paren_gap(type_parameters),
-            d.empty(),
+            None,
             d.concat(&sig_parts),
         );
     }
@@ -389,7 +389,7 @@ impl<'a> Printer<'a> {
         self.append_signature_head_gap_comments(
             &mut new_parts,
             next_token_start.map(|next_start| (new_end, next_start)),
-            d.text(" "),
+            Some(d.text(" ")),
             d.concat(&sig_parts),
         );
         let new_doc = d.concat(&new_parts);
@@ -412,7 +412,7 @@ impl<'a> Printer<'a> {
         self.append_signature_head_gap_comments(
             &mut parts,
             Some((abstract_end, new_start)),
-            d.text(" "),
+            Some(d.text(" ")),
             new_doc,
         );
         d.group(d.concat(&parts))

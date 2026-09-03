@@ -384,7 +384,7 @@ impl<'a> Printer<'a> {
     /// head→`=` ([`Self::route_pre_separator_gap`], `expressions/patterns.rs`) — the
     /// index-signature `]`→value-`:` gap (`build_index_signature_member_doc`), the two
     /// callee gaps that share [`Self::build_line_split_gap_doc`] — the callee→empty
-    /// argument list gap (`push_empty_args`) and an optional call's callee→`?.` half
+    /// argument list gap (`build_empty_args_parens_doc`) and an optional call's callee→`?.` half
     /// (`calls::optional_callee_gap_doc`) — and the switch case label's head→`:` gap
     /// (`build_switch_case_doc_inner`, gated on line comments only), where the tail is
     /// the bare `:`. Adding a site means calling this, never re-deriving
@@ -454,7 +454,7 @@ impl<'a> Printer<'a> {
     ///
     /// The two sites are one gap under two spellings, which is why the shape is stated
     /// once rather than hand-rolled at each: the callee→`(` gap ahead of an EMPTY argument
-    /// list (`push_empty_args`, where `tail` is the `()` an inline `//` would swallow) and
+    /// list (`build_empty_args_parens_doc`, where `tail` is the `()` an inline `//` would swallow) and
     /// the callee→`?.` half an optional call with arguments splits off
     /// (`calls::optional_callee_gap_doc`, where it is the `?.`). Both are the same
     /// position — the region between a callee and what opens its argument list — so a
@@ -1150,10 +1150,12 @@ impl<'a> Printer<'a> {
         start: u32,
         name_start: u32,
     ) -> (DocId, u32) {
-        let mut words: SmallVec<[&'static str; 3]> = SmallVec::new();
-        if declare {
-            words.push("declare");
+        if !declare {
+            // The head is already the slice the emitter takes; a buffer exists only to
+            // put `declare` ahead of it.
+            return self.build_keyword_words_doc(head, start, name_start);
         }
+        let mut words: SmallVec<[&'static str; 3]> = smallvec!["declare"];
         words.extend_from_slice(head);
         self.build_keyword_words_doc(&words, start, name_start)
     }
@@ -1790,11 +1792,11 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         gap: Option<(u32, u32)>,
-        flat_separator: DocId,
+        flat_separator: Option<DocId>,
         tail: DocId,
     ) {
         let Some((gap_start, gap_end)) = gap else {
-            parts.push(flat_separator);
+            parts.extend(flat_separator);
             parts.push(tail);
             return;
         };
@@ -1813,7 +1815,7 @@ impl<'a> Printer<'a> {
             self.append_keyword_value_line_comments(parts, gap_start, gap_end, tail);
         } else {
             self.push_trailing_comments_in_range(parts, gap_start, gap_end);
-            parts.push(flat_separator);
+            parts.extend(flat_separator);
             parts.push(tail);
         }
     }

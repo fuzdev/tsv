@@ -217,7 +217,7 @@ impl<'a> Printer<'a> {
             }
 
             // Trailing comments before the closing brace, through the shared end-of-body
-            // run (`Printer::build_trailing_body_comments_doc`) rather than a copy of it:
+            // run (`Printer::push_trailing_body_comments`) rather than a copy of it:
             // the same walk, the same "already trailed by the last property" question, and
             // the same stripped-shell blank anchor every other container gets. The copy
             // this replaces had drifted from it on all three. An object that may still
@@ -225,12 +225,13 @@ impl<'a> Printer<'a> {
             // the hardline, like every other body.
             let closing_brace_pos = obj.span.end - 1;
             let separator = if must_break { d.hardline() } else { d.line() };
-            parts.extend(self.build_trailing_closer_comments_doc(
+            self.push_trailing_closer_comments(
+                &mut parts,
                 prev_end,
                 closing_brace_pos,
                 false,
                 separator,
-            ));
+            );
 
             if must_break {
                 // Forced multiline - use hardlines for predictable formatting

@@ -225,7 +225,7 @@ fn call_optional(
 /// it takes the uniform forced-continuation indent every line-comment-split construct
 /// shares, and a block comment stays inline glued in front of the `?.`. That is exactly
 /// [`Printer::build_line_split_gap_doc`], shared with the answer the fused spelling reaches
-/// through [`arg_comments::push_empty_args`]: the same gap, so the `?.` cannot change how it
+/// through [`arg_comments::build_empty_args_parens_doc`]: the same gap, so the `?.` cannot change how it
 /// reads.
 pub(super) fn optional_callee_gap_doc(printer: &Printer<'_>, gap: CalleeGap) -> Option<DocId> {
     let d = printer.d();

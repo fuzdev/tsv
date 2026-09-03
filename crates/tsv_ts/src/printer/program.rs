@@ -60,15 +60,14 @@ impl<'a> Printer<'a> {
 
         // Trailing program comments
         let mut has_output = tail.last_stmt_end.is_some();
-        let trailing_comments_doc = self.build_program_trailing_comments_doc(
+        if self.push_program_trailing_comments(
+            &mut parts,
             tail.prev_end,
             tail.claims_trailing,
             has_output,
-        );
-        if !trailing_comments_doc.is_empty() {
+        ) {
             has_output = true;
         }
-        parts.extend(trailing_comments_doc);
 
         // Trailing newline (only if there's content — empty files stay empty)
         if has_output {
@@ -82,7 +81,7 @@ impl<'a> Printer<'a> {
     ///
     /// Handles comments that appear after all statements but before end of file — the
     /// `}`-less end-of-body run, so it is the shared
-    /// [`Printer::build_trailing_body_comments_doc`] with the source length as its bound
+    /// [`Printer::push_trailing_body_comments`] with the source length as its bound
     /// (equivalent by construction to an unbounded scan: `self.comments` is already
     /// island-local for an embedded `<script>`).
     ///
@@ -101,13 +100,14 @@ impl<'a> Printer<'a> {
     /// Sound because nothing printed means nothing was skipped either — an orphan run that
     /// finds a comment always emits it — so `[0, prev_end)` provably holds no comments the
     /// widened scan could double-print.
-    fn build_program_trailing_comments_doc(
+    fn push_program_trailing_comments(
         &self,
+        parts: &mut DocBuf,
         prev_end: u32,
         claims_trailing: bool,
         has_output: bool,
-    ) -> DocBuf {
+    ) -> bool {
         let cursor = if has_output { prev_end } else { 0 };
-        self.build_trailing_body_comments_doc(cursor, self.source.len() as u32, claims_trailing)
+        self.push_trailing_body_comments(parts, cursor, self.source.len() as u32, claims_trailing)
     }
 }

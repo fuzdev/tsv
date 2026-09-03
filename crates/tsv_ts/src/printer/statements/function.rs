@@ -293,7 +293,7 @@ impl<'a> Printer<'a> {
         self.append_signature_head_gap_comments(
             &mut tail,
             self.type_params_paren_gap(decl.type_parameters.as_ref()),
-            d.empty(),
+            None,
             sig_doc,
         );
 

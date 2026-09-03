@@ -242,19 +242,18 @@ impl<'a> Printer<'a> {
         grouped: bool,
     ) -> DocId {
         let d = self.d();
-        let after = self.collect_post_semi_comments(content_end, decl_end);
-        if !grouped {
-            parts.push(d.text(";"));
-            parts.extend(after);
-            return d.concat(&parts);
+        if grouped {
+            // Wrap the content in a group for width-based wrapping; the `;` and trailing
+            // comments stay outside it so an own-line/line comment can't expand the
+            // braces. The buffer is reused for the outer assembly rather than a second
+            // one opened.
+            let content = d.group(d.concat(&parts));
+            parts.clear();
+            parts.push(content);
         }
-        // Wrap the content in a group for width-based wrapping; the `;` and trailing
-        // comments stay outside it so an own-line/line comment can't expand the braces.
-        let mut out = DocBuf::new();
-        out.push(d.group(d.concat(&parts)));
-        out.push(d.text(";"));
-        out.extend(after);
-        d.concat(&out)
+        parts.push(d.text(";"));
+        self.push_post_semi_comments(&mut parts, content_end, decl_end);
+        d.concat(&parts)
     }
 
     /// The source offset of a closing `}` — the first `}` (outside comments, so a

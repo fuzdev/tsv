@@ -10,8 +10,8 @@ use super::super::{
     is_curried_arrow_chain, is_multiline_template_expression,
 };
 use super::arg_comments::{
-    any_arg_gap_has_comment_on_page, build_arg_gap_docs, emit_first_arg_leading_comments,
-    emit_last_arg_trailing_comments, push_empty_args,
+    any_arg_gap_has_comment_on_page, build_arg_gap_docs, build_empty_args_parens_doc,
+    emit_first_arg_leading_comments, emit_last_arg_trailing_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_react_hook_call_with_deps_array,
@@ -2213,9 +2213,10 @@ pub(super) fn build_empty_args_doc(
     optional: bool,
 ) -> DocId {
     let prefix = if optional { "?.(" } else { "(" };
-    let mut parts: DocBuf = smallvec![callee];
-    push_empty_args(printer, &mut parts, after_type_args, paren_close, prefix);
-    printer.d().concat(&parts)
+    printer.d().concat(&[
+        callee,
+        build_empty_args_parens_doc(printer, after_type_args, paren_close, prefix),
+    ])
 }
 
 /// Whether the sole-multiline-template hug applies — [`try_hug_multiline_template_arg`]'s

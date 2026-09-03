@@ -702,7 +702,7 @@ impl<'a> Printer<'a> {
     /// line, so a following comment always has a newline between.
     ///
     /// The space it licenses is not the weld the separator-before rule exists to prevent
-    /// ([`Self::build_trailing_body_comments_doc`]): both comments stay distinct, and a line
+    /// ([`Self::push_trailing_body_comments`]): both comments stay distinct, and a line
     /// comment never hugs, so nothing can land behind a `//`. A **dangling** run — the
     /// container's only content — does not ask it at all, because prettier splits a glued
     /// pair there ([`Self::push_dangling_comment_run`]).
@@ -725,7 +725,7 @@ impl<'a> Printer<'a> {
     /// own-line arm is that unconditional break — the last-item→closer walk
     /// ([`Self::build_trailing_gap_comments`]), the array literal's end-of-array scan,
     /// and the call family's dangling emitter. A run whose non-glue separator is the
-    /// caller's ([`Self::build_trailing_closer_comments_doc`], whose container may still
+    /// caller's ([`Self::push_trailing_closer_comments`], whose container may still
     /// collapse) asks the predicate directly and keeps its own arm.
     ///
     /// ⚠️ **The blank question is `isPreviousLineEmpty`, asked of the COMMENT** — the
@@ -1045,7 +1045,7 @@ impl<'a> Printer<'a> {
     /// stable, lossless-looking outputs that reparse, which is why the ledger, F1, the
     /// round-trip and the fuzzer are all blind to them; only the census and a prettier
     /// `compare` see it. This is the trailing-gap face of the rule in
-    /// [`Self::build_trailing_body_comments_doc`] / [`Self::push_dangling_comment_run`]
+    /// [`Self::push_trailing_body_comments`] / [`Self::push_dangling_comment_run`]
     /// — see [docs/comments.md](../../../../../docs/comments.md) §Trailing and dangling
     /// runs.
     ///
@@ -1430,7 +1430,7 @@ impl<'a> Printer<'a> {
     /// A `Leading` caller must therefore answer "what follows this run?" itself: gate on
     /// [`Self::has_line_comments_between`] and route to
     /// [`Self::build_continuation_indent`] (or push its own break) before falling through
-    /// to this builder. `push_empty_args` and `build_dot_gap_doc` are the worked examples.
+    /// to this builder. `build_empty_args_parens_doc` and `build_dot_gap_doc` are the worked examples.
     /// The swallowed form parses and is a fixed point, so idempotency, round-trip, and the
     /// print-once ledger are all blind to it; `swallow_audit` sees only shapes some fixture
     /// already carries.

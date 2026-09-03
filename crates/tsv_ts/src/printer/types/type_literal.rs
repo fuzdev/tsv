@@ -145,21 +145,23 @@ impl<'a> Printer<'a> {
     /// deferred `//`, so the two shared one `line_suffix` flush: a second `//` WELDED onto
     /// the first (`a: A // c1⏎/* c2 */; // c3` reparsing as ONE comment) and a block came
     /// out REORDERED ahead of it, where both other member containers keep them apart.
-    fn build_comments_around_semicolon_doc(
+    fn push_comments_around_semicolon(
         &self,
+        parts: &mut DocBuf,
         comments: &[&tsv_lang::Comment],
         member_end: u32,
         upper_bound: u32,
         deferred: DocBuf,
-    ) -> DocBuf {
+    ) {
         let d = self.d();
         // Comment-free gap (the common case): no separator scan needed — the
         // partition below reduces to the bare `;`.
         if comments.is_empty() {
-            let mut docs = DocBuf::with_capacity(1 + deferred.len());
-            docs.push(d.text(";"));
-            docs.extend(deferred);
-            return docs;
+            parts.push(d.text(";"));
+            if !deferred.is_empty() {
+                parts.extend(deferred);
+            }
+            return;
         }
         // Find the source member separator — `;` OR `,` (both are valid type-member
         // separators; tsv normalizes either to `;`). Comment-aware so a separator
@@ -179,18 +181,15 @@ impl<'a> Printer<'a> {
                 None => false,
             });
 
-        let mut docs =
-            DocBuf::with_capacity(before_semi.len() + after_semi.len() + 1 + deferred.len());
         for comment in before_semi {
-            docs.push(self.build_trailing_comment_doc(comment));
+            parts.push(self.build_trailing_comment_doc(comment));
         }
-        docs.push(d.text(";"));
+        parts.push(d.text(";"));
         // The member's own deferred run, before anything that trails the separator.
-        docs.extend(deferred);
+        parts.extend(deferred);
         for comment in after_semi {
-            docs.push(self.build_trailing_comment_doc(comment));
+            parts.push(self.build_trailing_comment_doc(comment));
         }
-        docs
     }
 
     /// [`Printer::trailing_claim_end`] for the gap after a member ending at
@@ -261,12 +260,12 @@ impl<'a> Printer<'a> {
 
     /// The whole trailing arm of the type-literal member seam — the type-member arm of
     /// the shared member-body walk ([`MemberSeam::AroundSeparator`]), where the class and
-    /// interface bodies take [`Printer::member_trailing_run`].
+    /// interface bodies take [`Printer::push_member_trailing_run`].
     ///
     /// It cannot BE that call: those two emit a run and advance a cursor, while a type
     /// member must partition its run around its own `;` and slot the member→`;` gap's
     /// deferred comments between the two halves
-    /// ([`Self::build_comments_around_semicolon_doc`]). Keeping that difference
+    /// ([`Self::push_comments_around_semicolon`]). Keeping that difference
     /// expressible is why the walk names its seam rather than assuming one.
     ///
     /// Returns the walk's new `(prev_end, prev_deferred_line_comment)`. The order of the
@@ -292,12 +291,13 @@ impl<'a> Printer<'a> {
             body.has_comments,
             deferred_line_comment,
         );
-        member_parts.extend(self.build_comments_around_semicolon_doc(
+        self.push_comments_around_semicolon(
+            member_parts,
             &trailing,
             member_content_end,
             upper_bound,
             deferred,
-        ));
+        );
         (
             self.member_cursor_past_trailing(member_span.end, &trailing),
             deferred_line_comment,
@@ -970,12 +970,13 @@ impl<'a> Printer<'a> {
             // deferred run goes between the `;` and the trailing comments, the order the
             // `is_last` arm above already uses and the one the interface and class get from
             // [`Printer::build_member_with_semicolon_doc`].
-            member_parts.extend(self.build_comments_around_semicolon_doc(
+            self.push_comments_around_semicolon(
+                member_parts,
                 &trailing,
                 member_content_end,
                 upper_bound,
                 deferred,
-            ));
+            );
             // Space before next member only when flat
             member_parts.push(d.if_break(d.empty(), d.text(" ")));
         }

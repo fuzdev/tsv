@@ -109,11 +109,12 @@ impl<'a> Printer<'a> {
         // comment is deferred to `deferred` for the joiner to emit after the `;`
         // (matching prettier). Prettier relocates a no-annotation block before `?` for
         // the optional case — a cataloged divergence (we preserve the author's position).
-        deferred.extend(self.split_member_terminator_gap_comments(
+        self.split_member_terminator_gap_comments(
             &mut parts,
+            deferred,
             trailing_start,
             prop.span.end,
-        ));
+        );
         d.concat(&parts)
     }
 
@@ -262,7 +263,7 @@ impl<'a> Printer<'a> {
         self.append_signature_head_gap_comments(
             &mut parts,
             type_params_end.zip(paren_pos),
-            d.empty(),
+            None,
             sig_doc,
         );
         // Comments between return type (or params) and `;`
@@ -391,9 +392,9 @@ impl<'a> Printer<'a> {
         // glued, `new (` is not. A CALL signature has neither head, and takes no separator —
         // its `(` opens the member.
         let (head, flat_separator) = match (type_parameters.map(|t| t.span.end), new_paren_gap) {
-            (Some(type_params_end), _) => (Some(type_params_end), d.empty()),
-            (None, Some(new_end)) => (Some(new_end), d.text(" ")),
-            (None, None) => (None, d.empty()),
+            (Some(type_params_end), _) => (Some(type_params_end), None),
+            (None, Some(new_end)) => (Some(new_end), Some(d.text(" "))),
+            (None, None) => (None, None),
         };
         self.append_signature_head_gap_comments(
             &mut parts,
@@ -453,6 +454,11 @@ impl<'a> Printer<'a> {
         deferred: DocBuf,
     ) -> DocId {
         let d = self.d();
+        if deferred.is_empty() {
+            // The common case: nothing deferred past the `;`, so the member and its
+            // terminator are a pair.
+            return d.concat(&[member, d.text(";")]);
+        }
         let mut parts: DocBuf = smallvec![member, d.text(";")];
         parts.extend(deferred);
         d.concat(&parts)
@@ -692,11 +698,7 @@ impl<'a> Printer<'a> {
         // joiner's `content_end` starts at the `;`. Same-line comments stay before the
         // `;` (a block inline, a line via `line_suffix`); an own-line comment defers to
         // `deferred` for the joiner to emit after the `;`, matching prettier.
-        deferred.extend(self.split_member_terminator_gap_comments(
-            &mut parts,
-            gap_start,
-            idx.span.end,
-        ));
+        self.split_member_terminator_gap_comments(&mut parts, deferred, gap_start, idx.span.end);
 
         d.concat(&parts)
     }
