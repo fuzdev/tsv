@@ -457,8 +457,18 @@ share*, sorted by the **excess** (cycles share − instruction share, in points 
   says;
 - a row **below 1** is throughput-bound and only fewer instructions move it.
 
+**A row is a sample count before it is a share.** At 8 kHz a three-iteration `profile`
+run over a large corpus is ~6K samples, so a 0.2% row is ~14 samples and a 0.04% instruction
+row is ~3 — a ratio over those is Poisson noise, and it sorts to the top precisely because
+it is noise. Read the dump's `# Samples:` header (not a line count of `perf script`'s
+output, which includes every callchain frame), and take ratio draws long enough that both
+channels hold ~100 samples on the rows you will read: ~30 iterations, without
+`--call-graph` (a leaf-only draw is a few MB where a dwarf one is tens). The tell for a
+row too thin to price is `perf annotate -s <sym>` printing nothing at all.
+
 Calibrate before reading: fold two cycles draws of one binary against each other, and treat
-any excess inside that spread (a few tenths of a point on the largest rows here) as a draw.
+any excess inside that spread (at ~50K samples, ±0.16 points on a 2.5% line and ±0.07 on
+0.5–1% lines; a few tenths at ~6K) as a draw.
 Read the by-symbol view beside the by-line one — an inlined stall's cycles land on the lines
 that consume its result, so a by-line excess is a floor. The excess *names* the row; size the
 lever with the layout group (§Reading `cycles:u` below), because a stall row's win converts at

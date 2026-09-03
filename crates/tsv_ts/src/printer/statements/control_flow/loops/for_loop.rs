@@ -1919,7 +1919,6 @@ impl<'a> Printer<'a> {
                                     init,
                                     decl_start: decl.span.start,
                                     id_doc,
-                                    can_break_left: d.can_break(id_doc),
                                     gap: DeclaratorEqGap {
                                         id_end,
                                         equals_pos: eq_pos,
