@@ -654,12 +654,12 @@ macro_rules! lang_bindings {
             // `tsv_lang::printing::normalize_carriage_returns`. The parse exports
             // deliberately skip it: the wire's offsets are a drop-in contract over the
             // author's own bytes.
-            let normalized = tsv_lang::printing::normalize_carriage_returns(source);
-            let source = normalized.as_ref();
+            let folded = tsv_lang::printing::normalize_carriage_returns(source);
+            let source = folded.text();
             with_ast_arena(|arena| {
                 let ast = parse_ast!($goalness, $lang, source, opts.goal, arena).map_err(err)?;
                 Ok(with_doc_arena(|doc_arena| {
-                    $lang::format_in(&ast, source, doc_arena)
+                    $lang::format_folded_in(&ast, &folded, doc_arena)
                 }))
             })
         }

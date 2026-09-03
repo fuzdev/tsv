@@ -257,24 +257,38 @@ pub(crate) struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with the given source and comments (standalone layout).
+    /// A printer over `source`, classifying its lines here (standalone layout) — the
+    /// tests' constructor; the format entry points hand [`Self::with_line_breaks`] a
+    /// table they took.
+    #[cfg(test)]
     pub(crate) fn new(arena: &'a DocArena, source: &'a str, comments: &'a [Comment]) -> Self {
-        Self::with_embed(arena, source, comments, EmbedContext::default())
+        let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
+        Self::with_line_breaks(
+            arena,
+            source,
+            comments,
+            EmbedContext::default(),
+            line_breaks,
+        )
     }
 
-    /// Create a new printer with the given source, comments, and embed context.
-    pub(crate) fn with_embed(
+    /// Create a new printer with the given source, comments, embed context and line table.
+    ///
+    /// `line_breaks` is the document's one whole-source line table: every embedded island
+    /// borrows it (`build_program_doc` for `<script>`/`{expr}` TS,
+    /// `tsv_css::format_embedded_in` for `<style>` CSS) — never re-classify per island.
+    /// Its table, if a line question ever falls back to it, fills the arena-parked scratch
+    /// (one warm table across a multi-file driver's files); `into_string` parks it back.
+    /// The caller takes it (`format_svelte_in` classifies the source; the folded entry
+    /// point `format_svelte_folded_in` carries the fold's own verdict) so a document is
+    /// classified exactly once.
+    pub(crate) fn with_line_breaks(
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
         embed: EmbedContext,
+        line_breaks: LineBreaks<'a>,
     ) -> Self {
-        // The document's one whole-source line table: every embedded island borrows
-        // it (`build_program_doc` for `<script>`/`{expr}` TS, `tsv_css::format_embedded_in`
-        // for `<style>` CSS) — never re-classify per island. Its table, if a line
-        // question ever falls back to it, fills the arena-parked scratch (one warm table
-        // across a multi-file driver's files); `into_string` parks it back.
-        let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
         // The two document-level presence flags come from the one scan `tsv_ts` owns
         // (`PrinterInputs::for_document`); `ts_inputs()` copies them per island.
         let tsv_ts::PrinterInputs {
@@ -881,6 +895,29 @@ pub(crate) fn format_svelte_in(
     source: &str,
     arena: &DocArena,
 ) -> String {
+    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
+    format_root(root, source, line_breaks, arena)
+}
+
+/// [`format_svelte_in`] over a document the caller folded ahead of the parse: the line
+/// verdict comes from the fold's own pass (`LineBreaks::of_folded`), not a second walk.
+pub(crate) fn format_svelte_folded_in(
+    root: &internal::Root<'_>,
+    folded: &tsv_lang::printing::FoldedSource<'_>,
+    arena: &DocArena,
+) -> String {
+    let line_breaks = LineBreaks::of_folded(folded, arena.take_line_breaks_scratch());
+    format_root(root, folded.text(), line_breaks, arena)
+}
+
+/// The shared body of the two: register the document's comments, build the printer on
+/// its line table, print the root.
+fn format_root<'a>(
+    root: &internal::Root<'_>,
+    source: &'a str,
+    line_breaks: LineBreaks<'a>,
+    arena: &'a DocArena,
+) -> String {
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`). `Root.comments` is the `<script>` + template-expression
     // JS comments; the `<style>` island registers its own through `tsv_css`. The template's
@@ -895,7 +932,13 @@ pub(crate) fn format_svelte_in(
         tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
     }
 
-    let mut printer = Printer::new(arena, source, &root.comments);
+    let mut printer = Printer::with_line_breaks(
+        arena,
+        source,
+        &root.comments,
+        EmbedContext::default(),
+        line_breaks,
+    );
     printer.print_root(root);
     printer.into_string()
 }
