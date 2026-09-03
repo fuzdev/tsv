@@ -275,7 +275,7 @@ pub fn canonicalize_js(source: &str) -> Result<String, CanonicalizeError> {
     // The format path's line-terminator fold, ahead of the parse (see
     // `tsv_lang::printing::normalize_carriage_returns`) — a canonical reprint is a format,
     // so it owes the same LF-only output as every other one.
-    let source = tsv_lang::printing::normalize_carriage_returns(source);
+    let source = tsv_lang::printing::normalize_carriage_returns(source).into_text();
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse_with_goal(&source, Goal::Module, &arena)?;
     let output = tsv_ts::format_canonical(&program, &source);

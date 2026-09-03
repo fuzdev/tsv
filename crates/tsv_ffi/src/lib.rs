@@ -268,13 +268,13 @@ macro_rules! parse_format {
         // The format path's line-terminator fold, ahead of the parse — see
         // `tsv_lang::printing::normalize_carriage_returns`. `parse_convert!` deliberately
         // skips it: the wire's offsets are a drop-in contract over the author's own bytes.
-        let normalized = tsv_lang::printing::normalize_carriage_returns($source);
-        let source = normalized.as_ref();
+        let folded = tsv_lang::printing::normalize_carriage_returns($source);
+        let source = folded.text();
         with_ast_arena(|arena| {
             let ast =
                 parse_ast!($goalness, $lang, source, $goal, arena).map_err(|e| e.to_string())?;
             Ok(with_doc_arena(|doc_arena| {
-                $lang::format_in(&ast, source, doc_arena)
+                $lang::format_folded_in(&ast, &folded, doc_arena)
             }))
         })
     }};

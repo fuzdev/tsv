@@ -354,10 +354,27 @@ pub fn ecmascript_lines(text: &str) -> impl Iterator<Item = &str> {
 /// (`<LS>` → U+2028), so folding one would change what a template renders.
 ///
 /// Idempotent: its own output holds no `<CR>` to fold.
+///
+/// **The fold's pass also takes the folded document's line verdict** — whether every
+/// terminator left in it is a `\n` ([`FoldedSource::lf_only`]) — because the one loose
+/// needle that finds a `\r` (`\r` or any non-ASCII byte, [`classify_line_terminators`])
+/// is the needle the verdict pass asks too ([`line_terminators_are_lf_only`]), and a
+/// printer built on the fold ([`LineBreaks::of_folded`]) would otherwise walk every byte a
+/// second time to re-ask it. The verdict is a fact about the FOLDED text: no `\r` remains
+/// in it, so it is exactly "no U+2028 / U+2029 anywhere", and the fold moves neither.
 #[must_use]
-pub fn normalize_carriage_returns(source: &str) -> Cow<'_, str> {
-    let Some(first) = source.find('\r') else {
-        return Cow::Borrowed(source);
+pub fn normalize_carriage_returns(source: &str) -> FoldedSource<'_> {
+    let Terminators {
+        first_cr,
+        holds_separator,
+    } = classify_line_terminators(source.as_bytes());
+    let lf_only = !holds_separator;
+    let Some(first) = first_cr else {
+        debug_assert_eq!(lf_only, line_terminators_are_lf_only(source.as_bytes()));
+        return FoldedSource {
+            text: Cow::Borrowed(source),
+            lf_only,
+        };
     };
     let mut out = String::with_capacity(source.len());
     out.push_str(&source[..first]);
@@ -371,7 +388,41 @@ pub fn normalize_carriage_returns(source: &str) -> Cow<'_, str> {
         rest = after.strip_prefix('\n').unwrap_or(after);
     }
     out.push_str(rest);
-    Cow::Owned(out)
+    debug_assert_eq!(lf_only, line_terminators_are_lf_only(out.as_bytes()));
+    FoldedSource {
+        text: Cow::Owned(out),
+        lf_only,
+    }
+}
+
+/// A document with its `<CR>` fold applied ([`normalize_carriage_returns`]) and the line
+/// verdict the fold's own pass took over the folded text — so a printer built on it
+/// ([`LineBreaks::of_folded`]) takes the verdict from the pass that already ran instead
+/// of walking the source again. The two travel as one value so the verdict can never be
+/// read against a text it was not taken on.
+#[derive(Debug)]
+pub struct FoldedSource<'a> {
+    text: Cow<'a, str>,
+    lf_only: bool,
+}
+
+impl<'a> FoldedSource<'a> {
+    /// The folded text — borrowed when the source held no `<CR>`.
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Whether every line terminator in [`Self::text`] is a `\n` — the fact
+    /// [`line_terminators_are_lf_only`] states over those bytes, here taken by the fold's
+    /// pass (a `\r` cannot remain, so this is exactly "no U+2028 / U+2029 anywhere").
+    pub fn lf_only(&self) -> bool {
+        self.lf_only
+    }
+
+    /// The folded text alone, for a caller with no printer to hand the verdict to.
+    pub fn into_text(self) -> Cow<'a, str> {
+        self.text
+    }
 }
 
 /// The line `position` sits on, as `(line_start, line_end, line_number)` — bounds in bytes,
@@ -785,6 +836,22 @@ impl<'s> LineBreaks<'s> {
         Self::new(source, Vec::new())
     }
 
+    /// [`Self::new`] over a folded document, taking the verdict the fold's own pass
+    /// already took ([`FoldedSource::lf_only`]) instead of classifying the bytes again —
+    /// the format entry points that fold ahead of the parse (the CLI, the bindings, each
+    /// crate's `format_str`) build their table this way, so the document is walked once,
+    /// not twice.
+    pub fn of_folded(folded: &'s FoldedSource<'_>, scratch: Vec<u32>) -> Self {
+        let bytes = folded.text().as_bytes();
+        debug_assert_eq!(folded.lf_only(), line_terminators_are_lf_only(bytes));
+        LineBreaks {
+            source: bytes,
+            lf_only: folded.lf_only(),
+            table: OnceCell::new(),
+            scratch: Cell::new(scratch),
+        }
+    }
+
     /// Whether every line terminator in the document is a `\n` (a `\r\n` counts: the
     /// byte the table records for it IS the `\n`; a bare `\r` or a U+2028 / U+2029 does
     /// not) — the document's verdict, taken once at construction.
@@ -870,8 +937,9 @@ impl LineTable<'_> {
 // The document's verdict — one pass, ahead of any table
 //
 
-/// [`line_terminators_are_lf_only`]'s loose lane test — `\r` or any non-ASCII byte — is a
-/// superset of the exact candidate class `{ \r, 0xE2 }` its word re-ask and tail answer,
+/// [`line_terminators_are_lf_only`]'s loose lane test — `\r` or any non-ASCII byte, and
+/// [`classify_line_terminators`]'s, which walks the same loop — is a superset of the exact
+/// candidate class `{ \r, 0xE2 }` their word re-asks and tails answer,
 /// proved here rather than trusted (a uniform word cannot borrow across lanes unless it is
 /// itself a match, so `hits != 0` is exactly the byte test).
 const _: () = {
@@ -891,7 +959,10 @@ const _: () = {
 /// table records for it is the `\n`); a bare `\r` or a U+2028 / U+2029 anywhere, a string
 /// literal or a comment body included, says no. The document-level fact the scan forms of
 /// the three line questions are gated on, and the one thing a document pays for up front
-/// now that its table is built on demand ([`LineBreaks`]).
+/// now that its table is built on demand ([`LineBreaks`]) — on the entry points that fold
+/// `<CR>` ahead of the parse, the fold's own pass takes it instead
+/// ([`classify_line_terminators`], the same loop with a different cold re-ask), so this
+/// runs only for a caller that never folds (`format_in` reached directly).
 ///
 /// One pass with ONE loose needle: `\r` or any non-ASCII byte, three operations a word
 /// ([`crate::swar::zero_or_high_lanes`]), and nearly every word of real source fires
@@ -978,6 +1049,107 @@ fn lf_only_at(bytes: &[u8], at: usize) -> bool {
 fn lf_only_tail(bytes: &[u8], from: usize) -> bool {
     (from..bytes.len())
         .all(|i| !matches!(bytes[i], b'\r' | LINE_SEPARATOR_LEAD) || lf_only_at(bytes, i))
+}
+
+/// What the `<CR>` fold's one pass learns about a document ([`classify_line_terminators`]):
+/// where its first `\r` is, if it holds one — where the fold starts copying — and whether
+/// a U+2028 / U+2029 is anywhere in it — the folded text's line verdict, negated.
+struct Terminators {
+    first_cr: Option<usize>,
+    holds_separator: bool,
+}
+
+/// The `<CR>` fold's pass ([`normalize_carriage_returns`]): [`line_terminators_are_lf_only`]'s
+/// loose loop — the same one needle, `\r` or any non-ASCII byte, two words a step, a
+/// fired word re-asked out of line — recording the two facts the fold and the folded
+/// document's verdict need, so the fold's up-front `find('\r')` (std's memchr, nine
+/// instructions a word — a whole-source pass on every format entry point that folds, over
+/// a corpus in which no file holds a `\r`) is gone and the verdict pass does not run a
+/// second time behind it; the fold's per-line search from the first `\r` on is unchanged. Unlike the verdict pass it has
+/// no early answer to return: it runs to the end, or until both facts are known.
+///
+/// The verdict is stated over the FOLDED text, which is why a `\r` is not asked whether
+/// it ends in a `\n` here: after the fold every `\r` and `\r\n` IS a `\n`, and a U+2028 /
+/// U+2029 — which the fold does not touch — is the only terminator that can remain
+/// otherwise.
+///
+/// Outlined on purpose, like the verdict pass: inlined into the CLI's format function the
+/// loop carried that function's register pressure — 19 instructions per sixteen bytes
+/// against 17 here — and read 0.07 points less of a CLI run (measured on two corpora).
+#[inline(never)]
+fn classify_line_terminators(bytes: &[u8]) -> Terminators {
+    let mut found = Terminators {
+        first_cr: None,
+        holds_separator: false,
+    };
+    let mut i = 0;
+    // The loop is `line_terminators_are_lf_only`'s, spelled the same way for the same
+    // reasons (two words a step; the sixteen bytes claimed once).
+    while let Some(chunk) = bytes[i..].first_chunk::<16>() {
+        let (words, _) = chunk.as_chunks::<8>();
+        let (a, b) = (u64::from_le_bytes(words[0]), u64::from_le_bytes(words[1]));
+        if (zero_or_high_lanes(a ^ splat(b'\r')) | zero_or_high_lanes(b ^ splat(b'\r'))) != 0
+            && (classify_word(bytes, i, a, &mut found)
+                || classify_word(bytes, i + 8, b, &mut found))
+        {
+            return found;
+        }
+        i += 16;
+    }
+    // The one word that may remain ahead of the tail.
+    if let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let w = u64::from_le_bytes(*chunk);
+        if zero_or_high_lanes(w ^ splat(b'\r')) != 0 && classify_word(bytes, i, w, &mut found) {
+            return found;
+        }
+        i += 8;
+    }
+    for at in i..bytes.len() {
+        if matches!(bytes[at], b'\r' | LINE_SEPARATOR_LEAD) && classify_at(bytes, at, &mut found) {
+            break;
+        }
+    }
+    found
+}
+
+/// [`classify_line_terminators`]'s exact question over the one word at `at` the loose
+/// test fired on — every `\r` and every `0xE2` lane in it, asked [`classify_at`]. Out of
+/// line for the reason [`lf_only_in_word`] is: the loose loop's unit holds one loop and
+/// nothing else, and this runs on a fraction of a percent of the words. Returns whether
+/// both facts are now known, so the pass can stop.
+#[cold]
+#[inline(never)]
+fn classify_word(bytes: &[u8], at: usize, w: u64, found: &mut Terminators) -> bool {
+    let mut hits = zero_lanes(w ^ splat(b'\r')) | zero_lanes(w ^ splat(LINE_SEPARATOR_LEAD));
+    while hits != 0 {
+        let lane = (hits.trailing_zeros() / 8) as usize;
+        if classify_at(bytes, at + lane, found) {
+            return true;
+        }
+        hits &= hits - 1;
+    }
+    false
+}
+
+/// Record what the candidate byte at `at` is — the first `\r` seen, a U+2028 / U+2029, or
+/// (a `0xE2` that leads another character, or a lane the SWAR kernel flagged spuriously)
+/// nothing. Returns whether both facts are now known.
+#[inline]
+fn classify_at(bytes: &[u8], at: usize, found: &mut Terminators) -> bool {
+    match bytes[at] {
+        b'\r' => {
+            if found.first_cr.is_none() {
+                found.first_cr = Some(at);
+            }
+        }
+        LINE_SEPARATOR_LEAD => {
+            if line_terminator_len(bytes, at).is_some() {
+                found.holds_separator = true;
+            }
+        }
+        _ => {}
+    }
+    found.first_cr.is_some() && found.holds_separator
 }
 
 //
@@ -2966,14 +3138,14 @@ mod tests {
     /// Every spelling of a carriage return folds to LF, and a CRLF pair stays ONE terminator.
     #[test]
     fn carriage_returns_normalize_to_lf() {
-        assert_eq!(normalize_carriage_returns("a\r\nb"), "a\nb");
-        assert_eq!(normalize_carriage_returns("a\rb"), "a\nb");
-        assert_eq!(normalize_carriage_returns("a\r\n\r\nb"), "a\n\nb");
-        assert_eq!(normalize_carriage_returns("a\r\rb"), "a\n\nb");
+        assert_eq!(normalize_carriage_returns("a\r\nb").text(), "a\nb");
+        assert_eq!(normalize_carriage_returns("a\rb").text(), "a\nb");
+        assert_eq!(normalize_carriage_returns("a\r\n\r\nb").text(), "a\n\nb");
+        assert_eq!(normalize_carriage_returns("a\r\rb").text(), "a\n\nb");
         // `\n\r` is two terminators, not a pair — only `\r\n` is one.
-        assert_eq!(normalize_carriage_returns("a\n\rb"), "a\n\nb");
-        assert_eq!(normalize_carriage_returns("\r"), "\n");
-        assert_eq!(normalize_carriage_returns("\r\n"), "\n");
+        assert_eq!(normalize_carriage_returns("a\n\rb").text(), "a\n\nb");
+        assert_eq!(normalize_carriage_returns("\r").text(), "\n");
+        assert_eq!(normalize_carriage_returns("\r\n").text(), "\n");
     }
 
     /// A CR-free string comes back BORROWED — the fold runs ahead of every format, so the
@@ -2981,16 +3153,41 @@ mod tests {
     #[test]
     fn carriage_return_normalization_borrows_without_one_and_is_idempotent() {
         assert!(matches!(
-            normalize_carriage_returns("a\nb\n"),
+            normalize_carriage_returns("a\nb\n").into_text(),
             Cow::Borrowed("a\nb\n")
         ));
-        assert!(matches!(normalize_carriage_returns(""), Cow::Borrowed("")));
-        let once = normalize_carriage_returns("a\r\nb\rc").into_owned();
         assert!(matches!(
-            normalize_carriage_returns(&once),
+            normalize_carriage_returns("").into_text(),
+            Cow::Borrowed("")
+        ));
+        let once = normalize_carriage_returns("a\r\nb\rc")
+            .into_text()
+            .into_owned();
+        assert!(matches!(
+            normalize_carriage_returns(&once).into_text(),
             Cow::Borrowed(_)
         ));
         assert_eq!(once, "a\nb\nc");
+    }
+
+    /// The verdict the fold's pass takes is the verdict over the FOLDED text: a `\r` or a
+    /// `\r\n` is a `\n` on the other side of the fold, so only a U+2028 / U+2029 can say
+    /// no — and the fold does not move those. (The exhaustive test below grades the same
+    /// claim at every alignment of every terminator shape; these are the shapes by name.)
+    #[test]
+    fn the_fold_takes_the_folded_texts_line_verdict() {
+        assert!(normalize_carriage_returns("a\nb").lf_only());
+        assert!(normalize_carriage_returns("a\r\nb").lf_only());
+        assert!(normalize_carriage_returns("a\rb").lf_only());
+        assert!(normalize_carriage_returns("a\u{2000}b\u{e9}").lf_only());
+        assert!(!normalize_carriage_returns("a\u{2028}b").lf_only());
+        assert!(!normalize_carriage_returns("a\u{2029}b").lf_only());
+        assert!(!normalize_carriage_returns("a\u{2028}\r\nb").lf_only());
+        assert!(!normalize_carriage_returns("a\r\n\u{2028}b").lf_only());
+        // Both facts known early: the pass may stop, and the first `\r` is still the FIRST.
+        let folded = normalize_carriage_returns("\r\u{2028}x\ry\r\nz");
+        assert_eq!(folded.text(), "\n\u{2028}x\ny\nz");
+        assert!(!folded.lf_only());
     }
 
     /// U+2028 / U+2029 are terminators to ECMAScript and ordinary characters to HTML and CSS
@@ -2999,9 +3196,18 @@ mod tests {
     /// `line_terminator_len` counts them.
     #[test]
     fn carriage_return_normalization_leaves_line_and_paragraph_separators_alone() {
-        assert_eq!(normalize_carriage_returns("a\u{2028}b"), "a\u{2028}b");
-        assert_eq!(normalize_carriage_returns("a\u{2029}b"), "a\u{2029}b");
-        assert_eq!(normalize_carriage_returns("a\u{2028}\r\nb"), "a\u{2028}\nb");
+        assert_eq!(
+            normalize_carriage_returns("a\u{2028}b").text(),
+            "a\u{2028}b"
+        );
+        assert_eq!(
+            normalize_carriage_returns("a\u{2029}b").text(),
+            "a\u{2029}b"
+        );
+        assert_eq!(
+            normalize_carriage_returns("a\u{2028}\r\nb").text(),
+            "a\u{2028}\nb"
+        );
     }
 
     #[test]
@@ -3161,6 +3367,22 @@ mod tests {
                         lf_only,
                         "verdict with a non-ASCII byte ahead {ahead:?}"
                     );
+                    // The fold's own pass states the folded text's verdict — the up-front
+                    // verdict over the bytes it returns — at the same alignments.
+                    for document in [&padded, &ahead] {
+                        let folded = normalize_carriage_returns(document);
+                        assert_eq!(
+                            folded.lf_only(),
+                            line_terminators_are_lf_only(folded.text().as_bytes()),
+                            "fold verdict {document:?}"
+                        );
+                        assert!(!folded.text().contains('\r'), "fold left a CR {document:?}");
+                        assert_eq!(
+                            matches!(folded.into_text(), Cow::Borrowed(_)),
+                            !document.contains('\r'),
+                            "fold borrowed/copied wrongly {document:?}"
+                        );
+                    }
                 }
                 if lf_only {
                     lf_only_documents += 1;
