@@ -111,6 +111,11 @@ pub(crate) use specialize_short_len;
 /// have only a handful of parts, so the common case stays on the stack and only
 /// larger nodes spill. Shared by the TS chain / binary-operator printers and the
 /// Svelte template printer; `DocId` is `Copy` and 4 bytes → 32-byte inline buffer.
+///
+/// Most assemblies hold one or two parts, and a one-part concat is its part — so parts
+/// produced one at a time go through `DocArena::concat_iter`, which pulls three before
+/// opening a buffer, and a site whose count is decidable at the site pairs or returns
+/// directly. A `DocBuf` is for the site that genuinely accumulates.
 pub type DocBuf = smallvec::SmallVec<[arena::DocId; 8]>;
 
 // Diagnostic: line-comment swallow check (opt-in, render-time; `swallow_check` feature)

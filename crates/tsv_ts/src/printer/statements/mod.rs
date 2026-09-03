@@ -213,7 +213,6 @@ impl<'a> Printer<'a> {
         } else {
             self.build_expression_statement_value_doc(stmt, ctx.in_program_or_block)
         };
-        let mut parts: DocBuf = smallvec![value_doc];
 
         // Comments between the expression and the `;`, with the `;` bound to the
         // statement: a same-line block trails *after* it (`fn() /* c */;` → `fn(); /* c */`,
@@ -224,6 +223,10 @@ impl<'a> Printer<'a> {
         let gap_start = consumed_close.map_or(expr_end, |close| {
             Self::past_grouping_close(close, stmt.span.end)
         });
+        if self.semicolon_gap_is_bare(gap_start, stmt.span.end) {
+            return d.concat(&[value_doc, d.text(";")]);
+        }
+        let mut parts: DocBuf = smallvec![value_doc];
         self.push_semicolon_with_gap_comments(
             &mut parts,
             gap_start,
@@ -274,7 +277,6 @@ impl<'a> Printer<'a> {
         in_program_or_block: bool,
     ) -> (DocId, Option<u32>) {
         let d = self.d();
-        let mut parts = DocBuf::new();
         // A `//` the author wrote inside the value's own grouping parens keeps those
         // parens: the terminator gap would defer it past the `)` and the `;`, onto a line
         // that may already hold a `//`, where the two MERGE into one comment. The
@@ -379,6 +381,13 @@ impl<'a> Printer<'a> {
         // Which grouping `)` this print retains and emits the expression→`)` gap inside.
         // The two paren-KEEPING branches below claim it; the decorated one does not (its
         // layout has no seam for a trailing run), so there the terminator gap keeps it.
+        // The plain statement — no required, directive-avoiding, or source paren — IS its
+        // expression: the branch below would push it alone and `concat` would hand it
+        // back, so the buffer is skipped outright (the common case by a wide margin).
+        if !needs_parens && !source_paren && shell_close.is_none() {
+            return (expr_doc, None);
+        }
+        let mut parts = DocBuf::new();
         let mut consumed_close = None;
         if paren_open_comments {
             // The parens break open around the run. Only the first `hardline` is

@@ -182,11 +182,7 @@ pub(super) fn build_expanded_chain_doc<'a>(
     let (first_groups, rest) = groups.split_at(split_at.min(groups.len()));
 
     // Print first group(s) inline
-    let first_docs: DocBuf = first_groups
-        .iter()
-        .map(|g| print_group(g, printer))
-        .collect();
-    let first_doc = d.concat(&first_docs);
+    let first_doc = d.concat_iter(first_groups.iter().map(|g| print_group(g, printer)));
 
     if rest.is_empty() {
         return first_doc;
@@ -215,11 +211,7 @@ pub(super) fn build_first_groups_doc<'a>(
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
-    let first_docs: DocBuf = first_groups
-        .iter()
-        .map(|g| print_group(g, printer))
-        .collect();
-    d.concat(&first_docs)
+    d.concat_iter(first_groups.iter().map(|g| print_group(g, printer)))
 }
 
 /// Build first groups doc with expanded calls
@@ -228,9 +220,9 @@ pub(super) fn build_first_groups_expanded_doc<'a>(
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
-    let first_docs: DocBuf = first_groups
-        .iter()
-        .map(|g| print_group_expanded(g, printer))
-        .collect();
-    d.concat(&first_docs)
+    d.concat_iter(
+        first_groups
+            .iter()
+            .map(|g| print_group_expanded(g, printer)),
+    )
 }

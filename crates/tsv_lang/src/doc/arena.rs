@@ -2437,12 +2437,60 @@ impl DocArena {
     /// array to materialize.
     #[expect(clippy::inline_always)]
     #[inline(always)]
+    #[cfg_attr(feature = "census", track_caller)]
     pub fn concat(&self, docs: &[DocId]) -> DocId {
+        #[cfg(feature = "census")]
+        crate::census::site(core::panic::Location::caller(), docs.len());
         match docs {
             [single] => *single,
             [a, b] => self.concat_pair(*a, *b),
             _ => self.concat_other(docs),
         }
+    }
+
+    /// [`Self::concat`] over parts produced one at a time — a chain group's node docs,
+    /// a flattened child list, a first doc ahead of its rest. Three quarters of the
+    /// buffers the printers assembled for a `concat` held one or two parts (a census
+    /// over real TypeScript: of 894 K buffer-built concats a pass, 674 K were one- or
+    /// two-part), and a one-part concat IS its part — so the first three parts are
+    /// pulled before any buffer exists: none → `empty()`, one → itself, two →
+    /// [`Self::concat_pair`], and only a third opens a [`DocBuf`] for the rest.
+    ///
+    /// Parts are pulled in order, so an iterator that builds docs as it goes allocates
+    /// exactly as the `collect` it replaces did — the doc tree is the same node for node.
+    #[inline]
+    pub fn concat_iter(&self, parts: impl IntoIterator<Item = DocId>) -> DocId {
+        let mut parts = parts.into_iter();
+        let Some(a) = parts.next() else {
+            return self.empty();
+        };
+        let Some(b) = parts.next() else {
+            return a;
+        };
+        let Some(c) = parts.next() else {
+            return self.concat_pair(a, b);
+        };
+        self.concat_from_three(a, b, c, &mut parts)
+    }
+
+    /// [`Self::concat_iter`]'s three-or-more arm, out of line and over a `dyn` iterator
+    /// so every `concat_iter` instantiation shares one body: the buffer, its spill and
+    /// the `extend` stay out of the callers' frames, and only the pull of the first
+    /// three parts is inlined. The rest is still pulled in order.
+    #[inline(never)]
+    fn concat_from_three(
+        &self,
+        a: DocId,
+        b: DocId,
+        c: DocId,
+        rest: &mut dyn Iterator<Item = DocId>,
+    ) -> DocId {
+        let mut buf = DocBuf::new();
+        buf.push(a);
+        buf.push(b);
+        buf.push(c);
+        buf.extend(rest);
+        self.concat_other(&buf)
     }
 
     /// [`Self::concat`]'s two-child arm, taking its children by value so the
@@ -2473,7 +2521,10 @@ impl DocArena {
     }
 
     /// Create a fill doc for greedy line packing.
+    #[cfg_attr(feature = "census", track_caller)]
     pub fn fill(&self, parts: &[DocId]) -> DocId {
+        #[cfg(feature = "census")]
+        crate::census::site(core::panic::Location::caller(), parts.len());
         let range = self.alloc_children(parts);
         self.alloc(DocNode::Fill(range))
     }
@@ -3344,20 +3395,16 @@ impl DocArena {
             }
             Info::IfBreakFlat(flat_doc) => self.flatten_lines_impl(flat_doc, mode),
             Info::IndentIfBreakContents(contents) => self.flatten_lines_impl(contents, mode),
-            Info::Concat(kids) => {
-                let flattened: DocBuf = kids
-                    .into_iter()
-                    .map(|kid| self.flatten_lines_impl(kid, mode))
-                    .collect();
-                self.concat(&flattened)
-            }
+            Info::Concat(kids) => self.concat_iter(
+                kids.into_iter()
+                    .map(|kid| self.flatten_lines_impl(kid, mode)),
+            ),
             Info::Fill(kids) => {
                 // Fill becomes regular concat when flattened
-                let flattened: DocBuf = kids
-                    .into_iter()
-                    .map(|kid| self.flatten_lines_impl(kid, mode))
-                    .collect();
-                self.concat(&flattened)
+                self.concat_iter(
+                    kids.into_iter()
+                        .map(|kid| self.flatten_lines_impl(kid, mode)),
+                )
             }
             Info::WithContext(doc, context) => {
                 let new_doc = self.flatten_lines_impl(doc, mode);

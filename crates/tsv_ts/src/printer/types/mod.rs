@@ -205,19 +205,24 @@ impl<'a> Printer<'a> {
             // `build_intersection_type_doc` directly with `own_line = true`.
             TSType::Intersection(i) => self.build_intersection_type_doc(i, true, false),
             TSType::TypeReference(r) => {
-                let mut parts: DocBuf = smallvec![self.build_entity_name_doc(&r.type_name)];
-                if let Some(type_args) = &r.type_arguments {
-                    // Preserve comments before type args: `Map/* c */ <string, number>`
-                    if let Some(doc) = self.build_name_to_type_params_comments_opt(
-                        r.type_name.span().end,
-                        type_args.span.start,
-                        CommentSpacing::Trailing,
-                    ) {
-                        parts.push(doc);
+                let name_doc = self.build_entity_name_doc(&r.type_name);
+                match &r.type_arguments {
+                    // A bare name is its own doc — no buffer.
+                    None => name_doc,
+                    Some(type_args) => {
+                        let mut parts: DocBuf = smallvec![name_doc];
+                        // Preserve comments before type args: `Map/* c */ <string, number>`
+                        if let Some(doc) = self.build_name_to_type_params_comments_opt(
+                            r.type_name.span().end,
+                            type_args.span.start,
+                            CommentSpacing::Trailing,
+                        ) {
+                            parts.push(doc);
+                        }
+                        parts.push(self.build_type_arguments_doc(type_args));
+                        d.concat(&parts)
                     }
-                    parts.push(self.build_type_arguments_doc(type_args));
                 }
-                d.concat(&parts)
             }
             TSType::TypeLiteral(t) => self.build_type_literal_doc(t),
             TSType::Function(f) => self.build_function_type_doc(f),

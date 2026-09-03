@@ -337,15 +337,14 @@ impl<'a> Printer<'a> {
         parens: AnnotationParens,
     ) -> DocId {
         let d = self.d();
-        let mut parts: DocBuf = smallvec![d.text(": ")];
         // Skip the `empty()` comment child on the comment-free `: Type` gap — type
         // annotations are one of the most frequent TS constructs, so a wasted child here
         // (walked by render + every fits pass) is ubiquitous. Byte-identical: the gap is
-        // comment-free, so the comment doc would be `empty()`.
+        // comment-free, so the comment doc would be `empty()`. A pair, not a buffer.
         if !gap_has_comments {
-            parts.push(self.build_annotation_value_doc(ty, parens));
-            return d.concat(&parts);
+            return d.concat(&[d.text(": "), self.build_annotation_value_doc(ty, parens)]);
         }
+        let mut parts: DocBuf = smallvec![d.text(": ")];
         // A glued format-ignore directive in the gap freezes a non-composite type
         // verbatim (`let v: /* format-ignore */ {x:   1}` — the directive itself is
         // emitted inline; own-line directives took the own-line branch). The slice
