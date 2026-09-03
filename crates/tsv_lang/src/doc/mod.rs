@@ -304,31 +304,37 @@ mod arena_tests {
     #[test]
     fn test_static_text_node_interned_per_document() {
         let mut a = DocArena::new();
+        // A fresh arena holds the prelude (the singletons and the hottest
+        // statics at fixed ids) and nothing else.
+        let prelude = a.borrow_nodes().len();
 
-        // Repeated statics within one document share one node.
+        // A prelude member is a fixed id and allocates nothing.
         let comma_1 = a.text(",");
         let comma_2 = a.text(",");
         assert_eq!(comma_1, comma_2);
+        assert_ne!(comma_1, a.text(";"));
+        assert_eq!(a.empty(), a.empty());
+        assert_eq!(a.borrow_nodes().len(), prelude);
+        // Repeated statics beyond the prelude share one node per document.
+        let kw_1 = a.text("const");
+        let kw_2 = a.text("const");
+        assert_eq!(kw_1, kw_2);
+        assert_eq!(kw_1.index(), prelude);
         // A different static gets its own node.
-        let semi = a.text(";");
-        assert_ne!(comma_1, semi);
-        // empty() interns through its dedicated cell.
-        let empty_1 = a.empty();
-        let empty_2 = a.empty();
-        assert_eq!(empty_1, empty_2);
-        let node_count = a.borrow_nodes().len();
-        assert_eq!(node_count, 3); // ",", ";", ""
+        let other = a.text("export");
+        assert_ne!(kw_1, other);
+        assert_eq!(a.borrow_nodes().len(), prelude + 2);
 
-        // reset() invalidates every interned node (ids restart at 0): the next
-        // document re-allocs rather than returning a prior document's id, and
-        // interning resumes within it.
+        // reset() re-seeds the prelude (its ids are the same in every document)
+        // and invalidates every interned node beyond it: the next document
+        // re-allocs rather than returning a prior document's id, and interning
+        // resumes within it.
         a.reset();
-        let comma_3 = a.text(",");
-        let empty_3 = a.empty();
-        assert_eq!(comma_3.index(), 0);
-        assert_eq!(empty_3.index(), 1);
-        assert_eq!(a.text(","), comma_3);
-        assert_eq!(a.empty(), empty_3);
+        assert_eq!(a.borrow_nodes().len(), prelude);
+        assert_eq!(a.text(","), comma_1);
+        let kw_3 = a.text("const");
+        assert_eq!(kw_3.index(), prelude);
+        assert_eq!(a.text("const"), kw_3);
     }
 
     #[test]
@@ -347,26 +353,24 @@ mod arena_tests {
         assert_eq!(a.softline(), soft);
         assert_eq!(a.hardline(), hard);
         assert_eq!(a.literalline(), literal);
-        // LineSuffixBoundary and BreakParent intern through their own cells.
+        // LineSuffixBoundary and BreakParent are singletons too.
         let lsb = a.line_suffix_boundary();
         assert_eq!(a.line_suffix_boundary(), lsb);
         let bp = a.break_parent();
         assert_eq!(a.break_parent(), bp);
-        assert_eq!(a.borrow_nodes().len(), 6); // 4 line kinds + LSB + BreakParent
+        assert_ne!(lsb, bp);
+        // Every singleton is a prelude node: nothing was allocated.
+        assert_eq!(a.borrow_nodes().len(), DocArena::new().borrow_nodes().len());
 
-        // reset() invalidates every interned singleton (ids restart at 0):
-        // the next document re-allocs rather than returning a prior
-        // document's id, and interning resumes within it.
+        // reset() re-seeds the prelude, so every singleton keeps its id across
+        // documents.
         a.reset();
-        let normal_2 = a.line();
-        let lsb_2 = a.line_suffix_boundary();
-        let bp_2 = a.break_parent();
-        assert_eq!(normal_2.index(), 0);
-        assert_eq!(lsb_2.index(), 1);
-        assert_eq!(bp_2.index(), 2);
-        assert_eq!(a.line(), normal_2);
-        assert_eq!(a.line_suffix_boundary(), lsb_2);
-        assert_eq!(a.break_parent(), bp_2);
+        assert_eq!(a.line(), normal);
+        assert_eq!(a.softline(), soft);
+        assert_eq!(a.hardline(), hard);
+        assert_eq!(a.literalline(), literal);
+        assert_eq!(a.line_suffix_boundary(), lsb);
+        assert_eq!(a.break_parent(), bp);
     }
 
     #[test]

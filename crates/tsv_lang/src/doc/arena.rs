@@ -1007,6 +1007,184 @@ fn pooled_text_width_cold(s: &str, first: usize) -> u16 {
     }
 }
 
+/// The statics pre-interned at FIXED ids — the prelude every document opens with.
+///
+/// Seeded into `nodes` by the constructors and by [`DocArena::reset`] ahead of the
+/// document's own first node, so `DocId(i)` names `PRELUDE[i]` in every document and
+/// [`DocArena::text`] answers a member without touching the arena at all:
+/// [`prelude_index`] is a byte match, and at a literal call site (`text(",")`) it
+/// folds to a constant — no hash, no slot probe, no generation compare, no node.
+/// A runtime argument (`text(op_str)`) pays the match — a length switch and a byte
+/// jump table — ahead of the probe it would have paid anyway.
+///
+/// The set is the census's head, not a style: on a 1,666-file TypeScript corpus
+/// one pass makes 1.57 M `text()` calls over 169 distinct strings, and the ten
+/// hottest — every one a piece of punctuation — carry 74% of them (the top 24,
+/// 90%); a Svelte corpus adds the tag punctuation, a CSS corpus is 98% `(` / `)`
+/// / `,` / `: `. Keywords stay out: their population is long-tailed and each
+/// entry lengthens the runtime match. Widths are stated, not measured — a test
+/// grades them against [`pooled_text_width`] — and `"\t"` is [`TAB_WIDTH`].
+///
+/// Seeding costs a node per entry per document (a few hundred instructions),
+/// and buys back the once-per-document miss each member used to pay.
+///
+/// The stateless singletons sit AHEAD of the statics, at [`PRELUDE_EMPTY`] through
+/// [`PRELUDE_FLOW_PROBE_END`]: a node with no per-use state — [`DocArena::empty`],
+/// the four [`LineKind`]s, the line-suffix boundary, the two breaks, the flow-probe
+/// sentinel — serves every call site in a document, and at a fixed id every builder
+/// is a constant rather than a generation-gated cell probe.
+const PRELUDE: &[(&str, u16)] = &[
+    ("(", 1),
+    (")", 1),
+    (" ", 1),
+    (";", 1),
+    (",", 1),
+    (".", 1),
+    ("}", 1),
+    ("{", 1),
+    (":", 1),
+    ("\t", 2),
+    ("]", 1),
+    ("[", 1),
+    ("<", 1),
+    (">", 1),
+    ("=", 1),
+    ("!", 1),
+    ("?", 1),
+    ("`", 1),
+    ("&", 1),
+    ("*", 1),
+    ("+", 1),
+    ("-", 1),
+    ("/", 1),
+    ("|", 1),
+    ("~", 1),
+    ("\"", 1),
+    (": ", 2),
+    (", ", 2),
+    (" =", 2),
+    (" =>", 3),
+    (" = ", 3),
+    ("</", 2),
+    ("=\"", 2),
+    ("/>", 2),
+    ("{ ", 2),
+    (" }", 2),
+    ("| ", 2),
+    (" (", 2),
+    (") ", 2),
+    ("${", 2),
+    ("?.", 2),
+    ("...", 3),
+    ("{}", 2),
+    ("> ", 2),
+    (" &", 2),
+    ("=>", 2),
+];
+
+/// Fixed ids of the singleton nodes seeded ahead of [`PRELUDE`]'s statics, in seeding order.
+const PRELUDE_EMPTY: u32 = 0;
+/// `PRELUDE_LINE + kind as u32` for each [`LineKind`], in discriminant order.
+const PRELUDE_LINE: u32 = 1;
+const PRELUDE_LINE_SUFFIX_BOUNDARY: u32 = 5;
+const PRELUDE_BREAK_PARENT: u32 = 6;
+const PRELUDE_FLUSH_BREAK: u32 = 7;
+const PRELUDE_FLOW_PROBE_END: u32 = 8;
+/// Where the statics start: `PRELUDE[i]` is `DocId(PRELUDE_STATICS + i)`.
+const PRELUDE_STATICS: u32 = 9;
+
+/// The id of `s` in the prelude, as a byte match.
+///
+/// Spelled as a `match` on byte-string patterns rather than a scan of the table:
+/// the patterns fold to a constant at a literal call site once `text` inlines
+/// (a scan would need the loop fully unrolled to do the same), and for a runtime
+/// argument the match compiles to a length switch plus a byte jump table. The
+/// arm order is the table's; a test binds the two.
+///
+/// `inline(always)`: the fold happens only where this body is inlined, and the
+/// inline-cost analyzer prices the one-byte arms — a jump table on a loaded
+/// byte — at face value, so under plain `#[inline]` a literal `text(".")` kept
+/// a call to this function (a three-byte literal folded; a one-byte one did
+/// not). Forced, every literal member is a constant; a runtime argument
+/// carries the switch and the table at its site.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn prelude_index(s: &str) -> Option<u32> {
+    let i = match s.as_bytes() {
+        b"(" => 0,
+        b")" => 1,
+        b" " => 2,
+        b";" => 3,
+        b"," => 4,
+        b"." => 5,
+        b"}" => 6,
+        b"{" => 7,
+        b":" => 8,
+        b"\t" => 9,
+        b"]" => 10,
+        b"[" => 11,
+        b"<" => 12,
+        b">" => 13,
+        b"=" => 14,
+        b"!" => 15,
+        b"?" => 16,
+        b"`" => 17,
+        b"&" => 18,
+        b"*" => 19,
+        b"+" => 20,
+        b"-" => 21,
+        b"/" => 22,
+        b"|" => 23,
+        b"~" => 24,
+        b"\"" => 25,
+        b": " => 26,
+        b", " => 27,
+        b" =" => 28,
+        b" =>" => 29,
+        b" = " => 30,
+        b"</" => 31,
+        b"=\"" => 32,
+        b"/>" => 33,
+        b"{ " => 34,
+        b" }" => 35,
+        b"| " => 36,
+        b" (" => 37,
+        b") " => 38,
+        b"${" => 39,
+        b"?." => 40,
+        b"..." => 41,
+        b"{}" => 42,
+        b"> " => 43,
+        b" &" => 44,
+        b"=>" => 45,
+        _ => return None,
+    };
+    Some(PRELUDE_STATICS + i)
+}
+
+/// Seed the singletons and [`PRELUDE`] into a freshly cleared node store, so their ids
+/// are fixed.
+fn seed_prelude(nodes: &mut Vec<DocNode>) {
+    debug_assert!(nodes.is_empty());
+    nodes.extend([
+        DocNode::Text(DocText::Static("", 0)),
+        DocNode::Line(LineKind::Normal),
+        DocNode::Line(LineKind::Soft),
+        DocNode::Line(LineKind::Hard),
+        DocNode::Line(LineKind::Literal),
+        DocNode::LineSuffixBoundary,
+        DocNode::BreakParent,
+        DocNode::FlushBreak,
+        DocNode::FlowProbeEnd,
+    ]);
+    debug_assert_eq!(nodes.len(), PRELUDE_STATICS as usize);
+    nodes.extend(
+        PRELUDE
+            .iter()
+            .map(|&(s, width)| DocNode::Text(DocText::Static(s, width))),
+    );
+}
+
 /// Arena allocator for document nodes.
 ///
 /// All doc nodes are stored contiguously in `nodes`. Multi-child nodes
@@ -1151,45 +1329,13 @@ pub struct DocArena {
     /// lives on the stack or in a thread-local and is only ever borrowed,
     /// never moved after construction, so the array adds no per-use
     /// indirection.
-    static_cache: [Cell<StaticSlot>; STATIC_CACHE_SLOTS],
+    static_cache: [StaticSlot; STATIC_CACHE_SLOTS],
     /// The current document's format generation, keying the validity of the
-    /// interned node halves in `static_cache` and the singleton cells
-    /// (`empty_node`, `line_nodes`, `line_suffix_boundary_node`,
-    /// `break_parent_node`, `flush_break_node`). Starts
+    /// interned node halves in `static_cache`. Starts
     /// at 1 (0 marks a never-stamped slot) and is bumped by `reset()`, so a
     /// prior document's `node_id`s — invalidated by the reset — can never be
     /// returned for the new document.
     format_gen: Cell<u32>,
-    /// The interned [`Self::empty`] node for the current document (generation,
-    /// id) — `empty()` is the single hottest static (~1/3 of static allocs), so
-    /// it gets a dedicated slot with no hash probe. Valid iff the generation
-    /// matches `format_gen`.
-    empty_node: Cell<(u32, DocId)>,
-    /// The interned [`DocNode::Line`] node per [`LineKind`] for the current
-    /// document (generation, id), direct-indexed by the kind's discriminant —
-    /// no hash probe, like `empty_node`. A `Line` node carries no per-use
-    /// state (mode and indent are supplied per visit by the enclosing render
-    /// command), so every `line()`/`softline()`/`hardline()`/`literalline()`
-    /// in a document can return one shared node — the layout analog of
-    /// "statics are position-free". Valid iff the generation matches
-    /// `format_gen`.
-    line_nodes: [Cell<(u32, DocId)>; 4],
-    /// The interned [`DocNode::LineSuffixBoundary`] node for the current
-    /// document (generation, id) — stateless like `Line`, same dedicated-cell
-    /// interning. Valid iff the generation matches `format_gen`.
-    line_suffix_boundary_node: Cell<(u32, DocId)>,
-    /// The interned [`DocNode::BreakParent`] node for the current document
-    /// (generation, id) — stateless like `Line`, same dedicated-cell
-    /// interning. Valid iff the generation matches `format_gen`.
-    break_parent_node: Cell<(u32, DocId)>,
-    /// The interned [`DocNode::FlushBreak`] node for the current document
-    /// (generation, id) — stateless like `Line`, same dedicated-cell
-    /// interning. Valid iff the generation matches `format_gen`.
-    flush_break_node: Cell<(u32, DocId)>,
-    /// The interned [`DocNode::FlowProbeEnd`] node for the current document
-    /// (generation, id) — stateless like `Line`, same dedicated-cell
-    /// interning. Valid iff the generation matches `format_gen`.
-    flow_probe_end_node: Cell<(u32, DocId)>,
     /// Flow-probe render state: the output-length snapshots of the probes currently open
     /// (a stack — probed subtrees nest), plus the most recently completed probe's answer.
     /// Written only by the render loop (probe begin at a flagged node, finish at its
@@ -1250,27 +1396,37 @@ struct FlowProbeState {
 /// address + same length ⇒ same bytes). That same identity argument covers
 /// the node half: identical `ptr`+`len` ⇒ the same `&'static str`, so the
 /// interned node's stored text is indistinguishable from the caller's.
-#[derive(Clone, Copy, Debug)]
+///
+/// A struct of `Cell`s, not a `Cell` of a struct: the hit path in [`DocArena::text`]
+/// reads the three fields it compares and the one it returns straight from the
+/// slot. As one `Cell<StaticSlot>`, `get()` copied all 24 bytes to a stack
+/// temporary that the compares then re-read — two stores and a store-forward
+/// round trip on every probe, at every inlined site — because the by-value
+/// `slot` argument to the cold miss kept the copy live on the hot path. The
+/// miss re-reads the slot it is handed the index of.
+#[derive(Debug)]
 struct StaticSlot {
-    ptr: usize,
-    len: u32,
-    width: u16,
+    ptr: Cell<usize>,
+    len: Cell<u32>,
+    width: Cell<u16>,
     /// Format generation that stamped `node_id`; 0 = never stamped.
-    node_gen: u32,
+    node_gen: Cell<u32>,
     /// The interned node for the generation in `node_gen`.
-    node_id: DocId,
+    node_id: Cell<DocId>,
 }
 
 impl StaticSlot {
     /// An empty slot: `ptr == 0` is never a real entry (references are never
     /// null — even `""` has a non-null dangling address).
-    const EMPTY: Self = Self {
-        ptr: 0,
-        len: 0,
-        width: 0,
-        node_gen: 0,
-        node_id: DocId(0),
-    };
+    const fn empty() -> Self {
+        Self {
+            ptr: Cell::new(0),
+            len: Cell::new(0),
+            width: Cell::new(0),
+            node_gen: Cell::new(0),
+            node_id: Cell::new(DocId(0)),
+        }
+    }
 }
 
 /// 2048 slots (× 24 B on 64-bit = 48 KB inline). Kept in lockstep with the
@@ -1278,7 +1434,9 @@ impl StaticSlot {
 ///
 /// **Sized against the collision draw, not against the population.** The
 /// unique-static population is ~165–190 across real corpora and the *per
-/// document* working set is ~55, so a 512-slot table looks like ten times the
+/// document* working set is ~55 (before [`PRELUDE`] took the hottest 46 — and
+/// three quarters of the calls — out of the cache entirely; what reaches it now
+/// is the long tail, keywords mostly), so a 512-slot table looks like ten times the
 /// room it needs — and the eviction rate it produces is genuinely small
 /// (≤0.7% of `text()` calls). That framing is what made 512 look sufficient,
 /// and it measures the wrong thing: the cost is not the *rate*, it is **which
@@ -1340,7 +1498,7 @@ impl DocArena {
     // between calls already box it (`tsv_arena::with_doc_arena`).
     #[allow(clippy::large_stack_arrays)]
     pub fn new() -> Self {
-        Self {
+        let mut arena = Self {
             nodes: RefCell::new(Vec::new()),
             children: RefCell::new(Vec::new()),
             text_pool: RefCell::new(String::new()),
@@ -1354,14 +1512,8 @@ impl DocArena {
             docbuf_pool: RefCell::new(Vec::new()),
             share_map_scratch: RefCell::new(FxHashMap::default()),
             layout_cache: RefCell::new(Vec::new()),
-            static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
+            static_cache: [const { StaticSlot::empty() }; STATIC_CACHE_SLOTS],
             format_gen: Cell::new(1),
-            empty_node: Cell::new((0, DocId(0))),
-            line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
-            line_suffix_boundary_node: Cell::new((0, DocId(0))),
-            break_parent_node: Cell::new((0, DocId(0))),
-            flush_break_node: Cell::new((0, DocId(0))),
-            flow_probe_end_node: Cell::new((0, DocId(0))),
             flow_probe: RefCell::new(FlowProbeState::default()),
             flow_probe_broke: Cell::new(false),
             #[cfg(debug_assertions)]
@@ -1370,7 +1522,9 @@ impl DocArena {
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
             comment_docs: RefCell::new(Vec::new()),
-        }
+        };
+        seed_prelude(arena.nodes.get_mut());
+        arena
     }
 
     /// Create an arena with pre-allocated capacity based on source size.
@@ -1393,7 +1547,7 @@ impl DocArena {
     pub fn with_source_size_hint(source_len: usize) -> Self {
         let estimated_nodes = source_len * 2;
         let estimated_children = estimated_nodes / 2;
-        Self {
+        let mut arena = Self {
             nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),
             children: RefCell::new(Vec::with_capacity(estimated_children)),
             // Pooled text is rare (~1.4% of Text nodes) but its bytes are not
@@ -1416,14 +1570,8 @@ impl DocArena {
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
             layout_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
-            static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
+            static_cache: [const { StaticSlot::empty() }; STATIC_CACHE_SLOTS],
             format_gen: Cell::new(1),
-            empty_node: Cell::new((0, DocId(0))),
-            line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
-            line_suffix_boundary_node: Cell::new((0, DocId(0))),
-            break_parent_node: Cell::new((0, DocId(0))),
-            flush_break_node: Cell::new((0, DocId(0))),
-            flow_probe_end_node: Cell::new((0, DocId(0))),
             flow_probe: RefCell::new(FlowProbeState::default()),
             flow_probe_broke: Cell::new(false),
             #[cfg(debug_assertions)]
@@ -1432,7 +1580,9 @@ impl DocArena {
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
             comment_docs: RefCell::new(Vec::new()),
-        }
+        };
+        seed_prelude(arena.nodes.get_mut());
+        arena
     }
 
     /// Create an arena sized for `source`.
@@ -1459,10 +1609,9 @@ impl DocArena {
     /// The static cache's *width* halves are deliberately NOT cleared:
     /// they key on `'static` string addresses, so they stay valid for the
     /// arena's whole lifetime and the cache warms once across documents. The
-    /// interned *node* halves (and the `empty()`/line/boundary singleton
-    /// cells) are invalidated in O(1)
-    /// by bumping `format_gen` — their `DocId`s point into the node store this
-    /// method just cleared.
+    /// interned *node* halves are invalidated in O(1) by bumping `format_gen` —
+    /// their `DocId`s point into the node store this method just cleared — and
+    /// the prelude is re-seeded at its fixed ids.
     pub fn reset(&mut self) {
         let next = self.format_gen.get().wrapping_add(1);
         if next == 0 {
@@ -1471,23 +1620,14 @@ impl DocArena {
             // false-hit and return a dangling id, so hard-clear every node
             // half once per wrap. The width halves stay valid ('static-keyed).
             for slot in &self.static_cache {
-                let mut s = slot.get();
-                s.node_gen = 0;
-                slot.set(s);
+                slot.node_gen.set(0);
             }
-            self.empty_node.set((0, DocId(0)));
-            for cell in &self.line_nodes {
-                cell.set((0, DocId(0)));
-            }
-            self.line_suffix_boundary_node.set((0, DocId(0)));
-            self.break_parent_node.set((0, DocId(0)));
-            self.flush_break_node.set((0, DocId(0)));
-            self.flow_probe_end_node.set((0, DocId(0)));
             self.format_gen.set(1);
         } else {
             self.format_gen.set(next);
         }
         self.nodes.get_mut().clear();
+        seed_prelude(self.nodes.get_mut());
         self.children.get_mut().clear();
         self.text_pool.get_mut().clear();
         self.layout_cache.get_mut().clear();
@@ -1567,70 +1707,96 @@ impl DocArena {
     //
 
     /// Create a text doc from a static string (zero allocation), interned
-    /// per document.
+    /// per document — or, for a [`PRELUDE`] member, a fixed id.
     ///
     /// Repeated calls with the same static within one format return one
-    /// shared node (`text(",")` ×10 K → 1 node): the direct-mapped slot
-    /// carries the interned `DocId` alongside the cached width, gated by the
-    /// arena's `format_gen` so a `reset()` invalidates every interned node in
-    /// O(1). Sharing is output-identical — statics are position-free at
-    /// render, nodes are append-only and immutable, and no consumer compares
-    /// `DocId` identity (`join_doc` has always shared separator ids). The
-    /// width half is amortized the same way as before (measured once per
-    /// unique string per arena *lifetime* — the *per-node* eager measure was
-    /// a measured loss); fits queries answer from the node alone and
-    /// `render_text`'s column advance skips its byte scan.
+    /// shared node (`text(",")` ×10 K → 1 node). The hottest statics — the
+    /// punctuation that is three quarters of a format run's `text()` calls —
+    /// are the prelude, seeded at fixed ids ahead of every document, and a
+    /// literal call site folds to that id with no probe at all. The rest go
+    /// through the direct-mapped slot, which carries the interned `DocId`
+    /// alongside the cached width, gated by the arena's `format_gen` so a
+    /// `reset()` invalidates every interned node in O(1). Sharing is
+    /// output-identical — statics are position-free at render, nodes are
+    /// append-only and immutable, and no consumer compares `DocId` identity
+    /// (`join_doc` has always shared separator ids). The width half is
+    /// amortized the same way as before (measured once per unique string per
+    /// arena *lifetime* — the *per-node* eager measure was a measured loss);
+    /// fits queries answer from the node alone and `render_text`'s column
+    /// advance skips its byte scan.
     ///
-    /// Hot path (92–95% of calls on real corpora): the slot hash, one slot
-    /// load, and a ptr/len/gen compare. ⚠️ **The hash does not fold.** The
+    /// Hot path of the interned half: the slot hash, three field loads, and a
+    /// ptr/len/gen compare — field loads,
+    /// not a slot copy: as one `Cell<StaticSlot>` the 24-byte `get()` went
+    /// through a stack temporary at every inlined site. ⚠️ **The hash does not fold.** The
     /// tempting reading is that `s`'s address is a link-time constant, so a
     /// folded call site should carry a literal index — but every shipped target
     /// is PIE, where the address is `image_base + link_offset` and the base is
     /// not known until `execve`. `objdump` shows the arithmetic emitted whole at
-    /// every one of the ~860 folded sites (`lea` the RIP-relative address,
+    /// every site the interned half inlines into (`lea` the RIP-relative address,
     /// `movabs` the constant, `imul`, `shr`), and the consequence is bigger than
     /// four instructions: the slot index is **re-drawn on every exec**, which is
     /// what [`STATIC_CACHE_SLOTS`] is sized against. The miss path — first use
     /// this document, first sighting ever, or collision evict — allocs and
     /// restamps in the cold helper.
-    #[inline]
+    ///
+    /// `inline(always)`: the prelude match is what this wrapper is for, and it
+    /// folds only where the wrapper is inlined — the inline-cost analyzer prices
+    /// the match and the probe behind it at face value (it does not fold a load
+    /// from a constant global), and under plain `#[inline]` LLVM declined the
+    /// body at the literal sites, leaving each one a call plus the runtime
+    /// match: `.text` fell, instructions did not. Forced, a literal member is a
+    /// constant and a literal non-member a direct call to [`Self::text_interned`].
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub fn text(&self, s: &'static str) -> DocId {
+        match prelude_index(s) {
+            Some(i) => DocId(i),
+            None => self.text_interned(s),
+        }
+    }
+
+    /// The interned half of [`Self::text`] for a static outside the prelude: the
+    /// slot probe, and the cold miss behind it.
+    #[inline]
+    fn text_interned(&self, s: &'static str) -> DocId {
         let ptr = s.as_ptr() as usize;
         // Hash in u64: usize is 32-bit on wasm32, where the Fibonacci constant
         // and the top-11-bit shift would overflow. The `>> 53` keeps the top 11
         // bits ⇒ index < 2048, locked to `STATIC_CACHE_SLOTS` by the assert at
         // its definition (and eliding the bounds check below).
         let slot_i = ((ptr as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 53) as usize;
-        let slot = self.static_cache[slot_i].get();
-        if slot.ptr == ptr && slot.len as usize == s.len() && slot.node_gen == self.format_gen.get()
+        let slot = &self.static_cache[slot_i];
+        if slot.ptr.get() == ptr
+            && slot.len.get() as usize == s.len()
+            && slot.node_gen.get() == self.format_gen.get()
         {
-            return slot.node_id;
+            return slot.node_id.get();
         }
-        self.text_miss(s, slot_i, slot)
+        self.text_miss(s, slot_i)
     }
 
-    /// The cold half of [`Self::text`]: alloc the node and (re)stamp the slot.
+    /// The cold half of [`Self::text_interned`]: alloc the node and (re)stamp the slot.
     ///
     /// Reuses the slot's cached width when only the node half is stale (the
     /// once-per-static-per-document case); measures it on a true width miss
     /// (first sighting or collision evict).
     #[cold]
     #[inline(never)]
-    fn text_miss(&self, s: &'static str, slot_i: usize, slot: StaticSlot) -> DocId {
+    fn text_miss(&self, s: &'static str, slot_i: usize) -> DocId {
+        let slot = &self.static_cache[slot_i];
         let ptr = s.as_ptr() as usize;
-        let width = if slot.ptr == ptr && slot.len as usize == s.len() {
-            slot.width
+        let width = if slot.ptr.get() == ptr && slot.len.get() as usize == s.len() {
+            slot.width.get()
         } else {
             pooled_text_width(s)
         };
         let node_id = self.alloc(DocNode::Text(DocText::Static(s, width)));
-        self.static_cache[slot_i].set(StaticSlot {
-            ptr,
-            len: s.len() as u32,
-            width,
-            node_gen: self.format_gen.get(),
-            node_id,
-        });
+        slot.ptr.set(ptr);
+        slot.len.set(s.len() as u32);
+        slot.width.set(width);
+        slot.node_gen.set(self.format_gen.get());
+        slot.node_id.set(node_id);
         node_id
     }
 
@@ -2156,95 +2322,48 @@ impl DocArena {
         }
     }
 
-    /// Return the per-document interned node held in `cell`, allocating it on
-    /// first use within the current document.
-    ///
-    /// The shared engine behind the singleton builders — [`Self::empty`],
-    /// [`Self::line`] and its kind siblings, [`Self::line_suffix_boundary`],
-    /// [`Self::break_parent`], and [`Self::flush_break`]: each is a node with no per-use state, so
-    /// one node per document serves every call site. Hot path: one cell load
-    /// plus a generation compare — no hash, cheaper than even the static
-    /// cache's slot probe. `reset()` invalidates every cell in O(1) via the
-    /// `format_gen` bump (plus the once-per-u32-wrap hard-clear). The node is
-    /// built behind a closure, NOT passed by value: a by-value `DocNode`
-    /// argument measured a consistent +0.26..+0.30% instructions (the
-    /// aggregate is materialized on the hot path; LLVM does not reliably sink
-    /// it into the cold branch), while the closure defers construction into
-    /// the per-call-site miss instantiation — hot-path codegen identical to a
-    /// hand-specialized pair.
-    #[inline]
-    fn interned_singleton(
-        &self,
-        cell: &Cell<(u32, DocId)>,
-        make: impl FnOnce() -> DocNode,
-    ) -> DocId {
-        let (node_gen, node_id) = cell.get();
-        if node_gen == self.format_gen.get() {
-            return node_id;
-        }
-        self.interned_singleton_miss(cell, make)
-    }
-
-    /// The cold half of [`Self::interned_singleton`]: alloc this document's
-    /// node and stamp the cell (once per cell per document). Monomorphized
-    /// per call site (one cold body per singleton kind — the same set of cold
-    /// fns the hand-specialized form had, written once).
-    #[cold]
-    #[inline(never)]
-    fn interned_singleton_miss(
-        &self,
-        cell: &Cell<(u32, DocId)>,
-        make: impl FnOnce() -> DocNode,
-    ) -> DocId {
-        let node_id = self.alloc(make());
-        cell.set((self.format_gen.get(), node_id));
-        node_id
-    }
-
-    /// Create an empty doc that produces no output, interned per document.
-    ///
-    /// `empty()` is the single hottest static text (~1/3 of static allocs on
-    /// real corpora), so it interns through a dedicated generation-gated cell
-    /// — no hash probe — allocating once per document.
+    /// Create an empty doc that produces no output — a prelude singleton at a
+    /// fixed id, so the call is a constant (see [`PRELUDE`]).
     #[inline]
     pub fn empty(&self) -> DocId {
-        self.interned_singleton(&self.empty_node, || DocNode::Text(DocText::Static("", 0)))
+        DocId(PRELUDE_EMPTY)
     }
 
-    /// Create a normal line break (space if fits, newline if doesn't),
-    /// interned per document.
+    /// Create a normal line break (space if fits, newline if doesn't) — a
+    /// prelude singleton at a fixed id (see [`PRELUDE`]).
     #[inline]
     pub fn line(&self) -> DocId {
         self.line_node(LineKind::Normal)
     }
 
-    /// Create a soft line that disappears in flat mode, interned per document.
+    /// Create a soft line that disappears in flat mode — a prelude singleton.
     #[inline]
     pub fn softline(&self) -> DocId {
         self.line_node(LineKind::Soft)
     }
 
-    /// Create a hard line break (always breaks), interned per document.
+    /// Create a hard line break (always breaks) — a prelude singleton.
     #[inline]
     pub fn hardline(&self) -> DocId {
         self.line_node(LineKind::Hard)
     }
 
-    /// Create a literal line break (just newline, no indentation), interned
-    /// per document.
+    /// Create a literal line break (just newline, no indentation) — a prelude
+    /// singleton.
     #[inline]
     pub fn literalline(&self) -> DocId {
         self.line_node(LineKind::Literal)
     }
 
-    /// Shared interning path for the four [`LineKind`]s: a `Line` node
-    /// carries no per-use state (mode and indent are supplied per visit by
-    /// the enclosing render command), so every line of a kind within one
-    /// document shares one node — the layout analog of "statics are
-    /// position-free". Direct-indexed by the kind's discriminant.
+    /// The prelude's `Line` node for `kind`: a `Line` node carries no per-use
+    /// state (mode and indent are supplied per visit by the enclosing render
+    /// command), so every line of a kind within one document shares one node —
+    /// the layout analog of "statics are position-free" — and at a fixed id
+    /// (see [`PRELUDE`]) the call is a constant, indexed by the kind's
+    /// discriminant.
     #[inline]
     fn line_node(&self, kind: LineKind) -> DocId {
-        self.interned_singleton(&self.line_nodes[kind as usize], || DocNode::Line(kind))
+        DocId(PRELUDE_LINE + kind as u32)
     }
 
     //
@@ -2556,37 +2675,35 @@ impl DocArena {
         self.alloc(DocNode::LineSuffix(doc))
     }
 
-    /// Force pending LineSuffix content to be flushed, interned per document
-    /// (stateless, like [`Self::line`] — one shared node per document).
+    /// Force pending LineSuffix content to be flushed — a prelude singleton
+    /// (stateless, like [`Self::line`]: one shared node per document, at a fixed id).
     #[inline]
     pub fn line_suffix_boundary(&self) -> DocId {
-        self.interned_singleton(&self.line_suffix_boundary_node, || {
-            DocNode::LineSuffixBoundary
-        })
+        DocId(PRELUDE_LINE_SUFFIX_BOUNDARY)
     }
 
-    /// Force parent group to break, interned per document (stateless, like
-    /// [`Self::line`] — one shared node per document).
+    /// Force parent group to break — a prelude singleton (stateless, like
+    /// [`Self::line`]: one shared node per document, at a fixed id).
     #[inline]
     pub fn break_parent(&self) -> DocId {
-        self.interned_singleton(&self.break_parent_node, || DocNode::BreakParent)
+        DocId(PRELUDE_BREAK_PARENT)
     }
 
     /// Flush-scoped break for a deferred trailing run ([`DocNode::FlushBreak`]):
     /// force only the nearest enclosing group with a line opportunity AFTER this
     /// point — where the pending [`Self::line_suffix`] actually flushes — leaving
     /// groups that close before it free to stay flat. Emit it right after the
-    /// `line_suffix` it scopes. Interned per document (stateless, like
+    /// `line_suffix` it scopes. A prelude singleton (stateless, like
     /// [`Self::break_parent`]).
     #[inline]
     pub fn flush_break(&self) -> DocId {
-        self.interned_singleton(&self.flush_break_node, || DocNode::FlushBreak)
+        DocId(PRELUDE_FLUSH_BREAK)
     }
 
-    /// The interned [`DocNode::FlowProbeEnd`] sentinel — pushed only by the render loop
+    /// The [`DocNode::FlowProbeEnd`] sentinel, a prelude singleton — pushed only by the render loop
     /// behind a [`DocContext::flow_break_probe`]-flagged subtree, never by a printer.
     pub(super) fn flow_probe_end_node(&self) -> DocId {
-        self.interned_singleton(&self.flow_probe_end_node, || DocNode::FlowProbeEnd)
+        DocId(PRELUDE_FLOW_PROBE_END)
     }
 
     /// Open a flow probe: snapshot the output length at the probed subtree's start.
@@ -3406,10 +3523,14 @@ impl DocArena {
                 )
             }
             Info::Fill(kids) => {
-                // Fill becomes regular concat when flattened
+                // Fill becomes regular concat when flattened — and, as a concat, carries
+                // no empty child either (a flattened softline separator). The parity a
+                // `Fill` keeps between its items and separators is gone with the fill.
+                let empty = self.empty();
                 self.concat_iter(
                     kids.into_iter()
-                        .map(|kid| self.flatten_lines_impl(kid, mode)),
+                        .map(|kid| self.flatten_lines_impl(kid, mode))
+                        .filter(|&kid| kid != empty),
                 )
             }
             Info::WithContext(doc, context) => {
@@ -3798,6 +3919,121 @@ impl std::fmt::Write for PoolTextWriter<'_> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         self.scratch.push_str(s);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod prelude_tests {
+    use super::{
+        DocArena, DocId, DocNode, DocText, PRELUDE, PRELUDE_BREAK_PARENT, PRELUDE_EMPTY,
+        PRELUDE_FLOW_PROBE_END, PRELUDE_FLUSH_BREAK, PRELUDE_LINE, PRELUDE_LINE_SUFFIX_BOUNDARY,
+        PRELUDE_STATICS, pooled_text_width, prelude_index,
+    };
+    use crate::doc::LineKind;
+
+    /// The match and the table are two spellings of one list: every entry answers
+    /// its own index, nothing else answers at all, and no entry repeats.
+    #[test]
+    fn prelude_index_is_the_tables_order() {
+        for (i, &(s, _)) in PRELUDE.iter().enumerate() {
+            assert_eq!(prelude_index(s), Some(PRELUDE_STATICS + i as u32), "{s:?}");
+            assert_eq!(
+                PRELUDE.iter().filter(|&&(t, _)| t == s).count(),
+                1,
+                "{s:?} repeats"
+            );
+        }
+        for s in ["", "const", "await ", "import ", "x", "((", "\n"] {
+            assert_eq!(prelude_index(s), None, "{s:?}");
+        }
+    }
+
+    /// The stated widths are what the measure would have computed.
+    #[test]
+    fn prelude_widths_match_the_measure() {
+        for &(s, width) in PRELUDE {
+            assert_eq!(pooled_text_width(s), width, "{s:?}");
+        }
+    }
+
+    /// Every document opens with the prelude at fixed ids: `text(member)` returns the
+    /// seeded node, before and after a `reset()`, and never allocates.
+    #[test]
+    fn prelude_ids_are_fixed_across_resets() {
+        let mut arena = DocArena::new();
+        let before = arena.nodes.borrow().len();
+        let statics = PRELUDE_STATICS as usize;
+        assert_eq!(before, statics + PRELUDE.len());
+        for (i, &(s, width)) in PRELUDE.iter().enumerate() {
+            assert_eq!(arena.text(s), DocId(PRELUDE_STATICS + i as u32));
+            assert!(matches!(
+                arena.nodes.borrow()[statics + i],
+                DocNode::Text(DocText::Static(t, w)) if t == s && w == width
+            ));
+        }
+        assert_eq!(arena.nodes.borrow().len(), before);
+        arena.text("const");
+        arena.reset();
+        assert_eq!(arena.nodes.borrow().len(), statics + PRELUDE.len());
+        assert_eq!(arena.text(","), DocId(PRELUDE_STATICS + 4));
+    }
+
+    /// The singletons are the prelude's head, in seeding order, each builder its id.
+    #[test]
+    fn singletons_are_the_preludes_head() {
+        let arena = DocArena::new();
+        let nodes = arena.nodes.borrow();
+        assert_eq!(arena.empty(), DocId(PRELUDE_EMPTY));
+        assert!(matches!(
+            nodes[PRELUDE_EMPTY as usize],
+            DocNode::Text(DocText::Static("", 0))
+        ));
+        for kind in [
+            LineKind::Normal,
+            LineKind::Soft,
+            LineKind::Hard,
+            LineKind::Literal,
+        ] {
+            let id = PRELUDE_LINE + kind as u32;
+            assert!(matches!(nodes[id as usize], DocNode::Line(k) if k == kind));
+        }
+        assert_eq!(arena.line(), DocId(PRELUDE_LINE + LineKind::Normal as u32));
+        assert_eq!(
+            arena.softline(),
+            DocId(PRELUDE_LINE + LineKind::Soft as u32)
+        );
+        assert_eq!(
+            arena.hardline(),
+            DocId(PRELUDE_LINE + LineKind::Hard as u32)
+        );
+        assert_eq!(
+            arena.literalline(),
+            DocId(PRELUDE_LINE + LineKind::Literal as u32)
+        );
+        assert_eq!(
+            arena.line_suffix_boundary(),
+            DocId(PRELUDE_LINE_SUFFIX_BOUNDARY)
+        );
+        assert!(matches!(
+            nodes[PRELUDE_LINE_SUFFIX_BOUNDARY as usize],
+            DocNode::LineSuffixBoundary
+        ));
+        assert_eq!(arena.break_parent(), DocId(PRELUDE_BREAK_PARENT));
+        assert!(matches!(
+            nodes[PRELUDE_BREAK_PARENT as usize],
+            DocNode::BreakParent
+        ));
+        assert_eq!(arena.flush_break(), DocId(PRELUDE_FLUSH_BREAK));
+        assert!(matches!(
+            nodes[PRELUDE_FLUSH_BREAK as usize],
+            DocNode::FlushBreak
+        ));
+        assert_eq!(arena.flow_probe_end_node(), DocId(PRELUDE_FLOW_PROBE_END));
+        assert!(matches!(
+            nodes[PRELUDE_FLOW_PROBE_END as usize],
+            DocNode::FlowProbeEnd
+        ));
+        assert_eq!(PRELUDE_FLOW_PROBE_END + 1, PRELUDE_STATICS);
     }
 }
 
