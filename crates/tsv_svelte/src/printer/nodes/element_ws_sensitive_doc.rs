@@ -401,10 +401,12 @@ impl<'a> Printer<'a> {
         // The dedicated ws-sensitive if/each builders already hug; this also gates
         // await/key/snippet, which fall through to the normal (dangling) builders.
         let prev_dangle = self.set_block_dangle_allowed(false);
-        let node_docs: DocBuf = nodes
-            .iter()
-            .map(|node| self.build_whitespace_sensitive_node_doc(node))
-            .collect();
+        let d = self.d();
+        let body = d.concat_iter(
+            nodes
+                .iter()
+                .map(|node| self.build_whitespace_sensitive_node_doc(node)),
+        );
         self.set_block_dangle_allowed(prev_dangle);
         // One body-indent level per container (element body, block body), matching
         // prettier's uniform "each container adds a level" model. Preserved text has
@@ -412,8 +414,7 @@ impl<'a> Printer<'a> {
         // only accumulates the depth that nested elements' wrapped attributes and
         // dangling `>` breaks resolve against. See nodes/element_ws_sensitive_doc.rs
         // header + docs/conformance_prettier_svelte.md §Svelte: Elements.
-        let d = self.d();
-        d.indent(d.concat(&node_docs))
+        d.indent(body)
     }
 
     /// Build doc for a single node in whitespace-sensitive context.

@@ -14,6 +14,8 @@ mod expansion;
 mod helpers;
 mod member_only;
 
+use std::iter;
+
 use expansion::{
     call_callback_status, call_has_complex_args, ends_with_member, has_blank_lines_between_methods,
     has_comments_forcing_expansion,
@@ -36,6 +38,7 @@ use super::types::{ChainGroup, ChainNode};
 use super::{InlineLookups, resolve_inline_lookups};
 use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression};
 use crate::printer::Printer;
+
 use smallvec::SmallVec;
 use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -363,9 +366,7 @@ fn build_short_chain_doc<'a>(
         .iter()
         .map(|g| print_group(g, printer))
         .collect();
-    let mut on_line_parts: DocBuf = smallvec![first_doc];
-    on_line_parts.extend(rest_docs.iter().copied());
-    let on_line = d.concat(&on_line_parts);
+    let on_line = d.concat_iter(iter::once(first_doc).chain(rest_docs.iter().copied()));
 
     // Check if first groups contain any calls (regardless of arg count)
     let first_has_calls = first_groups
@@ -743,19 +744,17 @@ fn build_multiarg_short_chain_doc<'a>(
     // State: First args inline, rest groups with arrow-hugging expanded call args
     // `(sig =>\n  body,\n)` — more compact (fewer lines) but longer first line
     let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-    let mut state_last_hugged_parts: DocBuf = smallvec![first_doc];
-    state_last_hugged_parts.extend(rest_expanded);
-    let state_last_hugged = d.concat(&state_last_hugged_parts);
+    let state_last_hugged = d.concat_iter(iter::once(first_doc).chain(rest_expanded));
 
     // State: First args inline, rest groups with standard expanded call args
     // `(\n  args,\n)` — shorter first line, used when arrow-hugging doesn't fit
-    let rest_standard_expanded: DocBuf = rest_groups
-        .iter()
-        .map(|g| print_group_standard_expanded(g, printer))
-        .collect();
-    let mut state_last_standard_parts: DocBuf = smallvec![first_doc];
-    state_last_standard_parts.extend(rest_standard_expanded);
-    let state_last_standard = d.concat(&state_last_standard_parts);
+    let state_last_standard = d.concat_iter(
+        iter::once(first_doc).chain(
+            rest_groups
+                .iter()
+                .map(|g| print_group_standard_expanded(g, printer)),
+        ),
+    );
 
     // State: First call's args expanded, rest groups flexible.
     // Wrap the expanded first group in group_break so it renders in Break mode when this
@@ -913,9 +912,7 @@ fn build_member_ending_chain_doc<'a>(
     // First groups stay flat, rest groups have calls expanded
     let first_docs = build_groups_flat_docs(first_groups, printer);
     let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-    let mut args_expanded_parts = first_docs;
-    args_expanded_parts.extend(rest_expanded);
-    let args_expanded_inner = d.concat(&args_expanded_parts);
+    let args_expanded_inner = d.concat_iter(first_docs.into_iter().chain(rest_expanded));
     // Wrap in group_break: when the conditional_group selects this state in Flat
     // mode, the group forces Break mode during rendering. Without this, hardlines
     // in the expanded call args create newlines but the mode stays Flat, causing

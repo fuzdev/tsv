@@ -2897,6 +2897,63 @@ text it was not taken on; `LineBreaks::of_folded` asserts the two agree in a deb
 the exhaustive terminator test grades the fold's verdict against the up-front one over the
 bytes it returns at every alignment of every terminator shape.
 
+### A doc assembled from one or two parts is not built in a buffer
+
+The `SmallVec` file row was 6.0% of the TS format board by FILE with no symbol above 1.05%
+(`Extend::extend`), spread over the `spilled()` test every push, deref and drop makes, over
+`from_iter`, `into_iter` and `push`. The printers assemble a node's parts into a `DocBuf`
+(`SmallVec<[DocId; 8]>`) and hand it to `concat` — 754 mentions across the printers. Two
+censuses priced the population before a line was written. A patched copy of the crate
+(session-local, under `[patch.crates-io]`; counters in `new` / `push` / `try_grow` / `clear` /
+`drop` / `into_iter`, read by `tsv_lang::census::report`) said the 8-slot buffer spills 0.10%
+of the time (1,588 of 1.6 M buffers a tsbig pass) — the inline capacity is right-sized and
+there is no spill-side lever — and that of the 1.24 M buffers a pass consumes with anything in
+them, 41% hold ONE part and 38% TWO. Then `#[track_caller]` on `concat` / `fill` (the `census`
+feature) put a `(file, line)` and a part-count histogram on every call: 2.07 M `concat`s a
+pass, 894 K of them from a buffer, 674 K of those (75%) holding one or two parts — and a
+one-part `concat` returns its part, a two-part one is the register-handoff `concat_pair`. So
+the buffer was the whole cost: `print_group_inner` spent ~80 instructions of buffer machinery
+around ONE `print_node_inner` call (`SmallVec::new`, `collect`'s `size_hint` / `reserve`, a
+48-byte copy of the buffer, the len / spilled matches, the `free` test on drop).
+
+`DocArena::concat_iter` takes the parts as they are produced and pulls three before any
+buffer exists: none → `empty()`, one → itself, two → `concat_pair`, and only a third opens a
+`DocBuf` for the rest — out of line, over a `&mut dyn Iterator`, so every instantiation shares
+one body. Parts are pulled in order, so an iterator that builds docs as it goes allocates
+exactly as the `collect` it replaces did: the doc tree is the same node for node, which is why
+the byte-identity sweep had nothing to find. It replaces every collect-then-concat site (the
+chain group printers, the chain builders' first-groups and state assemblies, the member-only
+chain's base, the arena's `flatten_lines_impl`, the Svelte whitespace-sensitive element
+body). The push-built sites whose part count is decidable at the site pair or return
+directly: an expression statement's value (the plain statement IS its expression) and its
+`value;` (a pair when the terminator gap is bare), `: T`, a bare type reference, an arrow
+signature's tail, `{a}` / `{a as b}`, a member-only chain's segments (a RANGE of nodes printed
+when it closes — most hold one) and its first-doc-plus-segments, and a declaration's keyword +
+continuation. And the terminator idiom asks the one question it has (`semicolon_gap_is_bare`)
+once, before the deferred run's buffer, the deferral and the outlined `push_gap_comments`
+exist.
+
+`instructions:u` **−1.543% / −0.606% / +0.001%** (`profile` tsbig / sveltebig / cssbig),
+**+0.000%** on `json_profile` (the parse path is untouched); cycles **−2.280% pooled over a
+twelve-binary layout group on the `profile` entry point, 3/3 replicate signs (−1.888 / −2.972 /
+−1.976), against a null group at −0.246% (2/3: +0.003 / −0.630 / −0.109)** — ~1.48x the
+instruction share, since a buffer's construct, push, deref and drop are dependent loads and
+compares on its own capacity word and `collect`'s `reserve` is a call chain, none of it work
+the machine was hiding; `.text` **−192 B** (2,887,061). Three things decided the shape:
+
+- ⭐⭐⭐ **Census the CONSUMER of a container, not the container.** The lead was filed on the
+  spill rate, and the spill is 0.1%. What the buffers HOLD was the lever, and only a per-site
+  count could say it — a `concat` inlined at 700 sites has no symbol of its own on any board.
+- ⭐⭐⭐ **An attribute rung won BOTH channels.** With the three-or-more tail inlined at every
+  `concat_iter` instantiation the same tree read −1.374% and `.text` +7,888 B; `#[inline(never)]`
+  over a `dyn` iterator read −1.543% and −192 B. The rare arm sat in every caller's frame — L88's
+  lesson (a pass inlined into the CLI's format function) from the other side.
+- ⭐⭐ **A deletion rung named the surprise.** The push-built rung beat its paper price by half
+  a point; dropping only the terminator gate gave 0.267 of it back: each of ~100 K bare `;` a
+  pass had paid the outlined `push_gap_comments` — a `peekable` over the emit iterator, the
+  deferral, a `DocBuf` for the deferred run and an `extend` of it back — to learn there was
+  nothing to emit.
+
 ## WASM bundle size
 
 The `tsv_wasm` crate produces three WASM binaries via the `format` +

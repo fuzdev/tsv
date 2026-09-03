@@ -409,17 +409,10 @@ pub(crate) fn print_group_standard_expanded<'a>(
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
-    let docs: DocBuf = group
-        .nodes
-        .iter()
-        .map(|n| match n {
-            ChainNode::Call { call, facts } => {
-                printer.print_call_args_standard_expanded(call, *facts)
-            }
-            _ => print_node_inner(n, printer, false, false),
-        })
-        .collect();
-    d.concat(&docs)
+    d.concat_iter(group.nodes.iter().map(|n| match n {
+        ChainNode::Call { call, facts } => printer.print_call_args_standard_expanded(call, *facts),
+        _ => print_node_inner(n, printer, false, false),
+    }))
 }
 
 /// Print a chain group, skipping block comments for the first member node
@@ -449,17 +442,11 @@ fn print_group_inner<'a>(
     skip_first_comments: bool,
 ) -> DocId {
     let d = printer.arena();
-    let docs: DocBuf = group
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| {
-            // Skip comments only for the first member node
-            let skip_comments = skip_first_comments && i == 0 && n.is_member();
-            print_node_inner(n, printer, expanded, skip_comments)
-        })
-        .collect();
-    d.concat(&docs)
+    d.concat_iter(group.nodes.iter().enumerate().map(|(i, n)| {
+        // Skip comments only for the first member node
+        let skip_comments = skip_first_comments && i == 0 && n.is_member();
+        print_node_inner(n, printer, expanded, skip_comments)
+    }))
 }
 
 //

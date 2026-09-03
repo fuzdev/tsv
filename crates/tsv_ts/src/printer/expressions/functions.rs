@@ -1749,12 +1749,14 @@ impl<'a> Printer<'a> {
         // The signature TAIL — parameters plus return type — belongs to the `>`→`(` gap's
         // emitter, not to `parts`: a `//` in that gap drops the whole tail to a continuation
         // line, which it can only do while holding it.
-        let mut tail = DocBuf::new();
-        tail.push(self.build_arrow_params_doc_ungrouped(arrow));
-        if let Some(return_type) = &arrow.return_type {
-            tail.push(self.build_arrow_return_type_doc(return_type, arrow.params_start));
-        }
-        let tail = d.concat(&tail);
+        let params_doc = self.build_arrow_params_doc_ungrouped(arrow);
+        let tail = match &arrow.return_type {
+            Some(return_type) => d.concat(&[
+                params_doc,
+                self.build_arrow_return_type_doc(return_type, arrow.params_start),
+            ]),
+            None => params_doc,
+        };
 
         self.append_signature_head_gap_comments(
             &mut parts,

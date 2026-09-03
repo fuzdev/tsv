@@ -424,10 +424,11 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let (left_span, right_span) = (left.span(), right.span());
-        let mut parts = DocBuf::new();
-        parts.push(self.build_module_export_name_doc(left));
+        let left_doc = self.build_module_export_name_doc(left);
         // Compare spans, not values: `{a}` has one span, `{a as a}` has two.
-        if left_span != right_span {
+        let named = if left_span == right_span {
+            left_doc
+        } else {
             // A rename (`{a as b}`): the `as`-binding continuation is shared with the
             // namespace `*`→`as` gap via `build_as_binding_continuation` — a *line*
             // comment in the `left`→`as` or `as`→binding gap stays where the author
@@ -437,14 +438,19 @@ impl<'a> Printer<'a> {
             // specifier. See conformance_prettier.md §Uniform Forced-Continuation Indent
             // and §Comment relocation. A comment-free `{a as b}` skips the scan and emits
             // `a as b` unchanged.
-            if !self.has_comments_to_emit_between(left_span.end, right_span.start) {
-                parts.push(d.text(" as "));
-                parts.push(self.build_module_export_name_doc(right));
+            if self.has_comments_to_emit_between(left_span.end, right_span.start) {
+                d.concat(&[
+                    left_doc,
+                    self.build_as_binding_continuation(left_span.end, right),
+                ])
             } else {
-                parts.push(self.build_as_binding_continuation(left_span.end, right));
+                d.concat(&[
+                    left_doc,
+                    d.text(" as "),
+                    self.build_module_export_name_doc(right),
+                ])
             }
-        }
-        let named = d.concat(&parts);
+        };
         if declaration_is_type_only || !specifier_is_type {
             return named;
         }
