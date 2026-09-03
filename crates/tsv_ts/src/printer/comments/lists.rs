@@ -133,7 +133,6 @@ impl<'a> Printer<'a> {
         end: u32,
         skip_delim: Option<u32>,
     ) -> DocBuf {
-        let d = self.d();
         let mut parts = DocBuf::new();
         self.push_leading_comment_run(
             &mut parts,
@@ -141,7 +140,7 @@ impl<'a> Printer<'a> {
                 .filter(|c| !skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, c))),
             end,
             LeadingGlue::Adjacent,
-            d.empty(),
+            None,
         );
         parts
     }
@@ -193,7 +192,7 @@ impl<'a> Printer<'a> {
             comments,
             element_start,
             LeadingGlue::Adjacent,
-            self.d().empty(),
+            None,
         );
         self.build_list_element_group(leading, element)
     }
@@ -808,7 +807,7 @@ impl<'a> Printer<'a> {
             comments.iter().copied(),
             target_start,
             LeadingGlue::Adjacent,
-            self.d().empty(),
+            None,
         );
     }
 
@@ -842,7 +841,7 @@ impl<'a> Printer<'a> {
             leading.iter().copied(),
             last.span.start,
             LeadingGlue::Adjacent,
-            self.d().empty(),
+            None,
         );
         parts.push(self.build_comment_doc(last));
         if self.has_blank_line_between(last.span.end, gap_end) {
@@ -1045,14 +1044,19 @@ impl<'a> Printer<'a> {
     /// A comment on the same source line as the opening delimiter at `delim_pos`
     /// is kept on that line — instead of being relocated to its own line as the
     /// first element's leading comment (prettier's behavior). Returns the emitted
-    /// prefix docs (` /* c */` / ` // c`, leading-space convention) and, when the
+    /// prefix doc (` /* c */` / ` // c`, leading-space convention) and, when the
     /// pull fired, `Some(delim_pos)` — the position the caller passes back to
     /// exclude those same-line comments from the first element's leading set
-    /// (`None` when nothing was pulled, so the prefix is empty).
+    /// (`None` when nothing was pulled, so there is no prefix).
+    ///
+    /// The prefix is an `Option`, never an empty doc: almost every delimiter has no
+    /// comment on its line, and an `empty()` child sitting in the delimited body's
+    /// concat is visited by every later walk (layout, fits, render) for nothing —
+    /// see [`Self::build_delimited_doc`], which assembles the body without the slot.
     ///
     /// Gated on `should_force_expansion_for_comments`, so an inline block comment
     /// hugging the first element (`{ /* c */ a: 1 }`, `[/* c */ x]`) is left in
-    /// place and the result is `(empty, None)`. See conformance_prettier_ts_comments.md
+    /// place and the result is `(None, None)`. See conformance_prettier_ts_comments.md
     /// §Comment relocation.
     ///
     /// The call family asks the same question about its `(` and reaches the same rule
@@ -1066,8 +1070,29 @@ impl<'a> Printer<'a> {
         &self,
         delim_pos: u32,
         first_elem_start: u32,
-    ) -> (DocBuf, Option<u32>) {
+    ) -> (Option<DocId>, Option<u32>) {
         self.delimiter_line_comment_prefix_impl(delim_pos, first_elem_start, false)
+    }
+
+    /// Assemble a delimited body — `open`, the delimiter-line `prefix` when there is
+    /// one, the `body`, the `closer_line` and `close` — as one concat with no empty
+    /// slot. The one assembly for every consumer of
+    /// [`Self::delimiter_line_comment_prefix`] whose body has this five-part shape, so
+    /// the common no-prefix tree is four children, not four and an `empty()`.
+    #[inline]
+    pub(in crate::printer) fn build_delimited_doc(
+        &self,
+        open: DocId,
+        prefix: Option<DocId>,
+        body: DocId,
+        closer_line: DocId,
+        close: DocId,
+    ) -> DocId {
+        let d = self.d();
+        match prefix {
+            Some(prefix) => d.concat(&[open, prefix, body, closer_line, close]),
+            None => d.concat(&[open, body, closer_line, close]),
+        }
     }
 
     /// Object-literal variant of `delimiter_line_comment_prefix` that *also* pulls
@@ -1083,7 +1108,7 @@ impl<'a> Printer<'a> {
         &self,
         delim_pos: u32,
         first_elem_start: u32,
-    ) -> (DocBuf, Option<u32>) {
+    ) -> (Option<DocId>, Option<u32>) {
         self.delimiter_line_comment_prefix_impl(delim_pos, first_elem_start, true)
     }
 
@@ -1108,13 +1133,13 @@ impl<'a> Printer<'a> {
         let mut inner =
             self.build_leading_comments_multiline(bracket_char + 1, body_start, pull_pos);
         inner.push(body);
-        d.group_break(d.concat(&[
+        d.group_break(self.build_delimited_doc(
             d.text(open),
-            d.concat(&line_prefix),
+            line_prefix,
             d.indent_softline(d.concat(&inner)),
             d.softline(),
             d.text("]"),
-        ]))
+        ))
     }
 
     fn delimiter_line_comment_prefix_impl(
@@ -1122,7 +1147,7 @@ impl<'a> Printer<'a> {
         delim_pos: u32,
         first_elem_start: u32,
         pull_expanding_block: bool,
-    ) -> (DocBuf, Option<u32>) {
+    ) -> (Option<DocId>, Option<u32>) {
         let pc = super::calls::PartitionedComments::new(
             self.comments,
             self.source.as_bytes(),
@@ -1141,12 +1166,13 @@ impl<'a> Printer<'a> {
             || (pull_expanding_block
                 && pc.has_trailing_block()
                 && !self.is_same_line(delim_pos, first_elem_start));
-        let mut prefix = DocBuf::new();
-        if pull {
+        let prefix = pull.then(|| {
+            let mut prefix = DocBuf::new();
             // The run, plus the author blank below it — one emitter for every
             // delimiter-line pull in both families.
             pc.emit_delimiter_line_pull(&mut prefix, self);
-        }
+            self.d().concat(&prefix)
+        });
         (prefix, pull.then_some(delim_pos))
     }
 

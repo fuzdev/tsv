@@ -890,13 +890,13 @@ impl<'a> Printer<'a> {
             }
         }
 
-        d.concat(&[
+        self.build_delimited_doc(
             d.text("<"),
-            d.concat(&angle_line_prefix),
+            angle_line_prefix,
             d.indent_hardline(d.concat(&inner_parts)),
             d.hardline(),
             d.text(">"),
-        ])
+        )
     }
 
     /// Try to build a hugging doc for curly-brace types (object literals, mapped types).

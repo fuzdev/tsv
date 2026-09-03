@@ -530,7 +530,7 @@ impl<'a> Printer<'a> {
     /// `docs/comments.md` hazard 4 in its head variant, and the same defect the function-type
     /// hug had. Routing them is also what makes the pattern head agree with the identifier
     /// head it is a spelling of: one rule for `a /* c */?: T` and `{ a } /* c */?: T` alike.
-    fn build_pattern_tail_doc(&self, tail: PatternTail<'_>) -> DocId {
+    fn build_pattern_tail_doc(&self, tail: PatternTail<'_>) -> Option<DocId> {
         let d = self.d();
         let mut parts = DocBuf::new();
         let marker_end = if tail.optional {
@@ -541,7 +541,7 @@ impl<'a> Printer<'a> {
         if let Some(ta) = tail.type_annotation {
             parts.push(self.build_binding_type_annotation_doc(marker_end, ta, false));
         }
-        d.concat(&parts)
+        (!parts.is_empty()).then(|| d.concat(&parts))
     }
 
     /// Build a Doc for an object pattern
@@ -619,7 +619,7 @@ impl<'a> Printer<'a> {
 
                     // Separator comma between properties; no trailing comma on the last
                     // property (trailingComma: 'none').
-                    let comma = if !is_last { d.text(",") } else { d.empty() };
+                    let comma = (!is_last).then(|| d.text(","));
                     self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                     // Add line break between properties
@@ -632,8 +632,11 @@ impl<'a> Printer<'a> {
 
                 // Whatever the last property's trailing run left unclaimed, before the
                 // closing brace — e.g. `{a /*, b*/}`.
-                let trailing = self.build_object_pattern_trailing_comments(prev_end, boundary);
-                parts.push(trailing);
+                if let Some(trailing) =
+                    self.build_object_pattern_trailing_comments(prev_end, boundary)
+                {
+                    parts.push(trailing);
+                }
 
                 // Build group contents: { + properties + } with bracketSpacing
                 // boundaries (space when flat `{ a }`, newline when broken).
@@ -645,7 +648,9 @@ impl<'a> Printer<'a> {
                 ];
 
                 // Include `?` + type annotation in the group for width calculation
-                group_parts.push(self.build_pattern_tail_doc(tail));
+                if let Some(tail) = self.build_pattern_tail_doc(tail) {
+                    group_parts.push(tail);
+                }
 
                 d.group(d.concat(&group_parts))
             }
@@ -663,7 +668,11 @@ impl<'a> Printer<'a> {
     /// is neither on the property's line nor unclaimed. The expanded paths use
     /// `build_pattern_trailing_dangling_comments` instead, which puts each comment on its
     /// own line.
-    fn build_object_pattern_trailing_comments(&self, prev_end: u32, boundary: u32) -> DocId {
+    fn build_object_pattern_trailing_comments(
+        &self,
+        prev_end: u32,
+        boundary: u32,
+    ) -> Option<DocId> {
         let d = self.d();
 
         let mut parts = DocBuf::new();
@@ -671,7 +680,7 @@ impl<'a> Printer<'a> {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
-        d.concat(&parts)
+        (!parts.is_empty()).then(|| d.concat(&parts))
     }
 
     /// Build dangling comments after the last element of an *expanded* pattern
@@ -863,14 +872,13 @@ impl<'a> Printer<'a> {
 
     /// Build doc for empty object pattern: `{}` with optional `?` + type annotation
     fn build_empty_object_pattern_doc(&self, obj: &internal::ObjectPattern<'_>) -> DocId {
-        let d = self.d();
         // Bound the comment scan to the braces (before any `?`/`: Type`), mirroring
         // `build_empty_array_pattern_doc`. Scanning the full span would pull a
         // comment out of the type annotation into the empty `{}` and duplicate it.
         let tail = self.object_pattern_tail(obj);
         let body_doc = self
             .build_empty_braces_inline_with_comments_doc(Span::new(obj.span.start, tail.body_end));
-        d.concat(&[body_doc, self.build_pattern_tail_doc(tail)])
+        self.append_opt(body_doc, self.build_pattern_tail_doc(tail))
     }
 
     /// Build expanded doc for object pattern with hardlines (always multiline)
@@ -904,7 +912,7 @@ impl<'a> Printer<'a> {
         let (brace_line_prefix, brace_pull_pos) = if has_comments {
             self.delimiter_line_comment_prefix(obj.span.start, first_prop_start)
         } else {
-            (DocBuf::new(), None)
+            (None, None)
         };
 
         // Track previous end for comment detection (start after `{`)
@@ -949,7 +957,7 @@ impl<'a> Printer<'a> {
             // Separator comma between properties; no trailing comma on the last
             // property under `trailingComma: 'none'` (a rest element never takes one
             // either — it is a syntax error there).
-            let comma = if !is_last { d.text(",") } else { d.empty() };
+            let comma = (!is_last).then(|| d.text(","));
             self.push_element_comma_trailing(&mut prop_parts, &trailing, comma);
 
             if !is_last {
@@ -975,15 +983,17 @@ impl<'a> Printer<'a> {
         }
 
         // Structure: { + brace-line prefix + indent(hardline + props) + hardline + } + type_annotation
-        let mut result_parts: DocBuf = smallvec![
-            d.text("{"),
-            d.concat(&brace_line_prefix),
-            d.indent_hardline(d.concat(&prop_parts)),
-            d.hardline(),
-            d.text("}"),
-        ];
+        let mut result_parts: DocBuf = smallvec![d.text("{")];
+        if let Some(prefix) = brace_line_prefix {
+            result_parts.push(prefix);
+        }
+        result_parts.push(d.indent_hardline(d.concat(&prop_parts)));
+        result_parts.push(d.hardline());
+        result_parts.push(d.text("}"));
 
-        result_parts.push(self.build_pattern_tail_doc(tail));
+        if let Some(tail) = self.build_pattern_tail_doc(tail) {
+            result_parts.push(tail);
+        }
 
         d.concat(&result_parts)
     }
@@ -1182,14 +1192,13 @@ impl<'a> Printer<'a> {
 
     /// Build doc for empty array pattern: `[]` with optional type annotation
     fn build_empty_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>) -> DocId {
-        let d = self.d();
         // For array patterns with a `?` / type annotation, the body ends at the `]`
         let tail = self.array_pattern_tail(arr);
 
         let body_doc =
             self.build_empty_brackets_inline_with_comments_doc_range(arr.span.start, tail.body_end);
 
-        d.concat(&[body_doc, self.build_pattern_tail_doc(tail)])
+        self.append_opt(body_doc, self.build_pattern_tail_doc(tail))
     }
 
     /// Build grouped array pattern doc (width-based expansion). `has_comments` is the
@@ -1234,7 +1243,7 @@ impl<'a> Printer<'a> {
                 // Block comments around the comma (line comments force the expanded
                 // path, so `trailing.line` is empty here). Separator comma between
                 // elements; no trailing comma on the last (trailingComma: 'none').
-                let comma = if !is_last { d.text(",") } else { d.empty() };
+                let comma = (!is_last).then(|| d.text(","));
                 self.push_element_comma_trailing(&mut parts, &trailing, comma);
                 if !is_last {
                     parts.push(d.line());
@@ -1282,7 +1291,7 @@ impl<'a> Printer<'a> {
 
         let group_doc = d.group(d.concat(&group_parts));
 
-        d.concat(&[group_doc, self.build_pattern_tail_doc(tail)])
+        self.append_opt(group_doc, self.build_pattern_tail_doc(tail))
     }
 
     /// Build expanded array pattern doc (always multiline)
@@ -1307,7 +1316,7 @@ impl<'a> Printer<'a> {
                 Some(first) => {
                     self.delimiter_line_comment_prefix(arr.span.start, first.span().start)
                 }
-                None => (DocBuf::new(), None),
+                None => (None, None),
             };
 
         for (i, elem) in arr.elements.iter().enumerate() {
@@ -1348,7 +1357,7 @@ impl<'a> Printer<'a> {
                 // Separator comma between elements; no trailing comma on the last
                 // element under `trailingComma: 'none'` (a rest element never takes one
                 // either — it is a syntax error there).
-                let comma = if !is_last { d.text(",") } else { d.empty() };
+                let comma = (!is_last).then(|| d.text(","));
                 self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                 if !is_last {
@@ -1411,15 +1420,17 @@ impl<'a> Printer<'a> {
         parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary, past_elision));
 
         // Structure: [ + bracket-line prefix + indent(hardline + elements) + hardline + ] + type_annotation
-        let mut result_parts: DocBuf = smallvec![
-            d.text("["),
-            d.concat(&bracket_line_prefix),
-            d.indent_hardline(d.concat(&parts)),
-            d.hardline(),
-            d.text("]"),
-        ];
+        let mut result_parts: DocBuf = smallvec![d.text("[")];
+        if let Some(prefix) = bracket_line_prefix {
+            result_parts.push(prefix);
+        }
+        result_parts.push(d.indent_hardline(d.concat(&parts)));
+        result_parts.push(d.hardline());
+        result_parts.push(d.text("]"));
 
-        result_parts.push(self.build_pattern_tail_doc(tail));
+        if let Some(tail) = self.build_pattern_tail_doc(tail) {
+            result_parts.push(tail);
+        }
 
         d.concat(&result_parts)
     }

@@ -1415,7 +1415,6 @@ impl<'a> Printer<'a> {
         annotation: &internal::TSTypeAnnotation<'_>,
         params_start: Option<u32>,
     ) -> DocId {
-        let d = self.d();
         // One depth-tracked close-`)` scan feeds both `)`→`:` questions below.
         let close_paren_after = self.return_type_close_paren(params_start, annotation.span.start);
         // An alone-on-line format-ignore directive in the `)`→`:` gap freezes the whole
@@ -1440,18 +1439,18 @@ impl<'a> Printer<'a> {
         // no comment-aware twin to fall back to.
         let inner_type = unwrap_parenthesized(annotation.type_annotation);
         if matches!(inner_type, internal::TSType::Function(_)) {
-            return d.concat(&[
+            return self.prepend_opt(
                 comment_prefix,
                 self.build_arrow_return_type_annotation_doc(annotation),
-            ]);
+            );
         }
 
         // Use return type version - only wraps for complex type args (unions/intersections)
         // Simple cases like Promise<void> let params break first
-        d.concat(&[
+        self.prepend_opt(
             comment_prefix,
             self.build_type_annotation_doc_for_return_type(annotation),
-        ])
+        )
     }
 
     /// Build doc for arrow params NOT in their own group (outer signature group controls breaking)
@@ -2309,7 +2308,7 @@ impl<'a> Printer<'a> {
         let (paren_prefix, paren_pull_pos) = match params_start {
             Some(open) if comments_present => self
                 .delimiter_line_comment_prefix(open, self.param_start_with_decorators(&params[0])),
-            _ => (DocBuf::new(), None),
+            _ => (None, None),
         };
 
         // Check if any trailing line comments exist on params
@@ -2573,8 +2572,8 @@ impl<'a> Printer<'a> {
         // No group - outer signature group controls breaking
         let mut result: DocBuf = smallvec![d.text("(")];
         // A pulled `( // c` comment renders on the `(` line before the break.
-        if !paren_prefix.is_empty() {
-            result.extend(paren_prefix);
+        if let Some(prefix) = paren_prefix {
+            result.push(prefix);
         }
 
         if force_break {
@@ -2863,7 +2862,7 @@ impl<'a> Printer<'a> {
             comments.iter().copied(),
             param_render_start,
             LeadingGlue::Adjacent,
-            d.empty(),
+            None,
         );
         d.concat(&parts)
     }

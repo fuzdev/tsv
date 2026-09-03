@@ -186,9 +186,12 @@ impl<'a> Printer<'a> {
             // rewrite the program. Only a single-line block reaches here (`x /* c */++`);
             // anything spanning lines took the shell.
             let operator_start = update.span.end - operator_len;
-            let comments =
-                self.build_inline_comments_between_doc(update.argument.span().end, operator_start);
-            d.concat(&[argument_doc, comments, operator_doc])
+            match self
+                .build_inline_comments_between_doc_opt(update.argument.span().end, operator_start)
+            {
+                Some(comments) => d.concat(&[argument_doc, comments, operator_doc]),
+                None => d.concat(&[argument_doc, operator_doc]),
+            }
         }
     }
 

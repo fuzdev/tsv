@@ -3395,10 +3395,16 @@ impl DocArena {
             }
             Info::IfBreakFlat(flat_doc) => self.flatten_lines_impl(flat_doc, mode),
             Info::IndentIfBreakContents(contents) => self.flatten_lines_impl(contents, mode),
-            Info::Concat(kids) => self.concat_iter(
-                kids.into_iter()
-                    .map(|kid| self.flatten_lines_impl(kid, mode)),
-            ),
+            Info::Concat(kids) => {
+                // A flattened `softline` is `empty()`; a concat carries no empty child,
+                // since every later walk would visit it for nothing.
+                let empty = self.empty();
+                self.concat_iter(
+                    kids.into_iter()
+                        .map(|kid| self.flatten_lines_impl(kid, mode))
+                        .filter(|&kid| kid != empty),
+                )
+            }
             Info::Fill(kids) => {
                 // Fill becomes regular concat when flattened
                 self.concat_iter(
