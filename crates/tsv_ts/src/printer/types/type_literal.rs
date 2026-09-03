@@ -237,6 +237,7 @@ impl<'a> Printer<'a> {
         }
         let claim_end = self.type_member_claim_end(member_content_end, next_start);
         self.trailing_same_line_comments(member_content_end, upper_bound.min(claim_end))
+            .collect()
     }
 
     /// The cursor past everything a member's own emitters printed: its span end, or the

@@ -700,28 +700,32 @@ impl<'a> Printer<'a> {
     ///
     /// The one statement of "what trails here", for the emitter that renders it
     /// ([`Self::build_trailing_same_line_comment_docs`]) and for the caller that needs the
-    /// run as a LIST first — a type-literal member partitions it around its own `;`. A
-    /// re-spelled `is_same_line(after_pos, c.span.start)` filter answers the multi-line
-    /// case wrong, which is what put the interface and type-literal member walks at odds
-    /// with the class body and with prettier.
+    /// run as a LIST first — a type-literal member partitions it around its own `;`, and
+    /// collects. A re-spelled `is_same_line(after_pos, c.span.start)` filter answers the
+    /// multi-line case wrong, which is what put the interface and type-literal member walks
+    /// at odds with the class body and with prettier.
+    ///
+    /// Yielded lazily: the run is empty in nearly every ask (the next comment is lines
+    /// away), and a buffer built, returned by value and moved again into the caller's loop
+    /// was the whole cost of asking.
     pub(crate) fn trailing_same_line_comments(
         &self,
         after_pos: u32,
         upper_bound: u32,
-    ) -> CommentVec<'_> {
+    ) -> impl Iterator<Item = &'a internal::Comment> {
         let mut line_ref = after_pos;
-        let mut run = CommentVec::new();
-        for comment in comments_to_emit_in_range(self.comments, after_pos, upper_bound) {
-            if !self.is_same_line(line_ref, comment.span.start) {
-                break; // Only same-line comments
-            }
-            // Follow multi-line block comments to their closing line
-            if comment.is_block && !self.is_same_line(comment.span.start, comment.span.end) {
-                line_ref = comment.span.end;
-            }
-            run.push(comment);
-        }
-        run
+        comments_to_emit_in_range(self.comments, after_pos, upper_bound).take_while(
+            move |comment| {
+                if !self.is_same_line(line_ref, comment.span.start) {
+                    return false; // Only same-line comments
+                }
+                // Follow multi-line block comments to their closing line
+                if comment.is_block && !self.is_same_line(comment.span.start, comment.span.end) {
+                    line_ref = comment.span.end;
+                }
+                true
+            },
+        )
     }
 
     /// Build docs for trailing same-line comments after a node

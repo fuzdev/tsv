@@ -1236,13 +1236,30 @@ impl<'a> Printer<'a> {
     /// keyword's interior gaps, and the import-equals header — the one multi-gap header
     /// whose words aren't contiguous (its name sits between `import` and `=`), so it
     /// drives this directly instead.
+    ///
+    /// Two tiers, like the comment-existence wrappers: the narrow-gap test and the bare
+    /// separator answer inline at every site (the gap is the one space between two
+    /// keyword words in nearly every ask), and only a gap wide enough to hold a comment
+    /// pays the call into [`Self::build_keyword_gap_doc_wide`]. Under a plain `#[inline]`
+    /// the whole body came out as one outlined symbol, so every narrow ask paid a call
+    /// for the separator.
     #[inline]
     pub(crate) fn build_keyword_gap_doc(&self, start: u32, end: u32) -> (DocId, bool) {
+        if tsv_lang::range_too_narrow_for_a_comment(start, end) {
+            return (self.d().text(" "), false);
+        }
+        self.build_keyword_gap_doc_wide(start, end)
+    }
+
+    /// The search half of [`Self::build_keyword_gap_doc`] — one outlined copy, so the
+    /// inline head carries no search of its own at any site.
+    #[inline(never)]
+    fn build_keyword_gap_doc_wide(&self, start: u32, end: u32) -> (DocId, bool) {
         let d = self.d();
         // One search settles the gap. With no comment there is nothing to emit but the
         // separator — no empty child, and neither of the per-shape searches below runs.
-        // Every declaration in every file passes through here, so this is the hottest of
-        // the gap printers.
+        // Reached only past the inline gate, so the gap here is wide enough to hold a
+        // comment; it still holds none in most of these asks.
         if !self.has_comments_to_emit_between(start, end) {
             return (d.text(" "), false);
         }
