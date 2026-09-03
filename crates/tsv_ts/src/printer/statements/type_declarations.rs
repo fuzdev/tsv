@@ -16,10 +16,10 @@ use crate::printer::{
     MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam,
 };
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Span, comments_to_emit_in_range};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -396,8 +396,9 @@ impl<'a> Printer<'a> {
             // every subsequent comment go on their own line in the indent. Two line
             // comments must not merge onto one line — the second `//` would stop
             // being a delimiter (a boundary loss).
-            let comments: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, eq_pos + 1, type_start).collect();
+            let comments: CommentVec<'_> = self
+                .comments_to_emit_between(eq_pos + 1, type_start)
+                .collect();
             for (idx, comment) in comments.iter().enumerate() {
                 let multiline_block = comment.multiline;
                 let authored_on_eq_line = self.is_same_line(eq_pos, comment.span.start);
@@ -647,11 +648,8 @@ impl<'a> Printer<'a> {
                 // A comment-free value that doesn't `will_break` hangs (long case).
                 let type_doc = build_value();
                 let value_span = value_type.span();
-                let value_has_comments = tsv_lang::has_comments_to_emit_in_range(
-                    self.comments,
-                    value_span.start,
-                    value_span.end,
-                );
+                let value_has_comments =
+                    self.has_comments_to_emit_between(value_span.start, value_span.end);
                 // The `will_break` is what makes "bearing a comment" mean "laid out by
                 // one": a value whose comments all ride `line_suffix` (a trailing run in
                 // the index→`]` or stripped-paren gap) renders exactly as the comment-free

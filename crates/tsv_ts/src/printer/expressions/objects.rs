@@ -15,7 +15,6 @@ use crate::printer::{CommentVec, Printer, StandaloneGlue};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
@@ -581,11 +580,13 @@ impl<'a> Printer<'a> {
             }
 
             // Comments between key region and colon (e.g., {key /* comment */: value})
-            let pre_colon_comments: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, key_region_end, colon_pos).collect();
+            let pre_colon_comments: CommentVec<'_> = self
+                .comments_to_emit_between(key_region_end, colon_pos)
+                .collect();
             // Comments between colon and value (e.g., {key: /* comment */ value})
-            let post_colon_comments: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, colon_pos + 1, value_start).collect();
+            let post_colon_comments: CommentVec<'_> = self
+                .comments_to_emit_between(colon_pos + 1, value_start)
+                .collect();
 
             // Check if value needs parens (e.g., assignment expressions)
             let needs_parens =
@@ -1025,8 +1026,9 @@ impl<'a> Printer<'a> {
         // hugs inline. This is also what makes a BLOCK-spelled honored directive reachable
         // here — the floor reads only a directive alone on its line, so the collapse used to
         // make the block spelling inert while the `//` spelling froze.
-        let bracket_own_line =
-            comments_to_emit_in_range(self.comments, bracket_start + 1, key_start).any(|c| {
+        let bracket_own_line = self
+            .comments_to_emit_between(bracket_start + 1, key_start)
+            .any(|c| {
                 self.has_newline_between(bracket_start + 1, c.span.start)
                     && self.has_newline_between(c.span.end, key_start)
             });
@@ -1043,12 +1045,12 @@ impl<'a> Printer<'a> {
         // Byte-identical to the pre-divergence behavior.
         if !bracket_line && !after_key_line && !bracket_own_line {
             let mut parts: DocBuf = smallvec![d.text("[")];
-            for comment in comments_to_emit_in_range(self.comments, bracket_start + 1, key_start) {
+            for comment in self.comments_to_emit_between(bracket_start + 1, key_start) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }
             parts.push(key_doc);
-            for comment in comments_to_emit_in_range(self.comments, key_end, bracket_end) {
+            for comment in self.comments_to_emit_between(key_end, bracket_end) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             }
@@ -1068,7 +1070,7 @@ impl<'a> Printer<'a> {
         // bracket-break helper owns the `[`→key line-comment prefix and the break shell.
         let mut body_parts: DocBuf = smallvec![key_doc];
         let mut prev = key_end;
-        for comment in comments_to_emit_in_range(self.comments, key_end, bracket_end) {
+        for comment in self.comments_to_emit_between(key_end, bracket_end) {
             if self.is_same_line(prev, comment.span.start) {
                 body_parts.push(d.text(" "));
             } else {

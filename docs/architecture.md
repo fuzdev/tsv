@@ -809,6 +809,8 @@ table (which caller asks which) is in [comments.md](./comments.md); the function
 | **on page** — "does any comment occupy the page here?" (owned counted) | `comments_on_page_in_range()` | — | `has_comments_on_page_in_range()`, `has_multiline_block_comments_on_page_in_range()` |
 | **in source** — "what bytes are physically here?" (owned counted) | `comments_in_source_range()` | `comments_in_source_after()`; `comments_in_source_after_comment()` from a comment the caller holds (by index, never through the hint) | — |
 
+Each range walk and existence check has an index-keyed `*_from` twin (`comments_to_emit_from()`, `comments_on_page_from()`, `comments_in_source_from()`, `has_*_from()`) for a caller that already holds the range's first index. The TS printer wraps them all (`Printer::comments_to_emit_between()` and siblings), reading its comment-free window ahead of the search.
+
 Plus the axis-independent primitives:
 
 - `classify_comment()` — Determine if trailing, leading-own-line, or inline
@@ -824,7 +826,9 @@ between two siblings:
 
 ```rust
 // Between two sibling nodes
-let comments = comments_to_emit_in_range(self.comments, prev_end, node_start);
+// The printer's wrapper over `comments_to_emit_in_range` — it reads the
+// comment-free window ahead of the search.
+let comments = self.comments_to_emit_between(prev_end, node_start);
 
 // Classify each comment
 for comment in comments {

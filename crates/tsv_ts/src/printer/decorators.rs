@@ -8,10 +8,7 @@ use crate::ast::internal;
 use crate::printer::comments::CommentVec;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
-use tsv_lang::{
-    Comment, CommentPosition, Span, classify_comment, comments_to_emit_in_range, doc::arena::DocId,
-    has_comments_to_emit_in_range, has_line_comments_in_range,
-};
+use tsv_lang::{Comment, CommentPosition, Span, classify_comment, doc::arena::DocId};
 
 use super::Printer;
 
@@ -146,7 +143,7 @@ impl<'a> Printer<'a> {
     ) -> (CommentVec<'c>, bool) {
         let mut own_line: CommentVec<'c> = CommentVec::new();
         let mut has_line = false;
-        for comment in comments_to_emit_in_range(self.comments, decorator.span.end, boundary) {
+        for comment in self.comments_to_emit_between(decorator.span.end, boundary) {
             has_line |= !comment.is_block;
             match self.classify_decorator_gap_comment(
                 comment,
@@ -404,7 +401,7 @@ impl<'a> Printer<'a> {
         // Common case — no comment interleaved with the decorators: emit the bare
         // `@expr <sep> … <sep> binding` flat, skipping the comment scans and the
         // per-decorator segment wrapping the comment-aware path needs.
-        if !has_comments_to_emit_in_range(self.comments, decorators[0].span.start, inner_start) {
+        if !self.has_comments_to_emit_between(decorators[0].span.start, inner_start) {
             let d = self.d();
             let sep = if self.has_newline_after_any_decorator(decorators) {
                 d.hardline()
@@ -449,7 +446,7 @@ impl<'a> Printer<'a> {
         // decorators — a `//` runs to end-of-line, so the binding can't share its
         // line and the `hardline` keeps it from swallowing the next token.
         let own_line = self.has_newline_after_any_decorator(decorators)
-            || has_line_comments_in_range(self.comments, decorators[0].span.start, inner_start);
+            || self.has_line_comments_between(decorators[0].span.start, inner_start);
         let sep = if own_line { d.hardline() } else { d.text(" ") };
 
         let mut segments: DocBuf = DocBuf::new();
