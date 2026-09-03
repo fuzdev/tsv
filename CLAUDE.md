@@ -880,7 +880,11 @@ Comments are stored **separately from AST nodes** in a flat `Comment` array at t
 level (`Program.comments`, `CssStyleSheet.comments`, `Root.comments`); the printer finds
 them by span position through one physical entry point, `find_first_comment_from` — a
 thread-local one-entry hint over an O(log n) search, verified against the array on every
-read so a stale hint is a miss and never a wrong answer. `Comment` (`tsv_lang/src/comment.rs`)
+read so a stale hint is a miss and never a wrong answer. The TS printer's existence wrappers
+read one thing ahead of it: the **comment-free window** the previous search drew
+(`Printer::comment_free_gap`, the stretch between the two comments it landed between), which
+answers an ask nested inside it with two compares and no array load — nine wide asks in ten on
+real code. `Comment` (`tsv_lang/src/comment.rs`)
 is a `Copy` POD of spans + flags — text is recovered on demand via
 `Comment::content(source)`, never stored owned. **The full model — fields, ownership
 doctrine, the three lookup axes, the five hazards, and every emitter rule — is
@@ -913,8 +917,10 @@ A comment can be asked about along exactly **three** axes, and the lookup API
 `comments_to_emit_in_range` / `has_comments_to_emit_in_range` / `comments_to_emit_after` ·
 `comments_on_page_in_range` / `has_comments_on_page_in_range` /
 `has_multiline_block_comments_on_page_in_range` · `comments_in_source_range` /
-`comments_in_source_after`. Every name states its axis, so a miswire reads as a category
-error at the call site. Two standing corollaries: a **zero-comment fast gate** guarding a
+`comments_in_source_after` / `comments_in_source_from`. Every name states its axis, so a
+miswire reads as a category error at the call site; each existence check also has an
+index-keyed `has_*_from` twin for a caller that already holds the range's first index (the
+window-reading wrappers), so the axis's membership rule stays one spelling. Two standing corollaries: a **zero-comment fast gate** guarding a
 whole builder is an **on-page** question (an emit-keyed one blinds every layout gate it
 guards); a **blank-line scan** is an **in-source** question (step over every comment in the
 gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller emits).
