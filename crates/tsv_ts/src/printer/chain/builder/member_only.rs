@@ -3,6 +3,8 @@
 // Handles chains that contain only member accesses (no calls), giving each
 // lookup its own group — prettier's `printMemberExpression` shape.
 
+use std::iter;
+
 use super::super::printing::{
     chain_gap_any, member_lookup_group, node_comment_gap, print_node, print_node_inner,
     push_gap_comments_and_break,
@@ -71,12 +73,12 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a>(
         .take_while(|n| !n.is_member())
         .count()
         .max(1);
-    let first_doc_nodes: DocBuf = all_nodes
-        .iter()
-        .take(first_doc_end)
-        .map(|n| print_node(n, printer))
-        .collect();
-    let first_doc = d.concat(&first_doc_nodes);
+    let first_doc = d.concat_iter(
+        all_nodes
+            .iter()
+            .take(first_doc_end)
+            .map(|n| print_node(n, printer)),
+    );
 
     // Each remaining node breaks onto its own line. When its gap carries comments,
     // emit them in place (trailing on the previous line, leading on their own) and
@@ -219,13 +221,13 @@ pub(super) fn build_member_only_chain_doc<'a>(
     let first_doc_end = all_nodes.iter().take_while(|n| !starts_segment(n)).count();
 
     // Build first_doc from base + any trailing non-null assertions
-    let first_doc_nodes: DocBuf = all_nodes
-        .iter()
-        .take(first_doc_end)
-        .map(|n| print_node(n, printer))
-        .collect();
-    // `concat` short-circuits the empty case to `empty()`.
-    let first_doc = d.concat(&first_doc_nodes);
+    // (`concat_iter` short-circuits the empty case to `empty()`).
+    let first_doc = d.concat_iter(
+        all_nodes
+            .iter()
+            .take(first_doc_end)
+            .map(|n| print_node(n, printer)),
+    );
 
     // If no remaining nodes after first_doc, just return it
     if first_doc_end >= all_nodes.len() {
@@ -245,26 +247,37 @@ pub(super) fn build_member_only_chain_doc<'a>(
     // `print_node` handles each member node's own block comments.
     let remaining_nodes = &all_nodes[first_doc_end..];
     let mut segments: DocBuf = DocBuf::new();
-    let mut current_segment: DocBuf = DocBuf::new();
+    // A segment is a RANGE of the remaining nodes, printed when it closes — most hold
+    // one node, and `concat_iter` prints a one-node segment without assembling a buffer.
+    // The nodes are still printed in source order: a segment's nodes print at its close,
+    // ahead of the node that closed it.
+    let segment_doc = |start: usize, end: usize| {
+        d.concat_iter(
+            remaining_nodes[start..end]
+                .iter()
+                .map(|n| print_node(n, printer)),
+        )
+    };
+    let mut segment_start = 0;
     let mut seen_member = false;
 
-    for node in remaining_nodes {
+    for (i, node) in remaining_nodes.iter().enumerate() {
         let starts = starts_segment(node);
         // A segment must CONTAIN a member, so the flush is gated on `seen_member` rather
-        // than on the buffer being non-empty: a leading glued node would otherwise be
+        // than on the range being non-empty: a leading glued node would otherwise be
         // flushed as a segment of its own, and a segment with no member has no break
         // point to own.
         if starts && seen_member {
-            segments.push(d.concat(&std::mem::take(&mut current_segment)));
+            segments.push(segment_doc(segment_start, i));
+            segment_start = i;
             seen_member = false;
         }
-        current_segment.push(print_node(node, printer));
         if starts {
             seen_member = true;
         }
     }
-    if !current_segment.is_empty() {
-        segments.push(d.concat(&current_segment));
+    if segment_start < remaining_nodes.len() {
+        segments.push(segment_doc(segment_start, remaining_nodes.len()));
     }
 
     // If no segments, just return the first doc
@@ -292,10 +305,7 @@ pub(super) fn build_member_only_chain_doc<'a>(
     // Asked AFTER the segment walk rather than before it, so both shapes share one
     // segmentation.
     if inline_every_lookup || lone_lookup_off_bare_base(&all_nodes, segments.len()) {
-        let mut parts: DocBuf = DocBuf::with_capacity(segments.len() + 1);
-        parts.push(first_doc);
-        parts.extend(segments.iter().copied());
-        return d.concat(&parts);
+        return d.concat_iter(iter::once(first_doc).chain(segments.iter().copied()));
     }
 
     // Mirror prettier's `printMemberExpression`, which gives EACH lookup

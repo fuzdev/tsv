@@ -1538,11 +1538,14 @@ impl<'a> Printer<'a> {
         block_after_separator: bool,
         clause_tail: Option<u8>,
     ) {
-        let semicolon_pos = if span_end > content_end {
-            span_end - 1
-        } else {
-            content_end
-        };
+        if self.semicolon_gap_is_bare(content_end, span_end) {
+            // `push_gap_comments`' own zero-comment gate, asked here first: with nothing to
+            // emit, the deferred run's buffer and the deferral need not exist, and the
+            // terminator is the bare `;` — the common case by a wide margin.
+            parts.push(self.d().text(";"));
+            return;
+        }
+        let semicolon_pos = Self::semicolon_pos(content_end, span_end);
         let deferral = self.terminator_gap_deferral(clause_tail);
         let after = self.push_gap_comments(
             parts,
@@ -1554,6 +1557,24 @@ impl<'a> Printer<'a> {
         );
         parts.push(self.d().text(";"));
         parts.extend(after);
+    }
+
+    /// Where a statement's `;` sits: the span's last byte when the span reaches past the
+    /// content, else the content's end (a statement with no terminator of its own).
+    fn semicolon_pos(content_end: u32, span_end: u32) -> u32 {
+        if span_end > content_end {
+            span_end - 1
+        } else {
+            content_end
+        }
+    }
+
+    /// Whether the content→`;` gap holds no comment to emit — the one question the
+    /// terminator idiom ([`Self::push_semicolon_with_gap_comments`]) asks before it splits
+    /// anything. When it holds, the terminator is exactly the `;` text, so a caller that
+    /// holds only the content can pair the two without assembling a buffer.
+    pub(crate) fn semicolon_gap_is_bare(&self, content_end: u32, span_end: u32) -> bool {
+        !self.has_comments_to_emit_between(content_end, Self::semicolon_pos(content_end, span_end))
     }
 
     /// The **type-member `;`** variant of the gap split: a same-line

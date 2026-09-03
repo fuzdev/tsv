@@ -689,7 +689,6 @@ impl<'a> Printer<'a> {
         clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
-        let mut prefix: DocBuf = DocBuf::new();
 
         let first_decl_start = decl.declarations[0].span.start;
 
@@ -707,7 +706,6 @@ impl<'a> Printer<'a> {
         // cases stay inline. The leading space is supplied by the gap helper below.
         let (keyword_doc, keyword_end) =
             self.build_keyword_words_doc(&words, decl.span.start, first_decl_start);
-        prefix.push(keyword_doc);
 
         // Everything after the gap is collected into `parts` (the continuation).
         let mut parts = DocBuf::new();
@@ -1032,11 +1030,9 @@ impl<'a> Printer<'a> {
             d.concat(&parts)
         };
         // A line comment in the keyword→declarator gap indents the continuation.
-        prefix.push(self.build_keyword_to_name_continuation(
-            keyword_end,
-            first_decl_start,
-            continuation,
-        ));
-        d.concat(&prefix)
+        d.concat(&[
+            keyword_doc,
+            self.build_keyword_to_name_continuation(keyword_end, first_decl_start, continuation),
+        ])
     }
 }
