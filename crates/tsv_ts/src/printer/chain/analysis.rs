@@ -823,7 +823,10 @@ pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printe
 /// Asked of every member node the grouping walks, and the gap is the `.` alone in ~98% of
 /// those asks — so the head is inline: the node's range and the narrow-gap test answer at
 /// the site, and only a gap wide enough to hold a comment pays the call into the search.
-#[inline]
+/// Pinned `always`: under a plain hint the head stayed an outlined symbol at its four
+/// sites, and every narrow ask paid its prologue and `ret` for a two-compare answer.
+#[expect(clippy::inline_always)]
+#[inline(always)]
 fn gap_has_line_comment(node: &ChainNode<'_>, comments: &[Comment]) -> bool {
     // Through the hole-honoring seam: the widened range's skipped middle holds comments
     // this node prints none of — an inner member's gap forces its OWN node's group split,
