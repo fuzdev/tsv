@@ -215,13 +215,7 @@ fn build_hugged_arrow_arg_doc(
     with_chain_head(
         d,
         head,
-        d.concat(&[
-            d.text(ctx.prefix),
-            sig_doc,
-            d.text(" => "),
-            body_doc,
-            d.text(")"),
-        ]),
+        d.concat(&[ctx.prefix, sig_doc, d.text(" => "), body_doc, d.text(")")]),
     )
 }
 
@@ -260,7 +254,9 @@ pub(super) fn build_call_args_doc_for_chain_standard_expanded(
 #[expect(clippy::struct_excessive_bools)] // independent prologue flags, not a state machine
 struct ChainArgsContext {
     paren_open: u32,
-    prefix: &'static str,
+    /// The `(` / `?.(` opener as a doc, built once where its spelling is a literal (a
+    /// constant there; every layout below emits it as a node, none re-spells it).
+    prefix: DocId,
     /// [`ChainCall::own_call_layout`] — whether the call-level layout rules apply to this
     /// link at all. Threaded here rather than re-derived, because it is a fact about the
     /// link's POSITION in the chain and no branch builder can see one.
@@ -389,7 +385,11 @@ fn build_call_args_doc_for_chain_impl(
     // argument list and no type arguments ([`super::CallOptional::Fused`], the one spelling
     // both call printers ask). Everywhere else this link prints the `?.` itself, behind the
     // callee-side half of its own gap.
-    let prefix = if gap.optional.fused() { "?.(" } else { "(" };
+    let prefix = if gap.optional.fused() {
+        printer.d().text("?.(")
+    } else {
+        printer.d().text("(")
+    };
 
     // The HEAD every layout below opens with — an optional call's `?.` half, the
     // callee→type-arguments comments and the type arguments themselves. Absent on nearly
@@ -443,7 +443,7 @@ fn build_call_args_doc_for_chain_impl(
         paren_open,
         call.span.end,
         call_has_comments,
-        printer.d().text(prefix),
+        prefix,
     ) {
         return with_chain_head(printer.d(), head, doc);
     }
@@ -540,7 +540,7 @@ fn build_chain_args_force_expand(
         ) {
             // Build the object/array with forced internal expansion (hardlines)
             let arg_doc = printer.build_arg_expression_doc_expanded(arg);
-            return with_chain_head(d, head, d.concat(&[d.text(prefix), arg_doc, d.text(")")]));
+            return with_chain_head(d, head, d.concat(&[prefix, arg_doc, d.text(")")]));
         }
     }
 
@@ -612,7 +612,7 @@ fn build_chain_args_force_expand(
                 d,
                 head,
                 d.concat(&[
-                    d.text(prefix),
+                    prefix,
                     sig_doc,
                     d.text(" =>"),
                     d.indent_hardline(body_doc),
@@ -779,7 +779,7 @@ fn build_chain_args_force_expand(
         d,
         head,
         d.concat(&[
-            d.text(prefix),
+            prefix,
             d.concat(&paren_line_prefix_parts),
             d.indent_hardline(d.concat(&arg_parts)),
             d.hardline(),
@@ -878,7 +878,7 @@ fn build_chain_args_single(
 
         // State 1: sig hugged, body indented — (sig =>\n  body\n)
         let break_state = d.concat(&[
-            d.text(prefix),
+            prefix,
             sig_doc,
             d.text(" =>"),
             d.indent_hardline(body_doc),
@@ -891,7 +891,7 @@ fn build_chain_args_single(
         // that puts a line right after "(" so fits() returns true early
         // when evaluated in Break mode during look-ahead.
         let all_broken_state = d.group_break(d.concat(&[
-            d.text(prefix),
+            prefix,
             d.indent(d.concat(&[d.line(), arrow_doc])),
             d.line(),
             d.text(")"),
@@ -904,7 +904,7 @@ fn build_chain_args_single(
         } else {
             d.conditional_group(&[
                 // State 0: flat — (arrow)
-                d.concat(&[d.text(prefix), arrow_doc, d.text(")")]),
+                d.concat(&[prefix, arrow_doc, d.text(")")]),
                 // State 1: body breaks
                 break_state,
                 // State 2: all broken out
@@ -1073,7 +1073,7 @@ fn build_chain_args_single(
             d,
             head,
             d.concat(&[
-                d.text(prefix),
+                prefix,
                 d.indent_hardline(arg_with_comments),
                 d.hardline(),
                 d.text(")"),
@@ -1098,11 +1098,7 @@ fn build_chain_args_single(
     // output. The residual — the member-chain link, where tsv hugs and prettier expands — is
     // a chain-linearization difference, not this arm's.
     if is_multiline_template_expression(arg) {
-        return with_chain_head(
-            d,
-            head,
-            d.concat(&[d.text(prefix), arg_with_comments, d.text(")")]),
-        );
+        return with_chain_head(d, head, d.concat(&[prefix, arg_with_comments, d.text(")")]));
     }
 
     // Block-body arrows: use conditional_group to try hug first, then expand.
@@ -1118,7 +1114,7 @@ fn build_chain_args_single(
         && matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
     {
         let state_expand = d.concat(&[
-            d.text(prefix),
+            prefix,
             d.indent_hardline(arg_with_comments),
             d.hardline(),
             d.text(")"),
@@ -1132,7 +1128,7 @@ fn build_chain_args_single(
             state_expand
         } else {
             // No leading comments — try hug first, then expand
-            let state_hug = d.concat(&[d.text(prefix), arg_with_comments, d.text(")")]);
+            let state_hug = d.concat(&[prefix, arg_with_comments, d.text(")")]);
             d.conditional_group(&[state_hug, state_expand])
         };
         return with_chain_head(d, head, doc);
@@ -1188,11 +1184,11 @@ fn build_chain_args_single(
             // breaks out. Everything else here (objects, arrays, blocks, `function`s) hugs
             // unconditionally in prettier too, so it keeps the single state.
             if is_curried_arrow_chain(arg) {
-                let state_hug = d.concat(&[d.text(prefix), arg_with_comments, d.text(")")]);
+                let state_hug = d.concat(&[prefix, arg_with_comments, d.text(")")]);
                 d.conditional_group(&[state_hug, opener.wrap_soft(d, arg_with_comments)])
             } else {
                 // Objects/arrays/blocks that hug naturally
-                d.concat(&[d.text(prefix), arg_with_comments, d.text(")")])
+                d.concat(&[prefix, arg_with_comments, d.text(")")])
             }
         }
     };

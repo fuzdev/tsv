@@ -1262,7 +1262,7 @@ impl<'a> Printer<'a> {
             body_span.start,
             body_span.end,
             d.text("{"),
-            "}",
+            d.text("}"),
             d.hardline(),
         )
     }
@@ -1277,18 +1277,24 @@ impl<'a> Printer<'a> {
     /// `{/* c */}`, so this is a divergence — see conformance_prettier_ts.md
     /// §Empty-object comment bracket spacing. A truly empty `{}` (no comment)
     /// has no content to space and stays tight in both. See
-    /// [`Self::build_empty_inline_with_comments_doc`].
+    /// [`Self::build_empty_bracketed_with_comments_doc`].
     pub(crate) fn build_empty_braces_inline_with_comments_doc(&self, body_span: Span) -> DocId {
         let d = self.d();
         let sep = d.line();
-        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{}", sep)
+        self.build_empty_bracketed_with_comments_doc(
+            body_span.start,
+            body_span.end,
+            d.text("{"),
+            d.text("}"),
+            sep,
+        )
     }
 
     /// Build a Doc for an empty bracket `[]` body whose only content is a
     /// dangling comment, keeping a fitting block comment inline (`[/* c */]`).
     ///
     /// Used by array literals/patterns and tuple types. See
-    /// [`Self::build_empty_inline_with_comments_doc`].
+    /// [`Self::build_empty_bracketed_with_comments_doc`].
     pub(crate) fn build_empty_brackets_inline_with_comments_doc(&self, span: Span) -> DocId {
         self.build_empty_brackets_inline_with_comments_doc_range(span.start, span.end)
     }
@@ -1303,7 +1309,13 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let sep = d.softline();
-        self.build_empty_inline_with_comments_doc(body_start, body_end, "[]", sep)
+        self.build_empty_bracketed_with_comments_doc(
+            body_start,
+            body_end,
+            d.text("["),
+            d.text("]"),
+            sep,
+        )
     }
 
     /// Build a Doc for an empty paren list whose only content is a dangling
@@ -1325,20 +1337,21 @@ impl<'a> Printer<'a> {
     /// whole list to an indented continuation line.
     ///
     /// `paren_open` is the `(` position and `paren_close_after` the position past
-    /// the `)` (as returned by `find_closing_paren`).
+    /// the `)` (as returned by `find_closing_paren`); `opening` is the emitted opener
+    /// (`(`, or a call's `?.(`), built where its spelling is known.
     pub(crate) fn build_empty_parens_inline_with_comments_doc(
         &self,
         paren_open: u32,
         paren_close_after: u32,
-        opening: &'static str,
+        opening: DocId,
     ) -> DocId {
         let d = self.d();
         let sep = d.softline();
         self.build_empty_bracketed_with_comments_doc(
             paren_open,
             paren_close_after,
-            d.text(opening),
-            ")",
+            opening,
+            d.text(")"),
             sep,
         )
     }
@@ -1361,7 +1374,11 @@ impl<'a> Printer<'a> {
         if let Some(open) = params_start
             && let Some(close_after) = self.find_closing_paren(open, search_limit)
         {
-            return self.build_empty_parens_inline_with_comments_doc(open, close_after, "(");
+            return self.build_empty_parens_inline_with_comments_doc(
+                open,
+                close_after,
+                self.d().text("("),
+            );
         }
         self.d().text("()")
     }
@@ -1372,39 +1389,24 @@ impl<'a> Printer<'a> {
     /// (`[/* c */]`, `{/* c */}`); a line comment can't be inlined and forces
     /// the break, and an overflowing or multi-line block comment breaks via the
     /// enclosing group. `sep` is the open/close separator — `softline` (no
-    /// space) for brackets, object literals/patterns, and enum bodies, `line`
-    /// (bracket spacing) for type literals.
+    /// space) for brackets, object literals/patterns, enum bodies and the empty
+    /// import-attribute clause (`with {}`), `line` (bracket spacing) for type
+    /// literals. Containers that always break with a dangling comment (class,
+    /// interface, and namespace bodies) pass a `hardline`
+    /// ([`Self::build_empty_body_with_comments_doc`]).
     ///
-    /// Containers that always break with a dangling comment (class, interface,
-    /// and namespace bodies) reach the same emitter through
-    /// [`Self::build_empty_body_with_comments_doc`], with `sep` a `hardline`.
-    ///
-    /// The empty import-attribute clause (`with {}`) calls it directly, from
-    /// `statements/modules/import_attributes.rs` — hence `pub(in crate::printer)`
-    /// rather than module-private.
-    pub(in crate::printer) fn build_empty_inline_with_comments_doc(
-        &self,
-        span_start: u32,
-        span_end: u32,
-        pair: &'static str,
-        sep: DocId,
-    ) -> DocId {
-        let opening = self.d().text(&pair[..1]);
-        self.build_empty_bracketed_with_comments_doc(span_start, span_end, opening, &pair[1..], sep)
-    }
-
-    /// Like [`Self::build_empty_inline_with_comments_doc`] but with an arbitrary
-    /// `opening` doc (which may carry a prefix, e.g. a parenthesized-intersection
-    /// `(A & {`) and a static `closing` string (`}`, `]`, `)`). The empty body
-    /// stays delimiter-tight when comment-free (`{}` not `{ }`), so a union-member
-    /// or paren-intersection object type that reaches the alignment path prints
-    /// with no spurious bracket space and preserves any interior comment.
+    /// `opening` and `closing` are the delimiters' docs, built by the caller where
+    /// their spelling is a literal (a constant there rather than a runtime match
+    /// here); `opening` may carry a prefix, e.g. a parenthesized-intersection `(A & {`.
+    /// The empty body stays delimiter-tight when comment-free (`{}` not `{ }`), so a
+    /// union-member or paren-intersection object type that reaches the alignment path
+    /// prints with no spurious bracket space and preserves any interior comment.
     pub(crate) fn build_empty_bracketed_with_comments_doc(
         &self,
         span_start: u32,
         span_end: u32,
         opening: DocId,
-        closing: &'static str,
+        closing: DocId,
         sep: DocId,
     ) -> DocId {
         let d = self.d();
@@ -1415,7 +1417,7 @@ impl<'a> Printer<'a> {
             comments_to_emit_in_range(self.comments, body_start, body_end).collect();
 
         if comments.is_empty() {
-            return d.concat(&[opening, d.text(closing)]);
+            return d.concat(&[opening, closing]);
         }
 
         let mut comment_parts = DocBuf::new();
@@ -1431,7 +1433,7 @@ impl<'a> Printer<'a> {
             opening,
             d.indent(d.concat(&[sep, d.concat(&comment_parts)])),
             close_sep,
-            d.text(closing),
+            closing,
         ]))
     }
 

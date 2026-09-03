@@ -84,10 +84,11 @@ impl<'a> Printer<'a> {
             // whenever the run holds a line comment and keeps a lone fitting block inline
             // (`{/* c */}`, delimiter-tight via the `softline` separator) — the empty
             // tuple type's rule, reached through the same call.
-            self.build_empty_inline_with_comments_doc(
+            self.build_empty_bracketed_with_comments_doc(
                 brace_span.start,
                 brace_span.end,
-                "{}",
+                d.text("{"),
+                d.text("}"),
                 d.softline(),
             )
         } else {

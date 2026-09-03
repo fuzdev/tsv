@@ -98,8 +98,8 @@ pub(super) struct InterArgGap<'a> {
 ///
 /// `search_from` is where to look for the `(` (the position after the type
 /// arguments, or after the callee when there are none) and `paren_close` the
-/// position past the `)`. `prefix` is the open delimiter — `"("`, or `"?.("` for
-/// an optional call.
+/// position past the `)`. `prefix` is the open delimiter's doc — `(`, or `?.(` for
+/// an optional call — built by the caller where its spelling is a literal.
 ///
 /// Shared by the plain call/`new` path and the member-chain path so the empty-args
 /// shape lives in one place: these two drifted apart once already, and the
@@ -108,7 +108,7 @@ pub(super) fn build_empty_args_parens_doc(
     printer: &Printer<'_>,
     search_from: u32,
     paren_close: u32,
-    prefix: &'static str,
+    prefix: DocId,
 ) -> DocId {
     let d = printer.d();
     // No `(` in the gap: a `new` written with no argument list at all synthesizes one
@@ -121,7 +121,7 @@ pub(super) fn build_empty_args_parens_doc(
         .find_char_outside_comments(search_from, paren_close, b'(')
         .unwrap_or(paren_close);
     let parens = if paren_pos == paren_close {
-        d.concat(&[d.text(prefix), d.text(")")])
+        d.concat(&[prefix, d.text(")")])
     } else {
         printer.build_empty_parens_inline_with_comments_doc(paren_pos, paren_close, prefix)
     };

@@ -731,17 +731,19 @@ impl<'a> Printer<'a> {
     ///
     /// `head.doc` is the content in its final shape — already through
     /// [`Self::indent_own_line_head`] when the content opens on its own line (see [`HeadExpr`]).
+    /// `close` is the closing token's doc, built by the caller where its spelling is a
+    /// literal; `open` stays the literal itself because the own-line layout trims it.
     pub(in crate::printer) fn build_prefixed_head_doc(
         &self,
         open: &'static str,
         head: HeadExpr,
-        close: &'static str,
+        close: DocId,
     ) -> DocId {
         let d = self.d();
         if !head.layout.indents_content() {
             // Nothing indents this content, so a trailing line comment's own `hardline` is
             // already the break the `}` needs, on the right column.
-            return d.concat(&[d.text(open), head.doc, d.text(close)]);
+            return d.concat(&[d.text(open), head.doc, close]);
         }
         // Whatever indented the content, the closer drops to the head's own column — the
         // question is [`HeadLayout::indents_content`], never which arm indented it, so the two
@@ -753,9 +755,9 @@ impl<'a> Printer<'a> {
         // blank line above it.
         let open_doc = self.head_open_doc(open, head.layout.opens_own_line());
         if head.ends_with_line_comment {
-            return d.concat(&[open_doc, head.doc, d.text(close)]);
+            return d.concat(&[open_doc, head.doc, close]);
         }
-        d.concat(&[open_doc, head.doc, d.hardline(), d.text(close)])
+        d.concat(&[open_doc, head.doc, d.hardline(), close])
     }
 
     /// A head's content for an assembler that **hugs** its delimiters — the one seam that

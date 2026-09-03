@@ -903,7 +903,7 @@ impl<'a> Printer<'a> {
         let key = block.key.as_ref()?;
         let key_head = self.build_each_key_expr(key, allow_wrapping || in_multiline_context);
         if key_head.layout.opens_own_line() || block.context.is_none() {
-            return Some(self.build_prefixed_head_doc("(", key_head, ")"));
+            return Some(self.build_prefixed_head_doc("(", key_head, self.d().text(")")));
         }
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         Some(self.build_block_head(

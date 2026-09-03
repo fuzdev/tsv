@@ -1747,6 +1747,16 @@ impl DocArena {
     /// body at the literal sites, leaving each one a call plus the runtime
     /// match: `.text` fell, instructions did not. Forced, a literal member is a
     /// constant and a literal non-member a direct call to [`Self::text_interned`].
+    ///
+    /// ⚠️ **The fold needs a literal AT THE CALL SITE.** A `&'static str` that reaches
+    /// this call as a runtime value — a builder's parameter, an enum's `as_str()`, a
+    /// trimmed const — is the length switch and the byte jump table at that site, and
+    /// when its value alternates per caller the jump mispredicts: ~48 cycles a call
+    /// where the instruction count says ~8. A builder that receives a delimiter or an
+    /// operator therefore takes it as a `DocId` its caller built where the literal is
+    /// spelled (`d.text(":")`, `d.text("?.(")`), and emits the node it was handed; a
+    /// keyword table's values are longer than any prelude member and fall out of the
+    /// switch on one predictable compare, so those sites keep the string.
     #[expect(clippy::inline_always)]
     #[inline(always)]
     pub fn text(&self, s: &'static str) -> DocId {
@@ -2774,28 +2784,26 @@ impl DocArena {
         self.concat(&parts)
     }
 
-    /// Wrap a doc with open and close delimiters.
-    #[inline]
-    pub fn wrap(&self, open: &'static str, inner: DocId, close: &'static str) -> DocId {
-        self.concat(&[self.text(open), inner, self.text(close)])
-    }
-
     /// Wrap a doc in parentheses.
+    ///
+    /// The three wrappers spell their delimiters in place rather than through a shared
+    /// `wrap(open, inner, close)`: that helper stayed outlined, so the literals reached
+    /// [`Self::text`] as runtime arguments and paid the prelude match at every call.
     #[inline]
     pub fn parens(&self, inner: DocId) -> DocId {
-        self.wrap("(", inner, ")")
+        self.concat(&[self.text("("), inner, self.text(")")])
     }
 
     /// Wrap a doc in square brackets.
     #[inline]
     pub fn brackets(&self, inner: DocId) -> DocId {
-        self.wrap("[", inner, "]")
+        self.concat(&[self.text("["), inner, self.text("]")])
     }
 
     /// Wrap a doc in curly braces.
     #[inline]
     pub fn braces(&self, inner: DocId) -> DocId {
-        self.wrap("{", inner, "}")
+        self.concat(&[self.text("{"), inner, self.text("}")])
     }
 
     /// Indent with leading line break.

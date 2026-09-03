@@ -13,7 +13,7 @@
 //
 // - prettier/src/language-js/print/assignment.js
 
-use crate::ast::internal::{self, Expression, JsdocCast};
+use crate::ast::internal::{self, AssignmentOperator, Expression, JsdocCast};
 use crate::printer::ArrowChainContext;
 use crate::printer::OwnedCommentEffect;
 use crate::printer::Printer;
@@ -28,7 +28,7 @@ use tsv_lang::Comment;
 use tsv_lang::PRINT_WIDTH;
 use tsv_lang::Span;
 use tsv_lang::doc::GroupId;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Prettier's heuristic for "short" property keys.
 ///
@@ -1092,10 +1092,14 @@ impl<'a> Printer<'a> {
     /// forces `BreakAfterOperator`, a stripped-paren boundary to scan, and the value-head
     /// freeze. [`RhsCommentInfo::frozen_only`] is the shape for a caller that has nothing
     /// but the freeze verdict.
+    ///
+    /// `operator` is the operator's doc (`:`, ` =`, ` +=`, …), built by the caller where
+    /// its spelling is a literal — a constant there, where a `&'static str` threaded down
+    /// to this one `text()` site would be a runtime match at every layout.
     pub fn build_assignment_layout(
         &self,
         left_doc: DocId,
-        operator: &'static str,
+        operator: DocId,
         right_expr: &Expression<'_>,
         is_short_key: bool,
         rhs_info: RhsCommentInfo,
@@ -1280,7 +1284,7 @@ impl<'a> Printer<'a> {
                 // Each inner group can break independently based on remaining width
                 d.group(d.concat(&[
                     d.group(left_doc),
-                    d.text(operator),
+                    operator,
                     hang_after_operator(d, right_doc_with_comments),
                 ]))
             }
@@ -1291,7 +1295,7 @@ impl<'a> Printer<'a> {
                 // Structure: group([group(left), op, " ", right])
                 d.group(d.concat(&[
                     d.group(left_doc),
-                    d.text(operator),
+                    operator,
                     d.text(" "),
                     right_doc_with_comments,
                 ]))
@@ -1309,7 +1313,7 @@ impl<'a> Printer<'a> {
                 // ])
                 d.group(d.concat(&[
                     d.group(left_doc),
-                    d.text(operator),
+                    operator,
                     fluid_after_operator(d, right_doc_with_comments, GroupId::Assignment),
                 ]))
             }
@@ -1334,7 +1338,7 @@ impl<'a> Printer<'a> {
     fn build_frozen_assignment_doc(
         &self,
         left_doc: DocId,
-        operator: &'static str,
+        operator: DocId,
         right_expr: &Expression<'_>,
         frozen: Span,
         comments: Option<DocId>,
@@ -1363,15 +1367,11 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_frozen_assignment_shape(
         &self,
         left_doc: DocId,
-        operator: &'static str,
+        operator: DocId,
         rhs: DocId,
     ) -> DocId {
         let d = self.d();
-        d.group(d.concat(&[
-            d.group(left_doc),
-            d.text(operator),
-            hang_after_operator(d, rhs),
-        ]))
+        d.group(d.concat(&[d.group(left_doc), operator, hang_after_operator(d, rhs)]))
     }
 
     /// Check if an expression is a member-only chain with line comments.
@@ -1495,6 +1495,74 @@ impl<'a> Printer<'a> {
                 self.has_line_comments_in_chain(non_null.expression)
             }
             _ => false,
+        }
+    }
+}
+
+impl AssignmentOperator {
+    /// The operator with its leading space (`" ="`, `" +="`, …) as a doc.
+    ///
+    /// Each arm spells its own literal, so the text is a constant at the arm — the
+    /// prelude fold, or a direct intern of a fixed address — where `d.text(
+    /// self.as_str_with_leading_space())` would hand `text()` a runtime string and pay the
+    /// prelude's length switch and byte jump at every assignment. A test binds the two
+    /// tables.
+    #[inline]
+    pub(in crate::printer) fn doc_with_leading_space(self, d: &DocArena) -> DocId {
+        match self {
+            AssignmentOperator::Assign => d.text(" ="),
+            AssignmentOperator::AddAssign => d.text(" +="),
+            AssignmentOperator::SubtractAssign => d.text(" -="),
+            AssignmentOperator::MultiplyAssign => d.text(" *="),
+            AssignmentOperator::DivideAssign => d.text(" /="),
+            AssignmentOperator::RemainderAssign => d.text(" %="),
+            AssignmentOperator::ExponentiateAssign => d.text(" **="),
+            AssignmentOperator::LeftShiftAssign => d.text(" <<="),
+            AssignmentOperator::RightShiftAssign => d.text(" >>="),
+            AssignmentOperator::UnsignedRightShiftAssign => d.text(" >>>="),
+            AssignmentOperator::BitwiseOrAssign => d.text(" |="),
+            AssignmentOperator::BitwiseXorAssign => d.text(" ^="),
+            AssignmentOperator::BitwiseAndAssign => d.text(" &="),
+            AssignmentOperator::LogicalOrAssign => d.text(" ||="),
+            AssignmentOperator::LogicalAndAssign => d.text(" &&="),
+            AssignmentOperator::NullishAssign => d.text(" ??="),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `doc_with_leading_space`'s per-arm literals are `as_str_with_leading_space`'s
+    /// table: within one document `text()` interns a static by identity, so the two
+    /// spellings agree exactly when they return the same node.
+    #[test]
+    fn assignment_operator_doc_matches_its_string_table() {
+        let d = DocArena::new();
+        for op in [
+            AssignmentOperator::Assign,
+            AssignmentOperator::AddAssign,
+            AssignmentOperator::SubtractAssign,
+            AssignmentOperator::MultiplyAssign,
+            AssignmentOperator::DivideAssign,
+            AssignmentOperator::RemainderAssign,
+            AssignmentOperator::ExponentiateAssign,
+            AssignmentOperator::LeftShiftAssign,
+            AssignmentOperator::RightShiftAssign,
+            AssignmentOperator::UnsignedRightShiftAssign,
+            AssignmentOperator::BitwiseOrAssign,
+            AssignmentOperator::BitwiseXorAssign,
+            AssignmentOperator::BitwiseAndAssign,
+            AssignmentOperator::LogicalOrAssign,
+            AssignmentOperator::LogicalAndAssign,
+            AssignmentOperator::NullishAssign,
+        ] {
+            assert_eq!(
+                op.doc_with_leading_space(&d),
+                d.text(op.as_str_with_leading_space()),
+                "{op:?}"
+            );
         }
     }
 }

@@ -1055,7 +1055,7 @@ impl<'a> Printer<'a> {
                 obj.span.start,
                 obj.span.end,
                 opening,
-                "}",
+                d.text("}"),
                 d.line(),
             );
         }

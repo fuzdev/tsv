@@ -94,11 +94,11 @@ enum ChainSegment {
 fn build_chain_doc(
     d: &tsv_lang::doc::arena::DocArena,
     left_doc: DocId,
-    operator: &'static str,
+    operator: DocId,
     right_doc: DocId,
     segment: ChainSegment,
 ) -> DocId {
-    let mut parts: DocBuf = smallvec![d.group(left_doc), d.text(operator)];
+    let mut parts: DocBuf = smallvec![d.group(left_doc), operator];
 
     match segment {
         ChainSegment::ArrowChainTail => {
@@ -265,7 +265,7 @@ impl<'a> Printer<'a> {
             if !inner_rhs_is_assignment {
                 return self.build_assignment_layout(
                     left_doc,
-                    assign.operator.as_str_with_leading_space(),
+                    assign.operator.doc_with_leading_space(d),
                     assign.right,
                     false,
                     RhsCommentInfo {
@@ -336,15 +336,11 @@ impl<'a> Printer<'a> {
                         )
                     })
             {
-                return d.concat(&[
-                    left_doc,
-                    d.text(assign.operator.as_str_with_leading_space()),
-                    rhs_doc,
-                ]);
+                return d.concat(&[left_doc, assign.operator.doc_with_leading_space(d), rhs_doc]);
             }
             return self.build_assignment_layout(
                 left_doc,
-                assign.operator.as_str_with_leading_space(),
+                assign.operator.doc_with_leading_space(d),
                 assign.right,
                 false,
                 RhsCommentInfo {
@@ -395,7 +391,7 @@ impl<'a> Printer<'a> {
             build_chain_doc(
                 d,
                 left_doc,
-                assign.operator.as_str_with_leading_space(),
+                assign.operator.doc_with_leading_space(d),
                 right_doc,
                 segment,
             )
@@ -407,13 +403,13 @@ impl<'a> Printer<'a> {
             if rhs_frozen.is_some() {
                 self.build_frozen_assignment_shape(
                     left_doc,
-                    assign.operator.as_str_with_leading_space(),
+                    assign.operator.doc_with_leading_space(d),
                     right_doc,
                 )
             } else {
                 d.concat(&[
                     left_doc,
-                    d.text(assign.operator.as_str_with_leading_space()),
+                    assign.operator.doc_with_leading_space(d),
                     d.text(" "),
                     right_doc,
                 ])
@@ -422,7 +418,7 @@ impl<'a> Printer<'a> {
             // RHS is a chain - group + indent (chain formatting from recursive call)
             d.group(d.concat(&[
                 left_doc,
-                d.text(assign.operator.as_str_with_leading_space()),
+                assign.operator.doc_with_leading_space(d),
                 d.indent_line(right_doc),
             ]))
         }

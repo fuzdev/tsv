@@ -542,7 +542,7 @@ impl<'a> Printer<'a> {
                     // A comment-free object provably holds no directive either.
                     self.build_assignment_layout(
                         key_doc,
-                        ":",
+                        d.text(":"),
                         prop.value,
                         is_short_key,
                         RhsCommentInfo::frozen_only(None),
@@ -637,7 +637,7 @@ impl<'a> Printer<'a> {
                     let is_short_key = self.is_short_property_key(prop.key, prop.computed);
                     self.build_assignment_layout(
                         key_doc,
-                        ":",
+                        d.text(":"),
                         prop.value,
                         is_short_key,
                         RhsCommentInfo::frozen_only(value_frozen),
@@ -730,7 +730,7 @@ impl<'a> Printer<'a> {
                         // threaded rather than hardcoded so the two can't drift.
                         self.build_assignment_layout(
                             lhs_doc,
-                            ":",
+                            d.text(":"),
                             prop.value,
                             is_short_key,
                             RhsCommentInfo {
