@@ -1535,9 +1535,10 @@ four real corpora for **+9.7 KB** — 52% of the win at 2.8% of the size — and
 So the decision is not binary. Read it as three questions in order:
 
 - **Is the callee's hot path a few loads behind cold edges?** If not (a byte
-  scan, a loop), stop — `build_line_breaks_into` is a SWAR newline scan run once
+  scan, a loop), stop — `build_line_breaks_into` was a SWAR newline scan run once
   per document, ~1.2% of cycles and ~2% of retired instructions on a real-corpus
-  board, and its cost is work rather than call overhead. ⚠️ That answers the
+  board, and its cost was work rather than call overhead (L87 later retired the
+  per-document run altogether by building the table on demand). ⚠️ That answers the
   *inlining* question only, and answering it is not the same as clearing the
   symbol. A scan whose cost is work is attacked by asking for less of it — see
   [§A candidate scan can ask a wider question than its
@@ -2761,9 +2762,10 @@ shape, and the ladder had to find both:
   170-instruction unit: six pushes, five 64-bit constants loaded on every one of 176 call
   sites, more than the search it replaced. The class was the lever. The format path folds
   CR ahead of the parse, so nearly every table IS the set of `\n` positions, and the builder
-  that fills the table sees each terminator's last byte as it pushes it: it now returns that
-  verdict (`build_line_breaks_into` → `PrinterInputs::line_breaks_lf_only`), written only on
-  its rare non-`\n` arms, and the scan is one needle with two constants. **Classify the
+  that fills the table sees each terminator's last byte as it pushes it: it returned that
+  verdict, written only on its rare non-`\n` arms (the table and its verdict travel as one
+  `LineTable` value; since L87, below, the verdict is taken by its own pass and the table is
+  built on demand), and the scan is one needle with two constants. **Classify the
   document once, not the ask** — a document holding a bare `\r` or a U+2028 takes the search
   exactly as before.
 - ⭐⭐⭐ **The scan must inline, and what keeps it from inlining is the fallback beside it.**
@@ -2798,6 +2800,59 @@ copies run, and gave back the whole L86 win on the TypeScript one — the extrac
 §A slice's scan is bounded by the slice, a third time. The copies stay, each with its own
 compile-time class proof; a refactor that touches a hot function's spelling is a rung here,
 never tidying.
+
+### A table read only as a fallback is built only when one asks — and the verdict it needs is one streaming pass
+
+After the scan forms above, the line-break table was read only past a 64-byte cap (0.3% of
+asks) or on a document holding a terminator that is not a `\n` (none the format path
+produces), yet every document still built it: a whole-source terminator scan with a
+`Vec::push` per line, 1.75% of a TypeScript format run's instructions and, by the line, its
+own word loop (the push is small on cycles — the scan is the cost). What the scan forms need
+before they read a byte is one fact — is every line terminator a `\n`? — and that is what a
+document pays for now: `printing::line_terminators_are_lf_only`, one pass with one loose
+needle (`\r` or any non-ASCII byte, three operations a word, two words a step, 8 instructions
+a word), no per-line work. The table itself lives in `printing::LineBreaks` behind a
+`OnceCell`, filled only from the `#[cold]` fallbacks — the cap raised to 128, at which 8 of
+1,666 documents (0.4% of the bytes) ever fill one — and every direct table reader in the
+three printers goes through the scan forms, so nothing else can trigger the fill.
+`instructions:u` **−0.944% / −0.940% / −1.283%** (TS / Svelte / CSS format), −0.931% on the
+shipped CLI, −0.002% on the parse-only control; cycles −0.808% pooled over a twelve-binary layout group, 3/3 replicate signs (−0.504 / −1.234 / −0.686), against a null group at +0.013%; `.text` −2 KB. Four things
+decided the shape:
+
+- ⭐⭐⭐⭐ **The verdict cannot come from the lexer.** It was filed that way — the lexer
+  classifies every terminator on a cold branch — but the string scanner's needles are
+  `[quote, \, \n, \r]` and the template scanner's `` [`, $, \] ``: a raw U+2028 inside a
+  literal (legal since ES2019) never reaches a classifying arm, and the table RECORDS it. A
+  fact the table is defined over is a fact about the bytes, and only a pass over the bytes
+  states it soundly; the same class test the builder ran (`line_terminator_len`), proved
+  against the builder at every alignment of every terminator shape by the exhaustive test.
+- ⭐⭐⭐⭐⭐ **A handoff to an exact loop is priced by the bytes after the first hit, not by
+  the hits.** The first rung copied `next_line_terminator_candidate`'s shape — a loose word
+  test that hands the rest of the document to the exact two-needle loop on the first
+  non-ASCII word — and read half the lever, with the census exactly right (0.7% of words hold
+  a non-ASCII byte). 917 of 1,666 files hold one somewhere (a `©` in a header, an em dash in
+  a comment), and **64% of the corpus's bytes sit after it**: two thirds of the corpus ran
+  the ~20-instruction exact loop. The candidate scan's handoff pays there because its
+  re-entry is per byte inside a run; a verdict has no per-hit re-entry, so a fired word is
+  re-asked exactly out of line (`lf_only_in_word`) and the loose loop resumes at the next.
+- ⭐⭐⭐⭐ **With a lazy table the cap decides who BUILDS one.** At 64, 241 documents holding
+  29% of the bytes fell back at least once and each paid the whole build for a handful of
+  searches (+0.47 points against cap 128 — the per-cap document census, taken in the
+  fallbacks from the table they had just been handed, predicted it to a hundredth); at 128,
+  8 documents; at 256, none. A cap that bounded a pathological ask now bounds a per-document
+  cost.
+- ⚠️⚠️ **A respelling can keep a bound check inside the loop.** clippy refused the
+  `try_into().unwrap()` extraction of the two words; `split_first_chunk` + `first_chunk`
+  with the lone-word arm inside the loop compiled with both bound checks in the loop — 22
+  instructions per sixteen bytes against 16 — and gave back 0.35 points. `first_chunk::<16>`
+  + `as_chunks::<8>` claims the sixteen bytes once and is `.text`-byte-identical to the form
+  clippy refused. The disassembly named the arm before the A/B did.
+
+The accounting was closed through a measurement-only rung with the verdict short-circuited
+to `true`: the lazy table alone is −1.58%, the verdict pass alone +0.73% = 16 M instructions
+over 1.52 M words, 10.5 a word against the loop's ten. The erased layout table is a distinct
+state now (`LineTable::EMPTY` is `breaks: None`, answered before a byte is read), not an
+empty table that happens to answer "no terminator anywhere".
 
 ## WASM bundle size
 

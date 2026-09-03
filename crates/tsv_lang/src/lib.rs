@@ -43,7 +43,7 @@ mod whitespace;
 
 pub use acorn_prefix::{AcornPrefix, AcornPrefixText};
 pub use comment::{
-    ClassifiedComments, Comment, CommentPosition, classify_comment, classify_comment_fast,
+    ClassifiedComments, Comment, CommentPosition, classify_comment, classify_comment_scan,
     comments_in_source_after, comments_in_source_range, comments_on_page_in_range,
     comments_to_emit_after, comments_to_emit_in_range, directive_alone_on_line,
     find_first_comment_from, has_comments_on_page_in_range, has_comments_to_emit_in_range,

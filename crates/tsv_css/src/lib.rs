@@ -123,7 +123,7 @@ pub fn format_in(
 ///
 /// `embed.base_indent_offset` seeds the indent so wrapped lines respect the host's
 /// indentation, and `source` is the whole host document (spans are absolute), so
-/// `line_breaks` is the host's whole-source table — never island-local.
+/// `line_table` is the host's whole-source table — never island-local.
 ///
 /// The doc IR is built into `arena` rather than a freshly allocated one, so a Svelte host
 /// formatting a `<style>` block shares its own document arena instead of allocating a
@@ -136,11 +136,11 @@ pub fn format_in(
 pub fn format_embedded_in(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,
-    line_breaks: &[u32],
+    line_table: tsv_lang::printing::LineTable<'_>,
     embed: tsv_lang::EmbedContext,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
-    printer::format_css_embedded_in(stylesheet, source, line_breaks, embed, arena)
+    printer::format_css_embedded_in(stylesheet, source, line_table, embed, arena)
 }
 
 /// Convert CSS AST to JSON with character-based positions

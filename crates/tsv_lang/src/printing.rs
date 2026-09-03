@@ -8,6 +8,8 @@ use crate::escapes::swap_quote_escaping;
 use crate::swar::{high_bit_lanes, lanes_less_than, splat, zero_lanes, zero_or_high_lanes};
 use crate::whitespace::is_js_whitespace;
 use std::borrow::Cow;
+use std::cell::{Cell, OnceCell};
+use std::fmt;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthChar;
 
@@ -594,10 +596,12 @@ pub fn has_newline_between(source: &str, start: u32, end: u32) -> bool {
 //
 // Line Breaks Table Functions (O(log n) binary search)
 //
-//
-// These functions use a precomputed line breaks table for O(log n) lookups
-// instead of O(n) string scans. The table is a Vec<u32> of newline byte offsets
-// built during lexing.
+// The three line questions asked of a BUILT table — a sorted `Vec<u32>` of the byte
+// offsets of each terminator's last byte (`build_line_breaks_into`). No printer calls
+// these directly any more: they are the search behind the `#[cold]` fallbacks of the scan
+// forms below (`is_same_line_scan` and siblings, which read the source bytes and reach
+// the table only past the scan cap or on a non-LF-only document) and the oracle the
+// exhaustive test grades those scan forms against.
 
 /// Check if two positions are on the same line using precomputed line breaks.
 ///
@@ -738,28 +742,242 @@ pub fn has_newline_between_fast(line_breaks: &[u32], start: u32, end: u32) -> bo
     line_breaks.get(idx).is_some_and(|&pos| pos < end)
 }
 
-/// A document's line-break table paired with its builder's verdict on it, so the two
-/// cannot drift apart across the printers that carry them.
+/// A document's line-break table, built on demand — and the document's verdict on it,
+/// taken up front.
 ///
-/// `breaks` is one entry per line terminator's LAST byte ([`build_line_breaks_into`]);
-/// `lf_only` says every recorded byte is a `\n`, under which the table IS the set of `\n`
-/// positions and the scan forms of the three line questions ([`is_same_line_scan`] and
-/// siblings) may read the bytes instead of searching it. [`LineTable::EMPTY`] is the
-/// canonical reprint's erased layout table: an empty table is authoritative under either
-/// verdict (no terminator anywhere), which is what lets the erasure ride through the scan
-/// forms untouched.
+/// The printers ask the line-break table three questions (same line? a newline between?
+/// a blank line between?), and since the scan forms of those questions
+/// ([`is_same_line_scan`] and siblings) answer nearly every ask off the source bytes,
+/// the table is read only as a fallback: past [`LINE_SCAN_CAP`] bytes, or on a document
+/// holding a terminator that is not a `\n`. A census over 12 MB of TypeScript put the
+/// fallback in 8 of 1,666 documents at the cap, none of them non-LF-only — so the table
+/// no longer exists until a fallback asks for it. What is taken up front is the one fact
+/// the scan forms need before they read a byte: whether every line terminator in the
+/// document is a `\n` ([`line_terminators_are_lf_only`], one loose-needle pass with no
+/// per-line work), the fact under which the table would be exactly the set of `\n`
+/// positions.
+///
+/// The fill goes into `scratch`, the arena-parked table a multi-file driver hands each
+/// document (`DocArena::take_line_breaks_scratch`); [`Self::into_scratch`] hands it back,
+/// built or not, for parking.
+pub struct LineBreaks<'s> {
+    source: &'s [u8],
+    lf_only: bool,
+    table: OnceCell<Vec<u32>>,
+    scratch: Cell<Vec<u32>>,
+}
+
+impl<'s> LineBreaks<'s> {
+    /// Classify `source` (one pass) and park `scratch` — a logically empty table whose
+    /// capacity is warm — for the fill a fallback may ask for.
+    pub fn new(source: &'s str, scratch: Vec<u32>) -> Self {
+        let bytes = source.as_bytes();
+        LineBreaks {
+            source: bytes,
+            lf_only: line_terminators_are_lf_only(bytes),
+            table: OnceCell::new(),
+            scratch: Cell::new(scratch),
+        }
+    }
+
+    /// [`Self::new`] with a fresh scratch — the one-document callers.
+    pub fn of(source: &'s str) -> Self {
+        Self::new(source, Vec::new())
+    }
+
+    /// Whether every line terminator in the document is a `\n` (a `\r\n` counts: the
+    /// byte the table records for it IS the `\n`; a bare `\r` or a U+2028 / U+2029 does
+    /// not) — the document's verdict, taken once at construction.
+    pub fn lf_only(&self) -> bool {
+        self.lf_only
+    }
+
+    /// The handle the printers carry: this table with its verdict.
+    pub fn table(&self) -> LineTable<'_> {
+        LineTable {
+            breaks: Some(self),
+            lf_only: self.lf_only,
+        }
+    }
+
+    /// The table itself — one entry per line terminator's LAST byte
+    /// ([`build_line_breaks_into`]) — filled on the first call.
+    ///
+    /// Reached only from the cold fallbacks of the scan forms (and from the two-sided
+    /// `debug_assert` in each of them, so a debug build fills every document's table and
+    /// grades every ask against it).
+    pub fn breaks(&self) -> &[u32] {
+        self.table.get_or_init(|| {
+            let mut breaks = self.scratch.take();
+            breaks.clear();
+            breaks.reserve(self.source.len() / 32);
+            let lf_only = build_line_breaks_bytes(self.source, &mut breaks);
+            // The builder's own verdict re-derives the up-front one; the exhaustive test
+            // grades the two against each other at every alignment of every terminator.
+            debug_assert_eq!(lf_only, self.lf_only);
+            breaks
+        })
+    }
+
+    /// The scratch back, for parking: the filled table when a fallback asked for it,
+    /// else the untouched capacity.
+    pub fn into_scratch(self) -> Vec<u32> {
+        self.table
+            .into_inner()
+            .unwrap_or_else(|| self.scratch.into_inner())
+    }
+}
+
+impl fmt::Debug for LineBreaks<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LineBreaks")
+            .field("bytes", &self.source.len())
+            .field("lf_only", &self.lf_only)
+            .field("built", &self.table.get().is_some())
+            .finish()
+    }
+}
+
+/// A document's line-break table with its verdict — the value the printers carry, so the
+/// two cannot drift apart across the printers that hold it — or the ERASED table.
+///
+/// [`LineTable::EMPTY`] is the canonical reprint's erased layout table: no terminator
+/// anywhere, whatever the source says, which is what lets the erasure ride through the
+/// scan forms untouched (an erased table is answered before a byte is read).
 #[derive(Clone, Copy, Debug)]
 pub struct LineTable<'a> {
-    pub breaks: &'a [u32],
-    pub lf_only: bool,
+    /// `None` is the erased table.
+    breaks: Option<&'a LineBreaks<'a>>,
+    lf_only: bool,
 }
 
 impl LineTable<'_> {
-    /// No line breaks at all — the erased layout table, and a one-line document's.
+    /// No line breaks at all — the erased layout table.
     pub const EMPTY: LineTable<'static> = LineTable {
-        breaks: &[],
+        breaks: None,
         lf_only: true,
     };
+
+    /// The table's entries, for grading: empty when erased, else built on demand. Reached
+    /// only from the `debug_assert_eq!` in each public scan form (a release build
+    /// typechecks that call and folds it away, so this is not `cfg`-gated).
+    fn breaks_for_grading(&self) -> &[u32] {
+        self.breaks.map_or(&[], LineBreaks::breaks)
+    }
+}
+
+//
+// The document's verdict — one pass, ahead of any table
+//
+
+/// [`line_terminators_are_lf_only`]'s loose lane test — `\r` or any non-ASCII byte — is a
+/// superset of the exact candidate class `{ \r, 0xE2 }` its word re-ask and tail answer,
+/// proved here rather than trusted (a uniform word cannot borrow across lanes unless it is
+/// itself a match, so `hits != 0` is exactly the byte test).
+const _: () = {
+    let mut b = 0u16;
+    while b < 256 {
+        let byte = b as u8;
+        let loose = zero_or_high_lanes(u64::from_le_bytes([byte; 8]) ^ splat(b'\r'));
+        assert!((loose != 0) == (byte == b'\r' || byte >= 0x80));
+        let exact = zero_lanes(u64::from_le_bytes([byte; 8]) ^ splat(b'\r'))
+            | zero_lanes(u64::from_le_bytes([byte; 8]) ^ splat(LINE_SEPARATOR_LEAD));
+        assert!((exact != 0) == (byte == b'\r' || byte == LINE_SEPARATOR_LEAD));
+        b += 1;
+    }
+};
+
+/// Whether every line terminator in `bytes` is a `\n` — a `\r\n` included (the byte the
+/// table records for it is the `\n`); a bare `\r` or a U+2028 / U+2029 anywhere, a string
+/// literal or a comment body included, says no. The document-level fact the scan forms of
+/// the three line questions are gated on, and the one thing a document pays for up front
+/// now that its table is built on demand ([`LineBreaks`]).
+///
+/// One pass with ONE loose needle: `\r` or any non-ASCII byte, three operations a word
+/// ([`crate::swar::zero_or_high_lanes`]), and nearly every word of real source fires
+/// neither — this is a streaming loop with no per-hit chain, unlike the table builder it
+/// replaces, which re-entered its scan once per line to push each hit. A word that fires
+/// is asked the exact two-needle question out of line ([`lf_only_in_word`]) and the loose
+/// loop **resumes at the next word** — it never hands the rest of the document to an exact
+/// loop the way `next_line_terminator_candidate` does. That handoff was built first and
+/// measured: 917 of 1,666 files of a 12 MB TypeScript corpus hold a non-ASCII byte
+/// somewhere (a `©` in a header, an em dash in a comment), and 64% of the corpus's bytes
+/// sit after the first one, so the ~20-instruction exact loop ran over two thirds of the
+/// corpus and the pass averaged ~16 instructions a word against this loop's 10. Only 0.7%
+/// of the words hold a non-ASCII byte at all, and a re-ask per fired WORD (not per byte,
+/// which is what makes the candidate scan's handoff pay there) leaves a CJK-dense document
+/// at the exact loop's price and everything else at the loose loop's.
+///
+/// Byte-at-a-time is sound for the exact question (`line_terminator_len`): neither `\r`
+/// nor `0xE2` is ever a UTF-8 continuation byte, so a candidate found at any offset is a
+/// character boundary.
+pub fn line_terminators_are_lf_only(bytes: &[u8]) -> bool {
+    let mut i = 0;
+    // Two words a step: with nothing firing, the bound check and the branch are the loop's
+    // own overhead, and they amortize over sixteen bytes (measured against one word a
+    // step: a tenth of a point of a TypeScript format run, on both corpora).
+    // ⚠️ The sixteen bytes are claimed ONCE (`first_chunk::<16>`) and split with no second
+    // check: spelled as `split_first_chunk::<8>` + `first_chunk::<8>` with the lone-word
+    // arm inside the loop, LLVM kept both bound checks in the loop — 22 instructions per
+    // sixteen bytes against 16 — and gave back 0.35 points of the lever.
+    while let Some(chunk) = bytes[i..].first_chunk::<16>() {
+        let (words, _) = chunk.as_chunks::<8>();
+        let (a, b) = (u64::from_le_bytes(words[0]), u64::from_le_bytes(words[1]));
+        if (zero_or_high_lanes(a ^ splat(b'\r')) | zero_or_high_lanes(b ^ splat(b'\r'))) != 0
+            && !(lf_only_in_word(bytes, i, a) && lf_only_in_word(bytes, i + 8, b))
+        {
+            return false;
+        }
+        i += 16;
+    }
+    // The one word that may remain ahead of the tail.
+    if let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let w = u64::from_le_bytes(*chunk);
+        if zero_or_high_lanes(w ^ splat(b'\r')) != 0 && !lf_only_in_word(bytes, i, w) {
+            return false;
+        }
+        i += 8;
+    }
+    lf_only_tail(bytes, i)
+}
+
+/// The exact question over the one word at `at` the loose test fired on: every `\r` and
+/// every `0xE2` lane in it, asked [`lf_only_at`] (which may read the two bytes past the
+/// lane — the `\n` of a `\r\n`, the tail of a U+2028 — into the next word). Out of line
+/// so the loose loop's unit holds one loop and nothing else; it runs on a fraction of a
+/// percent of the words.
+#[cold]
+#[inline(never)]
+fn lf_only_in_word(bytes: &[u8], at: usize, w: u64) -> bool {
+    let mut hits = zero_lanes(w ^ splat(b'\r')) | zero_lanes(w ^ splat(LINE_SEPARATOR_LEAD));
+    while hits != 0 {
+        let lane = (hits.trailing_zeros() / 8) as usize;
+        if !lf_only_at(bytes, at + lane) {
+            return false;
+        }
+        hits &= hits - 1;
+    }
+    true
+}
+
+/// The exact question at a candidate byte (a `\r` or a `0xE2`): does the terminator that
+/// begins here, if one does, end in a `\n`? The builder's own rule
+/// (`build_line_breaks_bytes` records each terminator's last byte and asks whether it is
+/// a `\n`), spelled once for the word loop and its tail.
+#[inline]
+fn lf_only_at(bytes: &[u8], at: usize) -> bool {
+    match line_terminator_len(bytes, at) {
+        Some(len) => bytes[at + len - 1] == b'\n',
+        None => true,
+    }
+}
+
+/// [`line_terminators_are_lf_only`] over the fewer-than-eight bytes the word loop stops
+/// short of, a byte at a time.
+#[inline]
+fn lf_only_tail(bytes: &[u8], from: usize) -> bool {
+    (from..bytes.len())
+        .all(|i| !matches!(bytes[i], b'\r' | LINE_SEPARATOR_LEAD) || lf_only_at(bytes, i))
 }
 
 //
@@ -776,9 +994,14 @@ impl LineTable<'_> {
 /// question was asked on: a census over that corpus puts the bytes a forward scan reads
 /// at a mean of **5.5** for `is_same_line` (82.7% within eight, 99.7% within 64), 2.6 for
 /// the blank-line check and 3.2 for the newline check — one host word answers almost every
-/// ask. Sixty-four keeps a pathological line (a minified document) from turning each ask
-/// into a walk of the whole line: past the cap the search runs exactly as before.
-const LINE_SCAN_CAP: usize = 64;
+/// ask. The cap keeps a pathological line (a minified document) from turning each ask into
+/// a walk of the whole line: past it the search runs exactly as before — and since the
+/// table is built only when a fallback asks ([`LineBreaks`]), the cap is also what decides
+/// how many documents build one at all. At 64 the fallback reached 241 of 1,666 documents
+/// of that corpus, holding 29% of its bytes; at 128, 8 documents and 0.4% of the bytes;
+/// at 256, none. The asks between 64 and 128 bytes are ~630 a pass — a few thousand
+/// instructions against a builder run over 3.5 MB.
+const LINE_SCAN_CAP: usize = 128;
 
 /// [`next_lf_in`]'s and [`next_lf`]'s lane test and the byte compare their scalar tails run
 /// must agree on every byte value — proved here rather than trusted (a uniform word cannot
@@ -848,16 +1071,17 @@ fn lf_count_in(
 }
 
 /// [`is_same_line_fast`], answered by a bounded scan of `bytes` — the source the table
-/// was built from — with the table search as the fallback past [`LINE_SCAN_CAP`].
+/// belongs to — with the table search as the fallback past [`LINE_SCAN_CAP`].
 ///
-/// `table.lf_only` is the builder's own verdict ([`build_line_breaks_into`]): when it
-/// holds, the table IS the set of `\n` positions and a one-needle scan reads the same
-/// answer off the bytes; when it does not (a bare `\r`, a U+2028 / U+2029 — none of which
-/// the format path's CR fold leaves in a real document), the search runs as before. Same
-/// answer as the table form at every position (the exhaustive test beside it grades every
-/// position of every terminator shape at every cap), and **an empty table is
-/// authoritative**: the canonical reprint empties the layout table to erase authoring
-/// intent, and a scan that re-read the source would put it back.
+/// `table` carries the document's verdict ([`LineBreaks::lf_only`]): when it holds, the
+/// table is the set of `\n` positions and a one-needle scan reads the same answer off the
+/// bytes; when it does not (a bare `\r`, a U+2028 / U+2029 — none of which the format
+/// path's CR fold leaves in a real document), the search runs as before, over a table
+/// built on that first ask. Same answer as the table form at every position (the
+/// exhaustive test beside it grades every position of every terminator shape at every
+/// cap), and **an erased table is authoritative**: the canonical reprint erases the
+/// layout table to erase authoring intent, and a scan that re-read the source would put
+/// it back.
 #[inline]
 pub fn is_same_line_scan(
     bytes: &[u8],
@@ -868,7 +1092,7 @@ pub fn is_same_line_scan(
     let answer = is_same_line_scan_capped(bytes, table, prev_end, curr_start, LINE_SCAN_CAP);
     debug_assert_eq!(
         answer,
-        is_same_line_fast(table.breaks, prev_end, curr_start)
+        is_same_line_fast(table.breaks_for_grading(), prev_end, curr_start)
     );
     answer
 }
@@ -886,7 +1110,7 @@ pub fn has_blank_line_between_scan(
         has_blank_line_between_scan_capped(bytes, table, prev_end, curr_start, LINE_SCAN_CAP);
     debug_assert_eq!(
         answer,
-        has_blank_line_between_fast(table.breaks, prev_end, curr_start)
+        has_blank_line_between_fast(table.breaks_for_grading(), prev_end, curr_start)
     );
     answer
 }
@@ -896,36 +1120,41 @@ pub fn has_blank_line_between_scan(
 #[inline]
 pub fn has_newline_between_scan(bytes: &[u8], table: LineTable<'_>, start: u32, end: u32) -> bool {
     let answer = has_newline_between_scan_capped(bytes, table, start, end, LINE_SCAN_CAP);
-    debug_assert_eq!(answer, has_newline_between_fast(table.breaks, start, end));
+    debug_assert_eq!(
+        answer,
+        has_newline_between_fast(table.breaks_for_grading(), start, end)
+    );
     answer
 }
 
-// The table searches, outlined and cold, so the scan forms' hot unit holds ONE loop.
+// The table searches, outlined and cold, so the scan forms' hot unit holds ONE loop — and
+// the table's fill lives behind them: the first of these a document reaches is what builds
+// its table.
 //
 // ⚠️ Measured, not stylistic. With the searches inline, LLVM outlined each scan form as
 // one ~120-instruction unit carrying both fallback searches: a seven-register prologue,
 // the cap passed on the stack, and two 64-bit constants re-materialized INSIDE the word
 // loop — ~60 instructions an ask, exactly what the search it replaced cost, and the
-// lever read as a null (+0.036% of a TypeScript format run). The fallbacks run on 0.3%
-// of asks (the cap) and on documents the format path never produces (a bare `\r`, a
-// U+2028); they belong out of line.
+// lever read as a null (+0.036% of a TypeScript format run). The fallbacks run on a few
+// hundred asks a pass (the cap) and on documents the format path never produces (a bare
+// `\r`, a U+2028); they belong out of line.
 
 #[cold]
 #[inline(never)]
-fn is_same_line_table(line_breaks: &[u32], prev_end: u32, curr_start: u32) -> bool {
-    is_same_line_fast(line_breaks, prev_end, curr_start)
+fn is_same_line_table(breaks: &LineBreaks<'_>, prev_end: u32, curr_start: u32) -> bool {
+    is_same_line_fast(breaks.breaks(), prev_end, curr_start)
 }
 
 #[cold]
 #[inline(never)]
-fn has_blank_line_between_table(line_breaks: &[u32], prev_end: u32, curr_start: u32) -> bool {
-    has_blank_line_between_fast(line_breaks, prev_end, curr_start)
+fn has_blank_line_between_table(breaks: &LineBreaks<'_>, prev_end: u32, curr_start: u32) -> bool {
+    has_blank_line_between_fast(breaks.breaks(), prev_end, curr_start)
 }
 
 #[cold]
 #[inline(never)]
-fn has_newline_between_table(line_breaks: &[u32], start: u32, end: u32) -> bool {
-    has_newline_between_fast(line_breaks, start, end)
+fn has_newline_between_table(breaks: &LineBreaks<'_>, start: u32, end: u32) -> bool {
+    has_newline_between_fast(breaks.breaks(), start, end)
 }
 
 // `inline(always)` on the three `_capped` bodies, and it is a measured constraint, not a
@@ -952,16 +1181,16 @@ fn is_same_line_scan_capped(
     if prev_end > curr_start {
         return false;
     }
-    // An empty table is authoritative (the canonical reprint's erased layout).
-    if table.breaks.is_empty() {
+    // An erased table is authoritative (the canonical reprint's layout).
+    let Some(breaks) = table.breaks else {
         return true;
-    }
+    };
     if !table.lf_only {
-        return is_same_line_table(table.breaks, prev_end, curr_start);
+        return is_same_line_table(breaks, prev_end, curr_start);
     }
     match lf_count_in(bytes, prev_end as usize, curr_start as usize, cap, 1) {
         Some(found) => found == 0,
-        None => is_same_line_table(table.breaks, prev_end, curr_start),
+        None => is_same_line_table(breaks, prev_end, curr_start),
     }
 }
 
@@ -974,15 +1203,18 @@ fn has_blank_line_between_scan_capped(
     curr_start: u32,
     cap: usize,
 ) -> bool {
-    if prev_end >= curr_start || table.breaks.is_empty() {
+    if prev_end >= curr_start {
         return false;
     }
+    let Some(breaks) = table.breaks else {
+        return false;
+    };
     if !table.lf_only {
-        return has_blank_line_between_table(table.breaks, prev_end, curr_start);
+        return has_blank_line_between_table(breaks, prev_end, curr_start);
     }
     match lf_count_in(bytes, prev_end as usize, curr_start as usize, cap, 2) {
         Some(found) => found == 2,
-        None => has_blank_line_between_table(table.breaks, prev_end, curr_start),
+        None => has_blank_line_between_table(breaks, prev_end, curr_start),
     }
 }
 
@@ -995,15 +1227,18 @@ fn has_newline_between_scan_capped(
     end: u32,
     cap: usize,
 ) -> bool {
-    if start >= end || table.breaks.is_empty() {
+    if start >= end {
         return false;
     }
+    let Some(breaks) = table.breaks else {
+        return false;
+    };
     if !table.lf_only {
-        return has_newline_between_table(table.breaks, start, end);
+        return has_newline_between_table(breaks, start, end);
     }
     match lf_count_in(bytes, start as usize, end as usize, cap, 1) {
         Some(found) => found == 1,
-        None => has_newline_between_table(table.breaks, start, end),
+        None => has_newline_between_table(breaks, start, end),
     }
 }
 
@@ -1048,17 +1283,15 @@ pub fn build_line_breaks(source: &str) -> Vec<u32> {
     breaks
 }
 
-/// Like [`build_line_breaks`], filling a caller-provided (empty) table — the
-/// seam behind the arena-parked line-break scratch
-/// (`DocArena::take_line_breaks_scratch`), so multi-file drivers fill one warm
-/// table per file instead of allocating a fresh `Vec`.
+/// Like [`build_line_breaks`], filling a caller-provided (empty) table — the fill behind
+/// [`LineBreaks::breaks`], into the arena-parked scratch (`DocArena::take_line_breaks_scratch`),
+/// which runs only when a line question falls back to the table.
 ///
 /// Returns whether the table is **LF-only** — every recorded byte is a `\n`, so the
-/// table is exactly the set of `\n` positions and the scan forms of the three line
-/// questions ([`is_same_line_scan`] and siblings) may read the bytes instead of
-/// searching it. Answered by the walk that fills the table, on the branch it already
-/// takes per line; [`line_breaks_are_lf_only`] is the same fact re-derived from the
-/// finished table, for grading.
+/// table is exactly the set of `\n` positions. The document's verdict is taken ahead of
+/// any table by [`line_terminators_are_lf_only`]; this is the builder's own re-derivation
+/// of it, on the branch it already takes per line, graded against it wherever the table
+/// is built ([`line_breaks_are_lf_only`] is the same fact read off the finished table).
 pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) -> bool {
     // Pre-size to ~one newline per 32 bytes (average code lines run ~25–40
     // bytes), so typical files fill in one allocation instead of the doubling
@@ -2872,10 +3105,13 @@ mod tests {
     /// The scan forms answer exactly as the table forms at EVERY byte position — inside
     /// a multi-byte terminator included — for every terminator shape at every alignment,
     /// and at every cap (so both the walk and the table fallback are graded, at the
-    /// boundary where a terminator straddles the cap too). No corpus can grade this: a
-    /// wrong answer moves a blank line or a trailing-comment classification only on a
-    /// document that holds the shape, and the shapes that matter (a `\r` the format path
-    /// folds away, a U+2028) appear in none.
+    /// boundary where a terminator straddles the cap too); the document's up-front
+    /// verdict ([`line_terminators_are_lf_only`]) agrees with the builder's and with the
+    /// finished table at every alignment of every terminator, the word loop and its
+    /// handoff included; and the table built on demand is the eager builder's. No corpus
+    /// can grade this: a wrong answer moves a blank line or a trailing-comment
+    /// classification only on a document that holds the shape, and the shapes that matter
+    /// (a `\r` the format path folds away, a U+2028) appear in none.
     #[test]
     fn line_break_scan_fns_agree_with_the_table_at_every_position_and_cap() {
         // `\u{2000}` is an `0xE2`-led character that is NOT a terminator (the candidate
@@ -2885,6 +3121,7 @@ mod tests {
         let mut checked = 0usize;
         let mut lf_only_documents = 0usize;
         let mut source = String::new();
+        let mut padded = String::new();
         // Every sequence of up to five pieces (7^5 = 16,807 documents).
         for len in 0..=5 {
             let mut counters = vec![0usize; len];
@@ -2896,19 +3133,41 @@ mod tests {
                 let bytes = source.as_bytes();
                 let mut breaks = Vec::new();
                 let lf_only = build_line_breaks_into(&source, &mut breaks);
-                // The builder's verdict is the table's own fact, re-derived.
+                // The builder's verdict is the table's own fact, re-derived — and the
+                // up-front verdict is the same fact, at every alignment the word loop can
+                // meet a piece at (a prefix of 0..=17 plain bytes puts every piece in
+                // every lane of a word and in the tail, with and without a non-ASCII byte
+                // ahead of it).
                 assert_eq!(
                     lf_only,
                     line_breaks_are_lf_only(bytes, &breaks),
                     "lf_only {source:?}"
                 );
+                for pad in 0..=17 {
+                    padded.clear();
+                    for _ in 0..pad {
+                        padded.push('x');
+                    }
+                    padded.push_str(&source);
+                    assert_eq!(
+                        line_terminators_are_lf_only(padded.as_bytes()),
+                        lf_only,
+                        "verdict {padded:?}"
+                    );
+                    let mut ahead = String::from("é");
+                    ahead.push_str(&padded);
+                    assert_eq!(
+                        line_terminators_are_lf_only(ahead.as_bytes()),
+                        lf_only,
+                        "verdict with a non-ASCII byte ahead {ahead:?}"
+                    );
+                }
                 if lf_only {
                     lf_only_documents += 1;
                 }
-                let table = LineTable {
-                    breaks: &breaks,
-                    lf_only,
-                };
+                let lazy = LineBreaks::new(&source, Vec::new());
+                assert_eq!(lazy.lf_only(), lf_only, "{source:?}");
+                let table = lazy.table();
                 // Every position pair, out-of-range ones included (the table forms take
                 // any `u32`, so the scan forms must too).
                 for p in 0..=bytes.len() + 2 {
@@ -2934,6 +3193,10 @@ mod tests {
                         }
                     }
                 }
+                // The table built on demand is the eager builder's, and it comes back
+                // out for parking.
+                assert_eq!(lazy.breaks(), &breaks[..], "{source:?}");
+                assert_eq!(lazy.into_scratch(), breaks, "{source:?}");
                 // Advance the odometer.
                 let mut i = 0;
                 loop {
@@ -2960,29 +3223,53 @@ mod tests {
             "{checked} {lf_only_documents}"
         );
 
-        // An empty table is authoritative (the canonical reprint's erased layout), even
+        // An erased table is authoritative (the canonical reprint's erased layout), even
         // over a source full of terminators — under either verdict.
         let bytes = b"a\n\nb\n\nc";
         for lf_only in [true, false] {
-            let empty = LineTable {
-                breaks: &[],
+            let erased = LineTable {
+                breaks: None,
                 lf_only,
             };
-            assert!(is_same_line_scan(bytes, empty, 0, 7));
-            assert!(!has_blank_line_between_scan(bytes, empty, 0, 7));
-            assert!(!has_newline_between_scan(bytes, empty, 0, 7));
+            assert!(is_same_line_scan(bytes, erased, 0, 7));
+            assert!(!has_blank_line_between_scan(bytes, erased, 0, 7));
+            assert!(!has_newline_between_scan(bytes, erased, 0, 7));
         }
         assert!(is_same_line_scan(bytes, LineTable::EMPTY, 0, 7));
 
-        // The cap hands a long line to the table, and a `\n` straddling the cap is
-        // still counted once.
+        // The cap hands a long line to the table — built on that first ask, and not
+        // before — and a `\n` straddling the cap is still counted once.
         let long = format!("{}\n\n{}", "x".repeat(200), "y".repeat(200));
         let mut breaks = Vec::new();
         assert!(build_line_breaks_into(&long, &mut breaks));
-        let table = LineTable {
-            breaks: &breaks,
-            lf_only: true,
-        };
+        let lazy = LineBreaks::of(&long);
+        assert!(lazy.lf_only());
+        assert!(lazy.table.get().is_none());
+        // (The `_capped` forms: the public ones grade every ask against the table in a
+        // debug build, which builds it.)
+        assert!(is_same_line_scan_capped(
+            long.as_bytes(),
+            lazy.table(),
+            0,
+            3,
+            LINE_SCAN_CAP
+        ));
+        assert!(
+            lazy.table.get().is_none(),
+            "answered within the cap: no table"
+        );
+        assert!(!is_same_line_scan_capped(
+            long.as_bytes(),
+            lazy.table(),
+            0,
+            250,
+            LINE_SCAN_CAP
+        ));
+        assert!(
+            lazy.table.get().is_some(),
+            "past the cap: the table was built"
+        );
+        let table = lazy.table();
         for p in 0..long.len() as u32 {
             for c in [p, p + 1, 150, 201, 202, 250, long.len() as u32] {
                 assert_eq!(
@@ -2997,11 +3284,26 @@ mod tests {
         }
 
         // A `\r\n` document is LF-only (the recorded byte is the `\n`); a bare `\r` and
-        // a U+2028 are not.
+        // a U+2028 are not — by the builder and by the up-front verdict alike.
         let mut breaks = Vec::new();
         assert!(build_line_breaks_into("a\r\nb\r\n", &mut breaks));
         assert_eq!(breaks, vec![2, 5]);
+        assert!(LineBreaks::of("a\r\nb\r\n").lf_only());
+        assert_eq!(LineBreaks::of("a\r\nb\r\n").breaks(), &[2, 5]);
         assert!(!build_line_breaks_into("a\rb", &mut Vec::new()));
+        assert!(!LineBreaks::of("a\rb").lf_only());
         assert!(!build_line_breaks_into("a\u{2028}b\n", &mut Vec::new()));
+        assert!(!LineBreaks::of("a\u{2028}b\n").lf_only());
+        // A non-LF-only document's asks all go to the table, built on the first.
+        let ls = LineBreaks::of("a\u{2028}b\nc");
+        assert!(ls.table.get().is_none());
+        assert!(!is_same_line_scan_capped(
+            ls.source,
+            ls.table(),
+            0,
+            5,
+            LINE_SCAN_CAP
+        ));
+        assert!(ls.table.get().is_some());
     }
 }

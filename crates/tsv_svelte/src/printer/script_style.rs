@@ -134,7 +134,7 @@ impl<'a> Printer<'a> {
             let formatted_css = tsv_css::format_embedded_in(
                 &style.css_stylesheet,
                 self.source(),
-                &self.line_breaks,
+                self.line_table(),
                 embed,
                 self.d(),
             );

@@ -1075,7 +1075,8 @@ impl<'a> Printer<'a> {
     ) -> (DocBuf, Option<u32>) {
         let pc = super::calls::PartitionedComments::new(
             self.comments,
-            self.comment_line_breaks.breaks,
+            self.source.as_bytes(),
+            self.comment_line_breaks,
             delim_pos,
             first_elem_start,
         );

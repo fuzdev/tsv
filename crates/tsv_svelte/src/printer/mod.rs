@@ -33,6 +33,7 @@ use std::cell::{Cell, RefCell};
 use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::printing::LineBreaks;
 use tsv_lang::{
     Comment, EmbedContext, INDENT, LayoutMode, OutputBuffer, Span, TAB_WIDTH,
     comments_in_source_range, comments_to_emit_in_range, is_format_ignore_directive,
@@ -223,11 +224,11 @@ pub(crate) struct Printer<'a> {
     /// `member_gap_frozen` short-circuits per `{expr}` without an O(comments)
     /// rescan there — the same per-`{expr}` trap `has_owned_comments` documents.
     has_format_ignore: bool,
-    /// Precomputed line break positions (byte offsets of '\n' in source)
-    line_breaks: Vec<u32>,
-    /// The builder's verdict on `line_breaks` (`tsv_ts::PrinterInputs::line_breaks_lf_only`):
-    /// every recorded byte is a `\n`. Computed once at construction, copied per island.
-    line_breaks_lf_only: bool,
+    /// The document's line-break table with its verdict (`tsv_lang::printing::LineBreaks`):
+    /// the verdict is taken once at construction, the table is filled only if a line
+    /// question falls back to it, and every embedded island borrows it through
+    /// [`Self::line_table`].
+    line_breaks: LineBreaks<'a>,
     /// Whether a wrapped block-tag head may dangle its `}` (and, later, expand its
     /// body) in the current context. True almost everywhere — including inside
     /// inline elements / components, where the body-expand is render-safe because a
@@ -268,28 +269,19 @@ impl<'a> Printer<'a> {
         comments: &'a [Comment],
         embed: EmbedContext,
     ) -> Self {
-        // The document's one whole-source line-break table: every embedded
-        // island borrows it (`build_program_doc` for `<script>`/`{expr}` TS,
-        // `tsv_css::format_embedded_in` for `<style>` CSS) — never rebuild it
-        // per island. Filled into the arena-parked scratch (one warm table
+        // The document's one whole-source line table: every embedded island borrows
+        // it (`build_program_doc` for `<script>`/`{expr}` TS, `tsv_css::format_embedded_in`
+        // for `<style>` CSS) — never re-classify per island. Its table, if a line
+        // question ever falls back to it, fills the arena-parked scratch (one warm table
         // across a multi-file driver's files); `into_string` parks it back.
-        let mut line_breaks = arena.take_line_breaks_scratch();
-        let line_breaks_lf_only =
-            tsv_lang::printing::build_line_breaks_into(source, &mut line_breaks);
+        let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
         // The two document-level presence flags come from the one scan `tsv_ts` owns
         // (`PrinterInputs::for_document`); `ts_inputs()` copies them per island.
         let tsv_ts::PrinterInputs {
             has_owned_comments,
             has_format_ignore,
             ..
-        } = tsv_ts::PrinterInputs::for_document(
-            source,
-            comments,
-            tsv_lang::printing::LineTable {
-                breaks: &line_breaks,
-                lf_only: line_breaks_lf_only,
-            },
-        );
+        } = tsv_ts::PrinterInputs::for_document(source, comments, line_breaks.table());
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
@@ -300,7 +292,6 @@ impl<'a> Printer<'a> {
             has_owned_comments,
             has_format_ignore,
             line_breaks,
-            line_breaks_lf_only,
             block_dangle_allowed: Cell::new(true),
             root_inline_run_block_starts: RefCell::new(FxHashSet::default()),
         }
@@ -428,8 +419,9 @@ impl<'a> Printer<'a> {
         };
         let d = self.d();
         let comment_doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
-        let separator = if tsv_lang::printing::has_newline_between_fast(
-            &self.line_breaks,
+        let separator = if tsv_lang::printing::has_newline_between_scan(
+            self.source.as_bytes(),
+            self.line_table(),
             comment.span.end,
             start,
         ) {
@@ -769,14 +761,10 @@ impl<'a> Printer<'a> {
         self.source
     }
 
-    /// The document's line-break table paired with its builder's verdict — what every
-    /// embedded TypeScript island reads its line questions from (the table is the whole
-    /// document's; spans are absolute).
+    /// The document's line table — what every embedded TypeScript island reads its line
+    /// questions from (the table is the whole document's; spans are absolute).
     pub(crate) fn line_table(&self) -> tsv_lang::printing::LineTable<'_> {
-        tsv_lang::printing::LineTable {
-            breaks: &self.line_breaks,
-            lf_only: self.line_breaks_lf_only,
-        }
+        self.line_breaks.table()
     }
 
     /// Standard [`tsv_ts::PrinterInputs`] for embedding TypeScript: this
@@ -807,9 +795,10 @@ impl<'a> Printer<'a> {
     /// - Normal elements: rendered with `print_doc_with_indent_resolved()` which strips
     /// - Whitespace-sensitive elements: rendered with `print_doc_with_indent_resolved_preserve_whitespace()` which preserves
     pub(crate) fn into_string(self) -> String {
-        // Park the line-break table back on the arena for the next format
-        // (capacity retained; see `with_embed`).
-        self.arena.park_line_breaks_scratch(self.line_breaks);
+        // Park the line-break scratch back on the arena for the next format
+        // (capacity retained, filled or not; see `with_embed`).
+        self.arena
+            .park_line_breaks_scratch(self.line_breaks.into_scratch());
         self.buffer.into_string()
     }
 

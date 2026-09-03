@@ -33,13 +33,14 @@ mod values;
 use crate::ast::internal::{Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{
-    CommentPosition, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, classify_comment_fast,
+    CommentPosition, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, classify_comment_scan,
     comments_to_emit_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
     },
-    is_format_ignore_directive, printing,
+    is_format_ignore_directive,
+    printing::{self, LineBreaks, LineTable},
 };
 
 /// Printer state for building output
@@ -57,8 +58,10 @@ pub(crate) struct Printer<'a> {
     pub(crate) source: &'a str,
     /// All comments sorted by span.start
     pub(crate) comments: &'a [Comment],
-    /// Precomputed line break positions for O(log n) line boundary lookups
-    pub(crate) line_breaks: &'a [u32],
+    /// The document's line-break table with its builder's verdict — what the two line
+    /// questions below read, by a bounded scan of `source` with the table as the fallback
+    /// (`printing::is_same_line_scan` and siblings).
+    pub(crate) line_table: LineTable<'a>,
     /// True while printing the body of an `@keyframes` block, so the `from`/`to`
     /// keyframe-selector keywords can be lowercased (they're case-insensitive
     /// keywords there; outside keyframes a `from`/`to` type selector is preserved).
@@ -70,20 +73,14 @@ pub(crate) struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with source, comments, and line_breaks
+    /// Create a new printer with source, comments, and the document's line table
     pub(crate) fn new(
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
-        line_breaks: &'a [u32],
+        line_table: LineTable<'a>,
     ) -> Self {
-        Self::with_embed(
-            arena,
-            source,
-            comments,
-            line_breaks,
-            EmbedContext::default(),
-        )
+        Self::with_embed(arena, source, comments, line_table, EmbedContext::default())
     }
 
     /// Create a new printer with the given embedding context.
@@ -91,7 +88,7 @@ impl<'a> Printer<'a> {
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
-        line_breaks: &'a [u32],
+        line_table: LineTable<'a>,
         embed: EmbedContext,
     ) -> Self {
         Self {
@@ -101,7 +98,7 @@ impl<'a> Printer<'a> {
             arena,
             source,
             comments,
-            line_breaks,
+            line_table,
             in_keyframes: false,
             holds_boundary_ws: boundary_ws::source_holds_boundary_ws(source),
         }
@@ -113,7 +110,8 @@ impl<'a> Printer<'a> {
         self.arena
     }
 
-    /// Check if two positions are on the same line (O(log n) binary search)
+    /// Check if two positions are on the same line (a bounded scan of the source, the
+    /// line table as the fallback — `printing::is_same_line_scan`)
     ///
     /// Deliberately the shared (ECMAScript) class, unlike
     /// [`Self::has_blank_line_between`]: this one decides whether a comment TRAILS a node,
@@ -126,7 +124,12 @@ impl<'a> Printer<'a> {
     /// stays a range question and the blank-line rule does not.
     #[inline]
     pub(crate) fn is_same_line(&self, prev_end: u32, curr_start: u32) -> bool {
-        printing::is_same_line_fast(self.line_breaks, prev_end, curr_start)
+        printing::is_same_line_scan(
+            self.source.as_bytes(),
+            self.line_table,
+            prev_end,
+            curr_start,
+        )
     }
 
     /// Is there a blank line between two positions? — the **formatter oracle's** rule, read
@@ -168,7 +171,13 @@ impl<'a> Printer<'a> {
     pub(crate) fn has_blank_line_between(&self, prev_end: u32, curr_start: u32) -> bool {
         let blank = css_blank_line_between(self.source, prev_end, curr_start);
         debug_assert!(
-            !blank || printing::has_blank_line_between_fast(self.line_breaks, prev_end, curr_start),
+            !blank
+                || printing::has_blank_line_between_scan(
+                    self.source.as_bytes(),
+                    self.line_table,
+                    prev_end,
+                    curr_start
+                ),
             "the positional rule accepted a gap the shared line-break table holds no pair for"
         );
         blank
@@ -580,7 +589,13 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            let position = classify_comment_fast(comment, prev_end, curr_start, self.line_breaks);
+            let position = classify_comment_scan(
+                comment,
+                prev_end,
+                curr_start,
+                self.source.as_bytes(),
+                self.line_table,
+            );
 
             // Skip trailing comments (same line as prev node)
             if prev_end > 0 && matches!(position, CommentPosition::Trailing) {
@@ -1142,14 +1157,14 @@ pub(crate) fn format_css_in(
     #[cfg(feature = "comment_check")]
     register_stylesheet_comments(stylesheet, source);
 
-    // Fill the arena-parked line-break table (one warm table across a
-    // multi-file driver's files instead of a fresh Vec per file).
-    let mut line_breaks = arena.take_line_breaks_scratch();
-    printing::build_line_breaks_into(source, &mut line_breaks);
-    let mut printer = Printer::new(arena, source, &stylesheet.comments, &line_breaks);
+    // The document's line verdict, over the arena-parked table (one warm table across a
+    // multi-file driver's files instead of a fresh Vec per file — filled only if a line
+    // question falls back to it).
+    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
+    let mut printer = Printer::new(arena, source, &stylesheet.comments, line_breaks.table());
     printer.print_css_nodes(stylesheet.nodes);
     let output = printer.into_string();
-    arena.park_line_breaks_scratch(line_breaks);
+    arena.park_line_breaks_scratch(line_breaks.into_scratch());
     output
 }
 
@@ -1165,7 +1180,7 @@ pub(crate) fn format_css_in(
 pub(crate) fn format_css_embedded_in(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,
-    line_breaks: &[u32],
+    line_table: LineTable<'_>,
     embed: EmbedContext,
     arena: &DocArena,
 ) -> String {
@@ -1190,7 +1205,7 @@ pub(crate) fn format_css_embedded_in(
         base_indent_offset: 0,
         ..embed
     };
-    let mut printer = Printer::with_embed(arena, source, &stylesheet.comments, line_breaks, embed);
+    let mut printer = Printer::with_embed(arena, source, &stylesheet.comments, line_table, embed);
     printer.indent_level = base;
     printer.print_css_nodes(stylesheet.nodes);
     printer.into_string()
