@@ -807,7 +807,7 @@ table (which caller asks which) is in [comments.md](./comments.md); the function
 | --- | --- | --- | --- |
 | **to emit** — "which must *I* print here?" (owned skipped) | `comments_to_emit_in_range()` | `comments_to_emit_after()` | `has_comments_to_emit_in_range()` |
 | **on page** — "does any comment occupy the page here?" (owned counted) | `comments_on_page_in_range()` | — | `has_comments_on_page_in_range()`, `has_multiline_block_comments_on_page_in_range()` |
-| **in source** — "what bytes are physically here?" (owned counted) | `comments_in_source_range()` | `comments_in_source_after()` | — |
+| **in source** — "what bytes are physically here?" (owned counted) | `comments_in_source_range()` | `comments_in_source_after()`; `comments_in_source_after_comment()` from a comment the caller holds (by index, never through the hint) | — |
 
 Plus the axis-independent primitives:
 

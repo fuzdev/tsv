@@ -10,6 +10,7 @@ use super::{CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use crate::printer::{next_printed_stmt, next_printed_stmt_start, statement_gap_floor};
 use tsv_lang::Span;
+use tsv_lang::comments_in_source_after_comment;
 use tsv_lang::comments_in_source_range;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -483,7 +484,10 @@ impl<'a> Printer<'a> {
         next_start: u32,
     ) -> bool {
         let mut pos = comment.span.end;
-        for c in comments_in_source_range(self.comments, pos, next_start) {
+        for c in comments_in_source_after_comment(self.comments, comment)
+            .iter()
+            .take_while(|c| c.span.end <= next_start)
+        {
             if !self.is_same_line(pos, c.span.start) {
                 return false;
             }

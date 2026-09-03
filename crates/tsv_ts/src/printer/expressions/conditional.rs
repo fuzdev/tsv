@@ -829,7 +829,7 @@ impl<'a> Printer<'a> {
         let blank_before_value = comments.last().is_some_and(|c| {
             self.has_blank_line_between_strict(
                 c.span.end,
-                self.blank_scan_end(c.span.end, value_start),
+                self.blank_scan_end_after(c, value_start),
             )
         });
         TernaryBranchPlacement {

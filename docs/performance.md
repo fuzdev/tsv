@@ -474,6 +474,15 @@ that consume its result, so a by-line excess is a floor. The excess *names* the 
 lever with the layout group (§Reading `cycles:u` below), because a stall row's win converts at
 a ratio the instruction A/B cannot see — in either direction.
 
+**Then type the row by its leaf histogram before pricing it.** `perf script -F ip,sym,symoff
+--hide-call-graph` over the draw, filtered to the symbol, counts the samples per instruction
+(`symoff` added to the symbol's address maps each one, at any symbol size); a ratio row whose
+samples sit on its entry and its `ret` is the call boundary, not a loop, and the loop the row
+was filed for may live in a *different* symbol that inlined the same helper — a comment
+binary search read as one symbol's excess turned out to hold 3 of its 186 samples there and 55%
+of a neighbouring symbol's. Never count a symbol's samples by grepping the callchain dump: its
+return addresses count as callers.
+
 ### 5. `heaptrack` — allocation-site profiling
 
 When `perf` shows time inside malloc/free internals, it can't say _which_

@@ -668,7 +668,7 @@ impl<'a> Printer<'a> {
         comment: &Comment,
         emit_next: u32,
     ) {
-        let next = self.blank_scan_end(comment.span.end, emit_next);
+        let next = self.blank_scan_end_after(comment, emit_next);
         if self.comment_hugs_next(comment) {
             parts.push(self.d().text(" "));
         } else {
@@ -1582,7 +1582,7 @@ impl<'a> Printer<'a> {
             // is the same anchor the selecting gate uses
             // (`comments_force_own_line_between` walks `comments_in_source_range`), so
             // gate and emitter answer the one question identically.
-            let next = self.blank_scan_end(comment.span.end, emit_next);
+            let next = self.blank_scan_end_after(comment, emit_next);
             // An honored directive owns its line on BOTH sides. The after-side is
             // [`Self::comment_hangs_next`], which this asks of every comment; the
             // before-side is this separator read one comment earlier — a single-line block
@@ -1646,7 +1646,7 @@ impl<'a> Printer<'a> {
             );
             parts.push(self.build_comment_doc(comment));
             let emit_next = comments.peek().map_or(end, |n| n.span.start);
-            let next = self.blank_scan_end(comment.span.end, emit_next);
+            let next = self.blank_scan_end_after(comment, emit_next);
             if self.comment_hugs_next(comment) {
                 parts.push(d.text(" "));
             } else {
@@ -1965,8 +1965,8 @@ impl<'a> Printer<'a> {
             // Owned comments are always the glued suffix of a leading run, so this
             // only ever differs at the last emitted comment; bounding `blank_scan_end`
             // at the emit-next keeps it from over-reaching a caller's filtered set.
-            let next = self.blank_scan_end(
-                comment.span.end,
+            let next = self.blank_scan_end_after(
+                comment,
                 comments.peek().map_or(terminal_pos, |c| c.span.start),
             );
             let hugs = match glue {
@@ -2300,7 +2300,7 @@ impl<'a> Printer<'a> {
             comments_to_emit_in_range(self.comments, gap_start, value_start).collect();
         let last = comments.last()?;
         if !comments.iter().all(|c| c.is_block)
-            || self.blank_scan_end(last.span.end, value_start) != value_start
+            || self.blank_scan_end_after(last, value_start) != value_start
             || self.comment_hugs_next(last)
         {
             return None;

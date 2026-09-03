@@ -246,6 +246,25 @@ impl<'a> Printer<'a> {
             .map_or(node_start, |c| c.span.start)
     }
 
+    /// [`Self::blank_scan_end`] from a comment's own end: where a blank-line scan running
+    /// from `comment` up to `node_start` must stop — at its successor when that comment
+    /// lies wholly before `node_start`, else at `node_start`.
+    ///
+    /// The same answer as `blank_scan_end(comment.span.end, node_start)`, taken from the
+    /// comment's own index (`tsv_lang::comments_in_source_after_comment`) rather than from
+    /// a position lookup that is a guaranteed hint miss. ⚠️ Every scan that starts at a
+    /// comment's end goes through here, none through the position form.
+    pub(in crate::printer) fn blank_scan_end_after(
+        &self,
+        comment: &tsv_lang::Comment,
+        node_start: u32,
+    ) -> u32 {
+        tsv_lang::comments_in_source_after_comment(self.comments, comment)
+            .first()
+            .filter(|c| c.span.end <= node_start)
+            .map_or(node_start, |c| c.span.start)
+    }
+
     /// **in source**: where a blank-line scan running *up to* `end` must **start** — past
     /// the last comment physically in `[start, end)`, else at `start`.
     ///
