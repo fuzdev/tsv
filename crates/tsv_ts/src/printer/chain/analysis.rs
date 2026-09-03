@@ -12,7 +12,9 @@ use crate::printer::calls::is_memberish;
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
 use crate::printer::{ParenContext, Printer, is_multiline_template_expression, needs_parens};
 use tsv_lang::source_scan::has_newline_before_position;
-use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_comments_in_range};
+use tsv_lang::{
+    Comment, Span, TAB_WIDTH, has_line_comments_in_range, range_too_narrow_for_a_comment,
+};
 
 //
 // Linearization
@@ -817,6 +819,11 @@ pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printe
 /// pre-bracket break is what keeps it off the index (pinned by
 /// `member/computed_leading_line_comment`). Take this asymmetry as deliberate before
 /// "fixing" the two spellings into one.
+///
+/// Asked of every member node the grouping walks, and the gap is the `.` alone in ~98% of
+/// those asks — so the head is inline: the node's range and the narrow-gap test answer at
+/// the site, and only a gap wide enough to hold a comment pays the call into the search.
+#[inline]
 fn gap_has_line_comment(node: &ChainNode<'_>, comments: &[Comment]) -> bool {
     // Through the hole-honoring seam: the widened range's skipped middle holds comments
     // this node prints none of — an inner member's gap forces its OWN node's group split,
@@ -824,9 +831,17 @@ fn gap_has_line_comment(node: &ChainNode<'_>, comments: &[Comment]) -> bool {
     // split the group for a comment that is not on this gap's line at all.
     node.comment_range().is_some_and(|gap| {
         chain_gap_any(gap, node.paren_gap_skip(), |start, end| {
-            has_line_comments_in_range(comments, start, end)
+            !range_too_narrow_for_a_comment(start, end)
+                && gap_half_has_line_comment(comments, start, end)
         })
     })
+}
+
+/// The search half of [`gap_has_line_comment`] — one outlined copy, so the inline head
+/// carries no search of its own at any of its call sites.
+#[inline(never)]
+fn gap_half_has_line_comment(comments: &[Comment], start: u32, end: u32) -> bool {
+    has_line_comments_in_range(comments, start, end)
 }
 
 /// Check if chain should NOT wrap between first and second groups

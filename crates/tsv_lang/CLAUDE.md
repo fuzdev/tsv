@@ -228,7 +228,13 @@ Shared:
   (`Comment::MIN_SPAN_LEN`, guarded at the three parsers' construction sites) without
   probing the array at all — the printers ask about token-sized gaps by the hundred
   thousand, and the chain grouping's member gap is the `.` alone in the overwhelming
-  majority of its asks
+  majority of its asks. The test is public (`range_too_narrow_for_a_comment`) so a
+  printer's own existence wrapper can ask it *ahead of the call*: the compiler outlines a
+  wrapper spelled at hundreds of sites, and an outlined wrapper is a call on every ask its
+  first two compares would have answered, so `tsv_ts`'s wrappers are two tiers — an
+  `#[inline]` gate and an `#[inline(never)]` search body (measured: ~70% of the
+  narrow asks paid the call, and the split was worth 0.4% of a TypeScript format pass's
+  instructions with no search spelled at any site)
 - `classify_comment()` — Classify as Trailing, LeadingOwnLine, or LeadingInline
 - `classify_comment_scan()` — Same, against the document's line table (a bounded scan of the source, the table as the fallback)
 - `ClassifiedComments::from_range()` — Batch classify all 4 categories in one pass (emit-keyed)
