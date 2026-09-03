@@ -586,7 +586,10 @@ thread_local! {
 /// One question is deliberately NOT asked here: a walk that starts at a comment's own end
 /// takes [`comments_in_source_after_comment`], whose answer is the comment's index — the
 /// hint sits at that comment and would miss by exactly one, into a full search, on every
-/// such ask.
+/// such ask. And the TS printer's existence wrappers answer one question *before* asking
+/// here at all: whether the range lies inside the comment-free window the previous search
+/// landed in (`Printer::comment_free_gap`), a fact about the array that a caller holding
+/// the array can keep without the verification the hint needs.
 ///
 /// Left to the inliner deliberately, and measured: on a 1,666-file TypeScript corpus this
 /// beats `#[inline(never)]` by 0.24 and an explicit inlined-bracket / `#[inline(never)]`-
@@ -648,9 +651,16 @@ pub fn comments_to_emit_in_range(
 /// **to emit**: whether this caller has any comment to print in `[start, end)`.
 #[inline]
 pub fn has_comments_to_emit_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
-    comments_to_emit_in_range(comments, start, end)
-        .next()
-        .is_some()
+    has_comments_to_emit_from(comments, first_index_in_range(comments, start, end), end)
+}
+
+/// **to emit**, from an index the caller already found: whether any comment from
+/// `first_idx` on that ends by `end` is one *this* caller must print —
+/// [`Comment::owned_by_node`] comments **skipped**. The index form of
+/// [`has_comments_to_emit_in_range`]; see [`comments_in_source_from`] for who holds one.
+#[inline]
+pub fn has_comments_to_emit_from(comments: &[Comment], first_idx: usize, end: u32) -> bool {
+    comments_in_source_from(comments, first_idx, end).any(|c| !c.owned_by_node)
 }
 
 /// **to emit**: the comments at or after `pos` that *this* caller must print.
@@ -668,10 +678,15 @@ pub fn comments_to_emit_after(comments: &[Comment], pos: u32) -> impl Iterator<I
 /// [`has_comments_to_emit_in_range`] for anything that decides who *prints*.
 #[inline]
 pub fn has_comments_on_page_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
-    if range_too_narrow_for_a_comment(start, end) {
-        return false;
-    }
-    let first_idx = find_first_comment_from(comments, start);
+    has_comments_on_page_from(comments, first_index_in_range(comments, start, end), end)
+}
+
+/// **on page**, from an index the caller already found: whether the comment at
+/// `first_idx` (the first one starting at or after the asked position) ends by `end` —
+/// [`Comment::owned_by_node`] comments **counted**. The index form of
+/// [`has_comments_on_page_in_range`]; see [`comments_in_source_from`] for who holds one.
+#[inline]
+pub fn has_comments_on_page_from(comments: &[Comment], first_idx: usize, end: u32) -> bool {
     comments.get(first_idx).is_some_and(|c| c.span.end <= end)
 }
 
@@ -706,7 +721,24 @@ pub fn has_multiline_block_comments_on_page_in_range(
     start: u32,
     end: u32,
 ) -> bool {
-    comments_in_source_range(comments, start, end).any(|c| c.is_block && c.multiline)
+    has_multiline_block_comments_on_page_from(
+        comments,
+        first_index_in_range(comments, start, end),
+        end,
+    )
+}
+
+/// **on page**, from an index the caller already found: whether any comment from
+/// `first_idx` on that ends by `end` is a multi-line block comment —
+/// [`Comment::owned_by_node`] comments **counted**. The index form of
+/// [`has_multiline_block_comments_on_page_in_range`].
+#[inline]
+pub fn has_multiline_block_comments_on_page_from(
+    comments: &[Comment],
+    first_idx: usize,
+    end: u32,
+) -> bool {
+    comments_in_source_from(comments, first_idx, end).any(|c| c.is_block && c.multiline)
 }
 
 /// Whether any **line** comment lies in `[start, end)`.
@@ -718,7 +750,14 @@ pub fn has_multiline_block_comments_on_page_in_range(
 /// (If a line comment ever becomes ownable, this function must grow an axis.)
 #[inline]
 pub fn has_line_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
-    comments_in_source_range(comments, start, end).any(|c| !c.is_block)
+    has_line_comments_from(comments, first_index_in_range(comments, start, end), end)
+}
+
+/// Whether any **line** comment lies from index `first_idx` on, ending by `end` — the
+/// index form of [`has_line_comments_in_range`], axis-free for the same reason.
+#[inline]
+pub fn has_line_comments_from(comments: &[Comment], first_idx: usize, end: u32) -> bool {
+    comments_in_source_from(comments, first_idx, end).any(|c| !c.is_block)
 }
 
 /// **in source**: every comment physically inside `[start, end)` —
@@ -734,11 +773,34 @@ pub fn comments_in_source_range(
     start: u32,
     end: u32,
 ) -> impl Iterator<Item = &Comment> {
-    let first_idx = if range_too_narrow_for_a_comment(start, end) {
+    comments_in_source_from(comments, first_index_in_range(comments, start, end), end)
+}
+
+/// The index every range lookup starts its walk at: the first comment starting at or
+/// after `start`, or `comments.len()` when `[start, end)` is too narrow to hold one
+/// ([`range_too_narrow_for_a_comment`]) — so the sorted array is never probed for a
+/// token-sized gap.
+#[inline]
+fn first_index_in_range(comments: &[Comment], start: u32, end: u32) -> usize {
+    if range_too_narrow_for_a_comment(start, end) {
         comments.len()
     } else {
         find_first_comment_from(comments, start)
-    };
+    }
+}
+
+/// **in source**: every comment from index `first_idx` on that ends by `end` — the tail
+/// of [`comments_in_source_range`] for a caller that already holds the range's first
+/// index from [`find_first_comment_from`] (and reads something else off it, such as the
+/// comment-free gap around it) rather than searching twice. The `has_*_from` forms
+/// beside each axis's range lookup are its existence checks, each keeping that axis's
+/// one spelling of which comments count.
+#[inline]
+pub fn comments_in_source_from(
+    comments: &[Comment],
+    first_idx: usize,
+    end: u32,
+) -> impl Iterator<Item = &Comment> {
     comments[first_idx..]
         .iter()
         .take_while(move |c| c.span.end <= end)
