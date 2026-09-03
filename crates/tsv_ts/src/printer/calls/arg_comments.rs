@@ -9,7 +9,6 @@ use smallvec::SmallVec;
 
 use super::super::{LeadingGlue, Printer};
 use crate::ast::internal;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -408,7 +407,7 @@ pub(super) fn should_force_expansion_for_comments(
     // `next_code_pos` bounds the gap, so an item always follows: every caller scans either
     // the `(`→first-argument gap or an inter-argument one, and the trailing position past
     // the last argument belongs to `Printer::has_own_line_block_comment_before_closer`.
-    for comment in comments_to_emit_in_range(printer.comments, start, next_code_pos) {
+    for comment in printer.comments_to_emit_between(start, next_code_pos) {
         if comment.is_block && printer.block_comment_owns_its_line(comment, true) {
             return true;
         }
@@ -1017,7 +1016,7 @@ impl<'a> PartitionedComments<'a> {
             }
             run_end = comment.span.end;
         }
-        let leading = comments_to_emit_in_range(printer.comments, run_end, end).collect();
+        let leading = printer.comments_to_emit_between(run_end, end).collect();
         Self {
             trailing_line,
             trailing_block,

@@ -6,7 +6,6 @@
 // - Signature parameters (shared with type members)
 // - Return type annotations
 
-use super::super::comments_to_emit_in_range;
 use super::super::expressions::functions::{has_huggable_type_annotation, is_huggable_pattern};
 use super::helpers::type_args_should_wrap_for_return_type;
 use super::{BlankRule, CommentSpacing, Printer};
@@ -595,8 +594,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![];
         let mut last_is_line = false;
         if let Some(close_after) = close_paren_after {
-            for comment in comments_to_emit_in_range(self.comments, close_after, return_type_start)
-            {
+            for comment in self.comments_to_emit_between(close_after, return_type_start) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
                 // A `//` line comment can't stay inline — it would swallow the
@@ -837,11 +835,9 @@ impl<'a> Printer<'a> {
                 } else {
                     // Last param → `)`: no comma is emitted (trailingComma 'none'), so the
                     // whole gap trails the param in source order.
-                    for comment in comments_to_emit_in_range(
-                        self.comments,
-                        param_end,
-                        close_paren_pos.unwrap_or(param_end),
-                    ) {
+                    for comment in self
+                        .comments_to_emit_between(param_end, close_paren_pos.unwrap_or(param_end))
+                    {
                         param_parts.push(d.text(" "));
                         param_parts.push(self.build_comment_doc(comment));
                     }

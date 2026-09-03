@@ -7,7 +7,6 @@
 // - ConstructSignature: `new (args): Return`
 // - IndexSignature: `[key: Type]: Value`
 
-use super::super::comments_to_emit_in_range;
 use super::CommentSpacing;
 use super::Printer;
 use crate::ast::internal::{self, TSTypeElement};
@@ -602,10 +601,11 @@ impl<'a> Printer<'a> {
                 let mut lead_parts = DocBuf::new();
                 self.push_leading_comment_run(
                     &mut lead_parts,
-                    comments_to_emit_in_range(self.comments, open + 1, key_start).filter(|c| {
-                        !bracket_pull_pos
-                            .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c))
-                    }),
+                    self.comments_to_emit_between(open + 1, key_start)
+                        .filter(|c| {
+                            !bracket_pull_pos
+                                .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c))
+                        }),
                     key_start,
                     LeadingGlue::Adjacent,
                     None,
@@ -626,7 +626,7 @@ impl<'a> Printer<'a> {
                 let mut tparts = DocBuf::new();
                 let mut has_line = false;
                 let mut prev = search_start;
-                for comment in comments_to_emit_in_range(self.comments, search_start, cp) {
+                for comment in self.comments_to_emit_between(search_start, cp) {
                     if self.is_same_line(prev, comment.span.start) {
                         tparts.push(d.text(" "));
                     } else {

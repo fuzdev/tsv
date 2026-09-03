@@ -15,7 +15,6 @@ use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::expressions::operators::SeqLayout;
 use smallvec::smallvec;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{
@@ -607,9 +606,9 @@ impl<'a> Printer<'a> {
         // `split_terminator_gap_comments`.
         // Axis-free: the rule looks only at LINE comments, and ownership binds only a block
         // comment (`owned ⇒ is_block`), so skipping and counting give the same answer.
-        let has_operand_line_comment =
-            comments_to_emit_in_range(self.comments, expr_end, semicolon_pos)
-                .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
+        let has_operand_line_comment = self
+            .comments_to_emit_between(expr_end, semicolon_pos)
+            .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
         let mut inline_trailing = DocBuf::new();
         let after_semi = self.split_terminator_gap_comments(
             &mut inline_trailing,

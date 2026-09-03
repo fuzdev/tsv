@@ -183,11 +183,13 @@ than as plausible code. See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md
 **to emit** — "which comments must *I* print here?" — **skips** owned:
 
 - `comments_to_emit_in_range()` / `has_comments_to_emit_in_range()` / `comments_to_emit_after()`
+  (index twins `comments_to_emit_from()` / `has_comments_to_emit_from()`)
 
 **on page** — "does any comment occupy the page here?" — **counts** owned. Every layout gate
 (break / expand / hug / paren / fast-path / force-multiline):
 
-- `has_comments_on_page_in_range()` / `has_multiline_block_comments_on_page_in_range()`
+- `comments_on_page_in_range()` / `has_comments_on_page_in_range()` / `has_multiline_block_comments_on_page_in_range()`
+  (index twins `comments_on_page_from()` / `has_comments_on_page_from()` / `has_multiline_block_comments_on_page_from()`)
 
 **in source** — "what comment bytes are physically here?" — **counts** owned. Every cursor
 (blank-line scan, offset, `prev_end`):

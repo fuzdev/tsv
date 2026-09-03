@@ -586,10 +586,10 @@ thread_local! {
 /// One question is deliberately NOT asked here: a walk that starts at a comment's own end
 /// takes [`comments_in_source_after_comment`], whose answer is the comment's index — the
 /// hint sits at that comment and would miss by exactly one, into a full search, on every
-/// such ask. And the TS printer's existence wrappers answer one question *before* asking
-/// here at all: whether the range lies inside the comment-free window the previous search
-/// landed in (`Printer::comment_free_gap`), a fact about the array that a caller holding
-/// the array can keep without the verification the hint needs.
+/// such ask. And the TS printer's existence wrappers and range walks answer one question
+/// *before* asking here at all: whether the range lies inside the comment-free window the
+/// previous search landed in (`Printer::comment_free_gap`), a fact about the array that a
+/// caller holding the array can keep without the verification the hint needs.
 ///
 /// Left to the inliner deliberately, and measured: on a 1,666-file TypeScript corpus this
 /// beats `#[inline(never)]` by 0.24 and an explicit inlined-bracket / `#[inline(never)]`-
@@ -597,6 +597,12 @@ thread_local! {
 /// the split. Both hand-pinned shapes force the search to a call the hit path does not
 /// need; left alone, the bracket compares landing ahead of it let **369** printer symbols
 /// shrink (`build_statement_doc` by 5,124 B), for `.text` 42 KB *below* the plain search's.
+/// That verdict belongs to the population that reaches this function ungated. Behind the
+/// TS printer's window gate, which answers four range walks in five before they get here,
+/// the same corpus read the opposite by the same margin: one outlined search body
+/// (`Printer::first_index_between_wide`) beat the search inlined at its 185 sites by 0.24
+/// points and 27 KB of `.text`. An attribute here is re-measured whenever a gate changes who
+/// reaches the body.
 #[inline]
 pub fn find_first_comment_from(comments: &[Comment], pos: u32) -> usize {
     FIRST_COMMENT_HINT.with(|hint| {
@@ -645,7 +651,20 @@ pub fn comments_to_emit_in_range(
     start: u32,
     end: u32,
 ) -> impl Iterator<Item = &Comment> {
-    comments_in_source_range(comments, start, end).filter(|c| !c.owned_by_node)
+    comments_to_emit_from(comments, first_index_in_range(comments, start, end), end)
+}
+
+/// **to emit**, from an index the caller already found: the comments from `first_idx` on
+/// that end by `end` and that *this* caller must print — [`Comment::owned_by_node`]
+/// comments **skipped**. The index form of [`comments_to_emit_in_range`]; see
+/// [`comments_in_source_from`] for who holds one.
+#[inline]
+pub fn comments_to_emit_from(
+    comments: &[Comment],
+    first_idx: usize,
+    end: u32,
+) -> impl Iterator<Item = &Comment> {
+    comments_in_source_from(comments, first_idx, end).filter(|c| !c.owned_by_node)
 }
 
 /// **to emit**: whether this caller has any comment to print in `[start, end)`.
@@ -660,7 +679,9 @@ pub fn has_comments_to_emit_in_range(comments: &[Comment], start: u32, end: u32)
 /// [`has_comments_to_emit_in_range`]; see [`comments_in_source_from`] for who holds one.
 #[inline]
 pub fn has_comments_to_emit_from(comments: &[Comment], first_idx: usize, end: u32) -> bool {
-    comments_in_source_from(comments, first_idx, end).any(|c| !c.owned_by_node)
+    comments_to_emit_from(comments, first_idx, end)
+        .next()
+        .is_some()
 }
 
 /// **to emit**: the comments at or after `pos` that *this* caller must print.
@@ -707,7 +728,20 @@ pub fn comments_on_page_in_range(
     start: u32,
     end: u32,
 ) -> impl Iterator<Item = &Comment> {
-    comments_in_source_range(comments, start, end)
+    comments_on_page_from(comments, first_index_in_range(comments, start, end), end)
+}
+
+/// **on page**, from an index the caller already found: every comment from `first_idx`
+/// on that ends by `end` — [`Comment::owned_by_node`] comments **counted**. The index
+/// form of [`comments_on_page_in_range`], and [`comments_in_source_from`] by construction
+/// for the same reason (two questions, one membership set).
+#[inline]
+pub fn comments_on_page_from(
+    comments: &[Comment],
+    first_idx: usize,
+    end: u32,
+) -> impl Iterator<Item = &Comment> {
+    comments_in_source_from(comments, first_idx, end)
 }
 
 /// **on page**: whether a multi-line block comment occupies the page in `[start, end)` —
@@ -779,7 +813,8 @@ pub fn comments_in_source_range(
 /// The index every range lookup starts its walk at: the first comment starting at or
 /// after `start`, or `comments.len()` when `[start, end)` is too narrow to hold one
 /// ([`range_too_narrow_for_a_comment`]) — so the sorted array is never probed for a
-/// token-sized gap.
+/// token-sized gap. (The TS printer's own walks start at `Printer::first_index_between`
+/// instead, which also reads its comment-free window ahead of the search.)
 #[inline]
 fn first_index_in_range(comments: &[Comment], start: u32, end: u32) -> usize {
     if range_too_narrow_for_a_comment(start, end) {
@@ -792,9 +827,10 @@ fn first_index_in_range(comments: &[Comment], start: u32, end: u32) -> usize {
 /// **in source**: every comment from index `first_idx` on that ends by `end` — the tail
 /// of [`comments_in_source_range`] for a caller that already holds the range's first
 /// index from [`find_first_comment_from`] (and reads something else off it, such as the
-/// comment-free gap around it) rather than searching twice. The `has_*_from` forms
-/// beside each axis's range lookup are its existence checks, each keeping that axis's
-/// one spelling of which comments count.
+/// comment-free gap around it) rather than searching twice. The `*_from` twins beside
+/// each axis's range lookup — [`comments_to_emit_from`] / [`comments_on_page_from`] and
+/// the `has_*_from` existence checks — each keep that axis's one spelling of which
+/// comments count.
 #[inline]
 pub fn comments_in_source_from(
     comments: &[Comment],

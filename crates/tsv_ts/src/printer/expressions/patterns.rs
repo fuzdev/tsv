@@ -17,7 +17,6 @@ use crate::printer::{
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -672,7 +671,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         let mut parts = DocBuf::new();
-        for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
+        for comment in self.comments_to_emit_between(prev_end, boundary) {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
@@ -715,7 +714,7 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         let mut last_pos = self.element_shell_end(prev_end, boundary);
         let mut first = true;
-        for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
+        for comment in self.comments_to_emit_between(prev_end, boundary) {
             let blanks_measurable = !(first && past_elision);
             first = false;
             if self.is_same_line(last_pos, comment.span.start) {
@@ -801,7 +800,7 @@ impl<'a> Printer<'a> {
 
             if has_comments {
                 // Check for line comments
-                for comment in comments_to_emit_in_range(self.comments, prev_end, elem_start) {
+                for comment in self.comments_to_emit_between(prev_end, elem_start) {
                     if !comment.is_block {
                         has_line_comments = true;
                         break;
@@ -820,7 +819,7 @@ impl<'a> Printer<'a> {
 
         // Check comments after last element
         if has_comments {
-            for comment in comments_to_emit_in_range(self.comments, prev_end, collection_end) {
+            for comment in self.comments_to_emit_between(prev_end, collection_end) {
                 if !comment.is_block {
                     return (true, has_blank_lines);
                 }
@@ -1268,7 +1267,7 @@ impl<'a> Printer<'a> {
         // sides partition the gap. A line comment routes to the expanded path, so only
         // blocks reach here.
         if has_comments && arr.elements.last().is_some_and(Option::is_none) {
-            for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
+            for comment in self.comments_to_emit_between(prev_end, boundary) {
                 if comment.is_block {
                     parts.push(self.build_comment_doc(comment));
                 }

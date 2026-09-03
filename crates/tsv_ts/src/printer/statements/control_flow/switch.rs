@@ -10,7 +10,6 @@ use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer, next_printed_stmt_start,
 };
 use smallvec::smallvec;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
@@ -74,7 +73,8 @@ impl<'a> Printer<'a> {
             // advanced past them via `find_end_with_trailing_comments` (the case-cursor
             // update below), so this range holds only genuine own-line comments.
             let comments: CommentVec<'_> = if body_has_comments {
-                comments_to_emit_in_range(self.comments, prev_end, case.span.start).collect()
+                self.comments_to_emit_between(prev_end, case.span.start)
+                    .collect()
             } else {
                 CommentVec::new()
             };
@@ -159,7 +159,7 @@ impl<'a> Printer<'a> {
             if stmt.cases.is_empty() {
                 self.push_dangling_comment_run(
                     &mut case_parts,
-                    comments_to_emit_in_range(self.comments, prev_end, switch_body_end),
+                    self.comments_to_emit_between(prev_end, switch_body_end),
                 );
             } else {
                 self.push_trailing_body_comments(&mut case_parts, prev_end, switch_body_end, false);
@@ -393,7 +393,8 @@ impl<'a> Printer<'a> {
         // rather than of the label's own line: the walk above can carry the run onto a
         // multiline block's closing line, and it is the RENDERED line the block competes for.
         let label_trailing_line_comment = body_has_comments
-            && comments_to_emit_in_range(self.comments, case_label_end, label_trailing_end)
+            && self
+                .comments_to_emit_between(case_label_end, label_trailing_end)
                 .any(|c| !c.is_block);
 
         // Consequent statements (indented from case line)

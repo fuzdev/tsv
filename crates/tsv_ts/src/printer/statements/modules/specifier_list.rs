@@ -6,10 +6,10 @@
 use super::header_comments::is_only_whitespace_and_comments;
 use super::{MODULE_KW_LEN, MODULE_TYPE_KW_LEN, Printer};
 use crate::ast::internal;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Span, comments_to_emit_in_range};
 
 /// The source offsets that bracket a braced specifier list — the window in which
 /// `push_braced_specifier_list` locates the `{ … }`, and the wider one its
@@ -590,7 +590,7 @@ impl<'a> Printer<'a> {
             let gap_start = prev_end;
 
             // Leading block comments before this item (after prev comma or `{`)
-            for comment in comments_to_emit_in_range(self.comments, prev_end, item_start) {
+            for comment in self.comments_to_emit_between(prev_end, item_start) {
                 if comment.is_block {
                     // One text node (`/*content*/ `; full span = the verbatim
                     // comment, delimiters included), like the lists.rs twins.
@@ -779,7 +779,7 @@ impl<'a> Printer<'a> {
                 // break, the same answer every other end-of-container run gives.
                 self.push_trailing_comment_run(
                     &mut parts,
-                    comments_to_emit_in_range(self.comments, trailing.end_pos, end_boundary),
+                    self.comments_to_emit_between(trailing.end_pos, end_boundary),
                     trailing.end_pos,
                 );
             }

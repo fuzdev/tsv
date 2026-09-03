@@ -58,7 +58,6 @@ use helpers::type_needs_parens_for_prefix_operator;
 use helpers::type_needs_parens_in_union_or_intersection;
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{find_char_skipping_comments, skip_comment};
@@ -874,9 +873,9 @@ impl<'a> Printer<'a> {
             return smallvec![];
         }
         let inner = unwrap_parenthesized(ty);
-        let lead: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, ty.span().start + 1, inner.span().start)
-                .collect();
+        let lead: CommentVec<'_> = self
+            .comments_to_emit_between(ty.span().start + 1, inner.span().start)
+            .collect();
         // Non-empty + all line comments ⇒ ≥1 leading line comment and no block comment
         // in the leading gap; the trailing check rules out a comment between the inner
         // and the outermost `)`.
@@ -1447,9 +1446,7 @@ impl<'a> Printer<'a> {
                 // The in-source cursor the own-line question is asked against — it
                 // advances over every comment emitted here, deferred or not.
                 let mut prev_end = trailing_start;
-                for comment in
-                    comments_to_emit_in_range(self.comments, trailing_start, trailing_end)
-                {
+                for comment in self.comments_to_emit_between(trailing_start, trailing_end) {
                     // Everything defers at a value position, so the break that separates
                     // two of them must ride INSIDE the `line_suffix` — a real one between
                     // them would land in the enclosing construct instead.

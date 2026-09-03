@@ -31,7 +31,6 @@ use super::expressions::operators::SeqLayout;
 use crate::ast::internal::{self, Expression, Statement};
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -323,8 +322,7 @@ impl<'a> Printer<'a> {
 
         // The `(`→expression gap, resolved in one place so the gate below and the two
         // emitters that can claim it cannot read different ranges.
-        let paren_gap =
-            || comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start);
+        let paren_gap = || self.comments_to_emit_between(stmt.span.start + 1, expr_start);
         // Deliberately **to emit**, not on-page: this branch also *prints* the comments it
         // finds. A block glued to the *expression* is owned by it, rides inside its doc and
         // is skipped here — which is what keeps `(/* c */ expr)` flat.

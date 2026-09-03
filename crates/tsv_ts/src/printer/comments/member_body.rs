@@ -18,7 +18,6 @@
 use super::{CommentVec, Printer};
 use crate::printer::MemberGap;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -179,8 +178,9 @@ impl<'a> Printer<'a> {
             let leading: CommentVec<'_> = if !body.has_comments {
                 CommentVec::new()
             } else {
-                let all: CommentVec<'_> =
-                    comments_to_emit_in_range(self.comments, prev_end, member_start).collect();
+                let all: CommentVec<'_> = self
+                    .comments_to_emit_between(prev_end, member_start)
+                    .collect();
                 if is_first {
                     // A first member has no previous member, so it can never be the
                     // deferring case; the only exclusion is what the `{` line pulled.

@@ -40,7 +40,6 @@ use crate::printer::{
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -497,7 +496,7 @@ impl<'a> Printer<'a> {
             || frozen_inner.is_some()
         {
             let mut parts: DocBuf = smallvec![d.hardline()];
-            for comment in comments_to_emit_in_range(self.comments, open + 1, inner_start) {
+            for comment in self.comments_to_emit_between(open + 1, inner_start) {
                 parts.push(self.build_comment_doc(comment));
                 // A line comment runs to end-of-line, so it must break; a block
                 // comment hugs the next token inline (`/** @type {B} */ (x)`) — unless
@@ -1056,8 +1055,7 @@ impl<'a> Printer<'a> {
                 && !self.paren_retains_for_trailing_run(type_annotation)
                 && self.has_comments_to_emit_between(inner.span().end, type_annotation.span().end)
             {
-                for comment in comments_to_emit_in_range(self.comments, kw_end, inner.span().start)
-                {
+                for comment in self.comments_to_emit_between(kw_end, inner.span().start) {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.text(" "));
                 }

@@ -50,11 +50,11 @@ pub(crate) use paren::{ParenLeadingValue, paren_pair_keeps_leading_run, paren_sh
 pub(super) use super::{Printer, calls, layout};
 
 use smallvec::SmallVec;
+use tsv_lang::Comment;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing;
 use tsv_lang::source_scan::has_newline_after_position;
-use tsv_lang::{Comment, comments_to_emit_in_range};
 
 /// Small stack-allocated vector of comment references. Inline capacity 8 keeps
 /// the common comment gaps off the heap: 0–2 comments are the bulk, and a
@@ -835,7 +835,7 @@ impl<'a> Printer<'a> {
     ) -> u32 {
         let mut pos = anchor;
         let mut prev_comment: Option<&Comment> = None;
-        for comment in comments_to_emit_in_range(self.comments, anchor, end) {
+        for comment in self.comments_to_emit_between(anchor, end) {
             if prev_comment.is_none() && !self.comment_has_newline_between(pos, comment.span.start)
             {
                 // On the anchor's own line (`x /* c */`, `a && // c`): it trails there —
@@ -892,8 +892,9 @@ impl<'a> Printer<'a> {
         continuation: Option<DocId>,
     ) {
         let d = self.d();
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, prev_end, next_start).collect();
+        let comments: CommentVec<'_> = self
+            .comments_to_emit_between(prev_end, next_start)
+            .collect();
         // Everything before the first line comment trails the previous item, and the
         // comma is placed there rather than at its authored offset — a `//` runs to
         // EOL, so a comma after it would be commented out, and any block between the
@@ -987,7 +988,8 @@ impl<'a> Printer<'a> {
     /// [`Printer::param_trailing_line_comment`] — since a drift between them is a weld at
     /// whichever one drifted, and the weld is lossless-looking to every structural guard.
     pub(crate) fn gap_emitted_line_comment_before(&self, gap_start: u32, pos: u32) -> bool {
-        comments_to_emit_in_range(self.comments, gap_start, pos).any(|c| !c.is_block)
+        self.comments_to_emit_between(gap_start, pos)
+            .any(|c| !c.is_block)
     }
 
     /// A block comment after the comma that sits on the comma's own line (no
@@ -1018,7 +1020,7 @@ impl<'a> Printer<'a> {
     /// the site's leading run (a block hugging the next item leads it).
     pub(crate) fn push_before_comma_blocks(&self, parts: &mut DocBuf, start: u32, comma_pos: u32) {
         let d = self.d();
-        for comment in comments_to_emit_in_range(self.comments, start, comma_pos) {
+        for comment in self.comments_to_emit_between(start, comma_pos) {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
@@ -1066,7 +1068,7 @@ impl<'a> Printer<'a> {
         // (docs/comments.md §the three axes), so it advances over every comment emitted
         // here, not just the ones that broke.
         let mut prev_end = start;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             // The *comment* line-break table, never the layout one: this decides whether
             // a `//` is followed by a break, so it must stay real under the canonical
             // reprint, where an erased read would re-weld the run.
@@ -1129,7 +1131,7 @@ impl<'a> Printer<'a> {
         end: u32,
     ) -> (Option<DocId>, u32) {
         let d = self.d();
-        let Some(comment) = comments_to_emit_in_range(self.comments, start, end).next() else {
+        let Some(comment) = self.comments_to_emit_between(start, end).next() else {
             return (None, start);
         };
         // ⚠️ The COMMENT line-break table, never the layout one: this is a comment-adjacency
@@ -1182,7 +1184,8 @@ impl<'a> Printer<'a> {
         pulled_end: u32,
         gap_end: u32,
     ) {
-        let next_start = comments_to_emit_in_range(self.comments, pulled_end, gap_end)
+        let next_start = self
+            .comments_to_emit_between(pulled_end, gap_end)
             .next()
             .map_or(gap_end, |c| c.span.start);
         // ⚠️ The scan measures a DISTANCE, so it must not span a delimiter glyph the
@@ -1284,7 +1287,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         let d = self.d();
         let mut has_line_comment = false;
-        let run: CommentVec<'_> = comments_to_emit_in_range(self.comments, start, end).collect();
+        let run: CommentVec<'_> = self.comments_to_emit_between(start, end).collect();
         for (i, comment) in run.iter().enumerate() {
             if comment.is_block {
                 parts.push(self.build_comment_doc(comment));
@@ -1334,7 +1337,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut trailing_parts = DocBuf::new();
         let mut own_line_parts = DocBuf::new();
-        for comment in comments_to_emit_in_range(self.comments, anchor, end) {
+        for comment in self.comments_to_emit_between(anchor, end) {
             if self.is_same_line(anchor, comment.span.start) {
                 trailing_parts.push(self.build_trailing_comment_doc(comment));
             } else {
@@ -1374,7 +1377,7 @@ impl<'a> Printer<'a> {
     ) -> Option<u32> {
         let d = self.d();
         let mut resume = None;
-        for comment in comments_to_emit_in_range(self.comments, comma_pos, next_start) {
+        for comment in self.comments_to_emit_between(comma_pos, next_start) {
             if !self.is_stranded_after_comma_block(comment, comma_pos, next_start) {
                 break;
             }
@@ -1458,7 +1461,7 @@ impl<'a> Printer<'a> {
             && tsv_lang::comment_ledger::comment_check_enabled()
         {
             let site = std::panic::Location::caller();
-            for c in comments_to_emit_in_range(self.comments, start, end) {
+            for c in self.comments_to_emit_between(start, end) {
                 if !c.is_block {
                     tsv_lang::comment_ledger::record_filtered_skip(self.source, c.span, site);
                 }
@@ -1468,7 +1471,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // Check if any comments exist in range (considering filter)
-        let has_comments = comments_to_emit_in_range(self.comments, start, end)
+        let has_comments = self
+            .comments_to_emit_between(start, end)
             .any(|c| !matches!(filter, CommentFilter::BlockOnly) || c.is_block);
 
         if !has_comments {
@@ -1488,7 +1492,7 @@ impl<'a> Printer<'a> {
         let mut prev_was_line = false;
         let mut prev_end: Option<u32> = None;
         let mut first = true;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             // Apply filter
             if matches!(filter, CommentFilter::BlockOnly) && !comment.is_block {
                 continue;
@@ -1572,7 +1576,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_trailing_comments_hang_next(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
+        let mut comments = self.comments_to_emit_between(start, end).peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
             let emit_next = comments.peek().map_or(end, |n| n.span.start);
@@ -1638,7 +1642,7 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         let d = self.d();
         let mut parts = DocBuf::new();
-        let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
+        let mut comments = self.comments_to_emit_between(start, end).peekable();
         while let Some(comment) = comments.next() {
             debug_assert!(
                 comment.is_block,
@@ -2296,8 +2300,9 @@ impl<'a> Printer<'a> {
         gap_start: u32,
         value_start: u32,
     ) -> Option<CommentVec<'a>> {
-        let comments: CommentVec<'a> =
-            comments_to_emit_in_range(self.comments, gap_start, value_start).collect();
+        let comments: CommentVec<'a> = self
+            .comments_to_emit_between(gap_start, value_start)
+            .collect();
         let last = comments.last()?;
         if !comments.iter().all(|c| c.is_block)
             || self.blank_scan_end_after(last, value_start) != value_start
@@ -2376,7 +2381,7 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         let forces_break = self.push_leading_comment_run(
             &mut parts,
-            comments_to_emit_in_range(self.comments, start, end)
+            self.comments_to_emit_between(start, end)
                 .filter(|c| !skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, c))),
             end,
             glue,
@@ -2453,8 +2458,9 @@ impl<'a> Printer<'a> {
         if self.has_line_comments_between(eq_pos + 1, value_start) {
             // Line comment → mandatory break. Partition the run: a comment on the
             // `=`'s line trails it; the rest lead the value on their own lines.
-            let after_eq: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, eq_pos + 1, value_start).collect();
+            let after_eq: CommentVec<'_> = self
+                .comments_to_emit_between(eq_pos + 1, value_start)
+                .collect();
             let mut trailing = DocBuf::new();
             let mut leading = DocBuf::new();
             for (ci, comment) in after_eq.iter().enumerate() {

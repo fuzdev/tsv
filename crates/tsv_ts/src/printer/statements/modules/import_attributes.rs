@@ -7,7 +7,6 @@ use super::specifier_list::{CommaListBlanks, CommaListSpans};
 use crate::ast::internal;
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -237,7 +236,7 @@ impl<'a> Printer<'a> {
     /// not the whole clause. The `:`→value gap is one of the two regions it so skips —
     /// the key→`:` gap is the other, and takes the inline-trailing path instead.
     fn has_own_line_value_gap_comment(&self, colon_pos: u32, value_start: u32) -> bool {
-        tsv_lang::comments_in_source_range(self.comments, colon_pos + 1, value_start)
+        self.comments_in_source_between(colon_pos + 1, value_start)
             .any(|c| self.comment_isolated_on_its_line(c))
     }
 
@@ -265,13 +264,14 @@ impl<'a> Printer<'a> {
         brace_start: u32,
         brace_close: u32,
     ) -> bool {
-        tsv_lang::comments_in_source_range(self.comments, brace_start + 1, brace_close).any(|c| {
-            let inside_attribute = attributes.iter().any(|a| a.span.contains(c.span));
-            if inside_attribute {
-                return false;
-            }
-            self.comment_isolated_on_its_line(c)
-        })
+        self.comments_in_source_between(brace_start + 1, brace_close)
+            .any(|c| {
+                let inside_attribute = attributes.iter().any(|a| a.span.contains(c.span));
+                if inside_attribute {
+                    return false;
+                }
+                self.comment_isolated_on_its_line(c)
+            })
     }
 
     /// Build doc for an import attribute key: a bare identifier emits verbatim;
@@ -354,7 +354,7 @@ impl<'a> Printer<'a> {
             // takes the same layout, for the same reason it does in an object
             // property: collapsing it onto the `:` line would move it.
             let mut cont: DocBuf = smallvec![d.hardline()];
-            for comment in comments_to_emit_in_range(self.comments, after_colon, value_start) {
+            for comment in self.comments_to_emit_between(after_colon, value_start) {
                 cont.push(self.build_comment_doc(comment));
                 cont.push(d.hardline());
             }
@@ -364,7 +364,7 @@ impl<'a> Printer<'a> {
             // Block comments only (or none): trail the `:` inline (` /* c */ `),
             // matching prettier when the attribute fits on one line.
             parts.push(d.text(" "));
-            for comment in comments_to_emit_in_range(self.comments, after_colon, value_start) {
+            for comment in self.comments_to_emit_between(after_colon, value_start) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }

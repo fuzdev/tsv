@@ -5,7 +5,6 @@
 // - Intersection types: `A & B & C`
 // - Comment handling between type members
 
-use super::super::comments_to_emit_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
     intersection_has_huggable_last_type, is_huggable_type, outermost_paren,
@@ -130,8 +129,9 @@ impl<'a> Printer<'a> {
             return smallvec![];
         }
         let inner = unwrap_parenthesized(t);
-        let leading: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, t.span().start, inner.span().start).collect();
+        let leading: CommentVec<'_> = self
+            .comments_to_emit_between(t.span().start, inner.span().start)
+            .collect();
         if leading.iter().any(|c| !c.is_block) {
             leading
         } else {
@@ -264,7 +264,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
         let mut breaks = false;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             if !comment.is_block {
                 continue;
             }
@@ -488,8 +488,9 @@ impl<'a> Printer<'a> {
         if union.span.start != first_start {
             return None;
         }
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, gap_start, first_start).collect();
+        let comments: CommentVec<'_> = self
+            .comments_to_emit_between(gap_start, first_start)
+            .collect();
         let (first, last) = (comments.first()?, comments.last()?);
         if !comments.iter().all(|c| c.is_block)
             || !self.is_same_line(last.span.end, self.blank_scan_end_after(last, first_start))
@@ -1048,7 +1049,7 @@ impl<'a> Printer<'a> {
                     // partition of the run — see [`Self::union_gap_inline_run_start`].
                     let after_pipe = pipe_pos + 1;
                     let run: CommentVec<'_> =
-                        comments_to_emit_in_range(self.comments, after_pipe, gap_end).collect();
+                        self.comments_to_emit_between(after_pipe, gap_end).collect();
                     let inline_start = self.union_gap_inline_run_start(&run);
                     let (own_line, inline) = run.split_at(inline_start);
                     // A blank line the author left *before* the first own-line comment
@@ -1202,7 +1203,7 @@ impl<'a> Printer<'a> {
 
             // Trailing comments on last type
             if i == union.types.len() - 1 {
-                for comment in comments_to_emit_in_range(self.comments, type_end, union.span.end) {
+                for comment in self.comments_to_emit_between(type_end, union.span.end) {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
@@ -1784,12 +1785,9 @@ impl<'a> Printer<'a> {
                 // left to the body while an enclosing gap had widened over the shell, the
                 // gap's own comments printed TWICE. `build_intersection_leading_gap_line_comment_doc`
                 // states the identical composition for the route a `//` in that gap takes.
-                let mut run: CommentVec<'_> = comments_to_emit_in_range(
-                    self.comments,
-                    intersection.span.start,
-                    first_member.span().start,
-                )
-                .collect();
+                let mut run: CommentVec<'_> = self
+                    .comments_to_emit_between(intersection.span.start, first_member.span().start)
+                    .collect();
                 run.extend(head.run.iter().copied());
                 // The compact inline body can't represent an *isolated* between-member
                 // comment (a line/own-line comment forces multiline); route those through
@@ -2105,12 +2103,9 @@ impl<'a> Printer<'a> {
             self.list_member_frozen(intersection.span.start, intersection.types, 0, freeze_first);
         let head = self.intersection_first_member_head_run(intersection, first_frozen);
         // To-emit axis: this is the gap's emitter (docs/comments.md).
-        let mut run: CommentVec<'_> = comments_to_emit_in_range(
-            self.comments,
-            intersection.span.start,
-            first_member.span().start,
-        )
-        .collect();
+        let mut run: CommentVec<'_> = self
+            .comments_to_emit_between(intersection.span.start, first_member.span().start)
+            .collect();
         run.extend(head.run.iter().copied());
 
         // The body, with the leading gap (and the first member's own head run) claimed
@@ -2230,7 +2225,8 @@ impl<'a> Printer<'a> {
             // was a live divergence. This collection now decides only WHICH comments lead
             // the member; whether they force the boundary open is `leading_run_ends_line`.
             let own_line_leading: CommentVec<'_> = match amp {
-                Some(amp_pos) => comments_to_emit_in_range(self.comments, amp_pos + 1, cur_start)
+                Some(amp_pos) => self
+                    .comments_to_emit_between(amp_pos + 1, cur_start)
                     .filter(|c| !self.is_same_line(amp_pos, c.span.start))
                     .collect(),
                 None => smallvec![],
@@ -2331,7 +2327,8 @@ impl<'a> Printer<'a> {
                 self.closer_trailing_run_end(prev_end, amp_pos)
             });
             if let Some(amp_pos) = amp {
-                for comment in comments_to_emit_in_range(self.comments, prev_end, amp_pos)
+                for comment in self
+                    .comments_to_emit_between(prev_end, amp_pos)
                     .filter(|c| c.is_block && c.span.end <= trailing_run_end)
                 {
                     parts.push(d.text(" "));
@@ -2364,7 +2361,7 @@ impl<'a> Printer<'a> {
                 let mut scan_from = prev_end;
                 let mut prev_comment: Option<&Comment> = None;
                 let mut crossed_operator = false;
-                for comment in comments_to_emit_in_range(self.comments, prev_end, amp_pos) {
+                for comment in self.comments_to_emit_between(prev_end, amp_pos) {
                     if comment.span.end <= trailing_run_end {
                         if !comment.is_block {
                             // Via `line_suffix`: the layout below breaks after a trailing
@@ -2411,7 +2408,8 @@ impl<'a> Printer<'a> {
                 // both as printed once, so F1, round-trip, the census and the fuzzer are
                 // all blind — only a prettier differential sees it. Routed through the
                 // shared run rule, which hugs only a block the author glued.
-                for comment in comments_to_emit_in_range(self.comments, amp_pos + 1, cur_start)
+                for comment in self
+                    .comments_to_emit_between(amp_pos + 1, cur_start)
                     .filter(|c| self.is_same_line(amp_pos, c.span.start))
                 {
                     if prev_comment.is_none()
@@ -2476,8 +2474,7 @@ impl<'a> Printer<'a> {
                 unit.push(self.build_intersection_line_comment_member_doc(cur, member_parens));
             }
             if is_last {
-                for comment in
-                    comments_to_emit_in_range(self.comments, cur.span().end, intersection.span.end)
+                for comment in self.comments_to_emit_between(cur.span().end, intersection.span.end)
                 {
                     unit.push(d.text(" "));
                     unit.push(self.build_comment_doc(comment));
@@ -2593,13 +2590,10 @@ impl<'a> Printer<'a> {
             return smallvec![];
         }
         if matches!(inner, TSType::Union(_)) {
-            return comments_to_emit_in_range(
-                self.comments,
-                first_member.span().start + 1,
-                inner.span().start,
-            )
-            .filter(|c| !c.is_block)
-            .collect();
+            return self
+                .comments_to_emit_between(first_member.span().start + 1, inner.span().start)
+                .filter(|c| !c.is_block)
+                .collect();
         }
         // Bare inner: hoist the full leading run (block + line), but only when a leading
         // line comment forces the hang — a block-only leading gap keeps its block inline
@@ -2607,12 +2601,9 @@ impl<'a> Printer<'a> {
         // hang trigger is a line comment in the run). The trailing comment is re-attached
         // by `build_hang_value_doc` in `build_intersection_first_member_stripped`, so
         // nothing is dropped.
-        let lead: CommentVec<'_> = comments_to_emit_in_range(
-            self.comments,
-            first_member.span().start + 1,
-            inner.span().start,
-        )
-        .collect();
+        let lead: CommentVec<'_> = self
+            .comments_to_emit_between(first_member.span().start + 1, inner.span().start)
+            .collect();
         if lead.iter().any(|c| !c.is_block) {
             return lead;
         }
@@ -2654,7 +2645,9 @@ impl<'a> Printer<'a> {
             return empty;
         };
         IntersectionHeadRun {
-            run: comments_to_emit_in_range(self.comments, claim.start, claim.end).collect(),
+            run: self
+                .comments_to_emit_between(claim.start, claim.end)
+                .collect(),
             claimed_shell: Some(claim),
         }
     }
