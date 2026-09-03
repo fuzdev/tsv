@@ -2854,6 +2854,49 @@ over 1.52 M words, 10.5 a word against the loop's ten. The erased layout table i
 state now (`LineTable::EMPTY` is `breaks: None`, answered before a byte is read), not an
 empty table that happens to answer "no terminator anywhere".
 
+### The fold's pass is the verdict pass — a document that folds is walked once
+
+On every entry point that formats a file — the CLI, the three bindings, each crate's
+`format_str` — the format path folds `<CR>` ahead of the parse (`normalize_carriage_returns`),
+and after L87 the printer's line table then took its verdict (`line_terminators_are_lf_only`)
+over the same bytes: two whole-source passes, the first std's `memchr` for `\r` (18
+instructions per sixteen bytes, inlined into the CLI's format function) and the second the
+loose-needle loop (16 per sixteen). The loose needle is `\r`-or-non-ASCII already — the
+fold's own needle is inside it — so one pass states both: `classify_line_terminators` walks
+the loop L87 wrote and records, on the cold re-ask of a fired word, where the first `\r` is
+and whether a U+2028 / U+2029 is anywhere. The fold returns a `FoldedSource` — the folded
+text with the verdict over it — and each crate's `format_folded_in` builds its
+`LineBreaks::of_folded` on that instead of classifying again; `format_in` (the `profile`
+path, which never folds) classifies as before. The verdict is stated over the FOLDED text,
+which is exactly "no U+2028 / U+2029 anywhere" once every `\r` is a `\n`, and the fold moves
+neither. `instructions:u` **−0.603% / −0.582% / −0.686%** on the shipped CLI (tsbig / sveltebig /
+cssbig), **−0.000%** on both `profile` and `json` (neither folds — the controls are neutral
+by construction); cycles **−0.554% pooled over a twelve-binary layout group on the CLI entry point, 3/3 replicate signs (−0.585 / −0.879 / −0.194), against a null group at −0.173% (3/3: −0.190 / −0.322 / −0.008)**; instructions −0.600% 3/3; `.text` **+1,648 B**. Three things decided the shape:
+
+- ⭐⭐⭐ **The population census said the handoff question was moot.** `bytes_census.py
+  --class=cr` over the three board corpora: **zero** `\r` bytes in 3,999 files, and 8 of
+  51,955 files in the byte-identity corpus (every one a deliberate line-terminator fixture).
+  So the fold is a `memchr` that never fires, its handoff population is empty, and the lever
+  is exactly "drop one pass": 8.5 instructions a word saved (17 → 8.5) over 1.52 M words =
+  13 M instructions = 0.60% of a 2.15 G CLI run, which is the number the A/B read.
+- ⭐⭐⭐ **Inlined into the CLI's format function the loop cost 0.07 points.** The first rung
+  let LLVM inline the pass into `format_source_in_with_goal` (a 456-byte frame): 19
+  instructions per sixteen bytes, three more than the standalone loop, from the caller's
+  register pressure. `#[inline(never)]` — the shape L87 chose for the verdict pass — reads
+  17 per sixteen and −0.603% against −0.534% (cssbig −0.686 against −0.617), and `.text` gives
+  320 B back. An attribute is a rung; read it in `objdump` before the A/B and the A/B still.
+- ⭐⭐ **A `.text` move is priced symbol by symbol from two `profiling` builds.** +1,648 B
+  did not close on paper (the pass is ~500 B); `nm -S` over the profiling profile's binaries
+  (`rig/symdiff.py`) closed it to 63 B: the outlined pass 513 + its cold word re-ask 260, the
+  CLI's format function +726 taking the three `LineBreaks::of_folded` constructions inline,
+  and the Svelte / TS bodies renamed into their shared functions (`format_root`,
+  `format_program_in`) at ±14 / ±72. The release binary is stripped and cannot say this.
+
+The two facts and the text travel as one value so the verdict can never be read against a
+text it was not taken on; `LineBreaks::of_folded` asserts the two agree in a debug build, and
+the exhaustive terminator test grades the fold's verdict against the up-front one over the
+bytes it returns at every alignment of every terminator shape.
+
 ## WASM bundle size
 
 The `tsv_wasm` crate produces three WASM binaries via the `format` +

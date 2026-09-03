@@ -68,10 +68,11 @@ pub fn format_str(source: &str) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with Svelte's.
-    let source = tsv_lang::printing::normalize_carriage_returns(source);
+    let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let root = parse(&source, &arena)?;
-    Ok(format(&root, &source))
+    let root = parse(folded.text(), &arena)?;
+    let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
+    Ok(format_folded_in(&root, &folded, &doc_arena))
 }
 
 /// Format into a caller-provided doc arena.
@@ -84,6 +85,18 @@ pub fn format_str(source: &str) -> Result<String> {
 /// builds its doc nodes into the host arena, not a second per-block one).
 pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::DocArena) -> String {
     printer::format_svelte_in(root, source, arena)
+}
+
+/// [`format_in`] over a document the caller folded ahead of the parse
+/// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
+/// (the CLI, the bindings, [`format_str`]). Identical output; the document's line verdict
+/// comes from the fold's own pass instead of a second walk of the source.
+pub fn format_folded_in(
+    root: &Root<'_>,
+    folded: &tsv_lang::printing::FoldedSource<'_>,
+    arena: &tsv_lang::doc::arena::DocArena,
+) -> String {
+    printer::format_svelte_folded_in(root, folded, arena)
 }
 
 /// Convert internal AST to JSON with character-based positions

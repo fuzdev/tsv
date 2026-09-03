@@ -592,7 +592,11 @@ contrast, folds `<CR>` and `<CR><LF>` to `<LF>` *before* it parses
 `format_str`, the CLI's `format_source`, each binding's format export, and
 `tsv_svelte_compile`'s `canonicalize_js`). tsv's output is therefore
 LF-only, including inside the regions it copies verbatim — a frozen embedded body, a
-`format-ignore` region, a multi-line comment, a template literal.
+`format-ignore` region, a multi-line comment, a template literal. The fold returns a
+`FoldedSource`: the folded text with the line verdict its one pass took over it (is every
+terminator left a `\n`?), which each crate's `format_folded_in` hands the printer's line
+table — so a document that folds pays one whole-source pass, not the fold's and then the
+printer's.
 
 Ahead of the parse is the only place the question can be answered once. The printers ask
 *where are the lines?* in several places that split on `'\n'` alone — `Comment::multiline`

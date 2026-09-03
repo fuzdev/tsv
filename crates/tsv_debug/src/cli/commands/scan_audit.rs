@@ -144,11 +144,6 @@ const ALLOW: &[Allow] = &[
     ),
     (
         "tsv_lang/src/printing.rs",
-        "let Some(first) = source.find('\\r') else {",
-        "terminator-fold",
-    ),
-    (
-        "tsv_lang/src/printing.rs",
         "while let Some(i) = rest.find('\\r') {",
         "terminator-fold",
     ),

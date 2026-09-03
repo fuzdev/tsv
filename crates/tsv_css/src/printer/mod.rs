@@ -40,7 +40,7 @@ use tsv_lang::{
         arena::{DocArena, DocId},
     },
     is_format_ignore_directive,
-    printing::{self, LineBreaks, LineTable},
+    printing::{self, FoldedSource, LineBreaks, LineTable},
 };
 
 /// Printer state for building output
@@ -1151,16 +1151,38 @@ pub(crate) fn format_css_in(
     source: &str,
     arena: &DocArena,
 ) -> String {
+    // The document's line verdict, over the arena-parked table (one warm table across a
+    // multi-file driver's files instead of a fresh Vec per file — filled only if a line
+    // question falls back to it).
+    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
+    format_stylesheet(stylesheet, source, line_breaks, arena)
+}
+
+/// [`format_css_in`] over a document the caller folded ahead of the parse: the line
+/// verdict comes from the fold's own pass (`LineBreaks::of_folded`), not a second walk.
+pub(crate) fn format_css_folded_in(
+    stylesheet: &CssStyleSheet<'_>,
+    folded: &FoldedSource<'_>,
+    arena: &DocArena,
+) -> String {
+    let line_breaks = LineBreaks::of_folded(folded, arena.take_line_breaks_scratch());
+    format_stylesheet(stylesheet, folded.text(), line_breaks, arena)
+}
+
+/// The shared body of the two: register the stylesheet's comments, build the printer on
+/// its line table, print, park the table.
+fn format_stylesheet(
+    stylesheet: &CssStyleSheet<'_>,
+    source: &str,
+    line_breaks: LineBreaks<'_>,
+    arena: &DocArena,
+) -> String {
     // The print-once comment ledger's expectation for this stylesheet — detached comments
     // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
     // `tsv_lang::comment_ledger`).
     #[cfg(feature = "comment_check")]
     register_stylesheet_comments(stylesheet, source);
 
-    // The document's line verdict, over the arena-parked table (one warm table across a
-    // multi-file driver's files instead of a fresh Vec per file — filled only if a line
-    // question falls back to it).
-    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
     let mut printer = Printer::new(arena, source, &stylesheet.comments, line_breaks.table());
     printer.print_css_nodes(stylesheet.nodes);
     let output = printer.into_string();

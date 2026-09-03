@@ -29,7 +29,7 @@ mod printer;
 use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
-use tsv_lang::printing::{LineBreaks, LineTable};
+use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 pub use tsv_lang::{ParseError, Result};
 
 pub use acorn_loc::AcornSeed;
@@ -230,10 +230,11 @@ pub fn format_str(source: &str) -> Result<String> {
     // `tsv_lang::printing::normalize_carriage_returns` for why it belongs here and not on
     // the finished string. `parse` deliberately does NOT do this: its offsets are a
     // drop-in contract over the author's own bytes.
-    let source = tsv_lang::printing::normalize_carriage_returns(source);
+    let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let program = parse(&source, &arena)?;
-    Ok(format(&program, &source))
+    let program = parse(folded.text(), &arena)?;
+    let doc_arena = DocArena::for_source(folded.text());
+    Ok(format_folded_in(&program, &folded, &doc_arena))
 }
 
 /// Format into a caller-provided doc arena.
@@ -244,12 +245,37 @@ pub fn format_str(source: &str) -> Result<String> {
 /// borrowed from `arena` escapes — the result is an owned `String` — so the
 /// caller may reset and reuse it the moment this returns.
 pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
+    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
+    format_document_in(program, source, line_breaks, arena)
+}
+
+/// [`format_in`] over a document the caller folded ahead of the parse
+/// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
+/// (the CLI, the bindings, [`format_str`]). Identical output; the document's line verdict
+/// comes from the fold's own pass instead of a second walk of the source.
+pub fn format_folded_in(
+    program: &Program<'_>,
+    folded: &FoldedSource<'_>,
+    arena: &DocArena,
+) -> String {
+    let line_breaks = LineBreaks::of_folded(folded, arena.take_line_breaks_scratch());
+    format_document_in(program, folded.text(), line_breaks, arena)
+}
+
+/// The shared body of [`format_in`] and [`format_folded_in`]: the one place the
+/// intent-preserving format registers its comments and hands the printer its table.
+fn format_document_in(
+    program: &Program<'_>,
+    source: &str,
+    line_breaks: LineBreaks<'_>,
+    arena: &DocArena,
+) -> String {
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`). A Svelte host registers its own `Root.comments`, so
     // an embedded `<script>` never reaches here.
     #[cfg(feature = "comment_check")]
     tsv_lang::comment_ledger::register_parsed(source, program.comments);
-    format_program_in(program, source, arena, false)
+    format_program_in(program, source, line_breaks, arena, false)
 }
 
 /// Format a program with newline-derived authoring intent **erased** — the
@@ -291,23 +317,24 @@ pub fn format_canonical(program: &Program<'_>, source: &str) -> String {
 /// [`format_canonical`] into a caller-provided doc arena (see [`format_in`] for
 /// the arena-reuse contract).
 pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
-    format_program_in(program, source, arena, true)
+    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
+    format_program_in(program, source, line_breaks, arena, true)
 }
 
-/// The shared body of [`format_in`] and [`format_canonical_in`]: take the document's line
-/// verdict (the arena-parked table behind it is filled only if a line question falls back
-/// to it — one warm table across a multi-file driver's files instead of a fresh Vec per
-/// file), build the printer, render. `canonical` switches the printer into canonical mode
-/// after construction — the build takes the real table (comment classification needs it)
-/// and `set_canonical` then erases only the *layout* table, so blank-line / expansion
-/// reads collapse while classification keeps the real lines.
+/// The shared body of every format: given the document's line verdict (the arena-parked
+/// table behind it is filled only if a line question falls back to it — one warm table
+/// across a multi-file driver's files instead of a fresh Vec per file), build the printer,
+/// render, park the table. `canonical` switches the printer into canonical mode after
+/// construction — the build takes the real table (comment classification needs it) and
+/// `set_canonical` then erases only the *layout* table, so blank-line / expansion reads
+/// collapse while classification keeps the real lines.
 fn format_program_in(
     program: &Program<'_>,
     source: &str,
+    line_breaks: LineBreaks<'_>,
     arena: &DocArena,
     canonical: bool,
 ) -> String {
-    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
     let inputs = PrinterInputs::for_document(source, program.comments, line_breaks.table());
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     if canonical {

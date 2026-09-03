@@ -289,7 +289,7 @@ tsv/
 Each language crate exports a consistent API:
 
 - `parse(source, arena) -> Result<AST>` — the AST allocates into the caller's `bumpalo` arena (the bindings reuse a per-thread arena across calls via `tsv_arena`)
-- `format(ast, source) -> String` — plus `format_in(ast, source, doc_arena)`, the same formatter writing through a reusable doc arena for the bindings' hot loop, and `format_str(source)`, the parse+format one-shot
+- `format(ast, source) -> String` — plus `format_in(ast, source, doc_arena)`, the same formatter writing through a reusable doc arena for the bindings' hot loop, `format_folded_in(ast, &folded, doc_arena)` for a caller that folded the source's line terminators itself, and `format_str(source)`, the parse+format one-shot
 - `convert_ast_json_bytes(ast, source) -> Vec<u8>` — the wire JSON, emitted directly from the internal AST, with `convert_ast_json_string`/`convert_ast_json` wrappers and span-only `_no_locations` variants alongside (default-on `convert` cargo feature; turn off for parse+format-only builds)
 
 For more details see [CLAUDE.md](CLAUDE.md).

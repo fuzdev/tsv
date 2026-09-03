@@ -157,7 +157,7 @@ pub(crate) fn comment_census(source: &str, parser: ParserType) -> CensusMultiset
 /// make `a<LS>b` and `a<LF>b` compare equal and blind the census to a real rewrite. `\r`
 /// left the trim class in the same step — after the fold there is none left to trim.
 fn normalize_interior(kind: CensusKind, raw: &str) -> String {
-    let raw = tsv_lang::printing::normalize_carriage_returns(raw);
+    let raw = tsv_lang::printing::normalize_carriage_returns(raw).into_text();
     match kind {
         // Runs to end of line, so it has exactly one edge the printer touches.
         CensusKind::Line => raw.trim_end_matches(tsv_lang::is_js_whitespace).to_owned(),

@@ -99,10 +99,11 @@ pub fn format_str(source: &str) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with `parseCss`'s.
-    let source = tsv_lang::printing::normalize_carriage_returns(source);
+    let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let stylesheet = parse(&source, &arena)?;
-    Ok(format(&stylesheet, &source))
+    let stylesheet = parse(folded.text(), &arena)?;
+    let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
+    Ok(format_folded_in(&stylesheet, &folded, &doc_arena))
 }
 
 /// Format into a caller-provided doc arena.
@@ -117,6 +118,18 @@ pub fn format_in(
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
     printer::format_css_in(stylesheet, source, arena)
+}
+
+/// [`format_in`] over a document the caller folded ahead of the parse
+/// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
+/// (the CLI, the bindings, [`format_str`]). Identical output; the document's line verdict
+/// comes from the fold's own pass instead of a second walk of the source.
+pub fn format_folded_in(
+    stylesheet: &CssStyleSheet<'_>,
+    folded: &tsv_lang::printing::FoldedSource<'_>,
+    arena: &tsv_lang::doc::arena::DocArena,
+) -> String {
+    printer::format_css_folded_in(stylesheet, folded, arena)
 }
 
 /// Format an embedded CSS stylesheet into a caller-provided doc arena.

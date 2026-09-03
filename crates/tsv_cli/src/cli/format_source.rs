@@ -68,18 +68,20 @@ pub fn format_source_in_with_goal(
     // printer never sees a `<CR>` and the doc-build's line splits agree with the output
     // about where the lines are. See `tsv_lang::printing::normalize_carriage_returns`; the
     // `parse` command deliberately skips it, its offsets being a drop-in contract over the
-    // author's own bytes. Borrowed unchanged on a source with no `<CR>`.
-    let source = tsv_lang::printing::normalize_carriage_returns(source);
-    let source = source.as_ref();
+    // author's own bytes. Borrowed unchanged on a source with no `<CR>`, and the fold's
+    // pass is the document's line verdict too — the `format_folded_in` siblings take it
+    // rather than walking the source again.
+    let folded = tsv_lang::printing::normalize_carriage_returns(source);
+    let source = folded.text();
     match parser_type {
         ParserType::Svelte => tsv_svelte::parse(source, arena)
-            .map(|ast| tsv_svelte::format_in(&ast, source, doc_arena))
+            .map(|ast| tsv_svelte::format_folded_in(&ast, &folded, doc_arena))
             .map_err(|e| e.to_string()),
         ParserType::Css => tsv_css::parse(source, arena)
-            .map(|ast| tsv_css::format_in(&ast, source, doc_arena))
+            .map(|ast| tsv_css::format_folded_in(&ast, &folded, doc_arena))
             .map_err(|e| e.to_string()),
         ParserType::TypeScript => tsv_ts::parse_with_goal(source, goal, arena)
-            .map(|ast| tsv_ts::format_in(&ast, source, doc_arena))
+            .map(|ast| tsv_ts::format_folded_in(&ast, &folded, doc_arena))
             .map_err(|e| e.to_string()),
     }
 }

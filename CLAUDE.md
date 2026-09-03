@@ -832,7 +832,9 @@ acorn / Svelte / `parseCss` over the author's own bytes. **Every parse-then-form
 point folds `<CR>` / `<CR><LF>` to `<LF>` before it parses**
 (`tsv_lang::printing::normalize_carriage_returns` — each language crate's `format_str`, the
 CLI's `format_source`, each binding's format export, `canonicalize_js`), so tsv's output is
-LF-only even inside the regions it copies verbatim. Ahead of the parse is the only place
+LF-only even inside the regions it copies verbatim. The fold's one pass also takes the
+folded document's line verdict (`FoldedSource`), which each crate's `format_folded_in`
+hands its printer, so a document that folds is walked once. Ahead of the parse is the only place
 that answers it once: the printers ask "where are the lines?" in several places that split
 on `'\n'` alone, and folding the finished string instead leaves those disagreeing with the
 output — the same document then formats two ways on two passes. `<LS>` / `<PS>` are
