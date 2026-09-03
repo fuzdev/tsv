@@ -400,10 +400,9 @@ impl<'a> Printer<'a> {
     /// (`}; // c`); an own-line comment stays on its own line after the `;`. Module
     /// statements (import/export source, specifiers, attributes) have no operand
     /// parens, so every trailing comment is statement-attached. The caller emits the
-    /// `;` right after the content, then `parts.extend(returned)`.
-    pub(crate) fn collect_post_semi_comments(&self, start: u32, end: u32) -> DocBuf {
+    /// `;` right after the content, then calls this to push what follows it.
+    pub(crate) fn push_post_semi_comments(&self, deferred: &mut DocBuf, start: u32, end: u32) {
         let d = self.d();
-        let mut deferred = DocBuf::new();
         let mut prev_end = start;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
             let same_line = self.is_same_line(prev_end, comment.span.start);
@@ -425,7 +424,6 @@ impl<'a> Printer<'a> {
             }
             prev_end = comment.span.end;
         }
-        deferred
     }
 
     /// Append trailing comments from stripped grouping parens in spread elements,

@@ -232,20 +232,20 @@ impl<'a> Printer<'a> {
         };
 
         let mut result_parts = smallvec![d.text(keyword), d.text(" "), rhs_doc];
-        let after = if has_trailing_comments {
-            self.split_terminator_gap_comments(
+        if has_trailing_comments {
+            let after = self.split_terminator_gap_comments(
                 &mut result_parts,
                 argument_end,
                 span_end,
                 false,
                 false,
                 clause_tail,
-            )
+            );
+            result_parts.push(d.text(";"));
+            result_parts.extend(after);
         } else {
-            DocBuf::new()
-        };
-        result_parts.push(d.text(";"));
-        result_parts.extend(after);
+            result_parts.push(d.text(";"));
+        }
         d.concat(&result_parts)
     }
 

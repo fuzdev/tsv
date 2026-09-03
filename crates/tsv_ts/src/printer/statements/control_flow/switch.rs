@@ -162,11 +162,7 @@ impl<'a> Printer<'a> {
                     comments_to_emit_in_range(self.comments, prev_end, switch_body_end),
                 );
             } else {
-                case_parts.extend(self.build_trailing_body_comments_doc(
-                    prev_end,
-                    switch_body_end,
-                    false,
-                ));
+                self.push_trailing_body_comments(&mut case_parts, prev_end, switch_body_end, false);
             }
         }
 

@@ -1730,6 +1730,11 @@ impl<'a> Printer<'a> {
         arrow: &internal::ArrowFunctionExpression<'_>,
     ) -> DocId {
         let d = self.d();
+        if !arrow.r#async && arrow.type_parameters.is_none() {
+            // No head at all — the common arrow — so the signature IS its tail: no
+            // buffer, and no separator ahead of it.
+            return self.build_arrow_signature_tail_doc(arrow);
+        }
         let mut parts = DocBuf::new();
 
         self.push_async_arrow_head(&mut parts, arrow);
@@ -1749,23 +1754,31 @@ impl<'a> Printer<'a> {
         // The signature TAIL — parameters plus return type — belongs to the `>`→`(` gap's
         // emitter, not to `parts`: a `//` in that gap drops the whole tail to a continuation
         // line, which it can only do while holding it.
-        let params_doc = self.build_arrow_params_doc_ungrouped(arrow);
-        let tail = match &arrow.return_type {
-            Some(return_type) => d.concat(&[
-                params_doc,
-                self.build_arrow_return_type_doc(return_type, arrow.params_start),
-            ]),
-            None => params_doc,
-        };
+        let tail = self.build_arrow_signature_tail_doc(arrow);
 
         self.append_signature_head_gap_comments(
             &mut parts,
             self.type_params_paren_gap(arrow.type_parameters.as_ref()),
-            d.empty(),
+            None,
             tail,
         );
 
         d.concat(&parts)
+    }
+
+    /// An arrow signature's tail — its parameters, plus its return type when it has one.
+    fn build_arrow_signature_tail_doc(
+        &self,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+    ) -> DocId {
+        let params_doc = self.build_arrow_params_doc_ungrouped(arrow);
+        match &arrow.return_type {
+            Some(return_type) => self.d().concat(&[
+                params_doc,
+                self.build_arrow_return_type_doc(return_type, arrow.params_start),
+            ]),
+            None => params_doc,
+        }
     }
 
     /// Check if any param has a trailing line comment or own-line block comment.
@@ -2073,7 +2086,7 @@ impl<'a> Printer<'a> {
         self.append_signature_head_gap_comments(
             &mut sig_parts,
             self.type_params_paren_gap(func.type_parameters.as_ref()),
-            d.empty(),
+            None,
             sig_doc,
         );
 
@@ -2560,7 +2573,9 @@ impl<'a> Printer<'a> {
         // No group - outer signature group controls breaking
         let mut result: DocBuf = smallvec![d.text("(")];
         // A pulled `( // c` comment renders on the `(` line before the break.
-        result.extend(paren_prefix);
+        if !paren_prefix.is_empty() {
+            result.extend(paren_prefix);
+        }
 
         if force_break {
             // When forcing break (trailing comments or param properties), use hardlines.

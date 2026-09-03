@@ -15,6 +15,16 @@ use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// How a separator binds the comments in its gap — the two per-separator axes
+/// [`Printer::push_gap_comments`]'s callers state (each explained there).
+#[derive(Clone, Copy)]
+pub(crate) struct GapBinding {
+    /// A same-line block comment trails AFTER the separator rather than staying before it.
+    pub(crate) block_after: bool,
+    /// An author blank line above a deferred own-line comment survives the separator.
+    pub(crate) preserve_blank: bool,
+}
+
 /// How a separator gap's deferred (own-line) run renders — the axis
 /// [`Printer::push_gap_comments`]'s callers name.
 #[derive(Clone, Copy)]
@@ -54,7 +64,7 @@ pub(crate) enum BlankRule {
     AfterComma,
 }
 
-/// What follows a member in its body, for [`Printer::member_trailing_run`].
+/// What follows a member in its body, for [`Printer::push_member_trailing_run`].
 ///
 /// The `floor` is the gap's slot floor — where the leads-next test
 /// ([`Printer::comment_leads_next_item`]) opens — and it is a **per-family fact**, not a
@@ -347,7 +357,7 @@ impl<'a> Printer<'a> {
     /// Keyed on a **terminator the construct's own doc re-prints**, which is what puts the
     /// deferred comment behind it: the statement / class-member `;`, and a type member's
     /// separator — `;` **or** `,`, since tsv normalizes either to the `;` the member doc
-    /// emits ([`Printer::build_comments_around_semicolon_doc`]). Reading only `;` here left
+    /// emits ([`Printer::push_comments_around_semicolon`]). Reading only `;` here left
     /// the comma authoring welding (`a: A // c1⏎, // c2` → `a: A; // c1 // c2`, the second
     /// `//` becoming text of the first) at the interface and type-literal walks — the very
     /// merge this predicate exists to prevent. A `}` / element-list `,` is NOT this: there
@@ -540,22 +550,26 @@ impl<'a> Printer<'a> {
     /// return it with the advanced cursor.
     ///
     /// The two families differ only in how they DERIVE `upper_bound` and `claim_end`
-    /// ([`Self::member_trailing_run`], [`Self::statement_trailing_run`]); what they do with
+    /// ([`Self::push_member_trailing_run`], [`Self::push_statement_trailing_run`]); what they do with
     /// them is this, and it was spelled twice. Both ends matter and they are not the same
     /// end: the emitted run stops at whichever of the two comes first, while the cursor is
     /// clamped to the **claim split alone** — a handed-over comment must stay ahead of it
     /// for the next item's leading run to find, and `upper_bound` (the next item's start)
     /// would clamp it past nothing at all.
-    fn trailing_run(&self, item_end: u32, upper_bound: u32, claim_end: u32) -> (DocBuf, u32) {
-        let docs = self.build_trailing_same_line_comment_docs(item_end, upper_bound.min(claim_end));
-        let prev_end = self
-            .find_end_with_trailing_comments(item_end)
-            .min(claim_end);
-        (docs, prev_end)
+    fn push_trailing_run(
+        &self,
+        parts: &mut DocBuf,
+        item_end: u32,
+        upper_bound: u32,
+        claim_end: u32,
+    ) -> u32 {
+        self.push_trailing_same_line_comment_docs(parts, item_end, upper_bound.min(claim_end));
+        self.find_end_with_trailing_comments(item_end)
+            .min(claim_end)
     }
 
     /// The whole trailing arm of the **member**-gap seam, shared by the class-body and
-    /// interface-body walks — the member sibling of [`Self::statement_trailing_run`], and
+    /// interface-body walks — the member sibling of [`Self::push_statement_trailing_run`], and
     /// for the same reason: the two walks held byte-identical copies of it, and the copy is
     /// what let them drift (the interface's re-spelled `is_same_line` filter missed a
     /// multi-line block's closing line, so a comment glued past that `*/` was torn onto its
@@ -567,19 +581,28 @@ impl<'a> Printer<'a> {
     /// Emits the member's same-line trailing run — bounded at the next member and stopped
     /// at the claim split ([`Self::trailing_claim_end`]) so a comment whose glue chain
     /// reaches that member leads it instead (`a: A; /* c */ b: B;`), emitted by its leading
-    /// run — and returns the docs plus the advanced cursor, clamped to the same split so a
+    /// run into `parts` — and returns the advanced cursor, clamped to the same split so a
     /// handed-over comment stays ahead of it for that leading run to find.
     ///
     /// The caller states the gap's slot FLOOR, a per-family fact rather than a preference
     /// ([`MemberGap`]) — the same role `statement_gap_floor` plays for a statement list.
-    pub(crate) fn member_trailing_run(&self, member_end: u32, gap: MemberGap) -> (DocBuf, u32) {
+    ///
+    /// Pushes into the caller's buffer rather than returning one: the run is empty on
+    /// nearly every member, and a returned buffer is minted, moved and `extend`ed away
+    /// on each of them.
+    pub(crate) fn push_member_trailing_run(
+        &self,
+        parts: &mut DocBuf,
+        member_end: u32,
+        gap: MemberGap,
+    ) -> u32 {
         let (upper_bound, claim_end) = match gap {
             MemberGap::Next { floor, start } => (start, self.trailing_claim_end(floor, start)),
             // Nothing prints after this member, so nothing can be led and the claim runs
             // to the body's end.
             MemberGap::Last { list_end } => (list_end, u32::MAX),
         };
-        self.trailing_run(member_end, upper_bound, claim_end)
+        self.push_trailing_run(parts, member_end, upper_bound, claim_end)
     }
 
     /// The whole trailing arm of the statement-gap seam for `body[index]`, shared by
@@ -588,18 +611,24 @@ impl<'a> Printer<'a> {
     /// trailing a dropped `;` (`a();; // c`) attaches here rather than being stranded,
     /// and stopped at the claim split ([`Self::statement_claim_end`]) so a comment
     /// whose glue chain reaches the next statement leads it instead
-    /// (`a(); /* c */ let b = 1;`), emitted by its leading run. Returns the docs and
-    /// the advanced cursor, clamped to the same split so the handed-over comments
-    /// stay ahead of it for that leading run to find.
-    pub(crate) fn statement_trailing_run(
+    /// (`a(); /* c */ let b = 1;`), emitted by its leading run. Pushes the run into
+    /// `parts` and returns the advanced cursor, clamped to the same split so the
+    /// handed-over comments stay ahead of it for that leading run to find.
+    pub(crate) fn push_statement_trailing_run(
         &self,
+        parts: &mut DocBuf,
         body: &[internal::Statement<'_>],
         index: usize,
         list_end: u32,
-    ) -> (DocBuf, u32) {
+    ) -> u32 {
         let stmt_end = body[index].span().end;
         let bound = next_printed_stmt_start(body, index, list_end);
-        self.trailing_run(stmt_end, bound, self.statement_claim_end(body, index, None))
+        self.push_trailing_run(
+            parts,
+            stmt_end,
+            bound,
+            self.statement_claim_end(body, index, None),
+        )
     }
 
     /// Whether `comment` was already emitted as the PREVIOUS item's trailing run — it
@@ -609,7 +638,7 @@ impl<'a> Printer<'a> {
     /// `is_same_line` call of its own: the two statement-list leading runs (block body, switch
     /// consequent), the class-member, type-literal-member and enum-member leading runs, and
     /// the three end-of-body runs (program, block, the shared
-    /// [`Self::build_trailing_body_comments_doc`] — which the object literal now reaches
+    /// [`Self::push_trailing_body_comments`] — which the object literal now reaches
     /// too). Answering it independently is exactly what let them drift — see the
     /// one-question-one-predicate rule the printer keeps re-learning.
     ///
@@ -698,17 +727,30 @@ impl<'a> Printer<'a> {
     /// calculations for preceding groups (matches Prettier behavior).
     /// Block comments are inline and do affect width.
     ///
-    /// Returns a Vec of docs to append to the current parts.
+    /// Returns the docs to append to the current parts — for a caller that emits them
+    /// later than it asks (the switch consequent, which builds the run ahead of the
+    /// statement it follows). A caller that appends them at once takes
+    /// [`Self::push_trailing_same_line_comment_docs`], which mints no buffer.
     pub(crate) fn build_trailing_same_line_comment_docs(
         &self,
         after_pos: u32,
         upper_bound: u32,
     ) -> DocBuf {
         let mut docs = DocBuf::new();
-        for comment in self.trailing_same_line_comments(after_pos, upper_bound) {
-            docs.push(self.build_trailing_comment_doc(comment));
-        }
+        self.push_trailing_same_line_comment_docs(&mut docs, after_pos, upper_bound);
         docs
+    }
+
+    /// [`Self::build_trailing_same_line_comment_docs`] into the caller's buffer.
+    pub(crate) fn push_trailing_same_line_comment_docs(
+        &self,
+        parts: &mut DocBuf,
+        after_pos: u32,
+        upper_bound: u32,
+    ) {
+        for comment in self.trailing_same_line_comments(after_pos, upper_bound) {
+            parts.push(self.build_trailing_comment_doc(comment));
+        }
     }
 
     /// The clause-tail spelling of [`Self::build_trailing_same_line_comment_docs`] —
@@ -832,7 +874,7 @@ impl<'a> Printer<'a> {
     /// Used by every end-of-body run: class body, interface body, enum body, type literal,
     /// namespace body, block-statement bodies (function and bare blocks, via
     /// [`Self::build_block_body_doc`]), the object literal (via
-    /// [`Self::build_trailing_closer_comments_doc`], the only caller whose container may
+    /// [`Self::push_trailing_closer_comments`], the only caller whose container may
     /// still collapse), and the `}`-less one — the end of the **program**, where `body_end`
     /// is the source length.
     ///
@@ -842,13 +884,15 @@ impl<'a> Printer<'a> {
     /// ([`Self::terminator_defers_line_comment`]) trailed nothing, so it passes `true` and
     /// this run claims them. Skipping them in BOTH places is a dropped comment — and with
     /// no further item in the list, this emitter is the last chance to print them.
-    pub(crate) fn build_trailing_body_comments_doc(
+    pub(crate) fn push_trailing_body_comments(
         &self,
+        parts: &mut DocBuf,
         prev_end: u32,
         body_end: u32,
         claims_trailing: bool,
-    ) -> DocBuf {
-        self.build_trailing_closer_comments_doc(
+    ) -> bool {
+        self.push_trailing_closer_comments(
+            parts,
             prev_end,
             body_end,
             claims_trailing,
@@ -856,7 +900,7 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// [`Self::build_trailing_body_comments_doc`] with the run's separator supplied, for
+    /// [`Self::push_trailing_body_comments`] with the run's separator supplied, for
     /// the one container that may still COLLAPSE around its trailing run — the object
     /// literal's inline form, whose separator is a soft `line` its group decides.
     ///
@@ -864,15 +908,20 @@ impl<'a> Printer<'a> {
     /// what let the two drift, and the stripped-shell blank scan below then had to be
     /// fixed twice. Every other end-of-body run is already hard-broken, hence the
     /// `hardline` default.
-    pub(crate) fn build_trailing_closer_comments_doc(
+    ///
+    /// Pushes into the caller's buffer and reports whether it emitted anything: the run
+    /// is empty after nearly every body, and a returned buffer is minted, moved and
+    /// `extend`ed away on each of them.
+    pub(crate) fn push_trailing_closer_comments(
         &self,
+        parts: &mut DocBuf,
         prev_end: u32,
         body_end: u32,
         claims_trailing: bool,
         separator: DocId,
-    ) -> DocBuf {
+    ) -> bool {
         let d = self.d();
-        let mut docs = DocBuf::new();
+        let mut emitted = false;
         // The blank scan measures a DISTANCE, so it opens past the closers of a stripped
         // paren shell the last item's doc consumed but did not print
         // ([`Self::element_shell_end`]) — an enum member's `A = (⏎1⏎)⏎/* c */` otherwise
@@ -914,21 +963,22 @@ impl<'a> Printer<'a> {
                 // `last_pos` — so it asks the predicate rather than routing through
                 // [`Self::push_trailing_run_separator`].
                 if self.trailing_run_hugs_previous(prev_emitted, comment.span.start) {
-                    docs.push(d.text(" "));
+                    parts.push(d.text(" "));
                 } else {
                     if self.has_blank_line_between(last_pos, comment.span.start) {
-                        docs.push(d.literalline());
+                        parts.push(d.literalline());
                     }
-                    docs.push(separator);
+                    parts.push(separator);
                 }
             }
-            docs.push(self.build_comment_doc(comment));
+            parts.push(self.build_comment_doc(comment));
             last_pos = comment.span.end;
             prev_emitted = Some(comment);
             needs_separator = true;
+            emitted = true;
         }
 
-        docs
+        emitted
     }
 
     /// Append a **dangling** comment run — the comments alone inside an otherwise empty
@@ -938,7 +988,7 @@ impl<'a> Printer<'a> {
     /// The separator sits strictly BETWEEN comments: the delimiter pair supplies the break
     /// before the first and after the last. It is emitted before each comment but the
     /// first, never after each comment but the last, for the same reason
-    /// [`Self::build_trailing_body_comments_doc`] is — the "after" formulation has to ask
+    /// [`Self::push_trailing_body_comments`] is — the "after" formulation has to ask
     /// what KIND the comment was, and "a block needs no break, the closer follows
     /// immediately" is false the moment another comment follows, welding the two together
     /// (`/* c1 *//* c2 */`).
@@ -1245,7 +1295,7 @@ impl<'a> Printer<'a> {
     /// The sibling swallow in CALLEE position — a line comment between the callee and
     /// its `(` (`call // c⏎()`, and the optional-call `call?. // c⏎()`) — is a different
     /// mechanism (callee-position trivia, not a dangling comment inside a delimiter
-    /// pair) and is handled by this emitter's caller, `push_empty_args`, which drops the
+    /// pair) and is handled by this emitter's caller, `build_empty_args_parens_doc`, which drops the
     /// whole list to an indented continuation line.
     ///
     /// `paren_open` is the `(` position and `paren_close_after` the position past
@@ -1392,14 +1442,17 @@ impl<'a> Printer<'a> {
         // canonical parser accepts it as a clause body, where the gap must defer like
         // every other `;` tail there); the type members are always list-joined.
         let deferral = self.terminator_gap_deferral(clause_tail);
-        deferred.extend(self.push_gap_comments(
+        self.push_gap_comments(
             parts,
+            deferred,
             content_end,
             span_end,
-            false,
-            true,
+            GapBinding {
+                block_after: false,
+                preserve_blank: true,
+            },
             deferral,
-        ));
+        );
     }
 
     /// Partition the comments in a content→separator gap `[start, sep_pos)`, binding
@@ -1440,14 +1493,19 @@ impl<'a> Printer<'a> {
         start: u32,
         sep_pos: u32,
     ) -> DocBuf {
+        let mut deferred = DocBuf::new();
         self.push_gap_comments(
             parts,
+            &mut deferred,
             start,
             sep_pos,
-            false,
-            false,
+            GapBinding {
+                block_after: false,
+                preserve_blank: false,
+            },
             GapDeferral::Break(self.d().hardline()),
-        )
+        );
+        deferred
     }
 
     /// The **for-header `;`** variant of
@@ -1474,14 +1532,19 @@ impl<'a> Printer<'a> {
         start: u32,
         sep_pos: u32,
     ) -> DocBuf {
+        let mut deferred = DocBuf::new();
         self.push_gap_comments(
             parts,
+            &mut deferred,
             start,
             sep_pos,
-            false,
-            false,
+            GapBinding {
+                block_after: false,
+                preserve_blank: false,
+            },
             GapDeferral::Break(self.d().line()),
-        )
+        );
+        deferred
     }
 
     /// The `;`-terminator family's deferral axis, from the statement CONTAINER's fact
@@ -1547,12 +1610,16 @@ impl<'a> Printer<'a> {
         }
         let semicolon_pos = Self::semicolon_pos(content_end, span_end);
         let deferral = self.terminator_gap_deferral(clause_tail);
-        let after = self.push_gap_comments(
+        let mut after = DocBuf::new();
+        self.push_gap_comments(
             parts,
+            &mut after,
             content_end,
             semicolon_pos,
-            block_after_separator,
-            true,
+            GapBinding {
+                block_after: block_after_separator,
+                preserve_blank: true,
+            },
             deferral,
         );
         parts.push(self.d().text(";"));
@@ -1582,22 +1649,26 @@ impl<'a> Printer<'a> {
     /// blank line before an own-line comment IS preserved (like a statement terminator).
     /// This mixed binding is what prettier does for a type-literal / interface member
     /// terminator, which neither of its two siblings' bindings expresses. Same
-    /// caller idiom (the returned own-line docs are emitted by the type-element *joiner*
-    /// after its `;`, since the member doc doesn't own the `;`).
+    /// caller idiom, into the caller's `deferred` (the own-line docs are emitted by the
+    /// type-element *joiner* after its `;`, since the member doc doesn't own the `;`).
     pub(crate) fn split_member_terminator_gap_comments(
         &self,
         parts: &mut DocBuf,
+        deferred: &mut DocBuf,
         start: u32,
         sep_pos: u32,
-    ) -> DocBuf {
+    ) {
         self.push_gap_comments(
             parts,
+            deferred,
             start,
             sep_pos,
-            false,
-            true,
+            GapBinding {
+                block_after: false,
+                preserve_blank: true,
+            },
             GapDeferral::Break(self.d().hardline()),
-        )
+        );
     }
 
     /// Where a separator gap's ANCHOR-LINE run ENDS — the split
@@ -1680,17 +1751,24 @@ impl<'a> Printer<'a> {
     /// ([`Self::split_for_header_gap_comments`]). Every break *within* the run is this
     /// site's and stays a `hardline`, so the caller can only move the run's first line,
     /// never merge two lines the author wrote.
+    ///
+    /// The deferred run goes into the caller's `deferred` rather than a buffer of this
+    /// function's own: every `;` and member terminator holds one already, and the run is
+    /// empty at nearly all of them.
     fn push_gap_comments(
         &self,
         parts: &mut DocBuf,
+        deferred: &mut DocBuf,
         start: u32,
         sep_pos: u32,
-        block_after: bool,
-        preserve_blank: bool,
+        binding: GapBinding,
         deferral: GapDeferral,
-    ) -> DocBuf {
+    ) {
+        let GapBinding {
+            block_after,
+            preserve_blank,
+        } = binding;
         let d = self.d();
-        let mut deferred = DocBuf::new();
         let mut prev = start;
         let mut gap = comments_to_emit_in_range(self.comments, start, sep_pos).peekable();
         // Zero-comment fast gate: the split is a search of its own, and every `;`-gap
@@ -1762,7 +1840,6 @@ impl<'a> Printer<'a> {
             prev = comment.span.end;
             prev_comment = Some(comment);
         }
-        deferred
     }
 
     /// Append leading inline block comments (`/*content*/ ` format) between two positions.

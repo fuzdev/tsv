@@ -85,7 +85,7 @@ pub(crate) enum MemberFloor {
 ///
 /// The two arms are not a preference. A class or interface member's doc prints its own
 /// `;`, so its trailing run is emitted whole and the cursor advances past it
-/// ([`Printer::member_trailing_run`]). A **type** member's `;` is the walk's, so its run
+/// ([`Printer::push_member_trailing_run`]). A **type** member's `;` is the walk's, so its run
 /// has to be partitioned around that separator with the member→`;` gap's deferred run
 /// slotted between the halves ([`Printer::push_type_member_trailing_seam`]) — emitting
 /// the two in one flush welds a second `//` onto the first and reorders a block ahead of
@@ -260,11 +260,12 @@ impl<'a> Printer<'a> {
         // The run after the last member, before the closing `}` — the shared end-of-body
         // emitter every container uses, taking its separator BEFORE each comment.
         if body.has_comments {
-            parts.extend(self.build_trailing_body_comments_doc(
+            self.push_trailing_body_comments(
+                parts,
                 prev_end,
                 body.span.end.saturating_sub(1),
                 prev_deferred_line_comment,
-            ));
+            );
         }
     }
 
@@ -275,7 +276,7 @@ impl<'a> Printer<'a> {
     /// The two are siblings on purpose: one call each, returning the walk's new
     /// `(prev_end, prev_deferred_line_comment)`, so the walk states WHICH seam a family
     /// takes and neither arm's rules leak into the loop body. This one is a thin shell over
-    /// [`Printer::member_trailing_run`] — the whole run is emitted and the cursor advances
+    /// [`Printer::push_member_trailing_run`] — the whole run is emitted and the cursor advances
     /// past it — because the member's `;` is already inside its doc.
     fn push_whole_member_trailing_seam(
         &self,
@@ -311,8 +312,6 @@ impl<'a> Printer<'a> {
                 list_end: body.span.end,
             },
         };
-        let (trailing, cursor) = self.member_trailing_run(member_end, gap);
-        parts.extend(trailing);
-        (cursor, false)
+        (self.push_member_trailing_run(parts, member_end, gap), false)
     }
 }

@@ -13,7 +13,7 @@ use crate::printer::{
     is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
     should_inline_logical_expression,
 };
-use smallvec::{SmallVec, smallvec};
+use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
@@ -696,16 +696,18 @@ impl<'a> Printer<'a> {
         // kind (`await using` is two words). Every gap *between* those words is a
         // position an author can comment in, so the words are located rather than
         // measured — measuring skips the interior gaps and drops what's in them.
-        let mut words: SmallVec<[&'static str; 3]> = SmallVec::new();
-        if decl.declare {
-            words.push("declare");
-        }
-        words.extend_from_slice(decl.kind.words());
+        // The kind's words are a static slice the head emitter takes as is; a `declare`
+        // prefix is the only reason to assemble one, and the shared head builder owns that.
+        //
         // The keyword→first-declarator gap. A *line* comment here indents the whole
         // continuation one level (uniform declaration-header rule); block/no-comment
         // cases stay inline. The leading space is supplied by the gap helper below.
-        let (keyword_doc, keyword_end) =
-            self.build_keyword_words_doc(&words, decl.span.start, first_decl_start);
+        let (keyword_doc, keyword_end) = self.build_declaration_head_doc(
+            decl.declare,
+            decl.kind.words(),
+            decl.span.start,
+            first_decl_start,
+        );
 
         // Everything after the gap is collected into `parts` (the continuation).
         let mut parts = DocBuf::new();

@@ -946,7 +946,7 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map(|t| t.span.end)
             .zip(paren_pos);
-        self.append_signature_head_gap_comments(&mut tail, gap, d.empty(), sig_doc);
+        self.append_signature_head_gap_comments(&mut tail, gap, None, sig_doc);
 
         // Comments between return type (or `)`) and `;`. An own-line comment defers
         // past the `;` (prettier); here the `;` is in this same doc, so emit it locally.
@@ -1211,8 +1211,7 @@ impl<'a> Printer<'a> {
 
             // Handle trailing comments after the last member
             if body_has_comments {
-                member_parts
-                    .extend(self.build_trailing_body_comments_doc(prev_end, body_end, false));
+                self.push_trailing_body_comments(&mut member_parts, prev_end, body_end, false);
             }
 
             parts.push(d.indent_hardline(d.concat(&member_parts)));
@@ -1504,11 +1503,12 @@ impl<'a> Printer<'a> {
                     );
 
                     // Handle own-line trailing comments after the last statement
-                    stmt_parts.extend(self.build_trailing_body_comments_doc(
+                    self.push_trailing_body_comments(
+                        &mut stmt_parts,
                         tail.prev_end,
                         body_end,
                         tail.claims_trailing,
-                    ));
+                    );
 
                     parts.push(d.indent_hardline(d.concat(&stmt_parts)));
                     parts.push(d.hardline());

@@ -949,7 +949,7 @@ full in docs/comments.md; here is the seam to reach for:
   [§Leading comments](docs/comments.md#leading-comments-one-rule-one-emitter),
   [§Array family vs params family](docs/comments.md#array-family-vs-params-family-whether-the-soft-line-collapses).
 - **Trailing and dangling runs** take their separator BEFORE each comment, never after
-  (`Printer::build_trailing_body_comments_doc`, `Printer::push_dangling_comment_run`); a run's
+  (`Printer::push_trailing_body_comments`, `Printer::push_dangling_comment_run`); a run's
   **anchor advances** over each comment it emits; a trailing GAP inside a construct
   (`Printer::push_trailing_comments_in_range`) asks the source and carries the break **inside**
   the `line_suffix`. The kind-keyed "a block needs no break" formulation welds

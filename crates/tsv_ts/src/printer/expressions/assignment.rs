@@ -1444,7 +1444,7 @@ impl<'a> Printer<'a> {
                 // A line comment between the callee (or its type arguments) and the
                 // arguments forces the break too: the `//` must end its line before the
                 // `(`, so the argument list drops to an indented continuation
-                // (`push_empty_args`). That break is the comment's, not a chain break
+                // (`build_empty_args_parens_doc`). That break is the comment's, not a chain break
                 // point the static analysis missed.
                 let args_gap_start = call
                     .type_arguments

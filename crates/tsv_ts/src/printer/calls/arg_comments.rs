@@ -11,6 +11,7 @@ use super::super::{LeadingGlue, Printer};
 use crate::ast::internal;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Open a non-last argument gap that may carry comments and emit its head into
@@ -103,13 +104,12 @@ pub(super) struct InterArgGap<'a> {
 /// Shared by the plain call/`new` path and the member-chain path so the empty-args
 /// shape lives in one place: these two drifted apart once already, and the
 /// inline-comment emission that drift preserved let a `//` comment swallow the `)`.
-pub(super) fn push_empty_args(
+pub(super) fn build_empty_args_parens_doc(
     printer: &Printer<'_>,
-    parts: &mut DocBuf,
     search_from: u32,
     paren_close: u32,
     prefix: &'static str,
-) {
+) -> DocId {
     let d = printer.d();
     // No `(` in the gap: a `new` written with no argument list at all synthesizes one
     // (`new (Foo /* c */)` → `new Foo /* c */()`), so the whole gap is pre-paren. The
@@ -131,7 +131,7 @@ pub(super) fn push_empty_args(
     // [`Printer::build_line_split_gap_doc`] states, shared with the callee→`?.` half an
     // optional call splits off ([`super::optional_callee_gap_doc`]) — the same position,
     // so the two cannot answer it differently.
-    parts.push(printer.build_line_split_gap_doc(search_from, paren_pos, parens));
+    printer.build_line_split_gap_doc(search_from, paren_pos, parens)
 }
 
 //

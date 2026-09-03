@@ -164,7 +164,7 @@ impl<'a> Printer<'a> {
         expand_empty: bool,
         in_program_or_block: bool,
     ) -> DocId {
-        self.build_block_body_doc(block, expand_empty, DocBuf::new(), in_program_or_block)
+        self.build_block_body_doc(block, expand_empty, in_program_or_block)
     }
 
     /// Build inner comments doc for empty block — the dangling run, hardline-joined
@@ -182,19 +182,16 @@ impl<'a> Printer<'a> {
         comment_parts
     }
 
-    /// Build a Doc for a block body with optional leading content
+    /// Build a Doc for a block body.
     ///
     /// This is the unified implementation for block statement doc building.
-    /// The `leading_content` is prepended to the body (used for outer comments).
     fn build_block_body_doc(
         &self,
         block: &internal::BlockStatement<'_>,
         expand_empty: bool,
-        leading_content: DocBuf,
         in_program_or_block: bool,
     ) -> DocId {
         let d = self.d();
-        let has_leading = !leading_content.is_empty();
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
 
@@ -204,20 +201,11 @@ impl<'a> Printer<'a> {
         // range rather than the statement list.
         if is_effectively_empty_body(block.body) {
             let inner_comments = self.build_inner_comments_for_empty_block(block);
-            let has_inner_comments = !inner_comments.is_empty();
-
-            if has_leading || has_inner_comments {
-                // Block with comments (outer and/or inner)
-                let mut all_content = leading_content;
-                if has_inner_comments {
-                    if has_leading {
-                        all_content.push(d.hardline());
-                    }
-                    all_content.extend(inner_comments);
-                }
+            if !inner_comments.is_empty() {
+                // Block with inner comments
                 return d.concat(&[
                     d.text("{"),
-                    d.indent_hardline(d.concat(&all_content)),
+                    d.indent_hardline(d.concat(&inner_comments)),
                     d.hardline(),
                     d.text("}"),
                 ]);
@@ -233,27 +221,22 @@ impl<'a> Printer<'a> {
 
         // A comment trailing the opening `{` on its own line is kept on the `{`
         // line when the body expands (divergence from prettier, which relocates it
-        // to its own line as the body's leading comment). Only when there's no
-        // hoisted outer content (which would already occupy the first body line).
+        // to its own line as the body's leading comment).
         // See conformance_prettier_ts_comments.md §Comment relocation (Block body `{`).
         let first_stmt_start = block.body[0].span().start;
-        let (brace_line_prefix, delimiter_pull_pos) = if has_leading {
-            (DocBuf::new(), None)
-        } else {
-            self.delimiter_line_comment_prefix(block.span.start, first_stmt_start)
-        };
+        let (brace_line_prefix, delimiter_pull_pos) =
+            self.delimiter_line_comment_prefix(block.span.start, first_stmt_start);
 
         // Build statements (leading comments, blank-line separators,
         // format-ignore, trailing same-line comments) via the shared walk,
-        // filling a pooled buffer (pre-loaded with any hoisted leading content)
-        // in place — one RAII owner, released back to the free-list on scope exit.
+        // filling a pooled buffer in place — one RAII owner, released back to the
+        // free-list on scope exit.
         let mut body_parts = d.pooled_docbuf();
-        body_parts.extend(leading_content);
         let tail = self.build_statement_list_docs_into(
             &mut body_parts,
             block.body,
             Span::new(block_start, block_end),
-            has_leading,
+            false,
             delimiter_pull_pos,
             in_program_or_block,
         );
@@ -272,11 +255,12 @@ impl<'a> Printer<'a> {
             // case for free: a last statement that deferred a line comment past its own
             // `;` left the cursor AT that `;`, which is where this run's anchor has to
             // stand — advancing past the very comments it must print would drop them.
-            body_parts.extend(self.build_trailing_body_comments_doc(
+            self.push_trailing_body_comments(
+                &mut body_parts,
                 tail.prev_end,
                 block_end,
                 tail.claims_trailing,
-            ));
+            );
         }
 
         d.concat(&[
@@ -529,12 +513,10 @@ impl<'a> Printer<'a> {
             } else if body_has_comments {
                 // The shared trailing arm of the statement-gap seam: the run bounded at
                 // the next printed statement and stopped at the claim split, the cursor
-                // clamped to the same split ([`Printer::statement_trailing_run`]) — so
+                // clamped to the same split ([`Printer::push_statement_trailing_run`]) — so
                 // a handed-over comment stays ahead of it for the next statement's
                 // leading run to find.
-                let (trailing, new_prev_end) = self.statement_trailing_run(body, i, body_end);
-                body_parts.extend(trailing);
-                prev_end = new_prev_end;
+                prev_end = self.push_statement_trailing_run(body_parts, body, i, body_end);
             } else {
                 prev_end = stmt_end;
             }
