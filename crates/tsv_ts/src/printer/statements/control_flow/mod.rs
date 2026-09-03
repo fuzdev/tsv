@@ -754,7 +754,7 @@ impl<'a> Printer<'a> {
                     self.push_blank_preserving_hardline(
                         parts,
                         last.span.end,
-                        self.blank_scan_end(last.span.end, next),
+                        self.blank_scan_end_after(last, next),
                     );
                 }
                 None => parts.push(d.hardline()),

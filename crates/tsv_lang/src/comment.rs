@@ -583,6 +583,11 @@ thread_local! {
 /// answer either way. That is what lets the hint sit in a thread-local with no owner, no
 /// invalidation protocol and no reset: staleness costs two compares, never correctness.
 ///
+/// One question is deliberately NOT asked here: a walk that starts at a comment's own end
+/// takes [`comments_in_source_after_comment`], whose answer is the comment's index — the
+/// hint sits at that comment and would miss by exactly one, into a full search, on every
+/// such ask.
+///
 /// Left to the inliner deliberately, and measured: on a 1,666-file TypeScript corpus this
 /// beats `#[inline(never)]` by 0.24 and an explicit inlined-bracket / `#[inline(never)]`-
 /// search split by 0.20 points of the program's instructions, at 36 KB less `.text` than
@@ -742,6 +747,40 @@ pub fn comments_in_source_after(comments: &[Comment], pos: u32) -> impl Iterator
     comments[first_idx..].iter()
 }
 
+/// **in source**: every comment physically after `comment` — its successors in
+/// `comments`, [`Comment::owned_by_node`] comments **counted**.
+///
+/// The printer's next question after a comment is very often asked from that comment's
+/// own end — a blank-line scan to the next node, a glue test to the next comment — and
+/// the comment's INDEX answers it outright: comments are disjoint and start-sorted, so
+/// its successor is the first comment at or past `comment.span.end`. Asking the position
+/// through [`find_first_comment_from`] instead is a guaranteed miss (the hint sits at the
+/// comment itself, whose start is below its own end) followed by a full search, and on a
+/// real corpus that one shape was ~60% of every miss the hint took. This walk also leaves
+/// the hint where it was, so the ask that follows — usually from before the comment —
+/// still hits.
+///
+/// `comment` is expected to be an element of `comments` (a reference handed out by one of
+/// the range walks above); its index is recovered from its address within the slice and
+/// verified by pointer identity, and a reference from anywhere else takes the search on
+/// its end position — the same answer either way.
+#[inline]
+pub fn comments_in_source_after_comment<'a>(
+    comments: &'a [Comment],
+    comment: &Comment,
+) -> &'a [Comment] {
+    let base = comments.as_ptr().addr();
+    let idx = core::ptr::from_ref(comment).addr().wrapping_sub(base) / size_of::<Comment>();
+    if comments
+        .get(idx)
+        .is_some_and(|at| core::ptr::eq(at, comment))
+    {
+        &comments[idx + 1..]
+    } else {
+        &comments[find_first_comment_from(comments, comment.span.end)..]
+    }
+}
+
 /// The block comment **owned** by the token beginning at `start`, when there is one.
 ///
 /// The lookup behind every owned-comment claim: an owned comment is skipped by the
@@ -833,6 +872,38 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// [`comments_in_source_after_comment`] is the successor slice for an element of the
+    /// array — without moving the hint — and the search's answer for a reference from
+    /// anywhere else, so the two spellings never disagree.
+    #[test]
+    fn comments_in_source_after_comment_is_the_successor_slice_or_the_search() {
+        let comments = vec![
+            comment(4, 8, true, "a"),
+            comment(20, 25, false, "b"),
+            comment(26, 40, true, "c"),
+        ];
+        for (idx, c) in comments.iter().enumerate() {
+            FIRST_COMMENT_HINT.with(|cell| cell.set(idx));
+            let after = comments_in_source_after_comment(&comments, c);
+            assert_eq!(after.len(), comments.len() - idx - 1, "successors of {idx}");
+            assert!(after.first().is_none_or(|n| n.span.start >= c.span.end));
+            assert_eq!(
+                FIRST_COMMENT_HINT.with(Cell::get),
+                idx,
+                "the element walk leaves the hint alone"
+            );
+            // A copy is not an element: the same answer, through the search.
+            let copy = *c;
+            assert_eq!(
+                comments_in_source_after_comment(&comments, &copy).len(),
+                after.len(),
+                "copy of {idx}"
+            );
+        }
+        let empty: Vec<Comment> = vec![];
+        assert!(comments_in_source_after_comment(&empty, &comments[0]).is_empty());
     }
 
     #[test]

@@ -492,10 +492,7 @@ impl<'a> Printer<'a> {
             comments_to_emit_in_range(self.comments, gap_start, first_start).collect();
         let (first, last) = (comments.first()?, comments.last()?);
         if !comments.iter().all(|c| c.is_block)
-            || !self.is_same_line(
-                last.span.end,
-                self.blank_scan_end(last.span.end, first_start),
-            )
+            || !self.is_same_line(last.span.end, self.blank_scan_end_after(last, first_start))
             || self
                 .composite_leading_run_freeze(union.span.start, union.types)
                 .is_some()

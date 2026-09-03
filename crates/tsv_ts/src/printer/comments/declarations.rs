@@ -1368,7 +1368,7 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(self.build_comment_doc(comment));
                 let emit_next = comments.peek().map_or(end, |n| n.span.start);
-                let next = self.blank_scan_end(comment.span.end, emit_next);
+                let next = self.blank_scan_end_after(comment, emit_next);
                 self.push_blank_preserving_hardline(&mut parts, comment.span.end, next);
                 at_line_start = true;
             }
@@ -1937,8 +1937,8 @@ impl<'a> Printer<'a> {
                     // no other emitter — it belongs to this seam. The break is forced (a
                     // `//`), so the blank survives with it, as at every other forced
                     // continuation.
-                    let next = self.blank_scan_end(
-                        comment.span.end,
+                    let next = self.blank_scan_end_after(
+                        comment,
                         comments.get(i + 1).map_or(value_start, |c| c.span.start),
                     );
                     // Prepending is well-defined: this arm needs `!on_own_line`, which

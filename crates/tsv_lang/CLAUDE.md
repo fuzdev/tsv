@@ -192,7 +192,12 @@ than as plausible code. See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md
 **in source** — "what comment bytes are physically here?" — **counts** owned. Every cursor
 (blank-line scan, offset, `prev_end`):
 
-- `comments_in_source_range()` / `comments_in_source_after()`
+- `comments_in_source_range()` / `comments_in_source_after()` /
+  `comments_in_source_after_comment()` — the last from a comment the caller holds rather than
+  from a position: its successors by INDEX (recovered from the reference's address in the
+  slice, `ptr::eq`-verified, the search as fallback). A blank scan or a glue test asked from a
+  comment's own end is a guaranteed hint miss the other way — the hint sits at that comment —
+  so every such walk goes through this one and never moves the hint
 
 Axis-free (provably): `has_line_comments_in_range()` — ownership only ever binds a **block**
 comment, so skip ≡ count. If a line comment ever becomes ownable, it must grow an axis.
@@ -215,7 +220,10 @@ Shared:
   in step) and falls back to a `partition_point`; the hint is **verified against the array on
   every read**, so a hint left by another document — or by an array rebuilt at the same
   address — is a miss and never a wrong answer, which is what lets it live unowned with no
-  invalidation protocol and no reset
+  invalidation protocol and no reset. ⚠️ Its body is inlined at ~1,000 sites with no outlined
+  copy: an instruction added there is added everywhere and re-budgets every caller's inliner
+  (a twelve-line neighbour probe cost +33 KB of `.text` and cycles); a question the hint
+  answers badly gets its own primitive at the sites (`comments_in_source_after_comment`)
 - Every *range* lookup short-circuits a range too narrow to hold a whole comment
   (`Comment::MIN_SPAN_LEN`, guarded at the three parsers' construction sites) without
   probing the array at all — the printers ask about token-sized gaps by the hundred

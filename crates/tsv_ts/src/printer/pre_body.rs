@@ -61,7 +61,7 @@ impl<'a> Printer<'a> {
             // an owned comment sitting between two emitted ones can't desync this emitter
             // from the gate that selected it (both walk the same range).
             let emit_next = comments.peek().map_or(end, |n| n.span.start);
-            let next = self.blank_scan_end(comment.span.end, emit_next);
+            let next = self.blank_scan_end_after(comment, emit_next);
             prev_hangs = self.comment_hangs_next(comment, next);
         }
         if parts.is_empty() {
