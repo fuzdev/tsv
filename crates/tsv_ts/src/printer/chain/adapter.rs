@@ -9,7 +9,7 @@ use super::printing::ComputedBracket;
 use super::types::ChainCall;
 use crate::ast::internal;
 use crate::printer::comments::CommentVec;
-use crate::printer::{CommentSpacing, Printer, comments_to_emit_in_range};
+use crate::printer::{CommentSpacing, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{ClassifiedComments, Comment, Span};
@@ -57,7 +57,8 @@ impl<'a> Printer<'a> {
         end: u32,
         spacing: CommentSpacing,
     ) -> DocId {
-        let block_comments: CommentVec<'_> = comments_to_emit_in_range(self.comments, start, end)
+        let block_comments: CommentVec<'_> = self
+            .comments_to_emit_between(start, end)
             .filter(|c| c.is_block)
             .collect();
         self.format_block_comments(&block_comments, spacing)
@@ -89,7 +90,7 @@ impl<'a> Printer<'a> {
         let mut body_parts = DocBuf::new();
         body_parts.push(inner);
         let mut prev = prop_end;
-        for comment in comments_to_emit_in_range(self.comments, prop_end, bracket_end) {
+        for comment in self.comments_to_emit_between(prop_end, bracket_end) {
             if self.is_same_line(prev, comment.span.start) {
                 body_parts.push(d.text(" "));
             } else {

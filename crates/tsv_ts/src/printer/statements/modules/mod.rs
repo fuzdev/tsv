@@ -25,7 +25,6 @@ use crate::printer::{ParenContext, needs_parens};
 use smallvec::SmallVec;
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -1088,9 +1087,7 @@ impl<'a> Printer<'a> {
             if open_has_line {
                 // Each open-gap comment on its own line — a line comment there can't
                 // share one with the literal.
-                for comment in
-                    comments_to_emit_in_range(self.comments, require_open_end, literal_start)
-                {
+                for comment in self.comments_to_emit_between(require_open_end, literal_start) {
                     inner.push(self.build_comment_doc(comment));
                     inner.push(d.hardline());
                 }

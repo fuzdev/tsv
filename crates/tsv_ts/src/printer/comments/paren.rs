@@ -12,7 +12,6 @@ use crate::printer::ParenContext;
 use crate::printer::expressions::operators::SeqLayout;
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::range_too_narrow_for_a_comment;
@@ -199,7 +198,7 @@ impl<'a> Printer<'a> {
             value_start as usize,
             b'(',
         )? as u32;
-        comments_to_emit_in_range(self.comments, gap_start, value_start)
+        self.comments_to_emit_between(gap_start, value_start)
             .next()
             .is_some_and(|first| first.span.start > paren)
             .then_some(paren)
@@ -265,7 +264,7 @@ impl<'a> Printer<'a> {
         // What physically precedes the next comment: an **in-source** cursor, so it
         // advances over every comment in the gap (docs/comments.md §the three axes).
         let mut prev_end = argument_end;
-        for comment in comments_to_emit_in_range(self.comments, argument_end, span_end) {
+        for comment in self.comments_to_emit_between(argument_end, span_end) {
             // The *comment* line-break table, never the layout one: this decides whether
             // a `//` is followed by a break, so it must stay real under the canonical
             // reprint, where an erased read would weld the run.
@@ -349,7 +348,7 @@ impl<'a> Printer<'a> {
         // position — right after the `;` — while the buffer flushes at the line's end,
         // so the pair comes out REORDERED.
         let mut run_deferred = false;
-        for comment in comments_to_emit_in_range(self.comments, argument_end, span_end) {
+        for comment in self.comments_to_emit_between(argument_end, span_end) {
             let same_line = !self.has_newline_between(prev_end, comment.span.start);
             let operand_enclosed =
                 same_line && self.gap_has_close_paren(comment.span.end, span_end);
@@ -410,7 +409,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_post_semi_comments(&self, deferred: &mut DocBuf, start: u32, end: u32) {
         let d = self.d();
         let mut prev_end = start;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             let same_line = self.is_same_line(prev_end, comment.span.start);
             if comment.is_block && same_line {
                 // Same-line block comment trails inline after the `;`.
@@ -453,7 +452,7 @@ impl<'a> Printer<'a> {
         span_end: u32,
     ) {
         let d = self.d();
-        for comment in comments_to_emit_in_range(self.comments, argument_end, span_end) {
+        for comment in self.comments_to_emit_between(argument_end, span_end) {
             if self.has_newline_between(argument_end, comment.span.start) {
                 // Own-line comments (line or block): skip — the parent's share.
                 continue;
@@ -511,7 +510,7 @@ impl<'a> Printer<'a> {
         spread: &internal::SpreadElement<'_>,
     ) -> CommentVec<'_> {
         let arg_end = spread.argument.span().end;
-        comments_to_emit_in_range(self.comments, arg_end, spread.span.end)
+        self.comments_to_emit_between(arg_end, spread.span.end)
             .filter(|c| self.has_newline_between(arg_end, c.span.start))
             .collect()
     }
@@ -532,7 +531,7 @@ impl<'a> Printer<'a> {
             return false;
         };
         let arg_end = spread.argument.span().end;
-        comments_to_emit_in_range(self.comments, arg_end, spread.span.end)
+        self.comments_to_emit_between(arg_end, spread.span.end)
             .filter(|c| self.has_newline_between(arg_end, c.span.start))
             .last()
             .is_some_and(|c| !c.is_block)
@@ -561,7 +560,7 @@ impl<'a> Printer<'a> {
             return false;
         };
         let arg_end = spread.argument.span().end;
-        comments_to_emit_in_range(self.comments, arg_end, spread.span.end)
+        self.comments_to_emit_between(arg_end, spread.span.end)
             .any(|c| !c.is_block || self.has_newline_between(arg_end, c.span.start))
     }
 
@@ -605,7 +604,7 @@ impl<'a> Printer<'a> {
         spread: &internal::SpreadElement<'_>,
     ) -> bool {
         let arg_end = spread.argument.span().end;
-        comments_to_emit_in_range(self.comments, arg_end, spread.span.end)
+        self.comments_to_emit_between(arg_end, spread.span.end)
             .any(|c| !c.is_block && !self.has_newline_between(arg_end, c.span.start))
     }
 
@@ -858,7 +857,7 @@ impl<'a> Printer<'a> {
         let Some(close) = self.collapsed_grouping_close(expr_end, boundary_end) else {
             return false;
         };
-        comments_to_emit_in_range(self.comments, expr_end, close)
+        self.comments_to_emit_between(expr_end, close)
             .any(|c| !c.is_block || c.multiline)
     }
 
@@ -1638,7 +1637,7 @@ impl<'a> Printer<'a> {
             && self.shell_meets_statement_terminator(boundary_end)
         {
             let mut parts: DocBuf = smallvec![inner];
-            for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
+            for comment in self.comments_to_emit_between(expr_end, boundary_end) {
                 let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
                 parts.push(d.line_suffix(suffix));
             }
@@ -1697,14 +1696,15 @@ impl<'a> Printer<'a> {
         // the `multiline` term the two authorings of one comment disagreed: `(⏎\tx // c⏎)`
         // expanded while `(x /* m1⏎m2 */)` stayed glued, at the same gap and for the same
         // reason.
-        let needs_break =
-            comments_to_emit_in_range(self.comments, expr_end, boundary_end).any(|c| {
+        let needs_break = self
+            .comments_to_emit_between(expr_end, boundary_end)
+            .any(|c| {
                 !c.is_block || c.multiline || self.has_newline_between(expr_end, c.span.start)
             });
 
         let mut parts = DocBuf::new();
         let mut prev_end = expr_end;
-        for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
+        for comment in self.comments_to_emit_between(expr_end, boundary_end) {
             if self.has_newline_between(prev_end, comment.span.start) {
                 parts.push(d.hardline());
             } else {
@@ -1830,7 +1830,7 @@ impl<'a> Printer<'a> {
         // Collect block comments that appear before the operator
         let mut promoted_parts = DocBuf::new();
         let mut last_promoted_end = start;
-        for comment in comments_to_emit_in_range(self.comments, start, op_pos) {
+        for comment in self.comments_to_emit_between(start, op_pos) {
             if comment.is_block {
                 promoted_parts.push(d.text(" "));
                 promoted_parts.push(self.build_comment_doc(comment));

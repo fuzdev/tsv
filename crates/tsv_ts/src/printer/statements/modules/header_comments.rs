@@ -5,7 +5,6 @@
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::comments::CommentSpacing;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -67,7 +66,7 @@ impl<'a> Printer<'a> {
     /// the `//` keeps its place in the run either way rather than reordering across it,
     /// which is why this is a split point and not a per-comment filter.
     pub(super) fn binding_separator_split(&self, binding_end: u32, scan_end: u32) -> u32 {
-        comments_to_emit_in_range(self.comments, binding_end, scan_end)
+        self.comments_to_emit_between(binding_end, scan_end)
             .find(|c| !c.is_block)
             .map_or(scan_end, |c| c.span.start)
     }

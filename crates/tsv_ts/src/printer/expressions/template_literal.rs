@@ -11,7 +11,6 @@ use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
@@ -95,18 +94,10 @@ impl<'a> Printer<'a> {
                 let (leading_comments, trailing_comments): (CommentVec<'_>, CommentVec<'_>) =
                     if template_has_comments {
                         (
-                            comments_to_emit_in_range(
-                                self.comments,
-                                quasi.span.end,
-                                expr.span().start,
-                            )
-                            .collect(),
-                            comments_to_emit_in_range(
-                                self.comments,
-                                expr.span().end,
-                                next_quasi.span.start,
-                            )
-                            .collect(),
+                            self.comments_to_emit_between(quasi.span.end, expr.span().start)
+                                .collect(),
+                            self.comments_to_emit_between(expr.span().end, next_quasi.span.start)
+                                .collect(),
                         )
                     } else {
                         (CommentVec::new(), CommentVec::new())
@@ -461,8 +452,9 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map_or(tag_gap_start, |ta| ta.span.end);
         let comment_end = tagged.quasi.span.start;
-        let gap_comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, comment_start, comment_end).collect();
+        let gap_comments: CommentVec<'_> = self
+            .comments_to_emit_between(comment_start, comment_end)
+            .collect();
         if !gap_comments.is_empty() {
             let mut prev_end = comment_start;
             let mut ends_with_hardline = false;

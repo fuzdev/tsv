@@ -36,7 +36,6 @@ use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, function_signature_has_breaking_comments,
 };
 use smallvec::smallvec;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -1043,9 +1042,9 @@ fn build_call_with_arg_comments(
                 // line; an author blank line in the gap breaks the run and is
                 // preserved (and forces the call open). A space keeps a block glued
                 // to its arg, so a hug (`/* c */ a`) stays inline.
-                let comments: CommentVec<'_> =
-                    comments_to_emit_in_range(printer.comments, paren_open, first_arg_start)
-                        .collect();
+                let comments: CommentVec<'_> = printer
+                    .comments_to_emit_between(paren_open, first_arg_start)
+                    .collect();
                 // A blank between two comments, or between the last and the arg, expands
                 // the call (the comment interiors are skipped — only the gaps matter).
                 let blank_in_gap = comments

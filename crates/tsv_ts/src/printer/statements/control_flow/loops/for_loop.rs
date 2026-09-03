@@ -12,7 +12,6 @@ use crate::printer::{
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
@@ -364,7 +363,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut prev = anchor;
         let mut first = true;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             if comment.is_block {
                 if cur.pending_break {
                     inner.push(d.hardline());
@@ -832,7 +831,7 @@ impl<'a> Printer<'a> {
         end: u32,
     ) {
         let d = self.d();
-        for comment in comments_to_emit_in_range(self.comments, range_start, boundary) {
+        for comment in self.comments_to_emit_between(range_start, boundary) {
             if self.is_same_line(end, comment.span.start) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -891,7 +890,7 @@ impl<'a> Printer<'a> {
         // to this run. What remains splits at the clause the way every gap does: the
         // glued suffix leads it inline, the rest take their own lines.
         let (run, hug) = self.split_glued_comments(
-            comments_to_emit_in_range(self.comments, search_start, clause_start)
+            self.comments_to_emit_between(search_start, clause_start)
                 .filter(|c| !prev_end.is_some_and(|pe| self.is_same_line(pe, c.span.start))),
         );
 
@@ -925,7 +924,7 @@ impl<'a> Printer<'a> {
     fn push_for_empty_slot_comments(&self, parts: &mut DocBuf, start: u32, end: u32) -> bool {
         let d = self.d();
         let mut emitted = false;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             if emitted {
                 parts.push(d.line());
             }
@@ -955,7 +954,7 @@ impl<'a> Printer<'a> {
         update_end: Option<u32>,
     ) {
         let d = self.d();
-        for comment in comments_to_emit_in_range(self.comments, start, close) {
+        for comment in self.comments_to_emit_between(start, close) {
             if update_end.is_some_and(|end| self.is_same_line(end, comment.span.start)) {
                 parts.push(d.text(" "));
             } else {
@@ -1168,7 +1167,7 @@ impl<'a> Printer<'a> {
 
         // Comments between ( and left
         if let Some(open) = spans.open_paren {
-            for comment in comments_to_emit_in_range(self.comments, open + 1, spans.left_start) {
+            for comment in self.comments_to_emit_between(open + 1, spans.left_start) {
                 if comment.is_block {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.text(" "));
@@ -1372,11 +1371,7 @@ impl<'a> Printer<'a> {
             // the two emitters cannot disagree about where the claim ended.
             let (glued, resume) = self.split_open_delimiter_glued_run(open + 1, spans.left_start);
             parts.extend(glued);
-            self.split_glued_comments(comments_to_emit_in_range(
-                self.comments,
-                resume,
-                spans.left_start,
-            ))
+            self.split_glued_comments(self.comments_to_emit_between(resume, spans.left_start))
         } else {
             Default::default()
         };
@@ -1570,7 +1565,7 @@ impl<'a> Printer<'a> {
     /// layout that can give one a line to end.
     fn append_for_in_of_block_comments(&self, parts: &mut DocBuf, start: u32, end: u32) {
         let d = self.d();
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             if comment.is_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -1730,10 +1725,10 @@ impl<'a> Printer<'a> {
             decl_docs.push(d.text(","));
             self.push_stranded_after_comma_blocks(decl_docs, comma_pos, curr_start);
             decl_docs.push(d.line());
-            let after: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, comma_pos, curr_start)
-                    .filter(|c| !self.is_stranded_after_comma_block(c, comma_pos, curr_start))
-                    .collect();
+            let after: CommentVec<'_> = self
+                .comments_to_emit_between(comma_pos, curr_start)
+                .filter(|c| !self.is_stranded_after_comma_block(c, comma_pos, curr_start))
+                .collect();
             self.push_leading_comment_run(
                 decl_docs,
                 after.iter().copied(),

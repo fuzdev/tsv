@@ -11,8 +11,6 @@ use crate::ast::internal;
 use crate::printer::{next_printed_stmt, next_printed_stmt_start, statement_gap_floor};
 use tsv_lang::Span;
 use tsv_lang::comments_in_source_after_comment;
-use tsv_lang::comments_in_source_range;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -137,7 +135,7 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         self.push_leading_comment_run(
             &mut parts,
-            comments_to_emit_in_range(self.comments, start, end)
+            self.comments_to_emit_between(start, end)
                 .filter(|c| !skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, c))),
             end,
             LeadingGlue::Adjacent,
@@ -253,7 +251,7 @@ impl<'a> Printer<'a> {
         let mut prev_end = start;
         // The comment emitted last, for the glue question in the own-line arm.
         let mut prev_comment: Option<&internal::Comment> = None;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             if comment.span.end <= run_end {
                 parts.push(self.build_trailing_comment_doc(comment));
             } else {
@@ -408,8 +406,9 @@ impl<'a> Printer<'a> {
             }
             // What precedes c on its line — the nearest comment (in SOURCE: this is a
             // cursor question, so owned comments count), or real content.
-            let Some(prev) =
-                comments_in_source_range(self.comments, span_start, c.span.start).last()
+            let Some(prev) = self
+                .comments_in_source_between(span_start, c.span.start)
+                .last()
             else {
                 return true;
             };
@@ -444,7 +443,9 @@ impl<'a> Printer<'a> {
             return None;
         }
         let separator = span_end - 1;
-        let last = comments_to_emit_in_range(self.comments, span_start, separator).last()?;
+        let last = self
+            .comments_to_emit_between(span_start, separator)
+            .last()?;
         bytes[last.span.end as usize..separator as usize]
             .iter()
             .all(u8::is_ascii_whitespace)
@@ -518,7 +519,7 @@ impl<'a> Printer<'a> {
     /// cursor with it (`find_end_with_trailing_comments(..).min(claim_end)`), so the
     /// leading side finds the handed-over comments still ahead of the cursor.
     pub(crate) fn trailing_claim_end(&self, gap_start: u32, next_start: u32) -> u32 {
-        comments_to_emit_in_range(self.comments, gap_start, next_start)
+        self.comments_to_emit_between(gap_start, next_start)
             .find(|c| self.comment_leads_next_item(c, next_start))
             .map_or(next_start, |c| c.span.start)
     }
@@ -714,8 +715,8 @@ impl<'a> Printer<'a> {
         upper_bound: u32,
     ) -> impl Iterator<Item = &'a internal::Comment> {
         let mut line_ref = after_pos;
-        comments_to_emit_in_range(self.comments, after_pos, upper_bound).take_while(
-            move |comment| {
+        self.comments_to_emit_between(after_pos, upper_bound)
+            .take_while(move |comment| {
                 if !self.is_same_line(line_ref, comment.span.start) {
                     return false; // Only same-line comments
                 }
@@ -724,8 +725,7 @@ impl<'a> Printer<'a> {
                     line_ref = comment.span.end;
                 }
                 true
-            },
-        )
+            })
     }
 
     /// Build docs for trailing same-line comments after a node
@@ -953,7 +953,7 @@ impl<'a> Printer<'a> {
         // comment glued to it in source has nothing here to glue to.
         let mut prev_emitted: Option<&internal::Comment> = None;
 
-        for comment in comments_to_emit_in_range(self.comments, prev_end, body_end) {
+        for comment in self.comments_to_emit_between(prev_end, body_end) {
             if self.comment_already_trailed(anchor, comment, claims_trailing, None) {
                 // Already emitted as the last item's trailing run — but the cursor still
                 // steps over its BYTES, since the blank-line scan below reads raw source
@@ -1241,8 +1241,9 @@ impl<'a> Printer<'a> {
         item_start: u32,
         delimiter_pull: Option<u32>,
     ) -> CommentVec<'_> {
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, gap_start, item_start).collect();
+        let comments: CommentVec<'_> = self
+            .comments_to_emit_between(gap_start, item_start)
+            .collect();
         self.first_member_leading_comments(comments, delimiter_pull)
     }
 
@@ -1421,8 +1422,9 @@ impl<'a> Printer<'a> {
         let body_start = span_start + 1; // After opening delimiter
         let body_end = span_end.saturating_sub(1); // Before closing delimiter
 
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, body_start, body_end).collect();
+        let comments: CommentVec<'_> = self
+            .comments_to_emit_between(body_start, body_end)
+            .collect();
 
         if comments.is_empty() {
             return d.concat(&[opening, closing]);
@@ -1744,7 +1746,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn gap_anchor_line_end(&self, anchor: u32, upper_bound: u32) -> u32 {
         let mut line_ref = anchor;
         let mut end = anchor;
-        for comment in comments_in_source_range(self.comments, anchor, upper_bound) {
+        for comment in self.comments_in_source_between(anchor, upper_bound) {
             if !self.is_same_line(line_ref, comment.span.start) {
                 break;
             }
@@ -1806,7 +1808,7 @@ impl<'a> Printer<'a> {
         } = binding;
         let d = self.d();
         let mut prev = start;
-        let mut gap = comments_to_emit_in_range(self.comments, start, sep_pos).peekable();
+        let mut gap = self.comments_to_emit_between(start, sep_pos).peekable();
         // Zero-comment fast gate: the split is a search of its own, and every `;`-gap
         // caller (a `const`'s terminator, a `for` head) asks on documents that mostly have
         // no comment here at all. Safe to skip when the to-emit range is empty even though
@@ -1890,7 +1892,7 @@ impl<'a> Printer<'a> {
         end: u32,
     ) {
         let d = self.d();
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             if comment.is_block {
                 // One text node (`/*content*/ `) — callers may pass `parts` as
                 // fill items, so the space can't split into its own node. The
@@ -1919,7 +1921,7 @@ impl<'a> Printer<'a> {
         end: u32,
     ) {
         let d = self.d();
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             if comment.is_block {
                 // One text node (` /*content*/`) — callers may pass `parts` as
                 // fill items, so the space can't split into its own node. The
@@ -2006,7 +2008,8 @@ impl<'a> Printer<'a> {
         // costs the before-comma readers nothing, since the run is a prefix — over
         // `[elem_end, comma_pos)` the two bounds classify identically.
         let anchor_line_end = self.gap_anchor_line_end(elem_end, next_start);
-        let last_deferred = comments_to_emit_in_range(self.comments, elem_end, comma_pos)
+        let last_deferred = self
+            .comments_to_emit_between(elem_end, comma_pos)
             .filter(|c| c.span.start >= anchor_line_end)
             .last();
 
@@ -2076,7 +2079,7 @@ impl<'a> Printer<'a> {
         // than at the comma. See [`Printer::gap_emitted_line_comment_before`] for what a
         // claim past that point welds or reorders.
         let mut after_comma_end = comma_pos + 1;
-        for comment in comments_to_emit_in_range(self.comments, comma_pos + 1, next_start) {
+        for comment in self.comments_to_emit_between(comma_pos + 1, next_start) {
             if self.gap_emitted_line_comment_before(elem_end, comment.span.start) {
                 break;
             }

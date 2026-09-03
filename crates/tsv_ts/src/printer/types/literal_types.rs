@@ -10,7 +10,6 @@
 use super::Printer;
 use crate::ast::internal::{TSLiteralType, TSType, TemplateElement, TemplateLiteralType};
 use smallvec::{SmallVec, smallvec};
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
@@ -121,7 +120,7 @@ impl<'a> Printer<'a> {
     /// [`Printer::is_own_line_comment`] answers a different question (it treats every line
     /// comment as own-line, which a trailing `${ // c` is not).
     fn interp_comment_authored_own_line(&self, gap_start: u32, gap_end: u32) -> bool {
-        comments_to_emit_in_range(self.comments, gap_start, gap_end)
+        self.comments_to_emit_between(gap_start, gap_end)
             .next()
             .is_some_and(|c| has_newline_before_position(self.source, c.span.start))
     }

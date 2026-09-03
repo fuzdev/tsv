@@ -9,7 +9,6 @@ use crate::printer::comments::{CommentSpacing, KeywordOperandGap};
 use crate::printer::{CommentVec, ParenContext, Printer, RunLeadingBlank};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Holds information about an operand in a binary expression chain
@@ -278,11 +277,7 @@ impl<'a> Printer<'a> {
         // what it says.
         let owned_leading_comment = leading_comments_opt.is_none()
             && !operand_encloses_owned_comment
-            && tsv_lang::has_comments_on_page_in_range(
-                self.comments,
-                leading_run_start,
-                argument_start,
-            );
+            && self.has_comments_on_page_between(leading_run_start, argument_start);
         let has_leading_comments =
             paren_glued.is_some() || leading_comments_opt.is_some() || owned_leading_comment;
 
@@ -1601,7 +1596,8 @@ impl<'a> Printer<'a> {
         // emits an inter-operand comment inline before its operand, which would glue an
         // own-line block directive onto the operand's line — an inert placement, so the
         // freeze would be lost on the second pass.
-        if comments_to_emit_in_range(self.comments, seq.span.start, trailing_end)
+        if self
+            .comments_to_emit_between(seq.span.start, trailing_end)
             .any(|c| !c.is_block || self.is_honored_directive(c))
         {
             return self.build_sequence_doc_with_line_comments(seq, trailing_end, parens, layout);
@@ -1669,7 +1665,7 @@ impl<'a> Printer<'a> {
             // (`trailing_end`), outside `seq.span`. Inside `inner`, so a hanging layout's
             // closing softline lands after it rather than between operand and comment.
             let last_end = seq.expressions[n - 1].span().end;
-            for comment in comments_to_emit_in_range(self.comments, last_end, trailing_end) {
+            for comment in self.comments_to_emit_between(last_end, trailing_end) {
                 inner.push(d.text(" "));
                 inner.push(self.build_comment_doc(comment));
             }
@@ -1688,8 +1684,9 @@ impl<'a> Printer<'a> {
     /// same own-line/inline treatment — so the float is idempotent.
     fn append_floated_leading_comments(&self, parts: &mut DocBuf, start: u32, operand_start: u32) {
         let d = self.d();
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, start, operand_start).collect();
+        let comments: CommentVec<'_> = self
+            .comments_to_emit_between(start, operand_start)
+            .collect();
         for (i, comment) in comments.iter().enumerate() {
             parts.push(self.build_comment_doc(comment));
             let next = comments.get(i + 1).map_or(operand_start, |c| c.span.start);
@@ -1751,7 +1748,7 @@ impl<'a> Printer<'a> {
                 let prev_end = seq.expressions[i - 1].span().end;
                 let mut pos = prev_end;
                 let mut in_trailing_run = true;
-                for comment in comments_to_emit_in_range(self.comments, prev_end, expr_start) {
+                for comment in self.comments_to_emit_between(prev_end, expr_start) {
                     // Comment-adjacency read (real even in canonical mode).
                     let own_line = self.comment_has_newline_between(pos, comment.span.start);
                     // Once a comment is own-line (or the trailing run already ended),
@@ -1774,7 +1771,7 @@ impl<'a> Printer<'a> {
             if !is_last {
                 let next_start = seq.expressions[i + 1].span().start;
                 let mut pos = expr_end;
-                for comment in comments_to_emit_in_range(self.comments, expr_end, next_start) {
+                for comment in self.comments_to_emit_between(expr_end, next_start) {
                     // Comment-adjacency read (real even in canonical mode): an
                     // own-line comment must lead the next operand, not merge into
                     // the previous operand's `line_suffix` trailing run.
@@ -1794,7 +1791,7 @@ impl<'a> Printer<'a> {
                 // line), an `Aligned` one has no break left before `)`, so it rides out past
                 // the `);` — which is prettier's split too. The comment lives up to the
                 // grouping `)` (`trailing_end`), outside `seq.span`.
-                for comment in comments_to_emit_in_range(self.comments, expr_end, trailing_end) {
+                for comment in self.comments_to_emit_between(expr_end, trailing_end) {
                     od.push(self.build_trailing_comment_doc(comment));
                 }
             }

@@ -17,7 +17,6 @@
 use crate::ast::internal;
 use crate::printer::Printer;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -49,7 +48,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
         let mut prev_hangs = own_line_first;
-        let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
+        let mut comments = self.comments_to_emit_between(start, end).peekable();
         while let Some(comment) = comments.next() {
             if prev_hangs {
                 parts.push(d.hardline());

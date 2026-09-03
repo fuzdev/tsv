@@ -14,7 +14,6 @@ use crate::ast::internal;
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, Printer, is_effectively_empty_body};
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -177,7 +176,7 @@ impl<'a> Printer<'a> {
         let mut comment_parts = DocBuf::new();
         self.push_dangling_comment_run(
             &mut comment_parts,
-            comments_to_emit_in_range(self.comments, block_start, block_end),
+            self.comments_to_emit_between(block_start, block_end),
         );
         comment_parts
     }
@@ -548,12 +547,12 @@ impl<'a> Printer<'a> {
         claims_trailing: bool,
         leads_target: Option<u32>,
     ) -> CommentVec<'_> {
-        let collected: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, prev_end, stmt_start)
-                .filter(|c| {
-                    !self.comment_already_trailed(prev_stmt_end, c, claims_trailing, leads_target)
-                })
-                .collect();
+        let collected: CommentVec<'_> = self
+            .comments_to_emit_between(prev_end, stmt_start)
+            .filter(|c| {
+                !self.comment_already_trailed(prev_stmt_end, c, claims_trailing, leads_target)
+            })
+            .collect();
         #[cfg(feature = "buffer_stats")]
         crate::printer::buffer_stats::record_leading_comments(collected.len());
         collected

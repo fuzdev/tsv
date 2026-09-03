@@ -10,7 +10,6 @@ use super::{CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use crate::printer::analysis;
 use smallvec::{SmallVec, smallvec};
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
@@ -687,7 +686,10 @@ impl<'a> Printer<'a> {
     /// (`= /* c */ v`, the ordinary arm's answer too), so the emit-axis reading is right for
     /// it — which is why this asks the cast by name rather than widening to the on-page axis.
     fn operator_gap_run_is_own_line(&self, op_pos: u32, value: ContinuationValue<'_, '_>) -> bool {
-        match comments_to_emit_in_range(self.comments, op_pos, value.gap_end()).next() {
+        match self
+            .comments_to_emit_between(op_pos, value.gap_end())
+            .next()
+        {
             Some(first) => !self.is_same_line(op_pos, first.span.start),
             None => value.leads_with_own_line_jsdoc_cast(self),
         }
@@ -1342,7 +1344,7 @@ impl<'a> Printer<'a> {
         let mut at_line_start = false;
         // The caller's token already supplied the run's first separator, if it had one.
         let mut owed_space = !preceded_by_space;
-        let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
+        let mut comments = self.comments_to_emit_between(start, end).peekable();
         while let Some(comment) = comments.next() {
             let space_before = !at_line_start && owed_space;
             owed_space = true;
@@ -1493,7 +1495,7 @@ impl<'a> Printer<'a> {
         let mut inline_parts = DocBuf::new();
         let mut indent_parts = DocBuf::new();
         let mut saw_line_comment = false;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             if saw_line_comment {
                 indent_parts.push(d.hardline());
                 indent_parts.push(self.build_comment_doc(comment));
@@ -1605,17 +1607,17 @@ impl<'a> Printer<'a> {
                 if i > 0 && gaps[i - 1] != HeritageGap::Baked {
                     let prev_end = heritage_item_end(&items[i - 1]);
                     let comma_pos = self.comma_between(prev_end, heritage.span.start);
-                    let leading: CommentVec<'_> =
-                        comments_to_emit_in_range(self.comments, comma_pos, heritage.span.start)
-                            .filter(|c| {
-                                !(group_mode
-                                    && self.is_stranded_after_comma_block(
-                                        c,
-                                        comma_pos,
-                                        heritage.span.start,
-                                    ))
-                            })
-                            .collect();
+                    let leading: CommentVec<'_> = self
+                        .comments_to_emit_between(comma_pos, heritage.span.start)
+                        .filter(|c| {
+                            !(group_mode
+                                && self.is_stranded_after_comma_block(
+                                    c,
+                                    comma_pos,
+                                    heritage.span.start,
+                                ))
+                        })
+                        .collect();
                     self.push_leading_comment_run(
                         &mut h_parts,
                         leading.iter().copied(),
@@ -1881,7 +1883,7 @@ impl<'a> Printer<'a> {
         let star_pos = star.unwrap_or(key_start);
         self.push_leading_comment_run(
             parts,
-            comments_to_emit_in_range(self.comments, search_start, star_pos),
+            self.comments_to_emit_between(search_start, star_pos),
             star_pos,
             LeadingGlue::Adjacent,
             None,
@@ -1893,7 +1895,7 @@ impl<'a> Printer<'a> {
             let name_bound = self.computed_key_name_bound(star + 1, key_start, computed);
             self.push_leading_comment_run(
                 parts,
-                comments_to_emit_in_range(self.comments, star + 1, name_bound),
+                self.comments_to_emit_between(star + 1, name_bound),
                 name_bound,
                 LeadingGlue::Adjacent,
                 None,
@@ -1938,8 +1940,9 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut value_block: DocBuf = smallvec![d.hardline()];
         let mut on_own_line = false;
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, keyword_end, value_start).collect();
+        let comments: CommentVec<'_> = self
+            .comments_to_emit_between(keyword_end, value_start)
+            .collect();
         for (i, comment) in comments.iter().enumerate() {
             let same_line = !on_own_line && self.is_same_line(keyword_end, comment.span.start);
             if same_line {

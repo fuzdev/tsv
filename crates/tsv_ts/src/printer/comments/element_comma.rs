@@ -31,7 +31,6 @@ use crate::ast::internal::Expression;
 use smallvec::SmallVec;
 use tsv_lang::Comment;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -304,11 +303,12 @@ impl<'a> Printer<'a> {
         end: u32,
     ) -> impl Iterator<Item = &'a Comment> + '_ {
         let mut past_line_comment = false;
-        comments_to_emit_in_range(self.comments, start, end).take_while(move |c| {
-            let claimed = !past_line_comment && self.comment_follows_content_on_its_line(c);
-            past_line_comment |= !c.is_block;
-            claimed
-        })
+        self.comments_to_emit_between(start, end)
+            .take_while(move |c| {
+                let claimed = !past_line_comment && self.comment_follows_content_on_its_line(c);
+                past_line_comment |= !c.is_block;
+                claimed
+            })
     }
 
     /// The LAST item→closer gap's trailing claim — the same prefix walk as
@@ -352,19 +352,20 @@ impl<'a> Printer<'a> {
     ) -> impl Iterator<Item = &'a Comment> + '_ {
         let mut past_line_comment = false;
         let mut anchor = item_end;
-        comments_to_emit_in_range(self.comments, item_end, end).take_while(move |c| {
-            let claimed = !past_line_comment
-                && if c.is_block {
-                    self.comment_follows_content_on_its_line(c)
-                } else {
-                    self.is_same_line(anchor, c.span.start)
-                };
-            if claimed {
-                anchor = c.span.end;
-            }
-            past_line_comment |= !c.is_block;
-            claimed
-        })
+        self.comments_to_emit_between(item_end, end)
+            .take_while(move |c| {
+                let claimed = !past_line_comment
+                    && if c.is_block {
+                        self.comment_follows_content_on_its_line(c)
+                    } else {
+                        self.is_same_line(anchor, c.span.start)
+                    };
+                if claimed {
+                    anchor = c.span.end;
+                }
+                past_line_comment |= !c.is_block;
+                claimed
+            })
     }
 
     /// Where a LAST item→closer gap's trailing run ends — the closer twin of

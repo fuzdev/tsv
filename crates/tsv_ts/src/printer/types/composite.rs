@@ -8,7 +8,6 @@
 // - Type queries: `typeof x`
 // - Entity names: `A.B.C`
 
-use super::super::comments_to_emit_in_range;
 use super::helpers::{
     type_needs_parens_for_array_element, type_needs_parens_for_conditional_check,
     type_needs_parens_for_conditional_extends, unwrap_parenthesized,
@@ -633,9 +632,9 @@ impl<'a> Printer<'a> {
             return None;
         }
         let extends_end = c.extends_type.span().end;
-        let gap_welds =
-            comments_to_emit_in_range(self.comments, extends_end, c.true_type.span().start)
-                .any(|cm| !cm.is_block && self.is_same_line(extends_end, cm.span.start));
+        let gap_welds = self
+            .comments_to_emit_between(extends_end, c.true_type.span().start)
+            .any(|cm| !cm.is_block && self.is_same_line(extends_end, cm.span.start));
         if gap_welds
             || !self
                 .stripped_paren_leading_line_comments(c.true_type)
@@ -676,7 +675,8 @@ impl<'a> Printer<'a> {
         if run.len() != 1 {
             return CommentVec::new();
         }
-        let welds = comments_to_emit_in_range(self.comments, anchor, gap_end)
+        let welds = self
+            .comments_to_emit_between(anchor, gap_end)
             .any(|cm| !cm.is_block && self.is_same_line(anchor, cm.span.start));
         if welds { CommentVec::new() } else { run }
     }
@@ -870,7 +870,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut needs_indent = false;
         let mut prev_was_line_comment = false;
-        for comment in comments_to_emit_in_range(self.comments, from, to) {
+        for comment in self.comments_to_emit_between(from, to) {
             if prev_was_line_comment {
                 parts.push(d.hardline());
                 parts.push(d.text(INDENT));
@@ -1288,10 +1288,12 @@ impl<'a> Printer<'a> {
             b'[',
         )
         .map_or(param_name_start, |p| p as u32);
-        let leading_comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, content_start, bracket_pos).collect();
-        let bracket_inner_comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, bracket_pos + 1, param_name_start).collect();
+        let leading_comments: CommentVec<'_> = self
+            .comments_to_emit_between(content_start, bracket_pos)
+            .collect();
+        let bracket_inner_comments: CommentVec<'_> = self
+            .comments_to_emit_between(bracket_pos + 1, param_name_start)
+            .collect();
 
         // Leading comments (before `[`): the node-adjacent (LAST) comment stays
         // inline iff it's a block comment with no newline after it; every earlier
@@ -1331,7 +1333,7 @@ impl<'a> Printer<'a> {
             let type_end = type_ann.span().end;
             body_parts.push(self.raw_source_range(bracket_pos, type_end));
             let body_end = m.span.end.saturating_sub(1); // before `}`
-            for comment in comments_to_emit_in_range(self.comments, type_end, body_end) {
+            for comment in self.comments_to_emit_between(type_end, body_end) {
                 body_parts.push(self.build_trailing_comment_doc(comment));
             }
             return self.build_mapped_type_shell(

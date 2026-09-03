@@ -5,7 +5,6 @@
 use crate::ast::internal;
 use crate::printer::{CommentVec, Printer, template_literal_has_newlines};
 use smallvec::smallvec;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{INDENT, Span};
@@ -767,7 +766,7 @@ impl<'a> Printer<'a> {
     ) -> TernaryBranchPlacement {
         let d = self.d();
         let comments: CommentVec<'_> = op_pos
-            .map(|p| comments_to_emit_in_range(self.comments, p + 1, value_start).collect())
+            .map(|p| self.comments_to_emit_between(p + 1, value_start).collect())
             .unwrap_or_default();
         let mut has_line_comment = false;
         let mut last_own_line = false;

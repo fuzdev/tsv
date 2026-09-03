@@ -6,7 +6,6 @@ use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -318,7 +317,7 @@ impl<'a> Printer<'a> {
             let mut run = DocBuf::new();
             self.push_leading_comment_run(
                 &mut run,
-                comments_to_emit_in_range(self.comments, colon_end, body_start),
+                self.comments_to_emit_between(colon_end, body_start),
                 body_start,
                 LeadingGlue::AdjacentAnchorLine,
                 None,
@@ -346,8 +345,9 @@ impl<'a> Printer<'a> {
         // **to emit**: this set is printed below, and `relocate` is derived from it — so the
         // two agree by construction. Nothing can be owned here anyway: an owned comment binds
         // to the token that follows it, and `:` begins no node.
-        let gap_comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, label_end, colon_pos as u32).collect();
+        let gap_comments: CommentVec<'_> = self
+            .comments_to_emit_between(label_end, colon_pos as u32)
+            .collect();
         let relocate = gap_comments.iter().any(|c| self.is_own_line_comment(c));
 
         let mut parts: DocBuf = smallvec![];

@@ -11,7 +11,6 @@ use crate::printer::{CommentVec, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::{comments_to_emit_in_range, has_multiline_block_comments_on_page_in_range};
 
 /// The gap after array slot `i`, in this container's terms: [`next_real_element_start`]
 /// with the literal's own fallback — just inside `]`, where a comment past the last real
@@ -336,7 +335,7 @@ impl<'a> Printer<'a> {
         elem_start: u32,
         parts: &mut DocBuf,
     ) {
-        for comment in comments_to_emit_in_range(self.comments, search_start, elem_start) {
+        for comment in self.comments_to_emit_between(search_start, elem_start) {
             if comment.is_block {
                 parts.push(self.format_inline_block_comment(comment, true));
             }
@@ -396,7 +395,7 @@ impl<'a> Printer<'a> {
 
         // Everything below the split is this element's, by construction — the next
         // element's leading scan resumes exactly there.
-        for comment in comments_to_emit_in_range(self.comments, elem_end, split) {
+        for comment in self.comments_to_emit_between(elem_end, split) {
             if comment.is_block {
                 parts.push(self.format_inline_block_comment(comment, false));
             }
@@ -514,11 +513,7 @@ impl<'a> Printer<'a> {
         // collect — on the comment-free common case.
         let has_expanding_comments = has_comments
             && (self.has_line_comments_between(arr.span.start, arr.span.end)
-                || has_multiline_block_comments_on_page_in_range(
-                    self.comments,
-                    arr.span.start,
-                    arr.span.end,
-                )
+                || self.has_multiline_block_comments_on_page_between(arr.span.start, arr.span.end)
                 || self.has_own_line_block_comments_in_array(arr));
 
         if has_expanding_comments {
@@ -748,9 +743,7 @@ impl<'a> Printer<'a> {
                 let scan_start = self
                     .last_element_trailing_split(arr)
                     .map_or(arr.span.start + 1, |(_, split)| split);
-                for comment in
-                    comments_to_emit_in_range(self.comments, scan_start, arr.span.end - 1)
-                {
+                for comment in self.comments_to_emit_between(scan_start, arr.span.end - 1) {
                     if comment.is_block {
                         parts.push(self.build_comment_doc(comment));
                     }
@@ -780,8 +773,7 @@ impl<'a> Printer<'a> {
             .flatten()
         {
             let last_real_split = self.last_element_trailing_split(arr);
-            for comment in comments_to_emit_in_range(self.comments, search_start, arr.span.end - 1)
-            {
+            for comment in self.comments_to_emit_between(search_start, arr.span.end - 1) {
                 // Only what no one closer prints — see `end_scan_emits_comment`
                 // for the two-region rule; a comment the element's claim covers would
                 // double-print.
@@ -906,7 +898,7 @@ impl<'a> Printer<'a> {
                     Some(prev) => self.element_gap_split(arr, prev, last_real_emit_end, upper),
                     None => last_real_emit_end,
                 };
-                comments_to_emit_in_range(self.comments, scan_start, upper)
+                self.comments_to_emit_between(scan_start, upper)
                     .filter(|c| {
                         // Bracket-line comments pulled onto the `[` line above are
                         // emitted as the prefix, not as leading on the first element.
@@ -974,7 +966,7 @@ impl<'a> Printer<'a> {
                 // The claimed prefix of this gap; the next slot's leading scan resumes at
                 // the same split, so every comment lands on exactly one side.
                 let split = self.element_gap_split(arr, i, elem_end, next_boundary);
-                comments_to_emit_in_range(self.comments, elem_end, split).collect()
+                self.comments_to_emit_between(elem_end, split).collect()
             } else {
                 smallvec![]
             };
@@ -1110,8 +1102,7 @@ impl<'a> Printer<'a> {
         // The comment this scan emitted last — `None` after one it skipped, which another
         // emitter put on a line of its own, so nothing here has it to glue to.
         let mut prev_comment: Option<&internal::Comment> = None;
-        for comment in comments_to_emit_in_range(self.comments, final_scan_start, arr.span.end - 1)
-        {
+        for comment in self.comments_to_emit_between(final_scan_start, arr.span.end - 1) {
             if self.end_scan_emits_comment(comment, final_scan_start, last_real_split) {
                 // A pair the author GLUED onto one line keeps that line
                 // ([`Printer::trailing_run_hugs_previous`], the rule every end-of-container

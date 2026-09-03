@@ -21,7 +21,6 @@ use crate::printer::{
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::has_newline_before_position;
@@ -947,7 +946,7 @@ impl<'a> Printer<'a> {
         // (`=> /* c */ {}`) sits between and can't swallow the brace.
         if has_post_arrow_comments {
             let mut comment_parts: DocBuf = DocBuf::new();
-            for comment in comments_to_emit_in_range(self.comments, arrow_end, body_start) {
+            for comment in self.comments_to_emit_between(arrow_end, body_start) {
                 comment_parts.push(d.text(" "));
                 comment_parts.push(self.build_comment_doc(comment));
             }
@@ -1066,11 +1065,12 @@ impl<'a> Printer<'a> {
         let body = terminal.span();
         emitted.push((body.start, body.end));
 
-        comments_to_emit_in_range(self.comments, head.span.start, head.span.end).any(|comment| {
-            !emitted
-                .iter()
-                .any(|&(start, end)| comment.span.start >= start && comment.span.end <= end)
-        })
+        self.comments_to_emit_between(head.span.start, head.span.end)
+            .any(|comment| {
+                !emitted
+                    .iter()
+                    .any(|&(start, end)| comment.span.start >= start && comment.span.end <= end)
+            })
     }
 
     /// The leading-comment run for an arrow-adjacent gap that is **already broken** — the
@@ -1131,7 +1131,8 @@ impl<'a> Printer<'a> {
     ) -> Option<ArrowGapGluedHead> {
         let d = self.d();
         // The same-line prefix, and whether it ends in the `//` that makes it one.
-        let glued: CommentVec<'_> = comments_to_emit_in_range(self.comments, sig_end, body_start)
+        let glued: CommentVec<'_> = self
+            .comments_to_emit_between(sig_end, body_start)
             .take_while(|c| self.is_same_line(sig_end, c.span.start))
             .collect();
         // ⚠️ **The rule is the LINE comment's**, not every glued comment's. A `//` runs to
@@ -1670,7 +1671,7 @@ impl<'a> Printer<'a> {
         let (Some(last_param), Some(params_end)) = (params.last(), params_end) else {
             return false;
         };
-        comments_to_emit_in_range(self.comments, last_param.span().end, params_end)
+        self.comments_to_emit_between(last_param.span().end, params_end)
             .any(|comment| self.comment_cannot_glue_to_operator(comment))
     }
 
@@ -1712,7 +1713,7 @@ impl<'a> Printer<'a> {
         }
         let d = self.d();
         let mut parts: DocBuf = smallvec![sig];
-        for comment in comments_to_emit_in_range(self.comments, sig_end, arrow_pos) {
+        for comment in self.comments_to_emit_between(sig_end, arrow_pos) {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
@@ -2511,7 +2512,7 @@ impl<'a> Printer<'a> {
                     param_end
                 };
                 let same_line_blocks: CommentVec<'_> = if comments_present {
-                    comments_to_emit_in_range(self.comments, param_end, search_end)
+                    self.comments_to_emit_between(param_end, search_end)
                         .filter(|c| c.is_block && c.span.start < anchor_line_end)
                         .collect()
                 } else {
@@ -2550,15 +2551,16 @@ impl<'a> Printer<'a> {
                 // the param's line at all. `leading_param_comments` excludes exactly this
                 // set, so the two partition the gap.
                 if comments_present {
-                    for comment in comments_to_emit_in_range(self.comments, param_end, search_end)
-                        .filter(|c| {
-                            self.param_trailing_line_comment(
-                                c,
-                                param_end,
-                                anchor_line_end,
-                                comma_pos,
-                            )
-                        })
+                    for comment in
+                        self.comments_to_emit_between(param_end, search_end)
+                            .filter(|c| {
+                                self.param_trailing_line_comment(
+                                    c,
+                                    param_end,
+                                    anchor_line_end,
+                                    comma_pos,
+                                )
+                            })
                     {
                         inner_parts.push(self.build_trailing_line_comment_doc(comment));
                     }
@@ -2692,7 +2694,7 @@ impl<'a> Printer<'a> {
         // ([`Printer::gap_anchor_line_end`] — it follows a multi-line block to its closing
         // `*/` line, so a comment glued past that `*/` still trails the previous param).
         let anchor_line_end = self.gap_anchor_line_end(start, param_render_start);
-        comments_to_emit_in_range(self.comments, start, param_render_start)
+        self.comments_to_emit_between(start, param_render_start)
             .filter(|c| {
                 // A comment already pulled onto the opening `(` line (first param)
                 // must not be re-emitted as a leading comment here.

@@ -19,10 +19,10 @@ use smallvec::SmallVec;
 use crate::ast::internal::{Expression, Statement, UnaryOperator};
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
+use tsv_lang::Comment;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Comment, comments_to_emit_in_range};
 
 /// Which of prettier's three comment runs a control-flow gap's off-the-anchor-line
 /// comments form — the single fact all three of
@@ -260,7 +260,7 @@ impl<'a> Printer<'a> {
         let mut own_line = SmallVec::new();
         let mut inline_next = SmallVec::new();
 
-        for comment in comments_to_emit_in_range(self.comments, prev_end, next_start) {
+        for comment in self.comments_to_emit_between(prev_end, next_start) {
             let same_line_as_prev = self.is_same_line(prev_end, comment.span.start);
             let same_line_as_next = self.is_same_line(comment.span.end, next_start);
 
@@ -332,7 +332,7 @@ impl<'a> Printer<'a> {
     /// the emitter it gates. [`Self::has_isolated_comment_between`] no longer is, and
     /// its own doc says why — do not read the two as a pair.
     fn has_anchor_trailing_comment_between(&self, prev_end: u32, next_start: u32) -> bool {
-        comments_to_emit_in_range(self.comments, prev_end, next_start)
+        self.comments_to_emit_between(prev_end, next_start)
             .any(|comment| self.is_same_line(prev_end, comment.span.start))
     }
 
@@ -367,8 +367,9 @@ impl<'a> Printer<'a> {
     /// ([`Self::build_comments_between_parts`]), the same place this gate's own emitter
     /// (`Printer::push_for_clause_leading_section` → `push_leading_comment_run`) keeps it.
     fn has_isolated_comment_between(&self, prev_end: u32, next_start: u32) -> bool {
-        let mut comments =
-            comments_to_emit_in_range(self.comments, prev_end, next_start).peekable();
+        let mut comments = self
+            .comments_to_emit_between(prev_end, next_start)
+            .peekable();
         let mut prev = prev_end;
         while let Some(comment) = comments.next() {
             let next = comments.peek().map_or(next_start, |c| c.span.start);
@@ -441,7 +442,7 @@ impl<'a> Printer<'a> {
     ///   Inert by shape: no `{`, so the clause cannot fire.
     fn header_to_body_gap_breaks(&self, gap_start: u32, body_start: u32) -> bool {
         let mut last = None;
-        for comment in comments_to_emit_in_range(self.comments, gap_start, body_start) {
+        for comment in self.comments_to_emit_between(gap_start, body_start) {
             if !comment.is_block || !self.is_same_line(gap_start, comment.span.start) {
                 return true;
             }
@@ -476,7 +477,7 @@ impl<'a> Printer<'a> {
         }
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in comments_to_emit_in_range(self.comments, keyword_end, op) {
+        for comment in self.comments_to_emit_between(keyword_end, op) {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
             // Block: glue with a trailing space so the `(` follows directly. Line: a
@@ -815,7 +816,7 @@ impl<'a> Printer<'a> {
         inner.push(d.hardline());
         self.push_leading_comment_run(
             &mut inner,
-            comments_to_emit_in_range(self.comments, gap_start, body_start),
+            self.comments_to_emit_between(gap_start, body_start),
             body_start,
             LeadingGlue::Adjacent,
             None,
@@ -1016,7 +1017,7 @@ impl<'a> Printer<'a> {
         let mut inner = DocBuf::new();
         self.push_leading_comment_run(
             &mut inner,
-            comments_to_emit_in_range(self.comments, gap_start, empty_start),
+            self.comments_to_emit_between(gap_start, empty_start),
             empty_start,
             LeadingGlue::AdjacentAnchorLine,
             None,
@@ -1406,7 +1407,7 @@ impl<'a> Printer<'a> {
         inner_parts.extend(glued);
 
         let leading_comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, resume, test_start).collect();
+            self.comments_to_emit_between(resume, test_start).collect();
 
         let (run_comments, bucket_breaks) = self.push_paren_line_comment_bucket(
             &mut inner_parts,

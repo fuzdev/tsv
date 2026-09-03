@@ -72,8 +72,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{
-    Span, comments_in_source_range, comments_to_emit_in_range, directive_alone_on_line,
-    is_format_ignore_directive, is_honored_format_ignore,
+    Span, directive_alone_on_line, is_format_ignore_directive, is_honored_format_ignore,
 };
 
 /// The freeze implied by a format-ignore directive alone on its line in a union's or
@@ -253,7 +252,8 @@ impl<'a> Printer<'a> {
     /// about the directive's own placement, not the freeze target.
     pub(in crate::printer) fn member_gap_frozen(&self, prev_end: u32, member_start: u32) -> bool {
         self.has_format_ignore
-            && comments_in_source_range(self.comments, prev_end, member_start)
+            && self
+                .comments_in_source_between(prev_end, member_start)
                 .any(|c| self.is_honored_directive(c))
     }
 
@@ -283,7 +283,8 @@ impl<'a> Printer<'a> {
         end: u32,
     ) -> bool {
         self.has_format_ignore
-            && comments_to_emit_in_range(self.comments, start, end)
+            && self
+                .comments_to_emit_between(start, end)
                 .next()
                 .is_some_and(|c| self.is_honored_directive(c))
     }
@@ -1187,10 +1188,11 @@ impl<'a> Printer<'a> {
             return false;
         }
         let inner = unwrap_parenthesized(t);
-        comments_in_source_range(self.comments, t.span().start, inner.span().start)
+        self.comments_in_source_between(t.span().start, inner.span().start)
             .next()
             .is_some()
-            || comments_in_source_range(self.comments, inner.span().end, t.span().end)
+            || self
+                .comments_in_source_between(inner.span().end, t.span().end)
                 .next()
                 .is_some()
     }

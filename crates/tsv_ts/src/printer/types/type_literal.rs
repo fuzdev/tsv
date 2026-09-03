@@ -7,7 +7,6 @@
 //   type / type-argument list) can control breaking
 
 use super::super::CommentVec;
-use super::super::comments_to_emit_in_range;
 use super::helpers::{outermost_paren, unwrap_parenthesized};
 use super::union_intersection::union_member_parens;
 use super::{Printer, StandaloneGlue};
@@ -117,8 +116,7 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut docs = DocBuf::new();
-        for comment in comments_to_emit_in_range(self.comments, brace_start + 1, first_member_start)
-        {
+        for comment in self.comments_to_emit_between(brace_start + 1, first_member_start) {
             docs.push(self.build_comment_doc(comment));
             docs.push(d.text(" "));
         }
@@ -930,7 +928,7 @@ impl<'a> Printer<'a> {
             if comments_present {
                 let prev_content_end = t.members[i - 1].content_end(self.source);
                 let claim_end = self.type_member_claim_end(prev_content_end, Some(m.span().start));
-                for comment in comments_to_emit_in_range(self.comments, claim_end, m.span().start) {
+                for comment in self.comments_to_emit_between(claim_end, m.span().start) {
                     member_parts.push(self.build_comment_doc(comment));
                     member_parts.push(d.text(" "));
                 }
@@ -952,7 +950,7 @@ impl<'a> Printer<'a> {
                 member_content_end,
                 t.members.get(i + 1).map(|n| n.span().start),
             );
-            comments_to_emit_in_range(self.comments, member_content_end, upper_bound)
+            self.comments_to_emit_between(member_content_end, upper_bound)
                 .filter(|c| c.span.start < claim_end)
                 .collect()
         } else {
@@ -1246,7 +1244,8 @@ impl<'a> Printer<'a> {
                     return inner;
                 }
                 let leading: CommentVec<'_> = if has_leading {
-                    comments_to_emit_in_range(self.comments, p.span.start, inner_start).collect()
+                    self.comments_to_emit_between(p.span.start, inner_start)
+                        .collect()
                 } else {
                     smallvec![]
                 };
