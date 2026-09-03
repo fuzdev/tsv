@@ -17,8 +17,6 @@ use std::cell::{Cell, RefCell};
 
 use smallvec::SmallVec;
 
-use crate::hash::FxHashMap;
-
 use crate::Span;
 use crate::config::TAB_WIDTH;
 use crate::printing::{
@@ -29,6 +27,7 @@ use crate::printing::{
 use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
 
 use super::DocBuf;
+use super::chain_share::ChainShareStore;
 #[cfg(feature = "swallow_check")]
 use super::swallow::swallow_check_enabled;
 use super::types::{
@@ -1269,23 +1268,21 @@ pub struct DocArena {
     /// files), like the other scratches; only ever affects allocation, never
     /// output.
     docbuf_pool: RefCell<Vec<DocBuf>>,
-    /// Parked node-keyed doc-share map: an AST-node pointer plus a consumer-owned
-    /// build tag (`(usize, u8)`) → the `DocId` already built for it. The tag is
-    /// what lets one node hold **several** entries — the same argument built
-    /// under different printer state, or by a different builder — so the
-    /// consumer's "a hit is byte-identical to a rebuild" rule is carried by the
-    /// key rather than by refusing to cache. Storage for the TS printer's
-    /// member-chain argument sharing, parked here — on the reused per-thread
-    /// arena — so the table's capacity warms once instead of a fresh `HashMap`
-    /// resize chain per printer/file. The consumer owns the protocol: it clears
-    /// the map at every share-scope entry AND exit, so between scopes it is
-    /// logically empty (stale `DocId`s from a prior document are unreachable —
-    /// cleared before any read) and only capacity persists across `reset()`. Only
-    /// ever affects allocation, never output (a hit is byte-identical to a rebuild
-    /// by construction of the consumer's key). Hashed by [`crate::hash::FxHasher`]
-    /// rather than SipHash — the consumer only ever does `get`/`insert`/`clear`,
-    /// never iterates, so the hasher is unobservable (see `hash`'s module docs).
-    share_map_scratch: RefCell<FxHashMap<(usize, u8), DocId>>,
+    /// The parked member-chain argument share ([`ChainShareStore`]: an AST-node
+    /// pointer plus a consumer-owned build tag (`(usize, u8)`) → the `DocId` already
+    /// built for it). The tag is what lets one node hold **several** entries — the
+    /// same argument built under different printer state, or by a different builder
+    /// — so the consumer's "a hit is byte-identical to a rebuild" rule is carried by
+    /// the key rather than by refusing to cache. Parked here — on the reused
+    /// per-thread arena — so both tiers' capacity warms once instead of a fresh
+    /// table per printer/file. The consumer owns the protocol: it clears the store
+    /// at every share-scope entry AND exit, so between scopes it is logically empty
+    /// (stale `DocId`s from a prior document are unreachable — cleared before any
+    /// read) and only capacity persists across `reset()`. Only ever affects
+    /// allocation, never output (a hit is byte-identical to a rebuild by
+    /// construction of the consumer's key); the hashed tier's `FxHasher` is
+    /// unobservable for the same reason (see `hash`'s module docs).
+    chain_share_store: RefCell<ChainShareStore>,
     /// Memoized per-subtree layout facts, indexed by `DocId` — the forced-break
     /// verdict [`Self::will_break`] answers at BUILD and the flat width
     /// `arena_fits` answers at RENDER, packed into one `u32` per node (the cell
@@ -1510,7 +1507,7 @@ impl DocArena {
             line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
-            share_map_scratch: RefCell::new(FxHashMap::default()),
+            chain_share_store: RefCell::new(ChainShareStore::default()),
             layout_cache: RefCell::new(Vec::new()),
             static_cache: [const { StaticSlot::empty() }; STATIC_CACHE_SLOTS],
             format_gen: Cell::new(1),
@@ -1565,7 +1562,7 @@ impl DocArena {
             line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
-            share_map_scratch: RefCell::new(FxHashMap::default()),
+            chain_share_store: RefCell::new(ChainShareStore::default()),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
@@ -3675,15 +3672,14 @@ impl DocArena {
         }
     }
 
-    /// The parked node-keyed doc-share map (see the field doc), keyed by
-    /// `(node pointer, consumer build tag)`. Returned as the
+    /// The parked member-chain argument share (see the field doc). Returned as the
     /// `RefCell` itself — the consumer's share scope spans many interleaved
     /// arena calls, so it borrows point-wise per lookup/insert/clear rather
     /// than holding a `RefMut` open. The consumer owns the clear-at-scope-
     /// entry/exit protocol; this accessor deliberately does NOT clear.
     #[inline]
-    pub fn share_map_scratch(&self) -> &RefCell<FxHashMap<(usize, u8), DocId>> {
-        &self.share_map_scratch
+    pub fn chain_share_store(&self) -> &RefCell<ChainShareStore> {
+        &self.chain_share_store
     }
 
     /// Borrow the pooled line-offset scratch (cleared here) — a multi-line
