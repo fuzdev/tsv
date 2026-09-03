@@ -1778,7 +1778,13 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(self.build_tuple_element_doc(elem));
             }
-            return d.group(bracketed_list_body(d, "[", "]", d.concat(&parts), false));
+            return d.group(bracketed_list_body(
+                d,
+                d.text("["),
+                d.text("]"),
+                d.concat(&parts),
+                false,
+            ));
         }
 
         // Check for comments that force expansion: line comments, multiline block comments,
@@ -1889,7 +1895,13 @@ impl<'a> Printer<'a> {
         // comma; trailingComma: 'none'). A multi-line frozen element forces the
         // broken form (see `bracketed_list_body`).
         let inner = d.concat(&[d.concat(&parts), d.concat(&last_after_comma)]);
-        d.group(bracketed_list_body(d, "[", "]", inner, force_break))
+        d.group(bracketed_list_body(
+            d,
+            d.text("["),
+            d.text("]"),
+            inner,
+            force_break,
+        ))
     }
 
     /// Build tuple type with expanding comments (line comments or own-line block comments)

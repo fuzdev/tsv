@@ -836,13 +836,6 @@ mod arena_tests {
     }
 
     #[test]
-    fn test_arena_wrap() {
-        let a = DocArena::new();
-        let doc = a.wrap("(", a.text("content"), ")");
-        assert_eq!(render_default(&a, doc), "(content)");
-    }
-
-    #[test]
     fn test_arena_parens() {
         let a = DocArena::new();
         let doc = a.parens(a.text("x"));

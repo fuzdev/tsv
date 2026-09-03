@@ -642,7 +642,7 @@ impl<'a> Printer<'a> {
             } else {
                 self.build_assignment_layout(
                     left_doc,
-                    " =",
+                    d.text(" ="),
                     value,
                     false,
                     RhsCommentInfo {

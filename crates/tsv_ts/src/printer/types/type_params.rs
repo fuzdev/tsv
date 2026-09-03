@@ -812,7 +812,13 @@ impl<'a> Printer<'a> {
             }
         }
 
-        bracketed_list_body(d, "<", ">", d.concat(&inner_parts), force_break)
+        bracketed_list_body(
+            d,
+            d.text("<"),
+            d.text(">"),
+            d.concat(&inner_parts),
+            force_break,
+        )
     }
 
     /// Render a type-argument list `<…>` that breaks onto multiple lines because it

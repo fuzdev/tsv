@@ -408,14 +408,14 @@ impl<'a> Printer<'a> {
                     d.concat(&[name_doc, d.text("="), value_doc])
                 } else {
                     let (open, close) = self.attribute_value_delims(value_parts);
-                    d.concat(&[name_doc, d.text(open), value_doc, d.text(close)])
+                    d.concat(&[name_doc, open, value_doc, close])
                 };
             }
 
             // General path: a multi-part value is always a quoted string (a pure
             // `{expr}` value is single-part and handled by the fast path above).
             let (open, close) = self.attribute_value_delims(value_parts);
-            let mut parts: DocBuf = smallvec![name_doc, d.text(open)];
+            let mut parts: DocBuf = smallvec![name_doc, open];
             let last_idx = value_parts.len().saturating_sub(1);
             for (i, part) in value_parts.iter().enumerate() {
                 if normalize_class {
@@ -424,7 +424,7 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_attribute_value_doc(part));
                 }
             }
-            parts.push(d.text(close));
+            parts.push(close);
 
             d.concat(&parts)
         } else {
@@ -450,10 +450,8 @@ impl<'a> Printer<'a> {
     /// the static reader's value alternative is `[^>\s]+`, which admits both
     /// (`<script a=x'y"z>`). The unquoted form is always available for exactly that
     /// value: having come from that alternative, it holds no whitespace and no `>`.
-    fn attribute_value_delims(
-        &self,
-        parts: &[internal::AttributeValue<'_>],
-    ) -> (&'static str, &'static str) {
+    fn attribute_value_delims(&self, parts: &[internal::AttributeValue<'_>]) -> (DocId, DocId) {
+        let d = self.d();
         let mut has_double = false;
         let mut has_single = false;
         for part in parts {
@@ -463,10 +461,12 @@ impl<'a> Printer<'a> {
                 has_single |= raw.contains('\'');
             }
         }
+        // Each arm spells its literals, so the pair is a constant at the arm rather than a
+        // runtime `text()` at every attribute.
         match (has_double, has_single) {
-            (true, true) => ("=", ""),
-            (true, false) => ("='", "'"),
-            _ => ("=\"", "\""),
+            (true, true) => (d.text("="), d.text("")),
+            (true, false) => (d.text("='"), d.text("'")),
+            _ => (d.text("=\""), d.text("\"")),
         }
     }
 
@@ -578,7 +578,7 @@ impl<'a> Printer<'a> {
         // verdicts.
         let head =
             self.assemble_head_expr(value_doc, comment_start, expr.span(), span_end - 1, frozen);
-        self.build_prefixed_head_doc(prefix, head, "}")
+        self.build_prefixed_head_doc(prefix, head, self.d().text("}"))
     }
 
     //
@@ -588,14 +588,9 @@ impl<'a> Printer<'a> {
     /// The head every directive starts with — `prefix` + name + `|modifier` run — as the
     /// parts buffer the caller appends its value to. The name is a span-identity source
     /// slice, so the emitted text is the author's.
-    fn directive_head_parts(
-        &self,
-        prefix: &'static str,
-        name_span: Span,
-        modifiers: &[&str],
-    ) -> DocBuf {
+    fn directive_head_parts(&self, prefix: DocId, name_span: Span, modifiers: &[&str]) -> DocBuf {
         let d = self.d();
-        let mut parts: DocBuf = smallvec![d.text(prefix), d.source_span(name_span, self.source)];
+        let mut parts: DocBuf = smallvec![prefix, d.source_span(name_span, self.source)];
         parts.extend(self.build_modifiers_doc(modifiers));
         parts
     }
@@ -609,7 +604,7 @@ impl<'a> Printer<'a> {
     /// attributes.
     fn build_directive_doc(
         &self,
-        prefix: &'static str,
+        prefix: DocId,
         name_span: Span,
         modifiers: &[&str],
         expression: Option<&Expression<'_>>,
@@ -640,7 +635,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for on:event directive
     fn build_on_directive_doc(&self, dir: &internal::OnDirective<'_>) -> DocId {
         self.build_directive_doc(
-            "on:",
+            self.d().text("on:"),
             dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
@@ -652,7 +647,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for bind:prop directive
     fn build_bind_directive_doc(&self, dir: &internal::BindDirective<'_>) -> DocId {
         self.build_directive_doc(
-            "bind:",
+            self.d().text("bind:"),
             dir.name_span,
             dir.modifiers,
             Some(&dir.expression),
@@ -664,7 +659,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for class:name directive
     fn build_class_directive_doc(&self, dir: &internal::ClassDirective<'_>) -> DocId {
         self.build_directive_doc(
-            "class:",
+            self.d().text("class:"),
             dir.name_span,
             dir.modifiers,
             Some(&dir.expression),
@@ -677,7 +672,7 @@ impl<'a> Printer<'a> {
     fn build_style_directive_doc(&self, dir: &internal::StyleDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts = self.directive_head_parts("style:", dir.name_span, dir.modifiers);
+        let mut parts = self.directive_head_parts(d.text("style:"), dir.name_span, dir.modifiers);
         match &dir.value {
             internal::StyleDirectiveValue::True => {}
             internal::StyleDirectiveValue::ExpressionTag(tag) => {
@@ -689,11 +684,11 @@ impl<'a> Printer<'a> {
             }
             internal::StyleDirectiveValue::Parts(value_parts) => {
                 let (open, close) = self.attribute_value_delims(value_parts);
-                parts.push(d.text(open));
+                parts.push(open);
                 for part in value_parts.iter() {
                     parts.push(self.build_attribute_value_doc(part));
                 }
-                parts.push(d.text(close));
+                parts.push(close);
             }
         }
         d.concat(&parts)
@@ -702,7 +697,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for use:action directive
     fn build_use_directive_doc(&self, dir: &internal::UseDirective<'_>) -> DocId {
         self.build_directive_doc(
-            "use:",
+            self.d().text("use:"),
             dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
@@ -714,7 +709,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for transition/in/out directive
     fn build_transition_directive_doc(&self, dir: &internal::TransitionDirective<'_>) -> DocId {
         self.build_directive_doc(
-            dir.direction.prefix_with_colon(),
+            self.d().text(dir.direction.prefix_with_colon()),
             dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
@@ -726,7 +721,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for animate:name directive
     fn build_animate_directive_doc(&self, dir: &internal::AnimateDirective<'_>) -> DocId {
         self.build_directive_doc(
-            "animate:",
+            self.d().text("animate:"),
             dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
@@ -738,7 +733,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for let:name directive
     fn build_let_directive_doc(&self, dir: &internal::LetDirective<'_>) -> DocId {
         self.build_directive_doc(
-            "let:",
+            self.d().text("let:"),
             dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),

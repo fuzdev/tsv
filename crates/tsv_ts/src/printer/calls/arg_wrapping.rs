@@ -1348,8 +1348,9 @@ pub(super) enum ArgOpener {
     /// The whole head the `(` follows — for `new` that includes the keyword and type
     /// arguments.
     Callee(DocId),
-    /// The chain's own `(` / `?.(`.
-    ChainPrefix(&'static str),
+    /// The chain's own `(` / `?.(`, as the doc the chain built where its spelling is a
+    /// literal.
+    ChainPrefix(DocId),
 }
 
 impl ArgOpener {
@@ -1358,7 +1359,7 @@ impl ArgOpener {
     fn open_text(self, d: &DocArena) -> DocId {
         match self {
             Self::Callee(_) => d.text("("),
-            Self::ChainPrefix(prefix) => d.text(prefix),
+            Self::ChainPrefix(prefix) => prefix,
         }
     }
 
@@ -1401,7 +1402,7 @@ impl ArgOpener {
     fn flat(self, d: &DocArena, before: DocId, after: DocId) -> DocId {
         match self {
             Self::Callee(callee) => d.concat(&[callee, d.text("("), before, after, d.text(")")]),
-            Self::ChainPrefix(prefix) => d.concat(&[d.text(prefix), before, after, d.text(")")]),
+            Self::ChainPrefix(prefix) => d.concat(&[prefix, before, after, d.text(")")]),
         }
     }
 
@@ -2212,8 +2213,9 @@ pub(super) fn build_empty_args_doc(
     paren_close: u32,
     optional: bool,
 ) -> DocId {
-    let prefix = if optional { "?.(" } else { "(" };
-    printer.d().concat(&[
+    let d = printer.d();
+    let prefix = if optional { d.text("?.(") } else { d.text("(") };
+    d.concat(&[
         callee,
         build_empty_args_parens_doc(printer, after_type_args, paren_close, prefix),
     ])

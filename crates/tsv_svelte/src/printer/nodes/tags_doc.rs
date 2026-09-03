@@ -42,7 +42,7 @@ impl<'a> Printer<'a> {
             tag.span.end - 1,
         );
 
-        self.build_prefixed_head_doc(HTML_TAG_OPEN, head, "}")
+        self.build_prefixed_head_doc(HTML_TAG_OPEN, head, self.d().text("}"))
     }
 
     /// Build a doc for {@const declaration}
@@ -339,7 +339,7 @@ impl<'a> Printer<'a> {
                     ends_with_line_comment,
                     owes_continuation_indent: false,
                 },
-                "}",
+                d.text("}"),
             );
         }
 
@@ -419,7 +419,7 @@ impl<'a> Printer<'a> {
                 ends_with_line_comment,
                 owes_continuation_indent: false,
             },
-            "}",
+            d.text("}"),
         )
     }
 
@@ -433,6 +433,6 @@ impl<'a> Printer<'a> {
             tag.span.end - 1,
         );
 
-        self.build_prefixed_head_doc(RENDER_TAG_OPEN, head, "}")
+        self.build_prefixed_head_doc(RENDER_TAG_OPEN, head, self.d().text("}"))
     }
 }
