@@ -27,5 +27,11 @@ had mirrored it. The multiline block is the sharper case — a multiline unit's 
 content line for an inline element, a component or a control-flow block, and the block element
 was the one unit kind still dangling its head there.
 
+Prettier's own HTML printer breaks every one of these shapes as tsv does, and the newline form is
+what the default display renders: a `<div>` amid inline content is a block box on its own line.
+The cost falls on a `<div>` restyled inline (a flex item, `display: inline`), which the
+default-display model excludes — there a `<span>` hugs. The same early return, at the text's other
+edge, is [space_after_block](../space_after_block_prettier_divergence/)'s stray leading space.
+
 See
 [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

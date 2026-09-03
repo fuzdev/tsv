@@ -11,11 +11,16 @@ tsv: text on its own line, boundary trimmed — one pass from either authoring
 Prettier: strands a leading space on the text line from the same-line authoring, converging only on
 a second pass
 
-This is prettier-plugin-svelte's `trimTextNodeLeft` boundary: when a block element precedes content
-text with a same-line (space, no linebreak) boundary, prettier trims the text's leading whitespace
-but its own block-child break still emits, leaving a stray space. tsv's children builder takes the
-same trim but emits **no** fold/group after the block (the block's break already supplies the line),
-so no leading space survives — the divergence the `prev_is_block_el` branch in `handle_text_child`
+The mechanism is positional, not a trim that half-fires: prettier-plugin-svelte's
+`printChildren` hands a fragment's first or last child straight to the text printer, ahead of the
+edge trims a text between two siblings gets, so the stray space appears only when the text is the
+fragment's **last** child (as it is here) — a mid-fragment text after a block is trimmed clean by
+`trimTextNodeLeft`. It is the same early return that hugs a block to a **first**-child text, the
+same artifact seen from the text's other edge: a stable hug at the text's trailing edge
+([block_after_spaced_text](../block_after_spaced_text_prettier_divergence/)), an unstable stray
+space at its leading edge (this fixture). tsv's children builder takes the trim at every position
+and emits **no** fold/group after the block (the block's break already supplies the line), so no
+leading space survives — the divergence the `prev_is_block_el` branch in `handle_text_child`
 guards.
 
 ## Files
