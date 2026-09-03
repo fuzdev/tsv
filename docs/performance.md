@@ -1406,8 +1406,11 @@ format board non-deterministic:
   the same corpus put the `Static` node population anywhere from 18,669 (the
   no-collision floor) to 30,994.
 
-The table is now sized so the draw stops mattering (per-exec spread ~0.01%), but
-the shape generalizes to any address-keyed cache, so the reading rules stand:
+The table is now sized so the draw stops mattering (per-exec spread ~0.01%), and
+the hottest statics no longer reach it at all — the punctuation that is three
+quarters of a run's `text()` calls is a prelude at fixed ids, folded to a
+constant at its literal call sites (`PRELUDE` in `arena.rs`) — but the shape
+generalizes to any address-keyed cache, so the reading rules stand:
 
 - **A real effect moves min, max and mean together; a layout draw moves the
   spread.** The `alloc_children` 4-arm rung reads `+0.328 / +0.332 / +0.336%` on
