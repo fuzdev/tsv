@@ -620,8 +620,13 @@ pub fn find_first_comment_from(comments: &[Comment], pos: u32) -> usize {
 /// place on the token-sized gaps the printers ask about by the hundred thousand: the TS
 /// chain grouping's member gap is the `.` alone in 97.6% of its asks, where two compares
 /// replace a binary search over the document's comments.
+///
+/// Public so a printer's own wrapper over a range lookup can ask it *ahead of the call*:
+/// where the wrapper is an outlined symbol (the compiler's choice for the ones spelled at
+/// hundreds of sites), the two compares at the site answer the narrow gap without the
+/// call, and only the gap that could hold a comment reaches the search.
 #[inline]
-const fn range_too_narrow_for_a_comment(start: u32, end: u32) -> bool {
+pub const fn range_too_narrow_for_a_comment(start: u32, end: u32) -> bool {
     end.saturating_sub(start) < Comment::MIN_SPAN_LEN
 }
 

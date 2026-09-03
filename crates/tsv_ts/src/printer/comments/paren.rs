@@ -15,6 +15,7 @@ use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::range_too_narrow_for_a_comment;
 use tsv_lang::source_scan::{TriviaProfile, find_char_skipping_comments, skip_trivia};
 
 /// What follows a stripped grouping shell, and so whether a trailing block comment has a
@@ -726,7 +727,18 @@ impl<'a> Printer<'a> {
     /// today (ownership needs a node starting after the comment, and every shell gap ends
     /// at a delimiter), so the axis is stated for the reader and for the next boundary
     /// that widens, not for a behaviour it changes.
+    ///
+    /// The narrow-gap test is inline at the site — a shell gap is a `)` or nothing in
+    /// nearly every ask — and only a gap that could hold a comment pays the call below.
+    #[inline]
     pub(crate) fn has_trailing_paren_comments(&self, expr_end: u32, boundary_end: u32) -> bool {
+        !range_too_narrow_for_a_comment(expr_end, boundary_end)
+            && self.has_trailing_paren_comments_wide(expr_end, boundary_end)
+    }
+
+    /// The search half of [`Self::has_trailing_paren_comments`] — one outlined copy.
+    #[inline(never)]
+    fn has_trailing_paren_comments_wide(&self, expr_end: u32, boundary_end: u32) -> bool {
         // The wide window first: it is a binary search over `self.comments` (trivially
         // false in a comment-free document) and a strictly weaker precondition, so the
         // source walk below never runs for the overwhelmingly common gap.
