@@ -14,6 +14,7 @@ use crate::printer::{
     should_inline_logical_expression,
 };
 use smallvec::smallvec;
+use std::cell::LazyCell;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
@@ -67,8 +68,6 @@ pub(in crate::printer) struct DeclaratorInitInputs<'e, 'a> {
     pub decl_start: u32,
     /// The printed binding.
     pub id_doc: DocId,
-    /// `can_break(id_doc)` — prettier's `canBreak(leftDoc)`, which decides the fluid arm.
-    pub can_break_left: bool,
     /// The `=` and what the gaps on either side of it hold.
     pub gap: DeclaratorEqGap,
     /// Whether the declaration hardline-separates its declarators (a multi-declarator
@@ -116,7 +115,6 @@ impl<'a> Printer<'a> {
             init,
             decl_start,
             id_doc,
-            can_break_left,
             gap:
                 DeclaratorEqGap {
                     id_end,
@@ -128,6 +126,12 @@ impl<'a> Printer<'a> {
             should_break,
             is_first,
         } = inputs;
+        // `can_break(id_doc)` — prettier's `canBreak(leftDoc)`, which decides the fluid arm.
+        // Asked at most once and only where an arm reads it (each read below keeps it LAST
+        // in its conjunction): prettier computes it eagerly, but on a real corpus two fifths
+        // of declarators never reach a reader, and the walk is the binding's whole doc when
+        // the binding is a pattern.
+        let can_break_left = LazyCell::new(|| d.can_break(id_doc));
         let mut parts: DocBuf = DocBuf::new();
         // Comments after `=` all stay after `=`, matching prettier — a JSDoc
         // cast (`= /** @type {T} */ (expr)`) keeps its parens via the
@@ -230,7 +234,7 @@ impl<'a> Printer<'a> {
         let has_complex_type_annotation = self.id_has_complex_type_annotation(declarator.id);
         let has_complex_destructuring = self.id_has_complex_destructuring(declarator.id);
         let is_arrow_with_breakable_left =
-            matches!(init, Expression::ArrowFunctionExpression(_)) && can_break_left;
+            matches!(init, Expression::ArrowFunctionExpression(_)) && *can_break_left;
 
         // Break-after-operator layout: group([left, " =", group(indent([line, right]))])
         // Used for fluid RHS or simple RHS when LHS can break.
@@ -383,12 +387,12 @@ impl<'a> Printer<'a> {
         //
         // Excludes is_expandable_member_call: when the call head fits, the call's own
         // arg-expansion handles line breaking via default layout.
-        let needs_fluid_for_breakable_lhs = can_break_left
-            && is_layout_eligible
+        let needs_fluid_for_breakable_lhs = is_layout_eligible
             && !should_break
             && !is_break_after_op_rhs
             && !is_expandable_member_call
-            && !init_pinned_to_eq;
+            && !init_pinned_to_eq
+            && *can_break_left;
 
         // Type assertion calls with LHS type annotation need special fluid handling
         // (handled separately below because they need non-wrapping LHS type)
@@ -398,7 +402,7 @@ impl<'a> Printer<'a> {
             PRINT_WIDTH,
         ) && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation().is_some());
 
-        let is_simple_rhs_with_breakable_lhs = can_break_left && is_simple_self_expanding(init);
+        let is_simple_rhs_with_breakable_lhs = is_simple_self_expanding(init) && *can_break_left;
 
         // `should_break` (a multi-declarator with initializers) withholds the
         // width-decided break at `=` because the declarators are hardline-separated
@@ -879,10 +883,6 @@ impl<'a> Printer<'a> {
             // Build id doc once for reuse and analysis
             let id_doc = self.build_variable_binding_doc(declarator.id, declarator.definite);
 
-            // Check if id doc can break (contains line elements like type annotations that wrap)
-            // This matches Prettier's `canBreak(leftDoc)` check
-            let can_break_left = d.can_break(id_doc);
-
             if !should_break && i > 0 {
                 // Non-break continuation declarators go to rest_parts (never have inits)
                 rest_parts.push(id_doc);
@@ -975,7 +975,6 @@ impl<'a> Printer<'a> {
                         init,
                         decl_start: decl.span.start,
                         id_doc,
-                        can_break_left,
                         gap: DeclaratorEqGap {
                             id_end,
                             equals_pos,

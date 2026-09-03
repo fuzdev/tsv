@@ -174,6 +174,12 @@ pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> boo
 /// unbreakable RHS may only stay welded to the operator when the LHS has nowhere to
 /// break either — otherwise the assignment falls through to `fluid` and breaks after the
 /// operator, rather than letting the LHS break inside the assignment target.
+///
+/// Only the two `never-break-after-operator` arms read it, and every arm above them
+/// returns without looking, so the caller asks the doc only when one of those arms can be
+/// reached (`is_short_key`, or a simple value) — see [`Printer::build_assignment_layout`].
+/// Prettier computes `canBreakLeftDoc` eagerly; on a real corpus two thirds of those
+/// answers went unread, a doc walk apiece.
 pub fn choose_layout(
     right_expr: &Expression<'_>,
     is_short_key: bool,
@@ -1119,10 +1125,17 @@ impl<'a> Printer<'a> {
                 rhs_info.boundary,
             );
         }
+        // The LHS walk is asked only when an arm that reads it can be reached: the two
+        // `never-break-after-operator` arms, gated on a short key or a simple value. Every
+        // other arm of `choose_layout` returns first, and on a real corpus that is two
+        // thirds of the asks. A gated bool rather than a lazy cell: this frame sits on the
+        // object-literal recursion (property → value → property), where a memo cell's
+        // extra words cost ~1% of the nesting depth the formatter survives.
+        let can_break_left = (is_short_key || is_simple_value(right_expr)) && d.can_break(left_doc);
         let mut layout = choose_layout(
             right_expr,
             is_short_key,
-            d.can_break(left_doc),
+            can_break_left,
             self.source,
             PRINT_WIDTH,
             self.comments,

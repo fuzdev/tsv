@@ -3217,8 +3217,17 @@ impl DocArena {
     /// right-hand side — a template literal, a boolean, a number — may stay welded to the
     /// operator, or must fall through to `fluid` so the break lands after the operator
     /// instead of inside the assignment target.
+    ///
+    /// The root is answered inline ahead of the walk: on a real corpus nine asks in ten
+    /// are a plain identifier target — a leaf `Text`, which cannot break — so the common
+    /// case is one tag load behind the first borrow, and only a composite root takes the
+    /// second borrow and the outlined recursion.
+    #[inline]
     pub fn can_break(&self, id: DocId) -> bool {
         let nodes = self.nodes.borrow();
+        if matches!(nodes[id.index()], DocNode::Text(_)) {
+            return false;
+        }
         let children = self.children.borrow();
         Self::can_break_inner(id, &nodes, &children)
     }
