@@ -81,6 +81,7 @@ use tsv_lang::{
     },
     has_comments_to_emit_in_range, has_line_comments_in_range,
     printing::{self, LineTable},
+    range_too_narrow_for_a_comment,
     source_scan::{
         OperandAnchor, PAREN_HOP_NEEDLES, TriviaProfile, has_newline_before_position,
         is_hop_needle, skip_regex_literal, skip_trivia,
@@ -1030,7 +1031,22 @@ impl<'a> Printer<'a> {
     /// ([`tsv_lang::Comment::owned_by_node`]). See `tsv_lang::comment` for the three
     /// axes — a *layout* gate wants [`Self::has_comments_on_page_between`] and a source
     /// cursor wants [`Self::comments_in_source_between`].
+    ///
+    /// Two tiers, like every existence wrapper below: the narrow-gap test is inline at
+    /// the site (a gap too short to hold a comment is answered by two compares), and
+    /// only a gap that could hold one pays the call into the outlined search. The
+    /// printers ask these wrappers by the hundred thousand a document and most of the
+    /// gaps are a single token wide, so the split is what keeps the common ask off the
+    /// call boundary while the search stays one copy.
+    #[inline]
     pub(crate) fn has_comments_to_emit_between(&self, start: u32, end: u32) -> bool {
+        !range_too_narrow_for_a_comment(start, end)
+            && self.has_comments_to_emit_between_wide(start, end)
+    }
+
+    /// The search half of [`Self::has_comments_to_emit_between`] — one outlined copy.
+    #[inline(never)]
+    fn has_comments_to_emit_between_wide(&self, start: u32, end: u32) -> bool {
         has_comments_to_emit_in_range(self.comments, start, end)
     }
 
@@ -1042,7 +1058,15 @@ impl<'a> Printer<'a> {
     /// but it is still in the output and still occupies width, so a layout decision must
     /// see it. Using [`Self::has_comments_to_emit_between`] here makes the comment
     /// silently vanish from a decision it is visibly part of.
+    #[inline]
     pub(crate) fn has_comments_on_page_between(&self, start: u32, end: u32) -> bool {
+        !range_too_narrow_for_a_comment(start, end)
+            && self.has_comments_on_page_between_wide(start, end)
+    }
+
+    /// The search half of [`Self::has_comments_on_page_between`] — one outlined copy.
+    #[inline(never)]
+    fn has_comments_on_page_between_wide(&self, start: u32, end: u32) -> bool {
         tsv_lang::has_comments_on_page_in_range(self.comments, start, end)
     }
 
@@ -1103,7 +1127,15 @@ impl<'a> Printer<'a> {
     /// Check if there are line comments (// style) between two positions
     ///
     /// Uses binary search: O(log n + k) where k is comments in range
+    #[inline]
     pub(crate) fn has_line_comments_between(&self, start: u32, end: u32) -> bool {
+        !range_too_narrow_for_a_comment(start, end)
+            && self.has_line_comments_between_wide(start, end)
+    }
+
+    /// The search half of [`Self::has_line_comments_between`] — one outlined copy.
+    #[inline(never)]
+    fn has_line_comments_between_wide(&self, start: u32, end: u32) -> bool {
         has_line_comments_in_range(self.comments, start, end)
     }
 
@@ -1112,12 +1144,30 @@ impl<'a> Printer<'a> {
     /// Multiline block comments (containing newlines) force break-after-operator
     /// layout in assignments and property values.
     /// Prettier ref: `hasLeadingOwnLineComment` in assignment.js `chooseLayout`
+    #[inline]
     pub(crate) fn has_multiline_block_comments_on_page_between(
         &self,
         start: u32,
         end: u32,
     ) -> bool {
+        !range_too_narrow_for_a_comment(start, end)
+            && self.has_multiline_block_comments_on_page_between_wide(start, end)
+    }
+
+    /// The search half of [`Self::has_multiline_block_comments_on_page_between`] — one
+    /// outlined copy.
+    #[inline(never)]
+    fn has_multiline_block_comments_on_page_between_wide(&self, start: u32, end: u32) -> bool {
         tsv_lang::has_multiline_block_comments_on_page_in_range(self.comments, start, end)
+    }
+
+    /// What the chain linearizer reads off the input — the source and the comment table
+    /// as one value, so the two cannot be handed over separately at a call site.
+    pub(crate) fn linearize_input(&self) -> chain::LinearizeInput<'_> {
+        chain::LinearizeInput {
+            source: self.source,
+            comments: self.comments,
+        }
     }
 
     /// Whether comments in the range force the following value onto its own line.
@@ -1141,16 +1191,18 @@ impl<'a> Printer<'a> {
     /// comment genuinely own its line, which this one never asks; use that variant
     /// only at the one carve-out site where prettier *keeps* that break
     /// (binary/logical operands).
-    /// What the chain linearizer reads off the input — the source and the comment table
-    /// as one value, so the two cannot be handed over separately at a call site.
-    pub(crate) fn linearize_input(&self) -> chain::LinearizeInput<'_> {
-        chain::LinearizeInput {
-            source: self.source,
-            comments: self.comments,
-        }
+    ///
+    /// Two tiers like the existence wrappers above: the narrow-gap test inline, the walk
+    /// one outlined copy.
+    #[inline]
+    pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
+        !range_too_narrow_for_a_comment(start, end)
+            && self.comments_force_own_line_between_wide(start, end)
     }
 
-    pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
+    /// The walk half of [`Self::comments_force_own_line_between`] — one outlined copy.
+    #[inline(never)]
+    fn comments_force_own_line_between_wide(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| self.comment_hangs_next(c, next))
     }
 
