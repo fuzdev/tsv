@@ -25,6 +25,7 @@ mod arena_fits;
 mod arena_render;
 mod arena_render_fill;
 mod arena_render_suffix;
+mod chain_share;
 mod render_config;
 #[cfg(feature = "swallow_check")]
 pub mod swallow;
@@ -130,6 +131,7 @@ pub use arena_render::{
 
 // Arena fits
 pub use arena_fits::arena_fits;
+pub use chain_share::{ChainShareStore, ShareKey};
 
 #[cfg(test)]
 mod arena_tests {

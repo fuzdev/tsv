@@ -200,7 +200,7 @@ mod tests {
 
     #[test]
     fn tuple_keys_are_distinguished() {
-        // The tuple-key path, live in the doc arena's `share_map_scratch`
+        // The tuple-key path, live in the doc arena's `ChainShareStore` hashed tier
         // (`(usize, u8)`) and `tsv_check`'s address map (`(usize, NodeKind)`);
         // `(u32, u32)` stands in for the class. A hasher that folded the pair
         // into one word would collide `(a, b)` with `(b, a)`.

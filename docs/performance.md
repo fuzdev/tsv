@@ -444,6 +444,26 @@ cmp /tmp/a.bin /tmp/b.bin
 `-p tsv_debug -p tsv_cli` differ by ~160 B on identical source through feature
 unification. Pin the invocation the way you pin the profile.
 
+#### The ratio board: an `instructions:u` draw beside the cycles draws
+
+A cycles board ranks source lines by what they *cost*; it cannot say what the machine is
+doing with that cost. Take one more `perf record` of the **same** profiling binary with
+`-e instructions:u` beside the `cycles:Pu` draws, dump both with `--sort=srcline,sym
+--full-source-path`, and fold each line (and each symbol) as *cycles share ÷ instruction
+share*, sorted by the **excess** (cycles share − instruction share, in points of the pass):
+
+- a row well **above 1** is waiting — a mispredicted branch, a dependent load — and a lever
+  that removes the stall can reach the row's whole excess, more than its instruction count
+  says;
+- a row **below 1** is throughput-bound and only fewer instructions move it.
+
+Calibrate before reading: fold two cycles draws of one binary against each other, and treat
+any excess inside that spread (a few tenths of a point on the largest rows here) as a draw.
+Read the by-symbol view beside the by-line one — an inlined stall's cycles land on the lines
+that consume its result, so a by-line excess is a floor. The excess *names* the row; size the
+lever with the layout group (§Reading `cycles:u` below), because a stall row's win converts at
+a ratio the instruction A/B cannot see — in either direction.
+
 ### 5. `heaptrack` — allocation-site profiling
 
 When `perf` shows time inside malloc/free internals, it can't say _which_

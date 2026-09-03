@@ -76,7 +76,7 @@ use tsv_lang::{
     EmbedContext, OutputBuffer, Span, TAB_WIDTH, comments_in_source_after,
     comments_to_emit_in_range,
     doc::{
-        self,
+        self, ShareKey,
         arena::{DocArena, DocId},
     },
     has_comments_to_emit_in_range, has_line_comments_in_range,
@@ -87,7 +87,7 @@ use tsv_lang::{
     },
 };
 
-/// Which builder a chain-share entry belongs to — the builder half of the share-map tag,
+/// Which builder a chain-share entry belongs to — the builder half of the share key's tag,
 /// sitting ABOVE the two `expandLastArg` state bits it is OR-ed with.
 ///
 /// One node is reached by more than one builder, and their docs are NOT interchangeable: the
@@ -116,7 +116,7 @@ impl ShareTag {
     const STATE_BITS: u8 = Self::SKIP_ARROW_CHAIN_BIT | Self::FLAT_PARAMS_BIT;
 }
 
-// The invariant the whole share map rests on, stated where a new variant is written rather
+// The invariant the whole share store rests on, stated where a new variant is written rather
 // than only in prose: a builder that overlapped a state bit would answer a lookup made under
 // different `expandLastArg` state, which is a hit that is NOT byte-identical to a rebuild.
 const _: () = assert!(ShareTag::ArgExpression as u8 & ShareTag::STATE_BITS == 0);
@@ -446,7 +446,7 @@ pub struct Printer<'a> {
     /// `needs_parens` check (assignment RHS, ternary branches/test).
     /// Uses Cell for interior mutability so doc builders (&self) can set this.
     pub(crate) in_for_init: Cell<bool>,
-    /// Whether the scoped doc-share map for member-chain building is active: an AST
+    /// Whether the scoped argument share for member-chain building is active: an AST
     /// node's pointer **plus a build tag** ([`ShareTag`]) → the `DocId` already built
     /// for it. A member chain renders the same group **flat** (`print_group`) and
     /// **expanded** (`print_group_expanded`) across `conditional_group` candidates;
@@ -466,10 +466,11 @@ pub struct Printer<'a> {
     ///
     /// Active only between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
     /// `build_chain_doc`); the pointer is stable, the AST arena being immutable during
-    /// formatting. The map's *storage* is the doc arena's parked
-    /// [`DocArena::share_map_scratch`] (cleared at both enter and exit, so between chains
-    /// — and across printers sharing one arena — it is logically empty and only its table
-    /// capacity persists, killing the per-printer `HashMap` resize chain).
+    /// formatting. The store itself is the doc arena's parked
+    /// [`DocArena::chain_share_store`] — a linear tier for the common chain of a few
+    /// entries, a hashed tier for the rare deep one — cleared at both enter and exit, so
+    /// between chains (and across printers sharing one arena) it is logically empty and
+    /// only its capacity persists.
     pub(crate) chain_arg_share_active: Cell<bool>,
     /// Expand-last-arg body reuse: `(body-expr span start, pre-built body DocId)`.
     /// The call/new expand-last paths build an arrow's call body **once** up front
@@ -842,7 +843,7 @@ impl<'a> Printer<'a> {
     /// Printer state a chain's flat and expanded candidates reach a given node under
     /// differently — so a hit is byte-identical to a rebuild by construction rather than
     /// by the caller having checked. See the `chain_arg_share_active` field doc.
-    pub(crate) fn chain_share_key<T>(&self, node: &T, builder: ShareTag) -> Option<(usize, u8)> {
+    pub(crate) fn chain_share_key<T>(&self, node: &T, builder: ShareTag) -> Option<ShareKey> {
         if !self.chain_arg_share_active.get() {
             return None;
         }
@@ -856,42 +857,42 @@ impl<'a> Printer<'a> {
         Some((std::ptr::from_ref(node) as usize, tag))
     }
 
-    /// Look up `key` in the chain share map, or build and record it.
+    /// Look up `key` in the chain share store, or build and record it.
     pub(crate) fn chain_shared_doc(
         &self,
-        key: Option<(usize, u8)>,
+        key: Option<ShareKey>,
         build: impl FnOnce() -> DocId,
     ) -> DocId {
         let Some(key) = key else {
             return build();
         };
-        let share_map = self.arena.share_map_scratch();
-        if let Some(&doc) = share_map.borrow().get(&key) {
+        let store = self.arena.chain_share_store();
+        if let Some(doc) = store.borrow().get(key) {
             return doc;
         }
         let doc = build();
-        share_map.borrow_mut().insert(key, doc);
+        store.borrow_mut().insert(key, doc);
         doc
     }
 
-    /// Activate the chain-arg share map for the outermost `build_chain_doc` only. Returns the
-    /// prior active state; nested chains observe `true` and become no-ops (the map
+    /// Activate the chain-arg share for the outermost `build_chain_doc` only. Returns the
+    /// prior active state; nested chains observe `true` and become no-ops (the store
     /// persists across the whole top-level chain so every nesting level shares).
     pub(crate) fn enter_chain_arg_share(&self) -> bool {
         let was_active = self.chain_arg_share_active.get();
         if !was_active {
             self.chain_arg_share_active.set(true);
-            self.arena.share_map_scratch().borrow_mut().clear();
+            self.arena.chain_share_store().borrow_mut().clear();
         }
         was_active
     }
 
-    /// Deactivate + clear the chain-arg share map when leaving the outermost `build_chain_doc`
+    /// Deactivate + clear the chain-arg share when leaving the outermost `build_chain_doc`
     /// (`was_active` false). Nested exits are no-ops.
     pub(crate) fn exit_chain_arg_share(&self, was_active: bool) {
         if !was_active {
             self.chain_arg_share_active.set(false);
-            self.arena.share_map_scratch().borrow_mut().clear();
+            self.arena.chain_share_store().borrow_mut().clear();
         }
     }
 
