@@ -118,10 +118,6 @@ impl<'a> Printer<'a> {
         self.is_expression_statement.set(false);
     }
 
-    pub(crate) fn get_layout_line_breaks(&self) -> &[u32] {
-        self.layout_line_breaks.breaks
-    }
-
     pub(crate) fn chain_has_comments(&self) -> bool {
         self.chain_has_comments.get()
     }
@@ -147,7 +143,8 @@ impl<'a> Printer<'a> {
             self.comments,
             start,
             end,
-            self.comment_line_breaks.breaks,
+            self.source.as_bytes(),
+            self.comment_line_breaks,
         )
     }
 

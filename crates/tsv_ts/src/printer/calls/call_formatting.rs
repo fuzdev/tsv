@@ -572,17 +572,9 @@ fn try_single_arg_comment_paths(
     // branches below — defer to the general comment path (which emits them
     // after the last arg, no trailing comma). Same-line inline trailing block
     // comments (e.g. `fn(/* c */ a /* t */)`) stay on this fast path.
-    let has_own_line_trailing_comment =
-        printer
-            .comments_on_page_between(arg_end, paren_close)
-            .any(|c| {
-                !c.is_block
-                    || !tsv_lang::printing::is_same_line_fast(
-                        printer.comment_line_breaks.breaks,
-                        arg_end,
-                        c.span.start,
-                    )
-            });
+    let has_own_line_trailing_comment = printer
+        .comments_on_page_between(arg_end, paren_close)
+        .any(|c| !c.is_block || !printer.is_same_line(arg_end, c.span.start));
 
     let has_line_comments = printer.has_line_comments_between(paren_open, arg_start);
 
@@ -607,7 +599,8 @@ fn try_single_arg_comment_paths(
         // §Comment relocation (Call open paren `(`).
         let gap_pc = PartitionedComments::new(
             printer.comments,
-            printer.comment_line_breaks.breaks,
+            printer.source.as_bytes(),
+            printer.comment_line_breaks,
             paren_open,
             arg_start,
         );
@@ -980,14 +973,7 @@ fn build_call_with_arg_comments(
         let search_start = last_arg.span().end;
         printer
             .comments_on_page_between(search_start, call.span.end)
-            .any(|c| {
-                c.is_block
-                    && !tsv_lang::printing::is_same_line_fast(
-                        printer.comment_line_breaks.breaks,
-                        search_start,
-                        c.span.start,
-                    )
-            })
+            .any(|c| c.is_block && !printer.is_same_line(search_start, c.span.start))
     });
 
     if !(has_leading_comments
@@ -1018,7 +1004,8 @@ fn build_call_with_arg_comments(
 
             let gap_pc = PartitionedComments::new(
                 printer.comments,
-                printer.comment_line_breaks.breaks,
+                printer.source.as_bytes(),
+                printer.comment_line_breaks,
                 paren_open,
                 first_arg_start,
             );

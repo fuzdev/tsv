@@ -13,7 +13,6 @@ use super::super::printing::{chain_gap_any, node_comment_gap};
 use super::super::types::{ChainGroup, ChainNode};
 use crate::printer::Printer;
 use tsv_lang::comments_on_page_in_range;
-use tsv_lang::printing::{self, has_blank_line_between_fast};
 
 /// Check if there are blank lines BETWEEN methods (not just before the first method)
 ///
@@ -27,7 +26,6 @@ pub(super) fn has_blank_lines_between_methods<'a>(
     groups: &[ChainGroup<'a>],
     printer: &Printer<'_>,
 ) -> bool {
-    let line_breaks = printer.get_layout_line_breaks();
     // Skip groups[0] (base) and groups[1] (first method) - only check groups[2+]
     groups.iter().skip(2).any(|group| {
         let Some(node) = group.nodes.first() else {
@@ -37,7 +35,7 @@ pub(super) fn has_blank_lines_between_methods<'a>(
         // the object — between two call arguments, say — and is not a blank between methods.
         node.comment_range().is_some_and(|gap| {
             chain_gap_any(gap, node.paren_gap_skip(), |obj_end, prop_start| {
-                has_blank_line_between_fast(line_breaks, obj_end, prop_start)
+                printer.has_blank_line_between(obj_end, prop_start)
             })
         })
     })
@@ -207,7 +205,7 @@ pub(super) struct CallbackStatus {
 /// Analyze callback status for a call node in a single pass
 pub(super) fn call_callback_status<'a>(
     node: &ChainNode<'a>,
-    line_breaks: &[u32],
+    printer: &Printer<'_>,
 ) -> CallbackStatus {
     let Some(call) = node.as_call_expression() else {
         return CallbackStatus::default();
@@ -226,16 +224,12 @@ pub(super) fn call_callback_status<'a>(
                         // (comment-only blocks emit hardlines via comment printing)
                         ArrowFunctionBody::BlockStatement(block) => {
                             !block.body.is_empty()
-                                || printing::has_newline_between_fast(
-                                    line_breaks,
-                                    block.span.start,
-                                    block.span.end,
-                                )
+                                || printer.has_newline_between(block.span.start, block.span.end)
                         }
-                        // Expression body - check if it's multiline (O(log n))
+                        // Expression body - check if it's multiline
                         ArrowFunctionBody::Expression(expr) => {
                             let span = expr.span();
-                            printing::has_newline_between_fast(line_breaks, span.start, span.end)
+                            printer.has_newline_between(span.start, span.end)
                         }
                     };
                 }
@@ -245,11 +239,7 @@ pub(super) fn call_callback_status<'a>(
                 has_callback = true;
                 if !will_break {
                     will_break = !func.body.body.is_empty()
-                        || printing::has_newline_between_fast(
-                            line_breaks,
-                            func.body.span.start,
-                            func.body.span.end,
-                        );
+                        || printer.has_newline_between(func.body.span.start, func.body.span.end);
                 }
             }
             _ => {}

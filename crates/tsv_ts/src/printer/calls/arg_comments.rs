@@ -707,7 +707,8 @@ pub(super) fn emit_first_arg_leading_comments(
     let d = printer.d();
     let pc = PartitionedComments::new(
         printer.comments,
-        printer.comment_line_breaks.breaks,
+        printer.source.as_bytes(),
+        printer.comment_line_breaks,
         paren_open,
         first_arg_start,
     );
@@ -888,7 +889,8 @@ impl<'a> PartitionedComments<'a> {
     /// **delimiter**-gap reading its name describes.
     pub(crate) fn new(
         comments: &'a [internal::Comment],
-        line_breaks: &[u32],
+        source: &[u8],
+        table: tsv_lang::printing::LineTable<'_>,
         start: u32,
         end: u32,
     ) -> Self {
@@ -897,7 +899,7 @@ impl<'a> PartitionedComments<'a> {
         // own-line buckets merged in source order — the inline-aware emitter and its
         // JSDoc-cast detection rely on the authored order.
         let classified =
-            tsv_lang::ClassifiedComments::from_range(comments, start, end, line_breaks);
+            tsv_lang::ClassifiedComments::from_range(comments, start, end, source, table);
         let leading = classified.leading_in_source_order();
         // ≤ 1 by construction: a second same-line comment would sit inside the first
         // `//`'s own text, so it cannot exist as a token.

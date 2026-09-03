@@ -175,25 +175,25 @@ pub struct Printer<'a> {
     /// directive (~all of them) skips the per-node range scan + directive-string match
     /// entirely — each entry reads this flag before any span arithmetic behind it.
     pub(crate) has_format_ignore: bool,
-    /// Precomputed line break positions for O(log n) line boundary lookups —
-    /// the *layout* table.
+    /// The document's line table (`tsv_lang::printing::LineTable` — a bounded scan of
+    /// the source, its on-demand table as the fallback) — the *layout* table.
     ///
     /// Backs every newline-derived **layout** read: blank-line preservation
-    /// (`has_blank_line_between`) and expansion intent (`has_newline_between`,
-    /// plus the free-function `*_fast` call sites that take this slice directly).
-    /// The canonical reprint path ([`crate::format_canonical`]) empties this
-    /// table via [`Self::set_canonical`] so those reads collapse (nothing is
-    /// "on a new line", no blank lines), erasing authoring intent.
+    /// (`has_blank_line_between`) and expansion intent (`has_newline_between`); every
+    /// such read goes through those two wrappers, nothing reads the table directly.
+    /// The canonical reprint path ([`crate::format_canonical`]) erases this table via
+    /// [`Self::set_canonical`] so those reads collapse (nothing is "on a new line", no
+    /// blank lines), erasing authoring intent.
     ///
     /// **Never read this for comment classification** — use `comment_line_breaks`.
-    /// Under `set_canonical` this table is empty, so a comment-adjacency read
+    /// Under `set_canonical` this table is erased, so a comment-adjacency read
     /// against it reports "same line" for every comment: a `//` comment stops
     /// being followed by a break and the next token is glued onto its line,
     /// swallowing content. The name is qualified precisely so the choice has to
     /// be conscious at every call site.
     pub(crate) layout_line_breaks: LineTable<'a>,
     /// Line breaks used exclusively for *comment* position classification
-    /// (`is_same_line`, `classify_comment_fast`, `PartitionedComments`), kept
+    /// (`is_same_line`, `ClassifiedComments`, `PartitionedComments`), kept
     /// real even in the canonical path so a comment's trailing/leading/own-line
     /// role stays correct and consecutive line comments never merge onto one
     /// output line. In the normal path this is the same table as

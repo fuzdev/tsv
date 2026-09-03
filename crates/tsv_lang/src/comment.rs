@@ -4,7 +4,7 @@ use std::cell::Cell;
 
 use crate::Span;
 use crate::acorn_prefix::AcornPrefix;
-use crate::printing;
+use crate::printing::{self, LineTable};
 use crate::source_scan::{self, has_newline_after_position, has_newline_before_position};
 use crate::whitespace::is_js_whitespace;
 use smallvec::SmallVec;
@@ -323,35 +323,37 @@ pub fn classify_comment(
     CommentPosition::LeadingOwnLine
 }
 
-/// Classify a comment's position using precomputed line breaks (O(log n)).
-///
-/// This is the optimized version of [`classify_comment`] that uses binary search
-/// on a precomputed line breaks table instead of scanning the source string.
+/// [`classify_comment`] against the document's line-break table — the two same-line
+/// questions answered by [`printing::is_same_line_scan`] (a bounded scan of `source`, the
+/// bytes the table was built from, with the table search as the fallback) rather than by
+/// the unbounded source walk.
 ///
 /// # Arguments
 ///
 /// * `comment` - The comment to classify
 /// * `prev_end` - End position of the previous element
 /// * `curr_start` - Start position of the next element
-/// * `line_breaks` - Sorted slice of newline byte offsets
+/// * `source` - The document's bytes
+/// * `table` - The document's line-break table with its builder's verdict
 ///
 /// # Returns
 ///
 /// The comment's position classification.
 #[inline]
-pub fn classify_comment_fast(
+pub fn classify_comment_scan(
     comment: &Comment,
     prev_end: u32,
     curr_start: u32,
-    line_breaks: &[u32],
+    source: &[u8],
+    table: LineTable<'_>,
 ) -> CommentPosition {
     // Check if trailing (same line as prev_end)
-    if printing::is_same_line_fast(line_breaks, prev_end, comment.span.start) {
+    if printing::is_same_line_scan(source, table, prev_end, comment.span.start) {
         return CommentPosition::Trailing;
     }
 
     // Check if inline leading (same line as curr_start)
-    if printing::is_same_line_fast(line_breaks, comment.span.end, curr_start) {
+    if printing::is_same_line_scan(source, table, comment.span.end, curr_start) {
         return CommentPosition::LeadingInline;
     }
 
@@ -387,14 +389,22 @@ impl<'a> ClassifiedComments<'a> {
     /// * `comments` - All comments sorted by span.start
     /// * `start` - Start position (e.g., end of previous chain element)
     /// * `end` - End position (e.g., start of next chain element)
-    /// * `line_breaks` - Precomputed line break positions for O(log n) same-line checks
+    /// * `source` - The document's bytes
+    /// * `table` - The document's line table (the same-line checks are bounded scans of
+    ///   `source` with the table as the fallback — `printing::is_same_line_scan`)
     ///
     /// # Complexity
     ///
     /// O(log n + k) where n is total comments and k is comments in range.
     /// Compared to 4 separate filter calls which would be O(4 log n + 4k).
-    pub fn from_range(comments: &'a [Comment], start: u32, end: u32, line_breaks: &[u32]) -> Self {
-        Self::from_range_inner(comments, start, end, line_breaks, false)
+    pub fn from_range(
+        comments: &'a [Comment],
+        start: u32,
+        end: u32,
+        source: &[u8],
+        table: LineTable<'_>,
+    ) -> Self {
+        Self::from_range_inner(comments, start, end, source, table, false)
     }
 
     /// [`Self::from_range`] with the trailing run's anchor ADVANCING over each comment
@@ -420,23 +430,25 @@ impl<'a> ClassifiedComments<'a> {
         comments: &'a [Comment],
         start: u32,
         end: u32,
-        line_breaks: &[u32],
+        source: &[u8],
+        table: LineTable<'_>,
     ) -> Self {
-        Self::from_range_inner(comments, start, end, line_breaks, true)
+        Self::from_range_inner(comments, start, end, source, table, true)
     }
 
     fn from_range_inner(
         comments: &'a [Comment],
         start: u32,
         end: u32,
-        line_breaks: &[u32],
+        source: &[u8],
+        table: LineTable<'_>,
         advance: bool,
     ) -> Self {
         let mut result = Self::default();
 
         let mut anchor = start;
         for comment in comments_to_emit_in_range(comments, start, end) {
-            let same_line = printing::is_same_line_fast(line_breaks, anchor, comment.span.start);
+            let same_line = printing::is_same_line_scan(source, table, anchor, comment.span.start);
             if same_line && advance {
                 anchor = comment.span.end;
             }
@@ -774,7 +786,7 @@ pub fn owned_leading_comment_at<'c>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::printing::build_line_breaks;
+    use crate::printing::LineBreaks;
 
     fn comment(start: u32, end: u32, is_block: bool, content: &str) -> Comment {
         Comment {
@@ -965,11 +977,10 @@ mod tests {
     }
 
     #[test]
-    fn classify_comment_slow_and_fast_agree() {
+    fn classify_comment_slow_and_scan_agree() {
         // Offsets: 'x'=0, "// trail"=[2,10), '\n'=10, "/* own */"=[11,20),
         // '\n'=20, "/* inline */"=[21,33), ' '=33, 'y'=34.
         let source = "x // trail\n/* own */\n/* inline */ y";
-        let breaks = build_line_breaks(source);
         let line = comment(2, 10, false, " trail");
         let own = comment(11, 20, true, " own ");
         let inline = comment(21, 33, true, " inline ");
@@ -988,13 +999,14 @@ mod tests {
             CommentPosition::LeadingInline
         );
 
-        // The precomputed-line-breaks variant must never disagree with the
-        // source-scanning one.
+        // The table-backed variant must never disagree with the source-scanning one.
+        let line_breaks = LineBreaks::of(source);
+        let table = line_breaks.table();
         for c in [&line, &own, &inline] {
             assert_eq!(
                 classify_comment(c, 1, 34, source),
-                classify_comment_fast(c, 1, 34, &breaks),
-                "slow/fast disagree for span {:?}",
+                classify_comment_scan(c, 1, 34, source.as_bytes(), table),
+                "slow/scan disagree for span {:?}",
                 c.span
             );
         }
