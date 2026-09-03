@@ -740,7 +740,7 @@ pub(crate) fn push_gap_comments_and_break(
             leading.iter().copied(),
             property_start,
             LeadingGlue::Adjacent,
-            printer.arena().empty(),
+            None,
         );
     }
 }

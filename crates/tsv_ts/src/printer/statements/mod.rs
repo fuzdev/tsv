@@ -400,7 +400,7 @@ impl<'a> Printer<'a> {
                 paren_gap(),
                 expr_start,
                 LeadingGlue::Adjacent,
-                d.empty(),
+                None,
             );
             inner.push(expr_doc);
             // The parens are already open, so a `//` before the `)` stays inside them
@@ -427,7 +427,7 @@ impl<'a> Printer<'a> {
                     paren_gap(),
                     expr_start,
                     LeadingGlue::Adjacent,
-                    d.empty(),
+                    None,
                 );
             }
             inner.push(expr_doc);
@@ -453,7 +453,7 @@ impl<'a> Printer<'a> {
                     paren_gap(),
                     expr_start,
                     LeadingGlue::Adjacent,
-                    d.empty(),
+                    None,
                 );
             }
             parts.push(expr_doc);

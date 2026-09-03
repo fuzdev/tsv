@@ -96,12 +96,12 @@ impl<'a> Printer<'a> {
         &self,
         t: &TSTypeLiteral<'_>,
         comments_present: bool,
-    ) -> (DocBuf, Option<u32>) {
+    ) -> (Option<DocId>, Option<u32>) {
         match t.members.first() {
             Some(first) if comments_present => {
                 self.delimiter_line_comment_prefix(t.span.start, first.span().start)
             }
-            _ => (DocBuf::new(), None),
+            _ => (None, None),
         }
     }
 
@@ -1071,7 +1071,7 @@ impl<'a> Printer<'a> {
         let (brace_line_prefix, delimiter_pull_pos) = if force_multiline {
             self.type_literal_brace_line_pull(obj, comments_present)
         } else {
-            (DocBuf::new(), None)
+            (None, None)
         };
         let members_doc = self.build_type_literal_members_only_doc_for_alignment(
             obj,
@@ -1089,19 +1089,19 @@ impl<'a> Printer<'a> {
             d.line()
         };
 
-        d.group(d.concat(&[
-            opening,
-            // The pulled comment rides on the `{`'s own line, ahead of the indent — no
-            // break precedes it, so the indent has nothing to act on.
-            d.concat(&brace_line_prefix),
-            d.indent(d.indent(members_doc)),
-            // The closing delimiter takes the union member's `align(2)` sub-tab
-            // offset (2 literal spaces), so it lands under its opener at any tab
-            // width — matching Prettier's `align(2, …)`. The members keep whole
-            // tabs (`align(2)` + `indent` rounds up), so only the closing line's
-            // representation changes.
-            d.align(2, d.concat(&[line_doc, d.text("}")])),
-        ]))
+        let members = d.indent(d.indent(members_doc));
+        // The closing delimiter takes the union member's `align(2)` sub-tab
+        // offset (2 literal spaces), so it lands under its opener at any tab
+        // width — matching Prettier's `align(2, …)`. The members keep whole
+        // tabs (`align(2)` + `indent` rounds up), so only the closing line's
+        // representation changes.
+        let closer = d.align(2, d.concat(&[line_doc, d.text("}")]));
+        // The pulled comment rides on the `{`'s own line, ahead of the indent — no
+        // break precedes it, so the indent has nothing to act on.
+        d.group(match brace_line_prefix {
+            Some(prefix) => d.concat(&[opening, prefix, members, closer]),
+            None => d.concat(&[opening, members, closer]),
+        })
     }
 
     /// Build doc for object type literal when it's a direct union member.
@@ -1162,7 +1162,9 @@ impl<'a> Printer<'a> {
             // conformance_prettier_ts_comments.md §Comment relocation (Type literal `{`).
             let (brace_line_prefix, delimiter_pull_pos) =
                 self.type_literal_brace_line_pull(t, comments_present);
-            parts.push(d.concat(&brace_line_prefix));
+            if let Some(prefix) = brace_line_prefix {
+                parts.push(prefix);
+            }
 
             // Multi-line format (same for both modes) — the shared member-body walk. A
             // preceding format-ignore directive keeps the member's source verbatim, up to

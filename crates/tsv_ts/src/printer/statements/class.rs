@@ -318,13 +318,13 @@ impl<'a> Printer<'a> {
         );
 
         // Wrap body content in indent
-        d.concat(&[
+        self.build_delimited_doc(
             d.text("{"),
-            d.concat(&brace_line_prefix),
+            brace_line_prefix,
             d.indent(d.concat(&member_parts)),
             d.hardline(),
             d.text("}"),
-        ])
+        )
     }
 
     /// Build a Doc for a class member

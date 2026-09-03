@@ -674,13 +674,13 @@ impl<'a> Printer<'a> {
             get_span,
             build_item_doc,
         );
-        d.concat(&[
+        self.build_delimited_doc(
             d.text("{"),
-            d.concat(&brace_line_prefix),
+            brace_line_prefix,
             d.indent_hardline(inner_doc),
             d.hardline(),
             d.text("}"),
-        ])
+        )
     }
 
     /// Build a comma-separated list with hardline breaks and full comment handling.
@@ -761,16 +761,16 @@ impl<'a> Printer<'a> {
             if !is_last {
                 let next_start = get_span(&items[i + 1]).start;
                 let trailing = self.collect_trailing_comments(item_end, next_start, false);
-                self.push_element_comma_trailing(&mut parts, &trailing, d.text(","));
+                self.push_element_comma_trailing(&mut parts, &trailing, Some(d.text(",")));
                 prev_end = trailing.end_pos;
             } else {
-                // Last item: the same contract with an EMPTY separator, since no trailing
+                // Last item: the same contract with NO separator (`None`), since no trailing
                 // comma is emitted (trailingComma: 'none') — so same-line block comments
                 // hug the item (`a /* c */`) and same-line line comments defer after it
                 // (`a // comment`), both through the shared emitter rather than a second
                 // spelling of the same-line walk.
                 let trailing = self.collect_trailing_comments(item_end, end_boundary, true);
-                self.push_element_comma_trailing(&mut parts, &trailing, d.empty());
+                self.push_element_comma_trailing(&mut parts, &trailing, None);
 
                 // What the run did not claim is own-line, and is this container's trailing
                 // comment run (`a⏎// comment`) — the shared separator

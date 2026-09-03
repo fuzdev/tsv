@@ -263,13 +263,13 @@ impl<'a> Printer<'a> {
             );
         }
 
-        d.concat(&[
+        self.build_delimited_doc(
             d.text("{"),
-            d.concat(&brace_line_prefix),
+            brace_line_prefix,
             d.indent_hardline(d.concat(&body_parts)),
             d.hardline(),
             d.text("}"),
-        ])
+        )
     }
 
     /// Build docs for a `{ }`-delimited statement list — the shared per-statement

@@ -92,7 +92,7 @@ impl<'a> Printer<'a> {
                 comments.iter().copied(),
                 case.span.start,
                 LeadingGlue::Adjacent,
-                d.empty(),
+                None,
             );
 
             // Determine the end boundary for inline comments on this case

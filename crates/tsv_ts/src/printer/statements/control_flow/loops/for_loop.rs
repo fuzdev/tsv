@@ -887,7 +887,6 @@ impl<'a> Printer<'a> {
         prev_end: Option<u32>,
         separator: DocId,
     ) {
-        let d = self.d();
         // A comment trailing the previous clause on its line belongs to that clause, not
         // to this run. What remains splits at the clause the way every gap does: the
         // glued suffix leads it inline, the rest take their own lines.
@@ -902,7 +901,7 @@ impl<'a> Printer<'a> {
             run.iter().copied(),
             clause_start,
             LeadingGlue::Adjacent,
-            d.empty(),
+            None,
         );
         self.push_glued_comment_run(parts, &hug);
     }
@@ -1388,7 +1387,7 @@ impl<'a> Printer<'a> {
             leading_run.iter().copied(),
             spans.left_start,
             LeadingGlue::Adjacent,
-            d.empty(),
+            None,
         );
         self.push_glued_comment_run(&mut inner, &leading_glued);
 
@@ -1718,13 +1717,7 @@ impl<'a> Printer<'a> {
             // A line comment forces the break, which the gap owns. The whole declarator
             // run is wrapped in a `d.indent()` by the caller, so continuation lines need
             // no explicit indent text (empty).
-            self.push_inter_item_line_comment_gap(
-                decl_docs,
-                prev_end,
-                comma_pos,
-                curr_start,
-                d.empty(),
-            );
+            self.push_inter_item_line_comment_gap(decl_docs, prev_end, comma_pos, curr_start, None);
         } else {
             // Blocks only: a before-comma block trails the previous initializer; the
             // width-based `line` separates; after-comma blocks lead the next
@@ -1746,7 +1739,7 @@ impl<'a> Printer<'a> {
                 after.iter().copied(),
                 curr_start,
                 LeadingGlue::Adjacent,
-                d.empty(),
+                None,
             );
         }
     }

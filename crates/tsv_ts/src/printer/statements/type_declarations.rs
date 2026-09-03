@@ -860,7 +860,9 @@ impl<'a> Printer<'a> {
             let (brace_line_prefix, delimiter_pull_pos) =
                 self.delimiter_line_comment_prefix(decl.body.span.start, first_member_start);
             parts.push(d.text("{"));
-            parts.push(d.concat(&brace_line_prefix));
+            if let Some(prefix) = brace_line_prefix {
+                parts.push(prefix);
+            }
             parts.push(d.indent(d.concat(&[self.build_type_elements_doc(
                 decl.body.body,
                 decl.body.span.start,
@@ -1116,7 +1118,9 @@ impl<'a> Printer<'a> {
                 self.delimiter_line_comment_prefix(body_start - 1, first_member_start);
 
             parts.push(d.text("{"));
-            parts.push(d.concat(&brace_line_prefix));
+            if let Some(prefix) = brace_line_prefix {
+                parts.push(prefix);
+            }
             // Build member docs with comment handling
             let mut member_parts = DocBuf::new();
             // Where the next member's LEADING scan resumes: the end of the previous
@@ -1166,7 +1170,7 @@ impl<'a> Printer<'a> {
                     comments.iter().copied(),
                     member_start,
                     LeadingGlue::Adjacent,
-                    d.empty(),
+                    None,
                 );
 
                 // A preceding format-ignore directive keeps the member's source
@@ -1204,7 +1208,7 @@ impl<'a> Printer<'a> {
                 // run and the next member's leading scan partition it. No trailing comma
                 // on the last member under `trailingComma: 'none'`.
                 let trailing = self.collect_trailing_comments(member_end, upper_bound, is_last);
-                let comma = if is_last { d.empty() } else { d.text(",") };
+                let comma = (!is_last).then(|| d.text(","));
                 self.push_element_comma_trailing(&mut member_parts, &trailing, comma);
                 prev_end = trailing.end_pos;
             }
@@ -1482,7 +1486,9 @@ impl<'a> Printer<'a> {
                         self.delimiter_line_comment_prefix(block.span.start, first_stmt_start);
 
                     parts.push(d.text("{"));
-                    parts.push(d.concat(&brace_line_prefix));
+                    if let Some(prefix) = brace_line_prefix {
+                        parts.push(prefix);
+                    }
 
                     // Shared per-statement walk (leading comments, blank-line
                     // separators, format-ignore, trailing same-line comments) —

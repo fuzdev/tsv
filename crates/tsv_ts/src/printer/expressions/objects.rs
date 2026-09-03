@@ -202,7 +202,7 @@ impl<'a> Printer<'a> {
                 trailing.demote_line_after_deferred(
                     spread.is_some_and(|s| self.spread_element_defers_trailing_line_comment(s)),
                 );
-                let comma = if is_last { d.empty() } else { d.text(",") };
+                let comma = (!is_last).then(|| d.text(","));
                 self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                 // The object's share of a spread's stripped-paren interior: the own-line
@@ -239,17 +239,17 @@ impl<'a> Printer<'a> {
                 let (indented_content, closing_line) =
                     self.wrap_with_decl_indent(inner, d.hardline());
 
-                d.concat(&[
+                self.build_delimited_doc(
                     d.text("{"),
-                    d.concat(&brace_line_prefix),
+                    brace_line_prefix,
                     indented_content,
                     closing_line,
                     d.text("}"),
-                ])
+                )
             } else {
                 // May stay inline - use group with bracketSpacing boundaries for
                 // width-based breaking: a space when flat (`{ foo }`), a newline when
-                // it breaks (brace_line_prefix is empty here — pulling implies must_break).
+                // it breaks (brace_line_prefix is `None` here — pulling implies must_break).
                 let inner = d.concat(&[d.line(), d.concat(&parts)]);
                 let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.line());
 

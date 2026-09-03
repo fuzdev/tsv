@@ -783,7 +783,7 @@ impl<'a> Printer<'a> {
                             prev_end,
                             comma_pos,
                             curr_start,
-                            continuation_indent,
+                            Some(continuation_indent),
                         );
                     } else {
                         // Block comment(s) before the comma trail the previous init
@@ -816,7 +816,7 @@ impl<'a> Printer<'a> {
                                 comments.iter().copied(),
                                 curr_start,
                                 LeadingGlue::Adjacent,
-                                continuation_indent,
+                                Some(continuation_indent),
                             );
                         }
                     }
@@ -835,7 +835,7 @@ impl<'a> Printer<'a> {
                             prev_end,
                             comma_pos,
                             curr_start,
-                            d.empty(),
+                            None,
                         );
                     } else {
                         // Block comments keep their side of the comma (preserve position).
@@ -851,7 +851,7 @@ impl<'a> Printer<'a> {
                                 comments_to_emit_in_range(self.comments, comma_pos, curr_start),
                                 curr_start,
                                 LeadingGlue::Adjacent,
-                                d.empty(),
+                                None,
                             );
                         }
                     }

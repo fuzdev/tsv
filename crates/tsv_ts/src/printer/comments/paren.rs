@@ -151,7 +151,12 @@ impl<'a> Printer<'a> {
         // question). `pull_pos` is the exclusion every consumer of that prefix owes.
         let (paren_line, pull_pos) = match self.paren_line_share_anchor(open_paren_end, value_start)
         {
-            Some(paren) => self.delimiter_line_comment_prefix(paren, value_start),
+            Some(paren) => {
+                let (prefix, pull_pos) = self.delimiter_line_comment_prefix(paren, value_start);
+                // The field stays a buffer (its two consumers read a slice and gate on
+                // `is_empty`); the `Option` collects into it only at this cold site.
+                (prefix.into_iter().collect(), pull_pos)
+            }
             None => (DocBuf::new(), None),
         };
         let run = self.build_leading_comment_run_with_break(

@@ -584,12 +584,13 @@ impl<'a> Printer<'a> {
     /// A **block** comment stays inline with a trailing space, and prettier adds a
     /// space before `:` when one precedes it (`m(a) /* c */ : void`). A **line**
     /// comment forces the return-type `:` onto the next line (`m(a) // c⏎: void`)
-    /// so it isn't swallowed. Returns an empty doc when there is no such comment.
+    /// so it isn't swallowed. Returns `None` when there is no such comment, so the caller
+    /// prepends nothing (`prepend_opt`) rather than an `empty()` every later walk would visit.
     pub(in crate::printer) fn build_close_paren_to_return_type_comments(
         &self,
         close_paren_after: Option<u32>,
         return_type_start: u32,
-    ) -> DocId {
+    ) -> Option<DocId> {
         let d = self.d();
         let mut parts: DocBuf = smallvec![];
         let mut last_is_line = false;
@@ -614,7 +615,7 @@ impl<'a> Printer<'a> {
         if !parts.is_empty() && !last_is_line {
             parts.push(d.text(" "));
         }
-        d.concat(&parts)
+        (!parts.is_empty()).then(|| d.concat(&parts))
     }
 
     /// [`Self::build_function_return_type_doc`] for a caller that has only the params'
@@ -690,17 +691,16 @@ impl<'a> Printer<'a> {
         close_paren_after: Option<u32>,
         return_type: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
-        let d = self.d();
         // The frozen `)`→`:` route, on the close paren this caller already located.
         if let Some(frozen) = self.build_frozen_return_type_doc(close_paren_after, return_type) {
             return frozen;
         }
         let prefix = self
             .build_close_paren_to_return_type_comments(close_paren_after, return_type.span.start);
-        d.concat(&[
+        self.prepend_opt(
             prefix,
             self.build_type_annotation_doc_for_return_type(return_type),
-        ])
+        )
     }
 
     /// Build signature params doc with width-based breaking.
@@ -1211,7 +1211,7 @@ impl<'a> Printer<'a> {
         // (Function/constructor-type `(` trailing). Same mechanism as the call-`(`
         // and object/array/block open-delimiter family.
         let (paren_prefix, paren_pull_pos) = paren_pos.map_or_else(
-            || (DocBuf::new(), None),
+            || (None, None),
             |open| self.delimiter_line_comment_prefix(open, params[0].span().start),
         );
 
@@ -1250,7 +1250,9 @@ impl<'a> Printer<'a> {
         }
 
         parts.push(d.text("("));
-        parts.push(d.concat(&paren_prefix));
+        if let Some(prefix) = paren_prefix {
+            parts.push(prefix);
+        }
         parts.push(d.indent_hardline(d.concat(&inner_parts)));
         parts.push(d.hardline());
         parts.push(d.text(")"));

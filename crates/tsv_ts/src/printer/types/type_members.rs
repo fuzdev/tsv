@@ -582,7 +582,7 @@ impl<'a> Printer<'a> {
         // the param→`]` gap (`[key: string /* c */]`) trails the contents.
         let (bracket_line_prefix, bracket_pull_pos) = match (bracket_open_pos, first_param_start) {
             (Some(open), Some(key_start)) => self.delimiter_line_comment_prefix(open, key_start),
-            _ => (DocBuf::new(), None),
+            _ => (None, None),
         };
         // Own-line leading comments stay inside the brackets; a comment pulled onto
         // the `[` line above (same source line as `[`) is emitted by the prefix, so
@@ -608,7 +608,7 @@ impl<'a> Printer<'a> {
                     }),
                     key_start,
                     LeadingGlue::Adjacent,
-                    d.empty(),
+                    None,
                 );
                 (!lead_parts.is_empty()).then(|| d.concat(&lead_parts))
             }
@@ -645,13 +645,13 @@ impl<'a> Printer<'a> {
         inner_parts.push(d.join(param_docs, ", "));
         inner_parts.extend(trailing_comment);
         let bracket_inner = d.concat(&inner_parts);
-        let bracket_body = d.concat(&[
+        let bracket_body = self.build_delimited_doc(
             d.text("["),
-            d.concat(&bracket_line_prefix),
+            bracket_line_prefix,
             d.indent_softline(bracket_inner),
             d.softline(),
             d.text("]"),
-        ]);
+        );
         // A same-line `[` comment pulled onto the `[` line, or any line comment in the
         // key-type→`]` gap, forces the bracket to break so the `//` can't swallow the
         // key or `]` (the group would otherwise stay flat); other breaks are width- or

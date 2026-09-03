@@ -321,7 +321,7 @@ impl<'a> Printer<'a> {
                 comments_to_emit_in_range(self.comments, colon_end, body_start),
                 body_start,
                 LeadingGlue::AdjacentAnchorLine,
-                d.empty(),
+                None,
             );
             tail_parts.push(d.group(d.concat(&run)));
             tail_parts.push(self.build_statement_doc(stmt.body, ctx.labeled_body()));

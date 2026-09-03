@@ -858,9 +858,9 @@ impl<'a> Printer<'a> {
         // rides the broken group and breaks. The sibling angle/paren lists
         // (type params, type args, function-type params) are already grouped by their
         // own callers, which is why they land on the break without this.
-        d.group_break(d.concat(&[
+        d.group_break(self.build_delimited_doc(
             d.text("<"),
-            d.concat(&angle_prefix),
+            angle_prefix,
             d.indent(d.concat(&[
                 d.hardline(),
                 d.concat(&leading),
@@ -869,7 +869,7 @@ impl<'a> Printer<'a> {
             ])),
             d.hardline(),
             d.text(">"),
-        ]))
+        ))
     }
 
     /// Build a Doc for a TypeScript binary cast expression — `expr as Type` or

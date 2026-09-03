@@ -818,7 +818,7 @@ impl<'a> Printer<'a> {
             comments_to_emit_in_range(self.comments, gap_start, body_start),
             body_start,
             LeadingGlue::Adjacent,
-            d.empty(),
+            None,
         );
         inner.push(body_doc);
         parts.push(d.indent(d.concat(&inner)));
@@ -1019,7 +1019,7 @@ impl<'a> Printer<'a> {
             comments_to_emit_in_range(self.comments, gap_start, empty_start),
             empty_start,
             LeadingGlue::AdjacentAnchorLine,
-            d.empty(),
+            None,
         );
         inner.push(d.text(";"));
         parts.push(d.group(d.concat(&inner)));
@@ -1448,7 +1448,7 @@ impl<'a> Printer<'a> {
                 run_comments.iter().copied(),
                 test_start,
                 LeadingGlue::Adjacent,
-                d.empty(),
+                None,
             );
 
         // The condition itself

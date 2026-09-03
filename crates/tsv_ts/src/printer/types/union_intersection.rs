@@ -2466,7 +2466,7 @@ impl<'a> Printer<'a> {
                 own_line_leading.iter().copied(),
                 cur_start,
                 LeadingGlue::Adjacent,
-                d.empty(),
+                None,
             );
             // Rule A between-members freeze: an own-line directive in this member's gap
             // freezes the member (paren-transparent). The directive is emitted by the

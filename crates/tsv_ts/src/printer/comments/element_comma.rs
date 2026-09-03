@@ -93,7 +93,7 @@ pub(in crate::printer) fn next_real_element_start(
 /// Trailing comments collected for a list element (property or array element)
 pub(in crate::printer) struct TrailingComments<'a> {
     /// Block comments emitted in source order, before the emitted comma. A last
-    /// element's after-comma block is included here too — its comma is `d.empty()`
+    /// element's after-comma block is included here too — its comma is `None`
     /// (trailingComma: 'none'), so "before the comma" and "after the comma" are the same
     /// position and the whole run trails the element together (prettier relocates an
     /// after-comma block before the comma; see conformance_prettier_ts_comments.md).
@@ -434,7 +434,7 @@ impl<'a> Printer<'a> {
         // §Comment relocation). With no trailing comma emitted, a last element's after-comma
         // block trails the element in the same run as its before-comma blocks, so all
         // the run's blocks collect into one source-ordered `before_comma` (the comma
-        // between them is `d.empty()`).
+        // between them is `None`).
         let is_before_comma = |c: &Comment| block_is_before_comma(is_last, comma_pos, c.span.start);
 
         let mut before_comma = SmallVec::new();
@@ -499,7 +499,7 @@ impl<'a> Printer<'a> {
 
     /// Push one element's trailing comments around its `comma` doc, in the order
     /// that preserves comment position: the run's before-comma blocks (source-ordered,
-    /// including a last element's after-comma block since its comma is `d.empty()`),
+    /// including a last element's after-comma block since its comma is `None`),
     /// the comma, the after-comma blocks the author wrote there, then the run's line
     /// comment as a suffix. That is source order for every arrangement of the run, which
     /// is the point: the pieces land on the same side of the comma and in the same
@@ -509,7 +509,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         trailing: &TrailingComments<'_>,
-        comma: DocId,
+        comma: Option<DocId>,
     ) {
         // The comment runs are empty on the common (comment-free) path — collected as
         // empty vecs by the zero-comment gate in `collect_trailing_comments`. Skip
@@ -520,7 +520,11 @@ impl<'a> Printer<'a> {
         if !trailing.before_comma.is_empty() {
             parts.push(self.build_block_comments_doc(&trailing.before_comma));
         }
-        parts.push(comma);
+        // The last element's comma is `None` (trailingComma: 'none'): nothing is pushed,
+        // for the same reason the empty runs above are not.
+        if let Some(comma) = comma {
+            parts.push(comma);
+        }
         if !trailing.after_comma.is_empty() {
             parts.push(self.build_block_comments_doc(&trailing.after_comma));
         }

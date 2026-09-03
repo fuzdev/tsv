@@ -1134,13 +1134,13 @@ impl<'a> Printer<'a> {
         let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
         let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
 
-        d.concat(&[
+        self.build_delimited_doc(
             d.text("["),
-            d.concat(&bracket_line_prefix),
+            bracket_line_prefix,
             indented_content,
             closing_line,
             d.text("]"),
-        ])
+        )
     }
 
     /// Build a Doc for an array expression with forced expansion (hardlines).
