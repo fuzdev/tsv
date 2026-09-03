@@ -808,7 +808,7 @@ table (which caller asks which) is in [comments.md](./comments.md); the function
 Plus the axis-independent primitives:
 
 - `classify_comment()` — Determine if trailing, leading-own-line, or inline
-- `classify_comment_fast()` — Same, using precomputed line breaks (faster)
+- `classify_comment_scan()` — Same, against the document's line table (a bounded scan of the source, the table as the fallback)
 - `ClassifiedComments::from_range()` — Batch classify all categories in one pass
 - `find_first_comment_from()` — Binary-search index of first comment with `span.start >= pos`
 

@@ -1205,8 +1205,9 @@ impl<'a> Printer<'a> {
                     let mut in_leading_run = false;
                     for comment in &after {
                         if !in_leading_run
-                            && tsv_lang::printing::has_newline_between_fast(
-                                &self.line_breaks,
+                            && tsv_lang::printing::has_newline_between_scan(
+                                self.source.as_bytes(),
+                                self.line_table(),
                                 pos,
                                 comment.span.start,
                             )

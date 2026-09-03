@@ -1071,9 +1071,10 @@ pub struct DocArena {
     /// lines slice-cheap without materializing a per-comment line buffer.
     /// Cleared at each borrow; capacity survives `reset()`.
     line_spans_scratch: RefCell<Vec<(u32, u32)>>,
-    /// Parked whole-source line-break table backing the per-file
-    /// `build_line_breaks` in each `format_in` — taken (moved out), filled,
-    /// and parked back cleared with capacity retained, like `render_scratch`.
+    /// Parked whole-source line-break table behind each `format_in`'s
+    /// `printing::LineBreaks` — taken (moved out), filled only if a line question
+    /// falls back to the table, and parked back cleared with capacity retained,
+    /// like `render_scratch`.
     line_breaks_scratch: Cell<Vec<u32>>,
     /// Free-list of reusable [`DocBuf`] assembly buffers for the wide-list doc
     /// builders (statement lists, object/array/call-arg lists, member chains).
