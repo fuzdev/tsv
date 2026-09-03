@@ -556,7 +556,15 @@ fn chain_head_comment_window(
     {
         return (chain_start, *start);
     }
-    let base_start = get_chain_base_start(expr);
+    // The linearizer has already walked to the innermost base: it is `nodes[0]`, and its
+    // span starts where the walk over member / call / non-null spans would stop (each of
+    // those spans opens at its leftmost child). Reading it there spares one dispatch per
+    // chain level; the walk stays as the debug oracle.
+    let base_start = match nodes.first() {
+        Some(chain::ChainNode::Base { expr: base, .. }) => base.span().start,
+        _ => get_chain_base_start(expr),
+    };
+    debug_assert_eq!(base_start, get_chain_base_start(expr));
     // The innermost widened claim's end. `paren_gap_skip` is `Some` exactly on a node
     // linearization widened, and its start is that node's object's own span start —
     // never past the base, since the object contains it — so the max is a position in
@@ -570,7 +578,10 @@ fn chain_head_comment_window(
     (start, base_start)
 }
 
-/// Get the start position of the innermost base expression in a chain
+/// Get the start position of the innermost base expression in a chain.
+///
+/// [`chain_head_comment_window`] reads this off the linearized base node instead and
+/// keeps the walk as its debug oracle (and the fallback for a node list without one).
 fn get_chain_base_start(expr: &internal::Expression<'_>) -> u32 {
     match expr {
         internal::Expression::MemberExpression(member) => get_chain_base_start(member.object),
