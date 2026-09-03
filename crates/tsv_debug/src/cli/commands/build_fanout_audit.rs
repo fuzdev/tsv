@@ -335,9 +335,9 @@ fn gen_ts_nested_curried_arrow_new(depth: usize) -> String {
 ///
 /// ⚠️ Unlike its three siblings, a double build in that arm does **not** move this curve, and
 /// that is a fact about the chain path rather than a gap here: every build under a chain rides
-/// the chain share map (`Printer::chain_share_key`), whose key carries the builder and the
+/// the chain share store (`Printer::chain_share_key`), whose key carries the builder and the
 /// `expandLastArg` state, so a repeat under the same state returns the same `DocId`. The axis
-/// still holds the growth curve for everything the map does not cover — anything built outside
+/// still holds the growth curve for everything the store does not cover — anything built outside
 /// a share scope, and anything whose state varies per candidate.
 fn gen_ts_nested_curried_arrow_chain(depth: usize) -> String {
     let mut expr = String::from("done");
