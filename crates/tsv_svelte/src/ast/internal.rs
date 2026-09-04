@@ -1637,10 +1637,51 @@ pub fn is_collapsible_ws(b: u8) -> bool {
 }
 
 /// [`is_collapsible_ws`] over a `char`, for the `str` pattern positions
-/// (`trim_matches`, `starts_with`, …).
+/// (`starts_with`, `ends_with`, `split`, …).
+///
+/// ⚠️ Not for a trim: `trim_matches(f)` and its halves build a searcher that decodes a char
+/// from an end before it can reject, and a text node's edges are asked once per node — use
+/// [`trim_start_collapsible_ws`] / [`trim_end_collapsible_ws`], which are the same answer on
+/// bytes, since every member of this class is one ASCII byte.
 #[inline]
 pub fn is_collapsible_ws_char(c: char) -> bool {
     matches!(c, ' ' | '\t' | '\n' | '\r')
+}
+
+/// Byte length of the [`is_collapsible_ws`] run at the head of `s` — exact, since every
+/// member is one ASCII byte, so the answer is a byte boundary and a char boundary at once.
+#[inline]
+pub fn collapsible_ws_prefix_len(s: &str) -> usize {
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && is_collapsible_ws(bytes[i]) {
+        i += 1;
+    }
+    i
+}
+
+/// Byte length of the [`is_collapsible_ws`] run at the tail of `s` — the mirror of
+/// [`collapsible_ws_prefix_len`].
+#[inline]
+pub fn collapsible_ws_suffix_len(s: &str) -> usize {
+    let bytes = s.as_bytes();
+    let mut i = bytes.len();
+    while i > 0 && is_collapsible_ws(bytes[i - 1]) {
+        i -= 1;
+    }
+    bytes.len() - i
+}
+
+/// `s.trim_start_matches(is_collapsible_ws_char)` on bytes — see [`is_collapsible_ws_char`].
+#[inline]
+pub fn trim_start_collapsible_ws(s: &str) -> &str {
+    &s[collapsible_ws_prefix_len(s)..]
+}
+
+/// `s.trim_end_matches(is_collapsible_ws_char)` on bytes — see [`is_collapsible_ws_char`].
+#[inline]
+pub fn trim_end_collapsible_ws(s: &str) -> &str {
+    &s[..s.len() - collapsible_ws_suffix_len(s)]
 }
 
 /// The runs of `s` between [`is_collapsible_ws_char`] characters, empties skipped — the
@@ -1651,9 +1692,42 @@ pub fn is_collapsible_ws_char(c: char) -> bool {
 /// class. `str::split_ascii_whitespace` is the same function over the **wider** set, and using it
 /// here dropped a form feed out of the middle of a word; `str::split_whitespace` is wider still
 /// and would drop a non-breaking space.
+///
+/// A byte walk, not `str::split(is_collapsible_ws_char)`: that searcher decodes a char per
+/// byte of every text node's prose to find a class that is four ASCII bytes, and the fill asks
+/// it of every content text it packs.
 #[inline]
 pub fn split_collapsible_ws(s: &str) -> impl Iterator<Item = &str> {
-    s.split(is_collapsible_ws_char).filter(|w| !w.is_empty())
+    CollapsibleWords { rest: s }
+}
+
+/// The iterator behind [`split_collapsible_ws`]: `rest` is the unconsumed tail, every word
+/// yielded is a maximal run of non-[`is_collapsible_ws`] bytes, and the class being ASCII
+/// is what makes each cut a char boundary.
+struct CollapsibleWords<'a> {
+    rest: &'a str,
+}
+
+impl<'a> Iterator for CollapsibleWords<'a> {
+    type Item = &'a str;
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a str> {
+        let s = self.rest;
+        let bytes = s.as_bytes();
+        let start = collapsible_ws_prefix_len(s);
+        if start == bytes.len() {
+            self.rest = "";
+            return None;
+        }
+        // `bytes[start]` is a non-member by construction, so the word scan begins past it.
+        let mut end = start + 1;
+        while end < bytes.len() && !is_collapsible_ws(bytes[end]) {
+            end += 1;
+        }
+        self.rest = &s[end..];
+        Some(&s[start..end])
+    }
 }
 
 /// The `leading` (else trailing) edge whitespace run of a text node's `raw` — its
@@ -1663,9 +1737,9 @@ pub fn split_collapsible_ws(s: &str) -> impl Iterator<Item = &str> {
 #[inline]
 pub fn text_edge_ws(raw: &str, leading: bool) -> &str {
     if leading {
-        &raw[..raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len()]
+        &raw[..collapsible_ws_prefix_len(raw)]
     } else {
-        &raw[raw.trim_end_matches(is_collapsible_ws_char).len()..]
+        &raw[raw.len() - collapsible_ws_suffix_len(raw)..]
     }
 }
 
@@ -2232,5 +2306,70 @@ mod lang_attribute_tests {
         ] {
             assert!(langs(tag).1, "{tag}");
         }
+    }
+}
+
+#[cfg(test)]
+mod collapsible_ws_tests {
+    use super::*;
+
+    /// Every arrangement of the four members, a non-member ASCII space relative (`<FF>`), a
+    /// multi-byte space (`<NBSP>`) and content, zero to four pieces long — the axis a corpus
+    /// samples arbitrarily and a byte walk must get right at every offset.
+    fn for_every_arrangement(mut check: impl FnMut(&str)) {
+        const PIECES: [&str; 8] = [" ", "\t", "\n", "\r", "\u{c}", "\u{a0}", "x", "é"];
+        let mut s = String::new();
+        for len in 0..=4u32 {
+            for code in 0..PIECES.len().pow(len) {
+                s.clear();
+                let mut c = code;
+                for _ in 0..len {
+                    s.push_str(PIECES[c % PIECES.len()]);
+                    c /= PIECES.len();
+                }
+                check(&s);
+            }
+        }
+    }
+
+    /// The byte trims agree with the char-predicate searchers.
+    #[test]
+    fn byte_trims_match_the_searchers() {
+        for_every_arrangement(|s| {
+            assert_eq!(
+                trim_start_collapsible_ws(s),
+                s.trim_start_matches(is_collapsible_ws_char),
+                "{s:?}"
+            );
+            assert_eq!(
+                trim_end_collapsible_ws(s),
+                s.trim_end_matches(is_collapsible_ws_char),
+                "{s:?}"
+            );
+            assert_eq!(
+                text_edge_ws(s, true).len(),
+                collapsible_ws_prefix_len(s),
+                "{s:?}"
+            );
+            assert_eq!(
+                text_edge_ws(s, false).len(),
+                collapsible_ws_suffix_len(s),
+                "{s:?}"
+            );
+        });
+    }
+
+    /// The byte splitter yields exactly the words `split(is_collapsible_ws_char)` yields with
+    /// the empties dropped.
+    #[test]
+    fn byte_split_matches_the_searcher() {
+        for_every_arrangement(|s| {
+            let words: Vec<&str> = split_collapsible_ws(s).collect();
+            let reference: Vec<&str> = s
+                .split(is_collapsible_ws_char)
+                .filter(|w| !w.is_empty())
+                .collect();
+            assert_eq!(words, reference, "{s:?}");
+        });
     }
 }
