@@ -284,7 +284,7 @@ impl<'a> Printer<'a> {
         // A `chooseLayout` fact added to one belongs in both.
         let should_break_after_op_rhs = (is_module_path_fluid_call(init, self.source)
             || is_pure_property_chain(init)
-            || is_poorly_breakable_chain(init, self.source, PRINT_WIDTH, self.comments)
+            || is_poorly_breakable_chain(init, PRINT_WIDTH, self)
             || is_string_literal(init)
             // A SEQUENCE init breaks after the `=` and lays its operands out under
             // one indent, prettier's own `shouldBreakAfterOperator` switch arm —

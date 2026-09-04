@@ -15,7 +15,6 @@ use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// How content relates to an element boundary (opening or closing tag)
@@ -1191,7 +1190,7 @@ impl<'a> Printer<'a> {
         // The gap probes below all go through this, so the claim is honored once here
         // rather than at each of the sites.
         let gap_comments = |start: u32, end: u32| {
-            comments_to_emit_in_range(self.comments, start, end)
+            self.comments_to_emit_between(start, end)
                 .filter(move |c| !claimed.is_some_and(|cl| cl.claims(self, c)))
         };
         let has_gap_comments = |start: u32, end: u32| gap_comments(start, end).next().is_some();

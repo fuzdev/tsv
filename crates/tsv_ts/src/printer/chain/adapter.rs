@@ -137,11 +137,12 @@ impl<'a> Printer<'a> {
     /// gap ownership, the dot/computed print paths, `push_gap_comments_and_break`)
     /// classifies through here, so they take the ADVANCING trailing anchor together
     /// and the gap's two sides cannot drift into a double-print
-    /// (`ClassifiedComments::from_range_advancing` — see its ⚠️ for why the advance
+    /// (`ClassifiedComments::from_index_advancing` — see its ⚠️ for why the advance
     /// is not `from_range`'s one behavior).
     pub(crate) fn classify_comments(&self, start: u32, end: u32) -> ClassifiedComments<'_> {
-        ClassifiedComments::from_range_advancing(
-            self.comments,
+        ClassifiedComments::from_index_advancing(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
             start,
             end,
             self.source.as_bytes(),

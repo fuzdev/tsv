@@ -12,7 +12,6 @@
 use crate::ast::internal;
 use crate::printer::{CommentRun, HeadExpr, HeadLayout, Printer};
 use smallvec::smallvec;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
@@ -1036,11 +1035,7 @@ impl<'a> Printer<'a> {
             // (conformance_prettier_svelte.md §Svelte: Attributes), and matching the drop here made
             // the sequence the one host that didn't.
             if let Some(span) = tag_span
-                && tsv_lang::has_comments_to_emit_in_range(
-                    self.comments,
-                    span.start + 1,
-                    span.end - 1,
-                )
+                && self.has_comments_to_emit_between(span.start + 1, span.end - 1)
             {
                 return smallvec![
                     d.text("="),
@@ -1125,7 +1120,7 @@ impl<'a> Printer<'a> {
         // It stays bare: `bind:value={(get, set)}` is a grouped expression to Svelte, not a
         // getter/setter pair (see value_sequence_prettier_ignore_head_prettier_divergence).
         let head_frozen = self.honored_directive_in_gap(tag_span.start + 1, first_start);
-        for comment in comments_to_emit_in_range(self.comments, tag_span.start + 1, first_start) {
+        for comment in self.comments_to_emit_between(tag_span.start + 1, first_start) {
             if comment.is_block && comment.multiline {
                 // Multi-line block: reindent-to-context through the shared comment
                 // builder (matching `build_leading_js_comment_doc`), then a hardline
@@ -1171,7 +1166,7 @@ impl<'a> Printer<'a> {
                         .map_or(prev_end, |c| c as u32);
 
                 // Comments before the comma trail the previous operand.
-                for comment in comments_to_emit_in_range(self.comments, prev_end, comma_pos) {
+                for comment in self.comments_to_emit_between(prev_end, comma_pos) {
                     items.push(self.build_trailing_js_comment_doc(comment, false));
                 }
 
@@ -1186,8 +1181,9 @@ impl<'a> Printer<'a> {
                 // up onto the comma's line (prettier keeps it own-line too) — and for an
                 // honored directive the relocation is fatal, since a trailing placement is
                 // inert, so the freeze would die on the next pass.
-                let after: CommentRun<'_> =
-                    comments_to_emit_in_range(self.comments, comma_pos + 1, cur_start).collect();
+                let after: CommentRun<'_> = self
+                    .comments_to_emit_between(comma_pos + 1, cur_start)
+                    .collect();
                 if after.is_empty() {
                     items.push(d.line());
                 } else if after.iter().all(|c| c.is_block) {
@@ -1349,9 +1345,7 @@ impl<'a> Printer<'a> {
         tag_span: Option<Span>,
     ) -> bool {
         matches!(expr, Expression::Identifier(id) if id.name(self.source) == name)
-            && tag_span.is_none_or(|s| {
-                !tsv_lang::has_comments_on_page_in_range(self.comments, s.start, s.end)
-            })
+            && tag_span.is_none_or(|s| !self.has_comments_on_page_between(s.start, s.end))
     }
 }
 

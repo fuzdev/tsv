@@ -815,8 +815,9 @@ Plus the axis-independent primitives:
 
 - `classify_comment()` — Determine if trailing, leading-own-line, or inline
 - `classify_comment_scan()` — Same, against the document's line table (a bounded scan of the source, the table as the fallback)
-- `ClassifiedComments::from_range()` — Batch classify all categories in one pass
+- `ClassifiedComments::from_index()` — Batch classify all categories in one pass, from the index the caller's window-reading lookup found
 - `find_first_comment_from()` — Binary-search index of first comment with `span.start >= pos`
+- `CommentFreeWindow` — the comment-free window a printer keeps over its array: every search refreshes it (`search_from()`), each printer's inline `first_index_between` gate reads it (`contains()`) ahead of one outlined search, `next_comment_start()` answers an unbounded walk, and `take_from()` hands it between printers over the same array (a Svelte printer and the island TS printers it constructs)
 
 ### Printer Strategy
 

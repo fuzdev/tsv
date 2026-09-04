@@ -7,7 +7,6 @@
 use crate::ast::internal::{EachBlock, EachKey, FragmentNode};
 use crate::printer::{HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -169,7 +168,7 @@ impl<'a> Printer<'a> {
     /// emitter that reindents+breaks a multi-line block. Empty when the range holds
     /// none. Callers concat it, or `extend` an in-progress buffer with it.
     pub(in crate::printer) fn leading_comment_docs(&self, from: u32, to: u32) -> DocBuf {
-        comments_to_emit_in_range(self.comments, from, to)
+        self.comments_to_emit_between(from, to)
             .map(|c| self.build_leading_js_comment_doc(c))
             .collect()
     }
@@ -221,10 +220,7 @@ impl<'a> Printer<'a> {
         to: u32,
         closer_owns_break: bool,
     ) -> (DocBuf, bool) {
-        self.trailing_comment_run_docs(
-            comments_to_emit_in_range(self.comments, from, to),
-            closer_owns_break,
-        )
+        self.trailing_comment_run_docs(self.comments_to_emit_between(from, to), closer_owns_break)
     }
 
     /// [`Self::trailing_comment_docs`] over an arbitrary run — the **pairing** itself,

@@ -8,7 +8,6 @@
 
 use crate::ast::internal::{self, SpecialElementKind};
 use crate::printer::Printer;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 use super::element_doc::{
@@ -266,12 +265,8 @@ impl<'a> Printer<'a> {
             self.push_attr_item_with_leading_comments(
                 &mut docs,
                 separator,
-                comments_to_emit_in_range(
-                    self.comments,
-                    element.name_span.end,
-                    claim.value_start(),
-                )
-                .filter(|c| claim.claims(self, c)),
+                self.comments_to_emit_between(element.name_span.end, claim.value_start())
+                    .filter(|c| claim.claims(self, c)),
                 this_doc,
             );
         }

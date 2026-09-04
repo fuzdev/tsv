@@ -73,13 +73,13 @@ use crate::PrinterInputs;
 use crate::ast::internal;
 use std::cell::Cell;
 use tsv_lang::{
-    EmbedContext, OutputBuffer, Span, TAB_WIDTH, comments_in_source_after,
+    CommentFreeWindow, EmbedContext, OutputBuffer, Span, TAB_WIDTH,
     doc::{
         self, ShareKey,
         arena::{DocArena, DocId},
     },
-    find_first_comment_from, has_comments_on_page_from, has_comments_to_emit_from,
-    has_line_comments_from, has_multiline_block_comments_on_page_from,
+    has_comments_on_page_from, has_comments_to_emit_from, has_line_comments_from,
+    has_multiline_block_comments_on_page_from,
     printing::{self, LineTable},
     range_too_narrow_for_a_comment,
     source_scan::{
@@ -497,32 +497,21 @@ pub struct Printer<'a> {
     /// only cause more work, never a dropped comment. Defaults `true` (do the full
     /// classify) so any member print reached without a preceding set is fail-safe.
     pub(crate) chain_has_comments: Cell<bool>,
-    /// The comment-free window the last outlined comment-existence search established:
-    /// `(gap_start, gap_end)`, a half-open range of source positions that holds no
-    /// comment at all — the gap between the two comments the search landed between, or
-    /// the document edge when it landed at an end. Starts as the empty window
-    /// `(u32::MAX, 0)`.
+    /// The comment-free window the last comment search on this printer established
+    /// ([`CommentFreeWindow`]: the mechanism, its soundness argument, and the gate's
+    /// inline/outlined shape live there).
     ///
-    /// The existence wrappers' outlined halves read it *ahead* of the search — the on-page
-    /// wrapper, the one the layout gates ask about whole node spans, reads it at the site
-    /// ahead of the call, and so does every range walk (the `comments_*_between` iterator
-    /// wrappers, through [`Self::first_index_between`]): an ask lying wholly inside the
-    /// window is `false` / an empty walk by two compares against two plain integers, with
-    /// no load through the comment array and no probe of the one-entry hint (a
-    /// dependent-load chain). The printers ask about whole node spans — a chain, then the
-    /// call inside it, then the object inside that — and about one statement gap several
-    /// times over (its trailing run, its claim, its blank scan, the next statement's
-    /// leading run), so consecutive asks nest inside one comment-free stretch of the
-    /// document nearly every time. Every search refreshes it, whatever it answered, since
-    /// the gap is a fact about the array, not about the ask
-    /// ([`Self::search_comments_from`]).
-    ///
-    /// Sound for the life of this printer by construction: `comments` is sorted by
-    /// start and never changes, so a window derived from it stays comment-free; a fresh
-    /// printer starts with the empty window and takes the search. Never trust it across
-    /// printers — it is not a document-level fact but an index into *this* printer's
-    /// array.
-    pub(crate) comment_free_gap: Cell<(u32, u32)>,
+    /// Every existence wrapper's outlined half reads it *ahead* of the search — the
+    /// on-page wrapper, the one the layout gates ask about whole node spans, reads it at
+    /// the site ahead of the call — and so does every range walk (the
+    /// `comments_*_between` iterator wrappers, through [`Self::first_index_between`]): an
+    /// ask lying wholly inside the window is `false` / an empty walk with no load through
+    /// the comment array. Every search refreshes it, whatever it answered
+    /// ([`Self::search_comments_from`]). A window is a fact about `comments`, so it is
+    /// handed between printers over the same array — an island printer starts from its
+    /// embedding printer's (`PrinterInputs::comment_free_window`) and hands its own back —
+    /// and never read against another; a document's own printer starts with the empty one.
+    pub(crate) comment_free_gap: CommentFreeWindow<'a>,
 }
 
 impl<'a> Printer<'a> {
@@ -538,6 +527,12 @@ impl<'a> Printer<'a> {
         embed: EmbedContext,
         buffer_capacity: usize,
     ) -> Self {
+        // An island printer starts from the embedding printer's window
+        // (`PrinterInputs::comment_free_window`); a document's own starts empty.
+        let comment_free_gap = CommentFreeWindow::new(inputs.comments);
+        if let Some(window) = inputs.comment_free_window {
+            comment_free_gap.take_from(window);
+        }
         Self {
             buffer: OutputBuffer::with_capacity(buffer_capacity),
             indent_level: 0,
@@ -574,64 +569,41 @@ impl<'a> Printer<'a> {
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
-            comment_free_gap: Cell::new((u32::MAX, 0)),
+            comment_free_gap,
         }
-    }
-
-    /// Whether `[start, end)` lies wholly inside the comment-free window
-    /// ([`Self::comment_free_gap`]) — in which case no comment of any kind is in it, and
-    /// a search is not needed.
-    #[inline]
-    fn range_in_comment_free_gap(&self, start: u32, end: u32) -> bool {
-        let (gap_start, gap_end) = self.comment_free_gap.get();
-        gap_start <= start && end <= gap_end
-    }
-
-    /// Refresh [`Self::comment_free_gap`] from a search that resolved to `first_idx`
-    /// (the first comment starting at or after the asked position): the window runs from
-    /// the end of the comment before it to the start of the comment at it, with the
-    /// document's edges standing in at either end of the array.
-    #[inline]
-    fn record_comment_free_gap(&self, first_idx: usize) {
-        let comments = self.comments;
-        let gap_start = first_idx
-            .checked_sub(1)
-            .and_then(|prev| comments.get(prev))
-            .map_or(0, |c| c.span.end);
-        let gap_end = comments.get(first_idx).map_or(u32::MAX, |c| c.span.start);
-        self.comment_free_gap.set((gap_start, gap_end));
     }
 
     /// The search behind every window-reading lookup on this printer: the first comment
     /// starting at or after `start`, with the comment-free window
-    /// ([`Self::comment_free_gap`]) refreshed from where it landed — whatever the ask
-    /// then answers, the stretch before that comment is comment-free.
+    /// ([`Self::comment_free_gap`]) refreshed from where it landed
+    /// ([`CommentFreeWindow::search_from`]).
     #[inline]
     fn search_comments_from(&self, start: u32) -> usize {
-        let first_idx = find_first_comment_from(self.comments, start);
-        self.record_comment_free_gap(first_idx);
-        first_idx
+        self.comment_free_gap.search_from(start)
     }
 
     /// The index a range walk over `[start, end)` on this printer starts at: `len` (an
-    /// empty walk) when the range is too narrow to hold a comment or lies inside the
-    /// comment-free window, else the search — the printer's form of tsv_lang's
-    /// `first_index_in_range`, with the window read ahead of the search. The range walks
-    /// ask about the same nested spans the existence gates do, so the window answers
-    /// most of them the same way: on a real corpus four range walks in five landed
-    /// inside the window the previous search had drawn.
+    /// empty walk) for a gap too narrow to hold a comment or lying inside the comment-free
+    /// window ([`Self::comment_free_gap`]), else the outlined search — the windowed form of
+    /// tsv_lang's `first_index_in_range`. The range walks ask about the same nested spans
+    /// the existence gates do, so the window answers most of them the same way (four range
+    /// walks in five on a real corpus); a builder that classifies a gap itself
+    /// (`ClassifiedComments::from_index`) asks this and hands the index on.
     #[inline]
-    fn first_index_between(&self, start: u32, end: u32) -> usize {
-        if range_too_narrow_for_a_comment(start, end) || self.range_in_comment_free_gap(start, end)
+    pub(crate) fn first_index_between(&self, start: u32, end: u32) -> usize {
+        if range_too_narrow_for_a_comment(start, end) || self.comment_free_gap.contains(start, end)
         {
-            self.comments.len()
+            self.comment_free_gap.comments().len()
         } else {
             self.first_index_between_wide(start)
         }
     }
 
     /// The search half of [`Self::first_index_between`] — one outlined copy, so the gate
-    /// ahead of it sits inline at every walk's site while the search stays one body.
+    /// ahead of it sits inline at every walk's site while the search stays one body. Takes
+    /// the printer, which every site already holds; a body taking the window's address
+    /// instead kept that derived value in a register across the call and grew two
+    /// recursive builders' frames (`CommentFreeWindow`'s doc has the measure).
     #[inline(never)]
     fn first_index_between_wide(&self, start: u32) -> usize {
         self.search_comments_from(start)
@@ -1134,10 +1106,14 @@ impl<'a> Printer<'a> {
     /// behind the comment-free window ([`Self::comment_free_gap`]).
     #[inline(never)]
     fn has_comments_to_emit_between_wide(&self, start: u32, end: u32) -> bool {
-        if self.range_in_comment_free_gap(start, end) {
+        if self.comment_free_gap.contains(start, end) {
             return false;
         }
-        has_comments_to_emit_from(self.comments, self.search_comments_from(start), end)
+        has_comments_to_emit_from(
+            self.comment_free_gap.comments(),
+            self.search_comments_from(start),
+            end,
+        )
     }
 
     /// **on page**: whether any comment occupies the page in `[start, end)` — an owned
@@ -1151,7 +1127,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(crate) fn has_comments_on_page_between(&self, start: u32, end: u32) -> bool {
         !range_too_narrow_for_a_comment(start, end)
-            && !self.range_in_comment_free_gap(start, end)
+            && !self.comment_free_gap.contains(start, end)
             && self.has_comments_on_page_between_wide(start, end)
     }
 
@@ -1160,7 +1136,11 @@ impl<'a> Printer<'a> {
     /// call, and refreshed here.
     #[inline(never)]
     fn has_comments_on_page_between_wide(&self, start: u32, end: u32) -> bool {
-        has_comments_on_page_from(self.comments, self.search_comments_from(start), end)
+        has_comments_on_page_from(
+            self.comment_free_gap.comments(),
+            self.search_comments_from(start),
+            end,
+        )
     }
 
     /// **to emit**: the comments in `[start, end)` that *this* caller must print — an
@@ -1175,7 +1155,11 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
     ) -> impl Iterator<Item = &'a internal::Comment> {
-        tsv_lang::comments_to_emit_from(self.comments, self.first_index_between(start, end), end)
+        tsv_lang::comments_to_emit_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
     }
 
     /// **on page**: every comment occupying the page in `[start, end)` — an owned comment
@@ -1192,7 +1176,11 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
     ) -> impl Iterator<Item = &'a internal::Comment> {
-        tsv_lang::comments_on_page_from(self.comments, self.first_index_between(start, end), end)
+        tsv_lang::comments_on_page_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
     }
 
     /// **in source**: every comment physically inside `[start, end)` — an owned comment
@@ -1209,7 +1197,30 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
     ) -> impl Iterator<Item = &'a internal::Comment> {
-        tsv_lang::comments_in_source_from(self.comments, self.first_index_between(start, end), end)
+        tsv_lang::comments_in_source_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
+    }
+
+    /// **in source**: every comment physically at or after `pos`, to the document's end —
+    /// the printer's form of `tsv_lang::comments_in_source_after`. An unbounded walk has
+    /// no range for the window to answer, but its search still refreshes the window
+    /// ([`Self::search_comments_from`]) for the asks that follow; a caller whose question
+    /// is only *where the next comment starts* asks the window itself first
+    /// (`CommentFreeWindow::next_comment_start`, as `find_end_with_trailing_comments`
+    /// does) and reaches this only when it has to walk.
+    #[inline]
+    pub(crate) fn comments_in_source_after(
+        &self,
+        pos: u32,
+    ) -> impl Iterator<Item = &'a internal::Comment> {
+        tsv_lang::comments_in_source_from(
+            self.comment_free_gap.comments(),
+            self.search_comments_from(pos),
+            u32::MAX,
+        )
     }
 
     /// Find the first occurrence of a byte in source between `start` and `end`
@@ -1249,10 +1260,14 @@ impl<'a> Printer<'a> {
     /// the comment-free window ([`Self::comment_free_gap`]).
     #[inline(never)]
     fn has_line_comments_between_wide(&self, start: u32, end: u32) -> bool {
-        if self.range_in_comment_free_gap(start, end) {
+        if self.comment_free_gap.contains(start, end) {
             return false;
         }
-        has_line_comments_from(self.comments, self.search_comments_from(start), end)
+        has_line_comments_from(
+            self.comment_free_gap.comments(),
+            self.search_comments_from(start),
+            end,
+        )
     }
 
     /// Check if there are multiline block comments between two positions
@@ -1274,11 +1289,11 @@ impl<'a> Printer<'a> {
     /// outlined copy, behind the comment-free window ([`Self::comment_free_gap`]).
     #[inline(never)]
     fn has_multiline_block_comments_on_page_between_wide(&self, start: u32, end: u32) -> bool {
-        if self.range_in_comment_free_gap(start, end) {
+        if self.comment_free_gap.contains(start, end) {
             return false;
         }
         has_multiline_block_comments_on_page_from(
-            self.comments,
+            self.comment_free_gap.comments(),
             self.search_comments_from(start),
             end,
         )
@@ -1581,16 +1596,14 @@ impl<'a> Printer<'a> {
     /// is a layout fact no build-time read can see, so the residual weld there is a
     /// tracked open item, whose structural answer would be a renderer-level flush guard.
     pub(crate) fn trailer_follows_through_closers(&self, pos: u32) -> bool {
-        comments_in_source_after(self.comments, pos)
-            .next()
-            .is_some_and(|c| {
-                self.comment_follows_content_on_its_line(c)
-                    && self.source.as_bytes()[pos as usize..c.span.start as usize]
-                        .iter()
-                        .all(|b| {
-                            b.is_ascii_whitespace() || matches!(b, b')' | b']' | b'}' | b';' | b',')
-                        })
-            })
+        self.comments_in_source_after(pos).next().is_some_and(|c| {
+            self.comment_follows_content_on_its_line(c)
+                && self.source.as_bytes()[pos as usize..c.span.start as usize]
+                    .iter()
+                    .all(|b| {
+                        b.is_ascii_whitespace() || matches!(b, b')' | b']' | b'}' | b';' | b',')
+                    })
+        })
     }
 
     /// Whether a single comment occupies its own physical line — a line comment
