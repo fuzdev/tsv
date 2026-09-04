@@ -96,6 +96,9 @@ export function visual_width(line: string): number {
 	return width;
 }
 
+/** Escape `text` for use verbatim inside a `RegExp` source — every metacharacter backslashed. */
+const escape_regex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 export interface HunkCoverageResult {
 	/** All hunks in the diff */
 	hunks: DiffHunk[];
@@ -759,7 +762,7 @@ const self_closing_nonvoid: DivergencePattern = {
 					const re = /<([a-zA-Z][\w.-]*)[^>]*\/>/g;
 					let m;
 					while ((m = re.exec(line)) !== null) {
-						const tag_name = m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+						const tag_name = escape_regex(m[1]);
 						if (close_lines.some((l) => new RegExp(`</${tag_name}\\b`).test(l))) {
 							return true;
 						}
@@ -831,7 +834,7 @@ const attr_value_single_quote: DivergencePattern = {
 			for (const line of hunk.added_lines) {
 				const m = ours_single_dq.exec(line);
 				if (!m) continue;
-				const name = m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+				const name = escape_regex(m[1]);
 				const prettier_dq = new RegExp(`${name}="[^"]*"`);
 				if (hunk.removed_lines.some((l) => prettier_dq.test(l))) return true;
 			}
@@ -844,6 +847,52 @@ const attr_value_single_quote: DivergencePattern = {
 				confidence: 'certain',
 				hunk_indices,
 				reason: 'Value with a literal " kept single-quoted (prettier corrupts to double quotes)'
+			};
+		}
+		return null;
+	}
+};
+
+const svelte_element_this_string: DivergencePattern = {
+	id: 'svelte_element_this_string',
+	description:
+		'<svelte:element this={…}> string literal single-quoted (prettier hardcodes double quotes)',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Elements'],
+	fixtures: ['svelte/special_elements/svelte_element_this_string_prettier_divergence'],
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		// prettier-plugin-svelte prints a brace-wrapped string literal in `this={…}` as a
+		// hardcoded `"${value}"`, ignoring `singleQuote`; tsv hands the literal to the normal
+		// string printer, so it comes out single-quoted like every other JS string. The
+		// fingerprint is the pair: OUR line carries `this={'value'}` and a PRETTIER line in the
+		// same hunk carries `this={"value"}` with the SAME value — nothing else spells a
+		// single-quoted literal directly inside `this={…}`, and requiring the double-quoted
+		// twin keeps a genuine content change (a different string) unclaimed. The plain
+		// `this="value"` attribute form is not matched: prettier reaches it only by collapsing a
+		// paren- or comment-prefixed literal, a structural rewrite that drops the comment, and
+		// that case stays honestly unclaimed rather than vouched by a quote-swap detector.
+		const ours_single = /\bthis=\{'([^'\\]*)'\}/;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			for (const line of hunk.added_lines) {
+				const m = ours_single.exec(line);
+				if (!m) continue;
+				const value = escape_regex(m[1]);
+				const prettier_double = new RegExp(`\\bthis=\\{"${value}"\\}`);
+				if (hunk.removed_lines.some((l) => prettier_double.test(l))) return true;
+			}
+			return false;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'svelte_element_this_string',
+				confidence: 'certain',
+				hunk_indices,
+				reason:
+					'<svelte:element this={…}> string literal single-quoted (prettier ignores singleQuote here)'
 			};
 		}
 		return null;
@@ -2327,6 +2376,23 @@ const inline_content_block_style: DivergencePattern = {
 		// proved whitespace-only.
 		const container_tag_alone =
 			/^[ \t]*<\/?(?:table|tbody|thead|tfoot|tr|colgroup|select|datalist)\b[^<>]*>[ \t]*$/;
+		// The comment-first arm: an inline element whose content OPENS with an HTML comment
+		// (`<span><!--⏎-->…`). Block-style gives the content its own line, comment included —
+		// the comment's `<!--` opens OUR line where prettier welds it to the open tag, and the
+		// closing `-->` stands alone on our line where prettier welds it to the close tag.
+		// Both markers are one-sided by construction: prettier never starts a line with the
+		// delimiter it just welded, and a comment that opens its own line in BOTH outputs is
+		// not on a changed line at all. Read as a PAIR across the hunk's two sides so a
+		// same-shaped whitespace-only hunk with no weld on prettier's side stays unclaimed.
+		const comment_open_alone = /^[ \t]*<!--/; //                         ours: `<!--` opens the line
+		const welded_open_comment = /<[A-Za-z][\w.:-]*(?:[ \t][^<>]*)?><!--/; // prettier: `<tag><!--`
+		const comment_close_alone = /^[ \t]*-->[ \t]*$/; //                  ours: `-->` alone
+		const welded_close_comment = /-->[ \t]*<\/[A-Za-z][\w.:-]*>/; //     prettier: `--></tag>`
+		const comment_first_signature = (hunk: DiffHunk): boolean =>
+			(hunk.added_lines.some((l) => comment_open_alone.test(l)) &&
+				hunk.removed_lines.some((l) => welded_open_comment.test(l))) ||
+			(hunk.added_lines.some((l) => comment_close_alone.test(l)) &&
+				hunk.removed_lines.some((l) => welded_close_comment.test(l)));
 		// The break-before posture (§"The rule reaches the element's own *position*"): an
 		// inline element preceded by same-line text that must wrap starts a FRESH line in
 		// ours, where prettier dangles the OPENING tag on the overflowing text line. The
@@ -2356,6 +2422,7 @@ const inline_content_block_style: DivergencePattern = {
 				.concat(hunk.added_lines)
 				.some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
 			hunk.removed_lines.some((l) => dangle_open_tag_after_text.test(l)) ||
+			comment_first_signature(hunk) ||
 			hunk.added_lines.some(
 				(l) =>
 					block_head_alone.test(l) ||
@@ -3697,6 +3764,7 @@ export const PATTERNS: DivergencePattern[] = [
 	bom_strip,
 	self_closing_nonvoid,
 	attr_value_single_quote,
+	svelte_element_this_string,
 	empty_statement_removal,
 	css_value_ratio,
 

@@ -1,0 +1,103 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 78,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 17,
+				"data": " comment1 "
+			},
+			{
+				"type": "Text",
+				"start": 17,
+				"end": 18,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 18,
+				"end": 35,
+				"data": " comment2 "
+			},
+			{
+				"type": "Text",
+				"start": 35,
+				"end": 36,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 60,
+				"end": 62,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 62,
+				"end": 77,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 63
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 66
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 67,
+							"end": 71,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": {
+		"start": 36,
+		"end": 60,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 52,
+				"end": 57,
+				"name": "runes",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 16,
+						"character": 52
+					},
+					"end": {
+						"line": 3,
+						"column": 21,
+						"character": 57
+					}
+				},
+				"value": true
+			}
+		],
+		"runes": true
+	},
+	"comments": []
+}

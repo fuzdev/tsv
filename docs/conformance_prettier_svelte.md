@@ -599,6 +599,44 @@ The **inline counterpart** of the dangle — a preceding sibling before an inlin
 
 **Space-only section boundaries glue inline (◆design_choice — Svelte-mirror trim).** A space-only content boundary in a block section is **render-free** — the compiler trims every fragment edge at compile (`clean_nodes`) — so tsv removes it in inline layout: `{#if a} x {/if}` → `{#if a}x{/if}`, uniformly across `{#if}` / `{:else if}` / `{:else}` / `{#each}` (+ fallback) / `{#key}` / every `{#await}` phase / `{#snippet}`. A render-free character neither survives in the output nor selects the layout; a **newline**-authored boundary keeps its meaning (the construct stays multiline) — a space is not intent. Prettier's own treatment splits by family: it **expands** a symmetric-spaced `{#if}` / `{#each}` / `{#key}` / `{#snippet}` body to multiline — a render-free space selecting the whole construct's form — with a quirk (the last block in a file stays inline as authored), yet it **preserves** a spaced `{#await}` inline, keeping a space the compiler deletes. (The split is a plugin artifact, not a stance: every block fragment maps a spaced boundary to the same `line` doc, but the plugin's `AwaitBlock` printer is the one block case built without the `breakParent` the `IfBlock`/`EachBlock`/`KeyBlock` cases carry, so only await's `line`s can collapse.) tsv glues consistently regardless of family or position. Same render-free principle as the empty-branch normalization above, and the same trim an inline element's content boundary gets (see [§Svelte: Inline content block-style](#svelte-inline-content-block-style)). Cataloged at [blocks/boundary_space_trim](../tests/fixtures/svelte/blocks/boundary_space_trim_prettier_divergence/) (the expanding if-family) and [blocks/await/boundary_space_trim](../tests/fixtures/svelte/blocks/await/boundary_space_trim_prettier_divergence/) (the preserving await, incl. the `then` shorthand); [blocks/if/spaces](../tests/fixtures/svelte/blocks/if/spaces_prettier_divergence/) is the if-family maximal injection — a space at every collapsible position at once (tag-internal + block-element content boundary + section boundary), across div/text/`{:else if}`/space-only-empty shapes.
 
+## Svelte: Root section ordering
+
+Both formatters print a component's root sections in one canonical order — `<svelte:options>`,
+module script, instance script, template, `<style>` — and carry the comments written directly
+above a section with it. tsv also carries a `<!-- #endregion -->` written directly *below* a
+section with it (prettier-plugin-svelte's region-end trail, matched exactly, precedence
+included — pinned by the non-divergence fixtures
+[region_markers](../tests/fixtures/svelte/script/ordering/region_markers/) and
+[region_markers_spelling](../tests/fixtures/svelte/script/ordering/region_markers_spelling/)).
+The three places the two formatters part:
+
+- Trailing comments after the last `<style>` — ◆prettier_bug (non-idempotent) — [trailing_comments_after_style](../tests/fixtures/svelte/script/ordering/trailing_comments_after_style_prettier_divergence/)
+- Region-end trail blank lines — ◆stable_quirk — [region_end_trail_blank_lines](../tests/fixtures/svelte/script/ordering/region_end_trail_blank_lines_prettier_divergence/)
+- Comment run above `<svelte:options>` — ◆comment_preservation — [options_leading_comment_run](../tests/fixtures/svelte/script/ordering/options_leading_comment_run_prettier_divergence/)
+
+**Trailing comments after the last `<style>`**: a comment written after the `<style>` that ends
+the source is hoisted to the template's end by the reorder, where it stands directly above the
+`<style>` in the output — and a comment above a section is that section's leading comment, so
+the next pass puts the section blank above it. tsv prints that final form in one pass (the run
+takes the section blank on its way in, and stands off the style's own leading run by a blank);
+prettier's first pass leaves the comment glued to the last template node and only its second
+pass adds the blank. Same fixed point, one pass against two.
+
+**Region-end trail blank lines**: the gap between a section's closing tag and its `#endregion`
+trail. Both formatters keep one authored blank line there. prettier prints the trail's
+whitespace with only its first newline removed, so the other spellings come out as written: a
+same-line marker gains a fabricated blank (`</script> <!-- #endregion -->` →
+`</script>⏎⏎<!-- #endregion -->`), and three blank lines stay two. tsv treats the gap as a gap:
+glued or one blank, whatever the authoring — `unformatted_ours_*` variants pin the
+normalization, `variant_same_line` / `prettier_variant_extra_blank_lines` pin prettier's
+per-authoring forms.
+
+**Comment run above `<svelte:options>`**: prettier-plugin-svelte lifts only the one comment
+glued to the tag (`stripSvelteOptionsComment`) and leaves an earlier comment in the template,
+which after the reorder prints *below* the tag — the two comments swap sides. tsv carries the
+whole run in authored order, as both formatters already do above a `<script>` or `<style>`
+([§Comment Position Philosophy](./conformance_prettier.md#comment-position-philosophy)).
+
 ## Svelte: destructuring literal normalization
 
 **◆design_choice.** tsv routes the binding patterns of `{#each … as}`, `{#await … then}`, `{:then}`, and `{:catch}` through its TypeScript printer, so **literal default values** normalize to tsv's canonical form — string literals to single quotes (`{ a = "x" }` → `{ a = 'x' }`, with escape-minimizing keeping double quotes when single would need escaping, so `"a'b"` stays double) and numeric literals to canonical shape (lowercase hex/exponent, leading/trailing-zero rules: `0xFF` → `0xff`, `1.50` → `1.5`, `.5` → `0.5`, `1E10` → `1e10`, `0xFFn` → `0xffn`). This is the same normalization `{@const}` (and every other literal tsv emits) already applies. prettier-plugin-svelte instead prints these patterns from raw source, preserving the author's quote style and numeric token verbatim — in these binding positions it ignores `singleQuote` and numeric normalization. tsv normalizes uniformly so a destructuring default reads the same wherever it appears. Booleans, `null`, and regex literals are already canonical in both formatters and are unaffected.

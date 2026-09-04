@@ -54,6 +54,56 @@ function run_pattern(pattern_id: string, ctx: DetectionContext): DivergenceMatch
 	return pattern.detect(ctx);
 }
 
+// ─── svelte_element_this_string ──────────────────────────────────
+
+Deno.test('svelte_element_this_string: positive - brace-wrapped literal re-quoted', () => {
+	const prettier = '<svelte:element this={"hello"}></svelte:element>';
+	const ours = "<svelte:element this={'hello'}></svelte:element>";
+	const match = run_pattern('svelte_element_this_string', make_context(ours, prettier));
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'svelte_element_this_string');
+});
+
+Deno.test('svelte_element_this_string: negative - different literal value', () => {
+	const prettier = '<svelte:element this={"hello"}></svelte:element>';
+	const ours = "<svelte:element this={'hi'}></svelte:element>";
+	assertEquals(run_pattern('svelte_element_this_string', make_context(ours, prettier)), null);
+});
+
+Deno.test('svelte_element_this_string: negative - plain attribute form is not a quote swap', () => {
+	// prettier's collapse of a comment-prefixed literal to the plain attribute drops the
+	// comment — a structural rewrite this detector must not vouch for.
+	const prettier = '<svelte:element this="hello"></svelte:element>';
+	const ours = "<svelte:element this={/* c */ 'hello'}></svelte:element>";
+	assertEquals(run_pattern('svelte_element_this_string', make_context(ours, prettier)), null);
+});
+
+Deno.test('svelte_element_this_string: negative - ordinary attribute single quotes', () => {
+	const prettier = '<div data-attr="a"></div>';
+	const ours = "<div data-attr='a\"b'></div>";
+	assertEquals(run_pattern('svelte_element_this_string', make_context(ours, prettier)), null);
+});
+
+// ─── inline_content_block_style: the comment-first arm ───────────
+
+Deno.test('inline_content_block_style: positive - comment-first inline content', () => {
+	// prettier welds the opening comment to the open tag and the closing comment to the
+	// close tag; tsv lays the content out block-style, comment delimiters on their own lines.
+	const prettier = '<span><!--\n--><span>a</span><!--\n--></span>';
+	const ours = '<span>\n\t<!--\n--><span>a</span><!--\n-->\n</span>';
+	const match = run_pattern('inline_content_block_style', make_context(ours, prettier));
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'inline_content_block_style');
+});
+
+Deno.test('inline_content_block_style: negative - comment on its own line in both outputs', () => {
+	// Same delimiters, but prettier never welded them: a plain blank-line change is not the
+	// block-style relocation and stays unclaimed for its own detector.
+	const prettier = '<div>\n\t<!-- c -->\n\n\t<span>a</span>\n</div>';
+	const ours = '<div>\n\t<!-- c -->\n\t<span>a</span>\n</div>';
+	assertEquals(run_pattern('inline_content_block_style', make_context(ours, prettier)), null);
+});
+
 // ─── template_literal_width ─────────────────────────────────────────────────
 
 Deno.test('template_literal_width: positive - }` closing on own line', () => {

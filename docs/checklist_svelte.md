@@ -669,6 +669,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - `@component` JSDoc (`<!-- @component -->`)
 - `format-ignore` / `prettier-ignore` directive (`<!-- format-ignore -->` emits the next node verbatim — see [directives.md](./directives.md))
 - `format-ignore-start` / `-end` range (`<!-- format-ignore-start -->` … `<!-- format-ignore-end -->` preserves a top-level range)
+- Editor region markers around a hoisted section (`<!-- #region … -->` above a `<script>` / `<style>` / `<svelte:options>`, `<!-- #endregion -->` directly below it): the `#endregion` travels below its section through the canonical reorder, the author's blank line between them kept — prettier-plugin-svelte's region-end trail, precedence included (a following `<script>`/`<style>` still claims the marker as its leading comment; a following `<svelte:options>` does not)
 
 ---
 
