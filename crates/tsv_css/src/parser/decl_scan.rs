@@ -193,8 +193,9 @@ enum Disambiguation {
 ///
 /// `from` is just past the identifier; the caller's `peek_significant_kind` has already
 /// established the next significant token is `:`. Phase one skips to the value's first byte
-/// exactly as the parser does (`skip_whitespace_and_comments`, `expect(:)`, `skip_whitespace`
-/// — whitespace only, since a comment after the `:` is value content). Phase two is the
+/// exactly as the parser does (`skip_boundary_whitespace_and_comments`, `expect(:)`,
+/// `skip_whitespace` — whitespace only, since a comment after the `:` is value content), on
+/// ASCII whitespace alone: a boundary run in the property gap declines to the token walk. Phase two is the
 /// shared value loop with the verdict latch on: it stops at the first paren-depth-0 `{` (a
 /// rule) and otherwise runs the value to its terminator, so the one walk answers both
 /// questions. `None` declines — exactly as the value byte scan does, for the same reasons —
@@ -329,9 +330,14 @@ fn scan_rule_or_declaration_tokens(
 ///
 /// Declining on the negative is deliberate. It costs one short whitespace scan on the rarer
 /// nested-rule child, and it buys the property the rest of this module rests on: the scan
-/// never has to *reject*, so a lexer error stays `peek_past_whitespace`'s alone, reported at
-/// its own position. Widening the accept set would mean re-deriving which bytes the lexer
-/// can error on — the same bet `scan_value_bytes` declines to make.
+/// never has to *reject*, so a lexer error stays `peek_past_boundary_whitespace`'s alone,
+/// reported at its own position. Widening the accept set would mean re-deriving which bytes
+/// the lexer can error on — the same bet `scan_value_bytes` declines to make.
+///
+/// The whitespace it skips is ASCII, and that is a second decline, not a class: a boundary
+/// run (`a { color <NBSP>: red }`) is a non-ASCII byte to this loop, so it declines to the
+/// token lookahead, which steps the run — `read_declaration` ends the property at JS `\s`
+/// and `allow_whitespace()`s to the colon, so the gap is a juncture like any other.
 fn peek_significant_kind_bytes(bytes: &[u8], from: usize) -> Option<TokenKind> {
     let len = bytes.len();
     let mut i = from;
@@ -347,9 +353,14 @@ fn peek_significant_kind_bytes(bytes: &[u8], from: usize) -> Option<TokenKind> {
     }
 }
 
-/// Byte scan first, `peek_past_whitespace` on decline — and in debug the token lookahead
-/// runs behind a successful byte scan and must agree, so the test suite proves the
+/// Byte scan first, `peek_past_boundary_whitespace` on decline — and in debug the token
+/// lookahead runs behind a successful byte scan and must agree, so the test suite proves the
 /// equivalence.
+///
+/// The boundary-aware lookahead, because the skip it predicts is: `parse_declaration` steps
+/// the property→colon gap with `skip_boundary_whitespace_and_comments`, and a lookahead
+/// narrower than that skip read `a { color <NBSP>: red }`'s run as the identifier that should
+/// have been the `:`, classified the child a nested rule, and rejected the document.
 pub(super) fn peek_significant_kind(parser: &CssParser<'_, '_>) -> Result<TokenKind, ParseError> {
     match peek_significant_kind_bytes(parser.source().as_bytes(), parser.current_end) {
         Some(kind) => {
@@ -357,7 +368,7 @@ pub(super) fn peek_significant_kind(parser: &CssParser<'_, '_>) -> Result<TokenK
             {
                 // An `Err` here fails the assert too, and must: it would mean the byte scan
                 // accepted a lookahead the lexer rejects.
-                let expected = parser.peek_past_whitespace();
+                let expected = parser.peek_past_boundary_whitespace();
                 assert!(
                     expected.as_ref().is_ok_and(|expected| *expected == kind),
                     "significant-kind byte scan disagreed with the token lookahead at {}: \
@@ -367,7 +378,7 @@ pub(super) fn peek_significant_kind(parser: &CssParser<'_, '_>) -> Result<TokenK
             }
             Ok(kind)
         }
-        None => parser.peek_past_whitespace(),
+        None => parser.peek_past_boundary_whitespace(),
     }
 }
 

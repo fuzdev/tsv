@@ -61,7 +61,8 @@
 // | a pseudo-argument list's lead and its `)` | `build_pseudo_args_doc` |
 // | an `:nth-*()` term's lead, its `)`, both sides of its `of`, the `)` after `S` | `build_pseudo_args_doc`'s `Nth` arm |
 // | `::part()`'s inter-name gaps | `build_part_idents_doc` |
-// | every attribute-selector interior gap | `push_attribute_gap` / `push_name_tail_boundary_ws` |
+// | every attribute-selector interior gap, and its tail | `push_attribute_gap` / `push_attribute_tail` |
+// | a declaration's property→colon gap | `extract_property_name`, through [`boundary_run_spelling`] |
 // | a block child's rebuilt head (declaration / at-rule / comment) | [`Printer::write_head_boundary_ws`] |
 // | a block's tail before `}` | [`Printer::write_block_tail_boundary_ws`] |
 // | a condition prelude's part heads | `build_condition_query_doc` |
@@ -87,13 +88,23 @@
 // come back empty on its own, and the two claim shapes stay the sole deciders of what the run
 // actually is.
 //
+// ## Where the bytes are the claim
+//
+// Two readers disagree about a run in a way no spacing can reconcile: to css-syntax-3 the
+// run is identifier content and the ASCII space beside it the token separator, to `parseCss`
+// the run is the separator. An attribute selector's tail and a declaration's property→colon
+// gap are where that bites — `[a=b<NBSP>]` is the value `b` to Svelte and the ident `b<NBSP>`
+// to a browser — so those two claims keep the author's bytes: a bare value glued to a run
+// stays bare and unquoted, a flag glued to a run stays glued, and ASCII whitespace beside a
+// run keeps its presence as one space ([`Printer::push_attribute_tail`],
+// [`boundary_run_spelling`]). Re-quoting the value or hoisting the run would emit a selector
+// the browser drops where it matched the input.
+//
 // ## Residue
 //
-// Two positions still drop the run: the stylesheet's own trailing whitespace (the outermost
+// One position still drops the run: the stylesheet's own trailing whitespace (the outermost
 // gap has no following construct, and a Svelte `<style>` host trims the island's tail before
-// writing it), and a run inside a COMMENT-BEARING property→colon gap, where the property name
-// is reconstructed from its parts and the gap's whitespace normalizes with it. Both are
-// ratcheted in
+// writing it). Ratcheted in
 // [`tests/css_boundary_whitespace.rs`](../../../../tests/css_boundary_whitespace.rs).
 
 use super::Printer;
@@ -381,19 +392,6 @@ impl<'a> Printer<'a> {
         (run_start as u32, holds_member)
     }
 
-    /// The boundary run of a gap whose PREVIOUS token is a bare name, with the ASCII space
-    /// that keeps the name's end where the author put it — the attribute selector's
-    /// `[name<HERE>]`.
-    ///
-    /// A thin spelling of the rule in this module's §Where a claim is emitted: build the run,
-    /// then ask [`name_run_separator_after`] of what it is being appended to. The gap this
-    /// serves always has a name on its left, so the separator is always the space — asking
-    /// anyway is what keeps one rule with one implementation rather than a second literal.
-    pub(super) fn push_name_tail_boundary_ws(&self, result: &mut String, from: u32, to: u32) {
-        let kept = self.boundary_ws_in_gap(from, to);
-        self.push_boundary_ws_after_name(result, &kept);
-    }
-
     /// Append `kept` to `result` behind the separator its left neighbour requires.
     ///
     /// The one appender for every claim that builds a rebuilt construct's text — the
@@ -489,11 +487,11 @@ pub(super) fn name_run_separator_after(before: &str) -> &'static str {
     }
 }
 
-/// A claim's ASCII TAIL removed — for the two junctures whose separator the printer emits
-/// AFTER the run rather than before it (an explicit combinator's `line`, a declaration's
-/// `: `). Keeping the author's trailing space there would stack with the regenerated one and
-/// grow the line a column per pass; every other claim sits flush against the token it
-/// precedes and has no tail to trim.
+/// A claim's ASCII TAIL removed — for the one juncture whose separator the printer emits
+/// AFTER the run rather than before it (an explicit combinator's `line`). Keeping the
+/// author's trailing space there would stack with the regenerated one and grow the line a
+/// column per pass; every other claim sits flush against the token it precedes and has no
+/// tail to trim — or spells the gap whole, as [`boundary_run_spelling`] does.
 ///
 /// The empty answer — every claim's answer on real code — returns before `trim_end_matches`,
 /// whose char-predicate machinery is an out-of-line call that a per-declaration and
@@ -519,6 +517,40 @@ pub(super) fn prefixed_run(separator: &'static str, kept: String) -> String {
     let mut out = String::with_capacity(separator.len() + kept.len());
     out.push_str(separator);
     out.push_str(&kept);
+    out
+}
+
+/// A whitespace-only gap's boundary run, spelled with the author's ASCII whitespace
+/// PRESENCE kept: every member of the class verbatim, each ASCII run beside one collapsed to
+/// a single space, and a trailing ASCII run dropped. Empty when the gap holds no member —
+/// which is every gap in every real stylesheet — so a caller can append it unconditionally.
+///
+/// For a gap the printer REBUILDS between two parts whose separator it regenerates — a
+/// declaration's property→colon gap, ahead of each comment in it and ahead of the colon —
+/// where the run has to be put back and the ASCII beside it is not merely spelling: to
+/// css-syntax-3 the run is identifier content and the space the token separator, so
+/// `color<NBSP>:` is one ident and `color <NBSP>:` an ident and a stray token, while
+/// `parseCss` reads the property `color` in both. Keeping the presence as one space is what
+/// lets the output tokenize as the input did under both readers; the space AFTER the run is
+/// the regenerated separator's to emit, which is why the trailing one is dropped.
+pub(super) fn boundary_run_spelling(gap: &str) -> String {
+    let mut out = String::new();
+    let mut pending_space = false;
+    for c in gap.chars() {
+        if crate::whitespace::is_boundary_only_whitespace(c) {
+            if pending_space {
+                out.push(' ');
+                pending_space = false;
+            }
+            out.push(c);
+        } else if crate::whitespace::is_boundary_whitespace(c) {
+            pending_space = true;
+        } else {
+            // Not a whitespace-only gap after all: keep the byte rather than lose it.
+            debug_assert!(false, "boundary_run_spelling over a gap holding {c:?}");
+            out.push(c);
+        }
+    }
     out
 }
 

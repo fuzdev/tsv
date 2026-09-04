@@ -126,8 +126,10 @@ The junctures are one entry per position `parseCss`'s two skips occupy: a select
 start, after a `,`, after a `;`, each child of a stylesheet / style-rule / at-rule block and
 the gap before that block's `}`, the **compound break** after every simple selector, a
 combinator's two gaps (the one before its symbol and the one after it, comments included), a
-pseudo-argument list's start and the gap before its `)`, and the attribute selector's `[`,
-matcher→value, value→flags and flags→`]` gaps. The compound break is the one that also needs a *replacement*:
+pseudo-argument list's start and the gap before its `)`, the attribute selector's `[`,
+matcher→value, value→flags and flags→`]` gaps, and a declaration's property→colon gap
+(`read_declaration` ends the property at the first JS-`\s` code point and skips to the
+colon). The compound break is the one that also needs a *replacement*:
 `read_selector` ends the compound there and `read_combinator` turns the same run into a
 descendant combinator, so tsv breaks and materializes the combinator together — doing only the
 first makes `&<NBSP>b` and `*<NBSP>b` parse errors.
@@ -186,37 +188,63 @@ inside the head *and* emitted it beside — doubling the run on every pass. Both
 member of the class proves nothing about the other four.
 
 **The printer restores at every selector juncture, at every rebuilt block-child head** — a
-declaration's property, an at-rule's `@`, a comment's `/*` — **at a block's tail before its
-`}`, and at every gap of a `@supports` / `@container` condition prelude.** Two positions still
-drop the run: the stylesheet's own trailing whitespace (the outermost gap has no following
-construct, and a Svelte `<style>` host trims the island's tail before writing it), and a run
-inside a **comment-bearing** property→colon gap, where the property name is reconstructed from
-its parts and the gap's whitespace normalizes with it. Two members of the class are also LINE
-TERMINATORS to tsv's shared line table (`<LS>`, `<PS>`), so preserving one beside a
-regenerated newline read as a blank line on the next pass; the CSS printer's blank-line
-question confirms the table's answer against a class that stops at `<LF>` / `<CR>`. ⚠️ That
-confirm is prettier's `isNextLineEmpty` transcribed — positional, and `<FF>`-terminated — not
-css-syntax-3 §3.3, whose `<FF>`-is-a-newline rule reads like the obvious authority and is the
-wrong oracle for a cosmetic blank line; the `<LS>` / `<PS>` exclusion is its one deliberate
-departure, cataloged in
+declaration's property, an at-rule's `@`, a comment's `/*` — **in the property→colon gap on
+either side of a comment, at a block's tail before its `}`, and at every gap of a
+`@supports` / `@container` condition prelude.** One position still drops the run: the
+stylesheet's own trailing whitespace (the outermost gap has no following construct, and a
+Svelte `<style>` host trims the island's tail before writing it). Two members of the class
+are also LINE TERMINATORS to tsv's shared line table (`<LS>`, `<PS>`), so preserving one
+beside a regenerated newline read as a blank line on the next pass; the CSS printer's
+blank-line question confirms the table's answer against a class that stops at `<LF>` /
+`<CR>`. ⚠️ That confirm is prettier's `isNextLineEmpty` transcribed — positional, and
+`<FF>`-terminated — not css-syntax-3 §3.3, whose `<FF>`-is-a-newline rule reads like the
+obvious authority and is the wrong oracle for a cosmetic blank line; the `<LS>` / `<PS>`
+exclusion is its one deliberate departure, cataloged in
 [conformance_prettier_css.md](./conformance_prettier_css.md).
 
-Pinned by [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs); found by
-[wire:audit:terminators](./audits.md#wire-injection-audit-wireaudit). Two things still
-disagree, neither of them a skip juncture — each is a *reader* whose own whitespace class is
-narrower than the one `parseCss` uses in the same place, so closing them changes what a token
-spans rather than where a skip goes: a **trailing** run inside an attribute selector's value
-or case flag (`[a=b<NBSP>]`, `[a=b<NBSP>i]`, `[a=b i<NBSP>]`), and the declaration-vs-rule
-byte scan's own ASCII class: `a { color <NBSP>: red }` and `a { color /* c */<NBSP>: red }` are declarations to
-`parseCss` (which reads the property raw and trims it) and parse errors to tsv, because the
-scan stops on the run and the token lookahead behind it reads it as the identifier that should
-have been the `:`. They are enumerated and pinned in that test. A `<ZWNBSP>` leading or trailing a declaration VALUE would be a
-fourth: the wire's own trims are JS `\s` (`ast/convert/mod.rs`'s
+**Three readers had a class narrower than `parseCss`'s, and each is closed the same way.**
+None was a skip juncture: each was a *reader* whose own whitespace class was narrower than
+the one `parseCss` uses in the same place, so closing it changed what a token *spans* rather
+than where a skip goes — the reader ends the token where `parseCss` ends it and re-seats the
+lexer there (`CssParser::resume_at`), and the ordinary skip steps the run it left standing.
+The attribute selector's **value and case flag**: `read_attribute_value` ends a bare value at
+the first JS-`\s` code point and `REGEX_ATTRIBUTE_FLAGS` reads letters only, where the lexer
+read one identifier, so `boundary_split_offset` (`boundary_prefix_len`'s twin) finds the
+split — `[a=b<NBSP>]` is the value `b`, `[a=b<NBSP>i]` the value `b` and the flag `i`,
+`[a=b i<NBSP>]` the flag `i`. The **An+B scanner**, ASCII where `REGEX_NTH_OF` is a JS regex
+(`:nth-child(2n<NBSP>)`). And the **declaration-vs-rule byte scan**, ASCII by design (it
+declines what it does not model) but declining to a token lookahead that was the narrow one,
+so `a { color <NBSP>: red }`'s run read as the identifier that should have been the `:` and
+the declaration was rejected; the fallback is the boundary-aware lookahead and
+`parse_declaration` steps the gap with `skip_boundary_whitespace_and_comments`.
+
+⚠️ **Where the two readers tokenize a run differently, the printer keeps the bytes.** To
+css-syntax-3 whitespace is ASCII only and the run is identifier content — a legacy tokenizer
+reads `b<NBSP>` as one ident, and the current draft's narrowed "non-ASCII ident code point"
+set makes the run a delim and the selector invalid either way — while to `parseCss` it is
+the separator. Re-quoting the value (`[a='b'<NBSP>]`) or hoisting the run ahead of the flag
+would move it out of the ident and emit a selector a browser drops where it matched the
+input. So a bare value glued to a run stays bare (`[a=b<NBSP>]`, `[a=<NBSP>b]`), a flag glued
+to a run stays glued (`[a=b<NBSP>i]`), and ASCII whitespace beside a run keeps its presence
+as one space (`[a=b<NBSP> i]`, `color <NBSP>: red`) — `Printer::push_attribute_tail` and
+`boundary_run_spelling`. Prettier drops the run outright at every one of these; the
+divergence is cataloged in [conformance_prettier_css.md](./conformance_prettier_css.md)
+(`css/selectors/attribute/tail_nonascii_space_prettier_divergence`,
+`css/declarations/property_nonascii_space_prettier_divergence`).
+
+The wire's **attribute value** is `read_attribute_value`'s `value.trim()` — JS `\s`, over a
+quoted interior as much as a bare value, and blind to escapes — so `[a=' b ']` is the value
+`b` and `[a=b\ ]` the value `b\` on both sides (`attribute_value_text`), while the printer
+keeps the padding as content. A `<ZWNBSP>` leading or trailing a declaration VALUE is the
+same correction one seam over: the wire's own trims are JS `\s` (`ast/convert/mod.rs`'s
 `trim_wire_start` / `trim_wire_end`, mirroring `read_value`'s `value.trim()`) rather than
 `str::trim`, which would keep a `<ZWNBSP>` `read_value` drops and delete a `<NEL>` it keeps.
-The printer's property→colon trim is the same seam read from the other side and took the same
-correction (`trim_property_part`); a class that moves on only one of them is the doubling bug
-above.
+The printer's property→colon trim is the same seam read from the other side and took the
+same correction (`trim_property_part`); a class that moves on only one of them is the
+doubling bug above.
+
+Pinned by [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs); found by
+[wire:audit:terminators](./audits.md#wire-injection-audit-wireaudit).
 
 ### CSS Parser Scope & Error Model
 
@@ -235,9 +263,12 @@ Where the two goals conflict on conformant input, Svelte-parity wins for now.
   names. tsv reads an identifier token there, so it either **silently truncates** the prefix
   (`%top`, `!top`, `(top` all reach the wire as `top` — content loss the wire cannot show) or
   **rejects** (`1top`, `+top`, `<NEL>top`). Closing it means giving the property and value
-  positions their own raw readers rather than the shared identifier token. Pinned as a
-  ratchet by [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs), whose `<NEL>`
-  case is the one member this family shares with the whitespace class below.
+  positions their own raw readers rather than the shared identifier token. (The property's
+  *end* is not part of this gap: `read_until`'s JS `\s` is what a boundary run is to the
+  parser's skip, so `color <NBSP>: red` is the property `color` on both sides — §Boundary
+  whitespace above.) Pinned as a ratchet by
+  [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs), whose `<NEL>` case is
+  the one member this family shares with the whitespace class below.
 
 - **Current behavior is hard-fail; recovery is the target, not the design.**
   Today tsv **errors on the first invalid construct**, which aborts the whole

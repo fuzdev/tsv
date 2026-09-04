@@ -459,7 +459,7 @@ pseudo.rs        — Pseudo-class/pseudo-element selectors
 value/           — Property value parsing (colors, dimensions, functions)
 ```
 
-Uses `peek_past_whitespace()` with a temporary lexer to disambiguate declarations vs nested rules without consuming whitespace tokens.
+Disambiguates declarations vs nested rules with a byte scan (`decl_scan::peek_significant_kind`) that declines to `peek_past_boundary_whitespace()` — a temporary lexer, so no token is consumed.
 
 ### Svelte (`tsv_svelte/src/parser/`)
 

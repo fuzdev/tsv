@@ -123,7 +123,7 @@ const ALLOW: &[Allow] = &[
     ),
     (
         "tsv_css/src/printer/value_normalization/mod.rs",
-        "match rest.find(\"/*\") {",
+        "match rest[comment_len..].find(\"/*\") {",
         "comment-marker",
     ),
     (

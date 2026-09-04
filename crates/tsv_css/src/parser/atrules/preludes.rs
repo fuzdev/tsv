@@ -942,7 +942,7 @@ fn url_token_has_unclosed_paren(text: &str) -> bool {
 /// The span is handed to a `CssValue::Identifier`, whose printer runs the comment-aware
 /// `normalize_css_whitespace` over it — so a two-comment run comes back single-spaced like
 /// every other CSS comment run. The comments are deliberately **not** registered (see
-/// [`CssParser::skip_whitespace_and_comments`]): the span re-emits them verbatim, and
+/// [`CssParser::skip_boundary_whitespace_and_comments`]): the span re-emits them verbatim, and
 /// registering would additionally offer them to the `@import` prelude's gap emitters, which
 /// print between the parsed values — outside this function, where they would print twice.
 fn take_comment_run(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, ParseError> {
@@ -973,7 +973,7 @@ fn take_comment_run(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Pars
 /// which makes a comment transparent to the *grammar* while it still occupies the text.
 ///
 /// Those comments are deliberately left **unregistered** (see
-/// [`CssParser::skip_whitespace_and_comments`], whose doc states the rule): the span
+/// [`CssParser::skip_boundary_whitespace_and_comments`], whose doc states the rule): the span
 /// re-emits them verbatim, and registering would additionally offer them to the `@import`
 /// prelude's gap emitters, which print *between* the parsed values — outside this
 /// function, where they would print a second time.
