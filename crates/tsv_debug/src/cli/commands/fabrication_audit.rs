@@ -234,8 +234,16 @@ struct BlankRun<'a> {
     line: usize,
     /// Last non-blank line before the run; `""` at the start of the document.
     prev: &'a str,
+    /// Every line after the run, the first non-blank one first — what [`leads_section`] reads
+    /// past the bracketing pair, and what [`Self::next`] heads.
+    after: &'a [&'a str],
+}
+
+impl<'a> BlankRun<'a> {
     /// First non-blank line after the run; `""` at the end of the document.
-    next: &'a str,
+    fn next(&self) -> &'a str {
+        self.after.first().copied().unwrap_or("")
+    }
 }
 
 /// Visit each maximal run of blank lines in `s`, in order.
@@ -263,20 +271,61 @@ fn for_each_blank_run(s: &str, mut visit: impl FnMut(BlankRun<'_>)) {
             continue;
         }
         let prev = if i == 0 { "" } else { lines[i - 1] };
-        let next = lines[i..]
+        let end = lines[i..]
             .iter()
-            .find(|l| !is_blank_line(l))
-            .copied()
-            .unwrap_or("");
+            .position(|l| !is_blank_line(l))
+            .map_or(lines.len(), |k| i + k);
         visit(BlankRun {
             line: i + 1,
             prev,
-            next,
+            after: &lines[end..],
         });
-        while i < lines.len() && is_blank_line(lines[i]) {
-            i += 1;
-        }
+        i = end;
     }
+}
+
+/// Whether the lines after a blank run are a section's LEADING COMMENT RUN — one or more
+/// full-line `<!-- -->` comments (multi-line ones included, blank lines between them allowed)
+/// with nothing else before a `<script>` / `<style>` / `<svelte:options>` line.
+///
+/// The hoisted-section seam ([`is_section_seam`]) one step removed: comments travel with
+/// their section, so a glued `<div>block1</div>⏎<!-- comment -->⏎<style>` puts the section's
+/// leading comment where the tag would be, and the run reads `</div` ⇢ `<!--` — a blank
+/// prettier emits too, which the bracketing pair alone cannot tell from a blank invented
+/// before some comment. Reading forward to the section tag is what makes the statement
+/// narrow: the run is excused only when the comments end at a section opener, and a line
+/// that is neither a comment line nor the opener (content on a comment's closing line
+/// included) refuses. The seam blank BETWEEN two comments of the run
+/// (`<!-- c1 -->⏎⏎<!-- c2 -->⏎<style>`) is the same run read from its own middle.
+fn leads_section(after: &[&str]) -> bool {
+    let mut saw_comment = false;
+    let mut in_comment = false;
+    for line in after {
+        let t = line.trim();
+        if in_comment {
+            if t.ends_with("-->") {
+                in_comment = false;
+            } else if t.contains("-->") {
+                return false;
+            }
+            continue;
+        }
+        if t.is_empty() {
+            continue;
+        }
+        if t.starts_with("<!--") {
+            saw_comment = true;
+            in_comment = !t.ends_with("-->");
+            continue;
+        }
+        return saw_comment && markup_head(t).is_some_and(|head| is_section_opener(&head));
+    }
+    false
+}
+
+/// The opening-tag half of [`is_section_seam`], on a line shape.
+fn is_section_opener(next: &str) -> bool {
+    matches!(next, "<script" | "<style" | "<svelte:options")
 }
 
 /// The number of maximal runs of consecutive blank lines in `s`.
@@ -315,17 +364,15 @@ fn is_sanctioned(shape: &FabricationShape) -> bool {
 /// `<svelte:options` appears on both sides because that section is a single self-closing line,
 /// so it opens and closes on the same shape.
 ///
-/// ⚠️ **Known over-report.** Comments travel with their section, so a glued
-/// `<div>block1</div>⏎<!-- comment -->⏎<style>` puts the section's *leading comment* where the
-/// tag would be — the run reads `</div` ⇢ `<!--`, nothing here fires, and the audit reports a
-/// blank prettier emits too. Not widened: the only shape visible here is "a blank before some
-/// comment", and excusing that would blind the audit to a whole class of real fabrications.
-/// Stating it narrowly needs the AST, not line shapes. Latent in practice — an already-formatted
-/// corpus carries the blank in its input, so the counts match.
+/// A section's *leading comment run* stands between the run and the tag
+/// (`<div>block1</div>⏎<!-- comment -->⏎<style>`), so the shape alone reads `</div` ⇢ `<!--`
+/// and nothing here fires; that arm is [`leads_section`], which reads forward to the tag —
+/// `scan_output` asks it first. (Widening THIS shape to "a blank before some comment" was
+/// refused for blinding the audit to a whole class of real fabrications; the lookahead is the
+/// narrow statement.)
 fn is_section_seam(prev: &str, next: &str) -> bool {
     let closes_section = matches!(prev, "</script" | "</style" | "<svelte:options");
-    let opens_section = matches!(next, "<script" | "<style" | "<svelte:options");
-    closes_section || opens_section
+    closes_section || is_section_opener(next)
 }
 
 /// Whether the run IS an empty block body.
@@ -417,16 +464,16 @@ fn scan_output(out: &str) -> OutputScan {
     for_each_blank_run(out, |run| {
         let shape = FabricationShape {
             before: line_shape(run.prev),
-            after: line_shape(run.next),
+            after: line_shape(run.next()),
         };
-        if is_sanctioned(&shape) {
+        if is_sanctioned(&shape) || leads_section(run.after) {
             scan.sanctioned += 1;
             return;
         }
         scan.invented.push(Invented {
             line: run.line,
             // Anchor on the line the run precedes — what the blank was inserted before.
-            anchor: run.next.trim().to_string(),
+            anchor: run.next().trim().to_string(),
             shape,
         });
     });
@@ -519,7 +566,8 @@ fn print_json(sweep: &Sweep) {
 #[cfg(test)]
 mod tests {
     use super::{
-        FabricationShape, count_blank_runs, is_blank_line, is_sanctioned, line_shape, scan_output,
+        FabricationShape, count_blank_runs, is_blank_line, is_sanctioned, leads_section,
+        line_shape, scan_output,
     };
 
     /// The raw-line → shape → carve-out pipeline exactly as [`scan_output`] runs it, so the
@@ -560,6 +608,38 @@ mod tests {
         // starts with a section name does not widen it.
         assert!(!sanctioned("text", "<style-guide>"));
         assert!(!sanctioned("</script-host>", "text"));
+    }
+
+    #[test]
+    fn a_leading_comment_run_is_the_seam_one_step_removed() {
+        let leads = |doc: &str| leads_section(&doc.lines().collect::<Vec<_>>());
+        assert!(leads("<!-- comment -->\n<style>"));
+        assert!(leads("<!-- c1 -->\n\n<!-- c2 -->\n<script lang=\"ts\">"));
+        assert!(leads("<!-- multi\nline -->\n<svelte:options runes />"));
+        // No comment before the tag: that is `is_section_seam`'s own arm, not this one.
+        assert!(!leads("<style>"));
+        // The run must END at the section tag — content between refuses, and so does
+        // content on a comment's closing line.
+        assert!(!leads("<!-- comment -->\n<div>a</div>\n<style>"));
+        assert!(!leads("<!-- comment --> text\n<style>"));
+        assert!(!leads("<!-- multi\nline --> text\n<style>"));
+        // A comment before ordinary content is exactly the class the shape must not excuse.
+        assert!(!leads("<!-- comment -->\n<div>a</div>"));
+        assert!(!leads("<!-- comment -->"));
+        // Through `scan_output`: the glued authoring's seam blank is sanctioned, one
+        // before a template comment is not.
+        assert_eq!(
+            scan_output("<div>a</div>\n\n<!-- c -->\n<style></style>")
+                .invented
+                .len(),
+            0
+        );
+        assert_eq!(
+            scan_output("<div>a</div>\n\n<!-- c -->\n<div>b</div>")
+                .invented
+                .len(),
+            1
+        );
     }
 
     #[test]

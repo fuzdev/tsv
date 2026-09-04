@@ -1,0 +1,320 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 121,
+		"end": 161,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 130,
+					"end": 133,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 130,
+							"end": 133,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 130,
+											"end": 133
+										}
+									],
+									"start": 130,
+									"end": 133
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 134,
+					"end": 152,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 138,
+							"end": 148,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 130,
+				"end": 152
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 128,
+			"end": 153,
+			"styles": "\n\tdiv {\n\t\tcolor: red;\n\t}\n",
+			"comment": {
+				"type": "Comment",
+				"start": 100,
+				"end": 120,
+				"data": " #endregions "
+			}
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 190,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 32,
+				"end": 33,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 33,
+				"end": 50,
+				"data": "#endregion"
+			},
+			{
+				"type": "Text",
+				"start": 50,
+				"end": 52,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 52,
+				"end": 71,
+				"data": " #endregion "
+			},
+			{
+				"type": "Text",
+				"start": 71,
+				"end": 72,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 72,
+				"end": 86,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 73
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 76
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 77,
+							"end": 80,
+							"expression": {
+								"type": "Identifier",
+								"start": 78,
+								"end": 79,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 6
+									},
+									"end": {
+										"line": 7,
+										"column": 7
+									}
+								},
+								"name": "a"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 86,
+				"end": 87,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 87,
+				"end": 98,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 88
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 89
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 90,
+							"end": 94,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 98,
+				"end": 100,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 100,
+				"end": 120,
+				"data": " #endregions "
+			},
+			{
+				"type": "Text",
+				"start": 120,
+				"end": 121,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 161,
+				"end": 162,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 162,
+				"end": 189,
+				"data": " # ENDREGION Styles "
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 32,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 23,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 22,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 21,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 17,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 20,
+								"end": 21,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

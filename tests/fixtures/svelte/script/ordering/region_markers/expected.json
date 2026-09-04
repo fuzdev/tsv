@@ -1,0 +1,534 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 345,
+		"end": 385,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 354,
+					"end": 357,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 354,
+							"end": 357,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 354,
+											"end": 357
+										}
+									],
+									"start": 354,
+									"end": 357
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 358,
+					"end": 376,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 362,
+							"end": 372,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 354,
+				"end": 376
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 352,
+			"end": 377,
+			"styles": "\n\tdiv {\n\t\tcolor: red;\n\t}\n",
+			"comment": {
+				"type": "Comment",
+				"start": 321,
+				"end": 344,
+				"data": " #region STYLES "
+			}
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 407,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 24,
+				"data": " #region OPTIONS "
+			},
+			{
+				"type": "Text",
+				"start": 24,
+				"end": 25,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 49,
+				"end": 51,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 51,
+				"end": 70,
+				"data": " #endregion "
+			},
+			{
+				"type": "Text",
+				"start": 70,
+				"end": 72,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 72,
+				"end": 95,
+				"data": " #region MODULE "
+			},
+			{
+				"type": "Text",
+				"start": 95,
+				"end": 96,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 135,
+				"end": 137,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 137,
+				"end": 163,
+				"data": " #endregion MODULE "
+			},
+			{
+				"type": "Text",
+				"start": 163,
+				"end": 165,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 165,
+				"end": 188,
+				"data": " #region SCRIPT "
+			},
+			{
+				"type": "Text",
+				"start": 188,
+				"end": 189,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 221,
+				"end": 222,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 222,
+				"end": 241,
+				"data": " #endregion "
+			},
+			{
+				"type": "Text",
+				"start": 241,
+				"end": 243,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 243,
+				"end": 259,
+				"data": " comment "
+			},
+			{
+				"type": "Text",
+				"start": 259,
+				"end": 260,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 260,
+				"end": 283,
+				"data": " #region MARKUP "
+			},
+			{
+				"type": "Text",
+				"start": 283,
+				"end": 284,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 284,
+				"end": 298,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 21,
+						"column": 1,
+						"character": 285
+					},
+					"end": {
+						"line": 21,
+						"column": 4,
+						"character": 288
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 289,
+							"end": 292,
+							"expression": {
+								"type": "Identifier",
+								"start": 290,
+								"end": 291,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 6
+									},
+									"end": {
+										"line": 21,
+										"column": 7
+									}
+								},
+								"name": "a"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 298,
+				"end": 300,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 300,
+				"end": 319,
+				"data": " #endregion "
+			},
+			{
+				"type": "Text",
+				"start": 319,
+				"end": 321,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 321,
+				"end": 344,
+				"data": " #region STYLES "
+			},
+			{
+				"type": "Text",
+				"start": 344,
+				"end": 345,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 385,
+				"end": 387,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 387,
+				"end": 406,
+				"data": " #endregion "
+			}
+		]
+	},
+	"options": {
+		"start": 25,
+		"end": 49,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 41,
+				"end": 46,
+				"name": "runes",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 16,
+						"character": 41
+					},
+					"end": {
+						"line": 2,
+						"column": 21,
+						"character": 46
+					}
+				},
+				"value": true
+			}
+		],
+		"runes": true
+	},
+	"comments": [],
+	"module": {
+		"type": "Script",
+		"start": 96,
+		"end": 135,
+		"context": "module",
+		"content": {
+			"type": "Program",
+			"start": 111,
+			"end": 126,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 113,
+					"end": 125,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 119,
+							"end": 124,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 119,
+								"end": 120,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "m"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 123,
+								"end": 124,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " #region MODULE "
+				}
+			]
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 104,
+				"end": 110,
+				"name": "module",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 8,
+						"character": 104
+					},
+					"end": {
+						"line": 7,
+						"column": 14,
+						"character": 110
+					}
+				},
+				"value": true
+			}
+		]
+	},
+	"instance": {
+		"type": "Script",
+		"start": 189,
+		"end": 221,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 197,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 199,
+					"end": 211,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 205,
+							"end": 210,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 205,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 209,
+								"end": 210,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 12
+									}
+								},
+								"name": "m"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " #region SCRIPT "
+				}
+			]
+		},
+		"attributes": []
+	}
+}

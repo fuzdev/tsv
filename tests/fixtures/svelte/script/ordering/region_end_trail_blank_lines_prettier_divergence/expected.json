@@ -1,0 +1,251 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 70,
+		"end": 110,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 79,
+					"end": 82,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 79,
+							"end": 82,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 79,
+											"end": 82
+										}
+									],
+									"start": 79,
+									"end": 82
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 83,
+					"end": 101,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 87,
+							"end": 97,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 79,
+				"end": 101
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 77,
+			"end": 102,
+			"styles": "\n\tdiv {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 132,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 32,
+				"end": 33,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 33,
+				"end": 52,
+				"data": " #endregion "
+			},
+			{
+				"type": "Text",
+				"start": 52,
+				"end": 54,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 54,
+				"end": 68,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 55
+					},
+					"end": {
+						"line": 6,
+						"column": 4,
+						"character": 58
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 59,
+							"end": 62,
+							"expression": {
+								"type": "Identifier",
+								"start": 60,
+								"end": 61,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 6
+									},
+									"end": {
+										"line": 6,
+										"column": 7
+									}
+								},
+								"name": "a"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 68,
+				"end": 70,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Text",
+				"start": 110,
+				"end": 112,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 112,
+				"end": 131,
+				"data": " #endregion "
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 32,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 23,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 22,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 21,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 17,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 20,
+								"end": 21,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
