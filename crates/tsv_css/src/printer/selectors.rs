@@ -36,6 +36,7 @@ use super::Printer;
 use super::boundary_ws::{closer_pos, prefixed_run, skip_gap_trivia, trim_regenerated_separator};
 use super::value_normalization;
 use crate::ast::internal;
+use crate::whitespace::is_ascii_boundary_whitespace;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::printing::format_string_literal;
@@ -115,8 +116,8 @@ impl<'a> Printer<'a> {
                     // The comment-free twin of `build_comma_list_doc`'s pre-comma
                     // preservation — this loop writes its `,` directly, so it owes the same
                     // run (`@keyframes k { 0%<NBSP>, 50% {…} }`).
-                    let kept = self
-                        .pre_comma_boundary_ws(list.selectors[i - 1].span.end, complex.span.start);
+                    let kept =
+                        self.pre_comma_boundary_ws(&list.selectors[i - 1], complex.span.start);
                     if !kept.is_empty() {
                         self.write(&kept);
                     }
@@ -189,8 +190,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(" "));
                     parts.push(d.text_pooled(&before));
                 }
-                let kept =
-                    self.pre_comma_boundary_ws(list.selectors[i - 1].span.end, complex.span.start);
+                let kept = self.pre_comma_boundary_ws(&list.selectors[i - 1], complex.span.start);
                 if !kept.is_empty() {
                     parts.push(d.text_pooled(&kept));
                 }
@@ -373,10 +373,16 @@ impl<'a> Printer<'a> {
     /// ⚠️ Flush against the comma is safe on the run's RIGHT and says nothing about its left,
     /// which is the selector that just ended — so the answer carries `name_run_separator`'s
     /// space wherever that selector ends in a name (`a.x <NBSP>, c` re-parsed with the class
-    /// `x<NBSP>`; `a[b] <NBSP>, c` and `* <NBSP>, c` never could). Included in the returned
-    /// string rather than left to the two callers, which is what keeps them from disagreeing
-    /// about it the way they once disagreed about the run itself.
-    fn pre_comma_boundary_ws(&self, prev_end: u32, next_start: u32) -> String {
+    /// `x<NBSP>`; `a[b] <NBSP>, c` and `* <NBSP>, c` never could, and neither can an `Nth`
+    /// term — `selector_run_separator`). Included in the returned string rather than left to
+    /// the two callers, which is what keeps them from disagreeing about it the way they once
+    /// disagreed about the run itself.
+    fn pre_comma_boundary_ws(
+        &self,
+        prev: &internal::ComplexSelector<'_>,
+        next_start: u32,
+    ) -> String {
+        let prev_end = prev.span.end;
         // An all-ASCII gap can hold no member; settle before the comma scan (see
         // `boundary_ws_in_gap`, whose own guard this mirrors one step earlier — bounds check
         // included, so a caller's inverted or out-of-range pair can never slice).
@@ -394,9 +400,83 @@ impl<'a> Printer<'a> {
         if kept.is_empty() {
             return kept;
         }
-        let mut out = String::from(self.name_run_separator(prev_end));
+        let mut out = String::from(self.selector_run_separator(prev));
         out.push_str(&kept);
         out
+    }
+
+    /// [`Self::name_run_separator`] for a run restored after a complex selector — the space
+    /// that keeps its last NAME closed — unless the selector ends in an `Nth` term.
+    ///
+    /// An An+B term re-parses through the byte scanner (`match_nth_value` /
+    /// `nth_arg_terminator`), not `read_identifier`: the scanner steps the run as the
+    /// terminator's gap, so `2n<NBSP>)` comes back the same `Nth` with nothing glued, and a
+    /// space ahead of the run would be an insertion the author did not write and prettier
+    /// does not make (`:is(2n<NBSP>)`). The name predicate alone cannot tell — an An+B ends
+    /// in a digit or an `n`, both of which continue a name.
+    fn selector_run_separator(&self, complex: &internal::ComplexSelector<'_>) -> &'static str {
+        let ends_in_nth = complex
+            .children
+            .last()
+            .and_then(|relative| relative.selectors.last())
+            .is_some_and(|simple| matches!(simple, internal::SimpleSelector::Nth { .. }));
+        if ends_in_nth {
+            ""
+        } else {
+            self.name_run_separator(complex.span.end)
+        }
+    }
+
+    /// [`Self::selector_run_separator`] for the run a selector LIST's `)` gap restores: the
+    /// list's last selector decides. An empty list has no name to close.
+    fn list_run_separator(&self, list: &internal::SelectorList<'_>) -> &'static str {
+        list.selectors
+            .last()
+            .map_or("", |complex| self.selector_run_separator(complex))
+    }
+
+    /// The `An+B` head and the ` of ` keyword text of an `:nth-*(An+B of S)` argument, with
+    /// the boundary runs the parser skipped on either side of `of` restored.
+    ///
+    /// Three claims meet at this keyword, and they partition the gap
+    /// `[value_span.end, selectors.span.start)`:
+    ///
+    /// - the run BEFORE `of` (`2n + 1<NBSP> of`) has nothing but this arm to carry it, so it
+    ///   is swept whole and printed flush after the An+B text, ahead of the regenerated
+    ///   space;
+    /// - the run contiguous with `S`'s first compound (`of<NBSP>.x`) is that compound's own
+    ///   claim — its backward scan reaches the run behind its name (the same partition the
+    ///   `:is(<NBSP>b)` arm relies on) — so this arm prints no space where that claim stands:
+    ///   the run IS the separator, as the author, canonical and prettier all spell it;
+    /// - what a comment strands between the two (`of<NBSP>/* c */ .x`) is this arm's again,
+    ///   bounded at the contiguous run's start (`boundary_ws_in_gap_before_anchor`).
+    ///
+    /// The keyword is located by stepping the gap's trivia (`skip_gap_trivia`): the parser
+    /// keeps no span for it. Settled to the plain `" of "` on the document precondition —
+    /// this runs once per `of S` argument, and no real stylesheet holds a member.
+    fn nth_of_keyword<'v>(
+        &self,
+        head: Cow<'v, str>,
+        value_span: Span,
+        selectors: &internal::SelectorList<'_>,
+    ) -> (Cow<'v, str>, Cow<'static, str>) {
+        if !self.holds_boundary_ws {
+            return (head, Cow::Borrowed(" of "));
+        }
+        let of_start = skip_gap_trivia(self.source, value_span.end, selectors.span.start);
+        let before = self.boundary_ws_in_gap(value_span.end, of_start);
+        let stranded = self.boundary_ws_in_gap_before_anchor(of_start, selectors.span.start);
+        let compound_claims_run = self.boundary_run(of_start, selectors.span.start).1;
+        let mut after = stranded;
+        if !compound_claims_run {
+            after.push(' ');
+        }
+        let head = if before.is_empty() {
+            head
+        } else {
+            Cow::Owned(head.into_owned() + &before)
+        };
+        (head, of_keyword_text("", &after))
     }
 
     /// Whether this complex selector carries a comment at a combinator boundary — any
@@ -1121,15 +1201,22 @@ impl<'a> Printer<'a> {
                 // Normalize An+B operator spacing (`2n+1` → `2n + 1`) to match prettier,
                 // exactly like the dedicated `:nth-child` args path. An `An+B of S` term
                 // folds ` of ` into the value (matching Svelte — see `match_nth_value`):
-                // split it off, normalize the An+B, and re-emit ` of ` with a single
+                // split it off, normalize the An+B, and re-emit the ` of ` with a single
                 // trailing space so the following sibling selector (`S`) stays separated
-                // in the glued compound.
+                // in the glued compound — or with the boundary run the fold carried in its
+                // place (`of_keyword_text`; `2n of<NBSP>.x` keeps its `<NBSP>`, which is
+                // the separator the author wrote and the one prettier keeps).
                 let raw = span.extract(self.source);
                 match split_nth_of(raw) {
-                    Some(anb) => {
+                    Some(split) => {
                         let mut w = d.pool_writer();
-                        w.push_str(&Self::normalize_an_plus_b(anb));
-                        w.push_str(" of ");
+                        w.push_str(&Self::normalize_an_plus_b(split.anb));
+                        let after = if split.after_of.is_empty() {
+                            " "
+                        } else {
+                            &split.after_of
+                        };
+                        w.push_str(&of_keyword_text(&split.before_of, after));
                         w.finish_text()
                     }
                     None => d.text_pooled(&Self::normalize_an_plus_b(raw)),
@@ -1242,7 +1329,7 @@ impl<'a> Printer<'a> {
                 // short of it, and the separator ahead of it is what keeps the last
                 // selector's own name off it (`:is(a <NBSP>)` re-parsed as `:is(a<NBSP>)`).
                 let kept = self.boundary_ws_before_closer(selectors.span.end, *span);
-                let kept = prefixed_run(self.name_run_separator(selectors.span.end), kept);
+                let kept = prefixed_run(self.list_run_separator(selectors), kept);
                 // …and the lead gap's own, which only this arm can claim: the inner list's
                 // first compound reaches the run CONTIGUOUS with its name by scanning back
                 // (`:is(<NBSP>b)`), but it has no floor to sweep forward from, so a run a
@@ -1286,8 +1373,20 @@ impl<'a> Printer<'a> {
                 match of_selector {
                     None => {
                         let trailing = self.comment_blocks_in_range(value_span.end, span.end);
+                        // …nor the run the `)` gap skipped (`:nth-child(2n<NBSP>)`), flush
+                        // against the `)`. `span.end` IS the `)` here (the Nth span ends
+                        // before it, unlike the other arms' — see `wrap_args_gap_comments`),
+                        // so the gap needs no `closer_pos`. No separator ahead of it: an
+                        // An+B re-parses through the byte scanner, which steps the run as
+                        // the terminator's gap, so nothing glues (`list_run_separator`).
+                        let kept_trailing = self.boundary_ws_in_gap(value_span.end, span.end);
+                        let text = if kept_trailing.is_empty() {
+                            normalized
+                        } else {
+                            Cow::Owned(normalized.into_owned() + &kept_trailing)
+                        };
                         let inner = self.wrap_inner_with_comments(
-                            d.text_pooled(&normalized),
+                            d.text_pooled(&text),
                             &leading,
                             &trailing,
                         );
@@ -1303,7 +1402,22 @@ impl<'a> Printer<'a> {
                             "",
                         );
                         let trailing = self.comment_blocks_in_range(selectors.span.end, span.end);
-                        let inner = d.concat(&[d.text_pooled(&normalized), d.text(" of "), list]);
+                        let (head, of) = self.nth_of_keyword(normalized, *value_span, selectors);
+                        // The run the `)` gap skipped after `S` (`of .b <NBSP>)`), flush against
+                        // the `)` behind the separator its last name needs — the same claim the
+                        // SelectorList arm makes; `S` is a nested list with no other emitter.
+                        let tail = self.boundary_ws_in_gap(selectors.span.end, span.end);
+                        let tail = prefixed_run(self.list_run_separator(selectors), tail);
+                        let inner = if tail.is_empty() {
+                            d.concat(&[d.text_pooled(&head), d.text_pooled(&of), list])
+                        } else {
+                            d.concat(&[
+                                d.text_pooled(&head),
+                                d.text_pooled(&of),
+                                list,
+                                d.text_pooled(&tail),
+                            ])
+                        };
                         let inner = self.wrap_inner_with_comments(inner, &leading, &trailing);
                         self.wrap_pseudo_args(inner)
                     }
@@ -1475,13 +1589,21 @@ impl<'a> Printer<'a> {
     /// operator characters in prose (`/* a-b */` → `/* a - b */`) — the value-scanner
     /// opacity class, and the reason this walk steps over a comment through
     /// [`crate::comments`] rather than treating it as content.
+    ///
+    /// ⚠️ The whitespace it respaces is the ASCII half of the An+B gap's class
+    /// ([`is_ascii_boundary_whitespace`]) — what it regenerates as the one space around an
+    /// operator. A `<NBSP>` or `<ZWNBSP>` in the gap is a member the scanner stepped
+    /// (`2n<NBSP>+<NBSP>1` is one term to `parseCss`) but not one this walk may drop:
+    /// prettier keeps it in place (`2n<NBSP> + <NBSP>1`), and `str::trim` would have eaten
+    /// it with the spaces. `<VT>` is in the ASCII half, so it collapses like a space (the
+    /// uniform rule the `combinator_control_whitespace` divergence states).
     fn normalize_an_plus_b(value: &str) -> Cow<'_, str> {
         // Lowercase the `n` variable when it carries a numeric coefficient
         // (`2N`→`2n`), matching prettier — a bare `N`/`-N` keeps its case (prettier
         // preserves it), as do the `even`/`odd` keywords (their `n` isn't
         // digit-preceded). Applied before the early return so `2N` (no operator)
         // is cased too.
-        let cased = lowercase_an_plus_b_n(value.trim());
+        let cased = lowercase_an_plus_b_n(value.trim_matches(is_ascii_boundary_whitespace));
 
         // Simple cases: a keyword or plain number with nothing for the walk to do — no
         // operator to respace, no comment to space off — returns the cased form as-is
@@ -1509,7 +1631,7 @@ impl<'a> Printer<'a> {
                     result.push(' ');
                 }
                 result.push_str(&rest[..end]);
-                rest = rest[end..].trim_start();
+                rest = rest[end..].trim_start_matches(is_ascii_boundary_whitespace);
                 if !rest.is_empty() {
                     result.push(' ');
                 }
@@ -1523,7 +1645,7 @@ impl<'a> Printer<'a> {
             if (ch == '+' || ch == '-') && prev_exists {
                 // Operator only when there is content before it (compute the trimmed
                 // length before mutating so the immutable borrow is released first).
-                let trimmed_len = result.trim_end().len();
+                let trimmed_len = result.trim_end_matches(is_ascii_boundary_whitespace).len();
                 if trimmed_len != 0 {
                     result.truncate(trimmed_len);
                     result.push(' ');
@@ -1531,7 +1653,7 @@ impl<'a> Printer<'a> {
 
                     // Skip any spaces after the operator and add a single space
                     // only when more content follows.
-                    rest = rest.trim_start();
+                    rest = rest.trim_start_matches(is_ascii_boundary_whitespace);
                     if !rest.is_empty() {
                         result.push(' ');
                     }
@@ -1548,14 +1670,72 @@ impl<'a> Printer<'a> {
     }
 }
 
-/// Split an `An+B of S` term's folded value (`"2n of "`, `"-n + 3 of "`) into its
-/// `An+B` prefix, or `None` for a bare An+B (`"2n"`, `"odd"`). The parser
-/// (`match_nth_value`) only ever produces `"<An+B>\s+of\s+"` or `"<An+B>"`, so the
-/// `of` — when present — is a trailing whole word preceded by whitespace; the
-/// whitespace check rejects a hypothetical An+B ending in the letters `of`.
-fn split_nth_of(value: &str) -> Option<&str> {
-    let anb = value.trim_end().strip_suffix("of")?;
-    anb.ends_with(char::is_whitespace).then(|| anb.trim_end())
+/// An `An+B of S` term's folded value, split at its `of`.
+struct NthOfSplit<'a> {
+    /// The An+B text, its trailing whitespace run removed.
+    anb: &'a str,
+    /// The boundary members (non-ASCII JS `\s`) of the `\s+` run ahead of `of`.
+    before_of: String,
+    /// The boundary members of the `\s+` run after `of`.
+    after_of: String,
+}
+
+/// Split an `An+B of S` term's folded value (`"2n of "`, `"-n + 3 of "`) at its `of`, or
+/// `None` for a bare An+B (`"2n"`, `"odd"`). The parser (`match_nth_value`) only ever
+/// produces `"<An+B>\s+of\s+"` or `"<An+B>"`, so the `of` — when present — is a trailing
+/// whole word preceded by whitespace; the whitespace check rejects a hypothetical An+B
+/// ending in the letters `of`.
+///
+/// Both `\s` are the regex's JS `\s`, so each run is scanned over that class
+/// ([`tsv_lang::is_js_whitespace`]) — a `<NBSP>` on either side of the keyword is part of
+/// the run, not of the An+B text or of `S`. The runs' ASCII halves are the printer's to
+/// regenerate; their boundary members ride along in the split so the emitter can put them
+/// back where the author wrote them.
+fn split_nth_of(value: &str) -> Option<NthOfSplit<'_>> {
+    let before_after = value.trim_end_matches(tsv_lang::is_js_whitespace);
+    let after_of = &value[before_after.len()..];
+    let anb_and_run = before_after.strip_suffix("of")?;
+    if !anb_and_run.ends_with(tsv_lang::is_js_whitespace) {
+        return None;
+    }
+    let anb = anb_and_run.trim_end_matches(tsv_lang::is_js_whitespace);
+    Some(NthOfSplit {
+        anb,
+        before_of: boundary_members(&anb_and_run[anb.len()..]),
+        after_of: boundary_members(after_of),
+    })
+}
+
+/// The boundary members (`is_boundary_only_whitespace`) of a whitespace run, in order —
+/// the half of it the printer preserves; the ASCII half is regenerated. Empty, without
+/// allocating, for the all-ASCII run every real stylesheet writes.
+fn boundary_members(run: &str) -> String {
+    if run.is_ascii() {
+        return String::new();
+    }
+    run.chars()
+        .filter(|c| crate::whitespace::is_boundary_only_whitespace(*c))
+        .collect()
+}
+
+/// The ` of ` between an An+B term and its `S`, carrying the boundary runs the parser
+/// skipped on either side of the keyword.
+///
+/// `before` sits flush after the term, ahead of the regenerated space (`2n + 1<NBSP> of`);
+/// `after` is EXACTLY what follows the keyword — the regenerated space, or a run in its
+/// place (`of<NBSP>.x`: the run IS the separator, as the author, canonical and prettier all
+/// spell it, and an ASCII space beside it would be a second one), or nothing at all where
+/// `S`'s own leading claim prints that run. The caller decides; an empty `after` here means
+/// empty. The plain keyword is borrowed, so the common case allocates nothing.
+fn of_keyword_text(before: &str, after: &str) -> Cow<'static, str> {
+    if before.is_empty() && after == " " {
+        return Cow::Borrowed(" of ");
+    }
+    let mut out = String::with_capacity(before.len() + 3 + after.len());
+    out.push_str(before);
+    out.push_str(" of");
+    out.push_str(after);
+    Cow::Owned(out)
 }
 
 /// Lowercase the An+B `n` variable when it carries a numeric coefficient

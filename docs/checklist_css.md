@@ -172,6 +172,16 @@ Spec: `selectors-4` (core features are REC via CSS2.1)
 - `:nth-last-of-type(An+B)`
 - `:nth-col(An+B)`, `:nth-last-col(An+B)` - Level 4, table columns
 - `:nth-child(An+B of selector)` - Level 4
+- Non-ASCII whitespace (`<NBSP>`, `<ZWNBSP>`, every `Zs`, `<LS>`, `<PS>`) at every An+B
+  juncture — before the `)`, on either side of the tail's operator, around `of`, and after
+  the `of` list — is the boundary run `parseCss` skips there (its `REGEX_NTH_OF` is a JS
+  regex): the term parses as the `Nth` canonical reads and the character stays where it
+  was written, flush against its neighbour, with the ASCII spacing regenerated around it
+  (`2n<NBSP> + <NBSP>1`, `2n + 1<NBSP>)`, `of<NBSP>.class`). Both grammars behind the
+  scanner take their own class: Svelte's JS `\s` for the `:is()`-style term, the parser's
+  boundary class for the `:nth-*()` term. The ASCII half of the class — VT and FF included,
+  as Svelte's `\s` has them — is regenerated instead: one space around the operator and
+  `of`, none against the parens (prettier freezes those bytes; `_prettier_divergence`)
 
 ### Logical Pseudo-Classes
 

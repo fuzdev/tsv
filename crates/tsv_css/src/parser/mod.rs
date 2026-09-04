@@ -329,9 +329,10 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
                 return Ok(());
             }
             let at = self.current_start + run;
-            // Any lookahead was lexed from past this token and is void once the cursor moves.
-            self.peek = None;
             if at != self.current_end {
+                // Any lookahead was lexed from past this token and is void once the cursor
+                // moves (`resume_at` drops it on the other arm).
+                self.peek = None;
                 // A token follows the run inside this same token: re-read from past it.
                 // `token_at` runs the WHOLE dispatch, not `read_identifier` — the run glues to
                 // a digit as readily as to a letter, so `{<NBSP>0%` must come back a
@@ -346,8 +347,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             // The whole identifier was the run — there is no name here at all. Consume it
             // and ask again from the top: the two classes can alternate any number of times
             // inside one run, and the loop's own leading skip is what steps the ASCII half.
-            self.lexer.seek(at);
-            self.advance()?;
+            self.resume_at(at)?;
         }
     }
 
@@ -636,6 +636,29 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.advance()
     }
 
+    /// Re-seat the parser at `pos`, making the token that begins there current.
+    ///
+    /// For a reader that established a position by scanning source AHEAD of the token
+    /// stream — the `:nth-*()` An+B scanner (`nth_arg_terminator`) and Svelte's `Nth`
+    /// production (`match_nth_value`) — whose stopping point can fall inside the current
+    /// token: a boundary run is name content to `read_identifier`, so `1<NBSP>of` is one
+    /// dimension token and `of<NBSP>b` one identifier, and no sequence of `advance` calls
+    /// lands on the `of` in the first or past it in the second. The boundary skip's own
+    /// whole-token arm and the CDO/CDC marker skip re-seat the same way. Only ever moves
+    /// forward, so unlike [`rewind_to`](Self::rewind_to) every comment registered so far
+    /// stands; any lookahead was lexed from before the jump and is dropped.
+    pub(in crate::parser) fn resume_at(&mut self, pos: usize) -> Result<(), ParseError> {
+        debug_assert!(
+            pos >= self.current_start,
+            "resume_at moves forward only ({pos} < {})",
+            self.current_start
+        );
+        self.peek = None;
+        // `seek` also drops the lexer's parked decode, which belonged to the token left behind.
+        self.lexer.seek(pos);
+        self.advance()
+    }
+
     /// Skip a run of legacy HTML-comment markers `<!-- ... -->` (CDO/CDC) at a
     /// stylesheet statement or selector-list boundary, mirroring Svelte `parseCss`'s
     /// `allow_comment_or_whitespace`. The whole span — **including any CSS between the
@@ -678,9 +701,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
                 }
                 i += 1;
             };
-            self.peek = None; // any lookahead was lexed from before the marker
-            self.lexer.seek(after);
-            self.advance()?;
+            self.resume_at(after)?;
             self.skip_boundary_whitespace()?;
         }
         Ok(())
