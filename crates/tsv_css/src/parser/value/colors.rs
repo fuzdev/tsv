@@ -1,5 +1,6 @@
 use crate::ast::internal::{AngleUnit, Color, ColorChannel};
 use crate::color::is_hex_color_body;
+use crate::escapes::trim_css;
 use crate::keyword_set::ascii_keyword_set;
 
 /// Parse a color value: hex, named, rgb(), hsl(), etc.
@@ -41,8 +42,14 @@ pub fn parse_color_function(name: &str, args_str: &str) -> Option<Color> {
 }
 
 /// Parse a color channel value: number, percentage, or "none"
+///
+/// Every trim in this file is [`trim_css`] — CSS whitespace only. A Unicode `str::trim`
+/// would eat a non-ASCII space (an NBSP) glued to a channel and classify the value as a
+/// color anyway, and the printer rebuilds a color from its parsed channels rather than from
+/// source, so the character would be dropped. Left in the text, the space fails the channel
+/// parse, the value stays a generic function, and its arguments print verbatim.
 fn parse_color_channel(s: &str) -> Option<ColorChannel> {
-    let s = s.trim();
+    let s = trim_css(s);
 
     // CSS Color 4 "none" keyword
     if s.eq_ignore_ascii_case("none") {
@@ -66,7 +73,7 @@ fn parse_color_channel(s: &str) -> Option<ColorChannel> {
 
 /// Parse hue value with optional angle unit
 fn parse_hue(s: &str) -> Option<(ColorChannel, Option<AngleUnit>)> {
-    let s = s.trim();
+    let s = trim_css(s);
 
     // Check for "none" keyword
     if s.eq_ignore_ascii_case("none") {
@@ -88,7 +95,7 @@ fn parse_hue(s: &str) -> Option<(ColorChannel, Option<AngleUnit>)> {
     };
 
     // Parse numeric value
-    if let Ok(value) = value_str.trim().parse::<f64>() {
+    if let Ok(value) = trim_css(value_str).parse::<f64>() {
         return Some((ColorChannel::Number(value), unit));
     }
 
@@ -120,7 +127,7 @@ type ColorArgs<'a> = (&'a str, &'a str, &'a str, Option<&'a str>);
 /// different fixed points (once as a misclassified generic function, once as a
 /// color).
 fn split_color_args(args_str: &str) -> Option<ColorArgs<'_>> {
-    let args_str = args_str.trim();
+    let args_str = trim_css(args_str);
     if let Some((head, alpha)) = args_str.split_once('/') {
         // Modern slash-alpha form: exactly `c c c / a`. Bind the alpha to the
         // fourth slot; the caller's channel parse rejects a malformed alpha (a
@@ -135,12 +142,12 @@ fn split_color_args(args_str: &str) -> Option<ColorArgs<'_>> {
         if channels.next().is_some() {
             return None; // more than three channels before the slash
         }
-        Some((c1, c2, c3, Some(alpha.trim())))
+        Some((c1, c2, c3, Some(trim_css(alpha))))
     } else if args_str.contains(',') {
         // Legacy comma form: exactly `c, c, c` or `c, c, c, a`. Empties are kept,
         // so `rgb(1,,2)` still presents three parts (and then fails to parse the
         // empty channel).
-        let mut parts = args_str.split(',').map(str::trim);
+        let mut parts = args_str.split(',').map(trim_css);
         let c1 = parts.next()?;
         let c2 = parts.next()?;
         let c3 = parts.next()?;

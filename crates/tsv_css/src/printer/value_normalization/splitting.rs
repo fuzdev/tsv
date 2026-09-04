@@ -231,8 +231,7 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     // element whose leading/trailing space the value parser deliberately kept). The
     // trailing trim also spares an escape's payload (`50px\ `), which the loop copied
     // verbatim as content.
-    let trimmed =
-        crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(&result));
+    let trimmed = crate::escapes::trim_css(&result);
     if trimmed.len() == result.len() {
         Cow::Owned(result)
     } else {
@@ -527,8 +526,7 @@ fn split_top_level(content: &str, is_sep: impl Fn(u8) -> bool, trim: bool) -> Ve
 /// a segment can legitimately end in an escaped space, which is content, not padding.
 fn push_segment<'a>(parts: &mut Vec<&'a str>, segment: &'a str, trim: bool) {
     if trim {
-        let trimmed =
-            crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(segment));
+        let trimmed = crate::escapes::trim_css(segment);
         if !trimmed.is_empty() {
             parts.push(trimmed);
         }

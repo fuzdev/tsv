@@ -25,7 +25,17 @@ content: <NBSP> 'z';
 ```
 
 For an **identifier** value (`font-family: <NBSP>q`) prettier keeps it glued, so tsv
-**matches** prettier there; only the string cases diverge. tsv is the more defensible
+**matches** prettier there. A **function** value diverges on one side only: led by the
+space (`<NBSP>calc(1px)`) prettier keeps it glued, trailed by one (`calc(1px)<NBSP>`) it
+splits the space off as its own word and inserts a space (`calc(1px) <NBSP>`), while tsv
+keeps both glued:
+
+```
+width: calc(1px)<NBSP>;
+height: <NBSP>calc(1px)<NBSP>;
+```
+
+So the string cases and the function-trailing case diverge. tsv is the more defensible
 side on those: it does not split adjacent glued value tokens, so the run stays one token
 and its bytes are preserved verbatim — the same lossless form it emits for the pure-ASCII
 analog `content: a'y'` (tsv keeps `a'y'`; prettier splits to `a 'y'`) and for the list
@@ -43,6 +53,10 @@ This pins a **content-loss** class — a boundary non-ASCII space silently dropp
   and above) — treating every `char::is_whitespace()` code point as CSS whitespace skips a
   **leading** space after the `:` as part of the colon→value gap before the value even
   begins — so a leading NBSP/em space opens the value's first token instead of vanishing.
+
+A **leading** space before a function's name, or one between the name and its `(`, reaches
+a third site — the function detector's name trim — where prettier and tsv **agree**; that
+plain conformance case is [boundary_nonascii_space_function](../boundary_nonascii_space_function/).
 
 `input.svelte` is tsv's inline form; `output_prettier.svelte` is prettier's split form.
 

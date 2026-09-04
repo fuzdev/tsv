@@ -303,6 +303,16 @@ pub(crate) fn trim_start_css(s: &str) -> &str {
     trimmed
 }
 
+/// Both ends at once: [`trim_start_css`] then [`trim_end_preserving_escape`] — the CSS
+/// counterpart of `str::trim`, and the one spelling every value-boundary trim takes (a
+/// value's text, a function's name and arguments, a color channel, a `url()` payload, a
+/// selector leaf). A site that reaches for `str::trim` here is a drop site for a non-ASCII
+/// space, which is content.
+#[inline]
+pub(crate) fn trim_css(s: &str) -> &str {
+    trim_end_preserving_escape(trim_start_css(s))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
