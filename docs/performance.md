@@ -922,6 +922,20 @@ width on the host's word: `text_pooled_in(span, source)` at the three sites that
 source slice read **+0.13%** against the tree beneath it — the width was never the price
 of those pooled texts.
 
+The next session took the row that board had left on top, `text_pooled` at 2% of the
+cell, and read it as what it is — a copy and an allocation, not a measure. Three of the
+CSS printer's pooled texts are slices of the document itself (the simple-selector leaf,
+the pseudo name, the function name), and a `source_span` node renders them identically
+with no pool copy at all. The leaf's ~12-byte slices, 12.3K a pass, read **−0.34%**
+as spans; the pseudo name a further −0.04%; and the function name — three bytes on four
+functions in five, 10.5K a pass — read **nothing**, twice, behind an exact `bcmp` and
+behind a call-free byte test alike. A pooled ask's price is its bytes: the scalar width
+tail and the `memcpy` grow with the slice, the node alloc does not, and at three bytes
+the copy costs what the span form's guard costs. The two sites that paid read
+**−1.17% cycles** and **−0.94% wall** in their groups for the −0.38% of instructions —
+the retired `memcpy` call and pool borrow had been dependency chains ahead of every
+selector leaf's node allocation.
+
 ### Ask whether a shared substrate's other consumer adopted its optimization
 
 A substrate with more than one consumer is a place where an optimization can be
