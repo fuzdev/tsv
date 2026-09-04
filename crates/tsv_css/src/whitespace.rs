@@ -95,6 +95,21 @@ pub(crate) fn is_boundary_whitespace(c: char) -> bool {
     tsv_lang::is_js_whitespace(c) || c.is_whitespace()
 }
 
+/// Could the char that begins or ends at this byte be [`is_boundary_whitespace`]? `true` for
+/// the six ASCII members — the two classes agree there: `<TAB>`, `<LF>`, `<VT>`, `<FF>`,
+/// `<CR>` and space — and for every non-ASCII byte, which may belong to a multi-byte member.
+/// `false` is a proof and `true` is a question for the char predicate: an ASCII byte outside
+/// the six is a whole char of its own, and not one either class holds.
+///
+/// The gate ahead of a trim over that class. A property name settles both of its ends here in
+/// four compares, where the char-predicate searchers each decode a char from one end to find
+/// nothing to trim — and a searcher's construction, not its walk, was the declaration
+/// printer's largest single cost.
+#[inline]
+pub(crate) const fn byte_may_be_boundary_whitespace(b: u8) -> bool {
+    b >= 0x80 || matches!(b, b'\t' | b'\n' | 0x0b | 0x0c | b'\r' | b' ')
+}
+
 /// Byte length of the [`is_boundary_only_whitespace`] run at the head of `text`, or `0`.
 ///
 /// The one measurement of "how much of this identifier token is really the run
@@ -110,4 +125,27 @@ pub(crate) fn boundary_prefix_len(text: &str) -> usize {
         .take_while(|c| is_boundary_only_whitespace(*c))
         .map(char::len_utf8)
         .sum()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The byte gate against the char class it stands in front of, at every byte value: an
+    /// ASCII byte is a whole char, so the two must agree exactly there; a non-ASCII byte is
+    /// a question the gate must not answer `false`.
+    #[test]
+    fn byte_gate_agrees_with_the_boundary_class_on_every_byte() {
+        for b in 0..=255u8 {
+            let gate = byte_may_be_boundary_whitespace(b);
+            if b < 0x80 {
+                assert_eq!(gate, is_boundary_whitespace(b as char), "byte {b:#x}");
+            } else {
+                assert!(
+                    gate,
+                    "non-ASCII byte {b:#x} must fall through to the predicate"
+                );
+            }
+        }
+    }
 }

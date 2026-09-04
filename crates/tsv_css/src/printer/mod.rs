@@ -243,17 +243,33 @@ impl<'a> Printer<'a> {
     ///
     /// Value comments are comments that appear after the colon, e.g., `color: /* comment */ red;`
     /// Detected by scanning the source text directly (value comments are not stored in the Vec).
+    ///
+    /// The gate is inline and the scan is one outlined copy
+    /// ([`Self::has_value_comments_in_decl_scan`]) — the inline-gate-over-outlined-body split
+    /// every comment lookup in the printers spells. `has_block_comment` is false for nearly
+    /// every declaration of a real stylesheet, and as one function the whole body was outlined
+    /// at its three sites, so each ask paid a call, four callee-saved pushes and the epilogue
+    /// for a one-byte answer.
+    #[inline]
     pub(crate) fn has_value_comments_in_decl(&self, decl: &CssDeclaration<'_>) -> bool {
         // Free O(1) negative gate: `has_block_comment` (recorded at parse time from the
         // lexer's comment tokens) is false iff no `/* … */` appears anywhere in the
         // declaration — property→colon gap or value/`!important`/trailing region. No block
         // comment anywhere ⟹ no value comment, so skip the colon scan + `/*` substring check
         // + value re-lex entirely on the common comment-free path (this fn runs up to 3× per
-        // declaration). When a comment is present the scan below runs unchanged, so the result
-        // is byte-identical.
+        // declaration). When a comment is present the scan runs unchanged, so the result is
+        // byte-identical.
         if !decl.has_block_comment {
             return false;
         }
+        self.has_value_comments_in_decl_scan(decl)
+    }
+
+    /// The scan half of [`Self::has_value_comments_in_decl`], reached only by a declaration
+    /// that holds a block comment somewhere: the colon scan, the `/*` substring check and the
+    /// value re-lex.
+    #[inline(never)]
+    fn has_value_comments_in_decl_scan(&self, decl: &CssDeclaration<'_>) -> bool {
         let decl_source = decl.span.extract(self.source);
         let value_start = decl.colon_pos() + 1;
         let value_part = &decl_source[value_start..];

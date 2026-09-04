@@ -586,7 +586,10 @@ pub(crate) fn extract_property_name(
         // keeps it before the `:` (`\41 : red`); any extra whitespace is still trimmed
         // (`color : red` → `color: red`).
         let bare = trim_property_part(property_part);
-        if property_part.ends_with(crate::whitespace::is_boundary_whitespace)
+        // A part ending in boundary whitespace is one the trim shortened, so an untouched
+        // part settles the `ends_with` without a searcher of its own.
+        if bare.len() != property_part.len()
+            && property_part.ends_with(crate::whitespace::is_boundary_whitespace)
             && ends_with_hex_escape(bare)
         {
             Cow::Owned(format!("{bare} "))
@@ -606,7 +609,31 @@ pub(crate) fn extract_property_name(
 /// (`1 → 2 → 4 → …`) — a non-idempotency no fixture can carry and no ratchet was watching.
 /// `is_boundary_whitespace` is the class that scan uses, so asking it here is what makes the
 /// two halves one answer.
+///
+/// The searchers run only for a part whose first or last byte could begin or end a run
+/// (`byte_may_be_boundary_whitespace`); a real property name is `color`, an ASCII name with
+/// nothing to trim at either end, and settles in four compares. The `debug_assert` keeps the
+/// gate's claim under the fixture suite rather than in prose.
+#[inline]
 fn trim_property_part(property_part: &str) -> &str {
+    let bytes = property_part.as_bytes();
+    if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last())
+        && !crate::whitespace::byte_may_be_boundary_whitespace(first)
+        && !crate::whitespace::byte_may_be_boundary_whitespace(last)
+    {
+        debug_assert_eq!(
+            trim_property_part_wide(property_part).len(),
+            property_part.len(),
+            "an ASCII non-whitespace byte at each end proves there is nothing to trim"
+        );
+        return property_part;
+    }
+    trim_property_part_wide(property_part)
+}
+
+/// The searcher half of [`trim_property_part`] — one outlined copy.
+#[inline(never)]
+fn trim_property_part_wide(property_part: &str) -> &str {
     property_part.trim_matches(crate::whitespace::is_boundary_whitespace)
 }
 
@@ -626,8 +653,9 @@ fn trim_property_part(property_part: &str) -> &str {
 /// letters of a bare identifier are lowercased.
 pub(crate) fn lowercase_property_name(name: Cow<'_, str>) -> Cow<'_, str> {
     // Cheapest discriminator first: an all-lowercase name (the overwhelming common
-    // case) has nothing to do, so bail before the substring scans below.
-    if !name.bytes().any(|b| b.is_ascii_uppercase()) {
+    // case) has nothing to do, so bail before the substring scans below — a word at a
+    // time, since every name takes this walk and nearly none has anything to find.
+    if !tsv_lang::swar::has_ascii_uppercase(name.as_bytes()) {
         return name;
     }
     // A standard property starts with an ASCII letter or a single vendor-prefix `-`
@@ -653,7 +681,7 @@ pub(crate) fn lowercase_property_name(name: Cow<'_, str>) -> Cow<'_, str> {
 /// `CssAtrule.name`: an escaped name still carries its `\` here, so the escape-guard
 /// below is what preserves it (the decoded form would hold a raw control char instead).
 pub(crate) fn lowercase_at_rule_name(name: &str) -> Cow<'_, str> {
-    if !name.bytes().any(|b| b.is_ascii_uppercase()) || name.contains('\\') {
+    if !tsv_lang::swar::has_ascii_uppercase(name.as_bytes()) || name.contains('\\') {
         return Cow::Borrowed(name);
     }
     Cow::Owned(name.to_ascii_lowercase())

@@ -10,10 +10,11 @@
 //! *is* guaranteed — and what every caller relies on — is stated per kernel
 //! below. Read the guarantee before adding a caller.
 //!
-//! [`next_byte_of`] is the one **public** entry point, and the only item here
-//! that is a scan rather than a lane kernel: `tsv_ts` and `tsv_css` reach it from
-//! their lexers, which is what a language crate wants and what keeps a fourth
-//! hand-rolled word loop from being written. Its density caveat is stated on it.
+//! [`next_byte_of`] and [`has_ascii_uppercase`] are the **public** entry points, and
+//! the only items here that are scans rather than lane kernels: `tsv_ts` and `tsv_css`
+//! reach them from their lexers and printers, which is what a language crate wants and
+//! what keeps a fourth hand-rolled word loop from being written. The density caveat is
+//! stated on [`next_byte_of`].
 
 /// `0x01` in every lane — the borrow unit the has-zero / has-less kernels
 /// subtract.
@@ -218,9 +219,77 @@ pub fn next_byte_of<const N: usize>(bytes: &[u8], from: usize, needles: [u8; N])
     i
 }
 
+/// Lane mask of the ASCII uppercase bytes (`A`..=`Z`) in `v`.
+///
+/// Computed on the word with its high bits cleared, so every lane is at most `0x7f` and
+/// neither add can carry into a neighbour: a lane is at or above `A` iff adding
+/// `0x80 - b'A'` sets its high bit, and past `Z` iff adding `0x80 - (b'Z' + 1)` does. The
+/// original high bits mask the result, so a non-ASCII byte whose low seven bits land in the
+/// range is not a hit. **Exact per lane** — no borrow, no carry — so the mask may be read
+/// any way; the boolean caller reads `!= 0`.
+#[inline]
+pub(crate) const fn uppercase_lanes(v: u64) -> u64 {
+    let low7 = v & !HIGH_BITS;
+    let at_least_a = low7.wrapping_add(splat(0x80 - b'A'));
+    let past_z = low7.wrapping_add(splat(0x80 - (b'Z' + 1)));
+    at_least_a & !past_z & !v & HIGH_BITS
+}
+
+/// Does `bytes` hold an ASCII uppercase letter (`A`..=`Z`)? [`uppercase_lanes`] a word at
+/// a time.
+///
+/// The last word read is the slice's LAST eight bytes, overlapping the word before it, so
+/// a slice of eight bytes or more never falls to the scalar tail; the tail runs only for a
+/// slice shorter than one word. That overlap is what the caller this was written for
+/// needs: a CSS property name is nine bytes on average, one word and a byte, and the byte
+/// would otherwise cost what the word did.
+#[inline]
+pub fn has_ascii_uppercase(bytes: &[u8]) -> bool {
+    let mut i = 0;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        if uppercase_lanes(u64::from_le_bytes(*chunk)) != 0 {
+            return true;
+        }
+        i += 8;
+    }
+    if i == bytes.len() {
+        return false;
+    }
+    if let Some(last) = bytes.last_chunk::<8>() {
+        return uppercase_lanes(u64::from_le_bytes(*last)) != 0;
+    }
+    bytes[i..].iter().any(u8::is_ascii_uppercase)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// [`has_ascii_uppercase`] against the scalar predicate: every byte value, at every
+    /// position of slices from empty to two words and a tail, over a background that
+    /// includes the non-ASCII bytes whose low seven bits spell a letter (`0xC1` = `A` with
+    /// the high bit) — the false positive the `& !v` term exists to refuse.
+    #[test]
+    fn has_ascii_uppercase_matches_the_scalar_predicate() {
+        let background = [b'a', b'-', b'z', 0xC1, 0xDA, 0x80, b'0', b' ', 0xFF, b'{'];
+        for len in 0..=19 {
+            for pos in 0..len.max(1) {
+                for b in 0..=255u8 {
+                    let mut v: Vec<u8> =
+                        (0..len).map(|k| background[k % background.len()]).collect();
+                    if pos < len {
+                        v[pos] = b;
+                    }
+                    let expected = v.iter().any(u8::is_ascii_uppercase);
+                    assert_eq!(
+                        has_ascii_uppercase(&v),
+                        expected,
+                        "len {len} pos {pos} byte {b:#x}"
+                    );
+                }
+            }
+        }
+    }
 
     /// [`next_byte_of`] against a plain scalar scan, over every needle count the
     /// crate uses and every alignment of a hit within and across words — the
