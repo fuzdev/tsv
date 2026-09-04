@@ -1,10 +1,11 @@
 use super::CssParser;
 use super::selectors::{
-    nth_arg_is_anb, parse_complex_selector_list, parse_forgiving_selector_list,
+    NthTerminator, nth_arg_terminator, parse_complex_selector_list, parse_forgiving_selector_list,
     parse_relative_selector_list,
 };
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use crate::whitespace::is_boundary_whitespace;
 use tsv_lang::{ParseError, Span};
 
 /// Parse pseudo-class or pseudo-element: :hover, ::before, :nth-child(2n+1)
@@ -362,7 +363,7 @@ fn parse_selector_list_args<'arena>(
 ///
 /// Any other argument (a bare selector `:nth-child(.a)`, a selector list
 /// `:nth-child(.a, .b)`, an unterminated An+B keyword `:nth-child(even odd)`, a
-/// comma-list `:nth-child(2n, .foo)`) is spec-invalid; `nth_arg_is_anb` demotes it to
+/// comma-list `:nth-child(2n, .foo)`) is spec-invalid; `nth_arg_terminator` demotes it to
 /// the ordinary complex-selector-list path so tsv reproduces parseCss's structured AST
 /// (drop-in parity) instead of raw-capturing it as one opaque `Nth` value.
 ///
@@ -380,49 +381,39 @@ fn parse_nth_args<'arena>(
 
     // Not a clean `<an+b> [of S]?`: parse as an ordinary complex-selector-list (like
     // `:is()`/`:not()`), matching parseCss for selector-shaped `:nth-*()` arguments.
-    if !nth_arg_is_anb(parser.source(), anb_start) {
+    let Some(terminator) = nth_arg_terminator(parser.source(), anb_start) else {
         let selectors = with_pseudo_args(parser, parse_complex_selector_list)?;
         return finish_selector_list_args(parser, args_start, selectors);
-    }
+    };
 
-    // Scan tokens until we hit "of" keyword or closing paren
-    let mut anb_end = anb_start;
-    let mut found_of = false;
-    let mut depth = 0;
+    // The An+B text runs from the term to its terminator — whitespace and comments
+    // included, so a comment in the gap before the `)` or the `of` stays part of the
+    // verbatim value (`2n /* c */`), as it always has. The scanner's offset is the only
+    // sound bound: the terminator can begin INSIDE the current token (`1<NBSP>of` is one
+    // dimension token, the `of` its unit's tail), so the token stream is not walked to it.
+    let (anb_end, found_of) = match terminator {
+        NthTerminator::Paren(at) => (at, false),
+        NthTerminator::Of(at) => (at, true),
+    };
 
-    while !parser.check(TokenKind::Eof) {
-        if parser.check(TokenKind::RightParen) && depth == 0 {
-            // End of nth args
-            break;
-        }
-        if depth == 0 && parser.check(TokenKind::Identifier) && parser.current_identifier() == "of"
-        {
-            // Found "of" keyword - An+B part ends here
-            found_of = true;
-            parser.advance()?; // consume "of"
-            break;
-        }
-        if parser.check(TokenKind::LeftParen) {
-            depth += 1;
-        } else if parser.check(TokenKind::RightParen) {
-            depth -= 1;
-        }
-        // Everything else — idents (`odd`, `n`), numbers, `+`/`-`,
-        // whitespace, comments — extends the raw An+B text.
-        anb_end = parser.current_end;
-        parser.advance()?;
-    }
-
-    // Extract An+B value. The scan extends `anb_end` over whitespace and
-    // comment tokens, so trim to the real text and keep its span — the
-    // printer uses it to locate the gap comments around the An+B.
+    // Trim to the real text and keep its span — the printer uses it to locate the gap
+    // comments around the An+B. The class is the parser's boundary one (JS `\s` ∪
+    // `White_Space`): a `<NBSP>` or `<ZWNBSP>` between the term and its terminator is the
+    // run `parseCss` skipped there, and `str::trim` (Unicode `White_Space`) would leave the
+    // `<ZWNBSP>` on the value.
     let anb_raw = &parser.source()[anb_start..anb_end];
-    let anb_trimmed_start = anb_start + (anb_raw.len() - anb_raw.trim_start().len());
-    let anb_value = parser.alloc_str_in(anb_raw.trim());
+    let anb_trimmed_start =
+        anb_start + (anb_raw.len() - anb_raw.trim_start_matches(is_boundary_whitespace).len());
+    let anb_value = parser.alloc_str_in(anb_raw.trim_matches(is_boundary_whitespace));
     let value_span = Span {
         start: parser.span_pos(anb_trimmed_start),
         end: parser.span_pos(anb_trimmed_start + anb_value.len()),
     };
+
+    // Re-seat the lexer at the terminator: on the `)` itself, or just past the `of`
+    // letters so the boundary skip below steps whatever follows them — the run inside the
+    // token the lexer had read as `of<NBSP>` included.
+    parser.resume_at(if found_of { anb_end + 2 } else { anb_end })?;
 
     // Parse optional selector list after "of". `S` is a `<complex-real-selector-list>`
     // (CSS Selectors 4), parsed with `in_pseudo_args` set — the same production a direct

@@ -1,0 +1,346 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 411,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 170,
+					"end": 190,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 170,
+							"end": 190,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 181,
+												"end": 189,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 181,
+														"end": 189,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n  +  1",
+																		"start": 181,
+																		"end": 189
+																	}
+																],
+																"start": 181,
+																"end": 189
+															}
+														]
+													}
+												]
+											},
+											"start": 170,
+											"end": 190
+										}
+									],
+									"start": 170,
+									"end": 190
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 191,
+					"end": 209,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 195,
+							"end": 205,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 170,
+				"end": 209
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 233,
+					"end": 252,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 233,
+							"end": 252,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 244,
+												"end": 251,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 244,
+														"end": 251,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n  + 1",
+																		"start": 244,
+																		"end": 251
+																	}
+																],
+																"start": 244,
+																"end": 251
+															}
+														]
+													}
+												]
+											},
+											"start": 233,
+											"end": 252
+										}
+									],
+									"start": 233,
+									"end": 252
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 253,
+					"end": 272,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 257,
+							"end": 268,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 233,
+				"end": 272
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 274,
+					"end": 293,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 274,
+							"end": 293,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 285,
+												"end": 292,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 285,
+														"end": 292,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n +  1",
+																		"start": 285,
+																		"end": 292
+																	}
+																],
+																"start": 285,
+																"end": 292
+															}
+														]
+													}
+												]
+											},
+											"start": 274,
+											"end": 293
+										}
+									],
+									"start": 274,
+									"end": 293
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 294,
+					"end": 314,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 298,
+							"end": 310,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 274,
+				"end": 314
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 369,
+					"end": 382,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 369,
+							"end": 382,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 373,
+												"end": 381,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 373,
+														"end": 381,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n  +  1",
+																		"start": 373,
+																		"end": 381
+																	}
+																],
+																"start": 373,
+																"end": 381
+															}
+														]
+													}
+												]
+											},
+											"start": 369,
+											"end": 382
+										}
+									],
+									"start": 369,
+									"end": 382
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 383,
+					"end": 402,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 387,
+							"end": 398,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 369,
+				"end": 402
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " U+00A0 on either side of the An+B operator is not whitespace to the respacing:\n\t   the ASCII gaps normalize to one space each and the character stays put ",
+				"start": 9,
+				"end": 168
+			},
+			{
+				"type": "CSSComment",
+				"value": " one side only ",
+				"start": 212,
+				"end": 231
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same term in a non-nth functional pseudo ",
+				"start": 317,
+				"end": 367
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 403,
+			"styles": "\n\t/* U+00A0 on either side of the An+B operator is not whitespace to the respacing:\n\t   the ASCII gaps normalize to one space each and the character stays put */\n\t:nth-child(2n  +  1) {\n\t\tcolor: red;\n\t}\n\n\t/* one side only */\n\t:nth-child(2n  + 1) {\n\t\tcolor: blue;\n\t}\n\t:nth-child(2n +  1) {\n\t\tcolor: green;\n\t}\n\n\t/* the same term in a non-nth functional pseudo */\n\t:is(2n  +  1) {\n\t\tcolor: teal;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 412,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

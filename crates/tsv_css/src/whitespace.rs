@@ -95,6 +95,20 @@ pub(crate) fn is_boundary_whitespace(c: char) -> bool {
     tsv_lang::is_js_whitespace(c) || c.is_whitespace()
 }
 
+/// The ASCII members of [`is_boundary_whitespace`] — the six code points below U+0080 that
+/// JS `\s` and `White_Space` share: `<TAB>`, `<LF>`, `<VT>`, `<FF>`, `<CR>` and space.
+///
+/// The half of a boundary run the printer REGENERATES (as indentation, or as the one space
+/// it puts around an operator) rather than preserves — so a trim over text that may hold both
+/// halves asks this and leaves the non-ASCII members standing, where `str::trim` (Unicode
+/// `White_Space`) would take the `<NBSP>` with them and `str::trim_ascii` would stop on the
+/// `<VT>`. The byte spelling is `Printer::boundary_run`'s inner loop
+/// (`u8::is_ascii_whitespace() || b == 0x0b`); this is the char one.
+#[inline]
+pub(crate) const fn is_ascii_boundary_whitespace(c: char) -> bool {
+    c.is_ascii() && tsv_lang::is_js_whitespace(c)
+}
+
 /// Could the char that begins or ends at this byte be [`is_boundary_whitespace`]? `true` for
 /// the six ASCII members — the two classes agree there: `<TAB>`, `<LF>`, `<VT>`, `<FF>`,
 /// `<CR>` and space — and for every non-ASCII byte, which may belong to a multi-byte member.

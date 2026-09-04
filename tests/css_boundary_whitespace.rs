@@ -100,14 +100,14 @@
 //!   it trims; `REGEX_ATTRIBUTE_FLAGS` reads letters only), where tsv's lexer reads one
 //!   identifier whose tail the head-anchored skip cannot reach — so the run rides into the
 //!   `value` (`[a=b<NBSP>]`), swallows the flag behind it (`[a=b<NBSP>i]`), or stands where
-//!   the `]` is due and the document is rejected (`[a=b i<NBSP>]`);
-//! - the **An+B scanner's** whitespace class (`is_anb_ws` in `parser/selectors.rs`), ASCII
-//!   where `REGEX_NTH_OF` is a JS regex — `:nth-child(2n<NBSP>)`, `(2n<NBSP>+ 1)` and
-//!   `(2n +<NBSP>1)` are rejected, and `(even<NBSP>)` demotes to a type selector. It cannot
-//!   simply be widened: one scanner serves two grammars behind a `spec` flag, Svelte's
-//!   `REGEX_NTH_OF` (JS `\s`) and the css-syntax-3 `<an+b>` microsyntax
-//!   (`<whitespace-token>`, ASCII), so both oracles have to be given their own class
-//!   together.
+//!   the `]` is due and the document is rejected (`[a=b i<NBSP>]`).
+//!
+//! The **An+B scanner** used to be the second: ASCII where `REGEX_NTH_OF` is a JS regex, so
+//! `:nth-child(2n<NBSP>)` and its tail gaps were rejected and `(even<NBSP>)` demoted to a type
+//! selector. It is CLOSED — one scanner serves two grammars behind a `spec` flag, and each now
+//! has its own class (Svelte's JS `\s`, and the parser's boundary class for the `:nth-*()`
+//! term, whose terminator is one of these junctures) — and
+//! `an_an_plus_b_juncture_steps_the_boundary_class` asks the whole class of it.
 //!
 //! A third — a `<ZWNBSP>` leading or trailing a declaration VALUE — is CLOSED, and its
 //! assertion lives in `a_declarations_boundary_trims_are_the_js_class`: the wire's own trims
@@ -501,10 +501,24 @@ fn next_line_is_a_tracked_gap_in_both_directions() {
         .iter()
         .filter(|(_, _, (ty, _))| *ty != "Declaration")
         .map(|(juncture, template, _)| (*juncture, *template))
-        .chain(std::iter::once((
-            "inside an identifier",
-            "<style>.a{T}b { color: red; }</style>",
-        )))
+        .chain([
+            (
+                "inside an identifier",
+                "<style>.a{T}b { color: red; }</style>",
+            ),
+            // The An+B junctures, one per grammar: the `:nth-*()` scanner steps the parser's
+            // boundary class (`<NEL>` in it, deliberately — the same over-acceptance as
+            // every juncture above), and inside `:is()` the lexer's own whitespace read
+            // carries the character past the term.
+            (
+                "an An+B term's terminator",
+                "<style>:nth-child(2n{T}) { color: red; }</style>",
+            ),
+            (
+                "a Svelte-grammar An+B term's terminator",
+                "<style>:is(2n{T}) { color: red; }</style>",
+            ),
+        ])
     {
         assert!(
             parses(&component(&template.replace("{T}", NEL))),
@@ -839,15 +853,17 @@ fn the_printers_remaining_drops_are_a_tracked_gap() {
     }
 }
 
-/// ⚠️ **RATCHET for the residue.** Two families still disagree with `parseCss` about a
-/// boundary run, plus the one `<ZWNBSP>` value case. They are enumerated in this module's
-/// doc; asserted here so "documented but unchecked" cannot quietly become "documented and
-/// wrong" — a prose-only gap is exactly the kind that outlives the code it describes.
+/// ⚠️ **RATCHET for the residue.** One family still disagrees with `parseCss` about a
+/// boundary run. It is enumerated in this module's doc; asserted here so "documented but
+/// unchecked" cannot quietly become "documented and wrong" — a prose-only gap is exactly the
+/// kind that outlives the code it describes.
 ///
-/// Neither family is a whitespace-SKIP juncture, which is why the sweep above left them:
-/// `skip_boundary_whitespace` steps a run off the HEAD of the current token, and both of
-/// these are a reader whose own whitespace class is narrower than the one `parseCss` uses in
-/// the same place. Closing either means changing what a token spans, not where a skip goes.
+/// It is not a whitespace-SKIP juncture, which is why the sweep above left it:
+/// `skip_boundary_whitespace` steps a run off the HEAD of the current token, and this is a
+/// reader whose own whitespace class is narrower than the one `parseCss` uses in the same
+/// place. Closing it means changing what a token spans, not where a skip goes. (The An+B
+/// scanner was the second such reader, and was closed exactly that way — see
+/// `an_an_plus_b_juncture_steps_the_boundary_class`.)
 #[test]
 fn the_remaining_junctures_are_a_tracked_gap() {
     // ── R1: a TRAILING run inside an attribute value or case flag ────────────────────
@@ -896,44 +912,104 @@ fn the_remaining_junctures_are_a_tracked_gap() {
              re-pin this ratchet"
         );
     }
+}
 
-    // ── R2: the An+B scanner's whitespace class ──────────────────────────────────────
-    // `REGEX_NTH_OF` is a JS regex, so its `\s` holds every member of the boundary class;
-    // `is_anb_ws` in `parser/selectors.rs` is ASCII. The scanner serves TWO grammars picked
-    // by one flag — Svelte's `REGEX_NTH_OF` (JS `\s`) and the css-syntax-3 `<an+b>`
-    // microsyntax (`<whitespace-token>`, ASCII) — so it cannot simply be widened; both
-    // oracles have to be given their own class together.
-    for (case, style) in [
-        (
-            "before the terminator",
-            "<style>:nth-child(2n\u{a0}) { color: red; }</style>",
-        ),
-        (
-            "before the `+` of a tail",
-            "<style>:nth-child(2n\u{a0}+ 1) { color: red; }</style>",
-        ),
-        (
-            "after the `+` of a tail",
-            "<style>:nth-child(2n +\u{a0}1) { color: red; }</style>",
-        ),
-    ] {
-        assert!(
-            !parses(&component(style)),
-            "An+B {case}: tsv over-REJECTS this and canonical accepts it — if that changed, \
-             re-pin this ratchet"
-        );
+/// The An+B junctures step the same class every other juncture does — asked of the whole
+/// class, because two grammars sit behind one scanner and parted on it: Svelte's
+/// `REGEX_NTH_OF` (JS `\s`, the `:is()` reading) and the css-syntax-3 `<an+b>` microsyntax
+/// (`<whitespace-token>`, ASCII — the `:nth-*()` reading), which tsv reads with the parser's
+/// own boundary class, so a `:nth-*()` term meets its `)` or its `of` across the same skip
+/// every other juncture has. Formerly R2 of the ratchet above: the ASCII scanner demoted the
+/// argument to the selector-list path, where the lexer's `1<NBSP>` dimension was rejected — a
+/// tsv over-rejection of input both oracles accept — and demoted `even<NBSP>` to a type
+/// selector.
+///
+/// Wire AND format, since the two halves are one change (a skip added to the parser owes
+/// the printer a claim): the `Nth.value` is what canonical reads, the character survives the
+/// format, and the output is its own fixed point. The `:nth-*()` `of` cases carry tsv's
+/// nested shape (`nth_child_of`), so the value alone is asserted there; the `:is()` fold
+/// keeps the run inside the value, as Svelte's regex does.
+#[test]
+fn an_an_plus_b_juncture_steps_the_boundary_class() {
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        for (case, template, value) in [
+            // The `:nth-*()` term: its terminator, its tail's two gaps, both sides of `of`,
+            // and the `)` gap after `S`.
+            (
+                "before the terminator",
+                "<style>:nth-child(2n{T}) { color: red; }</style>",
+                "2n",
+            ),
+            (
+                "a keyword before the terminator",
+                "<style>:nth-child(even{T}) { color: red; }</style>",
+                "even",
+            ),
+            (
+                "before the `+` of a tail",
+                "<style>:nth-child(2n{T}+ 1) { color: red; }</style>",
+                "2n{T}+ 1",
+            ),
+            (
+                "after the `+` of a tail",
+                "<style>:nth-child(2n +{T}1) { color: red; }</style>",
+                "2n +{T}1",
+            ),
+            (
+                "before `of`",
+                "<style>:nth-child(2n{T}of .b) { color: red; }</style>",
+                "2n",
+            ),
+            (
+                "after `of`",
+                "<style>:nth-child(2n of{T}.b) { color: red; }</style>",
+                "2n",
+            ),
+            (
+                "after `S`",
+                "<style>:nth-child(2n of .b {T}) { color: red; }</style>",
+                "2n",
+            ),
+            // Svelte's own grammar, inside `:is()`.
+            (
+                "`:is()` before the terminator",
+                "<style>:is(2n{T}) { color: red; }</style>",
+                "2n",
+            ),
+            (
+                "`:is()` before a `,`",
+                "<style>:is(2n{T}, .b) { color: red; }</style>",
+                "2n",
+            ),
+            (
+                "`:is()` around the operator",
+                "<style>:is(2n{T}+{T}1) { color: red; }</style>",
+                "2n{T}+{T}1",
+            ),
+            (
+                "`:is()` after `of`",
+                "<style>:is(2n of{T}.b) { color: red; }</style>",
+                "2n of{T}",
+            ),
+        ] {
+            let src = component(&template.replace("{T}", ch));
+            assert_eq!(
+                wire_field_values(&src, "Nth", "value"),
+                vec![value.replace("{T}", ch)],
+                "{label} {case}: the run is the juncture's, not the term's"
+            );
+            let out = tsv_svelte::format_str(&src).expect("component should format");
+            assert!(
+                out.contains(ch),
+                "{label} {case}: the character must survive the format; got {out:?}"
+            );
+            assert_eq!(
+                tsv_svelte::format_str(&out).expect("output should format"),
+                out,
+                "{label} {case}: the output must be its own fixed point"
+            );
+        }
     }
-    // `even`/`odd` have a type-selector reading, so the same narrow class demotes them
-    // rather than rejecting: canonical reads an `Nth`, tsv a `TypeSelector` over the run.
-    let named = named_nodes(&component(
-        "<style>:nth-child(even\u{a0}) { color: red; }</style>",
-    ));
-    assert!(
-        named
-            .iter()
-            .any(|(ty, name)| ty == "TypeSelector" && name == "even\u{a0}"),
-        "An+B `even` before the terminator: canonical reads an Nth here; wire held {named:?}"
-    );
 }
 
 /// A declaration's own boundary trims are `read_value`'s `value.trim()` / `value.trimStart()`

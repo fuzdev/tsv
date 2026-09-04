@@ -1,0 +1,376 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 569,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 99,
+					"end": 128,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 99,
+							"end": 128,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 110,
+												"end": 127,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 110,
+														"end": 127,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1 of ",
+																		"start": 110,
+																		"end": 120
+																	},
+																	{
+																		"type": "ClassSelector",
+																		"name": "class1",
+																		"start": 120,
+																		"end": 127
+																	}
+																],
+																"start": 110,
+																"end": 127
+															}
+														]
+													}
+												]
+											},
+											"start": 99,
+											"end": 128
+										}
+									],
+									"start": 99,
+									"end": 128
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 129,
+					"end": 147,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 133,
+							"end": 143,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 99,
+				"end": 147
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 242,
+					"end": 272,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 242,
+							"end": 272,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 253,
+												"end": 271,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 253,
+														"end": 271,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1  of ",
+																		"start": 253,
+																		"end": 264
+																	},
+																	{
+																		"type": "ClassSelector",
+																		"name": "class2",
+																		"start": 264,
+																		"end": 271
+																	}
+																],
+																"start": 253,
+																"end": 271
+															}
+														]
+													}
+												]
+											},
+											"start": 242,
+											"end": 272
+										}
+									],
+									"start": 242,
+									"end": 272
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 273,
+					"end": 292,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 277,
+							"end": 288,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 242,
+				"end": 292
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 370,
+					"end": 401,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 370,
+							"end": 401,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 381,
+												"end": 398,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 381,
+														"end": 398,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1 of ",
+																		"start": 381,
+																		"end": 391
+																	},
+																	{
+																		"type": "ClassSelector",
+																		"name": "class3",
+																		"start": 391,
+																		"end": 398
+																	}
+																],
+																"start": 381,
+																"end": 398
+															}
+														]
+													}
+												]
+											},
+											"start": 370,
+											"end": 401
+										}
+									],
+									"start": 370,
+									"end": 401
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 402,
+					"end": 422,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 406,
+							"end": 418,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 370,
+				"end": 422
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 518,
+					"end": 540,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 518,
+							"end": 540,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 522,
+												"end": 539,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 522,
+														"end": 539,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1 of ",
+																		"start": 522,
+																		"end": 532
+																	},
+																	{
+																		"type": "ClassSelector",
+																		"name": "class4",
+																		"start": 532,
+																		"end": 539
+																	}
+																],
+																"start": 522,
+																"end": 539
+															}
+														]
+													}
+												]
+											},
+											"start": 518,
+											"end": 540
+										}
+									],
+									"start": 518,
+									"end": 540
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 541,
+					"end": 560,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 545,
+							"end": 556,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 518,
+				"end": 560
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " U+00A0 after the `of` keyword is the separator before S; it stays, flush against S ",
+				"start": 9,
+				"end": 97
+			},
+			{
+				"type": "CSSComment",
+				"value": " ...and before it, flush against the An+B term, with the keyword's own space after it ",
+				"start": 150,
+				"end": 240
+			},
+			{
+				"type": "CSSComment",
+				"value": " after S, before the `)`, behind the space that closes the last name ",
+				"start": 295,
+				"end": 368
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same fold in a non-nth functional pseudo, where ` of ` stays inside the Nth value ",
+				"start": 425,
+				"end": 516
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 561,
+			"styles": "\n\t/* U+00A0 after the `of` keyword is the separator before S; it stays, flush against S */\n\t:nth-child(2n + 1 of .class1) {\n\t\tcolor: red;\n\t}\n\n\t/* ...and before it, flush against the An+B term, with the keyword's own space after it */\n\t:nth-child(2n + 1  of .class2) {\n\t\tcolor: blue;\n\t}\n\n\t/* after S, before the `)`, behind the space that closes the last name */\n\t:nth-child(2n + 1 of .class3  ) {\n\t\tcolor: green;\n\t}\n\n\t/* the same fold in a non-nth functional pseudo, where ` of ` stays inside the Nth value */\n\t:is(2n + 1 of .class4) {\n\t\tcolor: teal;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 570,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

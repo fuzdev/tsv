@@ -59,6 +59,7 @@
 // | a selector list's `,` | `pre_comma_boundary_ws` |
 // | a rule's pre-`{` gap | `boundary_ws_in_gap` (`printer/rules.rs`) |
 // | a pseudo-argument list's lead and its `)` | `build_pseudo_args_doc` |
+// | an `:nth-*()` term's lead, its `)`, both sides of its `of`, the `)` after `S` | `build_pseudo_args_doc`'s `Nth` arm |
 // | `::part()`'s inter-name gaps | `build_part_idents_doc` |
 // | every attribute-selector interior gap | `push_attribute_gap` / `push_name_tail_boundary_ws` |
 // | a block child's rebuilt head (declaration / at-rule / comment) | [`Printer::write_head_boundary_ws`] |

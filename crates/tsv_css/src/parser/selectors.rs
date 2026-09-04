@@ -729,11 +729,12 @@ pub(crate) fn parse_simple_selector<'arena>(
     if parser.in_pseudo_args
         && let Some(value_end) = match_nth_value(parser.source(), parser.current_start())
     {
-        // Consume the token run spanning the An+B value text (its boundary aligns
-        // with a token boundary — the matcher only ends on complete lexical units).
-        while parser.current_start() < value_end && !parser.check(TokenKind::Eof) {
-            parser.advance()?;
-        }
+        // Re-seat the lexer at the value's end rather than advancing token by token: the
+        // matcher scans SOURCE, and its end need not fall on a token boundary — a boundary
+        // run after the term or after `of` is name content to the lexer (`2n<NBSP>` is one
+        // dimension token, `of<NBSP>b` one identifier), so the token holding the run runs
+        // past `value_end`, and a token walk would consume the `b` with it.
+        parser.resume_at(value_end)?;
         return Ok(SimpleSelector::Nth {
             span: Span {
                 start: start as u32,
@@ -966,21 +967,60 @@ pub(crate) fn parse_simple_selector<'arena>(
     }
 }
 
-/// ASCII whitespace as Svelte's `\s` sees it in An+B: space, tab, LF, CR, FF, and VT
-/// (`U+000B`). This is JS `\s` restricted to ASCII — note it includes VT, which CSS
-/// whitespace (`is_css_whitespace`) excludes, because the An+B grammar is Svelte's
-/// `REGEX_NTH_OF` (a JS regex), not the CSS tokenizer; tsv's selector lexer treats VT
-/// as `\s` for the same parity (see the `combinator_control_whitespace` divergence).
-/// Multibyte Unicode `\s` (NBSP, …) is out of scope, matching tsv's ASCII-only `\s`.
-fn is_anb_ws(b: u8) -> bool {
-    matches!(b, b' ' | b'\t' | b'\n' | b'\r' | b'\x0b' | b'\x0c')
+/// Whether `c` is whitespace to the An+B gap being scanned — one class per grammar the
+/// scanner serves, selected by `spec` like the grammar itself (see [`match_an_plus_b`]).
+///
+/// Both are JS `\s` on ASCII: space, tab, LF, CR, FF and VT (`U+000B`, which CSS
+/// whitespace — `is_css_whitespace` — excludes; the An+B grammar is Svelte's `REGEX_NTH_OF`,
+/// a JS regex, not the CSS tokenizer, and tsv's selector lexer treats VT as `\s` for the
+/// same parity — see the `combinator_control_whitespace` divergence). They part above it:
+///
+/// - `spec = false` — `REGEX_NTH_OF`'s `\s` exactly ([`tsv_lang::is_js_whitespace`]):
+///   `<NBSP>`, every `Zs`, `<LS>`, `<PS>` and `<ZWNBSP>` step, `<NEL>` does not.
+/// - `spec = true` — the parser's own boundary class
+///   ([`crate::whitespace::is_boundary_whitespace`], JS `\s` ∪ `White_Space`). The
+///   `:nth-*()` term meets its `)` or its `of` clause across an `allow_comment_or_whitespace`
+///   juncture, and this scanner decides whether that juncture is reached — so it steps what
+///   `CssParser::skip_boundary_whitespace` will step there, `<NEL>` included, the lexer's
+///   tracked over-acceptance at every other juncture (`tests/css_boundary_whitespace.rs`).
+///
+/// ⚠️ Neither is the css-syntax-3 `<an+b>` microsyntax's own class. That knows only the
+/// `<whitespace-token>` (ASCII), under which `2n<NBSP>+<NBSP>1` is a `<dimension-token>` with
+/// the unit `n<NBSP>` and not An+B at all — but `parseCss` accepts it (a JS-`\s` gap to its
+/// regex) and prettier keeps the character, and a drop-in parser reads what its oracle
+/// reads. An ASCII-only class here demoted such an argument to the selector-list path,
+/// where the lexer's `1<NBSP>` dimension was then rejected — a tsv over-rejection of input
+/// both oracles accept.
+fn is_anb_ws(c: char, spec: bool) -> bool {
+    if spec {
+        crate::whitespace::is_boundary_whitespace(c)
+    } else {
+        tsv_lang::is_js_whitespace(c)
+    }
 }
 
-/// Advance past An+B whitespace (`\s*`) from `i`, returning the first non-whitespace
-/// offset.
-fn skip_anb_ws(bytes: &[u8], mut i: usize) -> usize {
-    while bytes.get(i).copied().is_some_and(is_anb_ws) {
-        i += 1;
+/// Advance past An+B whitespace (`\s*`, in the grammar's class — [`is_anb_ws`]) from `i`,
+/// returning the first offset that holds none. An ASCII byte settles without a decode; a
+/// non-ASCII lead byte decodes the one char under it. `i` is always on a char boundary:
+/// every step here is a whole char, and every caller's offset came from one.
+fn skip_anb_ws(source: &str, mut i: usize, spec: bool) -> usize {
+    let bytes = source.as_bytes();
+    while let Some(&b) = bytes.get(i) {
+        let width = if b.is_ascii() {
+            if !is_anb_ws(b as char, spec) {
+                break;
+            }
+            1
+        } else {
+            let Some(c) = source[i..].chars().next() else {
+                break;
+            };
+            if !is_anb_ws(c, spec) {
+                break;
+            }
+            c.len_utf8()
+        };
+        i += width;
     }
     i
 }
@@ -993,11 +1033,23 @@ fn skip_digits(bytes: &[u8], mut i: usize) -> usize {
     i
 }
 
-/// A CSS name code point that would *continue* an identifier (so `of` glued to it is not
-/// the standalone `of` keyword): ASCII alphanumerics, `-`, `_`, and non-ASCII bytes.
-/// Used to tell the `of` keyword (`2n of.x`, `2n of )`) from a longer ident (`2n offset`).
-fn is_css_name_continue(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b >= 0x80
+/// Whether the `of` whose two letters end at `i` is the standalone keyword — what follows
+/// does not continue a CSS name — so `2n of.x` and `2n of )` hold it where `2n offset`
+/// does not.
+///
+/// ASCII: alphanumerics, `-` and `_` continue a name. Non-ASCII: `read_identifier` takes
+/// every code point at or above U+00A0 as name content, so the lexer reads `of<NBSP>` as one
+/// identifier — but at this juncture `parseCss`'s boundary skip runs FIRST and steps a
+/// JS-`\s` member, so `of<NBSP>.x` holds the keyword (the run is the `\s+` after it) where
+/// `of♥` is one name. The class is the spec grammar's ([`is_anb_ws`]), the same skip the
+/// parser then performs: `CssParser::resume_at` past the letters, then
+/// `skip_boundary_whitespace_registering_comments`.
+fn of_keyword_ends_at(source: &str, i: usize) -> bool {
+    match source[i..].chars().next() {
+        None => true,
+        Some(c) if c.is_ascii() => !(c.is_ascii_alphanumeric() || c == '-' || c == '_'),
+        Some(c) => is_anb_ws(c, true) || !crate::lexer::is_non_ascii_identifier_codepoint(c),
+    }
 }
 
 /// Match an `An+B` term inside pseudo-class args at byte offset `pos`, returning the
@@ -1014,11 +1066,15 @@ fn is_css_name_continue(b: u8) -> bool {
 ///   (`parse_nth_args`) deliberately diverges to a nested `Nth.selector` — the `of S`
 ///   form is spec-defined only for `nth-*`, so there tsv applies its principled
 ///   nesting, while here (where Svelte merely over-accepts An+B) tsv matches Svelte.
+///
+/// Every `\s` above is the regex's own class (JS `\s`, [`is_anb_ws`] with `spec = false`),
+/// so the folded run may hold a `<NBSP>` on either side of `of` — `2n of<NBSP>.x` is one
+/// term whose value ends past the `<NBSP>`, exactly as `parseCss` reads it.
 fn match_nth_value(source: &str, pos: usize) -> Option<usize> {
     let bytes = source.as_bytes();
-    let value_end = match_an_plus_b(bytes, pos, false)?;
+    let value_end = match_an_plus_b(source, pos, false)?;
     // `(?=\s*[,)])`: optional whitespace then `,`/`)`.
-    let after = skip_anb_ws(bytes, value_end);
+    let after = skip_anb_ws(source, value_end, false);
     if matches!(bytes.get(after), Some(b',' | b')')) {
         return Some(value_end);
     }
@@ -1027,7 +1083,7 @@ fn match_nth_value(source: &str, pos: usize) -> Option<usize> {
     // whitespace. The value folds through the trailing whitespace run.
     if after > value_end && bytes[after..].starts_with(b"of") {
         let of_end = after + 2;
-        let after_of = skip_anb_ws(bytes, of_end);
+        let after_of = skip_anb_ws(source, of_end, false);
         if after_of > of_end {
             return Some(after_of);
         }
@@ -1054,11 +1110,14 @@ fn match_nth_value(source: &str, pos: usize) -> Option<usize> {
 ///   but not a bare uppercase `N`/`EVEN`/`ODD` (those have a valid type-selector reading,
 ///   so they defer to parseCss) — the `nth_case` rule.
 ///
+/// The flag also selects the whitespace class of the term's tail gaps ([`is_anb_ws`]).
+///
 /// Returns the end offset of the value, or `None` if no An+B starts at `start`.
 /// Case-sensitive on the `even`/`odd`/`n` literals, matching both grammars.
 ///
 /// [anb]: https://drafts.csswg.org/css-syntax-3/#the-anb-type
-fn match_an_plus_b(bytes: &[u8], start: usize, spec: bool) -> Option<usize> {
+fn match_an_plus_b(source: &str, start: usize, spec: bool) -> Option<usize> {
+    let bytes = source.as_bytes();
     // `even` / `odd` keywords (the terminator check rejects `evens`/`oddball`).
     // Case-sensitive in both grammars: an uppercase `EVEN`/`ODD`/`N` is a valid *type
     // selector*, so it falls through to the selector-list path and reads as
@@ -1092,7 +1151,7 @@ fn match_an_plus_b(bytes: &[u8], start: usize, spec: bool) -> Option<usize> {
         // tail and permits only `+` (`-\d*n(\s*\+\s*\d+)`); the spec grammar permits a
         // `+`/`-` tail regardless of the leading sign (`-2n-3`, `-n-3`).
         let plus_only = !spec && sign == Some(b'-');
-        match match_anb_tail(bytes, after_n, plus_only, spec) {
+        match match_anb_tail(source, after_n, plus_only, spec) {
             Some(end) => Some(end),
             // `-n` / `-2n` alone (leading `-`, no tail) is valid An+B per spec, but not
             // under `REGEX_NTH_OF`.
@@ -1110,14 +1169,15 @@ fn match_an_plus_b(bytes: &[u8], start: usize, spec: bool) -> Option<usize> {
 /// Advance past An+B whitespace **and `/* */` comments** — inter-token trivia the spec
 /// ignores — from `i`, returning the first offset that is neither. Used by the spec
 /// (`:nth-*()`) An+B scanner at **every** gap the microsyntax has: the terminator
-/// (`nth_arg_is_anb`) and both of the term's own tail gaps (`match_anb_tail`). Comments
+/// (`nth_arg_terminator`) and both of the term's own tail gaps (`match_anb_tail`). Comments
 /// are trivia per css-syntax-3, so `:nth-child(2n /* c */)` and `:nth-child(2n /* c */ + 1)`
 /// are alike spec-valid even though parseCss's comment-blind reader rejects both (the
 /// `nth_comment` / `nth_comment_in_term` `_svelte_divergence`s). `REGEX_NTH_OF`'s
 /// terminator (`skip_anb_ws`) stays comment-blind, matching parseCss for `:is()`/`:not()`.
-fn skip_anb_ws_and_comments(bytes: &[u8], mut i: usize) -> usize {
+fn skip_anb_ws_and_comments(source: &str, mut i: usize) -> usize {
+    let bytes = source.as_bytes();
     loop {
-        i = skip_anb_ws(bytes, i);
+        i = skip_anb_ws(source, i, true);
         if !crate::comments::is_comment_start(bytes, i) {
             return i;
         }
@@ -1125,40 +1185,51 @@ fn skip_anb_ws_and_comments(bytes: &[u8], mut i: usize) -> usize {
     }
 }
 
+/// How a clean `:nth-*()` argument ends — the offset [`nth_arg_terminator`] hands
+/// `parse_nth_args` to resume the lexer at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NthTerminator {
+    /// A bare `<an+b>`, closed by the `)` at this offset.
+    Paren(usize),
+    /// `<an+b> of S`: the standalone `of` keyword begins at this offset.
+    Of(usize),
+}
+
 /// Decide whether a `:nth-*()` argument starting at source offset `pos` is a clean
 /// `<an+b> [of S]?` (the dedicated `Nth` path) rather than an ordinary selector-list
-/// argument. The spec grammar (`:nth-child(<An+B> [of <complex-real-selector-list>]?)`,
-/// [selectors-4]) accepts *only* a leading An+B term, optionally followed by `of S`;
-/// anything else (`:nth-child(.a)`, `:nth-child(even odd)`, `:nth-child(2n, .foo)`) is
-/// spec-invalid, and tsv structures it like parseCss for drop-in parity by falling
-/// through to `parse_complex_selector_list`. Recognition is comment-tolerant (see
-/// `skip_anb_ws_and_comments`) and terminator-gated: the An+B term must be immediately
-/// followed by the closing `)` or a ` of ` clause — a trailing `,` (a list) or a bare
-/// selector demotes the whole argument to the selector-list path.
+/// argument, and where its terminator begins. The spec grammar
+/// (`:nth-child(<An+B> [of <complex-real-selector-list>]?)`, [selectors-4]) accepts *only*
+/// a leading An+B term, optionally followed by `of S`; anything else (`:nth-child(.a)`,
+/// `:nth-child(even odd)`, `:nth-child(2n, .foo)`) is spec-invalid, and tsv structures it
+/// like parseCss for drop-in parity by falling through to `parse_complex_selector_list`.
+/// Recognition is comment-tolerant (see `skip_anb_ws_and_comments`) and terminator-gated:
+/// the An+B term must be immediately followed by the closing `)` or a ` of ` clause — a
+/// trailing `,` (a list) or a bare selector demotes the whole argument to the
+/// selector-list path.
+///
+/// The terminator comes back as an OFFSET because the caller cannot find it in the token
+/// stream: a boundary run ahead of it can sit inside the current token — `1<NBSP>of` is one
+/// `<dimension-token>` to the lexer, the run being name content to `read_identifier` (see
+/// `CssParser::skip_boundary_whitespace`) — so no sequence of `advance` calls lands on the
+/// `of`. The caller re-seats the lexer there instead (`CssParser::resume_at`).
 ///
 /// [selectors-4]: https://drafts.csswg.org/selectors-4/#the-nth-child-pseudo
-pub(crate) fn nth_arg_is_anb(source: &str, pos: usize) -> bool {
+pub(crate) fn nth_arg_terminator(source: &str, pos: usize) -> Option<NthTerminator> {
     let bytes = source.as_bytes();
-    let Some(value_end) = match_an_plus_b(bytes, pos, true) else {
-        return false;
-    };
-    let after = skip_anb_ws_and_comments(bytes, value_end);
+    let value_end = match_an_plus_b(source, pos, true)?;
+    let after = skip_anb_ws_and_comments(source, value_end);
     match bytes.get(after) {
         // A bare `<an+b>` terminated by the closing paren.
-        Some(b')') => true,
+        Some(b')') => Some(NthTerminator::Paren(after)),
         // `<an+b> of S`: whitespace/comments before `of` (so `after > value_end`) then
         // the standalone `of` keyword (not a longer ident like `offset`). `S` may be
         // glued to `of` (`2n of.x`) — spec-valid, since whitespace between the `of` and
         // `S` tokens is optional — so this does not require trailing whitespace (that
         // is parseCss's comment-blind `\s+of\s+` bug; tsv diverges per spec).
-        _ => {
-            after > value_end
-                && bytes[after..].starts_with(b"of")
-                && !bytes
-                    .get(after + 2)
-                    .copied()
-                    .is_some_and(is_css_name_continue)
-        }
+        _ => (after > value_end
+            && bytes[after..].starts_with(b"of")
+            && of_keyword_ends_at(source, after + 2))
+        .then_some(NthTerminator::Of(after)),
     }
 }
 
@@ -1170,19 +1241,22 @@ pub(crate) fn nth_arg_is_anb(source: &str, pos: usize) -> bool {
 /// decides the terminator: under the spec grammar a comment is trivia and the term matches
 /// through it (`2n /* c */ + 1`), while `REGEX_NTH_OF` stays comment-blind for parseCss
 /// parity. Asking the two gaps a different question than the terminator is what made a
-/// split term reject — or, where the term had a type-selector reading, mis-parse.
-fn match_anb_tail(bytes: &[u8], pos: usize, plus_only: bool, spec: bool) -> Option<usize> {
-    let skip_trivia: fn(&[u8], usize) -> usize = if spec {
+/// split term reject — or, where the term had a type-selector reading, mis-parse. The
+/// whitespace class follows the flag the same way ([`is_anb_ws`]): a `<NBSP>` on either
+/// side of the operator is a gap, not a unit.
+fn match_anb_tail(source: &str, pos: usize, plus_only: bool, spec: bool) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let skip_trivia: fn(&str, usize) -> usize = if spec {
         skip_anb_ws_and_comments
     } else {
-        skip_anb_ws
+        |source, i| skip_anb_ws(source, i, false)
     };
-    let op_pos = skip_trivia(bytes, pos);
+    let op_pos = skip_trivia(source, pos);
     let op = *bytes.get(op_pos)?;
     if op != b'+' && (plus_only || op != b'-') {
         return None;
     }
-    let digits_start = skip_trivia(bytes, op_pos + 1);
+    let digits_start = skip_trivia(source, op_pos + 1);
     let end = skip_digits(bytes, digits_start);
     (end > digits_start).then_some(end)
 }
@@ -1190,8 +1264,8 @@ fn match_anb_tail(bytes: &[u8], pos: usize, plus_only: bool, spec: bool) -> Opti
 #[cfg(test)]
 mod tests {
     use super::{
-        Combinator, TokenKind, explicit_combinator_kind, is_explicit_combinator_kind,
-        match_nth_value, nth_arg_is_anb,
+        Combinator, NthTerminator, TokenKind, explicit_combinator_kind,
+        is_explicit_combinator_kind, match_nth_value, nth_arg_terminator,
     };
 
     /// `explicit_combinator_kind` is the single source of truth for the explicit-combinator
@@ -1246,14 +1320,14 @@ mod tests {
         }
     }
 
-    /// `nth_arg_is_anb` decides whether a `:nth-*()` argument takes the dedicated `Nth`
+    /// `nth_arg_terminator` decides whether a `:nth-*()` argument takes the dedicated `Nth`
     /// path (a clean spec `<an+b> [of S]?`, comment-tolerant) or falls through to the
     /// selector-list path. Each input is the argument text starting after the `(`,
     /// terminated by the `)` (or a ` of ` clause). Broader than `REGEX_NTH_OF`: it
     /// accepts the spec's negative forms and an uppercase `n` unit, and treats `of`
     /// glued to `S` as valid.
     #[test]
-    fn nth_arg_is_anb_spec_grammar() {
+    fn nth_arg_terminator_spec_grammar() {
         // Clean `<an+b> [of S]?` — the `Nth` path.
         for input in [
             "2n)",
@@ -1287,12 +1361,42 @@ mod tests {
             "2n- /* c */ 1)",          // <ndash-dimension> <signless-integer>
             "2n /* c */ + 1 of .x)",   // composes with of S
             "2n/* c */of .x)",         // and with a comment as the whole `of` separator
+            // The gaps' whitespace class is the parser's boundary one (JS `\s` ∪
+            // `White_Space`), not ASCII: a `<NBSP>` / `<ZWNBSP>` before the `)`, on either
+            // side of the tail's operator, or around `of` is the run `parseCss` skips there
+            // (`allow_whitespace()` is JS `\s`), and `<NEL>` is the lexer's tracked
+            // over-acceptance at every other juncture — so it steps here too.
+            "2n\u{a0})",
+            "2n\u{feff})",
+            "2n\u{85})",
+            "even\u{a0})",
+            "2n\u{a0}+\u{a0}1)",
+            "2n\u{feff}+ 1)",
+            "2n +\u{feff}1)",
+            "2n\u{a0}of .x)",
+            "2n of\u{a0}.x)", // the run after `of` is the keyword's end, not a longer name
+            "2n of\u{a0}x)",
         ] {
             assert!(
-                nth_arg_is_anb(input, 0),
+                nth_arg_terminator(input, 0).is_some(),
                 "expected {input:?} to take the Nth path"
             );
         }
+
+        // The terminator's OFFSET is the contract: it is where `parse_nth_args` re-seats the
+        // lexer, and a boundary run ahead of it can sit inside the current token.
+        assert_eq!(
+            nth_arg_terminator("2n\u{a0})", 0),
+            Some(NthTerminator::Paren(4))
+        );
+        assert_eq!(
+            nth_arg_terminator("2n\u{a0}of .x)", 0),
+            Some(NthTerminator::Of(4))
+        );
+        assert_eq!(
+            nth_arg_terminator("2n /* c */ of .x)", 0),
+            Some(NthTerminator::Of(11))
+        );
 
         // Not a clean `<an+b> [of S]?` — the selector-list fallback.
         for input in [
@@ -1312,9 +1416,12 @@ mod tests {
             "2/* c */n)",
             // An unterminated comment reaches end-of-input (§4.3.2), so no terminator.
             "2n /* c + 1)",
+            // A code point at or above U+00A0 that is NOT whitespace continues a name, so
+            // this `of` is a longer identifier, and the run is not the terminator's gap.
+            "2n of\u{2665}x)",
         ] {
             assert!(
-                !nth_arg_is_anb(input, 0),
+                nth_arg_terminator(input, 0).is_none(),
                 "expected {input:?} to take the selector-list path"
             );
         }
@@ -1335,6 +1442,13 @@ mod tests {
             ("2n - 1)", "2n - 1"),
             // VT (`U+000B`) is whitespace to Svelte's `\s`, so it separates An+B tokens.
             ("2n\x0b+\x0b1)", "2n\x0b+\x0b1"),
+            // …and so are `<NBSP>` and `<ZWNBSP>`, at every `\s` of the regex: the tail's
+            // gaps, the terminator lookahead, and both sides of `of`.
+            ("2n\u{a0}+\u{a0}1)", "2n\u{a0}+\u{a0}1"),
+            ("2n\u{feff})", "2n"),
+            ("2n\u{a0},", "2n"),
+            ("2n\u{a0}of\u{a0}.x)", "2n\u{a0}of\u{a0}"),
+            ("2n of\u{feff}.x)", "2n of\u{feff}"),
             ("0)", "0"),
             ("123)", "123"),
             ("+3)", "+3"),
@@ -1366,23 +1480,27 @@ mod tests {
 
         // Rejected — not an An+B in a pseudo-arg position (Svelte's regex fails too).
         for input in [
-            "-n)",        // leading `-` requires a `+B` tail
-            "-2n)",       // same
-            "-1)",        // a plain integer may not lead with `-`
-            "nth)",       // `n` followed by more ident chars (terminator fails)
-            "evens)",     // `even` prefix, but terminator lands on `s`
-            "div)",       // an ordinary type selector
-            ".a)",        // a class selector
-            "2n .foo)",   // no terminator after the An+B (a following selector)
-            "+)",         // a sign with no digits/`n`
-            "2nx)",       // `2n` followed by an ident char
-            "2n of.x)",   // `\s+of\s+` needs whitespace after `of`
-            "2nof .x)",   // `\s+of\s+` needs whitespace before `of`
+            "-n)",      // leading `-` requires a `+B` tail
+            "-2n)",     // same
+            "-1)",      // a plain integer may not lead with `-`
+            "nth)",     // `n` followed by more ident chars (terminator fails)
+            "evens)",   // `even` prefix, but terminator lands on `s`
+            "div)",     // an ordinary type selector
+            ".a)",      // a class selector
+            "2n .foo)", // no terminator after the An+B (a following selector)
+            "+)",       // a sign with no digits/`n`
+            "2nx)",     // `2n` followed by an ident char
+            "2n of.x)", // `\s+of\s+` needs whitespace after `of`
+            "2nof .x)", // `\s+of\s+` needs whitespace before `of`
+            // `<NEL>` is `White_Space` but not JS `\s`, so the regex does not step it —
+            // where the spec reader does (`nth_arg_terminator_spec_grammar`).
+            "2n\u{85})",
+            "2n\u{85}+ 1)",
             "2n often )", // `of` prefix, but the trailing `\s+` lands on `ten`
             // This grammar stays COMMENT-BLIND on purpose — An+B is not a selector, so
             // there is no spec to follow here and parity with parseCss is the whole
             // point. The spec `:nth-*()` reader matches every one of these (see
-            // `nth_arg_is_anb_spec_grammar`); the two must not be unified.
+            // `nth_arg_terminator_spec_grammar`); the two must not be unified.
             "2n /* c */ + 1)",
             "2n + /* c */ 1)",
             "2n/* c */+1)",
