@@ -747,7 +747,9 @@ impl<'a> Printer<'a> {
     /// `<wq-name>` separator); the value is re-quoted from its raw token like a
     /// declaration string (the delimiter that needs fewer escapes wins, ties prefer
     /// single — matches prettier), except that a bare value stays bare when quoting it
-    /// would force a re-escape.
+    /// would force a re-escape or move a boundary run out of it; the tail — the case flag
+    /// and whatever surrounds it — is spelled from source by [`Self::push_attribute_tail`],
+    /// so the AST's `flags` is the wire's alone.
     ///
     /// One probe splits the two builds: with no comment anywhere inside the selector
     /// there is no gap to interleave and no part to locate, so
@@ -759,7 +761,6 @@ impl<'a> Printer<'a> {
         name_span: Span,
         matcher: Option<internal::AttributeMatcher>,
         value_span: Option<Span>,
-        flags: Option<&str>,
         span: Span,
     ) -> String {
         if self.has_comments_to_emit_between(span.start, span.end) {
@@ -768,10 +769,10 @@ impl<'a> Printer<'a> {
                 name_span,
                 matcher,
                 value_span,
-                flags,
                 span,
             );
         }
+        let close = closer_pos(span);
         let mut result = String::from("[");
         // `[` is one of the `allow_whitespace()` junctures, so the name can be preceded by a
         // skipped non-ASCII whitespace run the printer would otherwise drop — the same
@@ -783,42 +784,28 @@ impl<'a> Printer<'a> {
             result.push('|');
         }
         result.push_str(name_span.extract(self.source));
-        if let Some(m) = matcher {
-            result.push_str(m.as_str());
-            // The run `read_selector`'s `allow_whitespace()` stepped between the matcher and
-            // the value, flush against the value — see `boundary_ws_in_gap`. It lands outside
-            // the quotes tsv may add, which is where it belongs: separator bytes, never part
-            // of the value.
-            if let Some(vs) = value_span {
-                let kept = self.boundary_ws_in_gap(name_span.end, vs.start);
+        // A matcher always brings a value (the parser reads them as one), so the two gaps
+        // around it are claimed together — and SEPARATELY, each flush against the token that
+        // follows it: the name→matcher run stays on its side of the `=` (`[a <NBSP>=b]`), the
+        // matcher→value run on its (`[a=<NBSP>b]`). One sweep over both moved the first run
+        // across the matcher, where it re-tokenizes as the head of the value.
+        let tail_from = match (matcher, value_span) {
+            (Some(m), Some(vs)) => {
+                // The matcher has no span of its own: it is the first non-trivia byte past the
+                // name (no comment can sit here — the commented twin took those).
+                let m_start = skip_gap_trivia(self.source, name_span.end, vs.start);
+                let kept = self.boundary_ws_in_gap(name_span.end, m_start);
                 self.push_boundary_ws_after_name(&mut result, &kept);
+                let text = m.as_str();
+                result.push_str(text);
+                let kept = self.boundary_ws_in_gap(m_start + text.len() as u32, vs.start);
+                self.push_boundary_ws_after_name(&mut result, &kept);
+                self.push_attribute_value(&mut result, vs);
+                vs.end
             }
-            self.push_attribute_value(&mut result, value_span);
-        }
-        // Everything skipped across the selector's tail — the run before the case flag and
-        // the run before the `]` are one gap here, since the flag carries no span of its own.
-        // It is emitted BEFORE the flag when there is one, never after: tsv still reads a run
-        // glued behind a flag as part of the flag's identifier (the tracked
-        // `[a=b i<NBSP>]` over-rejection), so parking it there would make this printer emit
-        // output its own parser rejects. Every arm appends through
-        // `push_boundary_ws_after_name`, which asks what this rebuild has actually WRITTEN
-        // rather than what the source held — an unquoted value tsv re-quotes ends in a `'`
-        // here and in a name there, and only the first is the seam the run lands on.
-        let tail_from = value_span.map_or(name_span.end, |vs| vs.end);
-        let close = closer_pos(span);
-        if let Some(f) = flags {
-            let kept = self.boundary_ws_in_gap(tail_from, close);
-            self.push_boundary_ws_after_name(&mut result, &kept);
-            result.push(' ');
-            result.push_str(f);
-        } else if matcher.is_some() {
-            let kept = self.boundary_ws_in_gap(tail_from, close);
-            self.push_boundary_ws_after_name(&mut result, &kept);
-        } else {
-            // A bare presence selector's tail runs from the NAME, and a run flush against a
-            // name glues into it — see `push_name_tail_boundary_ws`.
-            self.push_name_tail_boundary_ws(&mut result, tail_from, close);
-        }
+            _ => name_span.end,
+        };
+        self.push_attribute_tail(&mut result, tail_from, close);
         result.push(']');
         result
     }
@@ -837,7 +824,6 @@ impl<'a> Printer<'a> {
         name_span: Span,
         matcher: Option<internal::AttributeMatcher>,
         value_span: Option<Span>,
-        flags: Option<&str>,
         span: Span,
     ) -> String {
         // The `]`, and so the far bound of every interior gap.
@@ -877,11 +863,9 @@ impl<'a> Printer<'a> {
         }
         result.push_str(name_span.extract(self.source));
 
-        let value_end = value_span.map_or(name_span.end, |v| v.end);
-        match matcher {
-            Some(m) => {
-                let value_start = value_span.map_or(close, |v| v.start);
-                let m_start = skip_gap_trivia(self.source, name_span.end, value_start);
+        let tail_from = match (matcher, value_span) {
+            (Some(m), Some(vs)) => {
+                let m_start = skip_gap_trivia(self.source, name_span.end, vs.start);
                 self.push_attribute_gap(
                     &mut result,
                     name_span.end,
@@ -894,7 +878,7 @@ impl<'a> Printer<'a> {
                 // that, so the gap holds only comments.
                 let after_matcher = match text.strip_suffix('=').filter(|head| !head.is_empty()) {
                     Some(head) => {
-                        let eq = skip_gap_trivia(self.source, m_start + 1, value_start);
+                        let eq = skip_gap_trivia(self.source, m_start + 1, vs.start);
                         result.push_str(head);
                         self.push_attribute_gap(&mut result, m_start + 1, eq, AttributeGap::Glued);
                         result.push('=');
@@ -908,64 +892,31 @@ impl<'a> Printer<'a> {
                 self.push_attribute_gap(
                     &mut result,
                     after_matcher,
-                    value_start,
+                    vs.start,
                     AttributeGap::INTERIOR,
                 );
-                self.push_attribute_value(&mut result, value_span);
+                self.push_attribute_value(&mut result, vs);
+                vs.end
             }
-            // A bare presence selector has one interior gap left: name → `]`.
-            None => {
-                self.push_name_tail_boundary_ws(&mut result, name_span.end, close);
-                self.push_attribute_gap_comments(
-                    &mut result,
-                    name_span.end,
-                    close,
-                    AttributeGap::BEFORE_CLOSE,
-                );
-            }
-        }
-
-        if let Some(f) = flags {
-            // The flag token can hold no comment, so its start alone splits the tail
-            // into the comments that precede it and those that follow. A comment run
-            // supplies the flag's separator, so the plain space goes in only when the
-            // gap emitted none.
-            //
-            // ⚠️ The tail's boundary run is hoisted out of BOTH halves and emitted ahead of
-            // the flag — the whole tail is one gap for this purpose, exactly as it is in the
-            // uncommented twin. Left where it was authored, a run behind the flag re-emits as
-            // `[a='b' i<NBSP>]`, which this parser REJECTS (the tracked trailing-run residue):
-            // the printer would be producing output it cannot read back.
-            let flag_start = skip_gap_trivia(self.source, value_end, close);
-            let kept = self.boundary_ws_in_gap(value_end, close);
-            self.push_boundary_ws_after_name(&mut result, &kept);
-            if !self.push_attribute_gap_comments(
-                &mut result,
-                value_end,
-                flag_start,
-                AttributeGap::INTERIOR,
-            ) {
-                result.push(' ');
-            }
-            result.push_str(f);
-            self.push_attribute_gap_comments(
-                &mut result,
-                flag_start,
-                close,
-                AttributeGap::BEFORE_CLOSE,
-            );
-        } else if matcher.is_some() {
-            self.push_attribute_gap(&mut result, value_end, close, AttributeGap::BEFORE_CLOSE);
-        }
+            _ => name_span.end,
+        };
+        self.push_attribute_tail(&mut result, tail_from, close);
         result.push(']');
         result
     }
 
-    /// Append an attribute selector's value, re-quoted from its raw token.
-    fn push_attribute_value(&self, result: &mut String, value_span: Option<Span>) {
-        let Some(vs) = value_span else {
-            return;
-        };
+    /// Append an attribute selector's value, re-quoted from its raw token — unless a boundary
+    /// run is glued to a bare one, which then stays bare and verbatim.
+    ///
+    /// The run is a separator to `parseCss` (the value ends at it) and identifier content to
+    /// css-syntax-3, whose whitespace is ASCII only — so `[a=b<NBSP>]` is the value `b` to
+    /// Svelte and the one ident `b<NBSP>` to a browser, and `[a=<NBSP>b]` the value `b` and
+    /// the ident `<NBSP>b`. Re-quoting moves the run out of the ident (`[a='b'<NBSP>]`), which
+    /// re-tokenizes as a string followed by a stray token and turns a selector the browser
+    /// matched into one it drops. The author's bytes are the one spelling both readers take
+    /// as they took the input, so they are what this emits; the run itself rides in the gap
+    /// claim beside the value.
+    fn push_attribute_value(&self, result: &mut String, vs: Span) {
         match internal::attribute_value_quote_and_text(self.source, vs) {
             (Some(quote), interior) => {
                 // Quoted value: optimal-quote re-quoting over the raw interior,
@@ -973,7 +924,10 @@ impl<'a> Printer<'a> {
                 // quotes, `[a='it\'s']` becomes `[a="it's"]`).
                 result.push_str(&format_string_literal(interior, quote));
             }
-            (None, raw) if raw.bytes().any(|b| b == b'\'' || b == b'"') => {
+            (None, raw)
+                if raw.bytes().any(|b| b == b'\'' || b == b'"')
+                    || self.bare_value_touches_boundary_run(vs) =>
+            {
                 // A quote character reaches a bare value only via an escape
                 // (`[a=x\']`); wrapping it in quotes would need re-escaping, so
                 // it stays bare (matches prettier).
@@ -984,6 +938,109 @@ impl<'a> Printer<'a> {
                 result.push_str(raw);
                 result.push('\'');
             }
+        }
+    }
+
+    /// Whether a boundary run stands flush against either end of a bare attribute value in
+    /// source — the glue [`Self::push_attribute_value`] keeps.
+    ///
+    /// The parser ended the value at the run (`boundary_split_offset`) or stepped it ahead of
+    /// the value (the matcher→value juncture), so the run is never inside `vs`; it is the
+    /// character just past it, or just before it.
+    fn bare_value_touches_boundary_run(&self, vs: Span) -> bool {
+        if !self.holds_boundary_ws {
+            return false;
+        }
+        let touches =
+            |c: Option<char>| c.is_some_and(crate::whitespace::is_boundary_only_whitespace);
+        touches(self.source[..vs.start as usize].chars().next_back())
+            || touches(self.source[vs.end as usize..].chars().next())
+    }
+
+    /// Append an attribute selector's tail — everything from the value's end (or, with no
+    /// matcher, the name's) to its `]` — as the author tokenized it.
+    ///
+    /// The tail holds at most a case flag and comments, and the ASCII whitespace between them
+    /// normalizes as everywhere else: one space ahead of the flag, one around a comment, none
+    /// against the `]`. A boundary run changes what that whitespace means. To css-syntax-3
+    /// the run is identifier content and the space beside it the token separator — `b<NBSP>i`
+    /// is one ident, `b<NBSP> i` a value and a flag — while to `parseCss` both are the value
+    /// `b` with the flag `i`. Keeping the author's bytes is the one spelling both readers take
+    /// as they took the input, so the run is emitted where it stood (never hoisted ahead of
+    /// the flag, as it once was), a flag glued to a run stays glued, and ASCII whitespace
+    /// beside a run keeps its PRESENCE as a single space. A trailing ASCII run before the
+    /// `]` and the count of an interior one are the only spellings normalized away, since
+    /// no tokenizer reads either.
+    ///
+    /// A comment is padded off its neighbours as the interior gaps pad theirs
+    /// (`AttributeGap`): it is no token to any reader, so the space costs nothing.
+    fn push_attribute_tail(&self, result: &mut String, from: u32, close: u32) {
+        let (from, close) = (from as usize, close as usize);
+        if from >= close {
+            return;
+        }
+        let gap = &self.source[from..close];
+        let bytes = gap.as_bytes();
+        // What this walk last emitted — what the space ahead of a flag is decided against.
+        enum Last {
+            Start,
+            Run,
+            Comment,
+            Flag,
+        }
+        let mut last = Last::Start;
+        // ASCII whitespace seen since the last emitted item: a separator to keep beside a
+        // run, the ordinary normalized gap otherwise.
+        let mut pending_space = false;
+        let mut i = 0;
+        while i < gap.len() {
+            if crate::comments::is_comment_start(bytes, i) {
+                let end = crate::comments::comment_end(bytes, i);
+                if !result.ends_with(' ') {
+                    result.push(' ');
+                }
+                // Through the recording emitter, over exactly this comment's span, so the
+                // print-once ledger sees it printed here.
+                self.push_comment_blocks_in_range(
+                    result,
+                    (from + i) as u32,
+                    (from + end) as u32,
+                    "",
+                );
+                pending_space = true;
+                last = Last::Comment;
+                i = end;
+                continue;
+            }
+            let Some(c) = gap[i..].chars().next() else {
+                break;
+            };
+            i += c.len_utf8();
+            if crate::whitespace::is_boundary_only_whitespace(c) {
+                if pending_space {
+                    result.push(' ');
+                }
+                result.push(c);
+                last = Last::Run;
+            } else if crate::whitespace::is_boundary_whitespace(c) {
+                pending_space = true;
+                continue;
+            } else {
+                // The case flag's letters: one space ahead of the flag — the authored one
+                // beside a run, the normalized one otherwise — and none between its letters
+                // or against a run it is glued to.
+                let spaced = match last {
+                    Last::Flag => false,
+                    Last::Run => pending_space,
+                    Last::Start | Last::Comment => true,
+                };
+                if spaced {
+                    result.push(' ');
+                }
+                result.push(c);
+                last = Last::Flag;
+            }
+            pending_space = false;
         }
     }
 
@@ -1004,39 +1061,28 @@ impl<'a> Printer<'a> {
     /// the run is empty — which is what keeps the space out of the two junctures selectors-4
     /// forbids it at.
     ///
-    /// ⚠️ Not for the case flag's tail, which is TWO gaps around one flag and needs its run
-    /// hoisted ahead of the flag — see the flag arm of
-    /// [`Self::build_commented_attribute_selector_text`]. Returns whether COMMENTS were
-    /// emitted, which is the separator question its callers ask; a bare run answers that
-    /// question `false` on purpose (it is a separator to the parser but not to the layout).
-    fn push_attribute_gap(
-        &self,
-        result: &mut String,
-        from: u32,
-        to: u32,
-        gap: AttributeGap,
-    ) -> bool {
+    /// Not for the selector's tail, whose runs keep their authored place among the flag and
+    /// the comments — see [`Self::push_attribute_tail`].
+    fn push_attribute_gap(&self, result: &mut String, from: u32, to: u32, gap: AttributeGap) {
         if from >= to {
-            return false;
+            return;
         }
         let kept = self.boundary_ws_in_gap(from, to);
         self.push_boundary_ws_after_name(result, &kept);
-        self.push_attribute_gap_comments(result, from, to, gap)
+        self.push_attribute_gap_comments(result, from, to, gap);
     }
 
     /// Append the comments in `[from, to)` to an attribute selector being rebuilt,
-    /// spaced per `gap`. Returns whether any comment was emitted — a caller that owns its
-    /// own separator (the case flag's leading space) must not add one on top of a
-    /// padded run.
+    /// spaced per `gap`.
     fn push_attribute_gap_comments(
         &self,
         result: &mut String,
         from: u32,
         to: u32,
         gap: AttributeGap,
-    ) -> bool {
+    ) {
         if from >= to || !self.has_comments_to_emit_between(from, to) {
-            return false;
+            return;
         }
         if gap.pad_before() {
             result.push(' ');
@@ -1045,7 +1091,6 @@ impl<'a> Printer<'a> {
         if gap.pad_after() {
             result.push(' ');
         }
-        true
     }
 
     /// Fold a pseudo selector's `:name` / `::name` prefix to its canonical case,
@@ -1169,14 +1214,13 @@ impl<'a> Printer<'a> {
                 name_span,
                 matcher,
                 value_span,
-                flags,
+                flags: _,
                 span,
             } => d.text_pooled(&self.build_attribute_selector_text(
                 *namespace_span,
                 *name_span,
                 *matcher,
                 *value_span,
-                *flags,
                 *span,
             )),
             internal::SimpleSelector::PseudoClass {
@@ -1778,8 +1822,8 @@ fn lowercase_an_plus_b_n(s: &str) -> Cow<'_, str> {
 /// `<whitespace-token>` the grammar rejects, while a comment is no token at all
 /// (css-syntax-3 §4), so those gaps stay [`Glued`](AttributeGap::Glued). Every other
 /// juncture is bounded by the brackets and takes a space safely, so the comment is padded
-/// off its neighbours — glued only to `[` and `]` themselves, the answer `:is()` and
-/// `::part()` already give inside their parens.
+/// off its neighbours — glued only to `[` itself, the answer `:is()` and `::part()` already
+/// give inside their parens (the gap against `]` belongs to the tail's own emitter).
 #[derive(Clone, Copy)]
 enum AttributeGap {
     /// A `<wq-name>` or `<attr-matcher>` juncture: no space added anywhere, a run
@@ -1795,15 +1839,11 @@ impl AttributeGap {
         before: false,
         after: true,
     };
-    /// A gap between two interior tokens: padded on both sides.
+    /// A gap between two interior tokens: padded on both sides. The gap just inside `]` is
+    /// not one of these — the selector's tail has its own emitter (`push_attribute_tail`).
     const INTERIOR: Self = Self::Spaced {
         before: true,
         after: true,
-    };
-    /// The gap just inside `]`: padded off the content, glued to the bracket.
-    const BEFORE_CLOSE: Self = Self::Spaced {
-        before: true,
-        after: false,
     };
 
     fn separator(self) -> &'static str {

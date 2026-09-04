@@ -274,10 +274,17 @@ pub fn attribute_value_quote_and_text(source: &str, value_span: Span) -> (Option
 
 /// The public-AST text of an attribute selector's value (`AttributeSelector.value` on
 /// the wire, and what the scoping compiler matches against): the raw token with a
-/// string's delimiting quotes stripped. Escapes stay encoded in both forms — Svelte's
-/// `parseCss` emits `[a=x\27]` as `x\27` and `[a='it\'s']` as `it\'s`, never decoding.
+/// string's delimiting quotes stripped, then trimmed. Escapes stay encoded in both forms —
+/// Svelte's `parseCss` emits `[a=x\27]` as `x\27` and `[a='it\'s']` as `it\'s`, never
+/// decoding.
+///
+/// The trim is `read_attribute_value`'s own `value.trim()` — JS `\s`, over a quoted
+/// interior as much as a bare value, and blind to escapes — so `[a=' b ']` is the value `b`
+/// and `[a=b\ ]` the value `b\` on the wire, as they are in Svelte. The printer reads the
+/// untrimmed [`attribute_value_quote_and_text`] instead: the padding is the author's content
+/// and is kept.
 pub fn attribute_value_text(source: &str, value_span: Span) -> &str {
-    attribute_value_quote_and_text(source, value_span).1
+    tsv_lang::trim_js_whitespace(attribute_value_quote_and_text(source, value_span).1)
 }
 
 /// Pseudo-class/pseudo-element argument types (semantic representation)

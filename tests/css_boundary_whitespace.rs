@@ -90,26 +90,50 @@
 //! character in both places and doubled it every pass, while any of the other four members
 //! looked clean. Iterate the class; never probe one member of it.
 //!
-//! **Residue, deliberately not closed here.** Two things still disagree with `parseCss`
-//! about a boundary run, neither of them a skip juncture — each is a *reader* whose own
-//! whitespace class is narrower than the one `parseCss` uses in the same place, so closing
-//! them changes what a token spans rather than where a skip goes:
+//! **Three readers had a class narrower than `parseCss`'s, and each is closed the same way.**
+//! None was a skip juncture: each was a *reader* whose own whitespace class was narrower
+//! than the one `parseCss` uses in the same place, so closing it changed what a token SPANS
+//! rather than where a skip goes — the reader ends the token where `parseCss` ends it and
+//! re-seats the lexer there (`CssParser::resume_at`), and the ordinary skip then steps the
+//! run it left standing:
 //!
-//! - a **trailing** run inside an attribute selector's value or case flag. `parseCss` ends
-//!   both tokens at the run (`read_attribute_value`'s `REGEX_CLOSING_BRACKET` is JS `\s`, and
-//!   it trims; `REGEX_ATTRIBUTE_FLAGS` reads letters only), where tsv's lexer reads one
-//!   identifier whose tail the head-anchored skip cannot reach — so the run rides into the
-//!   `value` (`[a=b<NBSP>]`), swallows the flag behind it (`[a=b<NBSP>i]`), or stands where
-//!   the `]` is due and the document is rejected (`[a=b i<NBSP>]`).
+//! - the **attribute value and case flag** (`parser/attributes.rs`): `read_attribute_value`
+//!   ends a bare value at the first JS-`\s` code point (`REGEX_CLOSING_BRACKET`) and
+//!   `REGEX_ATTRIBUTE_FLAGS` reads letters only, where the lexer read one identifier —
+//!   `boundary_split_offset` (`boundary_prefix_len`'s twin) finds the split, so `[a=b<NBSP>]`
+//!   is the value `b`, `[a=b<NBSP>i]` the value `b` and the flag `i`, and `[a=b i<NBSP>]` the
+//!   flag `i`. Pinned by `an_attribute_tail_run_ends_the_value_and_the_flag`.
+//! - the **An+B scanner** (`nth_arg_terminator`): ASCII where `REGEX_NTH_OF` is a JS regex,
+//!   so `:nth-child(2n<NBSP>)` was rejected and `(even<NBSP>)` demoted to a type selector;
+//!   one scanner now serves two grammars behind a `spec` flag, each with its own class.
+//!   Pinned by `an_an_plus_b_juncture_steps_the_boundary_class`.
+//! - the **declaration-vs-rule byte scan** (`decl_scan::peek_significant_kind`): ASCII by
+//!   design (it DECLINES what it does not model), but the token lookahead it declined to was
+//!   the narrow one, and read `a { color <NBSP>: red }`'s run as the identifier that should
+//!   have been the `:`. `read_declaration` ends the property at JS `\s`
+//!   (`read_until(/[\s:]/)`) and `allow_whitespace()`s to the colon, so the gap is a
+//!   juncture: the fallback is `peek_past_boundary_whitespace` and `parse_declaration` steps
+//!   the gap with `skip_boundary_whitespace_and_comments`. Pinned by
+//!   `a_property_gap_run_is_the_gaps_at_every_spelling`.
 //!
-//! The **An+B scanner** used to be the second: ASCII where `REGEX_NTH_OF` is a JS regex, so
-//! `:nth-child(2n<NBSP>)` and its tail gaps were rejected and `(even<NBSP>)` demoted to a type
-//! selector. It is CLOSED — one scanner serves two grammars behind a `spec` flag, and each now
-//! has its own class (Svelte's JS `\s`, and the parser's boundary class for the `:nth-*()`
-//! term, whose terminator is one of these junctures) — and
-//! `an_an_plus_b_juncture_steps_the_boundary_class` asks the whole class of it.
+//! ⚠️ **Where the two readers tokenize a run differently, the printer keeps the BYTES.** To
+//! css-syntax-3 whitespace is ASCII only and a run is identifier content (a legacy tokenizer
+//! reads `b<NBSP>` as one ident; the current draft's narrowed ident set makes the run a delim
+//! and the selector invalid either way), while to `parseCss` it is the separator. Re-quoting
+//! the value (`[a='b'<NBSP>]`) or hoisting the run ahead of the flag moves it out of the ident
+//! and emits a selector a browser drops where it matched the input. So a bare value glued to a
+//! run stays bare, a flag glued to a run stays glued, and ASCII whitespace beside a run keeps
+//! its PRESENCE as one space (`Printer::push_attribute_tail`, `boundary_run_spelling` for the
+//! property gap); prettier drops the run outright at all of them, a cataloged divergence
+//! (`css/selectors/attribute/tail_nonascii_space_prettier_divergence`,
+//! `css/declarations/property_nonascii_space_prettier_divergence`).
 //!
-//! A third — a `<ZWNBSP>` leading or trailing a declaration VALUE — is CLOSED, and its
+//! The **wire's attribute value is `read_attribute_value`'s trimmed one** — JS `\s` over a
+//! quoted interior as much as a bare value, and blind to escapes (`[a=' b ']` is the value
+//! `b`, `[a=b\ ]` the value `b\`) — while the printer keeps the padding as content;
+//! `an_attribute_values_wire_trim_is_the_js_class` pins both sides.
+//!
+//! A `<ZWNBSP>` leading or trailing a declaration VALUE is closed the same way, and its
 //! assertion lives in `a_declarations_boundary_trims_are_the_js_class`: the wire's own trims
 //! are JS `\s` now (`ast/convert/mod.rs`'s `trim_wire*`, mirroring `read_value`'s
 //! `value.trim()`), where they used to be `str::trim` — which kept a `<ZWNBSP>` `read_value`
@@ -121,21 +145,14 @@
 //! The `<NEL>` (U+0085) gap is tracked separately below, with the raw-scan family it belongs
 //! to rather than with this class.
 //!
-//! **The printer's own residue is a different, shorter list**, ratcheted by
-//! `the_printers_remaining_drops_are_a_tracked_gap`: the stylesheet's own trailing whitespace
-//! (the outermost gap has no following construct at all, and a Svelte `<style>` host trims
-//! the island's tail before writing it), and a run inside a **comment-bearing**
-//! property→colon gap, where the property name is reconstructed from its parts and the gap's
-//! whitespace normalizes with it. Everywhere else — every selector juncture, every rebuilt
-//! block-child head (a declaration's property, an at-rule's `@`, a comment's `/*`), a block's
-//! tail before its `}`, and every gap of a `@supports` / `@container` condition prelude — the
-//! character comes back.
-//!
-//! One **over-rejection** is ratcheted with them: `a { color <NBSP>: red }` and
-//! `a { color /* c */<NBSP>: red }`, where the declaration-vs-rule byte scan
-//! (`peek_significant_kind_bytes`) stops on the run, declines, and the token lookahead behind
-//! it reads the run as the identifier that should have been a `:`. `parseCss` reads the
-//! property raw and trims it, so both are declarations there.
+//! **The printer's own residue is one position**, ratcheted by
+//! `the_stylesheets_trailing_run_is_a_tracked_drop`: the stylesheet's own trailing
+//! whitespace (the outermost gap has no following construct at all, and a Svelte `<style>`
+//! host trims the island's tail before writing it). Everywhere else — every selector
+//! juncture, every rebuilt block-child head (a declaration's property, an at-rule's `@`, a
+//! comment's `/*`), the property→colon gap on either side of a comment, a block's tail before
+//! its `}`, and every gap of a `@supports` / `@container` condition prelude — the character
+//! comes back.
 //!
 //! ⚠️ Two members of the class are LINE TERMINATORS to the shared line table (`<LS>`, `<PS>`),
 //! so preserving one beside a regenerated newline made the next pass read a blank line where
@@ -778,50 +795,14 @@ fn the_blank_line_rule_is_prettiers_walk_not_a_terminator_count() {
     }
 }
 
-/// ⚠️ **RATCHET for the printer's residue.** Two positions still DROP a boundary run the
-/// parser skipped, and one shape is still over-REJECTED. They are enumerated in this module's
-/// doc; asserted here so "documented but unchecked" cannot quietly become "documented and
-/// wrong".
-///
-/// Neither drop is a selector juncture, and neither has a following construct in the same
-/// node to hang the run against. The over-rejection is the declaration-vs-rule byte scan's
-/// own whitespace class (`peek_significant_kind_bytes`), ASCII where `parseCss` reads the
-/// property raw and `.trim()`s it — closing it means widening that scan and the token
-/// lookahead behind it together, which is a change to what a token spans rather than to where
-/// a claim goes.
+/// ⚠️ **RATCHET for the printer's residue.** One position still DROPS a boundary run the
+/// parser skipped: the stylesheet's own trailing whitespace. The outermost gap has no
+/// following construct at all, and under a Svelte `<style>` the host trims the island's tail
+/// before writing it (`formatted_css.trim_end()`, whose Unicode class takes these members) —
+/// so a claim here would be undone one layer up. Asserted so "documented but unchecked"
+/// cannot quietly become "documented and wrong".
 #[test]
-fn the_printers_remaining_drops_are_a_tracked_gap() {
-    // ── D1: a run inside a COMMENT-BEARING property→colon gap ────────────────────────
-    // The property name is reconstructed there (`extract_property_name` re-joins the name
-    // and its comments with single spaces), so the gap's whitespace normalizes and a
-    // boundary member goes with it. The comment-free spelling is claimed and kept.
-    for (case, style, kept) in [
-        (
-            "a comment-bearing property gap",
-            "<style>a { color\u{a0} /* c */ : red; }</style>",
-            false,
-        ),
-        (
-            "the comment-free spelling of the same gap",
-            "<style>a { color\u{a0}: red; }</style>",
-            true,
-        ),
-    ] {
-        let src = component(style);
-        let out = tsv_svelte::format_str(&src).expect("component should format");
-        assert_eq!(
-            out.contains('\u{a0}'),
-            kept,
-            "{case}: expected kept={kept} — if that changed, re-pin this ratchet (got {out:?})"
-        );
-        let again = tsv_svelte::format_str(&out).expect("output should re-format");
-        assert_eq!(again, out, "{case}: the answer is at least a fixed point");
-    }
-
-    // ── D2: the stylesheet's own trailing whitespace ──────────────────────────────────
-    // The outermost gap has no following construct at all, and under a Svelte `<style>` the
-    // host trims the island's tail before writing it (`formatted_css.trim_end()`, whose
-    // Unicode class takes these members) — so a claim here would be undone one layer up.
+fn the_stylesheets_trailing_run_is_a_tracked_drop() {
     let src = component("<style>a { color: red; }\u{a0}</style>");
     let out = tsv_svelte::format_str(&src).expect("component should format");
     assert!(
@@ -829,88 +810,299 @@ fn the_printers_remaining_drops_are_a_tracked_gap() {
         "the stylesheet's trailing run is still dropped — if that changed, re-pin this \
          ratchet (got {out:?})"
     );
+}
 
-    // ── R4: the declaration-vs-rule lookahead's ASCII class ──────────────────────────
-    // `parseCss` reads the property raw to the `:` and trims it, so all three parse there
-    // with the property `color`; tsv's byte scan stops on the run, declines, and the token
-    // lookahead behind it reads the run as an identifier — no `:` follows the name, so the
-    // child is parsed as a nested rule and the document is REJECTED.
-    for (case, style) in [
+/// An attribute selector's tail run ends the value and the flag where `parseCss` ends them —
+/// `read_attribute_value` at the first JS-`\s` code point, `REGEX_ATTRIBUTE_FLAGS` at the
+/// last letter — and the output keeps the author's bytes.
+///
+/// Wire AND format, asked of the whole class: the `value` and `flags` are what canonical
+/// reads, the selector comes back spelled as the author tokenized it (a bare value glued to a
+/// run stays bare, a flag glued to a run stays glued, ASCII whitespace beside a run keeps
+/// its presence), and the output is its own fixed point. The last two templates are the
+/// controls that separate the run from an escape and from a quote: an escaped member is
+/// content to both readers (the wire trims it like `read_attribute_value`'s `.trim()` does —
+/// see `an_attribute_values_wire_trim_is_the_js_class`), and a run after a quoted value is a
+/// token of its own on both sides.
+#[test]
+fn an_attribute_tail_run_ends_the_value_and_the_flag() {
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        for (case, template, value, flag, formatted) in [
+            (
+                "a bare value's trailing run",
+                "[a=b{T}]",
+                "b",
+                None,
+                "[a=b{T}]",
+            ),
+            (
+                "a bare value's trailing run, glued to the flag",
+                "[a=b{T}i]",
+                "b",
+                Some("i"),
+                "[a=b{T}i]",
+            ),
+            (
+                "a bare value's trailing run, a space, the flag",
+                "[a=b{T} s]",
+                "b",
+                Some("s"),
+                "[a=b{T} s]",
+            ),
+            (
+                "a space, the run, the flag",
+                "[a=b {T}i]",
+                "b",
+                Some("i"),
+                "[a='b' {T}i]",
+            ),
+            (
+                "the flag's trailing run",
+                "[a=b i{T}]",
+                "b",
+                Some("i"),
+                "[a='b' i{T}]",
+            ),
+            (
+                "the flag's trailing run, quoted value",
+                "[a='b' i{T}]",
+                "b",
+                Some("i"),
+                "[a='b' i{T}]",
+            ),
+            (
+                "a run on both sides of the flag",
+                "[a=b{T}i{T}]",
+                "b",
+                Some("i"),
+                "[a=b{T}i{T}]",
+            ),
+            (
+                "a run glued to the head of a bare value",
+                "[a={T}b]",
+                "b",
+                None,
+                "[a={T}b]",
+            ),
+            (
+                "a run in the name→matcher gap",
+                "[a {T}=b]",
+                "b",
+                None,
+                "[a {T}='b']",
+            ),
+            (
+                "an escaped member is content",
+                "[a=b\\{T}]",
+                "b\\",
+                None,
+                "[a='b\\{T}']",
+            ),
+            (
+                "a quoted value's trailing run",
+                "[a='b'{T}]",
+                "b",
+                None,
+                "[a='b'{T}]",
+            ),
+            (
+                "a quoted value's trailing run, glued to the flag",
+                "[a='b'{T}i]",
+                "b",
+                Some("i"),
+                "[a='b'{T}i]",
+            ),
+        ] {
+            let src = component(&format!(
+                "<style>{} {{ color: red; }}</style>",
+                template.replace("{T}", ch)
+            ));
+            assert_eq!(
+                attribute_values(&src),
+                vec![value.to_owned()],
+                "{label} {case}: the value ends where `read_attribute_value` ends it"
+            );
+            assert_eq!(
+                wire_field_values(&src, "AttributeSelector", "flags"),
+                flag.map(str::to_owned).into_iter().collect::<Vec<_>>(),
+                "{label} {case}: the flag is the token's letters"
+            );
+            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let expected = formatted.replace("{T}", ch);
+            assert!(
+                out.contains(&expected),
+                "{label} {case}: the tail is spelled as the author tokenized it — expected \
+                 {expected:?} in {out:?}"
+            );
+            assert_eq!(
+                tsv_svelte::format_str(&out).expect("output should format"),
+                out,
+                "{label} {case}: the output must be its own fixed point"
+            );
+        }
+    }
+}
+
+/// The wire's attribute value is `read_attribute_value`'s `value.trim()` — JS `\s`, over a
+/// quoted interior as much as a bare value, and blind to escapes — while the printer keeps
+/// the padding as the author's content. The `<NEL>` is the null control: not `\s`, so it
+/// stays on the wire too.
+#[test]
+fn an_attribute_values_wire_trim_is_the_js_class() {
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        for (case, template) in [
+            ("inside the quotes, trailing", "[a='b{T}']"),
+            ("inside the quotes, leading", "[a='{T}b']"),
+        ] {
+            let selector = template.replace("{T}", ch);
+            let src = component(&format!("<style>{selector} {{ color: red; }}</style>"));
+            assert_eq!(
+                attribute_values(&src),
+                vec!["b".to_owned()],
+                "{label} {case}: `read_attribute_value` trims its value"
+            );
+            let out = tsv_svelte::format_str(&src).expect("component should format");
+            assert!(
+                out.contains(&selector),
+                "{label} {case}: the padding is content to the printer; got {out:?}"
+            );
+        }
+    }
+    for (case, style, value) in [
         (
-            "a run separated from the property",
-            "<style>a { color \u{a0}: red; }</style>",
+            "ASCII padding inside the quotes",
+            "<style>[a=' b '] { color: red; }</style>",
+            "b",
         ),
         (
-            "a run behind a property-gap comment",
-            "<style>a { color /* c */\u{a0}: red; }</style>",
+            "an escaped trailing space",
+            "<style>[a=b\\ ] { color: red; }</style>",
+            "b\\",
+        ),
+        (
+            "a `<NEL>` inside the quotes",
+            "<style>[a='b\u{85}'] { color: red; }</style>",
+            "b\u{85}",
         ),
     ] {
-        assert!(
-            !parses(&component(style)),
-            "{case}: tsv over-REJECTS this and canonical accepts it — if that changed, \
-             re-pin this ratchet"
+        assert_eq!(
+            attribute_values(&component(style)),
+            vec![value.to_owned()],
+            "{case}: the wire's trim is JS `\\s`"
         );
     }
 }
 
-/// ⚠️ **RATCHET for the residue.** One family still disagrees with `parseCss` about a
-/// boundary run. It is enumerated in this module's doc; asserted here so "documented but
-/// unchecked" cannot quietly become "documented and wrong" — a prose-only gap is exactly the
-/// kind that outlives the code it describes.
+/// A run in a declaration's property→colon gap is the gap's at every spelling — glued to the
+/// name, separated from it, on either side of a property comment, between two — because the
+/// gap is an `allow_whitespace()` juncture: `read_declaration` ends the property at the first
+/// JS-`\s` code point and skips to the colon. Formerly R4 and D1 of the ratchets: the
+/// separated spellings were REJECTED (the declaration-vs-rule lookahead read the run as the
+/// token that should have been the `:`), and the comment-bearing gap DROPPED the run when the
+/// head was rebuilt from its parts.
 ///
-/// It is not a whitespace-SKIP juncture, which is why the sweep above left it:
-/// `skip_boundary_whitespace` steps a run off the HEAD of the current token, and this is a
-/// reader whose own whitespace class is narrower than the one `parseCss` uses in the same
-/// place. Closing it means changing what a token spans, not where a skip goes. (The An+B
-/// scanner was the second such reader, and was closed exactly that way — see
-/// `an_an_plus_b_juncture_steps_the_boundary_class`.)
+/// Wire AND format: the property is what canonical reads (and the value, which carries the
+/// comment and the colon under the Svelte quirk `split_declaration_svelte_compat` mirrors),
+/// the run comes back where it stood with the ASCII whitespace ahead of it kept as one space
+/// (`boundary_run_spelling`), and the output is its own fixed point. The custom property and
+/// the at-rule block child reach the same gap through the two other block-child paths.
 #[test]
-fn the_remaining_junctures_are_a_tracked_gap() {
-    // ── R1: a TRAILING run inside an attribute value or case flag ────────────────────
-    // `read_attribute_value` stops on JS `\s` (`REGEX_CLOSING_BRACKET`) and trims what is
-    // left, and `REGEX_ATTRIBUTE_FLAGS` reads letters only — so canonical ends both tokens
-    // at the run. tsv reads one identifier token, whose tail the head-anchored boundary skip
-    // cannot reach, so the run rides INTO the value (and swallows the flag behind it), or
-    // stands where the `]` is due and the document is rejected outright.
-    for (case, style, value) in [
-        (
-            "a bare value's trailing run",
-            "<style>[a=b\u{a0}] { color: red; }</style>",
-            "b\u{a0}",
-        ),
-        (
-            "a bare value's trailing run, swallowing the flag",
-            "<style>[a=b\u{a0}i] { color: red; }</style>",
-            "b\u{a0}i",
-        ),
-    ] {
-        let named = named_nodes(&component(style));
-        assert!(
-            named.iter().any(|(ty, _)| ty == "AttributeSelector"),
-            "{case}: expected an AttributeSelector, wire held {named:?}"
-        );
-        assert_eq!(
-            attribute_values(&component(style)),
-            vec![value.to_owned()],
-            "{case}: canonical stops the value at the run; tsv keeps it — if that changed, \
-             re-pin this ratchet"
-        );
-    }
-    for (case, style) in [
-        (
-            "a bare value's flag, trailing run",
-            "<style>[a=b i\u{a0}] { color: red; }</style>",
-        ),
-        (
-            "a quoted value's flag, trailing run",
-            "<style>[a='b' i\u{a0}] { color: red; }</style>",
-        ),
-    ] {
-        assert!(
-            !parses(&component(style)),
-            "{case}: tsv over-REJECTS this and canonical accepts it — if that changed, \
-             re-pin this ratchet"
-        );
+fn a_property_gap_run_is_the_gaps_at_every_spelling() {
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        for (case, template, property, value, formatted) in [
+            (
+                "glued to the name",
+                "a { color{T}: red; }",
+                "color",
+                "red",
+                "color{T}: red;",
+            ),
+            (
+                "separated from the name",
+                "a { color {T}: red; }",
+                "color",
+                "red",
+                "color {T}: red;",
+            ),
+            (
+                "two members, then a space",
+                "a { color{T}{T} : red; }",
+                "color",
+                "red",
+                "color{T}{T}: red;",
+            ),
+            (
+                "behind a property-gap comment",
+                "a { color /* c */{T}: red; }",
+                "color",
+                ": red",
+                "color /* c */{T} : red;",
+            ),
+            (
+                "ahead of a property-gap comment, glued to the name",
+                "a { color{T} /* c */ : red; }",
+                "color",
+                ": red",
+                "color{T} /* c */ : red;",
+            ),
+            (
+                "ahead of a property-gap comment, separated from the name",
+                "a { color {T}/* c */ : red; }",
+                "color",
+                ": red",
+                "color {T} /* c */ : red;",
+            ),
+            (
+                "between two property-gap comments",
+                "a { color /* x */{T}/* y */ : red; }",
+                "color",
+                ": red",
+                "color /* x */{T} /* y */ : red;",
+            ),
+            (
+                "a custom property",
+                "a { --x {T}: 1; }",
+                "--x",
+                "1",
+                "--x {T}: 1;",
+            ),
+            (
+                "an at-rule block's child",
+                "@media x { a { color {T}: red; } }",
+                "color",
+                "red",
+                "color {T}: red;",
+            ),
+        ] {
+            let src = component(&format!("<style>{}</style>", template.replace("{T}", ch)));
+            let declarations = named_nodes(&src)
+                .into_iter()
+                .filter(|(ty, _)| ty == "Declaration")
+                .map(|(_, name)| name)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                declarations,
+                vec![property.to_owned()],
+                "{label} {case}: the property ends where `read_declaration` ends it"
+            );
+            assert_eq!(
+                declaration_values(&src),
+                vec![value.to_owned()],
+                "{label} {case}: the value is `read_value`'s"
+            );
+            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let expected = formatted.replace("{T}", ch);
+            assert!(
+                out.contains(&expected),
+                "{label} {case}: the run comes back where it stood — expected {expected:?} in \
+                 {out:?}"
+            );
+            assert_eq!(
+                tsv_svelte::format_str(&out).expect("output should format"),
+                out,
+                "{label} {case}: the output must be its own fixed point"
+            );
+        }
     }
 }
 
@@ -1113,8 +1305,8 @@ fn declaration_values(src: &str) -> Vec<String> {
 
 /// Every string `field` of every `ty`-typed node in the CSS wire, in emission order.
 ///
-/// The `named_nodes` collector reports a node by its NAME; these two residues are about a
-/// node's `value`, which is a different key on the same walk.
+/// The `named_nodes` collector reports a node by its NAME; the attribute and declaration
+/// claims are about a node's `value` (or `flags`), a different key on the same walk.
 fn wire_field_values(src: &str, ty: &str, field: &str) -> Vec<String> {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
@@ -1380,7 +1572,7 @@ fn the_printer_keeps_the_run_at_every_juncture_exactly_once() {
 /// selector routes it to `build_commented_attribute_selector_text`, and `::part()` rebuilds
 /// its names from spans. A juncture that is restored on one path and dropped on the other is
 /// the same bug as one that is never restored, and only these spellings can see it.
-const PRINTER_ONLY_JUNCTURES: [(&str, &str); 16] = [
+const PRINTER_ONLY_JUNCTURES: [(&str, &str); 17] = [
     // `::part()` rebuilds every name from its span, so its inter-name gap has no carrier at
     // all — `join(" ")` regenerated it and deleted the run outright.
     (
@@ -1440,11 +1632,14 @@ const PRINTER_ONLY_JUNCTURES: [(&str, &str); 16] = [
         "a commented attribute's flag gap",
         "<style>[a='b'/* c */{T}i] { color: red; }</style>",
     ),
-    // Behind the comment, never glued to the flag: a run against the flag's own end is the
-    // tracked trailing-run residue (`[a=b i<NBSP>]`), which tsv REJECTS.
     (
         "a commented attribute's flag tail",
         "<style>[a='b' i /* c */{T}] { color: red; }</style>",
+    ),
+    // …and glued to the flag, which `REGEX_ATTRIBUTE_FLAGS` ends at the last letter.
+    (
+        "a commented attribute's flag tail, glued to the flag",
+        "<style>[a='b' i{T}/* c */] { color: red; }</style>",
     ),
     (
         "a commented attribute's `]` gap",

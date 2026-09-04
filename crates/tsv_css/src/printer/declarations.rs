@@ -6,7 +6,6 @@
 //! - Width-based wrapping for long lists
 //! - Doc building for width calculations
 
-use super::boundary_ws::trim_regenerated_separator;
 use super::{Printer, value_normalization};
 use crate::ast::internal::{self, CssValue};
 use tsv_lang::Span;
@@ -363,22 +362,12 @@ impl<'a> Printer<'a> {
                 decl.has_block_comment,
             ),
         );
+        // The property→colon gap's own runs (`color<NBSP>: red`, `top <NBSP>: 0`,
+        // `left<NBSP> /* c */ : 0`) ride inside that text: the gap is an `allow_whitespace()`
+        // juncture (`read_declaration` ends the name at JS `\s`), and the head is rebuilt
+        // from the trimmed name, so `extract_property_name` puts each run back where it
+        // stood — see `boundary_run_spelling`.
         self.write(&property_normalized);
-
-        // The property→colon gap's own run (`color<NBSP>: red`). Not an
-        // `allow_whitespace()` juncture — `parseCss` reads the property raw and `.trim()`s
-        // it, and JS's trim takes every one of these code points, so both parsers agree the
-        // name is `color` — but the byte is still the author's, and this head is rebuilt from
-        // the trimmed name. Floored inside the declaration so the scan cannot leave it, and
-        // ASCII-trimmed like the combinator's: the separator that follows is regenerated, so
-        // keeping the author's space before the colon would print one this formatter never
-        // writes.
-        let kept = trim_regenerated_separator(
-            self.preserved_boundary_ws(decl.span.start, decl.span.start + decl.colon_pos() as u32),
-        );
-        if !kept.is_empty() {
-            self.write(kept);
-        }
 
         // A property carrying a block comment (`color /* c */`) takes a space before
         // the colon in tsv's normalized form (`color /* c */ : value`; fixture
