@@ -30,6 +30,7 @@ use super::internal;
 use std::borrow::Cow;
 use tsv_lang::Span;
 use tsv_lang::is_js_whitespace;
+use tsv_lang::{trim_end_js_whitespace, trim_js_whitespace, trim_start_js_whitespace};
 
 mod write;
 pub(crate) use write::write_stylesheet_file_bytes;
@@ -48,25 +49,29 @@ pub use write::{CssComments, write_css_children, write_css_comments};
 /// right class for value *separation* and value-text *collapsing* — a different question one
 /// layer down. Here the oracle is a JS `.trim()` and nothing else.
 ///
+/// The bodies are `tsv_lang`'s byte trims — the same class, answered on bytes for
+/// the common case (the space after a colon, an empty tail) and handed to the char searcher
+/// only when the stop byte could begin a non-ASCII member.
+///
 /// The three spellings exist so a call site names which end it trims; they are one rule, and
 /// [`strip_css_comments_inner`]'s trim and the no-comment fast paths that stand in for it
 /// (`write_declaration`, [`split_declaration_svelte_compat`]) must all ask the same one — a
 /// fast path on a different class is the shortcut silently disagreeing with what it shortcuts.
 #[inline]
 fn trim_wire(s: &str) -> &str {
-    s.trim_matches(is_js_whitespace)
+    trim_js_whitespace(s)
 }
 
 /// The leading half of [`trim_wire`], same class and same reason.
 #[inline]
 pub(super) fn trim_wire_start(s: &str) -> &str {
-    s.trim_start_matches(is_js_whitespace)
+    trim_start_js_whitespace(s)
 }
 
 /// The trailing half of [`trim_wire`], same class and same reason.
 #[inline]
 pub(super) fn trim_wire_end(s: &str) -> &str {
-    s.trim_end_matches(is_js_whitespace)
+    trim_end_js_whitespace(s)
 }
 
 /// Split a declaration source into property and value, matching Svelte's quirky behavior.

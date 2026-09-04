@@ -178,7 +178,8 @@ pub fn trim_end_js_whitespace(s: &str) -> &str {
 pub fn trim_js_whitespace(s: &str) -> &str {
     let inner = s.trim_ascii();
     let bytes = inner.as_bytes();
-    if stop_byte_may_be_js_whitespace(bytes.first()) || stop_byte_may_be_js_whitespace(bytes.last()) {
+    if stop_byte_may_be_js_whitespace(bytes.first()) || stop_byte_may_be_js_whitespace(bytes.last())
+    {
         return trim_js_whitespace_wide(inner);
     }
     debug_assert_eq!(inner, s.trim_matches(is_js_whitespace));

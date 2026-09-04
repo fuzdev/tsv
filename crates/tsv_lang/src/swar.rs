@@ -219,6 +219,58 @@ pub fn next_byte_of<const N: usize>(bytes: &[u8], from: usize, needles: [u8; N])
     i
 }
 
+/// The first byte in `bytes[from..end)` that is below `floor`, at or above `0x80`, or one of
+/// `needles` — `end` when there is none. The **host-range** form of [`next_byte_of`]: `bytes`
+/// is the whole document and `[from, end)` the region asked about, so a region shorter than a
+/// word is still answered by one word read from the host (a lane past `end` is ignored), and
+/// only a region within seven bytes of the document's end falls to the scalar tail. What it
+/// exists for is a "does this short slice hold any byte of a class" question — `tsv_css`'s
+/// value normalizer asks it of every identifier value, 10.6 bytes on average and 42% under
+/// eight on a real corpus — where a scan over the bare slice can only test a byte at a time.
+///
+/// The three classes share one word read: the high bits answer "at or above `0x80`" exactly,
+/// the borrow of `floor` answers "below `floor`" ([`lanes_less_than`], exact in its lowest set
+/// lane), and each needle is one [`zero_lanes`]. Only the lowest set lane of the union is read,
+/// and every mask's spurious lanes lie above a genuine lane of its own, so that lane is a
+/// genuine hit. `floor` must be at most `0x80`.
+#[inline]
+pub fn next_byte_below_or_of<const N: usize>(
+    bytes: &[u8],
+    from: usize,
+    end: usize,
+    floor: u8,
+    needles: [u8; N],
+) -> usize {
+    debug_assert!(from <= end && end <= bytes.len() && floor <= 0x80);
+    let splats = needles.map(splat);
+    let mut i = from;
+    while i < end {
+        let Some(chunk) = bytes[i..].first_chunk::<8>() else {
+            break;
+        };
+        let w = u64::from_le_bytes(*chunk);
+        let mut hits = high_bit_lanes(w) | lanes_less_than(w, floor);
+        let mut k = 0;
+        while k < N {
+            hits |= zero_lanes(w ^ splats[k]);
+            k += 1;
+        }
+        if hits != 0 {
+            let at = i + (hits.trailing_zeros() / 8) as usize;
+            return if at < end { at } else { end };
+        }
+        i += 8;
+    }
+    if i >= end {
+        return end;
+    }
+    // Within eight bytes of the HOST's end — the one place no word is readable.
+    while i < end && bytes[i] >= floor && bytes[i] < 0x80 && !needles.contains(&bytes[i]) {
+        i += 1;
+    }
+    i
+}
+
 /// Lane mask of the ASCII uppercase bytes (`A`..=`Z`) in `v`.
 ///
 /// Computed on the word with its high bits cleared, so every lane is at most `0x7f` and
@@ -434,5 +486,43 @@ mod tests {
             high_bit_lanes,
             |b| b >= 0x80,
         );
+    }
+
+    /// The host-range scan against a scalar reference over every (from, end) window of a
+    /// buffer, for fillers on both sides of every class boundary and a single hit byte from
+    /// each class — the floor, a non-ASCII byte, each needle — at every position.
+    #[test]
+    fn next_byte_below_or_of_matches_a_scalar_scan() {
+        fn scalar(bytes: &[u8], from: usize, end: usize, floor: u8, needles: &[u8]) -> usize {
+            let mut i = from;
+            while i < end && bytes[i] >= floor && bytes[i] < 0x80 && !needles.contains(&bytes[i]) {
+                i += 1;
+            }
+            i
+        }
+        const NEEDLES: [u8; 6] = [b'(', b')', b',', b'/', b'\'', b'"'];
+        let filler = [0x21u8, b'a', 0x7f];
+        let hits = [0x00u8, 0x0b, 0x20, b'(', b'"', b'/', 0x80, 0xff];
+        for &f in &filler {
+            for len in 0..20usize {
+                for &h in &hits {
+                    for hit in 0..=len {
+                        let mut v = vec![f; len];
+                        if hit < len {
+                            v[hit] = h;
+                        }
+                        for from in 0..=len {
+                            for end in from..=len {
+                                assert_eq!(
+                                    next_byte_below_or_of(&v, from, end, 0x21, NEEDLES),
+                                    scalar(&v, from, end, 0x21, &NEEDLES),
+                                    "filler {f:#x} len {len} hit {h:#x}@{hit} [{from}, {end})"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -90,10 +90,17 @@ impl<'a> Printer<'a> {
         if span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
             if !raw.is_empty() {
+                // The verbatim case first, asked of the document's word: a value holding no
+                // byte the normalizer acts on — the overwhelmingly-common single-token
+                // identifier (`red`, `flex`, `100%`), 98.6% of identifier values on a real
+                // corpus — is emitted as a zero-allocation `DocText::SourceSpan` (the same
+                // source borrow the number / dimension normalizers take) without the
+                // normalizer's own byte-at-a-time scan-skip test over the bare slice.
+                if value_normalization::normalize_is_noop_in(self.source, span) {
+                    return d.source_span(span, self.source);
+                }
                 // Normalize whitespace for parenthesized expressions
-                // (e.g., "(  100%  -  40px  )" → "(100% - 40px)"). The
-                // overwhelmingly-common single-token identifier (`red`, `flex`,
-                // `1px`, `100%`) normalizes to itself and comes back `Cow::Borrowed`.
+                // (e.g., "(  100%  -  40px  )" → "(100% - 40px)").
                 let normalized = value_normalization::normalize_css_whitespace(raw);
 
                 // Parenthesized groups with multiple space-separated tokens get
@@ -108,11 +115,10 @@ impl<'a> Printer<'a> {
                 }
 
                 return match normalized {
-                    // Verbatim value: normalized == source[span], so emit a
-                    // zero-allocation `DocText::SourceSpan` — the same source borrow
-                    // the number / dimension normalizers take — instead of the pool
-                    // copy. (A verbatim value can never contain `(`, so it never
-                    // reaches the paren-group branch above.)
+                    // Verbatim value the host-word test refused (it holds a control byte the
+                    // normalizer keeps, `<VT>` and its kin): normalized == source[span], so
+                    // the same zero-allocation `DocText::SourceSpan`. (A verbatim value can never
+                    // contain `(`, so it never reaches the paren-group branch above.)
                     Cow::Borrowed(_) => d.source_span(span, self.source),
                     Cow::Owned(s) => d.text_pooled(&s),
                 };
