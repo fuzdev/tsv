@@ -516,14 +516,18 @@ pub enum CssValue<'arena> {
 
     /// Function call: calc(), var(), rgb(), url(), etc.
     ///
-    /// `name` is a **verbatim** source slice (the text before `(`, never escape-decoded —
-    /// the value subtree is source-faithful, never re-serialized; see `convert/mod.rs`). It is a
-    /// candidate for the span-for-verbatim idiom (a dedicated `name_span` would drop this
-    /// copy), but the exact name span needs trim-aware arithmetic (`s[..paren].trim()`) plus
-    /// base-offset alignment across callers — deferred as a perf-neutral additive. Not a
-    /// decoded identifier, unlike `CssAtrule.name` / `CssDeclaration.property`.
+    /// `name_span` is the **verbatim** span of the text before `(` — span-for-verbatim,
+    /// like `Identifier` and `Dimension`, so the author's bytes reach the output
+    /// unchanged and no name is copied into the arena. The value subtree is
+    /// source-faithful, never re-serialized (see `convert/mod.rs`), which is what lets a
+    /// span stand in for the text: an escape-spelled name (`\6c ayer(`) prints as
+    /// written rather than decoded, matching prettier. Unlike `CssAtrule.name` /
+    /// `CssDeclaration.property`, which are decoded identifiers.
+    ///
+    /// Recognition (`url`, `var`) reads the span and decodes only when it holds a `\`
+    /// — see `printer::values::function_name_is`.
     Function {
-        name: &'arena str,
+        name_span: Span,
         args: &'arena [CssValue<'arena>],
         span: Span,
     },
@@ -536,8 +540,14 @@ pub enum CssValue<'arena> {
     /// carries the same `ConditionQuery` and prints through the same printer — one
     /// condition, one form, in both positions. The function's own parentheses **are**
     /// the condition part's, so the query holds exactly one part and `span` (the whole
-    /// call, `supports` through its `)`) needs no separate paren bookkeeping. `name` is
-    /// a verbatim source slice like `Function`'s, so the author's case survives.
+    /// call, `supports` through its `)`) needs no separate paren bookkeeping.
+    ///
+    /// `name` is the **verbatim** token slice — the author's own bytes, not the decoded
+    /// identifier the recognition test above it runs on, so an escape-spelled
+    /// `\73 upports(` prints as written (prettier preserves it too). `Function` answers
+    /// the same question with a `name_span` and no copy at all; this variant keeps the
+    /// text because its printer spells the condition rather than the name, and the copy
+    /// is an `@import` prelude's alone.
     SupportsCondition {
         name: &'arena str,
         condition: ConditionQuery<'arena>,

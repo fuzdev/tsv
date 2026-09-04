@@ -53,9 +53,11 @@ impl<'a> Printer<'a> {
             CssValue::String { content, span } => self.build_string_doc(content, *span),
             CssValue::Dimension { span, .. } => self.build_dimension_doc(*span),
             CssValue::Color { color, span } => self.build_color_doc(color, *span),
-            CssValue::Function { name, args, span } => {
-                self.build_value_function_doc(name, args, *span)
-            }
+            CssValue::Function {
+                name_span,
+                args,
+                span,
+            } => self.build_value_function_doc(*name_span, args, *span),
             CssValue::SupportsCondition {
                 name, condition, ..
             } => self.build_supports_condition_doc(name, condition),
@@ -223,9 +225,14 @@ impl<'a> Printer<'a> {
     /// points). Every other function goes through the wrapping path
     /// (`build_value_function_doc`'s `group(…softline…)` structure) so it can
     /// break when it exceeds width.
-    fn flat_function_doc(&self, name: &str, args_doc: DocId) -> DocId {
+    fn flat_function_doc(&self, name_span: Span, args_doc: DocId) -> DocId {
         let d = self.d();
-        d.concat(&[d.text_pooled(name), d.text("("), args_doc, d.text(")")])
+        d.concat(&[
+            d.source_span(name_span, self.source),
+            d.text("("),
+            args_doc,
+            d.text(")"),
+        ])
     }
 
     /// Build a doc for a function value with automatic wrapping
@@ -244,7 +251,7 @@ impl<'a> Printer<'a> {
     ///   this point
     pub(super) fn build_value_function_doc(
         &self,
-        name: &str,
+        name_span: Span,
         args: &[CssValue<'_>],
         span: Span,
     ) -> DocId {
@@ -256,11 +263,11 @@ impl<'a> Printer<'a> {
         // it takes the same path (casing preserved via `span`) rather than generic-function
         // normalization — which would space an interior `/*` in the now-lexed `URL(x/*y)`
         // url-token.
-        if name.eq_ignore_ascii_case("url") {
+        if self.function_name_is(name_span, "url") {
             // Quoted url() — a single string arg. Print it through the normal string
             // path so the quote is normalized (`"x"` → `'x'`), matching prettier.
             if let [arg @ CssValue::String { .. }] = args {
-                return self.flat_function_doc(name, self.build_css_value_doc(arg));
+                return self.flat_function_doc(name_span, self.build_css_value_doc(arg));
             }
             // The same string plus a trailing comment region (`url('a.css' /* c */)`) —
             // still the string path, so the quote still normalizes; the region joins
@@ -271,7 +278,8 @@ impl<'a> Printer<'a> {
             // `url()` in a stylesheet. A *leading* comment cannot reach here at all — it
             // makes `url(` an opaque `<url-token>`, which lands on the verbatim arm below.
             if let [CssValue::String { .. }, ..] = args {
-                return self.flat_function_doc(name, self.build_separated_values_doc(args, " "));
+                return self
+                    .flat_function_doc(name_span, self.build_separated_values_doc(args, " "));
             }
             // Unquoted url() — the content is opaque. Emit the raw source verbatim,
             // stripping only the whitespace right after `url(` and right before `)`
@@ -285,9 +293,12 @@ impl<'a> Printer<'a> {
             // (every `url(...)`) and the span form's render-time resolution hop measured
             // +0.07% instructions there for no allocation win (the pool is amortized).
             // TODO: re-measure that verdict — it predates the render's inlined `resolve_text`,
-            // and the selector leaf (`span_leaf_doc`, ~12-byte slices) since read −0.34% as a
-            // `source_span` with no hop visible; a url is longer still. The `Borrowed` arm of
-            // `trim_url_raw` is the document's own bytes and would take the span form directly.
+            // and TWO span moves have since read no hop at all: the selector leaf
+            // (`span_leaf_doc`, ~12-byte slices, −0.34%) and this function's own name, whose
+            // `name_span` retired both a copy and the guard that had made the site a wash.
+            // A url is longer than either, so the copy it spends is larger. Only the
+            // `None` arm here needs the pool; `trim_url_raw`'s `Borrowed` arm is the
+            // document's own bytes and would take the span form directly.
             if span.end_usize() <= self.source.len() {
                 let raw = span.extract(self.source);
                 return match crate::url::trim_url_raw(raw) {
@@ -297,7 +308,7 @@ impl<'a> Printer<'a> {
             }
             // Fallback (span unavailable): rejoin args with no space after commas.
             let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ",");
-            return self.flat_function_doc(name, args_doc);
+            return self.flat_function_doc(name_span, args_doc);
         }
 
         // A function whose grammar tsv doesn't read parsed no args (`scope((.a) to (.b))`);
@@ -320,10 +331,10 @@ impl<'a> Printer<'a> {
         // path below spells the same closing comma, but wraps the argument list in a
         // breakable group, and prettier never breaks a `var()`. `var(--a, red)` has no
         // closing comma and takes the generic path with the normal `, ` separator.
-        if name.eq_ignore_ascii_case("var") && closing_comma {
+        if closing_comma && self.function_name_is(name_span, "var") {
             let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ", ");
             let comma = d.text(",");
-            return self.flat_function_doc(name, d.concat(&[args_doc, comma]));
+            return self.flat_function_doc(name_span, d.concat(&[args_doc, comma]));
         }
 
         // Build with group/softline structure for automatic wrapping
@@ -358,7 +369,7 @@ impl<'a> Printer<'a> {
             inner_parts.push(d.concat(&[last, d.text(",")]));
         }
 
-        let name_doc = d.text_pooled(name);
+        let name_doc = d.source_span(name_span, self.source);
         let inner = d.concat(&inner_parts);
         d.group(d.concat(&[
             name_doc,
@@ -386,6 +397,55 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let parts = self.build_space_fill_parts(values);
         d.group(d.indent(d.fill(&parts)))
+    }
+
+    /// Is the function name at `name_span` — read **verbatim** from the source — the
+    /// keyword `kw`?
+    ///
+    /// Function names are ASCII case-insensitive ("like keywords, function names are
+    /// ASCII case-insensitive" — css-values-4 §"Functional Notations"), and a name may be
+    /// escape-spelled: `\75 rl(` is a `url()`. The value subtree stores the author's own
+    /// bytes (`CssValue::Function::name_span`), so recognition — not emission — is where
+    /// an escape is resolved.
+    ///
+    /// Two byte tests answer every name a stylesheet really holds, which is what keeps
+    /// the decoder off this path (it is a call into a `String` builder, and this question
+    /// is asked of every function value):
+    ///
+    /// - **An escape spends at least two bytes on the one character it spells**, so a
+    ///   decoded spelling of `kw` is always LONGER than `kw` — an exact-length name is
+    ///   answered by the bytes alone. That is every name a declaration value can hold
+    ///   (the value classifier admits only `alphanumeric | - | _`, so its names never
+    ///   carry a `\`), and 82% of them are three bytes.
+    /// - **A longer name's first decoded character is either its first byte verbatim or
+    ///   an escape's `\`**, so a first byte that is neither `\` nor `kw`'s own opening
+    ///   character cannot spell `kw` however it decodes — `calc(` refuses `url` on one
+    ///   compare.
+    ///
+    /// What survives both is an `@import` prelude's escaped name and nothing else, which
+    /// is where the decode lives.
+    #[inline]
+    fn function_name_is(&self, name_span: Span, kw: &str) -> bool {
+        let name = &self.source.as_bytes()[name_span.range()];
+        let kw = kw.as_bytes();
+        if name.len() == kw.len() {
+            return name.eq_ignore_ascii_case(kw);
+        }
+        name.len() > kw.len()
+            && (name[0].eq_ignore_ascii_case(&kw[0]) || name[0] == b'\\')
+            && self.escaped_function_name_is(name_span, kw)
+    }
+
+    /// The escaped tail of `function_name_is` — outlined and cold, so the decoder it
+    /// calls stays off every function value's path.
+    #[cold]
+    #[inline(never)]
+    fn escaped_function_name_is(&self, name_span: Span, kw: &[u8]) -> bool {
+        let name = name_span.extract(self.source);
+        name.as_bytes().contains(&b'\\')
+            && crate::escapes::decode_escape_sequences(name)
+                .as_bytes()
+                .eq_ignore_ascii_case(kw)
     }
 
     /// Build a doc for a value list joined by `sep` — `" "` for a space-separated

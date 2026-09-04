@@ -797,11 +797,29 @@ pub(super) fn parse_import_prelude<'arena>(
         // `@namespace url(a(b))` already takes.
         let value_start = parser.span_pos(parser.current_start);
         let value_end = parser.span_pos(parser.current_end);
+        // The name is the token text up to its `(` — the ident that opened the url-token,
+        // so the `(` is the first one in it. The printer reads this span only as a
+        // url-detection key (`function_name_is(.., "url")`, which decodes an escaped
+        // spelling); the emitted text and the public AST both come from `span`, so real
+        // casing and content are preserved regardless.
+        let name_len = parser
+            .current_value()
+            .bytes()
+            .position(|b| b == b'(')
+            .unwrap_or(0);
+        // A url-token exists only because the lexer read an ident and then a `(`
+        // (`read_identifier`), so the `(` is always there; the `unwrap_or` degrades to an
+        // empty name span, which simply fails the url test and prints the span verbatim.
+        debug_assert!(
+            name_len > 0,
+            "a url-token with no `(`: {:?}",
+            parser.current_value()
+        );
         values.push(CssValue::Function {
-            // The printer's empty-args url path only reads `name` as a url-detection key
-            // (`eq_ignore_ascii_case("url")`); the emitted text and the public AST both
-            // come from `span`, so real casing/content is preserved regardless.
-            name: "url",
+            name_span: Span {
+                start: value_start,
+                end: value_start + name_len as u32,
+            },
             args: &[],
             span: Span {
                 start: value_start,
@@ -999,6 +1017,18 @@ fn parse_function_value<'arena>(
     } else {
         return Err(parser.error_expected("function name"));
     };
+    // Recognition below is on the DECODED `name` (`\6c ayer(` is a `layer()`), but what
+    // reaches the output is the author's own bytes: the value subtree is source-faithful,
+    // so the stored name is this span, never the decoded text (prettier preserves the
+    // escape too).
+    let name_span = Span {
+        start: parser.span_pos(parser.current_start),
+        end: parser.span_pos(parser.current_end),
+    };
+    // `supports()` keeps a text name (its printer prints the condition, not a span), so
+    // the same fact reaches it as the verbatim token slice — the copy is an `@import`
+    // prelude's alone.
+    let name_verbatim = parser.alloc_str_in(parser.current_value());
 
     parser.advance()?; // consume function name
 
@@ -1015,7 +1045,7 @@ fn parse_function_value<'arena>(
             return Err(parser.error_expected("')' to close function"));
         };
         return Ok(CssValue::SupportsCondition {
-            name,
+            name: name_verbatim,
             condition,
             span: Span {
                 start: value_start,
@@ -1099,7 +1129,7 @@ fn parse_function_value<'arena>(
     parser.advance()?; // consume ')'
 
     Ok(CssValue::Function {
-        name,
+        name_span,
         args: args.into_bump_slice(),
         span: Span {
             start: value_start,

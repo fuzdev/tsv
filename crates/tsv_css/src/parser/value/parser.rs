@@ -1111,8 +1111,11 @@ mod tests {
         let arena = Bump::new();
         let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::Function { .. }));
-        if let CssValue::Function { name, args, .. } = value {
-            assert_eq!(name, "linear-gradient");
+        if let CssValue::Function {
+            name_span, args, ..
+        } = value
+        {
+            assert_eq!(name_span.extract(source), "linear-gradient");
             // Arguments should have accurate spans pointing to original source
             assert_eq!(args.len(), 3); // "90deg", "red 01%", "blue 02%"
         }
