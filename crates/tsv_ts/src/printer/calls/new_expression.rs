@@ -573,14 +573,9 @@ impl<'a> Printer<'a> {
             // so the argument list must hard-break around it. So must a `(`-line run,
             // which ends in a `//` nothing may share a line with; asked here rather than
             // read off `paren_line` afterwards, since the join is chosen before the build.
-            let paren_line_run = PartitionedComments::new(
-                self.comments,
-                self.source.as_bytes(),
-                self.comment_line_breaks,
-                paren_open,
-                new_expr.arguments[0].span().start,
-            )
-            .has_trailing_line();
+            let paren_line_run =
+                PartitionedComments::new(self, paren_open, new_expr.arguments[0].span().start)
+                    .has_trailing_line();
             // The last-argument arm reads own-line-ness from the SOURCE
             // ([`Printer::has_own_line_block_comment_before_closer`]), the same predicate
             // the call and parameter lists ask of this position: the gap holds the list's
@@ -648,13 +643,7 @@ impl<'a> Printer<'a> {
         // kept. See conformance_prettier_ts_comments.md §Comment relocation.
         if has_leading_comments {
             let first_arg_start = new_expr.arguments[0].span().start;
-            let gap_pc = PartitionedComments::new(
-                self.comments,
-                self.source.as_bytes(),
-                self.comment_line_breaks,
-                paren_open,
-                first_arg_start,
-            );
+            let gap_pc = PartitionedComments::new(self, paren_open, first_arg_start);
             if gap_pc.pulls_to_delimiter_line(self) {
                 let mut paren_line_prefix = DocBuf::new();
                 gap_pc.emit_delimiter_line_pull(&mut paren_line_prefix, self);

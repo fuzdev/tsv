@@ -26,10 +26,10 @@ mod lexer;
 mod parser;
 mod printer;
 
-use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
+use tsv_lang::{CommentFreeWindow, EmbedContext};
 pub use tsv_lang::{ParseError, Result};
 
 pub use acorn_loc::AcornSeed;
@@ -81,6 +81,17 @@ pub struct PrinterInputs<'a> {
     /// it in — never inside `Printer::with_context` or `tsv_svelte`'s `ts_inputs()` (the
     /// per-`{expr}` O(islands × comments) trap the sibling `has_owned_comments` documents).
     pub has_format_ignore: bool,
+    /// The comment-free window of the printer embedding this one, when there is one. An
+    /// island printer (a template `{expr}`, a directive, a `<script>`) seeds its own
+    /// window (`Printer::comment_free_gap`) from it at construction and hands its own back
+    /// when it finishes (`with_doc_printer`), so the islands and the embedding printer
+    /// read one window between them. Sound because a window is a fact about the comment
+    /// ARRAY (`comments`), which the embedding printer shares with every island it
+    /// constructs (`tsv_svelte`'s `ts_inputs()` hands over its own array); a printer over
+    /// a different array passes `None`, as [`Self::for_document`] does. On a real Svelte
+    /// corpus an island's first search was 45% of every search the islands made, and nine
+    /// in ten of those lay inside a window already drawn.
+    pub comment_free_window: Option<&'a CommentFreeWindow<'a>>,
 }
 
 impl<'a> PrinterInputs<'a> {
@@ -101,6 +112,7 @@ impl<'a> PrinterInputs<'a> {
             has_format_ignore: comments
                 .iter()
                 .any(|c| is_format_ignore_directive(c.content(source))),
+            comment_free_window: None,
         }
     }
 }
@@ -128,6 +140,24 @@ fn make_doc_printer<'a>(
     embed: EmbedContext,
 ) -> printer::Printer<'a> {
     printer::Printer::with_context(arena, inputs, embed, 0)
+}
+
+/// Run `build` on a doc-only printer over `inputs` ([`make_doc_printer`]), then hand the
+/// comment-free window its searches drew back to the embedding printer
+/// (`PrinterInputs::comment_free_window`), so the next island that printer constructs —
+/// and its own next ask — start from where this one left off.
+fn with_doc_printer<'a, R>(
+    arena: &'a DocArena,
+    inputs: &PrinterInputs<'a>,
+    embed: EmbedContext,
+    build: impl FnOnce(&printer::Printer<'a>) -> R,
+) -> R {
+    let printer = make_doc_printer(arena, inputs, embed);
+    let out = build(&printer);
+    if let Some(window) = inputs.comment_free_window {
+        window.take_from(&printer.comment_free_gap);
+    }
+    out
 }
 
 /// Parse TypeScript source code into an internal AST
@@ -778,8 +808,9 @@ pub fn build_variable_declaration_doc(
     embed: EmbedContext,
     emit_semicolon: bool,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, embed);
-    printer.build_variable_declaration_doc(decl, emit_semicolon, None)
+    with_doc_printer(arena, inputs, embed, |printer| {
+        printer.build_variable_declaration_doc(decl, emit_semicolon, None)
+    })
 }
 
 /// Build a DocId for a TypeScript expression with comments in the caller's arena.
@@ -791,8 +822,9 @@ pub fn build_expression_doc(
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, embed);
-    printer.build_root_expression_doc(expression)
+    with_doc_printer(arena, inputs, embed, |printer| {
+        printer.build_root_expression_doc(expression)
+    })
 }
 
 /// Build a DocId for a single comment (`/* … */` / `// …`) in the caller's arena,
@@ -811,8 +843,9 @@ pub fn build_comment_doc(
     comment: &ast::Comment,
     inputs: &PrinterInputs<'_>,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, EmbedContext::default());
-    printer.build_comment_doc(comment)
+    with_doc_printer(arena, inputs, EmbedContext::default(), |printer| {
+        printer.build_comment_doc(comment)
+    })
 }
 
 /// Build a DocId for a function parameter list (`(…)`) with comments, in the caller's arena.
@@ -832,8 +865,9 @@ pub fn build_function_params_doc(
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, embed);
-    printer.build_params_doc_with_comments(params, params_start, trailing_comments_end)
+    with_doc_printer(arena, inputs, embed, |printer| {
+        printer.build_params_doc_with_comments(params, params_start, trailing_comments_end)
+    })
 }
 
 /// Build a DocId for a type-parameter declaration (`<…>`) with comments, in the caller's arena.
@@ -850,8 +884,9 @@ pub fn build_type_parameters_doc(
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, embed);
-    printer.build_type_parameter_declaration_doc_wrapping(type_parameters)
+    with_doc_printer(arena, inputs, embed, |printer| {
+        printer.build_type_parameter_declaration_doc_wrapping(type_parameters)
+    })
 }
 
 /// Build a DocId for a type annotation (`: T`) with comments, in the caller's arena.
@@ -869,8 +904,9 @@ pub fn build_type_annotation_doc(
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> DocId {
-    let printer = make_doc_printer(arena, inputs, embed);
-    printer.build_type_annotation_doc_public(annotation)
+    with_doc_printer(arena, inputs, embed, |printer| {
+        printer.build_type_annotation_doc_public(annotation)
+    })
 }
 
 /// Build a DocId for a TypeScript program in the caller's arena.

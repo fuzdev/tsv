@@ -904,8 +904,9 @@ impl<'a> Printer<'a> {
         // Same shared same-line/later-line classification as the call-argument
         // (`PartitionedComments`) and member-chain (`push_gap_comments_and_break`)
         // gap printers.
-        let classified = tsv_lang::ClassifiedComments::from_range(
-            self.comments,
+        let classified = tsv_lang::ClassifiedComments::from_index(
+            self.comment_free_gap.comments(),
+            self.first_index_between(operand_end, gap_end),
             operand_end,
             gap_end,
             self.source.as_bytes(),

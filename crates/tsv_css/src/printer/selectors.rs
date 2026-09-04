@@ -36,10 +36,10 @@ use super::Printer;
 use super::boundary_ws::{closer_pos, prefixed_run, skip_gap_trivia, trim_regenerated_separator};
 use super::value_normalization;
 use crate::ast::internal;
+use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::printing::format_string_literal;
 use tsv_lang::source_scan;
-use tsv_lang::{Span, has_comments_to_emit_in_range};
 
 /// Trailing punctuation that follows a selector on its last line (`) {` / `,`),
 /// reserved so a selector that would overflow once the brace is appended breaks
@@ -73,7 +73,7 @@ impl<'a> Printer<'a> {
         // is re-emitted as static text either way. With no comment in the gap both sides
         // are empty regardless of where the comma sits, so check that first and skip the
         // comment-aware byte scan entirely.
-        if !has_comments_to_emit_in_range(self.comments, start, end) {
+        if !self.has_comments_to_emit_between(start, end) {
             return (String::new(), String::new());
         }
         let comma = source_scan::find_char_skipping_comments(
@@ -103,7 +103,7 @@ impl<'a> Printer<'a> {
         if list.selectors.is_empty() {
             return;
         }
-        if has_comments_to_emit_in_range(self.comments, list.span.start, list.span.end) {
+        if self.has_comments_to_emit_between(list.span.start, list.span.end) {
             let doc = self.build_comma_list_doc(list, false);
             self.write_arena_doc_with_suffix(doc, SELECTOR_SUFFIX_WIDTH);
             return;
@@ -412,14 +412,14 @@ impl<'a> Printer<'a> {
         // comment registers only when it sits fully inside the queried range — so a
         // comment-free selector has no boundary comment. One probe answers that, instead
         // of one per simple selector.
-        if !has_comments_to_emit_in_range(self.comments, complex.span.start, complex.span.end) {
+        if !self.has_comments_to_emit_between(complex.span.start, complex.span.end) {
             return false;
         }
         let mut prev_end = complex.span.start;
         for rel in complex.children {
             for simple in rel.selectors {
                 let span = simple.span();
-                if has_comments_to_emit_in_range(self.comments, prev_end, span.start) {
+                if self.has_comments_to_emit_between(prev_end, span.start) {
                     return true;
                 }
                 prev_end = span.end;
@@ -507,7 +507,7 @@ impl<'a> Printer<'a> {
                 // drop the comment — a block-comment content loss `swallow_audit` can't
                 // catch (it only sees `//` line-comment swallows in rendered output).
                 debug_assert!(
-                    !has_comments_to_emit_in_range(self.comments, complex.span.start, first_start),
+                    !self.has_comments_to_emit_between(complex.span.start, first_start),
                     "leading gap comment before the first compound has no emission path"
                 );
             }
@@ -528,7 +528,7 @@ impl<'a> Printer<'a> {
                         parts.push(d.text_pooled(&kept));
                     }
                 }
-                if j > 0 && has_comments_to_emit_in_range(self.comments, prev_end, sspan.start) {
+                if j > 0 && self.has_comments_to_emit_between(prev_end, sspan.start) {
                     // Glued compound-internal trivia: emit the source slice verbatim (no
                     // space normalization). The run is fully glued (the parser keeps a
                     // compound together only across glued comments), so normalizing the
@@ -673,7 +673,7 @@ impl<'a> Printer<'a> {
         flags: Option<&str>,
         span: Span,
     ) -> String {
-        if has_comments_to_emit_in_range(self.comments, span.start, span.end) {
+        if self.has_comments_to_emit_between(span.start, span.end) {
             return self.build_commented_attribute_selector_text(
                 namespace_span,
                 name_span,
@@ -946,7 +946,7 @@ impl<'a> Printer<'a> {
         to: u32,
         gap: AttributeGap,
     ) -> bool {
-        if from >= to || !has_comments_to_emit_in_range(self.comments, from, to) {
+        if from >= to || !self.has_comments_to_emit_between(from, to) {
             return false;
         }
         if gap.pad_before() {
@@ -1332,7 +1332,7 @@ impl<'a> Printer<'a> {
         // back empty and `wrap_inner_with_comments` hands `inner` straight back. One probe
         // replaces the two range-collects on the common path — this fires on every
         // `:not()` / `:where()` / `:is()`, which are dense in real stylesheets.
-        if !has_comments_to_emit_in_range(self.comments, args_span.start, args_span.end) {
+        if !self.has_comments_to_emit_between(args_span.start, args_span.end) {
             return inner;
         }
         let leading = self.comment_blocks_in_range(args_span.start, content_span.start);
@@ -1361,7 +1361,7 @@ impl<'a> Printer<'a> {
         // rebuild is the only thing that can carry those characters, so a comment-keyed gate
         // in front of it deletes them — which it did, on input canonical accepts.
         if idents.len() < 2
-            || (!has_comments_to_emit_in_range(self.comments, run_span.start, run_span.end)
+            || (!self.has_comments_to_emit_between(run_span.start, run_span.end)
                 && !self.gap_may_hold_boundary_ws(run_span.start, run_span.end))
         {
             return d.text_pooled(&idents.join(" "));

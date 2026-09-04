@@ -379,45 +379,44 @@ pub struct ClassifiedComments<'a> {
 }
 
 impl<'a> ClassifiedComments<'a> {
-    /// Classify all comments in a range using a single binary search.
-    ///
-    /// This is more efficient than calling separate filter functions when you need
-    /// multiple comment categories from the same range.
+    /// Classify the comments to emit in `[start, end)` in one walk — every category a gap
+    /// emitter asks for, from one pass over the range rather than four filter calls.
     ///
     /// # Arguments
     ///
     /// * `comments` - All comments sorted by span.start
-    /// * `start` - Start position (e.g., end of previous chain element)
+    /// * `first_idx` - The index the walk starts at: the printer's `first_index_between`
+    ///   over `[start, end)`, which reads its comment-free window ([`CommentFreeWindow`])
+    ///   ahead of the search (the index form, like the `*_from` twins of the range lookups
+    ///   — a printer holding a window walks without a second search)
+    /// * `start` - Start position (e.g., end of previous chain element), the anchor the
+    ///   same-line question is asked against
     /// * `end` - End position (e.g., start of next chain element)
     /// * `source` - The document's bytes
     /// * `table` - The document's line table (the same-line checks are bounded scans of
     ///   `source` with the table as the fallback — `printing::is_same_line_scan`)
-    ///
-    /// # Complexity
-    ///
-    /// O(log n + k) where n is total comments and k is comments in range.
-    /// Compared to 4 separate filter calls which would be O(4 log n + 4k).
-    pub fn from_range(
+    pub fn from_index(
         comments: &'a [Comment],
+        first_idx: usize,
         start: u32,
         end: u32,
         source: &[u8],
         table: LineTable<'_>,
     ) -> Self {
-        Self::from_range_inner(comments, start, end, source, table, false)
+        Self::from_index_inner(comments, first_idx, start, end, source, table, false)
     }
 
-    /// [`Self::from_range`] with the trailing run's anchor ADVANCING over each comment
+    /// [`Self::from_index`] with the trailing run's anchor ADVANCING over each comment
     /// it takes: a comment beginning on the line the previous one ended on is still
     /// glued — the line a multiline block closes on included — so
     /// `prev /* m1⏎m2 */ /* c6 */` keeps `c6` trailing. Measured against `start`
-    /// alone (the fixed-anchor `from_range`), everything past a multiline block reads
+    /// alone (the fixed-anchor `from_index`), everything past a multiline block reads
     /// as own-line and the run splits. The advance stops at the first off-line comment
     /// for free: lines only grow, so once a comment starts below the anchor's line no
     /// later one can be on it (a comment glued to an own-line comment belongs to the
     /// leading run, whose emitter owns the glue question).
     ///
-    /// ⚠️ A separate constructor rather than `from_range`'s one behavior because the
+    /// ⚠️ A separate constructor rather than `from_index`'s one behavior because the
     /// classification often feeds a PARTITION — two emitters splitting one gap — and
     /// moving the trailing/leading bound moves comments between them: an emitter pair
     /// where only one side adopts the advance double-prints every re-homed comment.
@@ -426,18 +425,20 @@ impl<'a> ClassifiedComments<'a> {
     /// that partitions against an independently-spelled partner (the call-argument
     /// family's routed gaps, the delimiter-line pulls) keeps the fixed anchor until
     /// its partner moves with it.
-    pub fn from_range_advancing(
+    pub fn from_index_advancing(
         comments: &'a [Comment],
+        first_idx: usize,
         start: u32,
         end: u32,
         source: &[u8],
         table: LineTable<'_>,
     ) -> Self {
-        Self::from_range_inner(comments, start, end, source, table, true)
+        Self::from_index_inner(comments, first_idx, start, end, source, table, true)
     }
 
-    fn from_range_inner(
+    fn from_index_inner(
         comments: &'a [Comment],
+        first_idx: usize,
         start: u32,
         end: u32,
         source: &[u8],
@@ -447,7 +448,7 @@ impl<'a> ClassifiedComments<'a> {
         let mut result = Self::default();
 
         let mut anchor = start;
-        for comment in comments_to_emit_in_range(comments, start, end) {
+        for comment in comments_to_emit_from(comments, first_idx, end) {
             let same_line = printing::is_same_line_scan(source, table, anchor, comment.span.start);
             if same_line && advance {
                 anchor = comment.span.end;
@@ -498,7 +499,7 @@ impl<'a> ClassifiedComments<'a> {
     /// All leading (own-line) comments in source order, merging the `leading_block`
     /// and `leading_line` buckets.
     ///
-    /// `from_range` splits by kind for the TRAILING half of a gap, where the kinds
+    /// `from_index` splits by kind for the TRAILING half of a gap, where the kinds
     /// genuinely emit differently (a block trails inline, a `//` defers via
     /// `line_suffix`), and for the flat member arm that defers every line comment.
     /// A gap's leading run prints each comment the same way, so every emitter of one
@@ -588,7 +589,7 @@ thread_local! {
 /// hint sits at that comment and would miss by exactly one, into a full search, on every
 /// such ask. And the TS printer's existence wrappers and range walks answer one question
 /// *before* asking here at all: whether the range lies inside the comment-free window the
-/// previous search landed in (`Printer::comment_free_gap`), a fact about the array that a
+/// previous search landed in (a [`CommentFreeWindow`]), a fact about the array that a
 /// caller holding the array can keep without the verification the hint needs.
 ///
 /// Left to the inliner deliberately, and measured: on a 1,666-file TypeScript corpus this
@@ -600,7 +601,8 @@ thread_local! {
 /// That verdict belongs to the population that reaches this function ungated. Behind the
 /// TS printer's window gate, which answers four range walks in five before they get here,
 /// the same corpus read the opposite by the same margin: one outlined search body
-/// (`Printer::first_index_between_wide`) beat the search inlined at its 185 sites by 0.24
+/// (`Printer::first_index_between_wide`, behind a gate reading a [`CommentFreeWindow`]) beat the
+/// search inlined at its 185 sites by 0.24
 /// points and 27 KB of `.text`. An attribute here is re-measured whenever a gate changes who
 /// reaches the body.
 #[inline]
@@ -637,6 +639,123 @@ pub fn find_first_comment_from(comments: &[Comment], pos: u32) -> usize {
 #[inline]
 pub const fn range_too_narrow_for_a_comment(start: u32, end: u32) -> bool {
     end.saturating_sub(start) < Comment::MIN_SPAN_LEN
+}
+
+/// The comment-free window a printer keeps over its comment array: `(gap_start,
+/// gap_end)`, a half-open range of source positions that holds no comment at all — the
+/// stretch between the two comments the last search landed between, or the document edge
+/// when it landed at an end. Starts as the empty window `(u32::MAX, 0)`. Carries the
+/// array it is a fact about, so no ask names one and a window cannot be read against
+/// another array.
+///
+/// Every search over the sorted array establishes one, whatever it answered: the gap is
+/// a fact about the array, and the stretch before the comment the search found is
+/// comment-free. A printer asks about whole node spans — a chain, then the call inside
+/// it, then the object inside that — and about one gap several times over (a trailing
+/// run, a claim, a blank scan, the next item's leading run), so consecutive asks nest
+/// inside one comment-free stretch of the document nearly every time: on a real corpus
+/// four range walks in five and nine existence asks in ten lie inside the window the
+/// previous search drew. Read ahead of the search, the window answers those with two
+/// compares against two plain integers — no load through the array, no probe of the
+/// one-entry hint ([`find_first_comment_from`], a dependent-load chain).
+///
+/// Sound for the life of the array by construction: `comments` is sorted by start and
+/// never changes, so a window derived from it stays comment-free. Being a fact about the
+/// **array** rather than about a printer is what lets the printers over one document
+/// hand each other their window ([`Self::take_from`]) — an island printer starts from the
+/// embedding printer's and hands its own back — and the hand-off is between two windows
+/// over the *same* array, which a debug build asserts.
+///
+/// A printer spells the gate inline over [`Self::contains`] and puts the search
+/// ([`Self::search_from`]) behind one outlined body of its own, taking the printer —
+/// `Printer::first_index_between` / `first_index_between_wide` in each language crate.
+/// Three shapes were measured on a real corpus and the verdict belongs to the population
+/// that reaches the body: a wrapper spelled at hundreds of sites is outlined by the
+/// compiler as a plain function and returns its iterator through memory; the search
+/// inlined at every site loses to a single copy once the gate answers most asks; and the
+/// outlined body's argument must be a value the site already holds (the printer) — a
+/// derived address (this window's) is kept in a register across the call at every site,
+/// which cost 16 bytes of frame on two recursive builders.
+#[derive(Debug)]
+pub struct CommentFreeWindow<'a> {
+    /// The array the window is a fact about, sorted by `span.start`.
+    comments: &'a [Comment],
+    /// `(gap_start, gap_end)`.
+    gap: Cell<(u32, u32)>,
+}
+
+impl<'a> CommentFreeWindow<'a> {
+    /// The empty window over `comments`: nothing known yet, so every ask searches.
+    pub const fn new(comments: &'a [Comment]) -> Self {
+        Self {
+            comments,
+            gap: Cell::new((u32::MAX, 0)),
+        }
+    }
+
+    /// The array this window is a fact about.
+    #[inline]
+    pub fn comments(&self) -> &'a [Comment] {
+        self.comments
+    }
+
+    /// Take the window `other` established — a printer over the **same** array handing
+    /// its window to another (an embedding printer seeding an island's, the island
+    /// handing its own back). Debug-asserted to be the same array: a window read against
+    /// any other is unsound.
+    #[inline]
+    pub fn take_from(&self, other: &Self) {
+        debug_assert!(
+            core::ptr::eq(self.comments, other.comments),
+            "a comment-free window handed between printers over different comment arrays"
+        );
+        self.gap.set(other.gap.get());
+    }
+
+    /// Whether `[start, end)` lies wholly inside the window — in which case no comment
+    /// of any kind is in it, and a search is not needed.
+    #[inline]
+    pub fn contains(&self, start: u32, end: u32) -> bool {
+        let (gap_start, gap_end) = self.gap.get();
+        gap_start <= start && end <= gap_end
+    }
+
+    /// Where the first comment at or after `pos` starts, when the window knows: `pos`
+    /// inside the window (its end included) puts that comment at the window's end —
+    /// `u32::MAX` when there is none — and `None` means `pos` is outside it, so only a
+    /// search can say. The unbounded walks' question: a walk from a position asks it
+    /// ahead of the search, and a caller that only needs to know whether the next
+    /// comment is *lines away* is answered here.
+    #[inline]
+    pub fn next_comment_start(&self, pos: u32) -> Option<u32> {
+        let (gap_start, gap_end) = self.gap.get();
+        (gap_start <= pos && pos <= gap_end).then_some(gap_end)
+    }
+
+    /// Refresh the window from a search that resolved to `first_idx` (the first comment
+    /// starting at or after the asked position): it runs from the end of the comment
+    /// before it to the start of the comment at it, with the document's edges standing
+    /// in at either end of the array.
+    #[inline]
+    pub fn record(&self, first_idx: usize) {
+        let comments = self.comments;
+        let gap_start = first_idx
+            .checked_sub(1)
+            .and_then(|prev| comments.get(prev))
+            .map_or(0, |c| c.span.end);
+        let gap_end = comments.get(first_idx).map_or(u32::MAX, |c| c.span.start);
+        self.gap.set((gap_start, gap_end));
+    }
+
+    /// The search behind every window-reading lookup: [`find_first_comment_from`], with
+    /// the window refreshed from where it landed — whatever the ask then answers, the
+    /// stretch before that comment is comment-free.
+    #[inline]
+    pub fn search_from(&self, start: u32) -> usize {
+        let first_idx = find_first_comment_from(self.comments, start);
+        self.record(first_idx);
+        first_idx
+    }
 }
 
 /// **to emit**: the comments in `[start, end)` that *this* caller must print.
@@ -813,8 +932,8 @@ pub fn comments_in_source_range(
 /// The index every range lookup starts its walk at: the first comment starting at or
 /// after `start`, or `comments.len()` when `[start, end)` is too narrow to hold one
 /// ([`range_too_narrow_for_a_comment`]) — so the sorted array is never probed for a
-/// token-sized gap. (The TS printer's own walks start at `Printer::first_index_between`
-/// instead, which also reads its comment-free window ahead of the search.)
+/// token-sized gap. (A printer keeping a [`CommentFreeWindow`] starts its walks at its own
+/// `first_index_between` over the window instead, which also reads it ahead of the search.)
 #[inline]
 fn first_index_in_range(comments: &[Comment], start: u32, end: u32) -> usize {
     if range_too_narrow_for_a_comment(start, end) {

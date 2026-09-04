@@ -1156,13 +1156,7 @@ impl<'a> Printer<'a> {
         first_elem_start: u32,
         pull_expanding_block: bool,
     ) -> (Option<DocId>, Option<u32>) {
-        let pc = super::calls::PartitionedComments::new(
-            self.comments,
-            self.source.as_bytes(),
-            self.comment_line_breaks,
-            delim_pos,
-            first_elem_start,
-        );
+        let pc = super::calls::PartitionedComments::new(self, delim_pos, first_elem_start);
         // The base rule gates the pull on forced expansion (a line comment, or a
         // block standalone on its own line) — the call family's own predicate, so the
         // two families cannot drift. `pull_expanding_block` adds the object case: a

@@ -596,13 +596,7 @@ fn try_single_arg_comment_paths(
         // prettier, which relocates them to their own line); own-line comments
         // stay on their own lines before the arg. See conformance_prettier_ts_comments.md
         // §Comment relocation (Call open paren `(`).
-        let gap_pc = PartitionedComments::new(
-            printer.comments,
-            printer.source.as_bytes(),
-            printer.comment_line_breaks,
-            paren_open,
-            arg_start,
-        );
+        let gap_pc = PartitionedComments::new(printer, paren_open, arg_start);
 
         let mut paren_line_prefix = DocBuf::new();
         gap_pc.emit_delimiter_line_pull(&mut paren_line_prefix, printer);
@@ -1001,13 +995,7 @@ fn build_call_with_arg_comments(
                 force_expansion = true;
             }
 
-            let gap_pc = PartitionedComments::new(
-                printer.comments,
-                printer.source.as_bytes(),
-                printer.comment_line_breaks,
-                paren_open,
-                first_arg_start,
-            );
+            let gap_pc = PartitionedComments::new(printer, paren_open, first_arg_start);
             let has_paren_line = gap_pc.has_trailing_comments();
 
             // `PartitionedComments::pulls_to_delimiter_line`, spelled with the flag this

@@ -24,7 +24,6 @@ use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::types::helpers::unwrap_parenthesized;
-use tsv_lang::Comment;
 use tsv_lang::PRINT_WIDTH;
 use tsv_lang::Span;
 use tsv_lang::doc::GroupId;
@@ -184,9 +183,8 @@ pub fn choose_layout(
     right_expr: &Expression<'_>,
     is_short_key: bool,
     can_break_left: bool,
-    source: &str,
     print_width: usize,
-    comments: &[Comment],
+    printer: &Printer<'_>,
 ) -> AssignmentLayout {
     // A curried arrow chain (`(a) => (b) => …`) with no head triggering prettier's
     // `shouldBreakChain` uses fluid layout: break after `=` only when the signature heads
@@ -252,7 +250,7 @@ pub fn choose_layout(
     }
 
     // Check if RHS is a poorly breakable chain (should break after operator)
-    if should_break_after_operator(right_expr, source, print_width, comments) {
+    if should_break_after_operator(right_expr, print_width, printer) {
         return AssignmentLayout::BreakAfterOperator;
     }
 
@@ -441,9 +439,8 @@ pub fn is_simple_self_expanding(expr: &Expression<'_>) -> bool {
 /// Fluid layout, which produces the same output since regex can't break internally.
 fn should_break_after_operator(
     expr: &Expression<'_>,
-    source: &str,
     print_width: usize,
-    comments: &[Comment],
+    printer: &Printer<'_>,
 ) -> bool {
     // Unwrap wrapper expressions to get to the core
     let core_expr = unwrap_expression(expr);
@@ -454,7 +451,7 @@ fn should_break_after_operator(
     }
 
     // Check if it's a poorly breakable chain
-    is_poorly_breakable_chain(core_expr, source, print_width, comments)
+    is_poorly_breakable_chain(core_expr, print_width, printer)
 }
 
 /// Unwrap wrapper expressions (TSNonNullExpression, await, unary, yield, parenthesized)
@@ -508,8 +505,7 @@ fn unwrap_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
 /// is unsound. See `build_mapped_type_doc` for the full reasoning before touching this.
 fn is_call_with_complex_type_arguments(
     call: &internal::CallExpression<'_>,
-    source: &str,
-    comments: &[Comment],
+    printer: &Printer<'_>,
 ) -> bool {
     use internal::TSType;
     let Some(type_args) = &call.type_arguments else {
@@ -529,8 +525,8 @@ fn is_call_with_complex_type_arguments(
     // comment. Without this leg the call was classified poorly-breakable while its doc
     // force-broke, so the `=` broke *and* the `<…>` opened — two breaks where prettier
     // takes one, and a second fixed point (prettier's form was not tsv-stable).
-    if tsv_lang::has_comments_on_page_in_range(comments, type_args.span.start, type_args.span.end)
-        && type_args.span.extract(source).contains('\n')
+    if printer.has_comments_on_page_between(type_args.span.start, type_args.span.end)
+        && type_args.span.extract(printer.source).contains('\n')
     {
         return true;
     }
@@ -541,7 +537,7 @@ fn is_call_with_complex_type_arguments(
     // one type reaching two layouts.
     match type_args.params.first().map(unwrap_parenthesized) {
         Some(TSType::TypeLiteral(_) | TSType::Union(_) | TSType::Intersection(_)) => true,
-        Some(TSType::Mapped(m)) => m.span.extract(source).contains('\n'),
+        Some(TSType::Mapped(m)) => m.span.extract(printer.source).contains('\n'),
         _ => false,
     }
 }
@@ -573,29 +569,23 @@ fn is_call_with_complex_type_arguments(
 /// We have `DocArena::will_break()` infrastructure if a real gap ever surfaces.
 pub fn is_poorly_breakable_chain(
     expr: &Expression<'_>,
-    source: &str,
     print_width: usize,
-    comments: &[Comment],
+    printer: &Printer<'_>,
 ) -> bool {
-    is_poorly_breakable_chain_recursive(expr, false, source, print_width, comments)
+    is_poorly_breakable_chain_recursive(expr, false, print_width, printer)
 }
 
 fn is_poorly_breakable_chain_recursive(
     expr: &Expression<'_>,
     deep: bool,
-    source: &str,
     print_width: usize,
-    comments: &[Comment],
+    printer: &Printer<'_>,
 ) -> bool {
     match expr {
         // TSNonNullExpression is transparent - continue checking
-        Expression::TSNonNullExpression(non_null) => is_poorly_breakable_chain_recursive(
-            non_null.expression,
-            deep,
-            source,
-            print_width,
-            comments,
-        ),
+        Expression::TSNonNullExpression(non_null) => {
+            is_poorly_breakable_chain_recursive(non_null.expression, deep, print_width, printer)
+        }
         // Note: TSAsExpression and TSSatisfiesExpression are NOT included here.
         // They have breakable type annotations, so they're not "poorly breakable".
 
@@ -619,8 +609,8 @@ fn is_poorly_breakable_chain_recursive(
             // allowed to expand args instead of breaking at the assignment operator.
             let is_trivial_call = call.arguments.is_empty()
                 || (call.arguments.len() == 1
-                    && is_short_arg(&call.arguments[0], source, print_width)
-                    && !call_arg_has_comments(call, comments));
+                    && is_short_arg(&call.arguments[0], printer.source, print_width)
+                    && !call_arg_has_comments(call, printer));
 
             if !is_trivial_call {
                 return false;
@@ -630,7 +620,7 @@ fn is_poorly_breakable_chain_recursive(
             // or multiple type args) are NOT poorly breakable - they have internal break
             // points via the type arguments.
             // Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:422)
-            if is_call_with_complex_type_arguments(call, source, comments) {
+            if is_call_with_complex_type_arguments(call, printer) {
                 return false;
             }
 
@@ -643,9 +633,8 @@ fn is_poorly_breakable_chain_recursive(
                 return is_poorly_breakable_chain_recursive(
                     call.callee,
                     true,
-                    source,
                     print_width,
-                    comments,
+                    printer,
                 );
             }
 
@@ -658,9 +647,8 @@ fn is_poorly_breakable_chain_recursive(
                 return is_poorly_breakable_chain_recursive(
                     call.callee,
                     true,
-                    source,
                     print_width,
-                    comments,
+                    printer,
                 );
             }
 
@@ -670,13 +658,12 @@ fn is_poorly_breakable_chain_recursive(
             // `A.fn("long string").optional()` is NOT poorly breakable because
             // the inner call has a non-trivial arg that provides a good break point.
             if call_count == 2 {
-                if is_factory_chain(call.callee, source) {
+                if is_factory_chain(call.callee, printer.source) {
                     return is_poorly_breakable_chain_recursive(
                         call.callee,
                         true,
-                        source,
                         print_width,
-                        comments,
+                        printer,
                     );
                 }
                 // Non-factory with 2 calls → let chain formatter handle it
@@ -705,19 +692,25 @@ fn is_poorly_breakable_chain_recursive(
             let object_end = member.object.span().end;
             let gap_end = if member.computed {
                 crate::printer::chain::find_bracket_position(
-                    source,
+                    printer.source,
                     object_end,
                     member.property.span().start,
                 )
             } else {
                 member.property.span().start
             };
-            if tsv_lang::comments_on_page_in_range(comments, object_end, gap_end)
-                .any(|c| !tsv_lang::source_scan::has_newline_before_position(source, c.span.start))
+            if printer
+                .comments_on_page_between(object_end, gap_end)
+                .any(|c| {
+                    !tsv_lang::source_scan::has_newline_before_position(
+                        printer.source,
+                        c.span.start,
+                    )
+                })
             {
                 return false;
             }
-            is_poorly_breakable_chain_recursive(member.object, true, source, print_width, comments)
+            is_poorly_breakable_chain_recursive(member.object, true, print_width, printer)
         }
 
         // Base cases: identifiers, `this`, and `super` are valid chain roots
@@ -915,14 +908,14 @@ fn arg_is_multiline_string(expr: &Expression<'_>, source: &str) -> bool {
 ///
 /// Uses the comment region between the callee end and call span end to find any comments
 /// in the argument area (covers leading, trailing, and inter-argument comments).
-fn call_arg_has_comments(call: &internal::CallExpression<'_>, comments: &[Comment]) -> bool {
+fn call_arg_has_comments(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
     if call.arguments.is_empty() {
         return false;
     }
     // Check for any comments in the argument region (between callee end and closing paren)
     let args_region_start = call.callee.span().end;
     let args_region_end = call.span.end;
-    tsv_lang::has_comments_on_page_in_range(comments, args_region_start, args_region_end)
+    printer.has_comments_on_page_between(args_region_start, args_region_end)
 }
 
 /// Check if expression is a type assertion (`as` or `satisfies`) wrapping a call with long arguments.
@@ -1132,14 +1125,7 @@ impl<'a> Printer<'a> {
         // object-literal recursion (property → value → property), where a memo cell's
         // extra words cost ~1% of the nesting depth the formatter survives.
         let can_break_left = (is_short_key || is_simple_value(right_expr)) && d.can_break(left_doc);
-        let mut layout = choose_layout(
-            right_expr,
-            is_short_key,
-            can_break_left,
-            self.source,
-            PRINT_WIDTH,
-            self.comments,
-        );
+        let mut layout = choose_layout(right_expr, is_short_key, can_break_left, PRINT_WIDTH, self);
 
         // Override layout based on comments:
         //
@@ -1270,12 +1256,7 @@ impl<'a> Printer<'a> {
                 owned_comment_effect.is_some()
                     || self.has_comments_on_page_between(rhs_span.start, rhs_span.end)
                     || chain_has_multiline_string_arg(core_expr, self.source)
-                    || !is_poorly_breakable_chain(
-                        core_expr,
-                        self.source,
-                        PRINT_WIDTH,
-                        self.comments,
-                    )
+                    || !is_poorly_breakable_chain(core_expr, PRINT_WIDTH, self)
                     || !d.will_break(right_doc)
             },
             "is_poorly_breakable_chain classified expression as poorly breakable but the \

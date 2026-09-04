@@ -33,13 +33,13 @@ mod values;
 use crate::ast::internal::{Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{
-    CommentPosition, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, classify_comment_scan,
-    comments_to_emit_in_range,
+    CommentFreeWindow, CommentPosition, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH,
+    classify_comment_scan, comments_to_emit_from,
     doc::{
         self,
         arena::{DocArena, DocId},
     },
-    is_format_ignore_directive,
+    has_comments_to_emit_from, is_format_ignore_directive,
     printing::{self, FoldedSource, LineBreaks, LineTable},
 };
 
@@ -70,6 +70,12 @@ pub(crate) struct Printer<'a> {
     /// precondition every claim in [`boundary_ws`] is gated on. See
     /// [`boundary_ws::source_holds_boundary_ws`] for why one scan can answer for all of them.
     pub(crate) holds_boundary_ws: bool,
+    /// The comment-free window this printer's searches drew (`tsv_lang::CommentFreeWindow`):
+    /// every comment lookup here reads it ahead of the search, through the two wrappers
+    /// below rather than the free function over `self.comments`. A stylesheet's array is
+    /// its own — a `<style>` block's printer shares nothing with the Svelte printer around
+    /// it — so the window starts empty here and is never handed across.
+    comment_free_gap: CommentFreeWindow<'a>,
 }
 
 impl<'a> Printer<'a> {
@@ -101,7 +107,57 @@ impl<'a> Printer<'a> {
             line_table,
             in_keyframes: false,
             holds_boundary_ws: boundary_ws::source_holds_boundary_ws(source),
+            comment_free_gap: CommentFreeWindow::new(comments),
         }
+    }
+
+    /// The index a comment walk over `[start, end)` starts at: `len` (an empty walk) for a
+    /// gap too narrow to hold a comment or lying inside the comment-free window
+    /// ([`Self::comment_free_gap`]), else the outlined search — the same inline gate over
+    /// one `#[inline(never)]` body the `tsv_ts` printer spells (see `CommentFreeWindow`).
+    #[inline]
+    fn first_index_between(&self, start: u32, end: u32) -> usize {
+        if tsv_lang::range_too_narrow_for_a_comment(start, end)
+            || self.comment_free_gap.contains(start, end)
+        {
+            self.comment_free_gap.comments().len()
+        } else {
+            self.first_index_between_wide(start)
+        }
+    }
+
+    /// The search half of [`Self::first_index_between`] — one outlined copy, taking the
+    /// printer.
+    #[inline(never)]
+    fn first_index_between_wide(&self, start: u32) -> usize {
+        self.comment_free_gap.search_from(start)
+    }
+
+    /// **to emit**: the comments in `[start, end)` that *this* caller must print — the
+    /// printer's form of `tsv_lang::comments_to_emit_in_range`, reading the comment-free
+    /// window ([`Self::comment_free_gap`]) ahead of the search.
+    #[inline]
+    pub(crate) fn comments_to_emit_between(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> impl Iterator<Item = &'a Comment> + use<'a> {
+        comments_to_emit_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
+    }
+
+    /// **to emit**: whether *this* caller has a comment to print in `[start, end)` — the
+    /// existence form of [`Self::comments_to_emit_between`].
+    #[inline]
+    pub(crate) fn has_comments_to_emit_between(&self, start: u32, end: u32) -> bool {
+        has_comments_to_emit_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
     }
 
     /// Get a reference to the doc arena (convenience for `self.arena`).
@@ -793,7 +849,7 @@ impl<'a> Printer<'a> {
         sep: &str,
     ) {
         let mut first = true;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        for comment in self.comments_to_emit_between(start, end) {
             // The crate's other comment-emission seam (see `print_css_comment`). Sound to
             // record at build time: the CSS printer builds each doc once and renders it
             // once — no `conditional_group` candidate rebuilds.

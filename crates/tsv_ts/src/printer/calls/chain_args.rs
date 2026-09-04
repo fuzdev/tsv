@@ -105,13 +105,7 @@ fn build_inline_leading_comments(
         printer.push_leading_run_with_soft_line(&mut parts, &run);
         return Some(d.concat(&parts));
     }
-    let pc = PartitionedComments::new(
-        printer.comments,
-        printer.source.as_bytes(),
-        printer.comment_line_breaks,
-        paren_open,
-        arg_start,
-    );
+    let pc = PartitionedComments::new(printer, paren_open, arg_start);
 
     let mut parts = DocBuf::new();
     for comment in &pc.trailing_block {
@@ -641,13 +635,7 @@ fn build_chain_args_force_expand(
 
         // Handle leading comments before first argument
         if i == 0 && has_leading_comments {
-            let first_pc = PartitionedComments::new(
-                printer.comments,
-                printer.source.as_bytes(),
-                printer.comment_line_breaks,
-                paren_open,
-                arg_start,
-            );
+            let first_pc = PartitionedComments::new(printer, paren_open, arg_start);
 
             // The delimiter-line question, in the conjunction the force-expanded builders
             // spell (`docs/comments.md`; `emit_first_arg_leading_comments`' rustdoc names

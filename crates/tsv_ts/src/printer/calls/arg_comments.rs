@@ -704,13 +704,7 @@ pub(super) fn emit_first_arg_leading_comments(
         return;
     }
     let d = printer.d();
-    let pc = PartitionedComments::new(
-        printer.comments,
-        printer.source.as_bytes(),
-        printer.comment_line_breaks,
-        paren_open,
-        first_arg_start,
-    );
+    let pc = PartitionedComments::new(printer, paren_open, first_arg_start);
     if pc.has_trailing_line() {
         pc.emit_trailing_comments(paren_line, printer);
     } else {
@@ -886,19 +880,20 @@ impl<'a> PartitionedComments<'a> {
     /// reading dangled it below the argument and split a pair written as one. Every gap
     /// past a `(` now takes an item constructor, which leaves this one purely the
     /// **delimiter**-gap reading its name describes.
-    pub(crate) fn new(
-        comments: &'a [internal::Comment],
-        source: &[u8],
-        table: tsv_lang::printing::LineTable<'_>,
-        start: u32,
-        end: u32,
-    ) -> Self {
+    pub(crate) fn new(printer: &Printer<'a>, start: u32, end: u32) -> Self {
         // Share the same-line/later-line classification with the chain and ternary
         // gap printers (`tsv_lang::ClassifiedComments`). `leading` keeps the two
         // own-line buckets merged in source order — the inline-aware emitter and its
-        // JSDoc-cast detection rely on the authored order.
-        let classified =
-            tsv_lang::ClassifiedComments::from_range(comments, start, end, source, table);
+        // JSDoc-cast detection rely on the authored order. The walk starts at the
+        // printer's window-reading index, as every gap walk does.
+        let classified = tsv_lang::ClassifiedComments::from_index(
+            printer.comment_free_gap.comments(),
+            printer.first_index_between(start, end),
+            start,
+            end,
+            printer.source.as_bytes(),
+            printer.comment_line_breaks,
+        );
         let leading = classified.leading_in_source_order();
         // ≤ 1 by construction: a second same-line comment would sit inside the first
         // `//`'s own text, so it cannot exist as a token.

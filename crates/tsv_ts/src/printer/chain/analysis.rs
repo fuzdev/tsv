@@ -12,9 +12,7 @@ use crate::printer::calls::is_memberish;
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
 use crate::printer::{ParenContext, Printer, is_multiline_template_expression, needs_parens};
 use tsv_lang::source_scan::has_newline_before_position;
-use tsv_lang::{
-    Comment, Span, TAB_WIDTH, has_line_comments_in_range, range_too_narrow_for_a_comment,
-};
+use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_comments_in_range};
 
 //
 // Linearization
@@ -673,7 +671,7 @@ fn linearize_member_node<'a>(
 /// index where it opens and emitted as `&nodes[open..close]`. Nothing is copied.
 pub fn group_chain_nodes<'a>(
     nodes: &'a [ChainNode<'a>],
-    comments: &[Comment],
+    printer: &Printer<'_>,
 ) -> ChainGroupVec<'a> {
     if nodes.is_empty() {
         return ChainGroupVec::new();
@@ -693,7 +691,7 @@ pub fn group_chain_nodes<'a>(
     while i < nodes.len() {
         let node = &nodes[i];
         if (node.is_call() || node.is_non_null() || node.is_numeric_accessor())
-            && !gap_has_line_comment(node, comments)
+            && !gap_has_line_comment(node, printer)
         {
             i += 1;
         } else {
@@ -707,7 +705,7 @@ pub fn group_chain_nodes<'a>(
         while i + 1 < nodes.len()
             && nodes[i].is_member()
             && nodes[i + 1].is_member()
-            && !gap_has_line_comment(&nodes[i], comments)
+            && !gap_has_line_comment(&nodes[i], printer)
         {
             i += 1;
         }
@@ -727,7 +725,7 @@ pub fn group_chain_nodes<'a>(
         // When we've seen a call and encounter a member, start a new group — or when
         // the member's gap holds a line comment (only a member has a gap)
         if (seen_call && node.is_member() && !node.is_numeric_accessor())
-            || gap_has_line_comment(node, comments)
+            || gap_has_line_comment(node, printer)
         {
             if open < i {
                 groups.push(ChainGroup::new(&nodes[open..i]));
@@ -798,7 +796,7 @@ pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printe
     // matters — a merged member prints through `print_member_access`, which defers a
     // gap `//` to the line end (see `group_chain_nodes`), so a line comment there
     // needs the unmerged path's chain-level emitter.
-    if gap_has_line_comment(&groups[1].nodes[0], printer.comments) {
+    if gap_has_line_comment(&groups[1].nodes[0], printer) {
         return false;
     }
 
@@ -821,30 +819,24 @@ pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printe
 /// "fixing" the two spellings into one.
 ///
 /// Asked of every member node the grouping walks, and the gap is the `.` alone in ~98% of
-/// those asks — so the head is inline: the node's range and the narrow-gap test answer at
-/// the site, and only a gap wide enough to hold a comment pays the call into the search.
-/// Pinned `always`: under a plain hint the head stayed an outlined symbol at its four
-/// sites, and every narrow ask paid its prologue and `ret` for a two-compare answer.
+/// those asks — so the head is inline: the node's range answers at the site, and the
+/// printer's wrapper (`Printer::has_line_comments_between`) puts the narrow-gap test
+/// inline ahead of its one outlined search, which reads the comment-free window before
+/// it probes the array. Pinned `always`: under a plain hint the head stayed an outlined
+/// symbol at its four sites, and every narrow ask paid its prologue and `ret` for a
+/// two-compare answer.
 #[expect(clippy::inline_always)]
 #[inline(always)]
-fn gap_has_line_comment(node: &ChainNode<'_>, comments: &[Comment]) -> bool {
+fn gap_has_line_comment(node: &ChainNode<'_>, printer: &Printer<'_>) -> bool {
     // Through the hole-honoring seam: the widened range's skipped middle holds comments
     // this node prints none of — an inner member's gap forces its OWN node's group split,
     // and the head's share is printed ahead of the whole chain. Asking the range whole
     // split the group for a comment that is not on this gap's line at all.
     node.comment_range().is_some_and(|gap| {
         chain_gap_any(gap, node.paren_gap_skip(), |start, end| {
-            !range_too_narrow_for_a_comment(start, end)
-                && gap_half_has_line_comment(comments, start, end)
+            printer.has_line_comments_between(start, end)
         })
     })
-}
-
-/// The search half of [`gap_has_line_comment`] — one outlined copy, so the inline head
-/// carries no search of its own at any of its call sites.
-#[inline(never)]
-fn gap_half_has_line_comment(comments: &[Comment], start: u32, end: u32) -> bool {
-    has_line_comments_in_range(comments, start, end)
 }
 
 /// Check if chain should NOT wrap between first and second groups
@@ -921,9 +913,32 @@ fn is_factory_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PrinterInputs;
     use crate::ast::internal::{CallExpression, Identifier, MemberExpression};
     use bumpalo::Bump;
-    use tsv_lang::Span;
+    use tsv_lang::doc::arena::DocArena;
+    use tsv_lang::printing::LineBreaks;
+    use tsv_lang::{EmbedContext, Span};
+
+    /// A printer over `comments` alone — what the grouping asks about a member's gap. The
+    /// nodes and comments fabricate spans with no backing source, so the source is empty
+    /// and the inputs are spelled out rather than derived (`for_document` would read each
+    /// comment's text out of that source).
+    fn make_printer<'a>(
+        arena: &'a DocArena,
+        lines: &'a LineBreaks<'a>,
+        comments: &'a [Comment],
+    ) -> Printer<'a> {
+        let inputs = PrinterInputs {
+            source: "",
+            comments,
+            line_table: lines.table(),
+            has_owned_comments: false,
+            has_format_ignore: false,
+            comment_free_window: None,
+        };
+        Printer::with_context(arena, &inputs, EmbedContext::default(), 0)
+    }
 
     /// Helper to create an identifier expression. Tests fabricate spans with no
     /// backing source, so the name rides the escaped channel (an `&'arena str`
@@ -1065,7 +1080,10 @@ mod tests {
                 comments: &[],
             },
         );
-        let groups = group_chain_nodes(&nodes, &[]);
+        let arena_docs = DocArena::new();
+        let lines = LineBreaks::new("", Vec::new());
+        let printer = make_printer(&arena_docs, &lines, &[]);
+        let groups = group_chain_nodes(&nodes, &printer);
 
         // For member-only chains, Prettier puts almost everything in first group
         // (all consecutive members except the last one if followed by more members)
@@ -1097,7 +1115,10 @@ mod tests {
                 comments: &[],
             },
         );
-        let groups = group_chain_nodes(&nodes, &[]);
+        let arena_docs = DocArena::new();
+        let lines = LineBreaks::new("", Vec::new());
+        let printer = make_printer(&arena_docs, &lines, &[]);
+        let groups = group_chain_nodes(&nodes, &printer);
 
         // Grouping should break at member after call
         // Expected: [Base(a), Call()] [Member(.b), Call()] [Member(.c)]
@@ -1115,7 +1136,10 @@ mod tests {
 
     #[test]
     fn test_group_empty_input() {
-        let groups = group_chain_nodes(&[], &[]);
+        let arena_docs = DocArena::new();
+        let lines = LineBreaks::new("", Vec::new());
+        let printer = make_printer(&arena_docs, &lines, &[]);
+        let groups = group_chain_nodes(&[], &printer);
         assert!(groups.is_empty());
     }
 
@@ -1183,7 +1207,10 @@ mod tests {
             for (commented, member) in members.iter().enumerate() {
                 let (gap_start, _) = member.comment_range().unwrap();
                 let comments = [make_line_comment(gap_start + 1)];
-                let groups = group_chain_nodes(&nodes, &comments);
+                let arena_docs = DocArena::new();
+                let lines = LineBreaks::new("", Vec::new());
+                let printer = make_printer(&arena_docs, &lines, &comments);
+                let groups = group_chain_nodes(&nodes, &printer);
 
                 let mut found = false;
                 for group in &groups {
