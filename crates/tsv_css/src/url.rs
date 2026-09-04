@@ -35,8 +35,7 @@ pub(crate) fn trim_url_raw(raw: &str) -> Option<Cow<'_, str>> {
         return None;
     }
     let inner_raw = &raw[open + 1..close];
-    let inner =
-        crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(inner_raw));
+    let inner = crate::escapes::trim_css(inner_raw);
     // Nothing was trimmed (both ends full-length ⟺ identical slice) and the final `)`
     // is the last byte, so `format!` would reproduce `raw` exactly — borrow instead.
     if inner.len() == inner_raw.len() && close == raw.len() - 1 {

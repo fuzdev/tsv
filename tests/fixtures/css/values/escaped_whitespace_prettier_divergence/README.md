@@ -20,6 +20,7 @@ follows:
 | `width: 50px\ ;` | `width: 50px\;` | `\;` escapes the terminator — the declaration never ends |
 | `height: var(--a, 50px\ );` | `height: var(--a, 50px\);` | `\)` escapes the closer — the function never closes |
 | `margin: calc(1px\ );` | `margin: calc(1px\);` | same |
+| `top: calc\ (1px);` | `top: calc\(1px);` | `\(` escapes the **opener** — the value is no longer a function call but the single ident `calc(1px` followed by a `)` that closes nothing (it still parses, as text) |
 | `color: a\ b;` | `color: a\b;` | not a delimiter, but the value silently changes from `a b` to `ab` |
 | `padding: var(--b, x\,y);` | `padding: var(--b, x\, y);` | the **escaped comma** is read as an argument separator, so one ident is split and rejoined with `", "` — a space is inserted *inside* the value `x,y` |
 | `gap: a, b\,;` | `gap: a, b\;` | the same escaped comma at the value's *end*: its payload is dropped and `\;` escapes the terminator |

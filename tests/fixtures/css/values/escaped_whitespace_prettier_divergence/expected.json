@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 166,
+		"end": 186,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 157,
+					"end": 177,
 					"children": [
 						{
 							"type": "Declaration",
@@ -64,48 +64,55 @@
 						{
 							"type": "Declaration",
 							"start": 85,
-							"end": 96,
+							"end": 101,
+							"property": "top",
+							"value": "calc\\ (1px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 105,
+							"end": 116,
 							"property": "color",
 							"value": "a\\ b"
 						},
 						{
 							"type": "Declaration",
-							"start": 100,
-							"end": 123,
+							"start": 120,
+							"end": 143,
 							"property": "padding",
 							"value": "var(--b, x\\,y)"
 						},
 						{
 							"type": "Declaration",
-							"start": 127,
-							"end": 138,
+							"start": 147,
+							"end": 158,
 							"property": "gap",
 							"value": "a, b\\,"
 						},
 						{
 							"type": "Declaration",
-							"start": 142,
-							"end": 153,
+							"start": 162,
+							"end": 173,
 							"property": "inset",
 							"value": "a\\+b"
 						}
 					]
 				},
 				"start": 9,
-				"end": 157
+				"end": 177
 			}
 		],
 		"comments": [],
 		"content": {
 			"start": 7,
-			"end": 158,
-			"styles": "\n\tdiv {\n\t\twidth: 50px\\ ;\n\t\theight: var(--a, 50px\\ );\n\t\tmargin: calc(1px\\ );\n\t\tcolor: a\\ b;\n\t\tpadding: var(--b, x\\,y);\n\t\tgap: a, b\\,;\n\t\tinset: a\\+b;\n\t}\n",
+			"end": 178,
+			"styles": "\n\tdiv {\n\t\twidth: 50px\\ ;\n\t\theight: var(--a, 50px\\ );\n\t\tmargin: calc(1px\\ );\n\t\ttop: calc\\ (1px);\n\t\tcolor: a\\ b;\n\t\tpadding: var(--b, x\\,y);\n\t\tgap: a, b\\,;\n\t\tinset: a\\+b;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 167,
+	"end": 187,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

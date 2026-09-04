@@ -595,8 +595,10 @@ impl<'a> Printer<'a> {
         // Empty custom-property value carrying !important (`--a: !important;`): the `: `
         // separator already supplies the single space, so emit `!important` without the
         // extra leading space `write_declaration_end` adds — avoids `--a:  !important;`.
+        // "Empty" is a CSS-whitespace question (CSS Syntax 3 §4.2): a value that is one
+        // non-ASCII space (`--a: <NBSP>!important;`) is content, printed like any other.
         if decl.is_important()
-            && matches!(&decl.value, CssValue::Identifier { span } if span.extract(self.source).trim().is_empty())
+            && matches!(&decl.value, CssValue::Identifier { span } if crate::escapes::trim_start_css(span.extract(self.source)).is_empty())
         {
             self.write("!important;\n");
             return;

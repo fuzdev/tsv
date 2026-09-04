@@ -284,8 +284,7 @@ impl<'a> ValueParser<'a> {
 
         // Fallback (comment present, a non-ASCII/whitespace boundary, or a
         // non-trimmed range): trim, then classify and split, both comment-aware.
-        let trimmed =
-            crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(text));
+        let trimmed = crate::escapes::trim_css(text);
         if trimmed.is_empty() {
             return CssValue::Identifier {
                 span: self.absolute_span(),
@@ -628,10 +627,7 @@ impl<'a> ValueParser<'a> {
     /// helper).
     fn parse_single<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text();
-        self.build_leaf(
-            crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(text)),
-            arena,
-        )
+        self.build_leaf(crate::escapes::trim_css(text), arena)
     }
 }
 

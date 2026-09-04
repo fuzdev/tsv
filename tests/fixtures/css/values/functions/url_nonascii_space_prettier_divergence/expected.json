@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 348,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 339,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 165,
+							"end": 184,
+							"property": "background",
+							"value": "url( a)"
+						},
+						{
+							"type": "Declaration",
+							"start": 188,
+							"end": 207,
+							"property": "background",
+							"value": "url(a )"
+						},
+						{
+							"type": "Declaration",
+							"start": 211,
+							"end": 231,
+							"property": "background",
+							"value": "url( a )"
+						},
+						{
+							"type": "Declaration",
+							"start": 314,
+							"end": 335,
+							"property": "background",
+							"value": "url( \"a\")"
+						}
+					]
+				},
+				"start": 9,
+				"end": 339
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " An unquoted url() argument glued to a no-break space (U+00A0): the space is not\n\t\t   CSS whitespace, so it is url content, kept at either end ",
+				"start": 15,
+				"end": 162
+			},
+			{
+				"type": "CSSComment",
+				"value": " A quoted argument glued to one is a single opaque token, kept verbatim ",
+				"start": 235,
+				"end": 311
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 340,
+			"styles": "\n\ta {\n\t\t/* An unquoted url() argument glued to a no-break space (U+00A0): the space is not\n\t\t   CSS whitespace, so it is url content, kept at either end */\n\t\tbackground: url( a);\n\t\tbackground: url(a );\n\t\tbackground: url( a );\n\t\t/* A quoted argument glued to one is a single opaque token, kept verbatim */\n\t\tbackground: url( \"a\");\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 349,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

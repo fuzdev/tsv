@@ -1,0 +1,142 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 283,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 200,
+				"end": 274,
+				"name": "keyframes",
+				"prelude": "slide",
+				"block": {
+					"type": "Block",
+					"start": 217,
+					"end": 274,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 221,
+								"end": 226,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 221,
+										"end": 226,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "FROM ",
+														"start": 221,
+														"end": 226
+													}
+												],
+												"start": 221,
+												"end": 226
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 227,
+								"end": 244,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 232,
+										"end": 239,
+										"property": "left",
+										"value": "0"
+									}
+								]
+							},
+							"start": 221,
+							"end": 244
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 247,
+								"end": 250,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 247,
+										"end": 250,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "to ",
+														"start": 247,
+														"end": 250
+													}
+												],
+												"start": 247,
+												"end": 250
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 251,
+								"end": 271,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 256,
+										"end": 266,
+										"property": "left",
+										"value": "100%"
+									}
+								]
+							},
+							"start": 247,
+							"end": 271
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A keyframe selector glued to a no-break space (U+00A0) is not the `from`/`to`\n\t   keyword (the space is part of the name), so it is kept verbatim: not lowercased,\n\t   the space intact ",
+				"start": 9,
+				"end": 198
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 275,
+			"styles": "\n\t/* A keyframe selector glued to a no-break space (U+00A0) is not the `from`/`to`\n\t   keyword (the space is part of the name), so it is kept verbatim: not lowercased,\n\t   the space intact */\n\t@keyframes slide {\n\t\tFROM  {\n\t\t\tleft: 0;\n\t\t}\n\t\tto  {\n\t\t\tleft: 100%;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 284,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1036,9 +1036,11 @@ impl<'a> Printer<'a> {
                 // case-insensitive keywords — lowercase them (`FROM`→`from`),
                 // matching prettier. Any other type selector (and all type selectors
                 // outside keyframes) stays verbatim, so only pay the extract+trim on
-                // the keyframes path.
+                // the keyframes path. The trim is CSS-whitespace-only: a name glued to a
+                // non-ASCII space (`FROM<NBSP>`) is not the keyword, and a Unicode trim
+                // would both lowercase it and drop the space.
                 if self.in_keyframes {
-                    let text = span.extract(self.source).trim();
+                    let text = crate::escapes::trim_css(span.extract(self.source));
                     if text.eq_ignore_ascii_case("from") || text.eq_ignore_ascii_case("to") {
                         return d.text_pooled(&text.to_ascii_lowercase());
                     }
@@ -1150,8 +1152,7 @@ impl<'a> Printer<'a> {
                 #[cfg(feature = "comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 let raw = span.extract(self.source);
-                let item =
-                    crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(raw));
+                let item = crate::escapes::trim_css(raw);
                 d.text_pooled(&value_normalization::collapse_whitespace_runs(item))
             }
         }
