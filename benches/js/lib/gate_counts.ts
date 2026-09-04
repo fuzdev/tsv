@@ -294,7 +294,33 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * `CORPUS_FORMAT_MATCH_MIN`.
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
-	svelte: 7,
+	// 7 → 5: two `prettier/tests/format/html/prettier_ignore/*.html` files LEAVE the bucket,
+	// both by getting BETTER. `cases.html` leaves for **match** (its one hunk was a break tsv
+	// added after an inline `<!-- prettier-ignore -->`); `long_lines.html` leaves for `known`
+	// — what is left of it is the sanctioned boundary-whitespace trim
+	// (`svelte_boundary_ws_trim`), where before that residue sat beside three blank lines
+	// prettier keeps around the ignored nodes and tsv dropped, which no detector explained.
+	// Measured by diffing the `--all --filter svelte --json` bucket lists between a
+	// `f4929877a` (the previous green read) corpus-profile FFI build and the tip: these two
+	// are the ONLY movers among the reproducible files, nothing arrived in `unknown`, and
+	// `safety` / `errors` / `expected_errors` are identical file-for-file. The same diff
+	// moves one LIVE file, `zzz/src/lib/CapabilityWebsocket.svelte`, into `partial` — the
+	// unpinned dev-repo tier, reported as a WARN and not part of this count.
+	//
+	// 5 → 0: the bucket EMPTIES, by one formatter rule and two detector arms. The three
+	// `prettier-plugin-svelte/test/**/region-markers*.html` files leave for **match**: a
+	// `<!-- #endregion -->` directly after a hoisted section now travels below it through
+	// the canonical reorder (prettier-plugin-svelte's region-end trail, precedence included
+	// — fixture `svelte/script/ordering/region_markers`). `printer/samples/svelte-element.html`
+	// leaves for `known`: the cataloged `svelte_element_this_string` prettier bug gains the
+	// detector it never had. `prettier/tests/format/html/comments/surrounding-empty-line.html`
+	// leaves for `known`: `inline_content_block_style` gains its comment-first arm (an inline
+	// element whose content opens with a comment; `render_compare` grades the two outputs
+	// identical). Measured by diffing the `--all --filter svelte --json` bucket lists between
+	// the pre-change corpus-profile FFI build and this one (`match` 1190 → 1193, `known`
+	// 235 → 237): these five are the ONLY movers, nothing arrived in any bucket, and
+	// `partial` / `safety` / `errors` / `expected_errors` are identical file-for-file.
+	svelte: 0,
 	// 109 records a drop of five from 114, in two steps, each verified by diffing the
 	// `unknown` lists before and after rather than by the count alone:
 	//   -2  a binary operand of an `as`/`satisfies` cast takes prettier's continuation

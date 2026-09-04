@@ -30,6 +30,7 @@ use crate::ast::internal::{self, FragmentNode};
 use nodes::AttrGaps;
 use smallvec::SmallVec;
 use std::cell::{Cell, RefCell};
+use std::ops::{Index, IndexMut};
 use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -47,39 +48,99 @@ use tsv_ts::Expression;
 /// Mirrors `tsv_ts`'s `CommentVec`, which this crate can't see (`pub(crate)` there).
 pub(in crate::printer) type CommentRun<'a> = SmallVec<[&'a Comment; 8]>;
 
-/// Which section a fragment comment should travel with during canonical reordering.
-/// Comments attach to the nearest section that follows them in source order.
+/// A root section the printer lifts out of the fragment and prints at its canonical position.
+/// A fragment comment travels with the nearest one that follows it in source order
+/// ([`Printer::classify_fragment_comment`]), or stays in the template (`None` there).
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum CommentSection {
+enum HoistedSection {
     Options,
     ModuleScript,
     InstanceScript,
-    Template,
     Style,
 }
 
-/// The four root sections in canonical print order, each with the [`CommentSection`] it
-/// anchors. **The single enumeration of what hoists**: the comment-classification table
-/// ([`Printer::classify_fragment_comment`]) and the range-slice cuts
-/// ([`Printer::build_ignore_range_doc`], via `print_component`'s `hoisted`) both read it, so a
-/// section kind cannot join one and silently miss the other — a kind the cut missed would
-/// re-open the duplicate-section emit for exactly that kind.
-fn root_sections(root: &internal::Root<'_>) -> [(Option<Span>, CommentSection); 4] {
-    [
-        (
-            root.options.as_ref().map(|s| s.span),
-            CommentSection::Options,
-        ),
-        (
-            root.module.as_ref().map(|s| s.span),
-            CommentSection::ModuleScript,
-        ),
-        (
-            root.instance.as_ref().map(|s| s.span),
-            CommentSection::InstanceScript,
-        ),
-        (root.css.as_ref().map(|s| s.span), CommentSection::Style),
-    ]
+impl HoistedSection {
+    /// The hoisted sections in canonical print order. **The single enumeration of what
+    /// hoists**: [`root_sections`] maps over it, [`Self::slot`] indexes into it (the agreement
+    /// is asserted at compile time below), and [`HoistedComments`] is laid out by it — so the
+    /// comment-classification table ([`Printer::classify_fragment_comment`]) and the
+    /// range-slice cuts ([`Printer::build_ignore_range_doc`], via `print_component`'s
+    /// `hoisted`) read one list, and a section kind cannot join one and silently miss the
+    /// other (a kind the cut missed would re-open the duplicate-section emit for exactly that
+    /// kind).
+    const ALL: [Self; 4] = [
+        Self::Options,
+        Self::ModuleScript,
+        Self::InstanceScript,
+        Self::Style,
+    ];
+
+    /// This section's index into [`Self::ALL`].
+    const fn slot(self) -> usize {
+        match self {
+            Self::Options => 0,
+            Self::ModuleScript => 1,
+            Self::InstanceScript => 2,
+            Self::Style => 3,
+        }
+    }
+
+    /// The section's span in `root`, `None` when the component has no such section.
+    fn span_in(self, root: &internal::Root<'_>) -> Option<Span> {
+        match self {
+            Self::Options => root.options.as_ref().map(|s| s.span),
+            Self::ModuleScript => root.module.as_ref().map(|s| s.span),
+            Self::InstanceScript => root.instance.as_ref().map(|s| s.span),
+            Self::Style => root.css.as_ref().map(|s| s.span),
+        }
+    }
+}
+
+// `slot` and `ALL` are two spellings of one order; a drift between them is a compile error,
+// not a debug-build assertion some fixture has to reach.
+const _: () = {
+    let mut k = 0;
+    while k < HoistedSection::ALL.len() {
+        assert!(
+            HoistedSection::ALL[k].slot() == k,
+            "`HoistedSection::slot` disagrees with `ALL`"
+        );
+        k += 1;
+    }
+};
+
+/// The fragment comments one hoisted section prints: the run written directly ABOVE it
+/// (`leading`, printed before the section in source order) and the region-end marker written
+/// directly BELOW it (`trail`, printed after — [`Printer::region_end_trails`]).
+#[derive(Default)]
+struct SectionComments {
+    leading: Vec<usize>,
+    trail: Option<usize>,
+}
+
+/// [`SectionComments`] per hoisted section, indexed by the [`HoistedSection`] itself
+/// ([`HoistedSection::ALL`] order).
+#[derive(Default)]
+struct HoistedComments([SectionComments; 4]);
+
+impl Index<HoistedSection> for HoistedComments {
+    type Output = SectionComments;
+
+    fn index(&self, section: HoistedSection) -> &SectionComments {
+        &self.0[section.slot()]
+    }
+}
+
+impl IndexMut<HoistedSection> for HoistedComments {
+    fn index_mut(&mut self, section: HoistedSection) -> &mut SectionComments {
+        &mut self.0[section.slot()]
+    }
+}
+
+/// The four root sections in canonical print order ([`HoistedSection::ALL`]), each with its
+/// span when the component has it.
+fn root_sections(root: &internal::Root<'_>) -> [(Option<Span>, HoistedSection); 4] {
+    HoistedSection::ALL.map(|section| (section.span_in(root), section))
 }
 
 /// A format-ignore **range marker**'s kind — the `…-start` / `…-end` pair that brackets a
@@ -105,6 +166,28 @@ fn range_marker(comment: &internal::HtmlComment, source: &str) -> Option<RangeMa
     } else {
         None
     }
+}
+
+/// Whether an HTML comment is an editor region-end marker — `#endregion`, optionally
+/// spaced after the `#` and followed by a label (`<!-- #endregion STYLES -->`), matched
+/// anywhere in the content and case-insensitively. The spelling is prettier-plugin-svelte's
+/// (`/#\s*endregion\b/i` in its region-end trail), so the whitespace between `#` and the word
+/// is JS `\s` and the `\b` after it is the ASCII word boundary.
+fn is_region_end_marker(content: &str) -> bool {
+    const WORD: &str = "endregion";
+    let is_word_byte = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    content
+        .bytes()
+        .enumerate()
+        .filter(|&(_, b)| b == b'#')
+        .any(|(i, _)| {
+            // `#` is ASCII, so `i + 1` is a char boundary; `get` refuses a cut inside a
+            // multibyte char, which is then not the word either
+            let after = tsv_lang::trim_start_js_whitespace(&content[i + 1..]);
+            after.get(..WORD.len()).is_some_and(|word| {
+                word.eq_ignore_ascii_case(WORD) && !after[WORD.len()..].starts_with(is_word_byte)
+            })
+        })
 }
 
 /// A head's content doc plus whether that content **opens on its own line** — the pair every
@@ -1203,11 +1286,11 @@ impl<'a> Printer<'a> {
         comment: &internal::HtmlComment,
         comment_idx: usize,
         root: &internal::Root<'_>,
-    ) -> CommentSection {
+    ) -> Option<HoistedSection> {
         // format-ignore-start/end mark ranges within the template —
         // they must stay in the fragment so the range preservation logic sees them
         if range_marker(comment, self.source).is_some() {
-            return CommentSection::Template;
+            return None;
         }
 
         // A comment INSIDE a frozen range is already emitted by the range's verbatim slice, so
@@ -1215,11 +1298,11 @@ impl<'a> Printer<'a> {
         // the *section* is inside the range too, its start precedes the closing marker and wins
         // the nearest-start contest.
         if self.is_inside_ignore_range(comment_idx, &root.fragment) {
-            return CommentSection::Template;
+            return None;
         }
 
         let comment_end = comment.span.end;
-        let mut nearest: Option<(u32, CommentSection)> = None;
+        let mut nearest: Option<(u32, Option<HoistedSection>)> = None;
 
         // The first thing after the comment that pins it to the template: a real node (the
         // comment leads *it*), or a range marker.
@@ -1237,7 +1320,7 @@ impl<'a> Printer<'a> {
                 other => other.span().start,
             };
             if barrier >= comment_end {
-                nearest = Some((barrier, CommentSection::Template));
+                nearest = Some((barrier, None));
             }
             break;
         }
@@ -1251,11 +1334,129 @@ impl<'a> Printer<'a> {
                 continue;
             };
             if start >= comment_end && nearest.as_ref().is_none_or(|(p, _)| start < *p) {
-                nearest = Some((start, section));
+                nearest = Some((start, Some(section)));
             }
         }
 
-        nearest.map_or(CommentSection::Template, |(_, section)| section)
+        nearest.and_then(|(_, section)| section)
+    }
+
+    /// Each hoisted section's region-end trail CANDIDATE ([`HoistedSection::ALL`] order):
+    /// the fragment index of the first comment after the section's end, with nothing but
+    /// whitespace between, spelled as a region end ([`is_region_end_marker`]) — or `None`.
+    ///
+    /// Comments travel with the section they precede ([`Self::classify_fragment_comment`]),
+    /// so a comment after the last hoisted section — or one followed by template content —
+    /// normally stays in the template, and after the canonical reorder it prints on the far
+    /// side of whatever moved. A `#endregion` is the one comment whose meaning is BOUND to the
+    /// block above it (an editor folds `#region` … `#endregion` as a pair), so it travels
+    /// below the section it closes instead. prettier-plugin-svelte's rule (its
+    /// `extractRegionEndTrailAfterHoistedEnd`), asked the plugin's way — of each hoisted END,
+    /// not of each comment, so a document's template comments pay nothing for it. The one
+    /// byte the two readings differ on is the form feed: the plugin's whitespace gate is
+    /// `[\t\n\f\r ]`, [`internal::is_collapsible_ws`] deliberately lacks `\f`.
+    ///
+    /// A candidate only: the plugin's precedence is its evaluation order, and `print_root`
+    /// applies it against the classification. A `#endregion` that a FOLLOWING `<script>` or
+    /// `<style>` claims as its leading comment (`</script>⏎<!-- #endregion -->⏎<style>`)
+    /// leads that section, since the plugin's embed pass takes those comments before the
+    /// trail is extracted; a following `<svelte:options>` claims its comment AFTER the
+    /// extraction, so there the trail wins (`</style>⏎<!-- #endregion -->⏎<svelte:options />`
+    /// keeps the marker below the style). So a candidate is confirmed only when it classifies
+    /// to the template (`None`) or to [`HoistedSection::Options`]. Range markers and comments
+    /// inside a frozen range are excluded for the same reasons the leading classification
+    /// excludes them.
+    fn region_end_trails(&self, root: &internal::Root<'_>) -> [Option<usize>; 4] {
+        let nodes = &root.fragment.nodes;
+        let bytes = self.source.as_bytes();
+        root_sections(root).map(|(span, _)| {
+            let end = span?.end as usize;
+            // The fragment holds no node of the section itself, so the first node at or past
+            // its end is its successor; step over the whitespace text between them.
+            let first = nodes.partition_point(|n| (n.span().start as usize) < end);
+            let (idx, node) = nodes[first..]
+                .iter()
+                .enumerate()
+                .find(|(_, n)| !n.is_whitespace_only_text())
+                .map(|(k, n)| (first + k, n))?;
+            let FragmentNode::Comment(comment) = node else {
+                return None;
+            };
+            let start = comment.span.start as usize;
+            (bytes[end..start]
+                .iter()
+                .all(|&b| internal::is_collapsible_ws(b))
+                && is_region_end_marker(comment.content(self.source))
+                && range_marker(comment, self.source).is_none()
+                && !self.is_inside_ignore_range(idx, &root.fragment))
+            .then_some(idx)
+        })
+    }
+
+    /// The comment at fragment index `idx` — the one resolution of a classified comment index.
+    /// Only comment indices are classified to a section, so `None` is an invariant violation:
+    /// asserted under the fixture suite, skipped (never a panic — this is the shipped printer)
+    /// in a release build.
+    fn fragment_comment<'f>(
+        fragment: &'f internal::Fragment<'_>,
+        idx: usize,
+    ) -> Option<&'f internal::HtmlComment> {
+        let comment = match &fragment.nodes[idx] {
+            FragmentNode::Comment(comment) => Some(comment),
+            _ => None,
+        };
+        debug_assert!(comment.is_some(), "only comment indices are classified");
+        comment
+    }
+
+    /// Print one hoisted-section comment on its own line: the author's blank line between
+    /// `prev_end` (the previous comment, or the section's closing tag for a region-end trail)
+    /// and the comment survives, then the comment, then the line break. The one emitter behind
+    /// every comment a section prints around itself.
+    fn print_comment_line(&mut self, comment: &internal::HtmlComment, prev_end: Option<u32>) {
+        if let Some(end) = prev_end
+            && text::has_authored_blank_line(
+                &self.source[end as usize..comment.span.start as usize],
+            )
+        {
+            self.write("\n");
+        }
+        self.print_comment(comment);
+        self.write("\n");
+    }
+
+    /// Print a run of hoisted-section comments, each through [`Self::print_comment_line`].
+    /// Returns the last comment's end, `None` when the run is empty.
+    fn print_comment_run(
+        &mut self,
+        comment_indices: &[usize],
+        fragment: &internal::Fragment<'_>,
+    ) -> Option<u32> {
+        let mut prev_end: Option<u32> = None;
+        for &i in comment_indices {
+            let Some(comment) = Self::fragment_comment(fragment, i) else {
+                continue;
+            };
+            self.print_comment_line(comment, prev_end);
+            prev_end = Some(comment.span.end);
+        }
+        prev_end
+    }
+
+    /// Print a section's region-end trail ([`Self::region_end_trails`]) below the section:
+    /// the author's blank line between the closing tag and the marker survives (prettier
+    /// keeps it too), then the comment on its own line.
+    fn print_region_end_trail(
+        &mut self,
+        trail: Option<usize>,
+        fragment: &internal::Fragment<'_>,
+        section_end: u32,
+    ) {
+        if let Some(idx) = trail
+            && let Some(comment) = Self::fragment_comment(fragment, idx)
+        {
+            self.print_comment_line(comment, Some(section_end));
+        }
     }
 
     /// Print section-attached comments and preserve authorial blank lines.
@@ -1263,7 +1464,7 @@ impl<'a> Printer<'a> {
     ///
     /// Both blank questions ask [`text::has_authored_blank_line`], the RUN scan, because neither
     /// gap is guaranteed whitespace-only: a `format-ignore` range marker classifies
-    /// [`CommentSection::Template`] while [`Self::classify_fragment_comment`] skips *every*
+    /// to the template while [`Self::classify_fragment_comment`] skips *every*
     /// comment when it looks for the nearest real node, so a marker can sit between two section
     /// comments — or between the last one and its section. A newline *total* would read that
     /// marker's two bracketing newlines as an authored blank and invent one.
@@ -1280,31 +1481,13 @@ impl<'a> Printer<'a> {
         fragment: &internal::Fragment<'_>,
         section_start: u32,
     ) -> bool {
-        if comment_indices.is_empty() {
+        let Some(last_end) = self.print_comment_run(comment_indices, fragment) else {
             return false;
-        }
-        let mut prev_end: Option<u32> = None;
-        for &i in comment_indices {
-            if let FragmentNode::Comment(comment) = &fragment.nodes[i] {
-                // Preserve authorial blank line between consecutive comments
-                if let Some(end) = prev_end {
-                    let between = &self.source[end as usize..comment.span.start as usize];
-                    if text::has_authored_blank_line(between) {
-                        self.write("\n");
-                    }
-                }
-                self.print_comment(comment);
-                self.write("\n");
-                prev_end = Some(comment.span.end);
-            }
-        }
+        };
         // Preserve authorial blank line between last comment and section
-        if let Some(&last_idx) = comment_indices.last() {
-            let last_end = fragment.nodes[last_idx].span().end;
-            let between = &self.source[last_end as usize..section_start as usize];
-            if text::has_authored_blank_line(between) {
-                self.write("\n");
-            }
+        let between = &self.source[last_end as usize..section_start as usize];
+        if text::has_authored_blank_line(between) {
+            self.write("\n");
         }
         true
     }
@@ -1318,22 +1501,29 @@ impl<'a> Printer<'a> {
     /// 4. Style: `<style>`
     ///
     /// Sections are ordered canonically and separated by blank lines.
-    /// Comments travel with the section they immediately precede in source order.
+    /// Comments travel with the section they immediately precede in source order — and a
+    /// `#endregion` marker directly after a section travels below it
+    /// ([`Self::region_end_trails`]).
     pub(crate) fn print_root(&mut self, root: &internal::Root<'_>) {
-        // Classify fragment comments by the section they should travel with.
-        let mut options_comments: Vec<usize> = Vec::new();
-        let mut module_comments: Vec<usize> = Vec::new();
-        let mut instance_comments: Vec<usize> = Vec::new();
-        let mut style_comments: Vec<usize> = Vec::new();
+        // Classify fragment comments by the section they travel with. A region-end trail
+        // candidate is confirmed against the classification (the plugin's precedence — see
+        // `region_end_trails`); each candidate names one section and each section at most one
+        // candidate, so a confirmed trail is written exactly once.
+        let trails = self.region_end_trails(root);
+        let mut sections = HoistedComments::default();
 
         for (i, node) in root.fragment.nodes.iter().enumerate() {
             if let FragmentNode::Comment(comment) = node {
-                match self.classify_fragment_comment(comment, i, root) {
-                    CommentSection::Options => options_comments.push(i),
-                    CommentSection::ModuleScript => module_comments.push(i),
-                    CommentSection::InstanceScript => instance_comments.push(i),
-                    CommentSection::Style => style_comments.push(i),
-                    CommentSection::Template => {}
+                let section = self.classify_fragment_comment(comment, i, root);
+                if matches!(section, None | Some(HoistedSection::Options))
+                    && let Some(k) = trails.iter().position(|&trail| trail == Some(i))
+                {
+                    debug_assert!(sections.0[k].trail.is_none());
+                    sections.0[k].trail = Some(i);
+                    continue;
+                }
+                if let Some(section) = section {
+                    sections[section].leading.push(i);
                 }
             }
         }
@@ -1348,36 +1538,75 @@ impl<'a> Printer<'a> {
 
         // Non-template comments are skipped during fragment printing
         let mut printed_comment_indices: Vec<usize> = Vec::new();
-        printed_comment_indices.extend(&options_comments);
-        printed_comment_indices.extend(&module_comments);
-        printed_comment_indices.extend(&instance_comments);
-        printed_comment_indices.extend(&style_comments);
+        for section in &sections.0 {
+            printed_comment_indices.extend(&section.leading);
+            printed_comment_indices.extend(section.trail);
+        }
+
+        // The comment run that ENDS the fragment — comments after the last real template node,
+        // with nothing but whitespace between them and the end — when a `<style>` prints after
+        // the template. Printed as the style's leading run rather than as template content, for
+        // one fixed point: printed at the template's end, that run sits directly above the
+        // `<style>` in the OUTPUT, so the next pass reads it as the style's leading comments
+        // (that is what a comment above a section is) and inserts the section blank above it —
+        // a second pass that differs from the first. prettier-plugin-svelte converges on that
+        // second form too, so it is the one pass prints. A region-end trail is stepped over (it
+        // is the section's own, already placed); a range marker or a comment inside a frozen
+        // range ends the run, since moving either would move the freeze.
+        let mut style_trailing: Vec<usize> = Vec::new();
+        if root.css.is_some() {
+            for (i, node) in root.fragment.nodes.iter().enumerate().rev() {
+                match node {
+                    FragmentNode::Text(t) if t.is_collapsible_ws_only => {}
+                    FragmentNode::Comment(_) if sections.0.iter().any(|s| s.trail == Some(i)) => {}
+                    FragmentNode::Comment(c)
+                        if !printed_comment_indices.contains(&i)
+                            && range_marker(c, self.source).is_none()
+                            && !self.is_inside_ignore_range(i, &root.fragment) =>
+                    {
+                        style_trailing.push(i);
+                    }
+                    _ => break,
+                }
+            }
+            style_trailing.reverse();
+            printed_comment_indices.extend(&style_trailing);
+        }
 
         let mut has_previous_section = false;
 
         // Format svelte:options (if present) - always first
         if let Some(options) = &root.options {
-            self.print_section_comments(&options_comments, &root.fragment, options.span.start);
+            let comments = &sections[HoistedSection::Options];
+            self.print_section_comments(&comments.leading, &root.fragment, options.span.start);
             self.print_svelte_options(options);
+            self.print_region_end_trail(comments.trail, &root.fragment, options.span.end);
             has_previous_section = true;
         }
 
         // Format scripts (module then instance)
         for (script, comments) in [
-            (root.module.as_ref(), &module_comments),
-            (root.instance.as_ref(), &instance_comments),
+            (
+                root.module.as_ref(),
+                &sections[HoistedSection::ModuleScript],
+            ),
+            (
+                root.instance.as_ref(),
+                &sections[HoistedSection::InstanceScript],
+            ),
         ] {
             if let Some(script) = script {
                 if has_previous_section {
                     self.write("\n"); // Blank line between sections
                 }
-                self.print_section_comments(comments, &root.fragment, script.span.start);
+                self.print_section_comments(&comments.leading, &root.fragment, script.span.start);
                 if self.has_format_ignore_before(&root.fragment, script.span.start) {
                     self.write_verbatim_span(script.span);
                     self.write("\n");
                 } else {
                     self.print_script(script);
                 }
+                self.print_region_end_trail(comments.trail, &root.fragment, script.span.end);
                 has_previous_section = true;
             }
         }
@@ -1405,13 +1634,24 @@ impl<'a> Printer<'a> {
             if has_previous_section {
                 self.write("\n"); // Blank line between sections
             }
-            self.print_section_comments(&style_comments, &root.fragment, style.span.start);
+            if self
+                .print_comment_run(&style_trailing, &root.fragment)
+                .is_some()
+            {
+                // The run stands off the style's own leading run (or the tag) by a blank line —
+                // the section blank it earned as template content, which is also where the
+                // second pass would put it.
+                self.write("\n");
+            }
+            let comments = &sections[HoistedSection::Style];
+            self.print_section_comments(&comments.leading, &root.fragment, style.span.start);
             if ignore_style {
                 self.write_verbatim_span(style.span);
                 self.write("\n");
             } else {
                 self.print_style(style);
             }
+            self.print_region_end_trail(comments.trail, &root.fragment, style.span.end);
         }
     }
 
