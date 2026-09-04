@@ -642,14 +642,23 @@ impl<'a> Printer<'a> {
     /// losing the `Combinator`). `trim_end_preserving_escape` draws exactly that line:
     /// a whitespace preceded by an odd-length backslash run is a payload and stays;
     /// anything else (a hex terminator, ordinary padding) still goes.
+    ///
+    /// The leaf is the document's own bytes, so it is emitted as a `source_span` — no
+    /// copy into the arena's text pool, and its width read off the host's word rather
+    /// than a scalar walk over a bare slice (see `DocArena::source_span`). The trim only
+    /// ever shortens the END, so the kept text is still the slice at `span.start`; the
+    /// slice itself is materialized only when there is a trim to run.
     fn span_leaf_doc(&self, span: Span, is_last_in_compound: bool) -> DocId {
-        let raw = span.extract(self.source);
-        let text = if is_last_in_compound {
-            crate::escapes::trim_end_preserving_escape(raw)
+        let kept = if is_last_in_compound {
+            let text = crate::escapes::trim_end_preserving_escape(span.extract(self.source));
+            Span {
+                start: span.start,
+                end: span.start + text.len() as u32,
+            }
         } else {
-            raw
+            span
         };
-        self.d().text_pooled(text)
+        self.d().source_span(kept, self.source)
     }
 
     /// Reconstruct an attribute selector (`[ns|name op 'value' flags]`) from source.
@@ -1194,7 +1203,21 @@ impl<'a> Printer<'a> {
                 } else {
                     name.as_ref()
                 };
-                d.text_pooled(text)
+                match &name {
+                    // A borrowed name is the document's own bytes from `span.start` (the
+                    // trim only shortens the end), so it is emitted as a `source_span` —
+                    // no pool copy, the width read off the host's word — the same form
+                    // `span_leaf_doc` gives a type / class / id leaf. Only a case-folded
+                    // name (an owned `String`) is pooled.
+                    Cow::Borrowed(_) => d.source_span(
+                        Span {
+                            start: span.start,
+                            end: span.start + text.len() as u32,
+                        },
+                        self.source,
+                    ),
+                    Cow::Owned(_) => d.text_pooled(text),
+                }
             }
         }
     }

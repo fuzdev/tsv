@@ -284,6 +284,10 @@ impl<'a> Printer<'a> {
             // Deliberately pooled, not `source_span`: this arm is hot on CSS corpora
             // (every `url(...)`) and the span form's render-time resolution hop measured
             // +0.07% instructions there for no allocation win (the pool is amortized).
+            // TODO: re-measure that verdict — it predates the render's inlined `resolve_text`,
+            // and the selector leaf (`span_leaf_doc`, ~12-byte slices) since read −0.34% as a
+            // `source_span` with no hop visible; a url is longer still. The `Borrowed` arm of
+            // `trim_url_raw` is the document's own bytes and would take the span form directly.
             if span.end_usize() <= self.source.len() {
                 let raw = span.extract(self.source);
                 return match crate::url::trim_url_raw(raw) {
