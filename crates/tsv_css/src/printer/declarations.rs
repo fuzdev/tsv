@@ -405,8 +405,13 @@ impl<'a> Printer<'a> {
         ) && !self.has_value_comments_in_decl(decl)
         {
             self.print_decl_value_list(decl);
-        } else if let CssValue::Function { name, args, span } = &decl.value {
-            self.print_decl_function(decl, decl_source, name, args, *span);
+        } else if let CssValue::Function {
+            name_span,
+            args,
+            span,
+        } = &decl.value
+        {
+            self.print_decl_function(decl, decl_source, *name_span, args, *span);
         } else if self.has_value_comments_in_decl(decl) {
             self.print_decl_with_comments(decl, decl_source);
         } else if matches!(&decl.value, CssValue::String { .. }) {
@@ -452,15 +457,15 @@ impl<'a> Printer<'a> {
         &mut self,
         decl: &internal::CssDeclaration<'_>,
         decl_source: &str,
-        name: &str,
+        name_span: Span,
         args: &[CssValue<'_>],
         span: Span,
     ) {
         if self.has_value_comments_in_decl(decl) {
-            self.print_decl_function_with_comments(decl, decl_source, name, args, span);
+            self.print_decl_function_with_comments(decl, decl_source, name_span, args, span);
         } else {
             self.write(": ");
-            let doc = self.build_value_function_doc(name, args, span);
+            let doc = self.build_value_function_doc(name_span, args, span);
             // Reserve the trailing `;` plus any ` !important` tail for the OUTERMOST
             // function group's fit decision (the property + `: ` + tail + `;` boundary).
             // Counting the tail makes an `!important` function wrap when the keyword
@@ -502,7 +507,7 @@ impl<'a> Printer<'a> {
         &mut self,
         decl: &internal::CssDeclaration<'_>,
         decl_source: &str,
-        name: &str,
+        name_span: Span,
         args: &[CssValue<'_>],
         span: Span,
     ) {
@@ -524,7 +529,7 @@ impl<'a> Printer<'a> {
         self.write(": ");
         if needs_wrap {
             // Wrapped: func(\n\targ1,\n\targ2\n)
-            self.write(name);
+            self.write(name_span.extract(self.source));
             self.write("(\n");
             self.indent_level += 1;
             self.print_function_args_from_source(span, args);
