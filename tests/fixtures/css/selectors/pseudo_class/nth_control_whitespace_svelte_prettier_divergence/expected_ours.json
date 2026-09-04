@@ -1,0 +1,380 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 529,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 182,
+					"end": 200,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 182,
+							"end": 200,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 193,
+												"end": 199,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 193,
+														"end": 199,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1",
+																		"start": 193,
+																		"end": 199
+																	}
+																],
+																"start": 193,
+																"end": 199
+															}
+														]
+													}
+												]
+											},
+											"start": 182,
+											"end": 200
+										}
+									],
+									"start": 182,
+									"end": 200
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 201,
+					"end": 219,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 205,
+							"end": 215,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 182,
+				"end": 219
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 260,
+					"end": 289,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 260,
+							"end": 289,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 271,
+												"end": 288,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 271,
+														"end": 288,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1",
+																		"start": 271,
+																		"end": 288,
+																		"selector": {
+																			"type": "SelectorList",
+																			"start": 281,
+																			"end": 288,
+																			"children": [
+																				{
+																					"type": "ComplexSelector",
+																					"start": 281,
+																					"end": 288,
+																					"children": [
+																						{
+																							"type": "RelativeSelector",
+																							"combinator": null,
+																							"selectors": [
+																								{
+																									"type": "ClassSelector",
+																									"name": "class1",
+																									"start": 281,
+																									"end": 288
+																								}
+																							],
+																							"start": 281,
+																							"end": 288
+																						}
+																					]
+																				}
+																			]
+																		}
+																	}
+																],
+																"start": 271,
+																"end": 288
+															}
+														]
+													}
+												]
+											},
+											"start": 260,
+											"end": 289
+										}
+									],
+									"start": 260,
+									"end": 289
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 290,
+					"end": 309,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 294,
+							"end": 305,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 260,
+				"end": 309
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 395,
+					"end": 413,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 395,
+							"end": 413,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 406,
+												"end": 412,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 406,
+														"end": 412,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1",
+																		"start": 406,
+																		"end": 412
+																	}
+																],
+																"start": 406,
+																"end": 412
+															}
+														]
+													}
+												]
+											},
+											"start": 395,
+											"end": 413
+										}
+									],
+									"start": 395,
+									"end": 413
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 414,
+					"end": 434,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 418,
+							"end": 430,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 395,
+				"end": 434
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 489,
+					"end": 500,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 489,
+							"end": 500,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 493,
+												"end": 499,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 493,
+														"end": 499,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1",
+																		"start": 493,
+																		"end": 499
+																	}
+																],
+																"start": 493,
+																"end": 499
+															}
+														]
+													}
+												]
+											},
+											"start": 489,
+											"end": 500
+										}
+									],
+									"start": 489,
+									"end": 500
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 501,
+					"end": 520,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 505,
+							"end": 516,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 489,
+				"end": 520
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A control character Svelte's `\\s` counts as whitespace (VT U+000B, FF U+000C) around an\n\t   An+B operator normalizes to a single space, like every other selector gap ",
+				"start": 9,
+				"end": 180
+			},
+			{
+				"type": "CSSComment",
+				"value": " ...and around the `of` keyword ",
+				"start": 222,
+				"end": 258
+			},
+			{
+				"type": "CSSComment",
+				"value": " ...and inside the parens, before the term and after it, where it is dropped ",
+				"start": 312,
+				"end": 393
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same term in a non-nth functional pseudo ",
+				"start": 437,
+				"end": 487
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 521,
+			"styles": "\n\t/* A control character Svelte's `\\s` counts as whitespace (VT U+000B, FF U+000C) around an\n\t   An+B operator normalizes to a single space, like every other selector gap */\n\t:nth-child(2n + 1) {\n\t\tcolor: red;\n\t}\n\n\t/* ...and around the `of` keyword */\n\t:nth-child(2n + 1 of .class1) {\n\t\tcolor: blue;\n\t}\n\n\t/* ...and inside the parens, before the term and after it, where it is dropped */\n\t:nth-child(2n + 1) {\n\t\tcolor: green;\n\t}\n\n\t/* the same term in a non-nth functional pseudo */\n\t:is(2n + 1) {\n\t\tcolor: teal;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 530,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
