@@ -1,6 +1,7 @@
 use super::CssParser;
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use crate::whitespace::boundary_split_offset;
 use tsv_lang::{ParseError, Span};
 
 /// Parse attribute selector: `[attr]`, `[attr="value"]`, `[attr^="prefix"]`
@@ -211,46 +212,67 @@ fn parse_attribute_matcher_and_value(
 /// case-sensitive), preserving the original case. A trailing identifier that
 /// isn't a flag is left unconsumed. Advances past the flag + trailing
 /// whitespace when present.
+///
+/// The flag is the ASCII-letter prefix of the token, which is what `REGEX_ATTRIBUTE_FLAGS`
+/// (`/[a-zA-Z]+/y`) reads: a boundary run glued behind it (`[a=b i<NBSP>]`) is the
+/// flags→`]` `allow_whitespace()` to `parseCss`, where the lexer read one identifier
+/// `i<NBSP>`. The reader ends the flag at the letters and re-seats past them, so the skip
+/// below steps the run exactly as it steps a run the lexer tokenized on its own. Read from
+/// the RAW token for the same reason: an escaped spelling (`\69`) is no flag to that regex.
 fn parse_attribute_flags<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<Option<&'arena str>, ParseError> {
-    if parser.check(TokenKind::Identifier) {
-        // ASCII-cased by the grammar (`i`/`I`/`s`/`S`), so no `to_lowercase` allocation —
-        // and no Unicode folding to widen what counts as a flag.
-        let flag = parser.alloc_str_in(parser.current_value());
-        if flag.eq_ignore_ascii_case("i") || flag.eq_ignore_ascii_case("s") {
-            parser.advance()?;
-            // `read_selector`'s `allow_whitespace()` between the flags and `]`; a run left
-            // standing here is where the `]` is due, so `[a=b i<NBSP>]` REJECTED.
-            parser.skip_boundary_whitespace_registering_comments()?;
-            Ok(Some(flag)) // Preserve original case
-        } else {
-            Ok(None)
-        }
-    } else {
-        Ok(None)
+    if !parser.check(TokenKind::Identifier) {
+        return Ok(None);
     }
+    let (start, end) = (parser.current_start, parser.current_end);
+    let raw = &parser.source()[start..end];
+    let letters = raw.bytes().take_while(u8::is_ascii_alphabetic).count();
+    let flag = &raw[..letters];
+    // ASCII-cased by the grammar (`i`/`I`/`s`/`S`), so no `to_lowercase` allocation — and
+    // no Unicode folding to widen what counts as a flag.
+    if !(flag.eq_ignore_ascii_case("i") || flag.eq_ignore_ascii_case("s")) {
+        return Ok(None);
+    }
+    let flag = parser.alloc_str_in(flag);
+    parser.advance_from(start + letters)?;
+    // `read_selector`'s `allow_whitespace()` between the flags and `]`.
+    parser.skip_boundary_whitespace_registering_comments()?;
+    Ok(Some(flag)) // Preserve original case
 }
 
 /// Parse an attribute selector's value (identifier or string), recording the raw
 /// token span (a string keeps its quotes, an identifier its escapes — the wire
 /// derives its quote-stripped text via `attribute_value_text`, matching Svelte's
 /// undecoded `value`). Advances past the value token and trailing whitespace.
+///
+/// A bare value ends where `read_attribute_value` ends it — at the first JS-`\s` code point
+/// (`REGEX_CLOSING_BRACKET`), which the lexer read as identifier content: `[a=b<NBSP>]` is the
+/// value `b` and `[a=b<NBSP>i]` the value `b` with the flag `i` behind the run. The reader
+/// ends the span at the split (`boundary_split_offset`) and re-seats there, so the skip below
+/// steps the run as it steps one the lexer tokenized on its own; the head of the token was
+/// stepped by the matcher→value juncture before it was read.
 fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, ParseError> {
-    let span = match &parser.current_kind {
-        TokenKind::Identifier | TokenKind::String { .. } => Span {
-            start: parser.span_pos(parser.current_start),
-            end: parser.span_pos(parser.current_end),
-        },
+    let (start, mut end) = (parser.current_start, parser.current_end);
+    match &parser.current_kind {
+        TokenKind::Identifier => {
+            if let Some(split) = boundary_split_offset(&parser.source()[start..end]) {
+                end = start + split;
+            }
+        }
+        TokenKind::String { .. } => {}
         _ => {
             return Err(parser.error_expected("attribute value"));
         }
+    }
+    let span = Span {
+        start: parser.span_pos(start),
+        end: parser.span_pos(end),
     };
-    parser.advance()?;
+    parser.advance_from(end)?;
     // `read_selector`'s `allow_whitespace()` between the value and the flags — the run is a
     // separator on both sides of `parseCss` (`read_attribute_value` also stops on it, since
-    // its `REGEX_CLOSING_BRACKET` is JS `\s`), so `[a='b'<NBSP>]` and `[a='b'<NBSP>i]`
-    // REJECTED on input canonical accepts.
+    // its `REGEX_CLOSING_BRACKET` is JS `\s`).
     parser.skip_boundary_whitespace_registering_comments()?;
     Ok(Some(span))
 }

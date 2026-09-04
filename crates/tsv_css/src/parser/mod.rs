@@ -287,10 +287,13 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// `parse_block_comment`), the **compound break** after every simple selector and a
     /// combinator's two gaps — the one before its symbol and the one after it, comments
     /// included (`parse_combinator` / `parse_explicit_combinator` / `skip_combinator_gap`) —
-    /// a pseudo-argument list's start and its `)` (`parser/pseudo.rs`), and the attribute
+    /// a pseudo-argument list's start and its `)` (`parser/pseudo.rs`), the attribute
     /// selector's `[`, name, matcher→value, value→flags and flags→`]` gaps
-    /// (`parser/attributes.rs`). A declaration's property and value are NOT among them —
-    /// `parseCss` scans both raw, so the run is content there.
+    /// (`parser/attributes.rs`), and a declaration's property→colon gap
+    /// (`skip_boundary_whitespace_and_comments`). A declaration's VALUE is not among them —
+    /// `read_value` scans it raw, so the run is content there — and neither is the tail of a
+    /// bare attribute value or of a case flag, where the run ends a token the lexer read
+    /// longer (`parser/attributes.rs`, `boundary_prefix_len`'s twin `boundary_split_offset`).
     ///
     /// Each of those is also a position the PRINTER owes the run back at — see
     /// `Printer::gap_boundary_ws` and `Printer::write_head_boundary_ws`. Adding a caller here
@@ -402,24 +405,10 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         Ok(kind)
     }
 
-    /// Peek past whitespace and comments to find the next significant token.
-    /// This creates a temporary lexer to look ahead without modifying parser state.
-    ///
-    /// Its one caller is the declaration-vs-nested-rule disambiguation (`decl_scan`), and that
-    /// is the whole of its scope: `parseCss` reads a declaration's property and value with raw
-    /// scans, so a boundary run is CONTENT there and this lookahead is right to see the
-    /// identifier the lexer built. A lookahead that predicts a *skip* must instead be
-    /// [`peek_past_boundary_whitespace`](Self::peek_past_boundary_whitespace) — a class
-    /// narrower than the skip it predicts mis-reads the run as a token, which is how
-    /// `a /* c */<NBSP>{` came to be classified as a descendant combinator.
-    pub(crate) fn peek_past_whitespace(&self) -> Result<TokenKind, ParseError> {
-        self.peek_past(true)
-    }
-
     /// Peek past a run of `/* */` comments — and **only** comments — to the next
     /// token's kind, without consuming anything.
     ///
-    /// The comments-only twin of [`Self::peek_past_whitespace`], for the selector
+    /// The comments-only twin of [`Self::peek_past_boundary_whitespace`], for the selector
     /// positions where a comment is inter-token trivia but a `<whitespace-token>` is
     /// forbidden by the grammar: the components of a `<wq-name>` (`svg/* c */|rect`) and
     /// of an `<attr-matcher>` (`[attr~/* c */='value']`). Skipping whitespace here would
@@ -434,27 +423,31 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         if !matches!(next, TokenKind::Comment) {
             return Ok(next);
         }
-        self.peek_past(false)
+        let (_, mut temp_lexer) = self.lookahead_lexer();
+        loop {
+            let token = temp_lexer.next_token()?;
+            if !matches!(token.kind, TokenKind::Comment) {
+                return Ok(token.kind);
+            }
+        }
     }
 
     /// Peek past a run of trivia as `allow_comment_or_whitespace` sees it — comments,
     /// whitespace tokens, **and** the boundary run hiding at the head of an identifier — to
-    /// the kind of the next real token.
+    /// the kind of the next real token. A temporary lexer from the current token's end, so
+    /// parser state (the `peek` slot included) is untouched.
     ///
-    /// The boundary-aware twin of [`Self::peek_past_whitespace`], for the two selector
-    /// lookaheads that ask "what does this gap lead to?" and act on the answer: whether a
-    /// gap comment continues the selector, and whether a comment sits before a `,`. Both
-    /// were reading a `<NBSP>` behind a comment as an identifier — a selector start, a
-    /// non-comma — and so classified `a /* c */<NBSP>{` as a descendant combinator and
-    /// `a /* c */<NBSP>, b` as a list that had ended. A lookahead whose whitespace class is
-    /// narrower than the skip it predicts is the same defect as one wider than the lexer's.
-    ///
-    /// Deliberately NOT what `decl_scan`'s declaration-vs-rule lookahead uses: `parseCss`
-    /// reads a declaration's property and value with raw scans, so the run there is content,
-    /// not trivia.
+    /// For the lookaheads that ask "what does this gap lead to?" and act on the answer: the
+    /// two selector ones — whether a gap comment continues the selector, and whether a
+    /// comment sits before a `,` — and the declaration-vs-rule disambiguation's token walk
+    /// (`decl_scan::peek_significant_kind`, behind its ASCII byte scan). Each was reading a
+    /// `<NBSP>` in the gap as an identifier — a selector start, a non-comma, the token that
+    /// should have been a `:` — and so classified `a /* c */<NBSP>{` as a descendant
+    /// combinator, `a /* c */<NBSP>, b` as a list that had ended, and `a { color <NBSP>: red }`
+    /// as a nested rule. A lookahead whose whitespace class is narrower than the skip it
+    /// predicts is the same defect as one wider than the lexer's.
     pub(crate) fn peek_past_boundary_whitespace(&self) -> Result<TokenKind, ParseError> {
-        let remaining = &self.source()[self.current_end..];
-        let mut temp_lexer = Lexer::at_offset(remaining, self.base_offset + self.current_end);
+        let (remaining, mut temp_lexer) = self.lookahead_lexer();
         loop {
             let token = temp_lexer.next_token()?;
             match &token.kind {
@@ -480,19 +473,13 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         }
     }
 
-    /// The lookahead both `peek_past_*` spell: a temporary lexer from the current token's
-    /// end, so parser state (including the `peek` slot) is untouched.
-    fn peek_past(&self, whitespace: bool) -> Result<TokenKind, ParseError> {
+    /// A temporary lexer seated at the current token's end, with the source it reads from —
+    /// the seam both `peek_past_*` lookaheads spell, so parser state (the `peek` slot
+    /// included) is untouched.
+    fn lookahead_lexer(&self) -> (&'a str, Lexer<'a>) {
         let remaining = &self.source()[self.current_end..];
-        let mut temp_lexer = Lexer::at_offset(remaining, self.base_offset + self.current_end);
-        loop {
-            let token = temp_lexer.next_token()?;
-            match &token.kind {
-                TokenKind::Comment => continue,
-                TokenKind::Whitespace if whitespace => continue,
-                _ => return Ok(token.kind),
-            }
-        }
+        let lexer = Lexer::at_offset(remaining, self.base_offset + self.current_end);
+        (remaining, lexer)
     }
 
     /// Advance past a run of `/* */` comments — and **only** comments — registering each
@@ -500,8 +487,8 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     ///
     /// The consuming counterpart of [`Self::peek_past_comments`], with the same reason for
     /// leaving whitespace alone. Registration (rather than
-    /// [`Self::skip_whitespace_and_comments`]'s drop) is what lets the printer re-emit the
-    /// comment at its authored position.
+    /// [`Self::skip_boundary_whitespace_and_comments`]'s drop) is what lets the printer
+    /// re-emit the comment at its authored position.
     pub(crate) fn register_and_skip_comments(&mut self) -> Result<(), ParseError> {
         while matches!(&self.current_kind, TokenKind::Comment) {
             self.register_current_comment();
@@ -548,32 +535,37 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         Ok(())
     }
 
-    /// Skip whitespace and comments, **dropping** the comments.
+    /// Step the property→colon gap of a declaration: boundary whitespace and comments,
+    /// **dropping** the comments.
     ///
     /// A comment skipped here never reaches `self.comments`, so the printer's
     /// `comments_to_emit_in_range` lookups cannot reconstruct it — in any gap the printer
     /// rebuilds from the AST (rather than emitting verbatim source), that is
     /// silent content loss. Use `skip_whitespace_registering_comments` in those
     /// positions; this variant is only safe where the skipped range is re-emitted
-    /// verbatim or comments are recovered by other means (e.g. the declaration
-    /// property→colon gap, reconstructed by the svelte-compat property split).
+    /// verbatim or comments are recovered by other means: its one caller is the declaration
+    /// property→colon gap, reconstructed by the svelte-compat property split.
+    ///
+    /// Boundary-aware, because that gap is an `allow_whitespace()` juncture: `read_declaration`
+    /// ends the property with `read_until(/[\s:]/)` — JS `\s`, so a `<NBSP>` ends the name
+    /// there exactly as a space does — and skips to the colon. The lexer read the run as an
+    /// identifier (`color <NBSP>: red`), and the plain skip left it standing where the `:`
+    /// was due. Looped like `skip_boundary_whitespace_registering_comments`, since a run may
+    /// sit on either side of a comment in the gap (`color /* c */<NBSP>: red`).
     ///
     /// Returns whether any comment was skipped — the declaration property→colon
     /// gap uses this to fold into `CssDeclaration::has_block_comment` without a
     /// re-scan.
-    pub(crate) fn skip_whitespace_and_comments(&mut self) -> Result<bool, ParseError> {
+    pub(crate) fn skip_boundary_whitespace_and_comments(&mut self) -> Result<bool, ParseError> {
         let mut saw_comment = false;
         loop {
-            if self.check(TokenKind::Whitespace) {
-                self.advance()?;
-            } else if matches!(&self.current_kind, TokenKind::Comment) {
-                saw_comment = true;
-                self.advance()?;
-            } else {
-                break;
+            self.skip_boundary_whitespace()?;
+            if !matches!(&self.current_kind, TokenKind::Comment) {
+                return Ok(saw_comment);
             }
+            saw_comment = true;
+            self.advance()?;
         }
-        Ok(saw_comment)
     }
 
     /// Skip whitespace and **register** any comments encountered into `self.comments`.
@@ -581,8 +573,8 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// Used by structured preludes (e.g. `@import`) where comments are valid between
     /// the parsed tokens and must survive for the printer to reconstruct, even though
     /// they're stripped from the public-AST prelude string (matching Svelte). Unlike
-    /// `skip_whitespace_and_comments`, this preserves the comments rather than dropping
-    /// them.
+    /// `skip_boundary_whitespace_and_comments`, this preserves the comments rather than
+    /// dropping them.
     ///
     /// ⚠️ **Not the one to reach for at a SELECTOR juncture** — an at-rule prelude is a raw
     /// scan to `parseCss` (`read_value`), so the boundary class does not apply there, which is
@@ -644,9 +636,10 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// token: a boundary run is name content to `read_identifier`, so `1<NBSP>of` is one
     /// dimension token and `of<NBSP>b` one identifier, and no sequence of `advance` calls
     /// lands on the `of` in the first or past it in the second. The boundary skip's own
-    /// whole-token arm and the CDO/CDC marker skip re-seat the same way. Only ever moves
-    /// forward, so unlike [`rewind_to`](Self::rewind_to) every comment registered so far
-    /// stands; any lookahead was lexed from before the jump and is dropped.
+    /// whole-token arm, the CDO/CDC marker skip, and the attribute selector's value and
+    /// case-flag readers (through [`advance_from`](Self::advance_from)) re-seat the same way.
+    /// Only ever moves forward, so unlike [`rewind_to`](Self::rewind_to) every comment
+    /// registered so far stands; any lookahead was lexed from before the jump and is dropped.
     pub(in crate::parser) fn resume_at(&mut self, pos: usize) -> Result<(), ParseError> {
         debug_assert!(
             pos >= self.current_start,
@@ -657,6 +650,20 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         // `seek` also drops the lexer's parked decode, which belonged to the token left behind.
         self.lexer.seek(pos);
         self.advance()
+    }
+
+    /// Make current the token that begins at `end`: the current token's own end, or a split
+    /// INSIDE it that a reader established by scanning the token's source — the attribute
+    /// selector's value and case flag, which `parseCss` ends before the lexer does.
+    ///
+    /// The whole-token case is a plain [`advance`](Self::advance), which keeps a cached
+    /// lookahead; a split re-seats through [`resume_at`](Self::resume_at), which drops it.
+    pub(in crate::parser) fn advance_from(&mut self, end: usize) -> Result<(), ParseError> {
+        if end == self.current_end {
+            self.advance()
+        } else {
+            self.resume_at(end)
+        }
     }
 
     /// Skip a run of legacy HTML-comment markers `<!-- ... -->` (CDO/CDC) at a

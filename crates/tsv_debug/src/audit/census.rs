@@ -6,7 +6,7 @@
 //! (the print-once ledger) or the list the parser produced (`parse().comments`)
 //! — which inherits exactly the registration holes it should be checking: a
 //! comment a parse path consumes without registering (the CSS
-//! `skip_whitespace_and_comments` class) never existed as far as those
+//! `skip_boundary_whitespace_and_comments` class) never existed as far as those
 //! instruments know, so its drop is invisible and the corpus stays green **by
 //! absence**. The census's whole design is independence from that channel: it
 //! scans the raw INPUT and the raw OUTPUT with its own trivia scanners and

@@ -581,8 +581,9 @@ fn pseudo_arg_terminal_nth(parser: &CssParser<'_, '_>) -> bool {
 ///
 /// The lookahead is the **boundary** one, because the skip it predicts is: the gap is one
 /// `allow_comment_or_whitespace` to `parseCss`, so a `<NBSP>` behind the comment is trivia
-/// and not the identifier the lexer read. Asking `peek_past_whitespace` here saw a selector
-/// start in the run itself and called `a /* c */<NBSP>{` a descendant combinator.
+/// and not the identifier the lexer read. A lookahead that skipped only whitespace TOKENS
+/// here saw a selector start in the run itself and called `a /* c */<NBSP>{` a descendant
+/// combinator.
 fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
     let after = parser.peek_past_boundary_whitespace()?;
     Ok(is_selector_start_kind(after) || is_explicit_combinator_kind(after))

@@ -17,6 +17,7 @@ pub(crate) use splitting::{
 
 use std::borrow::Cow;
 
+use super::boundary_ws::boundary_run_spelling;
 use crate::color::is_hex_color_body;
 use numbers::{canonical_unit, is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
@@ -539,6 +540,15 @@ fn maybe_lowercase_feature_name(name: &str) -> Cow<'_, str> {
 /// - Input: `color/* comment */:red;`
 /// - Output: `color /* comment */` (normalized spacing)
 /// - Prettier: `color/* comment */` (no space before comment)
+///
+/// # Boundary whitespace
+/// The gap is an `allow_whitespace()` juncture to `parseCss` (`read_declaration` ends the
+/// name at the first JS-`\s` code point), so a boundary run in it — `color<NBSP>: red`,
+/// `top <NBSP>: 0`, `left<NBSP> /* c */ : 0` — is the gap's, not the name's, and this head
+/// is what carries it back out: each gap's run is spelled where it stood, with the ASCII
+/// whitespace beside it kept as one space (`boundary_run_spelling`). The trim that takes
+/// the run off the name and the spelling that restores it read one class, so the run is
+/// emitted exactly once.
 pub(crate) fn extract_property_name(
     decl_source: &str,
     colon_pos: usize,
@@ -553,32 +563,43 @@ pub(crate) fn extract_property_name(
     // the gate can only skip work, never change the branch taken.
     if has_block_comment && let Some(comment_start) = property_part.find("/*") {
         let before_comment = trim_property_part(&property_part[..comment_start]);
+        // The declaration's span starts at the property token, so the trim can only have
+        // shortened the part's END — which makes the trimmed length the start of the gap
+        // ahead of the first comment.
+        debug_assert!(property_part.starts_with(before_comment));
+        let mut out = String::from(before_comment);
+        let mut gap_start = before_comment.len();
 
         // Collect EVERY comment in the property→colon gap, not just the first: a
         // declaration may carry two or more (`color /* a */ /* b */ :`), and this
         // gap is the only place a CSS declaration comment survives formatting (the
         // parser drops value comments), so emitting only the first is silent
-        // content loss.
-        let mut comments: Vec<&str> = Vec::new();
-        let mut rest = &property_part[comment_start..];
+        // content loss. Each comment is preceded by its gap's boundary run — spelled with
+        // the author's ASCII presence, `boundary_run_spelling` — then a single space; the
+        // gap after the last comment, ahead of the colon, takes the same spelling.
+        let mut comment_pos = comment_start;
         loop {
-            // `rest` starts at a `/*`.
+            // `comment_pos` is at a `/*`.
             // `comment_end_checked`, not `comment_end`: a malformed comment abandons the
             // whole reconstruction rather than being taken as reaching end-of-input.
-            let Some(comment_end) = crate::comments::comment_end_checked(rest.as_bytes(), 0) else {
+            let rest = &property_part[comment_pos..];
+            let Some(comment_len) = crate::comments::comment_end_checked(rest.as_bytes(), 0) else {
                 // Malformed comment (no closing `*/`) - just trim the whole part.
                 return Cow::Borrowed(trim_property_part(property_part));
             };
-            comments.push(&rest[..comment_end]);
-            rest = &rest[comment_end..];
-            match rest.find("/*") {
-                Some(next) => rest = &rest[next..],
+            out.push_str(&boundary_run_spelling(
+                &property_part[gap_start..comment_pos],
+            ));
+            out.push(' ');
+            out.push_str(&rest[..comment_len]);
+            gap_start = comment_pos + comment_len;
+            match rest[comment_len..].find("/*") {
+                Some(next) => comment_pos = gap_start + next,
                 None => break,
             }
         }
-
-        // Normalize: property + space + comments joined by single spaces.
-        Cow::Owned(format!("{before_comment} {}", comments.join(" ")))
+        out.push_str(&boundary_run_spelling(&property_part[gap_start..]));
+        Cow::Owned(out)
     } else {
         // No comment: trim insignificant whitespace, but a property name ending in a
         // hex escape (`\41`) consumes one following whitespace as the escape's
@@ -586,12 +607,20 @@ pub(crate) fn extract_property_name(
         // keeps it before the `:` (`\41 : red`); any extra whitespace is still trimmed
         // (`color : red` → `color: red`).
         let bare = trim_property_part(property_part);
-        // A part ending in boundary whitespace is one the trim shortened, so an untouched
-        // part settles the `ends_with` without a searcher of its own.
-        if bare.len() != property_part.len()
-            && property_part.ends_with(crate::whitespace::is_boundary_whitespace)
-            && ends_with_hex_escape(bare)
-        {
+        // An untouched part — every real declaration — settles here without a second scan.
+        if bare.len() == property_part.len() {
+            return Cow::Borrowed(bare);
+        }
+        // The gap's own boundary run rides on the trimmed name, spelled with the author's
+        // ASCII presence (`color<NBSP>`, `top <NBSP>`): the trim's class is the run's class,
+        // so a part the trim shortened is the one place a run can be. The declaration's span
+        // starts at the property token, so the trim can only have shortened the part's END —
+        // what it took off is the tail, and a shortened part ends in the class by construction.
+        debug_assert!(property_part.starts_with(bare));
+        let run = boundary_run_spelling(&property_part[bare.len()..]);
+        if !run.is_empty() {
+            Cow::Owned(format!("{bare}{run}"))
+        } else if ends_with_hex_escape(bare) {
             Cow::Owned(format!("{bare} "))
         } else {
             Cow::Borrowed(bare)

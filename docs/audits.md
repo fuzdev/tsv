@@ -405,11 +405,12 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   comment-looping twin `skip_boundary_whitespace_registering_comments`) at every juncture
   `parseCss` has one — the stylesheet body, a style rule's block and an at-rule's, the
   selector-internal ones, the compound break, a pseudo-argument list's start and its `)`, and
-  the attribute selector's interior — and the printer puts the non-ASCII members back at every
-  selector juncture, at every rebuilt block-child head, and at a block's tail
-  (`preserved_boundary_ws` / `boundary_ws_in_gap`, which partition each gap between them).
-  Two printer positions still drop the run — the stylesheet's trailing whitespace and a
-  comment-bearing property→colon gap — ratcheted in
+  the attribute selector's interior, and a declaration's property→colon gap — and the printer
+  puts the non-ASCII members back at every selector juncture, at every rebuilt block-child
+  head, in the property gap, and at a block's tail (`preserved_boundary_ws` /
+  `boundary_ws_in_gap`, which partition each gap between them; an attribute selector's tail
+  and the property gap keep the author's bytes outright). One printer position still drops
+  the run — the stylesheet's trailing whitespace — ratcheted in
   [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs). See
   [conformance_svelte.md §Boundary whitespace](./conformance_svelte.md).
 
@@ -505,7 +506,7 @@ cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../z
 
 The whole-comment conservation gate: does every comment the author wrote survive formatting, byte-for-byte (modulo re-indent)? Per file, lex the comment trivia off the raw INPUT and the raw formatted OUTPUT — with the audit's own trivia scanners, **never** `parse().comments` — and compare the interior **multisets**, per language bucket. A drop, a duplication, a merge, or an interior rewrite is a plain arithmetic imbalance, no matter which internal layer caused it.
 
-Why it needs its own gate: every other comment instrument reads a channel the parser controls. The print-once ledger guards what a format entry *registered*; `parse().comments` is what the parser chose to carry. A comment a parse path consumes without registering (the CSS `skip_whitespace_and_comments` class that motivated this audit) never existed as far as those instruments know — the corpus stays green **by absence**, and every corrupted output in that family was a format fixed point, so F1, roundtrip, fuzz, and the authoring audit were all structurally blind too. The census's independence from the parser's comment carrying is its entire design.
+Why it needs its own gate: every other comment instrument reads a channel the parser controls. The print-once ledger guards what a format entry *registered*; `parse().comments` is what the parser chose to carry. A comment a parse path consumes without registering (the CSS `skip_boundary_whitespace_and_comments` class that motivated this audit) never existed as far as those instruments know — the corpus stays green **by absence**, and every corrupted output in that family was a format fixed point, so F1, roundtrip, fuzz, and the authoring audit were all structurally blind too. The census's independence from the parser's comment carrying is its entire design.
 
 ```bash
 # census_audit - format each pristine seed, lex comment trivia from BOTH raw sides with

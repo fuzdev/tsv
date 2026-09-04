@@ -1,0 +1,358 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 633,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 111,
+					"end": 124,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 111,
+							"end": 124,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 111,
+											"end": 124,
+											"name": "attr",
+											"matcher": "=",
+											"value": "value",
+											"flags": null
+										}
+									],
+									"start": 111,
+									"end": 124
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 125,
+					"end": 143,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 129,
+							"end": 139,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 111,
+				"end": 143
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 203,
+					"end": 217,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 203,
+							"end": 217,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 203,
+											"end": 217,
+											"name": "attr",
+											"matcher": "=",
+											"value": "value",
+											"flags": "i"
+										}
+									],
+									"start": 203,
+									"end": 217
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 218,
+					"end": 237,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 222,
+							"end": 233,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 203,
+				"end": 237
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 324,
+					"end": 339,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 324,
+							"end": 339,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 324,
+											"end": 339,
+											"name": "attr",
+											"matcher": "=",
+											"value": "value",
+											"flags": "s"
+										}
+									],
+									"start": 324,
+									"end": 339
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 340,
+					"end": 360,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 344,
+							"end": 356,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 324,
+				"end": 360
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 458,
+					"end": 473,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 458,
+							"end": 473,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 458,
+											"end": 473,
+											"name": "attr",
+											"matcher": "=",
+											"value": "value",
+											"flags": null
+										}
+									],
+									"start": 458,
+									"end": 473
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 474,
+					"end": 493,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 478,
+							"end": 489,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 458,
+				"end": 493
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 496,
+					"end": 513,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 496,
+							"end": 513,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 496,
+											"end": 513,
+											"name": "attr",
+											"matcher": "=",
+											"value": "value",
+											"flags": "i"
+										}
+									],
+									"start": 496,
+									"end": 513
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 514,
+					"end": 533,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 518,
+							"end": 529,
+							"property": "color",
+							"value": "gray"
+						}
+					]
+				},
+				"start": 496,
+				"end": 533
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 586,
+					"end": 603,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 586,
+							"end": 603,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 586,
+											"end": 603,
+											"name": "attr",
+											"matcher": "=",
+											"value": "value",
+											"flags": "s"
+										}
+									],
+									"start": 586,
+									"end": 603
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 604,
+					"end": 624,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 608,
+							"end": 620,
+							"property": "color",
+							"value": "black"
+						}
+					]
+				},
+				"start": 586,
+				"end": 624
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " U+00A0 glued to a bare value stays inside it: one ident to css-syntax, a separator to parseCss ",
+				"start": 9,
+				"end": 109
+			},
+			{
+				"type": "CSSComment",
+				"value": " ...and the case flag glued to the run stays glued ",
+				"start": 146,
+				"end": 201
+			},
+			{
+				"type": "CSSComment",
+				"value": " an ASCII space beside the run is a token separator and is kept, as one space ",
+				"start": 240,
+				"end": 322
+			},
+			{
+				"type": "CSSComment",
+				"value": " after a quoted value the run is its own token; flush against the quote, before the flag ",
+				"start": 363,
+				"end": 456
+			},
+			{
+				"type": "CSSComment",
+				"value": " behind the case flag, where the `]` is due ",
+				"start": 536,
+				"end": 584
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 625,
+			"styles": "\n\t/* U+00A0 glued to a bare value stays inside it: one ident to css-syntax, a separator to parseCss */\n\t[attr=value ] {\n\t\tcolor: red;\n\t}\n\n\t/* ...and the case flag glued to the run stays glued */\n\t[attr=value i] {\n\t\tcolor: blue;\n\t}\n\n\t/* an ASCII space beside the run is a token separator and is kept, as one space */\n\t[attr=value  s] {\n\t\tcolor: green;\n\t}\n\n\t/* after a quoted value the run is its own token; flush against the quote, before the flag */\n\t[attr='value' ] {\n\t\tcolor: teal;\n\t}\n\n\t[attr='value'  i] {\n\t\tcolor: gray;\n\t}\n\n\t/* behind the case flag, where the `]` is due */\n\t[attr='value' s ] {\n\t\tcolor: black;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 634,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

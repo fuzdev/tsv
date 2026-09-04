@@ -208,7 +208,10 @@ pub(crate) fn parse_declaration<'arena>(
     let property = parser.current_identifier_in_arena();
     parser.advance()?;
 
-    let property_gap_comment = parser.skip_whitespace_and_comments()?;
+    // The property→colon gap is an `allow_whitespace()` juncture: `read_declaration` ends
+    // the property at the first JS-`\s` code point (`read_until(/[\s:]/)`) and skips to the
+    // colon, so a boundary run standing here (`color <NBSP>: red`) is the gap's, not a name.
+    let property_gap_comment = parser.skip_boundary_whitespace_and_comments()?;
 
     // Record the real `property : value` colon offset (host coordinates, like the
     // declaration span) so the writer splits property/value without a re-scan. The

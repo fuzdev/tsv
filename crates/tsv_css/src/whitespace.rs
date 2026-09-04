@@ -141,9 +141,48 @@ pub(crate) fn boundary_prefix_len(text: &str) -> usize {
         .sum()
 }
 
+/// Byte offset of the first [`is_boundary_only_whitespace`] member INSIDE `text`, past its
+/// head, or `None`.
+///
+/// The twin of [`boundary_prefix_len`] for a reader whose own class is JS `\s` where the
+/// lexer's is "everything at or above U+00A0": `read_attribute_value` ends a bare value at the
+/// first `\s` (`[a=b<NBSP>]` is the value `b`, `[a=b<NBSP>i]` the value `b` and the flag `i`),
+/// where the lexer handed `parse_attribute_value` one identifier token — this is where that
+/// token really ends. The case flag beside it is a narrower reader still
+/// (`REGEX_ATTRIBUTE_FLAGS` reads letters only, so `[a=b i<NBSP>]` is the flag `i`) and takes
+/// its own ASCII-letter prefix rather than asking this.
+///
+/// A `\` escapes the code point after it on both sides — `read_attribute_value` appends `\`
+/// plus the char, the lexer reads the escape — so an escaped member is content and is stepped
+/// over (`[a=b\<NBSP>]` is the value `b\<NBSP>` to both).
+pub(crate) fn boundary_split_offset(text: &str) -> Option<usize> {
+    let mut chars = text.char_indices();
+    while let Some((i, c)) = chars.next() {
+        if c == '\\' {
+            chars.next();
+        } else if is_boundary_only_whitespace(c) {
+            return Some(i);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The split stops at the first member, steps an escaped one, and stays `None` on the
+    /// ASCII names every real stylesheet holds.
+    #[test]
+    fn boundary_split_offset_finds_the_first_unescaped_member() {
+        assert_eq!(boundary_split_offset("value"), None);
+        assert_eq!(boundary_split_offset("b\u{a0}"), Some(1));
+        assert_eq!(boundary_split_offset("b\u{a0}i"), Some(1));
+        assert_eq!(boundary_split_offset("i\u{feff}"), Some(1));
+        assert_eq!(boundary_split_offset("b\\\u{a0}"), None);
+        assert_eq!(boundary_split_offset("b\\\u{a0}\u{2028}"), Some(4));
+        assert_eq!(boundary_split_offset("b\\41 c"), None);
+    }
 
     /// The byte gate against the char class it stands in front of, at every byte value: an
     /// ASCII byte is a whole char, so the two must agree exactly there; a non-ASCII byte is
