@@ -864,6 +864,19 @@ So: when a board reads dry, ask which cell you took before concluding the
 surface is mined out. Taking another is one `board.sh` invocation with
 `BOARD_CMD` set.
 
+**And a cell has halves a scope rule can separate.** With parser-only levers
+out of scope, the CSS format cell (`profile` × `cssbig`) was the one format
+cell never taken at ratio grade, and its board split cleanly: the parser rows
+were off-limits, and the printer half held four per-declaration seams —
+an outlined one-bool gate, three char-predicate searchers constructed to trim
+nothing, a scalar case scan, a char-by-char quote swap — each priced by a
+census of one pass (21,374 declarations; every gate answering the common
+case) and together worth **−3.09% instructions / −2.93% cycles / −2.86%
+wall** of the CSS run, byte-identical, `+0` on TypeScript. The row that named
+the first of them read four times its `objdump` × census price: an outlined
+callee's prologue collects the call sites' skid, so a row on a symbol's first
+`push` is an attribution of the callers, not the callee's cost.
+
 ### Ask whether a shared substrate's other consumer adopted its optimization
 
 A substrate with more than one consumer is a place where an optimization can be

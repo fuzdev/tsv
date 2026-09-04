@@ -4,7 +4,7 @@
 // (TypeScript, CSS, Svelte) to eliminate code duplication.
 
 use crate::acorn_prefix::AcornPrefix;
-use crate::escapes::swap_quote_escaping;
+use crate::escapes::swap_quote_escaping_into;
 use crate::swar::{high_bit_lanes, lanes_less_than, splat, zero_lanes, zero_or_high_lanes};
 use crate::whitespace::is_js_whitespace;
 use std::borrow::Cow;
@@ -176,19 +176,14 @@ pub fn format_string_literal(raw_content: &str, original_quote: char) -> String 
     let optimal_quote = optimal_string_quote(raw_content);
 
     // Build the quoted literal in a single pre-sized allocation. On the common
-    // path (quote unchanged) the content copies in directly; the swap path still
-    // allocates inside `swap_quote_escaping`, but its result is copied in just
-    // once here rather than via a second `format!` buffer.
+    // path (quote unchanged) the content copies in directly; the swap path writes
+    // the swapped content into this same buffer.
     let mut result = String::with_capacity(raw_content.len() + 2);
     result.push(optimal_quote);
     if optimal_quote == original_quote {
         result.push_str(raw_content);
     } else {
-        result.push_str(&swap_quote_escaping(
-            raw_content,
-            original_quote,
-            optimal_quote,
-        ));
+        swap_quote_escaping_into(raw_content, original_quote, optimal_quote, &mut result);
     }
     result.push(optimal_quote);
     result
