@@ -35,8 +35,9 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::printing::LineBreaks;
 use tsv_lang::{
-    Comment, EmbedContext, INDENT, LayoutMode, OutputBuffer, Span, TAB_WIDTH,
-    comments_in_source_range, comments_to_emit_in_range, is_format_ignore_directive,
+    Comment, CommentFreeWindow, EmbedContext, INDENT, LayoutMode, OutputBuffer, Span, TAB_WIDTH,
+    comments_in_source_from, comments_on_page_from, comments_to_emit_from,
+    has_comments_on_page_from, has_comments_to_emit_from, is_format_ignore_directive,
     is_format_ignore_range_end, is_format_ignore_range_start, is_honored_format_ignore,
 };
 use tsv_ts::Expression;
@@ -254,6 +255,15 @@ pub(crate) struct Printer<'a> {
     /// `insert`/`contains`/`clear` are used, never iteration, so the hasher is
     /// unobservable (see `tsv_lang::hash`'s module docs).
     root_inline_run_block_starts: RefCell<FxHashSet<u32>>,
+    /// The comment-free window this printer's searches drew (`tsv_lang::CommentFreeWindow`).
+    /// Every comment lookup here reads it ahead of the search, through the
+    /// `comments_*_between` / `has_*_between` wrappers below — never the free function
+    /// over `self.comments` — and every island `tsv_ts` printer this one constructs starts
+    /// from it and hands its own back ([`Self::ts_inputs`]), since the islands share this
+    /// printer's comment array. On a real Svelte corpus three of this printer's own wide
+    /// asks in four, and nine of the islands' first searches in ten, lay inside a window
+    /// already drawn.
+    comment_free_gap: CommentFreeWindow<'a>,
 }
 
 impl<'a> Printer<'a> {
@@ -308,6 +318,7 @@ impl<'a> Printer<'a> {
             line_breaks,
             block_dangle_allowed: Cell::new(true),
             root_inline_run_block_starts: RefCell::new(FxHashSet::default()),
+            comment_free_gap: CommentFreeWindow::new(comments),
         }
     }
 
@@ -573,7 +584,9 @@ impl<'a> Printer<'a> {
         if frozen {
             return HeadLayout::OpensOwnLine;
         }
-        let mut run = comments_to_emit_in_range(self.comments, gap_start, value_start).peekable();
+        let mut run = self
+            .comments_to_emit_between(gap_start, value_start)
+            .peekable();
         let Some(first) = run.peek() else {
             return HeadLayout::Inline;
         };
@@ -784,9 +797,11 @@ impl<'a> Printer<'a> {
     }
 
     /// Standard [`tsv_ts::PrinterInputs`] for embedding TypeScript: this
-    /// document's source, comments, and line breaks. Call sites
-    /// needing empty comments override via
-    /// `PrinterInputs { comments: &[], ..self.ts_inputs() }`.
+    /// document's source, comments, and line breaks — and this printer's comment-free
+    /// window, which the island takes at construction and hands back when it finishes.
+    /// A call site that overrides `comments` (`PrinterInputs { comments: &[], .. }`) is
+    /// handing the island a different array and must clear `comment_free_window` too: a
+    /// window is a fact about one array, and `take_from` asserts as much in a debug build.
     pub(crate) fn ts_inputs(&self) -> tsv_ts::PrinterInputs<'_> {
         tsv_ts::PrinterInputs {
             source: self.source,
@@ -797,7 +812,101 @@ impl<'a> Printer<'a> {
             has_owned_comments: self.has_owned_comments,
             // Likewise the document-level format-ignore flag (computed once at construction).
             has_format_ignore: self.has_format_ignore,
+            // The island reads this printer's window and hands its own back: one array, one
+            // window (see the field).
+            comment_free_window: Some(&self.comment_free_gap),
         }
+    }
+
+    /// The index a comment walk over `[start, end)` starts at: `len` (an empty walk) for a
+    /// gap too narrow to hold a comment or lying inside the comment-free window
+    /// ([`Self::comment_free_gap`]), else the outlined search — the same inline gate over
+    /// one `#[inline(never)]` body the `tsv_ts` printer spells (see `CommentFreeWindow`).
+    #[inline]
+    fn first_index_between(&self, start: u32, end: u32) -> usize {
+        if tsv_lang::range_too_narrow_for_a_comment(start, end)
+            || self.comment_free_gap.contains(start, end)
+        {
+            self.comment_free_gap.comments().len()
+        } else {
+            self.first_index_between_wide(start)
+        }
+    }
+
+    /// The search half of [`Self::first_index_between`] — one outlined copy, taking the
+    /// printer.
+    #[inline(never)]
+    fn first_index_between_wide(&self, start: u32) -> usize {
+        self.comment_free_gap.search_from(start)
+    }
+
+    /// **to emit**: the comments in `[start, end)` that *this* caller must print — an owned
+    /// comment **skipped** (the node its token begins prints it). The printer's form of
+    /// `tsv_lang::comments_to_emit_in_range`, reading the comment-free window
+    /// ([`Self::comment_free_gap`]) ahead of the search; see `tsv_lang::comment` for the
+    /// three axes.
+    #[inline]
+    pub(crate) fn comments_to_emit_between(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> impl Iterator<Item = &'a Comment> + use<'a> {
+        comments_to_emit_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
+    }
+
+    /// **on page**: every comment occupying the page in `[start, end)` — an owned comment
+    /// **counted**. For a layout gate whose rule is per-comment.
+    #[inline]
+    pub(crate) fn comments_on_page_between(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> impl Iterator<Item = &'a Comment> + use<'a> {
+        comments_on_page_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
+    }
+
+    /// **in source**: every comment physically inside `[start, end)` — an owned comment
+    /// **counted**. For a cursor stepping over comment *bytes*.
+    #[inline]
+    pub(crate) fn comments_in_source_between(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> impl Iterator<Item = &'a Comment> + use<'a> {
+        comments_in_source_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
+    }
+
+    /// **to emit**: whether *this* caller has a comment to print in `[start, end)`.
+    #[inline]
+    pub(crate) fn has_comments_to_emit_between(&self, start: u32, end: u32) -> bool {
+        has_comments_to_emit_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
+    }
+
+    /// **on page**: whether any comment occupies the page in `[start, end)` — the existence
+    /// check for a layout gate, an owned comment **counted**.
+    #[inline]
+    pub(crate) fn has_comments_on_page_between(&self, start: u32, end: u32) -> bool {
+        has_comments_on_page_from(
+            self.comment_free_gap.comments(),
+            self.first_index_between(start, end),
+            end,
+        )
     }
 
     /// Write indentation based on current indent level
@@ -1015,7 +1124,8 @@ impl<'a> Printer<'a> {
     /// value in every component asks it.
     pub(in crate::printer) fn honored_directive_in_gap(&self, start: u32, end: u32) -> bool {
         self.has_format_ignore
-            && comments_in_source_range(self.comments, start, end)
+            && self
+                .comments_in_source_between(start, end)
                 .any(|c| self.is_honored_directive(c))
     }
 

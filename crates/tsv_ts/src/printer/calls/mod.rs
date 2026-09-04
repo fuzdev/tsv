@@ -433,7 +433,7 @@ impl<'a> Printer<'a> {
             chain::linearize_chain_from_call_into(call, self.linearize_input(), &mut nodes);
             let (head_start, head_end) =
                 chain_head_comment_window(&nodes, call.callee, call.span.start);
-            let groups = chain::group_chain_nodes(&nodes, self.comments);
+            let groups = chain::group_chain_nodes(&nodes, self);
             let chain_doc = chain::build_chain_doc(&groups, call.span, self);
             self.prepend_removed_paren_comments(head_start, head_end, chain_doc)
         } else {
@@ -463,7 +463,7 @@ impl<'a> Printer<'a> {
         chain::linearize_chain_from_member_into(member, self.linearize_input(), &mut nodes);
         let (head_start, head_end) =
             chain_head_comment_window(&nodes, member.object, member.span.start);
-        let groups = chain::group_chain_nodes(&nodes, self.comments);
+        let groups = chain::group_chain_nodes(&nodes, self);
         let chain_doc = chain::build_chain_doc(&groups, member.span, self);
 
         // Prepend comments from removed parentheses at the chain base — the share the

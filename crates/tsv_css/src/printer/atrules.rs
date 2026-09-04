@@ -24,7 +24,6 @@ use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
 use tsv_lang::source_scan;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
@@ -215,7 +214,7 @@ impl<'a> Printer<'a> {
                 }
                 // Trailing comments between the last value and the `;` (e.g.
                 // `@import 'a.css' /* c */;`).
-                for comment in comments_to_emit_in_range(self.comments, prev_end, atrule.span.end) {
+                for comment in self.comments_to_emit_between(prev_end, atrule.span.end) {
                     self.write(" ");
                     self.print_css_comment(comment);
                 }
@@ -816,7 +815,7 @@ impl<'a> Printer<'a> {
         needs_separator: bool,
         glue_next: bool,
     ) {
-        let comments: Vec<_> = comments_to_emit_in_range(self.comments, start, end).collect();
+        let comments: Vec<_> = self.comments_to_emit_between(start, end).collect();
         if comments.is_empty() {
             if needs_separator && !glue_next {
                 self.write(" ");

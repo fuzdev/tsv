@@ -6,7 +6,6 @@
 use crate::ast::internal;
 use crate::printer::{HeadExpr, HeadLayout, Printer};
 use tsv_lang::Span;
-use tsv_lang::comments_in_source_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::TriviaProfile;
@@ -182,11 +181,12 @@ impl<'a> Printer<'a> {
     /// [`tsv_lang::is_indentable_block`]) — the shared rule, so the two hosts cannot
     /// answer it differently.
     fn gap_comment_hangs_value(&self, gap_start: u32, value_start: u32) -> bool {
-        tsv_lang::comments_on_page_in_range(self.comments, gap_start, value_start).any(|c| {
-            !c.is_block
-                || tsv_lang::is_indentable_block(self.source, c)
-                || tsv_lang::source_scan::has_newline_after_position(self.source, c.span.end)
-        })
+        self.comments_on_page_between(gap_start, value_start)
+            .any(|c| {
+                !c.is_block
+                    || tsv_lang::is_indentable_block(self.source, c)
+                    || tsv_lang::source_scan::has_newline_after_position(self.source, c.span.end)
+            })
     }
 
     /// Check if a @const init expression needs break-after-operator layout.
@@ -286,12 +286,13 @@ impl<'a> Printer<'a> {
     pub(super) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
         let d = self.d();
 
-        // Every gap below is read with `comments_in_source_range` — the **in-source** axis
+        // Every gap below is read with `comments_in_source_between` — the **in-source** axis
         // named at each call site rather than filtered out of one collected run, so the
         // axis this builder stands on cannot be mistaken for the to-emit one anywhere in it.
         let tag_end = tag.span.end;
         if tag.identifiers.is_empty()
-            && comments_in_source_range(self.comments, tag.span.start, tag_end)
+            && self
+                .comments_in_source_between(tag.span.start, tag_end)
                 .next()
                 .is_none()
         {
@@ -314,10 +315,10 @@ impl<'a> Printer<'a> {
             && self.honored_directive_in_gap(last_end, first.span().start)
         {
             let list = Span::new(first.span().start, last.span().end);
-            let mut frozen_parts: DocBuf =
-                comments_in_source_range(self.comments, last_end, list.start)
-                    .map(|c| self.build_leading_js_comment_doc(c))
-                    .collect();
+            let mut frozen_parts: DocBuf = self
+                .comments_in_source_between(last_end, list.start)
+                .map(|c| self.build_leading_js_comment_doc(c))
+                .collect();
             frozen_parts.push(self.verbatim_source_doc(list));
             // This builder emits its own trailing run, so it answers `ends_with_line_comment`
             // off that one run rather than from a second scan that could disagree with it.
@@ -326,7 +327,7 @@ impl<'a> Printer<'a> {
             // the freeze is the first of the four things that do, so a run-final `//` must
             // break one level out or the `}` lands at the identifier list's column.
             let (trailing_docs, ends_with_line_comment) = self.trailing_comment_run_docs(
-                comments_in_source_range(self.comments, list.end, tag_end),
+                self.comments_in_source_between(list.end, tag_end),
                 true,
             );
             frozen_parts.extend(trailing_docs);
@@ -379,7 +380,7 @@ impl<'a> Printer<'a> {
 
                 // Comments before the comma trail the previous identifier.
                 parts.extend(
-                    comments_in_source_range(self.comments, last_end, comma)
+                    self.comments_in_source_between(last_end, comma)
                         .map(|c| self.build_trailing_js_comment_doc(c, false)),
                 );
                 parts.push(d.text(", "));
@@ -388,7 +389,7 @@ impl<'a> Printer<'a> {
             // Comments after the comma (or after the keyword, for the first
             // identifier) lead this identifier.
             parts.extend(
-                comments_in_source_range(self.comments, last_end, id_start)
+                self.comments_in_source_between(last_end, id_start)
                     .map(|c| self.build_leading_js_comment_doc(c)),
             );
             // Not a bare `d.source_span`: a JSDoc-cast entry's span (`(a)`) can
@@ -405,7 +406,7 @@ impl<'a> Printer<'a> {
         // dedent. [`Printer::trailing_comment_run_docs`] rather than its lookup-bearing
         // wrapper: this builder stands on the in-source axis its doc comment above explains.
         let (trailing_docs, ends_with_line_comment) = self.trailing_comment_run_docs(
-            comments_in_source_range(self.comments, last_end, tag_end),
+            self.comments_in_source_between(last_end, tag_end),
             layout.indents_content(),
         );
         parts.extend(trailing_docs);

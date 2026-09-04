@@ -395,6 +395,7 @@ mod tests {
             line_table: tsv_lang::printing::LineTable::EMPTY,
             has_owned_comments: false,
             has_format_ignore: false,
+            comment_free_window: None,
         };
         let printer = Printer::with_context(&arena, &inputs, EmbedContext::default(), 0);
         assert_eq!(

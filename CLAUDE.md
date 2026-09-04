@@ -882,9 +882,9 @@ them by span position through one physical entry point, `find_first_comment_from
 thread-local one-entry hint over an O(log n) search, verified against the array on every
 read so a stale hint is a miss and never a wrong answer. The TS printer's existence wrappers and range walks
 read one thing ahead of it: the **comment-free window** the previous search drew
-(`Printer::comment_free_gap`, the stretch between the two comments it landed between), which
-answers an ask nested inside it with two compares and no array load — nine wide asks in ten on
-real code. `Comment` (`tsv_lang/src/comment.rs`)
+(`Printer::comment_free_gap`, a `tsv_lang::CommentFreeWindow` — the stretch between the two
+comments it landed between), which answers an ask nested inside it with two compares and no
+array load — nine wide asks in ten on real code. `Comment` (`tsv_lang/src/comment.rs`)
 is a `Copy` POD of spans + flags — text is recovered on demand via
 `Comment::content(source)`, never stored owned. **The full model — fields, ownership
 doctrine, the three lookup axes, the five hazards, and every emitter rule — is
@@ -921,10 +921,13 @@ A comment can be asked about along exactly **three** axes, and the lookup API
 miswire reads as a category error at the call site; each range walk and existence check also
 has an index-keyed `*_from` twin (`comments_to_emit_from`, `has_comments_on_page_from`, …) for a
 caller that already holds the range's first index, so the axis's membership rule stays one
-spelling. In the TS printer that caller is always a `Printer::comments_*_between` /
-`has_*_between` wrapper, which reads the comment-free window ahead of the search — a printer
-body asks the wrapper, never the free function over `self.comments` (only a helper holding a
-bare `comments` slice still does). Two standing corollaries: a **zero-comment fast gate** guarding a
+spelling. In every printer (TS, Svelte, CSS) that caller is a `Printer::comments_*_between` /
+`has_*_between` wrapper, which reads the printer's comment-free window
+(`tsv_lang::CommentFreeWindow`) ahead of the search — a printer body asks the wrapper, never
+the free function over `self.comments` (only a helper holding a bare `comments` slice still
+does); a Svelte document's island TS printers start from the Svelte printer's window and hand
+theirs back (`PrinterInputs::comment_free_window`), since they share its array. Two standing
+corollaries: a **zero-comment fast gate** guarding a
 whole builder is an **on-page** question (an emit-keyed one blinds every layout gate it
 guards); a **blank-line scan** is an **in-source** question (step over every comment in the
 gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller emits).
