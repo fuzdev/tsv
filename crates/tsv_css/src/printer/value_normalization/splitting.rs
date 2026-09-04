@@ -2,6 +2,7 @@
 // parens/quotes/comments, plus prettier-style whitespace collapsing.
 
 use std::borrow::Cow;
+use tsv_lang::Span;
 
 use crate::whitespace::is_css_whitespace;
 
@@ -360,6 +361,32 @@ fn needs_whitespace_collapse(s: &str) -> bool {
 /// content). The acted-on ASCII whitespace set (`\t \n \x0C \r` space) is exactly
 /// `char::is_ascii_whitespace` / `is_css_whitespace` — note U+000B (VT) is *not*
 /// CSS whitespace, so it is a no-op byte the normalizer preserves.
+/// The bytes [`normalize_css_whitespace`] acts on besides whitespace — the paren pair, the
+/// comma, the comment lead, the two quotes: [`is_normalize_noop_byte`]'s structural half,
+/// spelled once so the host-word scan below and the byte predicate cannot disagree (the
+/// `host_word_noop_scan_agrees_with_the_byte_predicate` test holds them together).
+const NORMALIZE_STRUCTURAL: [u8; 6] = [b'(', b')', b',', b'/', b'\'', b'"'];
+
+/// [`normalize_css_whitespace`]'s scan-skip question asked of the **host**: does `source[span]`
+/// hold no byte the normalizer acts on? A `true` is exactly `bytes().all(is_normalize_noop_byte)`
+/// and the caller may emit the span verbatim. Answered by
+/// [`tsv_lang::swar::next_byte_below_or_of`] over the document, so a value shorter than a word
+/// (42% of identifier values on a real corpus) is one word read from the host instead of a
+/// scalar class test per byte — the reason this takes a span and not the slice.
+///
+/// Conservative on the ASCII control bytes the predicate accepts as no-ops (0x00–0x08, `<VT>`,
+/// 0x0E–0x1F — none of them CSS whitespace, none acted on): the word's `< 0x21` floor refuses
+/// them, and a refused span merely takes [`normalize_css_whitespace`], which hands it back as
+/// its own text. Every other byte class is answered identically.
+pub(crate) fn normalize_is_noop_in(source: &str, span: Span) -> bool {
+    let bytes = source.as_bytes();
+    let (from, end) = (span.start as usize, span.end as usize);
+    let noop =
+        tsv_lang::swar::next_byte_below_or_of(bytes, from, end, 0x21, NORMALIZE_STRUCTURAL) == end;
+    debug_assert!(!noop || bytes[from..end].iter().all(|&b| is_normalize_noop_byte(b)));
+    noop
+}
+
 #[inline]
 fn is_normalize_noop_byte(b: u8) -> bool {
     b.is_ascii()
@@ -675,5 +702,42 @@ mod tests {
             split_by_space_preserving_parens(r"'Font Name' serif"),
             vec!["'Font Name'", "serif"]
         );
+    }
+
+    /// The host-word scan and the byte predicate answer every byte alike, save the documented
+    /// conservative class (the control bytes the normalizer keeps); and over every window of a
+    /// mixed document a `true` from the scan is exact.
+    #[test]
+    fn host_word_noop_scan_agrees_with_the_byte_predicate() {
+        for b in 0..=255u8 {
+            let by_predicate = is_normalize_noop_byte(b);
+            let by_word = (0x21..0x80).contains(&b) && !NORMALIZE_STRUCTURAL.contains(&b);
+            if b < 0x21 && by_predicate {
+                // A control byte the normalizer keeps: the word refuses it (conservative).
+                assert!(!by_word, "byte {b:#x}");
+            } else {
+                assert_eq!(by_predicate, by_word, "byte {b:#x}");
+            }
+        }
+        let doc = "red (1px - 2px) a,b /*c*/ 'q' \u{a0}x\u{b}y\tz\u{feff}";
+        let bytes = doc.as_bytes();
+        for from in 0..=bytes.len() {
+            for end in from..=bytes.len() {
+                if !doc.is_char_boundary(from) || !doc.is_char_boundary(end) {
+                    continue;
+                }
+                let noop = normalize_is_noop_in(doc, Span::new(from as u32, end as u32));
+                let all = bytes[from..end].iter().all(|&b| is_normalize_noop_byte(b));
+                assert!(!noop || all, "a true must be exact: [{from}, {end})");
+                if noop != all {
+                    assert!(
+                        bytes[from..end]
+                            .iter()
+                            .any(|&b| b < 0x21 && is_normalize_noop_byte(b)),
+                        "only a kept control byte may be refused: [{from}, {end})"
+                    );
+                }
+            }
+        }
     }
 }

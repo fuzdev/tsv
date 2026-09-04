@@ -502,7 +502,7 @@ pub(super) fn trim_regenerated_separator(kept: &str) -> &str {
     if kept.is_empty() {
         return kept;
     }
-    kept.trim_end_matches(|c: char| c.is_ascii_whitespace())
+    kept.trim_ascii_end()
 }
 
 /// `separator` ahead of `kept`, or `kept` untouched when there is no run to separate.

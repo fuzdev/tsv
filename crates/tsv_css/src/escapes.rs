@@ -171,12 +171,29 @@ pub(crate) fn escape_len(s: &str, i: usize) -> Option<usize> {
 /// This is **not** the lexer's escape-terminator rule (`lexer::identifiers`), which is
 /// Unicode-wide because its oracle is `parseCss`'s `\s`-based regex. Different question,
 /// different oracle — see [`escape_len`] and the comment there.
+#[inline]
 pub(crate) fn trim_end_preserving_escape(s: &str) -> &str {
-    let trimmed = s.trim_end_matches(is_css_whitespace);
-    if trimmed.len() == s.len() || !ends_with_open_escape(trimmed) {
+    // `str::trim_ascii_end` IS the CSS class: [`is_css_whitespace`] is exactly
+    // `char::is_ascii_whitespace`, five single-byte members, so the byte loop answers every
+    // input the char searcher did — and the common ask (nothing to trim, or one space) is a
+    // few instructions inline instead of a call into a decoding searcher. Only an ask that
+    // trimmed something can owe an escape its payload back, and that is the cold body.
+    let trimmed = s.trim_ascii_end();
+    debug_assert_eq!(trimmed, s.trim_end_matches(is_css_whitespace));
+    if trimmed.len() == s.len() {
         return trimmed;
     }
-    // Give the escape back its one payload character.
+    restore_escape_payload(s, trimmed)
+}
+
+/// The arm [`trim_end_preserving_escape`] hands a trimmed input to: give an open escape
+/// back its one payload character.
+#[cold]
+#[inline(never)]
+fn restore_escape_payload<'a>(s: &'a str, trimmed: &'a str) -> &'a str {
+    if !ends_with_open_escape(trimmed) {
+        return trimmed;
+    }
     match s[trimmed.len()..].chars().next() {
         Some(c) if is_escapable_whitespace(c) => &s[..trimmed.len() + c.len_utf8()],
         _ => trimmed,
@@ -187,8 +204,11 @@ pub(crate) fn trim_end_preserving_escape(s: &str) -> &str {
 /// [`trim_end_preserving_escape`], and needed for the same reason: `str::trim_start` is
 /// Unicode-wide and would eat an NBSP that is content. No escape can own a *leading*
 /// whitespace (an escape's payload always follows its `\`), so there is nothing to restore.
+#[inline]
 pub(crate) fn trim_start_css(s: &str) -> &str {
-    s.trim_start_matches(is_css_whitespace)
+    let trimmed = s.trim_ascii_start();
+    debug_assert_eq!(trimmed, s.trim_start_matches(is_css_whitespace));
+    trimmed
 }
 
 #[cfg(test)]
