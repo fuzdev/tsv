@@ -14,7 +14,7 @@ use std::borrow::Cow;
 ///
 /// Returns a borrowed `Cow` for the common escape-free string (no allocation);
 /// only an input that actually contains `\` is decoded into an owned `String`.
-pub fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
+pub(crate) fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
     if !source.contains('\\') {
         return Cow::Borrowed(source);
     }
@@ -139,6 +139,98 @@ pub(crate) fn escape_len(s: &str, i: usize) -> Option<usize> {
     Some(1 + hex + terminator)
 }
 
+/// Does `s`, decoded as [`decode_escape_sequences`] would decode it, equal `kw` ASCII
+/// case-insensitively?
+///
+/// The allocation-free spelling of
+/// `decode_escape_sequences(s).as_bytes().eq_ignore_ascii_case(kw)`: a byte walk that steps
+/// over each escape by [`escape_len`], comparing a verbatim byte as itself and an escape as
+/// the UTF-8 bytes of the code point it spells, so no `String` is built and no `Cow` dropped.
+/// That keeps the decoder — a `String` builder the parser links for string literals — out of
+/// the one printer question that reads an escape-spelled identifier (function-name
+/// recognition, where `\75 rl(` must read as `url`).
+///
+/// Byte-for-byte the decoder's verdict, including where the two scanners disagree on what
+/// an escape *is*: `escape_len` refuses a `\` before a newline (§4.3.4) where the decoder
+/// takes it as a simple escape of the newline, and a trailing `\` is the decoder's literal
+/// backslash — both spelled here the decoder's way, since the decoder is the oracle (and a
+/// debug build asks it on every call). A hex escape naming no scalar value (a surrogate, past
+/// U+10FFFF) decodes to nothing on both sides. A `kw` that is not ASCII compares through the
+/// decoded code point's UTF-8 bytes.
+pub(crate) fn decodes_to_ascii_ignore_case(s: &str, kw: &[u8]) -> bool {
+    let verdict = decoded_bytes_eq_ignore_ascii_case(s, kw);
+    debug_assert_eq!(
+        verdict,
+        decode_escape_sequences(s)
+            .as_bytes()
+            .eq_ignore_ascii_case(kw)
+    );
+    verdict
+}
+
+/// The walk behind [`decodes_to_ascii_ignore_case`].
+fn decoded_bytes_eq_ignore_ascii_case(s: &str, kw: &[u8]) -> bool {
+    /// Take `text`'s bytes off the front of `kw`, ASCII case-insensitively.
+    fn take(kw: &mut std::slice::Iter<'_, u8>, text: &[u8]) -> bool {
+        text.iter()
+            .all(|b| kw.next().is_some_and(|k| k.eq_ignore_ascii_case(b)))
+    }
+
+    let bytes = s.as_bytes();
+    let mut kw = kw.iter();
+    let mut i = 0;
+    while let Some(&b) = bytes.get(i) {
+        if b != b'\\' {
+            // a verbatim byte compares as itself — a non-ASCII code point's UTF-8 bytes
+            // included, which is exactly how the decoded text's would
+            if !take(&mut kw, &[b]) {
+                return false;
+            }
+            i += 1;
+            continue;
+        }
+        let Some(len) = escape_len(s, i) else {
+            // `\` before a newline (a simple escape of it to the decoder — one ASCII byte,
+            // since only `\n` / `\r` / form feed refuse here) or a trailing `\` (its
+            // literal backslash)
+            let escaped = match bytes.get(i + 1) {
+                Some(next) => {
+                    i += 2;
+                    std::slice::from_ref(next)
+                }
+                None => {
+                    i += 1;
+                    b"\\"
+                }
+            };
+            if !take(&mut kw, escaped) {
+                return false;
+            }
+            continue;
+        };
+        let body = &bytes[i + 1..i + len];
+        i += len;
+        if body.first().is_some_and(u8::is_ascii_hexdigit) {
+            // the body is up to six hex digits (`escape_len` counted them) plus an optional
+            // whitespace terminator, which is not a digit and so contributes nothing
+            let code_point = body
+                .iter()
+                .filter_map(|&d| char::from(d).to_digit(16))
+                .fold(0, |cp, d| cp * 16 + d);
+            let mut utf8 = [0u8; 4];
+            if let Some(c) = char::from_u32(code_point)
+                && !take(&mut kw, c.encode_utf8(&mut utf8).as_bytes())
+            {
+                return false;
+            }
+        } else if !take(&mut kw, body) {
+            // a literally escaped code point is its own bytes
+            return false;
+        }
+    }
+    kw.next().is_none()
+}
+
 /// Trim trailing **CSS** whitespace, but never the whitespace a CSS **escape** owns.
 ///
 /// Two rules, and the first is the one that makes the second small.
@@ -232,6 +324,56 @@ mod tests {
 
         // With ONE leading zero (6 hex digits - CSS maximum)
         assert_eq!(decode_escape_sequences(r"\01F4A9"), "💩");
+    }
+
+    /// The comparator must return exactly what decoding and then comparing would.
+    fn oracle(s: &str, kw: &[u8]) -> bool {
+        decode_escape_sequences(s)
+            .as_bytes()
+            .eq_ignore_ascii_case(kw)
+    }
+
+    #[test]
+    fn decodes_to_ascii_ignore_case_matches_the_decoder() {
+        let cases: &[(&str, &[u8])] = &[
+            // the `@import` prelude spellings the printer recognizes
+            (r"\75 rl", b"url"),
+            (r"\75rl", b"url"),
+            (r"\6c ayer", b"layer"),
+            (r"\73 upports", b"supports"),
+            (r"\55 RL", b"url"),
+            (r"\75 rl", b"URL"),
+            // simple escapes, a terminator-less hex run, a trailing backslash
+            (r"u\rl", b"url"),
+            (r"\000075rl", b"url"),
+            (r"\000075 rl", b"url"),
+            (r"url\", b"url"),
+            (r"url\", b"url\\"),
+            // a decoded code point that is not the keyword's
+            (r"\76 rl", b"url"),
+            (r"\41", b"a"),
+            (r"\e9", b"\xc3\xa9"),
+            (r"\e9", b"e"),
+            // an escape naming no scalar value decodes to nothing
+            (r"\d800url", b"url"),
+            (r"\110000url", b"url"),
+            // length mismatches in both directions
+            (r"\75 r", b"url"),
+            (r"\75 rll", b"url"),
+            ("", b""),
+            ("", b"a"),
+            // `\` + newline is a simple escape to the decoder
+            ("u\\\nrl", b"u\nrl"),
+        ];
+        for &(s, kw) in cases {
+            assert_eq!(
+                decodes_to_ascii_ignore_case(s, kw),
+                oracle(s, kw),
+                "{s:?} vs {kw:?}"
+            );
+        }
+        assert!(decodes_to_ascii_ignore_case(r"\75 rl", b"url"));
+        assert!(!decodes_to_ascii_ignore_case(r"\76 rl", b"url"));
     }
 }
 

@@ -409,8 +409,7 @@ impl<'a> Printer<'a> {
     /// an escape is resolved.
     ///
     /// Two byte tests answer every name a stylesheet really holds, which is what keeps
-    /// the decoder off this path (it is a call into a `String` builder, and this question
-    /// is asked of every function value):
+    /// the escape walk off this path (this question is asked of every function value):
     ///
     /// - **An escape spends at least two bytes on the one character it spells**, so a
     ///   decoded spelling of `kw` is always LONGER than `kw` — an exact-length name is
@@ -423,7 +422,7 @@ impl<'a> Printer<'a> {
     ///   compare.
     ///
     /// What survives both is an `@import` prelude's escaped name and nothing else, which
-    /// is where the decode lives.
+    /// is where the escape walk lives.
     #[inline]
     fn function_name_is(&self, name_span: Span, kw: &str) -> bool {
         let name = &self.source.as_bytes()[name_span.range()];
@@ -436,16 +435,15 @@ impl<'a> Printer<'a> {
             && self.escaped_function_name_is(name_span, kw)
     }
 
-    /// The escaped tail of `function_name_is` — outlined and cold, so the decoder it
-    /// calls stays off every function value's path.
+    /// The escaped tail of `function_name_is` — outlined and cold, so the escape walk it
+    /// runs stays off every function value's path. The walk compares the name as it
+    /// decodes (`escapes::decodes_to_ascii_ignore_case`) rather than decoding it into a
+    /// `String` first: the same verdict, with nothing allocated on a path no corpus reaches.
     #[cold]
     #[inline(never)]
     fn escaped_function_name_is(&self, name_span: Span, kw: &[u8]) -> bool {
         let name = name_span.extract(self.source);
-        name.as_bytes().contains(&b'\\')
-            && crate::escapes::decode_escape_sequences(name)
-                .as_bytes()
-                .eq_ignore_ascii_case(kw)
+        name.as_bytes().contains(&b'\\') && crate::escapes::decodes_to_ascii_ignore_case(name, kw)
     }
 
     /// Build a doc for a value list joined by `sep` — `" "` for a space-separated
