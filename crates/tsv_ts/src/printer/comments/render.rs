@@ -9,8 +9,8 @@ use crate::ast::internal;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::is_js_whitespace;
 use tsv_lang::printing;
+use tsv_lang::{trim_end_js_whitespace, trim_js_whitespace, trim_start_js_whitespace};
 
 /// Slice one line out of a comment body by its `(start, end)` byte range — an
 /// entry of the arena's line-spans scratch, filled by `build_comment_doc`.
@@ -21,26 +21,26 @@ fn line_slice(content: &str, (start, end): (u32, u32)) -> &str {
 
 /// The trailing-trim class every comment emitter here shares.
 ///
-/// ⚠️ [`is_js_whitespace`], **not** `str::trim_end`: prettier trims comment text with
+/// ⚠️ [`is_js_whitespace`](tsv_lang::is_js_whitespace), **not** `str::trim_end`: prettier trims comment text with
 /// `String.prototype.trim*` (`printComment`, `printIndentableBlockComment`), which is the JS
 /// `\s` class. Rust's `White_Space` disagrees at exactly two code points and got both wrong —
 /// it **deletes a U+0085** prettier keeps (a character removed from the author's comment) and
-/// **keeps a U+FEFF** prettier deletes. See [`is_js_whitespace`].
+/// **keeps a U+FEFF** prettier deletes. See [`is_js_whitespace`](tsv_lang::is_js_whitespace).
 #[inline]
 fn trim_comment_end(line: &str) -> &str {
-    line.trim_end_matches(is_js_whitespace)
+    trim_end_js_whitespace(line)
 }
 
 /// The leading half of [`trim_comment_end`], same class and same reason.
 #[inline]
 fn trim_comment_start(line: &str) -> &str {
-    line.trim_start_matches(is_js_whitespace)
+    trim_start_js_whitespace(line)
 }
 
 /// Both halves — prettier's `line.trim()` on an indentable comment's interior line.
 #[inline]
 fn trim_comment(line: &str) -> &str {
-    line.trim_matches(is_js_whitespace)
+    trim_js_whitespace(line)
 }
 
 impl<'a> Printer<'a> {

@@ -6,7 +6,7 @@ use crate::Span;
 use crate::acorn_prefix::AcornPrefix;
 use crate::printing::{self, LineTable};
 use crate::source_scan::{self, has_newline_after_position, has_newline_before_position};
-use crate::whitespace::is_js_whitespace;
+use crate::whitespace::{trim_end_js_whitespace, trim_start_js_whitespace};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy)]
@@ -204,9 +204,10 @@ pub fn is_indentable_block(source: &str, comment: &Comment) -> bool {
 // language printer (the comment types differ across crates, so the shared atom
 // operates on the trimmed text).
 
-/// Trim a comment's text the way the oracle does.
+/// A comment's text trimmed the way the oracle does, when it could name a directive — `None`
+/// when it cannot.
 ///
-/// ⚠️ [`is_js_whitespace`], **not** `str::trim`: prettier recognizes its directive with
+/// ⚠️ [`is_js_whitespace`](crate::is_js_whitespace), **not** `str::trim`: prettier recognizes its directive with
 /// `comment.value.trim()` (`is-prettier-ignore-comment.js`, `language-css/print/sequence.js`,
 /// `language-html/utilities`), and `String.prototype.trim` is the JS `\s` class. Rust's
 /// `White_Space` disagrees in both directions and so got both witnesses wrong at once:
@@ -214,16 +215,27 @@ pub fn is_indentable_block(source: &str, comment: &Comment) -> bool {
 /// through, and `prettier-ignore<NEL>` is one prettier IGNORES that tsv froze — a region
 /// silently frozen or silently reflowed, in all three languages at once, since every printer
 /// routes here.
+///
+/// Every directive spelling begins with `f` or `p`, so a comment whose first non-blank byte is
+/// neither is refused on that byte, before its trailing edge is touched — the answer nearly every
+/// comment gets, at a seam asked once per comment (29K a pass on a TypeScript corpus).
 #[inline]
-fn directive_text(content: &str) -> &str {
-    content.trim_matches(is_js_whitespace)
+fn directive_text(content: &str) -> Option<&str> {
+    let head = trim_start_js_whitespace(content);
+    match head.as_bytes().first() {
+        Some(b'f' | b'p') => Some(trim_end_js_whitespace(head)),
+        _ => None,
+    }
 }
 
 /// Whether `content` is a `format-ignore` / `prettier-ignore` directive — emit
 /// the following construct as raw source instead of formatting it.
 #[inline]
 pub fn is_format_ignore_directive(content: &str) -> bool {
-    matches!(directive_text(content), "format-ignore" | "prettier-ignore")
+    matches!(
+        directive_text(content),
+        Some("format-ignore" | "prettier-ignore")
+    )
 }
 
 /// Whether `comment` is a format-ignore directive that HONORS — the recognizer above
@@ -257,7 +269,7 @@ pub fn directive_alone_on_line(source: &str, comment: &Comment) -> bool {
 pub fn is_format_ignore_range_start(content: &str) -> bool {
     matches!(
         directive_text(content),
-        "format-ignore-start" | "prettier-ignore-start"
+        Some("format-ignore-start" | "prettier-ignore-start")
     )
 }
 
@@ -267,7 +279,7 @@ pub fn is_format_ignore_range_start(content: &str) -> bool {
 pub fn is_format_ignore_range_end(content: &str) -> bool {
     matches!(
         directive_text(content),
-        "format-ignore-end" | "prettier-ignore-end"
+        Some("format-ignore-end" | "prettier-ignore-end")
     )
 }
 

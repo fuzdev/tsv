@@ -38,6 +38,9 @@
 //! NEL** — while `u8::is_ascii_whitespace` and a hand-written `b' ' | b'\t' | …` are narrower
 //! still, missing every non-ASCII member. Both witnesses are asserted below, and each has been
 //! the whole bug on its own; a fix graded against only one of them grades a half-fix as done.
+//! The one place `str::trim_ascii*` is right is beneath [`trim_start_js_whitespace`] and its
+//! siblings, where the byte it stops on is tested for what it cannot see — `<VT>`, a non-ASCII
+//! byte — and the searcher over the full class takes over from there.
 //!
 //! ⚠️ The `Zs` half of this set is **Unicode-version-dependent** (ECMA-262 mandates the latest
 //! Unicode, and U+180E left `Zs` in Unicode 6.3 — spec.html's own §Additions and Changes note
@@ -130,9 +133,124 @@ pub const fn is_js_whitespace(c: char) -> bool {
     )
 }
 
+/// `s.trim_start_matches(is_js_whitespace)`, the common case answered on bytes.
+///
+/// A predicate-taking `str` trim builds a searcher that decodes a char from an end before it can
+/// reject — tens of instructions to step the one space a comment line or a directive usually
+/// carries, at a site asked once per comment line (135K asks a pass on a TypeScript corpus).
+/// Five of the class's six ASCII members are `u8::is_ascii_whitespace`, so `str::trim_ascii_start`
+/// steps them as bytes with no slice check of its own; the byte it stops on decides the rest —
+/// `<VT>` (the one ASCII member that class lacks) or the lead byte of a non-ASCII char may still
+/// be a member, and only then does the searcher run, out of line. Every other stop byte is a
+/// whole char no member begins, so the byte answer is the searcher's; the `debug_assert` keeps
+/// that claim under the fixture suite rather than in prose.
+///
+/// One body per direction, no runtime flag: a single body over two direction flags came out as
+/// three outlined copies of ~300 B each (the `Range` slice's boundary checks, the wide test re-read
+/// from both ends), and paid the searcher's price call for call.
+#[inline]
+pub fn trim_start_js_whitespace(s: &str) -> &str {
+    let head = s.trim_ascii_start();
+    if stop_byte_may_be_js_whitespace(head.as_bytes().first()) {
+        return trim_start_js_whitespace_wide(head);
+    }
+    debug_assert_eq!(
+        head,
+        s.trim_start_matches(is_js_whitespace),
+        "an ASCII non-member at the trimmed end proves the searcher would stop there too"
+    );
+    head
+}
+
+/// `s.trim_end_matches(is_js_whitespace)` — see [`trim_start_js_whitespace`].
+#[inline]
+pub fn trim_end_js_whitespace(s: &str) -> &str {
+    let head = s.trim_ascii_end();
+    if stop_byte_may_be_js_whitespace(head.as_bytes().last()) {
+        return trim_end_js_whitespace_wide(head);
+    }
+    debug_assert_eq!(head, s.trim_end_matches(is_js_whitespace));
+    head
+}
+
+/// `s.trim_matches(is_js_whitespace)` — see [`trim_start_js_whitespace`].
+#[inline]
+pub fn trim_js_whitespace(s: &str) -> &str {
+    let inner = s.trim_ascii();
+    let bytes = inner.as_bytes();
+    if stop_byte_may_be_js_whitespace(bytes.first()) || stop_byte_may_be_js_whitespace(bytes.last()) {
+        return trim_js_whitespace_wide(inner);
+    }
+    debug_assert_eq!(inner, s.trim_matches(is_js_whitespace));
+    inner
+}
+
+/// Whether the byte a `trim_ascii*` stopped on may still belong to [`is_js_whitespace`]: `<VT>`,
+/// or any byte of a non-ASCII char (a lead byte at a head, a continuation byte at a tail).
+#[inline]
+const fn stop_byte_may_be_js_whitespace(b: Option<&u8>) -> bool {
+    matches!(b, Some(&b) if b == 0x0b || b >= 0x80)
+}
+
+#[cold]
+#[inline(never)]
+fn trim_start_js_whitespace_wide(s: &str) -> &str {
+    s.trim_start_matches(is_js_whitespace)
+}
+
+#[cold]
+#[inline(never)]
+fn trim_end_js_whitespace_wide(s: &str) -> &str {
+    s.trim_end_matches(is_js_whitespace)
+}
+
+#[cold]
+#[inline(never)]
+fn trim_js_whitespace_wide(s: &str) -> &str {
+    s.trim_matches(is_js_whitespace)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The byte-gated trims agree with the searchers at every arrangement of ASCII members
+    /// (`<VT>` among them — the member `trim_ascii` does not step), the non-ASCII witnesses
+    /// (`<NBSP>`, `<ZWNBSP>` — members; `<NEL>`, `é` — not) and content, zero to four pieces
+    /// long — the axis a corpus never samples, since real source carries none of the non-ASCII
+    /// members at a comment's edge.
+    #[test]
+    fn byte_trims_match_the_searchers() {
+        const PIECES: [&str; 10] = [
+            " ", "\t", "\n", "\u{b}", "\u{a0}", "\u{feff}", "\u{85}", "\u{2028}", "x", "é",
+        ];
+        let mut s = String::new();
+        for len in 0..=4u32 {
+            for code in 0..PIECES.len().pow(len) {
+                s.clear();
+                let mut c = code;
+                for _ in 0..len {
+                    s.push_str(PIECES[c % PIECES.len()]);
+                    c /= PIECES.len();
+                }
+                assert_eq!(
+                    trim_js_whitespace(&s),
+                    s.trim_matches(is_js_whitespace),
+                    "{s:?}"
+                );
+                assert_eq!(
+                    trim_start_js_whitespace(&s),
+                    s.trim_start_matches(is_js_whitespace),
+                    "{s:?}"
+                );
+                assert_eq!(
+                    trim_end_js_whitespace(&s),
+                    s.trim_end_matches(is_js_whitespace),
+                    "{s:?}"
+                );
+            }
+        }
+    }
 
     /// Svelte's own `is_whitespace(cc)` (`1-parse/index.js`), transcribed — the hand-written
     /// enumeration of JS `\s` that both of tsv's JS-spelled oracles are read through. The
