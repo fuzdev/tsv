@@ -905,6 +905,23 @@ word split (300 KB of prose decoded a char at a time): byte walks over that
 four-byte class read **−0.40% instructions** on the Svelte corpus and
 **−0.58% cycles** in its group, `+0` on TypeScript, byte-identical.
 
+The CSS format cell, re-boarded after its declaration seams had moved, gave the same
+lesson three more times over. Its `trim_end_preserving_escape` was a 425-byte outlined
+searcher asked 48.7K times a pass with nothing to trim on 96% of them — and its class,
+`is_css_whitespace`, is exactly `char::is_ascii_whitespace`, so `str::trim_ascii_end`
+inline (the escape-restoring tail a cold body) is the same answer with no searcher and no
+call: **−0.45%**. `normalize_css_whitespace`'s scan-skip test walked every identifier value
+a byte at a time behind a six-push prologue to find that 98.6% of them normalize to
+themselves; asking that question of the *document's word* (`swar::next_byte_below_or_of`,
+the host-range form: the region's bytes and a lane past its end ignored) ahead of the
+call read a further **−0.45%**. And the CSS wire writer's three JS-`\s` trims a
+declaration — the space after the colon the one byte trimmed among them — took the byte
+bodies the comment seams had landed the session before: **−0.59% of the wire pass**, `+0`
+on the format path. The rung that did NOT pay was the one that measured a pooled text's
+width on the host's word: `text_pooled_in(span, source)` at the three sites that own a
+source slice read **+0.13%** against the tree beneath it — the width was never the price
+of those pooled texts.
+
 ### Ask whether a shared substrate's other consumer adopted its optimization
 
 A substrate with more than one consumer is a place where an optimization can be

@@ -11,8 +11,8 @@ mod splitting;
 pub(crate) use colors::format_color_from_source;
 pub(crate) use numbers::normalize_dimension_from_source;
 pub(crate) use splitting::{
-    collapse_whitespace_runs, has_closing_comma, normalize_css_whitespace, split_args_by_comma,
-    split_by_space_preserving_parens,
+    collapse_whitespace_runs, has_closing_comma, normalize_css_whitespace, normalize_is_noop_in,
+    split_args_by_comma, split_by_space_preserving_parens,
 };
 
 use std::borrow::Cow;
