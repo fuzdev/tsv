@@ -1815,6 +1815,16 @@ impl DocArena {
     /// callers that build a `String` pass a borrow and keep (or immediately
     /// drop) their buffer.
     ///
+    /// ⚠️ **A slice of the DOCUMENT wants [`Self::source_span`] instead, and whether that
+    /// pays is a question of the slice's length.** The two nodes render identically; this
+    /// one adds the pool copy (a `RefCell` borrow, a `push_str`, a `memcpy` call) and
+    /// measures the width over the bare slice (a scalar tail under eight bytes), where
+    /// `source_span` reads the host's word and copies nothing. Measured on the CSS
+    /// printer: a ~12-byte selector leaf is ≈ 48 instructions an ask cheaper as a span
+    /// (12.3K asks a pass, −0.34% of the format run); a three-byte function name is the
+    /// SAME price either way — the copy of three bytes costs what a span's guard costs —
+    /// so a short text the caller cannot prove is the span's head stays pooled.
+    ///
     /// Width-cache policy: see [`pooled_text_width`] (always eager, so the
     /// fits walk never touches the pool).
     #[inline]
