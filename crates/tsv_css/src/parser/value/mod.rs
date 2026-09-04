@@ -204,8 +204,29 @@ pub(crate) fn parse_single_value<'arena>(
         // (`printer::declarations::list_has_closing_comma`) rather than from a synthesized
         // empty argument here: an *escaped* comma (`var(--b, x\,)`) is content inside the
         // last argument, and a synthesized one would double it.
+        //
+        // The name is a slice of `s`, so it is a slice of the source: hand the printer
+        // its span rather than a copy of its bytes (span-for-verbatim). `name` itself
+        // still answers `parse_color_function` above, at parse time.
+        //
+        // Its offset is read off the two heads rather than threaded out of the split,
+        // which keeps that tuple at four words (returning it as a fifth cost ~288 bytes
+        // of `.text` and a little of the lever).
+        //
+        // ⚠️ It does NOT buy back the frame. This is the CSS value parser's own
+        // recursion, and the name's location has to live across `parse_function_arguments`
+        // below, so `build_leaf` grows 16 bytes and `calc(calc(…))` loses ~1,157 levels of
+        // its depth budget. Three spellings were measured — the fifth tuple element, this
+        // one, and hoisting the recursive call above the struct expression — and all three
+        // read exactly that number. It is the shape's price, not a spelling's; don't spend
+        // a session re-spelling it.
+        let name_start = name.as_ptr() as usize - s.as_ptr() as usize;
+        let name_span = Span {
+            start: span.start + name_start as u32,
+            end: span.start + (name_start + name.len()) as u32,
+        };
         return Some(CssValue::Function {
-            name: arena.alloc_str(name),
+            name_span,
             args: parse_function_arguments(args, args_span, arena),
             span,
         });

@@ -1,0 +1,66 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 213,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 76,
+				"end": 108,
+				"name": "import",
+				"prelude": "'a.css' \\6c ayer(name1)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 110,
+				"end": 153,
+				"name": "import",
+				"prelude": "'b.css' \\73 upports(display: grid)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 155,
+				"end": 177,
+				"name": "import",
+				"prelude": "\\75 rl(c.css)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 179,
+				"end": 204,
+				"name": "import",
+				"prelude": "'d.css' \\6c ayer",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escape-spelled prelude function name keeps its backslash ",
+				"start": 9,
+				"end": 74
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 205,
+			"styles": "\n\t/* an escape-spelled prelude function name keeps its backslash */\n\t@import 'a.css' \\6c ayer(name1);\n\t@import 'b.css' \\73 upports(display: grid);\n\t@import \\75 rl(c.css);\n\t@import 'd.css' \\6c ayer;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 214,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

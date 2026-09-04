@@ -758,11 +758,20 @@ present). Two kinds of owned data remain on nodes, both deliberate:
   re-scanning: `TemplateElement.has_newline` and `RegexLiteral.pattern_width` (the
   `tsv_ts` printer's `is_simple_call_argument` checks), `Comment.multiline`.
 
-A handful of verbatim leaves whose *enclosing* span is larger than the leaf (a CSS
-function name inside `name(args)`, an at-rule name after `@`, a declaration property,
-a Svelte directive name inside `prefix:name|mods`) are still stored as `&'arena str`
+A handful of verbatim leaves whose *enclosing* span is larger than the leaf (an
+at-rule name after `@`, a declaration property, an `@import` `supports()` name, a
+Svelte directive name inside `prefix:name|mods`) are still stored as `&'arena str`
 rather than a dedicated leaf span — a benign, low-frequency exception, not a stored
-raw cache of the printed text.
+raw cache of the printed text. The CSS **function** name inside `name(args)` used to
+be one and is now a `CssValue::Function::name_span`: the copy was the smaller half of
+what it cost. A printer that must *prove* a stored text is the head of its span pays a
+guard on every ask — measured twice as a wash against the copy itself — where a parser
+that simply records the span makes both disappear. It also settled a correctness
+question the `&str` had been hiding: two producers stored a *decoded* name into a field
+documented verbatim, so an escape-spelled `@import \6c ayer(` printed `layer(`. A span
+cannot carry a decoded text, so the shape forbids the bug. **When a leaf on this list
+looks like a redundant copy, price the guard its absence would cost the printer, and
+check every producer stores the verbatim bytes.**
 
 ## Comment Handling
 
