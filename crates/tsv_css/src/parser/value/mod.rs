@@ -13,7 +13,7 @@ pub(crate) mod scan;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
-use crate::escapes::{trim_end_preserving_escape, trim_start_css};
+use crate::escapes::{trim_css, trim_end_preserving_escape, trim_start_css};
 use crate::parser::value::lists::ValueSeparator;
 use bumpalo::Bump;
 use tsv_lang::Span;
@@ -263,7 +263,11 @@ pub(crate) fn parse_single_value<'arena>(
 /// precondition trips the walk's `debug_assert` or its underflow, rather than quietly
 /// returning a wrong span.
 fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
-    let name_part = s[..paren_pos].trim();
+    // CSS whitespace only (CSS Syntax 3 §4.2), like every other value-boundary trim: a
+    // Unicode `str::trim` would cut a non-ASCII space (an NBSP) out of the name's span, and
+    // the printer emits the name from that span, so the character would be dropped. Kept in
+    // `name_part`, it fails the validation below and the value stays an opaque identifier.
+    let name_part = trim_css(&s[..paren_pos]);
 
     // Validate function name: alphanumeric, hyphens, underscores only
     if name_part.is_empty()

@@ -1,0 +1,121 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 440,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 431,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 179,
+							"end": 196,
+							"property": "width",
+							"value": "calc(1px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 200,
+							"end": 216,
+							"property": "color",
+							"value": "var(--x)"
+						},
+						{
+							"type": "Declaration",
+							"start": 308,
+							"end": 326,
+							"property": "height",
+							"value": "calc (1px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 392,
+							"end": 403,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 407,
+							"end": 427,
+							"property": "color",
+							"value": "rgb(1, 2, 3)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 431
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A no-break space (U+00A0) is not CSS whitespace, so one glued ahead of a function\n\t\t   name is value content: the run stays one opaque token, kept verbatim ",
+				"start": 15,
+				"end": 176
+			},
+			{
+				"type": "CSSComment",
+				"value": " ...and between the name and its `(`: the same opaque token, not a function call ",
+				"start": 220,
+				"end": 305
+			},
+			{
+				"type": "CSSComment",
+				"value": " A keyword and a color led by one keep it the same way ",
+				"start": 330,
+				"end": 389
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 432,
+			"styles": "\n\ta {\n\t\t/* A no-break space (U+00A0) is not CSS whitespace, so one glued ahead of a function\n\t\t   name is value content: the run stays one opaque token, kept verbatim */\n\t\twidth:  calc(1px);\n\t\tcolor:  var(--x);\n\t\t/* ...and between the name and its `(`: the same opaque token, not a function call */\n\t\theight: calc (1px);\n\t\t/* A keyword and a color led by one keep it the same way */\n\t\tcolor:  red;\n\t\tcolor:  rgb(1, 2, 3);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 441,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

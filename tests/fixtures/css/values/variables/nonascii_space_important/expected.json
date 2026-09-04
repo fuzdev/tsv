@@ -1,0 +1,88 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 236,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 227,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 185,
+							"end": 202,
+							"property": "--a",
+							"value": "!important"
+						},
+						{
+							"type": "Declaration",
+							"start": 206,
+							"end": 223,
+							"property": "--b",
+							"value": "!important"
+						}
+					]
+				},
+				"start": 9,
+				"end": 227
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " A custom-property value that is one no-break space (U+00A0) is not empty (the\n\t\t   space is not CSS whitespace), so `!important` follows it after the usual space ",
+				"start": 15,
+				"end": 182
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 228,
+			"styles": "\n\ta {\n\t\t/* A custom-property value that is one no-break space (U+00A0) is not empty (the\n\t\t   space is not CSS whitespace), so `!important` follows it after the usual space */\n\t\t--a:   !important;\n\t\t--b:   !important;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 237,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

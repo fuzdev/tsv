@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 476,
+		"end": 668,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 11,
-					"end": 467,
+					"end": 659,
 					"children": [
 						{
 							"type": "Declaration",
@@ -70,15 +70,29 @@
 						},
 						{
 							"type": "Declaration",
-							"start": 450,
-							"end": 463,
+							"start": 469,
+							"end": 486,
+							"property": "width",
+							"value": "calc(1px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 562,
+							"end": 581,
+							"property": "height",
+							"value": "calc(1px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 642,
+							"end": 655,
 							"property": "content",
 							"value": "'z'"
 						}
 					]
 				},
 				"start": 9,
-				"end": 467
+				"end": 659
 			}
 		],
 		"comments": [
@@ -108,21 +122,33 @@
 			},
 			{
 				"type": "CSSComment",
-				"value": " Single string value led by an em space (U+2003). ",
+				"value": " Single function value trailed by a non-breaking space — kept glued. ",
 				"start": 393,
-				"end": 447
+				"end": 466
+			},
+			{
+				"type": "CSSComment",
+				"value": " Single function value led AND trailed by one — both kept glued. ",
+				"start": 490,
+				"end": 559
+			},
+			{
+				"type": "CSSComment",
+				"value": " Single string value led by an em space (U+2003). ",
+				"start": 585,
+				"end": 639
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 468,
-			"styles": "\n\ta {\n\t\t/* Single string value led by a non-breaking space (U+00A0) — kept glued. */\n\t\tcontent:  'z';\n\t\t/* Single ident value led by a non-breaking space — kept glued (matches prettier). */\n\t\tfont-family:  q;\n\t\t/* Single string value trailed by a non-breaking space. */\n\t\tquotes: 'a' ;\n\t\t/* Single ident value trailed by a non-breaking space (matches prettier). */\n\t\tfont-family: q ;\n\t\t/* Single string value led by an em space (U+2003). */\n\t\tcontent:  'z';\n\t}\n",
+			"end": 660,
+			"styles": "\n\ta {\n\t\t/* Single string value led by a non-breaking space (U+00A0) — kept glued. */\n\t\tcontent:  'z';\n\t\t/* Single ident value led by a non-breaking space — kept glued (matches prettier). */\n\t\tfont-family:  q;\n\t\t/* Single string value trailed by a non-breaking space. */\n\t\tquotes: 'a' ;\n\t\t/* Single ident value trailed by a non-breaking space (matches prettier). */\n\t\tfont-family: q ;\n\t\t/* Single function value trailed by a non-breaking space — kept glued. */\n\t\twidth: calc(1px) ;\n\t\t/* Single function value led AND trailed by one — both kept glued. */\n\t\theight:  calc(1px) ;\n\t\t/* Single string value led by an em space (U+2003). */\n\t\tcontent:  'z';\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 477,
+	"end": 669,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
