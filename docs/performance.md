@@ -878,7 +878,8 @@ callee's prologue collects the call sites' skid, so a row on a symbol's first
 `push` is an attribution of the callers, not the callee's cost.
 
 **And a lever found in one cell names a class to sweep — but the sweep is
-priced by what each site WALKS, not by what it constructs.** The searcher
+priced by what each site WALKS, not by what it constructs, and a short walk
+by whether its answer is inline.** The searcher
 behind two of those CSS seams is what every predicate-taking `str` trim pays,
 so the sweep censused the twenty-odd sites across the three printers. The
 population was not where the symbol rows pointed: the `trim_matches` rows on
@@ -889,7 +890,16 @@ trimming one space. Replacing those with byte loops read **+0.01%**: a one-char
 trim costs about forty instructions either way — and the byte body itself came
 out outlined, one 935-byte function taking both direction flags at runtime, so
 each ask was still a call — while the CSS win had come from the gate that
-skipped the ask, not from a cheaper walk. What did move was the
+skipped the ask, not from a cheaper walk. Re-cut as one inline body per
+direction — core's `trim_ascii*` over the five ASCII members it shares with the
+class, the stop byte deciding whether the cold searcher still runs, the
+indentable-comment classifier comparing that byte to `*` with no slice, the
+directive recognizer refusing on a first byte outside `f`/`p` — the same 135K
+asks read **−0.21%** on the TypeScript corpus and **−0.28%** on Svelte,
+byte-identical, `.text` +2.0 KB: about twenty instructions an ask against the
+searcher's fifty. The price of a one-char trim was never the walk; it was the
+call — into the searcher, or into a byte body outlined behind runtime flags. A
+short trim wins only inline; a long walk wins either way. What moved first was the
 Svelte text node's edges (a newline plus its indent, 44K a pass) and the fill's
 word split (300 KB of prose decoded a char at a time): byte walks over that
 four-byte class read **−0.40% instructions** on the Svelte corpus and

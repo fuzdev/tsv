@@ -64,4 +64,6 @@ pub use location::{ByteToCharMap, LocationMapper, LocationTracker, Position};
 pub use output::{OutputBuffer, write_indent};
 pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};
 pub use span::Span;
-pub use whitespace::is_js_whitespace;
+pub use whitespace::{
+    is_js_whitespace, trim_end_js_whitespace, trim_js_whitespace, trim_start_js_whitespace,
+};

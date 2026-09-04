@@ -6,7 +6,7 @@
 use crate::acorn_prefix::AcornPrefix;
 use crate::escapes::swap_quote_escaping_into;
 use crate::swar::{high_bit_lanes, lanes_less_than, splat, zero_lanes, zero_or_high_lanes};
-use crate::whitespace::is_js_whitespace;
+use crate::whitespace::trim_start_js_whitespace;
 use std::borrow::Cow;
 use std::cell::{Cell, OnceCell};
 use std::fmt;
@@ -2169,7 +2169,7 @@ pub fn strip_comment_indentation(
 /// buffer is materialized, so classification never heap-allocates. Returns
 /// `false` for single-line content. Mirrors prettier's `isIndentableBlockComment`.
 ///
-/// ⚠️ The leading trim is [`is_js_whitespace`], because prettier's is
+/// ⚠️ The leading trim is [`is_js_whitespace`](crate::is_js_whitespace), because prettier's is
 /// `line.trimStart()[0] === "*"` — `String.prototype.trimStart`, the JS `\s` class. Rust's
 /// `str::trim_start` is `White_Space`, which disagrees at exactly the two witnesses and so
 /// flipped the CLASSIFICATION in both directions: a `<ZWNBSP>*`-prefixed line reads as
@@ -2201,15 +2201,18 @@ pub fn is_indentable_block_comment<'s>(mut lines: impl Iterator<Item = &'s str>)
         return false; // fewer than 2 lines → not a multi-line indentable comment
     };
     for next in lines {
-        // A successor exists, so `prev` is a middle line: it must be `*`-prefixed.
-        if !prev.trim_start_matches(is_js_whitespace).starts_with('*') {
+        // A successor exists, so `prev` is a middle line: it must be `*`-prefixed. The trim
+        // stops on a byte, and `*` is one, so the question is that byte's — no slice, no decode.
+        if trim_start_js_whitespace(prev).as_bytes().first() != Some(&b'*') {
             return false;
         }
         prev = next;
     }
     // The last line qualifies when empty or `*`-prefixed.
-    let last = prev.trim_start_matches(is_js_whitespace);
-    last.is_empty() || last.starts_with('*')
+    matches!(
+        trim_start_js_whitespace(prev).as_bytes().first(),
+        None | Some(b'*')
+    )
 }
 
 /// Calculate the visual width of a string, treating tabs as `tab_width` columns.
