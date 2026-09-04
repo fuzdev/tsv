@@ -26,7 +26,7 @@ mod nodes;
 mod script_style;
 mod text;
 
-use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
+use crate::ast::internal::{self, FragmentNode};
 use nodes::AttrGaps;
 use smallvec::SmallVec;
 use std::cell::{Cell, RefCell};
@@ -1500,9 +1500,10 @@ impl<'a> Printer<'a> {
         // boundary text. Both kinds only occur at the boundaries, so the kept content is a
         // contiguous slice.
         //
-        // ⚠️ The trim is [`is_collapsible_ws_char`], NOT `str::trim` (the Unicode `White_Space`
-        // property, which is wider). The root fragment is a fragment like any other, so it owes
-        // the same rule every element boundary follows: the trim stops at content. `str::trim`
+        // ⚠️ The class is `is_collapsible_ws` (the parser's precomputed `is_collapsible_ws_only`
+        // flag, keyed on `raw`), NOT `str::trim` (the Unicode `White_Space` property, which is
+        // wider). The root fragment is a fragment like any other, so it owes the same rule every
+        // element boundary follows: the trim stops at content. `str::trim`
         // deleted a root-boundary NBSP — content the compiler keeps (`regex_not_whitespace` =
         // `/[^ \t\r\n]/` matches U+00A0, so the node is not whitespace-only and survives:
         // `\u{a0}<div>block</div>` compiles to `<!---->\u{a0}<div>…`). prettier deletes it too,
@@ -1510,7 +1511,7 @@ impl<'a> Printer<'a> {
         let source = self.source;
         let skippable = |i: usize, n: &FragmentNode<'_>| {
             skip_indices.contains(&i)
-                || matches!(n, FragmentNode::Text(t) if t.raw(source).trim_matches(is_collapsible_ws_char).is_empty())
+                || matches!(n, FragmentNode::Text(t) if t.is_collapsible_ws_only)
         };
         let Some(start) = fragment
             .nodes
@@ -1644,7 +1645,7 @@ impl<'a> Printer<'a> {
     /// Walk `to` back over collapsible whitespace, stopping at `floor`.
     ///
     /// The class is [`internal::is_collapsible_ws`] — the byte spelling of
-    /// [`is_collapsible_ws_char`], the same set every other boundary in this printer trims;
+    /// [`is_collapsible_ws_char`](internal::is_collapsible_ws_char), the same set every other boundary in this printer trims;
     /// a form feed is content, so it stops the walk. A byte walk is exact here because the
     /// whole class is ASCII, and an ASCII byte value in UTF-8 is always a standalone char.
     fn trim_trailing_ws_back_to(&self, floor: u32, to: u32) -> u32 {

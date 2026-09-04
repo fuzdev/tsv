@@ -877,6 +877,24 @@ the first of them read four times its `objdump` × census price: an outlined
 callee's prologue collects the call sites' skid, so a row on a symbol's first
 `push` is an attribution of the callers, not the callee's cost.
 
+**And a lever found in one cell names a class to sweep — but the sweep is
+priced by what each site WALKS, not by what it constructs.** The searcher
+behind two of those CSS seams is what every predicate-taking `str` trim pays,
+so the sweep censused the twenty-odd sites across the three printers. The
+population was not where the symbol rows pointed: the `trim_matches` rows on
+the TypeScript and Svelte cells carried `is_js_whitespace`'s source line, and
+their callers were the directive recognizer, the indentable-comment classifier
+and the comment renderer — 135K asks a pass on the TypeScript corpus, each
+trimming one space. Replacing those with byte loops read **+0.01%**: a one-char
+trim costs about forty instructions either way — and the byte body itself came
+out outlined, one 935-byte function taking both direction flags at runtime, so
+each ask was still a call — while the CSS win had come from the gate that
+skipped the ask, not from a cheaper walk. What did move was the
+Svelte text node's edges (a newline plus its indent, 44K a pass) and the fill's
+word split (300 KB of prose decoded a char at a time): byte walks over that
+four-byte class read **−0.40% instructions** on the Svelte corpus and
+**−0.58% cycles** in its group, `+0` on TypeScript, byte-identical.
+
 ### Ask whether a shared substrate's other consumer adopted its optimization
 
 A substrate with more than one consumer is a place where an optimization can be

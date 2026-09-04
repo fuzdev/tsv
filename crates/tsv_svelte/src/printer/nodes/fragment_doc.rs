@@ -116,12 +116,17 @@ struct PendingFreeze {
 /// boundary logic to tell a leading-linebreak text (which supplies its own break) from
 /// content/space text (which needs a `softline`).
 ///
-/// The array spelling is deliberate: it feeds a `str` pattern, where an `is_collapsible_ws_char`
-/// predicate fn would change the `Pattern` monomorphization (a measured `.text` growth).
+/// A byte loop rather than a `str` pattern: the class is three ASCII bytes, and a
+/// pattern-taking trim builds a searcher per ask at a site asked once per block child.
 ///
 /// [`is_collapsible_ws`]: crate::ast::internal::is_collapsible_ws
 pub(super) fn text_starts_with_linebreak(raw: &str) -> bool {
-    raw.trim_start_matches([' ', '\t', '\r']).starts_with('\n')
+    let bytes = raw.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && matches!(bytes[i], b' ' | b'\t' | b'\r') {
+        i += 1;
+    }
+    bytes.get(i) == Some(&b'\n')
 }
 
 impl<'a> Printer<'a> {

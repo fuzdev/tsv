@@ -6,7 +6,7 @@
 // `ElementLayout`, `ElementKind`, `ElementContext`) live in `element_doc.rs`
 // alongside the build half that also consumes them.
 
-use crate::ast::internal::{FragmentNode, is_collapsible_ws_char};
+use crate::ast::internal::{FragmentNode, trim_end_collapsible_ws, trim_start_collapsible_ws};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
 use tsv_ts::ast::internal::Expression;
@@ -450,10 +450,10 @@ impl<'a> Printer<'a> {
                 // see [`Self::content_is_reflowable_fill`].
                 let mut scan = raw;
                 if idx == content_edges.0 || is_fill {
-                    scan = scan.trim_start_matches(is_collapsible_ws_char);
+                    scan = trim_start_collapsible_ws(scan);
                 }
                 if idx == content_edges.1 || is_fill {
-                    scan = scan.trim_end_matches(is_collapsible_ws_char);
+                    scan = trim_end_collapsible_ws(scan);
                 }
                 !is_fill && scan.contains('\n')
             }
