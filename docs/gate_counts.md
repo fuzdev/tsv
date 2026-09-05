@@ -104,11 +104,10 @@ real move in a number is a deliberate, visible edit.
      comes from a pinned checkout (the `../corpora` real-code snapshot + the prettier
      suites), so it's really exact-on-aligned-checkouts — the minimum exists only so
      a fixed win needn't re-pin; over pinned inputs a `match` DROP is always a real
-     regression. ⚠️ It is NOT a live-growth minimum, and the corpus is no longer
-     live: the author's dev repos used to sit in the gate as working trees, whose
-     ordinary edits shrank `match` and drove a re-pin treadmill (re-pinned 3× in 2
-     days). The snapshot is what ended that — a minimum is only sound if the metric
-     can't decrease, and over pinned inputs it can't except by regression.
+     regression. ⚠️ It is NOT a live-growth minimum. A minimum is only sound if the
+     metric can't decrease, and over pinned inputs it can't except by regression —
+     which is why the corpus is a snapshot rather than the author's dev working
+     trees, whose ordinary edits shrink `match` and make the gate a re-pin treadmill.
   2. The committed-fixtures audits (`fixtures_validate`, `swallow_audit`) ARE
      genuine growth minimums — fixture counts only grow with reviewed additions,
      and shrinkage is the discovery regression the pin guards.
@@ -140,12 +139,32 @@ left by getting better or worse, and what the A/B over the full corpus showed. A
 number is unauditable — the next re-pin cannot tell a recorded win from an absorbed
 regression — so the attribution is the constant's semantics, not its history.
 
-⚠️ **Attribution, not a changelog.** Dates, PR numbers and commit SHAs stay out (the
-`X→Y (date): …` entries were swept out for that reason, and the repo-wide rule against
-process notes in docs and comments applies here); the change's own narrative belongs in
-the **commit message**. What stays in-file is the sentence a reader needs to know what
-the number counts — including a harvest pin's provenance stamp (`Measured <date>:
-../wpt at <commit>`), which is the pin's identity, not its history.
+⚠️ **Attribution, not a changelog.** Dates, branch names, PR numbers and commit SHAs
+stay out (the repo-wide rule against process notes in docs and comments applies here);
+the change's own narrative belongs in the **commit message**. What stays in-file is the
+sentence a reader needs to know what the number counts — including a harvest pin's
+provenance stamp (`Measured <date>: ../wpt at <commit>`), which is the pin's identity,
+not its history.
+
+**An entry whose number a corpus refresh has replaced is superseded, and goes with it.**
+The chain of `X → Y` notes attributes the number as it stands: once a tier change or a
+snapshot refresh moves the corpus wholesale, the moves inside the corpus it replaced
+attribute nothing a reader can audit, and the surviving chain should start at the tier
+the current value was measured in. A pin that enumerates its backlog states the CURRENT
+membership — a list that later entries silently retire members from is worse than none,
+since it reads as the answer to "what is in this bucket".
+
+⚠️ **A merged number is a re-measurement, never a sum.** Two re-pins developed apart are
+each measured against their own tree, so their deltas are only *predictive* of the merged
+tip: verify the mover sets are disjoint per file, take the reading on the merged tree, and
+record the chain as the sequential steps it ends up being. That verification is a
+precondition for the entry, not a note to leave in it.
+
+⚠️ **A staged-tree corpus A/B is blind to the suite files `.prettierignore` hides.**
+`tsv format --list` honors `.gitignore` / `.prettierignore` and the prettier repo ignores
+its own test fixtures, so a rig enumerating with `--list` sees ~8,500 files where the
+`gates` view holds ~9,305 — an A/B reading ZERO movers there is not evidence the gate
+passes. Enumerate the suites with `find`, or diff the `--all --json` bucket lists.
 
 When a checkout moves, re-record its **id** (its HEAD commit; for `../corpora`, the `collections/` tree id) in `GATE_CHECKOUT_IDS` in the
 same change (`git -C ../<repo> rev-parse --short HEAD`; for the snapshot,
@@ -186,8 +205,8 @@ They guard different granularities. Checkout alignment
 ([`pins:audit:checkouts`](audits.md#checkout-alignment-audit-pinsauditcheckouts))
 compares `package.json` versions — but an upstream repo's version only bumps at
 release, so commits landing between releases change the SUITE without changing the
-version (proven on day one: a `../svelte` pull added three test inputs at the same
-declared version — the count pin caught it; the version check couldn't).
+version. A pull inside that window — a handful of test inputs added at the same
+declared version — moves what is graded, and only the count pin can see it.
 Conversely the count pins can't tell one release from another if the counts happen
 to coincide. Version alignment catches release-level skew; count pins catch
 commit-level suite drift within a version window.

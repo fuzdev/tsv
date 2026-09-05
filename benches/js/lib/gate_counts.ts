@@ -7,44 +7,37 @@
  * applied to counts: every real move in a number is a deliberate, visible edit.
  *
  * Three pin categories, chosen per surface — exact pins (`*_PINS` / `*_PIN`),
- * minimums (`*_MIN`), and failure-bucket pins (exact two-sided `!==`). What each
- * means, which surface takes which, and why (the pinned-snapshot rule, SAFETY
- * gating over EVERY file) is stated
- * once in docs/gate_counts.md §Semantics; the per-constant docstrings below carry
- * only what is specific to that constant.
+ * minimums (`*_MIN`), and failure-bucket pins (exact two-sided `!==`). What each means,
+ * which surface takes which, and why (the pinned-snapshot rule, SAFETY gating over EVERY
+ * file) is stated once in docs/gate_counts.md §Semantics; the per-constant docstrings
+ * below carry only what is specific to that constant.
  *
- * Pins are enforced only on FULL runs (default suite root, `--all`, default
- * harvest source) — a subtree or filtered run legitimately grades a slice.
- * Harvest pins fail BEFORE writing, so a wrong cache never replaces a good
- * one.
- * CI note: `.github/workflows/check.yml` runs on a clean checkout (no
- * sibling clones), so of these only the committed-tree Rust pins
- * (fixtures_validate via the integration test, swallow_audit) execute in CI —
- * the rest are dev-machine gates at conformance/publish cadence.
+ * Pins are enforced only on FULL runs (default suite root, `--all`, default harvest
+ * source) — a subtree or filtered run legitimately grades a slice. Harvest pins fail
+ * BEFORE writing, so a wrong cache never replaces a good one. `.github/workflows/check.yml`
+ * runs on a clean checkout (no sibling clones), so of these only the committed-tree Rust
+ * pins (fixtures_validate via the integration test, swallow_audit) execute in CI — the
+ * rest are dev-machine gates at conformance/publish cadence.
  *
- * Update ritual: the failure message prints expected vs got — update the
- * constant and say why in the COMMIT MESSAGE (that is where a pin move's
- * history lives — do NOT narrate it as an in-file comment; keep these
- * docstrings semantic). When a checkout moves, re-record its id in
- * `GATE_CHECKOUT_IDS` in the same change (`git -C ../<repo> rev-parse
- * --short HEAD`; for the `../corpora` snapshot, `HEAD:collections`) — that struct
- * is the single provenance record for what a pin
- * was measured against. When re-pinning after a suite refresh, glance at the
- * full bucket table, not
- * just the changed number — a count move can mask offsetting changes (the
- * per-file gates — unexpected over-rejections, stale ledgers, SAFETY — catch
- * tsv-side regressions independently, but the glance is cheap). A
- * failure-bucket-pin trip on a single `--all` run can be the known FFI/sidecar
- * heisenbug (see
- * benches/js/CLAUDE.md §Known Issues) — confirm on the single repo before
- * treating it as real. Never re-pin to absorb an unexplained move.
+ * Update ritual — the full procedure is docs/gate_counts.md §Update ritual; what governs
+ * THIS FILE is the shape of the note beside a constant. Record what moved as an `X → Y:`
+ * attribution in the neighbours' style: which file entered or left, in which direction,
+ * and what the A/B over the full corpus showed, so the next re-pin can tell a recorded win
+ * from an absorbed regression. Attribution, not a changelog — dates, branch names, PR
+ * numbers, commit SHAs and the change's own narrative belong in the COMMIT MESSAGE. An
+ * entry whose number a corpus refresh has replaced is superseded and goes with it, and a
+ * pin that enumerates its backlog states the CURRENT membership rather than a list later
+ * entries correct. Re-record a moved checkout's id in `GATE_CHECKOUT_IDS` in the same
+ * change — that struct is the single provenance record for what a pin was measured
+ * against. Never re-pin to absorb an unexplained move; a failure-bucket-pin trip on a
+ * single `--all` run can be the known FFI/sidecar heisenbug (benches/js/CLAUDE.md §Known
+ * Issues), so confirm on the single repo before treating it as real.
  *
- * The Rust-side pins (test262 discovery + graded manifest, `fixtures_validate`
- * fixture count) live as consts in their commands — grep `REGRESSION PIN`. The
- * as-authored audits' formatted-file count is one shared const,
- * `FIXTURES_FORMATTED_MIN` in `crates/tsv_debug/src/audit/vacuity.rs`: they walk
- * one corpus under one skip policy, so a per-audit pin would only let their
- * slack drift apart. See docs/gate_counts.md.
+ * The Rust-side pins (test262 discovery + graded manifest, `fixtures_validate` fixture
+ * count) live as consts in their commands — grep `REGRESSION PIN`. The as-authored
+ * audits' formatted-file count is one shared const, `FIXTURES_FORMATTED_MIN` in
+ * `crates/tsv_debug/src/audit/vacuity.rs`: they walk one corpus under one skip policy, so
+ * a per-audit pin would only let their slack drift apart.
  */
 
 import { CORPORA_ROOT, CORPORA_TREE } from './corpora.ts';
@@ -59,8 +52,9 @@ import type { Language } from './types.ts';
  * The counts are only meaningful relative to the inputs that produced them, and an
  * upstream `package.json` version bumps only at RELEASE — so commits landing between
  * releases change the graded suite without changing the version. `pins:audit`'s version
- * check is blind to that window, which is exactly how these pins went stale silently: a
- * `../svelte` pull added three test inputs at the same declared version.
+ * check is blind to that window, so a pull inside it can leave every pin here describing
+ * a suite that moved under it (docs/gate_counts.md §Why both the pins AND the checkout
+ * alignment exist).
  *
  * So `pins:audit:checkouts` also compares each checkout's git object against the id recorded
  * here and WARNS on a move. That is deliberately a warning, not a failure: the count pins are the
@@ -71,12 +65,12 @@ import type { Language } from './types.ts';
  *
  * `../corpora` is the real-code snapshot (`fuzdev/corpora`): every `real` and
  * `framework` corpus entry reads one of its collections, and one object id pins them
- * all — the author's dev repos included, which as live working trees could not be
- * pinned at all (their counts were "live-growth minimums" and a re-pin treadmill). The
- * id is its `collections/` TREE's, not a commit's: the corpus is those bytes, and the
- * snapshot repo's tooling and doc commits — two landed on the snapshot's first day, each
- * with a byte-identical tree — must not move every pin here. A snapshot refresh is a
- * corpus move like any other: re-record the tree id here, re-run the corpus gates, re-pin.
+ * all — the author's dev repos included, which as live working trees admit no pin at all
+ * (an ordinary edit moves their counts, so a gate over them is a re-pin treadmill). The
+ * id is its `collections/` TREE's, not a commit's: the corpus is those bytes, so a tooling
+ * or doc commit in the snapshot repo leaves a byte-identical tree and must not move every
+ * pin here. A snapshot refresh is a corpus move like any other: re-record the tree id
+ * here, re-run the corpus gates, re-pin.
  *
  * Re-record an id in the same change that re-pins the counts it explains. The
  * harvest-derived pins named beside each checkout ({@link SVELTE_REJECTS_PIN},
@@ -105,7 +99,7 @@ export const GATE_CHECKOUT_IDS: Record<
 		hash: '5f40c547c',
 		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*', 'SVELTE_STYLES_BLOCKS_PIN']
 	},
-	// `../svelte` feeds the conformance view only now (its `tests` tree); its
+	// `../svelte` feeds the conformance view alone (its `tests` tree); its
 	// `packages/svelte/src` is the snapshot's `svelte` collection.
 	'../svelte': {
 		hash: '5ccdfe355',
@@ -161,20 +155,17 @@ export interface GatePins {
 
 /** conformance:svelte-fixtures — `scanned` suite inputs + `both_accept`; provenance in `GATE_CHECKOUT_IDS`. */
 export const SVELTE_FIXTURES_PINS: GatePins = {
-	// 3392 → 3406 / 3297 → 3308 / 16 → 17: a `../svelte` pull (20b341f10 → 5ccdfe355) added 14
-	// graded `.svelte` inputs — the version-window this file's header describes, since the
-	// checkout still declares 5.56.9 while carrying commits published after that release. No
-	// tsv change is in it: an accept-verdict diff over 11318 corpus files across the change
-	// that landed beside this re-pin moved ZERO of them, and `unexpected` (over-REJECTIONS,
-	// the gated direction) stays 0.
+	// `scanned` counts the checkout's graded `.svelte` inputs, which move without the declared
+	// version moving — the version-window this file's header describes, since the checkout
+	// declares 5.56.9 while carrying commits published after that release.
 	//
-	// The `over_acceptance` step is an ORACLE-SKEW artifact rather than frontier growth, and
-	// is expected to fall back to 16 on its own. Its one new entry is
-	// `parser-modern/samples/css-nth-of-minified`, added by the upstream fix that parses
-	// `:nth-child(2n of.important)` with no whitespace after `of`. The checkout carries that
-	// fix; the pinned npm oracle (svelte@5.56.9) predates it and rejects the file, so tsv —
-	// which accepts it, agreeing with CURRENT Svelte — grades as over-accepting. Lower this
-	// deliberately when the canonical pin next moves past the fix.
+	// One over-acceptance is an ORACLE-SKEW artifact rather than frontier growth, and is
+	// expected to fall away on its own: `parser-modern/samples/css-nth-of-minified`, which
+	// exercises the upstream fix that parses `:nth-child(2n of.important)` with no whitespace
+	// after `of`. The checkout carries that fix; the pinned npm oracle (svelte@5.56.9)
+	// predates it and rejects the file, so tsv — which accepts it, agreeing with CURRENT
+	// Svelte — grades as over-accepting. Lower this deliberately when the canonical pin
+	// next moves past the fix.
 	scanned: 3406,
 	both_accept: 3308,
 	over_acceptance: 17
@@ -222,19 +213,7 @@ export const TS_REPO_PINS = { scanned: 13708, accept_parity: 12284, over_accepta
  * cross-language total would hide.
  */
 export const CORPUS_PARSE_COMPARED_PIN: Record<Language, number> = {
-	// 1371 / 4356 / 168 → 1178 / 4175 / 166: the corpus moved from the live working trees to
-	// the `../corpora` snapshot, which leaves the upstreams' own test-fixture subtrees behind
-	// (svelte-docinfo's, gro's, mdz's, fuz_gitops's, fuz_css's and fuz_code's `src/test/fixtures`;
-	// kit's `core/*/fixtures` + `test/samples`) — 274 svelte / 388 typescript / 3 css files, of
-	// which these are the ones both parsers accepted; the rest were parse-fail-skipped, as
-	// intentionally-invalid fixtures are. No file of real code left; the tsv-side failure
-	// counts below did not move.
-	//
-	// 1178 / 4175 / 166 → 1353 / 4285 / 172: earbetter (44 / 26 / 2) and cosmicplayground
-	// (131 / 84 / 2) join the `real` tier, plus their two `svelte_styles` concats (css +2) — every
-	// one of the 291 new files compared, so the tsv-side failure counts did not move.
-	//
-	// typescript 4285 → 4289: the loader walks the whole JS/TS family `tsv format` discovers
+	// The typescript denominator spans the whole JS/TS family `tsv format` discovers
 	// (`.mts`/`.cts`/`.mjs`/`.cjs` joined `.ts`/`.js`), which admits five prettier-suite files:
 	// `typescript/top-level-await/test.{mts,cts}`, `js/top-level-await/test.{mjs,cjs}` (all four
 	// compared) and `js/babel-plugins/pipeline-operator-hack.cjs` (rejected by both parsers, so
@@ -279,51 +258,6 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  * `GATE_CHECKOUT_IDS`; rationale in docs/gate_counts.md.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
-	// 500 → 499: one reproducible file, `svelte.dev/.../lib/components/PageControls.svelte`,
-	// where an inline element's content is a fill (`<Icon … /> Edit this page on GitHub`) and so
-	// stops letting its render-free content boundary select the layout — the deliberate rule in
-	// conformance_prettier_svelte.md §Svelte: Inline content block-style, and the only file the change
-	// moves across the whole reproducible subset. The detector already explains it
-	// (`inline_sibling_newline_flow` + `svelte_boundary_ws_trim`), so it lands in `known`, not
-	// `unknown` — that count is unmoved.
-	//
-	// 499 → 498: one reproducible file,
-	// `prettier-plugin-svelte/test/printer/samples/event-handler-comments.html`, whose whole
-	// content is `on:click={// comment⏎() => {…}}` — a leading line comment in a braced head,
-	// which now hangs its value one level in per conformance_prettier.md §Uniform
-	// Forced-Continuation Indent (extended from the block heads to the whole braced family).
-	// It is the only file the change moves across the reproducible subset: the one other
-	// pinned `.svelte` carrying the shape, `svelte/.../parser-legacy/samples/javascript-comments`,
-	// already diverged on the trailing comments prettier strips there. The
-	// `forced_continuation_indent` detector was widened with the clause in the same change, so
-	// it lands in `known` — the `unknown` count is unmoved.
-	//
-	// 502 → 499: the embedded-body freeze
-	// (conformance_prettier_svelte.md §Svelte: Foreign-language embedded bodies) takes three
-	// reproducible files out of `match`, each of them an ACCIDENT of the heuristic it replaced
-	// rather than a regression. `prettier-plugin-svelte/.../style-lang-less.html` and
-	// `style-type-less.html`: the old `<style>` path re-indented a foreign body by inferring
-	// its indent unit, which on an already-well-formed less body reproduced prettier's less
-	// printer exactly — tsv now emits the author's bytes, so a 4-space body stays 4-space.
-	// `prettier/tests/format/html/multiparser/unknown/unknown-lang.html`: `lang="unknown"` on
-	// both tags, which tsv used to format with its TS and CSS printers on the strength of
-	// nothing. Sanctioned by `svelte/style/foreign_lang_frozen_prettier_divergence` and
-	// `svelte/script/foreign_lang_frozen_prettier_divergence`; all three land in `known` via
-	// the `foreign_body_freeze` detector, so `unknown` and `partial` are unmoved. Those three
-	// plus `no-tag-snippings.html` (divergent before and after) are the ONLY reproducible
-	// svelte files whose tsv output changes at all — an A/B of every file under the framework
-	// roots and both `.html` suites against a pre-change binary. The floor it replaces was
-	// four below the tree's real 502, which is why a three-file drop cleared it; 499 is tight.
-	//
-	// 499 → 931: the author's own repos join the pinned corpus (the `../corpora` snapshot —
-	// they were a non-gating live tier before). Not a behavior change: the framework +
-	// prettier subset the old floor measured is unchanged, and the newcomers arrive with zero
-	// `unknown`.
-	//
-	// 931 → 1047: earbetter (33 of 44) and cosmicplayground (83 of 131) join the `real` tier;
-	// their other 59 svelte files are all `known` divergences (prettier-shaped code, mostly
-	// `self_closing_nonvoid` / `inline_content_block_style`), none `unknown`.
-	//
 	// 1047 → 2701: the six third-party collections join the gates as the `third_party` tier;
 	// 1654 of their 2097 svelte files match (flowbite-svelte 929 of 1296, layerchart 333 of 336,
 	// layercake 159 of 177, svelte-ux 161 of 198, svelte-maplibre 72 of 90), 438 are `known`
@@ -338,27 +272,6 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// `unknown` — the lone-container hug reaching its last state. Reasoning on
 	// `CORPUS_FORMAT_UNKNOWN_PIN`.
 	svelte: 2704,
-	// 2332 → 2334: two reproducible files, `prettier/tests/format/js/comments/11273.js` and
-	// `.../trailing-jsdocs.js`, whose divergence was a container-end trailing comment RUN the
-	// author glued onto one line and tsv split onto two. That run's separator now asks the
-	// source (docs/comments.md §Trailing and dangling runs), so a glued pair keeps its line as
-	// it does in prettier. Both files leave `known` — the count that moves against this one.
-	//
-	// 2334 → 2335: `prettier/tests/format/js/sequence-break/break.js`, which leaves `unknown`
-	// by matching once a sequence breaks on width. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`,
-	// which moves the other way in the same step.
-	//
-	// 2335 → 4059 and (css) 89 → 120: the author's repos join the pinned corpus — see svelte.
-	//
-	// 4059 → 4165 and (css) 120 → 125: earbetter + cosmicplayground join the `real` tier (106 of
-	// their 110 typescript files match, 3 `known`, 1 `partial` — see the partial pin; 5 of 6 css,
-	// 1 `known`).
-	//
-	// 4165 → 4169: the loader walks the whole JS/TS family `tsv format` discovers (see the parse
-	// `compared` pin): the four `top-level-await/test.{mts,cts,mjs,cjs}` prettier files all match,
-	// and `pipeline-operator-hack.cjs` is an expected error (both sides reject) — `unknown` and
-	// `partial` unmoved.
-	//
 	// 4169 → 5124 and (css) 125 → 133: the `third_party` tier — see svelte. 955 of its 966
 	// typescript files match (flowbite-svelte 338 of 338, layerchart 188 of 190, layercake 65 of
 	// 66, svelte-ux 100 of 100, svelte-maplibre 57 of 57, language-tools 207 of 215), none
@@ -387,23 +300,6 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// lists are file-for-file identical (pre-change tree vs tip, `--all --json` set-diffed).
 	// The third fix in that round — prettier refuses the fill when a signed literal's own
 	// argument carries a comment — moves no count: no corpus file spells one.
-	// ⚠️ That same measurement read css `match` 131 — two below the floor — and recorded it
-	// here as a pre-existing tree drop. It was not one: the machine's `svelte_styles` cache
-	// held 18 concats where the perf view has 20 collections, so `earbetter.css` and
-	// `cosmicplayground.css` were absent from the corpus entirely (css `total` 216, not 218).
-	// Both match, and `deno task bench:harvest:svelte-styles` restores them and the floor — the
-	// merged tip, harvested, reads css 133. The harvest is a CORPUS INPUT, not a measurement of
-	// tsv, so a short cache understates every css count at once and reads exactly like a
-	// regression — a standalone `corpus:compare:format --all` is the one entry point that does
-	// not chain it (`conformance` does, late, beside the legs that read it). Re-harvest before
-	// believing a css shortfall.
-	//
-	// ⚠️ The two entries above landed on SEPARATE branches, each measured against 5124 in its
-	// own tree, so their deltas are NOT composable in general. **5134 is the re-measurement on
-	// the merged tip**, not a sum — it happens to equal 5124 + 4 + 6 because the two mover sets
-	// are disjoint (the binaryish four are the two language-tools files plus prettier's
-	// `binary-expressions/inline-object-array.js` and `variable_declarator/multiple.js`; the
-	// fill six are numeric-array files and the one `partial`).
 	//
 	// 5134 → 5136: the binaryish CONTINUATION-INDENT batch — ten parent positions that took no
 	// continuation indent where prettier's binaryish fall-through gives one (`yield` / `yield*`
@@ -419,14 +315,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	//     `a || …` statement hunk is FIXED, and the residue is the pre-existing curried-arrow
 	//     body indent, which no detector explains — so the file stops being partly-explained
 	//     and becomes wholly-unexplained. `compare` on it shows only that class.
-	// ⚠️ All four are INVISIBLE to the standard staged-tree corpus A/B: `tsv format --list`
-	// honors `.gitignore` / `.prettierignore` and the prettier repo ignores its own test
-	// fixtures, so that rig enumerates 8,500 files where this view holds 9,305. The A/B read
-	// ZERO movers; this gate is what caught them. Measured by diffing the `--all --json` bucket
-	// lists across the two corpus-profile builds — these four are the only moves in any bucket,
-	// and `safety` / `errors` / `expected_errors` are identical file-for-file.
+	// Measured by diffing the `--all --json` bucket lists across the two corpus-profile
+	// builds — these four are the only moves in any bucket, and `safety` / `errors` /
+	// `expected_errors` are identical file-for-file.
 	//
-	// 5134 → 5137: the cast-seed first-argument hug. Three files arrive from `unknown`
+	// 5136 → 5139: the cast-seed first-argument hug. Three files arrive from `unknown`
 	// (`language-tools/…/svelte-check/src/options.ts` and prettier's own tests for the rule,
 	// `typescript/argument-expansion/argument_expansion.ts` +
 	// `typescript/satisfies-operators/argument-expansion.ts`); a fourth,
@@ -434,16 +327,7 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// `CORPUS_FORMAT_UNKNOWN_PIN`. Measured by formatting the gates view with a pre-change and
 	// a tip `--profile corpus` CLI and byte-diffing the two trees: those four are the ONLY
 	// movers among the 9,060 files `tsv format` accepts — every gates file but the ~245 `.html`
-	// the harness routes through the Svelte printer, whose every bucket is unmoved. That rig
-	// reaches the prettier suite by enumerating it with `find` rather than `--list`, which is
-	// exactly the blind slice the entry above ran into.
-	//
-	// ⚠️ The two entries above are again SEPARATE branches, each measured against 5134 in its
-	// own tree, so their deltas are NOT composable in general. **5139 is the
-	// re-measurement on the merged tip**, not a sum — it happens to equal 5134 + 2 + 3 because
-	// the two mover sets are disjoint: the binaryish four are prettier-suite files in the
-	// binary/conformance/arrow subtrees, the cast-seed four are options.ts, notes.ts and
-	// prettier's two `argument-expansion` tests.
+	// the harness routes through the Svelte printer, whose every bucket is unmoved.
 	//
 	// 5139 → 5140: the lone-literal call argument keeps its break point.
 	// `language-tools/…/svelte2tsx/src/svelte2tsx/addComponentExport.ts` arrives from
@@ -452,15 +336,16 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// `CORPUS_FORMAT_UNKNOWN_PIN`. ONE mover in any bucket: measured by diffing the
 	// `--all --json` bucket lists across a pre-change and a tip `--profile corpus` build over
 	// the whole 9,305-file gates view, where `partial` / `safety` / `errors` /
-	// `expected_errors` come back identical file-for-file.
-	//
-	// ⚠️ The same branch carries two corpus-NEUTRAL siblings of that fix, both found by
-	// sweeping every lone-argument kind across every call position at the 100/101 boundary
-	// rather than by this gate: the lone-`function`-expression ladder (plain call, `new`, and
-	// the member-chain spelling) and prettier's flat-parameter rule for it. Their shapes are
-	// `fn(function () {})` and `obj.m({})` past the print width, which no gates-view file
-	// holds — the +1 above is the literal fix alone.
+	// `expected_errors` come back identical file-for-file. The rule's lone-`function`-expression
+	// siblings (plain call, `new`, the member-chain spelling, and prettier's flat-parameter rule
+	// for them) are corpus-NEUTRAL: `fn(function () {})` and `obj.m({})` past the print width
+	// are shapes no gates-view file holds, so the +1 is the literal fix alone.
 	typescript: 5140,
+	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
+	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
+	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
+	// (`conformance` does, late, beside the legs that read it). Re-harvest before believing a
+	// css shortfall.
 	css: 133
 };
 
@@ -470,59 +355,24 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * directions fail: a rise = a new unexplained divergence (fix it, catalog a detector in
  * `lib/divergence/patterns.ts`, or consciously re-pin a legitimately-unsupported new pinned
  * file); a drop = the backlog shrank, re-pin to record the win. The author's own repos are
- * in here too now — their unknowns were a non-gating WARN while they were live working
- * trees, and are pinned since the snapshot. A single-run trip can be the FFI/sidecar
+ * gated here like every other snapshot collection. A single-run trip can be the FFI/sidecar
  * heisenbug — confirm on the single repo first. Same corpus + provenance as
  * `CORPUS_FORMAT_MATCH_MIN`.
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
-	// 7 → 5: two `prettier/tests/format/html/prettier_ignore/*.html` files LEAVE the bucket,
-	// both by getting BETTER. `cases.html` leaves for **match** (its one hunk was a break tsv
-	// added after an inline `<!-- prettier-ignore -->`); `long_lines.html` leaves for `known`
-	// — what is left of it is the sanctioned boundary-whitespace trim
-	// (`svelte_boundary_ws_trim`), where before that residue sat beside three blank lines
-	// prettier keeps around the ignored nodes and tsv dropped, which no detector explained.
-	// Measured by diffing the `--all --filter svelte --json` bucket lists between a
-	// `f4929877a` (the previous green read) corpus-profile FFI build and the tip: these two
-	// are the ONLY movers among the reproducible files, nothing arrived in `unknown`, and
-	// `safety` / `errors` / `expected_errors` are identical file-for-file. The same diff
-	// moves one file, `zzz/src/lib/CapabilityWebsocket.svelte`, into `partial` — then an
-	// unpinned live-tier WARN, and since the snapshot a gated arrival (see the partial pin).
-	//
-	// 5 → 0: the bucket EMPTIES, by one formatter rule and two detector arms. The three
-	// `prettier-plugin-svelte/test/**/region-markers*.html` files leave for **match**: a
-	// `<!-- #endregion -->` directly after a hoisted section now travels below it through
-	// the canonical reorder (prettier-plugin-svelte's region-end trail, precedence included
-	// — fixture `svelte/script/ordering/region_markers`). `printer/samples/svelte-element.html`
-	// leaves for `known`: the cataloged `svelte_element_this_string` prettier bug gains the
-	// detector it never had. `prettier/tests/format/html/comments/surrounding-empty-line.html`
-	// leaves for `known`: `inline_content_block_style` gains its comment-first arm (an inline
-	// element whose content opens with a comment; `render_compare` grades the two outputs
-	// identical). Measured by diffing the `--all --filter svelte --json` bucket lists between
-	// the pre-change corpus-profile FFI build and this one (`match` 1190 → 1193, `known`
-	// 235 → 237): these five are the ONLY movers, nothing arrived in any bucket, and
-	// `partial` / `safety` / `errors` / `expected_errors` are identical file-for-file.
-	//
-	// 0 → 5: the `third_party` tier arrives with five, each a real backlog item and none of
-	// them given a detector on purpose (a detector would assert a sanction nothing has decided):
-	//   `flowbite-svelte/src/lib/bottom-navigation/BottomNavItem.svelte` — a `&&` inside a
-	//     nested ternary's branch: prettier does not indent the operand's continuation there
-	//     (its binaryish `shouldNotIndent` conditional arm), tsv does.
-	//   `flowbite-svelte/src/lib/dialog/Dialog.svelte` — a multi-declarator `const a = …, b =
-	//     <&& chain>`: prettier breaks after the second `=` and indents the chain; tsv keeps
-	//     the first operand on the `=` line and DEDENTS the continuation below the declarator.
+	// The two open items, neither given a detector on purpose (a detector would assert a
+	// sanction nothing has decided):
 	//   `flowbite-svelte/src/lib/forms/button-toggle/ButtonToggle.svelte` — a seven-key
 	//     shorthand object pattern assigned an object literal: prettier keeps the pattern flat
 	//     (it fits) and breaks after `=`; tsv breaks the pattern and hugs the literal — the
 	//     pattern group's fits walk measures what follows flat, where prettier's stops at the
 	//     first line of the rest in break mode.
-	//   `flowbite-svelte/src/lib/stepper/TimelineStepper.svelte` — a `{circle({…})}` at the
-	//     end of a class value already past print width: prettier's conditional group falls
-	//     through to its most expanded state (every argument broken out) when no state fits;
-	//     tsv hugs the sole object argument.
 	//   `layerchart/packages/layerchart/src/lib/components/Text/Text.html.svelte` — whitespace
 	//     only: a multi-line class value's `{expr}` continuation line keeps the author's SPACE
 	//     indentation where prettier re-indents it with tabs.
+	//
+	// 0 → 5: the `third_party` tier arrives with five backlog items, the two above plus
+	// `BottomNavItem.svelte`, `Dialog.svelte` and `TimelineStepper.svelte`.
 	//
 	// 5 → 3: `Dialog.svelte` and `BottomNavItem.svelte` LEAVE the bucket by MATCHING (`match`
 	// 2701 → 2703). The multi-declarator list is a doc-tree `indent` now rather than literal
@@ -546,226 +396,9 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// function-expression arms). ONE mover in any bucket, by the same `--all --json`
 	// bucket-list diff described on `CORPUS_FORMAT_MATCH_MIN`.
 	svelte: 2,
-	// 109 records a drop of five from 114, in two steps, each verified by diffing the
-	// `unknown` lists before and after rather than by the count alone:
-	//   -2  a binary operand of an `as`/`satisfies` cast takes prettier's continuation
-	//       indent — clears `typescript/as/assignment2.ts` and
-	//       `typescript/satisfies-operators/assignment.ts`, the two mirror files.
-	//   -3  a ternary operand reached from one of prettier's `ancestorNameMap` value
-	//       positions expands its parens — clears `typescript/as/ternary.ts`,
-	//       `typescript/satisfies-operators/ternary.ts` and `typescript/ternaries/indent.ts`.
-	// A third step takes it to 108: `js/empty-statement/body.js` leaves the bucket entirely,
-	// its `with (a);` now refused as the sloppy-mode statement it is rather than misparsed as
-	// a call, so the file lands in `errors`. The two `js/identifier/for-of/*.js` files left
-	// the same round by MATCHING (`match` 4269 → 4271) once a `let` heading a for-in/of head
-	// kept its parens.
-	// `js/identifier/parentheses/let.js` moves to `errors` in that round too (its last line is
-	// `with (let[0] = 1);`) but moves no pin: it was neither matching nor unknown before, which
-	// is what the flat +2 on `match` says. Four pinned files now land in `errors` for the same
-	// deliberate refusal, and `errors` is not itself pinned — so a real parse regression that
-	// dropped files there would move no count. That hole is pre-existing, not new here.
-	// Neither step added an unknown. `js/ternaries/indent-after-paren.js` stays unknown for
-	// an unrelated pre-existing reason (a parenthesized ternary CALLEE takes the flat-paren
-	// bare-callee path in `call_formatting.rs`, not the chain base), but shrank from
-	// 107/126 differing lines to 61/92; its `diff_summary` names a representative hunk, not
-	// a total, so that string growing is not the file getting worse.
-	//
-	// 108 → 109: `js/comments/jsdoc-nestled.js` arrives from `partial`, and it arrives by
-	// getting BETTER (7 differing lines → 3). Its container-end glued runs now keep their
-	// line, which cleared two of its three hunks; what is left is the one prettier feature
-	// tsv does not implement — `mergeNestledJsdocComments`, which at PARSE time fuses two
-	// **zero-gap** indentable block comments into one, so prettier prints `*//**` where tsv
-	// prints `*/ /**`. That hunk is PRE-EXISTING and unmoved (it is the file's leading-comment
-	// run, untouched here); it was simply never the file's only divergence before, so a
-	// broader detector matched the file and it graded `partial`. tsv cannot borrow prettier's
-	// fix — a parse-time merge would break the acorn AST contract — so nestling is a printer
-	// question at every comment run, tracked separately rather than pinned as a detector here.
-	//
-	// 109 → 110: `js/comments-closure-typecast/styled-components.js` arrives from `known`,
-	// and it too arrives by getting BETTER. The file is an own-line JSDoc cast on a
-	// styled-components tagged template; the own-line-cast hang (break after `=`, comment and
-	// cast indented one level) made tsv's head lines match prettier byte-for-byte where tsv
-	// used to trail the cast comment on the `=` line with `(styled.div)` stranded at column 0
-	// — the shape `comment_position` was claiming. What is left is two COMPOSED sanctioned
-	// divergences in one file: the cast parens tsv preserves (`(styled.div)`; prettier strips
-	// them) and the tagged-template body tsv keeps verbatim (prettier's
-	// `embeddedLanguageFormatting` recognizes styled-components tags and reformats the
-	// embedded CSS). Neither detector reaches the residue: `jsdoc_type_cast_parens` keys on
-	// the same-line `*/ (` spelling, not the own-line-comment form, and
-	// `template_embedded_verbatim` recognizes only the explicit language tags
-	// (html/css/graphql/gql), not prettier's styled-components heuristic (`styled.div`,
-	// `styled(Component)`, `keyframes`, `createGlobalStyle`). Both halves are cataloged
-	// behavior, so the arrival is pinned; widening the detectors is a follow-up with its own
-	// overmatch questions, not a precondition for the pin.
-	//
-	// 110 → 109: `js/preserve-line/argument-list.js` LEAVES the bucket — prettier's own
-	// adversarial test for exactly this behavior, now matching byte-for-byte. tsv asked
-	// prettier's `anyArgEmptyLine` only at the BOTTOM of its call dispatcher, below every
-	// specialized layout's early return, so an author blank between arguments survived a
-	// plain argument list and was silently eaten by each hug / expand-first / expand-last /
-	// composition path; prettier asks it ABOVE them all and returns `allArgsBrokenOut()`.
-	// Hoisting it as a decline conjunct is the whole change. A/B'd against a HEAD-equivalent
-	// binary over the full corpus: this file is the ONLY move in any bucket — nothing was
-	// added to `unknown`, and `partial` / `safety` / `errors` are byte-identical.
-	//
-	// 109 → 110: `js/unary-expression/comments.js` arrives from `partial`, and — like the two
-	// arrivals above — it arrives by getting BETTER (9/11 differing lines → 6/6). The unary
-	// comment-holder parens are now prettier's own `group(["(", indent([softline, arg]),
-	// softline, ")"])` instead of a gate-selected hard-broken arm, so a `function`-expression
-	// operand's body break reaches them (`!(⏎\tfunction () {…} /* foo */⏎)` — the hunk
-	// `comment_position` was claiming) and a run the author glued onto its own line no longer
-	// pre-empts the width decision. What is left is six hunks of ONE cataloged divergence:
-	// prettier hoists a leading comment out of an operand's required parens
-	// (`!(/* foo */ (x = y))`) where tsv keeps it inside the single pair — the assignment,
-	// conditional, sequence, arrow, `yield` and `await` operands, all of
-	// `conformance_prettier_ts_comments.md` §Comment relocation. No detector reaches it, so
-	// the file drops out of `partial`; widening one is a follow-up, not a precondition.
-	// A/B'd against a reverse-patched HEAD binary over the full corpus: this file is the ONLY
-	// move in any bucket — `safety` is 0 both sides and `errors` is byte-identical.
-	//
-	// 110 → 109: `js/while/indent.js` LEAVES the bucket by MATCHING (`match` 4353 → 4354) —
-	// prettier's own adversarial test for this behavior, whose every case is a long `if` /
-	// `while` / do-while head. A do-while's condition now takes the same condition group
-	// `if` and `while` take, so its parens open for width instead of wrapping the operands at
-	// the statement's own indent, where they read as statements. tsv had kept the plain
-	// self-grouping expression doc on the reading that the do-while has no enclosing group
-	// for the ungrouped binary chain to break with; it has one — the condition group itself,
-	// which is what prettier's `printDoWhileStatementCondition` (its
-	// `printIfStatementCondition` under another name) builds too. A/B'd against a
-	// HEAD-source rebuild over the full corpus: this file is the ONLY move in any bucket —
-	// nothing arrived in `unknown`, and `partial` / `safety` / `errors` / `expected_errors`
-	// are byte-identical.
-	//
-	// 109 → 108: `js/sequence-break/break.js` LEAVES the bucket by MATCHING (`match` 4356 →
-	// 4357) — prettier's own adversarial test for sequence breaking, whose every case is a
-	// sequence too wide for its line. A `SequenceExpression` now joins its operands with
-	// `,` + `line` under prettier's three parent-keyed layouts rather than a flat `", "` that
-	// could never break (`printSequenceExpression`; `SeqLayout` in
-	// `printer/expressions/operators.rs`). The file's own residue was the `Indented` arm's
-	// indent SCOPE: wrapping the whole run also indents the lines a first operand breaks
-	// ITSELF (`((a = b ? c : fn()), …)`), where prettier indents only the continuations —
-	// which is why the arm splits the run rather than wrapping it. Measured over the full
-	// corpus: this file is the only move in any bucket, and `partial` / `safety` / `errors` /
-	// `expected_errors` are unchanged.
-	//
-	// 108 → 104: FOUR files LEAVE the bucket by MATCHING (`match` 2394 → 2398 over the
-	// reproducible subset), from three independent rules that happened to be measured
-	// together. `js/binary-expressions/in_instanceof.js` — a UNARY left operand of
-	// `in`/`instanceof` now keeps prettier's clarity parens (`(!a) in b`), the rule its
-	// `**` sibling already had in `needs_parens_binary_operand`; an `UpdateExpression` is
-	// still bare, which is prettier's own `node.type` term and the file's own control.
-	// `js/arrays/numbers-with-holes.js` — the blank-line scan across an ELISION stops at the
-	// first comment BELOW the element's line instead of running the whole span, so a blank
-	// the author left in front of a hole survives the comment's slide past the hole's comma.
-	// `js/arrows/chain-as-arg.js` + `js/arrows/chain-in-logical-expression.js` — prettier's
-	// `shouldBreakChain` is now a curried chain's group `shouldBreak` in call-argument and
-	// binaryish position rather than a refusal of the chain layout, so those heads take the
-	// progressive indent they were one level short of. Measured by diffing the `unknown`
-	// lists against a reverse-patched build over the whole corpus: these four are the only
-	// moves in any bucket, nothing arrived in `unknown`, and `partial` / `safety` / `errors`
-	// / `expected_errors` are byte-identical.
-	// ⚠️ That same measurement puts the reproducible-subset `match` at 2394 BEFORE this
-	// change, well above `CORPUS_FORMAT_MATCH_MIN`'s 2335 — a pre-existing slack in that
-	// floor, unrelated to this entry and deliberately not folded into it.
-	//
-	// 104 → 111: SEVEN files ARRIVE from `partial` in one step — a reclassification, not a
-	// loss. The clause-body statement tail now defers its own-line pre-`;` comment run
-	// through `line_suffix` (dedented to the flushing construct's level), so a collapsed
-	// head hoists the comment past the whole statement exactly as prettier does
-	// (`if (1) foo;⏎// c`) — the six `js/no-semi/*-statement.js` files and
-	// `js/for/continue-and-break-comment-without-blocks.js` lose the clause hunks the
-	// detector used to explain, leaving only a pre-existing residue no detector matches:
-	// for the no-semi six, a `// prettier-ignore` freeze's `;` binding; for the for/continue
-	// file, prettier reordering the hoisted comment past the author's blank line (tsv keeps
-	// the authored order: comment, then blank — cataloged, pinned by
-	// `for/clause_terminator_comment_then_blank_prettier_divergence`). `js/comments/break-continue-statements-2.js`
-	// leaves `partial` for **match** outright in the same step. Measured by byte-diffing the
-	// formatted prettier suites against a pre-change binary: these eight are the only moves
-	// in any bucket, and `safety` / `errors` / `expected_errors` are unchanged.
-	//
-	// −1: `js/function/issue-12967.js` leaves for **match** — a fix, not a
-	// reclassification. A JSDoc-annotated arrow as an IIFE callee had its leading run
-	// hoisted out of the pair the callee is required to carry; the run now stays inside
-	// it, which is prettier's own answer at that position. Measured by diffing the
-	// `unknown` lists against a reverse-patched build over the whole corpus: this file
-	// and `js/function/iife.js` (see `CORPUS_FORMAT_PARTIAL_PIN`) are the only moves in
-	// any bucket, and `safety` / `errors` / `expected_errors` are byte-identical.
-	//
-	// ⚠️ The two entries above landed on SEPARATE branches, each measured against 104 in its
-	// own tree, so their deltas are NOT composable in general. **110 is the re-measurement on
-	// the merged tip**, not a sum — it happens to equal 111 − 1 because the two movers are
-	// disjoint (the clause-tail seven are `js/no-semi/*` and `js/for/*`, the IIFE mover is
-	// `js/function/*`), and that was verified per file rather than assumed.
-	//
-	// 110 → 109 (`main`, the value-head freeze): `js/sequence-expression/ignored.js` LEAVES
-	// the bucket by MATCHING — a file whose whole content is a `// prettier-ignore` in an
-	// arrow's `=>`→body gap. The `=>`→body head now resolves the value-head freeze
-	// (`Printer::value_head_frozen_span`), along with the enum member's and the `for`
-	// header's init declarator `=`→value gaps, the last three hosts of the assignment
-	// family that were absent from the rule. A/B'd against a HEAD-source rebuild over the
-	// whole corpus: this file is the ONLY move in any bucket — nothing arrived in
-	// `unknown`, and `partial` / `safety` / `errors` / `expected_errors` are byte-identical.
-	//
-	// 110 → 108 (`bug456`, the multiline-template hug): `js/dynamic-import/template-literal.js`
-	// and `js/dynamic-import/import-phase.js` leave for **match** — a fix, not a
-	// reclassification. A dynamic `import()` never asked the sole-multiline-template hug, so
-	// it expanded where prettier keeps the specifier on the `(` line; `import()` shares
-	// `printCallExpression` with a call, so the rule reaches it too. Measured by a
-	// whole-corpus byte-diff against a reverse-patched build (~23k files): these two are the
-	// ONLY non-fixture movers in any bucket, and both land byte-identical to prettier's own
-	// committed snapshot.
-	//
-	// ⚠️ **107 is the re-measurement on the merged tip, not 110 − 1 − 2.** The two entries
-	// above landed on separate branches, each measured against 110 in its own tree; the sum
-	// is only *predictive*, and this file's earlier merge (111 − 1 = 110) is the standing
-	// reminder that it has to be verified per file rather than assumed. It was: the three
-	// movers are disjoint (`js/sequence-expression/*` vs `js/dynamic-import/*`) and
-	// `corpus:compare:format --all` on the merged tree reports 107.
-	//
-	// 107 → 106 (`bug461`, the unary/`${`/computed-key/spread value-head freeze):
-	// `js/sequence-expression/ignore.js` leaves for **match** — a `+` whose operand carries an
-	// own-line `// prettier-ignore`, the unary→operand head this cluster added. A/B'd against a
-	// HEAD worktree over the whole corpus: this is the ONLY mover in any bucket (the unknown
-	// lists are otherwise identical file-for-file, no new entry), SAFETY 0 both sides.
-	//
-	// 106 → 105 (`bug467`, the assignment-target member chain): `js/assignment/issue-1966.js`
-	// leaves for **match** — prettier's own regression test for this behavior, whose three
-	// cases are all a dotted target assigned an over-width value. An assignment target's
-	// `.prop` lookups now carry no break point (prettier's `printMemberExpression`
-	// `shouldInline`), so the target prints as one unbreakable unit and the assignment sheds
-	// width after the operator instead of splitting the thing being assigned to. A/B'd
-	// against the same tree with the mark disabled, over the whole corpus: this is the ONLY
-	// mover in any bucket (`match` 4416 → 4417, the unknown lists otherwise identical
-	// file-for-file, nothing arrived), and `partial` / `safety` / `errors` /
-	// `expected_errors` are byte-identical.
-	//
-	// 105 → 104 (`bug469`, the post-arrow glued line comment): `js/arrows/issue-17421.js`
-	// leaves for **`partial`**, not for `match` — a reclassification, and the file is
-	// prettier's own regression test for this gap. A `//` the author glued to `=>` now keeps
-	// that line (§Uniform Forced-Continuation Indent), so the file's arrow hunks become
-	// `comment_position` and the detector recognizes them; what keeps it out of `known` is a
-	// *different*, still-uncataloged divergence the same file carries — a **block** body
-	// behind a parameter list (`(id) => // c⏎{}`), where prettier hugs `=> {` and relocates
-	// the comment INSIDE the block. That residue is deliberately left unexplained rather
-	// than given a detector pattern: classifying it would assert a sanction nothing has
-	// decided. A/B'd against a worktree holding this branch's code minus the arrow change,
-	// over the whole corpus: this file is the ONLY mover in any bucket, and `safety` /
-	// `errors` / `expected_errors` are byte-identical file-for-file.
-	//
-	// 104 → 103 (the comment trim's whitespace class): `js/comments/trailing_space.js` leaves
-	// for **match**. A comment's trailing trim is prettier's `String.prototype.trim*` — JS
-	// `\s` — where tsv spelled it `str::trim_end`, whose Unicode `White_Space` disagrees at
-	// exactly two code points and gets both wrong: it deletes a `<NEL>` prettier keeps and
-	// keeps a `<ZWNBSP>` prettier deletes. Measured by diffing the `unknown` lists across the
-	// change rather than by the count: this file is the ONLY mover in any bucket, nothing
-	// arrived in `unknown`, and `partial` / `safety` / `errors` / `expected_errors` are
-	// byte-identical file-for-file. (Same class as the CSS-side trims that moved in the same
-	// round — the wire's `trim_wire*` and the printer's `trim_property_part` — which move no
-	// count here because no corpus file carries one.)
-	//
-	// 103 → 114: eleven arrive with the `third_party` tier. language-tools' eight are the
-	// cluster its perf onboarding was deferred on — member-chain, assignment and binaryish
-	// break priority — pinned here as the gate's backlog rather than sanctioned:
+	// Six of the `third_party` arrivals are still open, all of them the member-chain /
+	// assignment / binaryish break-priority cluster, pinned here as the gate's backlog rather
+	// than sanctioned:
 	//   `language-tools/…/typescript/features/CompletionProvider.ts` — a declarator whose init
 	//     is a `this.x.call()?.a?.b…` chain: prettier keeps the head on the `=` line and breaks
 	//     the chain; tsv breaks after `=` and indents the whole chain.
@@ -775,22 +408,10 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//   `language-tools/…/typescript/features/RenameProvider.ts` — `lang.call(a, b)
 	//     ?.definitions?.[0]`: prettier keeps the call flat and breaks before `?.definitions`;
 	//     tsv breaks the call's arguments.
-	//   `language-tools/…/svelte2tsx/addComponentExport.ts` — a `${returnType('events')}`
-	//     interpolation whose SOURCE already spans lines: prettier keeps the call breakable and
-	//     breaks its argument; tsv atomizes it.
-	//   `language-tools/…/svelte2tsx/nodes/ExportedNames.ts` — an `||` test inside a nested
-	//     ternary chain: prettier indents its continuation one level deeper than tsv.
 	//   `language-tools/…/typescript-plugin/src/source-mapper.ts` — a for-of head
 	//     destructuring `{0: a, 2: b, 3: c}` of `this.mappings[i]`: prettier keeps the pattern
 	//     flat and breaks the member; tsv breaks the pattern (the ButtonToggle.svelte fits-walk
 	//     difference again, see the svelte pin).
-	//   `language-tools/…/svelte-check/src/incremental.ts` — `a ?? b ?? ['.']` in a declarator:
-	//     inlinable (the last operand is an array) but with a same-precedence left operand, so
-	//     prettier still indents the continuation (binaryish.js `samePrecedenceSubExpression`);
-	//     tsv prints it at the statement's own indent.
-	//   `language-tools/…/svelte-check/src/options.ts` — `.reduce((s, x) => {…}, <T>{})`:
-	//     prettier refuses the first-argument hug for an angle-bracket-asserted seed and
-	//     breaks every argument; tsv hugs. (Fixed — see the 105 → 102 entry below.)
 	//   `layerchart/…/components/Chart/Chart.shared.svelte.ts` — a type alias with three
 	//     constrained or defaulted params: prettier's `isComplexTypeAliasParams` takes
 	//     `break-lhs` (the params break, `=` stays on the closing line); tsv keeps them flat
@@ -799,9 +420,10 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//     T, ...args: any) {…}` whose params do not fit: prettier keeps the hug and breaks the
 	//     params (its expanded-state fits measures nested groups in break mode); tsv breaks
 	//     every argument.
-	//   `layercake/src/_data/unemployment.js` — a numeric array fill that lands several lines
-	//     at 101 columns: the fill's fits check omits the item's trailing comma — an OVER-WIDTH
-	//     output, the one real bug of the eleven, of a kind no fixture carries.
+	//
+	// 103 → 114: eleven arrive with the `third_party` tier — the six above plus
+	// `addComponentExport.ts`, `ExportedNames.ts`, `incremental.ts`, `options.ts` and
+	// `layercake/src/_data/unemployment.js`, the one OVER-WIDTH output of the group.
 	//
 	// 114 → 110: FOUR files LEAVE the bucket by MATCHING (`match` 5124 → 5128), the
 	// binaryish continuation-indent cluster. `language-tools/…/svelte-check/src/incremental.ts`
@@ -825,20 +447,12 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// (`js/arrays/preserve_empty_lines.js`, whose authored blanks the fill packed through).
 	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`; `partial` moves one the same way.
 	//
-	// ⚠️ The two entries above landed on SEPARATE branches, each measured against 114 in its
-	// own tree, so their deltas are NOT composable in general. **105 is the re-measurement on
-	// the merged tip**, not a sum — it happens to equal 114 − 4 − 5 because the nine movers are
-	// disjoint. Three of the `third_party` files named in the list above are among them
-	// (`ExportedNames.ts` and `incremental.ts` to the binaryish cluster, `unemployment.js` to
-	// the fill round — the last of those was the one OVER-WIDTH output of that group, not a
-	// layout choice), so read the list as the state before both steps.
-	//
 	// 105 → 104: the binaryish continuation-indent batch. `js/binary-expressions/short-right.js`
 	// and `…/functionImplementationErrors.ts` LEAVE for `match`, and `typescript/arrow/16067.ts`
 	// ARRIVES from `partial` because the hunk a detector explained is the one that got fixed.
 	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`.
 	//
-	// 105 → 102: three files LEAVE for `match` — the cast-seed first-argument hug. Prettier's
+	// 104 → 101: three files LEAVE for `match` — the cast-seed first-argument hug. Prettier's
 	// `isHopefullyShortCallArgument` reads an `as` / `satisfies` seed through a cast branch of
 	// its own (array element unwrapped, a lone type argument descended into, then `isSimpleType`
 	// on what is left plus `isSimpleCallArgument` at depth 1 on the operand) and does not read a
@@ -851,9 +465,6 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// is not simple either. `partial` moves one the other way in the same step (notes.ts, to
 	// `known`), and the byte-diff over the gates view names those four as the only movers
 	// (measurement on `CORPUS_FORMAT_MATCH_MIN`).
-	//
-	// Both entries above measured against 105 in their own tree; 101 is the
-	// merged-tip re-measurement (disjoint mover sets — see `CORPUS_FORMAT_MATCH_MIN`).
 	//
 	// 101 → 100: `language-tools/…/svelte2tsx/src/svelte2tsx/addComponentExport.ts` LEAVES for
 	// `match`. A lone LITERAL argument no longer costs the call its break point: the printer
@@ -871,66 +482,19 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 /**
  * corpus:compare:format --all — EXACT per-language `partial` divergence count over the
  * gates view (same semantics as `CORPUS_FORMAT_UNKNOWN_PIN`). The author's repos are gated
- * here since the snapshot brought them into the pinned corpus; each arrival is named below.
+ * here like every other snapshot collection; each arrival is named below.
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// 1 → 2: the author's repos join the pinned corpus; `zzz/src/lib/CapabilityWebsocket.svelte`
-	// arrives from the former non-gating WARN (its explained hunk is `spaced_tag_travel`).
+	// arrives (its explained hunk is `spaced_tag_travel`).
 	svelte: 2,
-	// 37 → 34: the three `js/comments/between-head-and-body/*.js` files are `with`-statement
-	// comment tests, so all three now land in `errors` rather than being partially compared
-	// through a call-expression misparse.
-	//
-	// 34 → 33: `js/comments/jsdoc-nestled.js` leaves for `unknown` — not a loss but a
-	// shrink, its remaining hunk too narrow for the detector that used to match it. The
-	// reasoning is on `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other way in the same step.
-	//
-	// 33 → 32: `js/unary-expression/comments.js` leaves for `unknown` the same way — the
-	// hunk `comment_position` matched is FIXED, and its residue is one cataloged divergence
-	// no detector recognizes. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other
-	// way in the same step.
-	//
-	// 32 → 31: `js/assignment-comments/call.js` leaves for **match** — a fix, not a
-	// reclassification, so nothing arrives anywhere. The assignment expression was the lone
-	// dissenter among its own siblings at the operator→value gap: a line comment the author
-	// glued to the operator (`a = // c⏎expr`) hung on its own line where the declarator and
-	// the class field both trail it, and prettier trails at all three. Routing the
-	// assignment's line arm through the shared `build_eq_comment_break_rhs` partition made
-	// the family uniform. `CORPUS_FORMAT_UNKNOWN_PIN` does not move: this file left `partial`
-	// by matching outright.
-	//
-	// 31 → 23: the eight clause-tail movers above — seven reclassify to `unknown` (their
-	// explained hunks became matches; only an unexplained residue remains) and
-	// `js/comments/break-continue-statements-2.js` leaves by matching outright. Reasoning on
-	// `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other way in the same step.
-	//
-	// +1: `js/function/iife.js` arrives from `known` — prettier's own IIFE-comment
-	// test file, and a reclassification rather than a loss. The same fix that moved
-	// `issue-12967.js` to `match` (see `CORPUS_FORMAT_UNKNOWN_PIN`) re-cuts this file's
-	// hunks: the leading and trailing runs now stay inside the callee's pair, which
-	// leaves two long-standing behaviours in hunks of their own instead of folded into
-	// neighbouring `comment_position` ones — the UNHONORED `prettier-ignore` at a callee
-	// (pinned in `ignore_audit_known.txt`) and the own-line block prettier pulls up to
-	// the `(` line. 16 of the file's 17 hunks are still explained.
-	//
-	// ⚠️ **24 is the re-measurement on the merged tip**, not 23 + 1: the two deltas above are
-	// off different bases. It agrees with the sum only because the movers are disjoint, which
-	// was checked per file (`js/function/iife.js` is in `partial`, `issue-12967.js` in
-	// neither bucket) rather than inferred from the arithmetic.
-	//
-	// 24 → 25 (`bug469`, the post-arrow glued line comment): `js/arrows/issue-17421.js`
-	// ARRIVES from `unknown` — the same single mover, counted here on the other side.
-	// Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other way in the same step;
-	// the arrival is a gain (the file's arrow hunks are now explained) held short of `known`
-	// by an uncataloged block-body residue in the same file.
-	//
 	// 25 → 26: the author's repos join the pinned corpus; `fuz_ui/src/lib/project_stats_data.ts`
-	// arrives from the former non-gating WARN (its explained hunk is `fill_101_boundary`).
+	// arrives (its explained hunk is `fill_101_boundary`).
 	//
 	// 26 → 27: cosmicplayground joins the `real` tier; `cosmicplayground/src/lib/notes.ts` arrives
 	// with 3 of 5 hunks explained (`fill_101_boundary`, `comment_position`) and two from its
 	// `chromas.reduce((result, chroma) => {…}, {} as Record<Chroma, Hue>)` calls that no
-	// detector recognized — a real backlog item, closed at 26 → 25 below.
+	// detector recognized — a real backlog item, closed at 24 → 23 below.
 	//
 	// 27 → 26: `fuz_ui/src/lib/project_stats_data.ts` leaves for `match` — its one explained
 	// hunk was `fill_101_boundary`, the numbers-fill over-width the content-carried comma fixes.
@@ -940,14 +504,11 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// `unknown` (its explained hunk is fixed) and `…/functionImplementations.ts` leaves for
 	// `known`. Reasoning on `CORPUS_FORMAT_MATCH_MIN`.
 	//
-	// 26 → 25: `cosmicplayground/src/lib/notes.ts` leaves for `known` — those two hunks are
+	// 24 → 23: `cosmicplayground/src/lib/notes.ts` leaves for `known` — those two hunks are
 	// FIXED, and what is left of the file is the explained pair it arrived with. `Record<K, V>`
 	// carries two type arguments, so prettier's cast branch descends into nothing simple and it
 	// refuses the first-argument hug; tsv now refuses it too. Reasoning on
 	// `CORPUS_FORMAT_UNKNOWN_PIN`, which moves −3 in the same step.
-	//
-	// Both entries above measured against 26 in their own tree; 23 is the
-	// merged-tip re-measurement (disjoint mover sets — see `CORPUS_FORMAT_MATCH_MIN`).
 	typescript: 23,
 	css: 9
 };
@@ -962,10 +523,6 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
  * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
  * Measured 2026-09-05: ../corpora `collections/` at 5f40c547c, over the perf view's
  * 951 `.svelte` files.
- *
- * 264 → 278: the first EXACT measurement, over the `../corpora` snapshot at its first
- * commit. The 264 was a live-tree MINIMUM whose growth passed silently, so the move is
- * the corpus catching up with itself, not a change in what the harvest extracts.
  *
  * 278 → 401: earbetter and cosmicplayground join the `real` tier, so the perf view gains
  * their `.svelte` files (58 + 65 blocks) with the snapshot's tree id unmoved — the
