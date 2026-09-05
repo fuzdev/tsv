@@ -47,27 +47,27 @@ mod types;
 // Layout predicates re-exported from the crate root for embedders (tsv_svelte's
 // {@const} assignment layout reuses Prettier's break-after-operator rules).
 pub use analysis::conditional_should_break_after_op;
-pub(crate) use analysis::{
+use analysis::{
     PatternContext, build_entity_name_doc, is_brace_block_multiline, is_effectively_empty_body,
     is_module_path_fluid_call, is_multiline_string_literal, is_multiline_template_expression,
     is_pure_property_chain, is_string_literal, next_printed_stmt, next_printed_stmt_start,
     object_pattern_should_expand, statement_gap_floor, template_literal_has_newlines,
 };
-pub(crate) use comments::{
+use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,
     HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
     MemberGap, MemberSeam, OwnedCommentEffect, RunLeadingBlank, ShellLeadingRun, StandaloneGlue,
 };
 pub use expressions::assignment::should_inline_logical_expression;
-pub(crate) use expressions::assignment::{
+use expressions::assignment::{
     arrow_chain_should_break, class_expr_has_decorators, is_call_on_member_chain,
     is_curried_arrow_chain, is_curried_arrow_chain_that_breaks, is_literal_member_chain,
     is_poorly_breakable_chain, is_regex_root_chain, is_self_expanding_value,
     is_simple_self_expanding, is_simple_value, is_single_call_on_member_chain,
     is_type_assertion_call, jsdoc_cast_comment_is_own_line,
 };
-pub(crate) use needs_parens::{ParenContext, is_in_binary, needs_parens};
-pub(crate) use types::unwrap_parenthesized;
+use needs_parens::{ParenContext, is_in_binary, needs_parens};
+use types::unwrap_parenthesized;
 
 use crate::PrinterInputs;
 use crate::ast::internal;
@@ -239,9 +239,9 @@ pub struct Printer<'a> {
     /// sites that set it (`build_block_arrow_hug_states` and its `new` twin) build the
     /// argument WITHOUT going through `calls::build_printed_argument_doc`, so no
     /// `ArrowChainContext` is in scope and that predicate declines on the context alone — and
-    /// `build_arrow_body`'s `chain_should_break`, where it suppresses the break so the hugged
-    /// body stays on the `=>` line. That second reader is the whole reason the flag still
-    /// exists; deleting it as "the chain bail, already covered" would silently unhug every
+    /// `build_arrow_expression_body`'s `chain_should_break`, where it suppresses the break so
+    /// the hugged body stays on the `=>` line. That second reader is the whole reason the flag
+    /// still exists; deleting it as "the chain bail, already covered" would silently unhug every
     /// typed curried callback (`calls/curried_arrow_chain` is the fixture that says so).
     /// ⚠️ The first reader's redundancy is a fact about those two CALL SITES, not about the
     /// predicate: `should_use_arrow_chain_layout` does not refuse a `shouldBreakChain`
@@ -269,11 +269,11 @@ pub struct Printer<'a> {
     /// down instead; the test-call flat layout in `calls/call_formatting.rs` is the sole
     /// `.set` site, and it re-sets per argument so the flag cannot outlive one it never spent.
     ///
-    /// ⚠️ **Three readers, and only one of them spends it.** The type-parameter builders PEEK
-    /// (`.get()`) — `build_type_params_doc_for_arrow` for an arrow,
-    /// `build_type_parameter_declaration_doc_wrapping` for a function expression — because a
-    /// signature builds `<…>` before `(…)`, so consuming there would starve the
-    /// value parameters. [`Self::build_params_doc_with_comments`] CONSUMES (`.replace(false)`)
+    /// ⚠️ **Two readers, and only one of them spends it.** The type-parameter builder PEEKS
+    /// (`.get()`) — `build_type_parameter_declaration_doc_wrapping`, the one declaration
+    /// printer an arrow and a function expression share — because a signature builds `<…>`
+    /// before `(…)`, so consuming there would starve the value parameters.
+    /// [`Self::build_params_doc_with_comments`] CONSUMES (`.replace(false)`)
     /// at its top, before any child doc exists, which is what bounds the flag to the
     /// callback's own list: a function in the body, or in a parameter default, is built after
     /// the spend and keeps ordinary width-driven params. Left set for the whole argument
@@ -295,7 +295,7 @@ pub struct Printer<'a> {
     /// `({a: 1}).b().c()`. Matches prettier's `startsWithNoLookaheadToken` traversal.
     /// Keyed by span (not consumed, like `arrow_body_object_parens_target`) so a chain
     /// rebuilding its base across conditional-group variants wraps consistently; cleared
-    /// once per statement in `build_expression_statement`.
+    /// once per statement in `build_expression_statement_doc`.
     pub(crate) expr_stmt_paren_target: Cell<Option<Span>>,
     /// Span of a ternary whose enclosing parens must **expand** onto their own lines
     /// (`(⏎\tcond ? a : b⏎) as T`) instead of hanging — prettier's
@@ -357,7 +357,7 @@ pub struct Printer<'a> {
     ///
     /// Marked by [`Printer::mark_assignment_target_member_lookups`] /
     /// [`Printer::mark_new_callee_member_lookups`] and read once at the chain root
-    /// ([`chain::resolve_inline_lookups`], which also states the optional-chain decline).
+    /// (`chain::resolve_inline_lookups`, which also states the optional-chain decline).
     /// Keyed by span and not consumed, like the four targets above: a chain rebuilt across
     /// `conditional_group` variants must answer the same way every time, and a same-shaped
     /// chain nested deeper — in a computed index, or in the assignment's VALUE — has a

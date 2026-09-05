@@ -567,7 +567,8 @@ fn linearize_call_callee<'a>(
 
 /// Process a MemberExpression node: handle paren gaps and push the appropriate ChainNode.
 ///
-/// Extracted from `linearize_recursive` so it can be shared with `linearize_chain_from_member`.
+/// Extracted from `linearize_recursive` so it can be shared with
+/// `linearize_chain_from_member_into`.
 fn linearize_member_node<'a>(
     member: &'a internal::MemberExpression<'_>,
     source: &str,

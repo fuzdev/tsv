@@ -381,8 +381,8 @@ impl<'a> ChainNode<'a> {
     /// The linearizer keeps a **sealed** optional chain (`(a?.b).c`) as a
     /// [`Self::Base`], so a chain answering `true` here is one whose own top level is
     /// optional — exactly the nesting the public AST wraps. Read by
-    /// [`super::resolve_inline_lookups`], where that wrapper stops two of prettier's
-    /// `shouldInline` ancestor walks.
+    /// [`super::inline_lookups::resolve_inline_lookups`], where that wrapper stops two
+    /// of prettier's `shouldInline` ancestor walks.
     pub const fn is_optional_link(&self) -> bool {
         match self {
             Self::Member { optional, .. }

@@ -62,8 +62,8 @@ impl<'a> Printer<'a> {
         &self,
         decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
-        // A test call's callback inlines its type parameters at any width — the
-        // function-expression twin of the peek in `build_type_params_doc_for_arrow`
+        // A test call's callback inlines its type parameters at any width — the one peek
+        // for both function-expression and arrow callbacks, which share this builder
         // (prettier's `isParameterInTestCall` asks `isTestCall` of the function's
         // parent for both kinds). PEEKED, not consumed: the value parameters are the
         // ones that spend the flag. Delegating to the always-inline builder keeps its
@@ -230,7 +230,7 @@ impl<'a> Printer<'a> {
     /// (`<T extends (A extends B ? C : D)>`) — prettier keeps them for clarity,
     /// and for an `infer`'s conditional constraint they're required (without them
     /// the enclosing `? :` rebinds and the result fails to parse). The `=` default
-    /// position strips redundant parens. See `append_keyword_value_with_comments`.
+    /// position strips redundant parens. See [`Self::append_keyword_value`].
     pub(in crate::printer) fn build_type_parameter_doc(
         &self,
         param: &TSTypeParameter<'_>,
@@ -674,7 +674,7 @@ impl<'a> Printer<'a> {
         // A single *simple* or *hugged-union* type argument inlines atomically: no
         // group, no softlines. Simple = keyword, literal, `this`, or a bare type
         // reference (`is_simple_type_arg`); hugged union = `{…} | null` / `null | {…}`
-        // (`union_type_arg_hug_shape`), whose object member carries its own group and
+        // (`type_arg_union_prints_hugged`), whose object member carries its own group and
         // breaks block-style inside the hugged `<…>` rather than breaking the `<…>` onto
         // its own lines. Matches Prettier's `shouldInline`/`shouldHugType` and tsv's own
         // type-position builder (`build_type_arguments_doc`), via the shared

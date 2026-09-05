@@ -1955,7 +1955,7 @@ impl<'a> Printer<'a> {
     /// relocates it past the `)` (cataloged as the non-null grouped-operand and
     /// angle-bracket assertion-operand divergences). Four constructs reach this gap and
     /// must answer it identically: the standalone non-null whose operand needs its
-    /// parens (`build_non_null_doc`'s needs-parens arm), the chain's parenthesized
+    /// parens (`build_ts_non_null_doc`'s needs-parens arm), the chain's parenthesized
     /// base (`ChainNode::Base`'s `paren_comment_end`), the required-paren positions
     /// that never enter a chain — a `new` callee and a template tag
     /// (`build_sealed_non_null_paren_doc`) — and the angle-bracket type assertion,

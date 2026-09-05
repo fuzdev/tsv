@@ -1150,8 +1150,8 @@ impl<'a> Printer<'a> {
     /// whatever its precedence-paren rule (`member_parens`: the type-parameter
     /// constraint site keeps a conditional value's clarity parens, the conditional
     /// `extends` site its own). Same catalog class as the multiline-member
-    /// divergences: prettier glues the container flat around its printed-ignored slice
-    /// (`annotation_prettier_ignore_multiline_value`).
+    /// divergence (`union_prettier_ignore_multiline_member`): prettier glues the container
+    /// flat around its printed-ignored slice.
     pub(in crate::printer) fn build_frozen_head_doc(
         &self,
         child: &TSType<'_>,

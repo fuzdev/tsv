@@ -183,7 +183,7 @@ fn lone_lookup_off_bare_base(nodes: &[&ChainNode<'_>], segment_count: usize) -> 
 ///
 /// `inline_every_lookup` suppresses every one of those break points: a chain the parent
 /// marked — an assignment TARGET, a `new` CALLEE — prints as one unbreakable unit (see
-/// [`crate::printer::chain::resolve_inline_lookups`]).
+/// [`super::super::inline_lookups::resolve_inline_lookups`]).
 pub(super) fn build_member_only_chain_doc<'a>(
     groups: &[ChainGroup<'a>],
     inline_every_lookup: bool,

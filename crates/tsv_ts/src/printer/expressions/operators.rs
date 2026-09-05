@@ -571,7 +571,7 @@ impl<'a> Printer<'a> {
         // prettier's parse postprocess rebalances `a ?? (b ?? [1])` into `(a ?? b) ?? [1]`
         // before the printer runs, so its `node.left` is a chain exactly when tsv's chain
         // has 3+ operands, and its `node.right` is the last operand — which is what
-        // `should_inline_logical_expression` reads (`rebalanced_logical_right`). A
+        // `should_inline_logical_expression` reads (`BinaryExpression::rebalanced_right`). A
         // two-operand inlining chain has no line for either answer to act on.
         // Fixtures: `logical/inline_chain_long`, `logical/inline_chain_paren_nested_long`.
         let style = if matches!(style, BinaryChainStyle::Grouped)

@@ -39,7 +39,7 @@ pub(in crate::printer) use composite::ArraySuffixLayout;
 
 // The pair an annotation's POSITION requires around its type — read by the hang seam
 // below as well as by the annotation emitters themselves.
-pub(in crate::printer) use type_annotation::AnnotationParens;
+use type_annotation::AnnotationParens;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::StandaloneGlue;

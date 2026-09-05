@@ -229,14 +229,14 @@ impl<'a> Printer<'a> {
 
     /// Partition comments between two positions into inline vs own-line.
     ///
-    /// Returns `(inline_with_prev, own_line, inline_with_next)` where:
-    /// - `inline_with_prev`: Comments on the same line as `prev_end`
+    /// Returns `(inline_prev, own_line, inline_next)` where:
+    /// - `inline_prev`: Comments on the same line as `prev_end`
     /// - `own_line`: Comments on their own line (not same line as prev or next)
-    /// - `inline_with_next`: Comments on the same line as `next_start`
+    /// - `inline_next`: Comments on the same line as `next_start`
     ///
     /// ⚠️ **The primitive, not the API — emit through one of the two wrappers below.**
     /// No gap emitter wants these three buckets *as three*: every one folds
-    /// `inline_with_next` into `own_line` ([`Self::partition_comments_trailing_vs_own_line`]),
+    /// `inline_next` into `own_line` ([`Self::partition_comments_trailing_vs_own_line`]),
     /// and the header→body gaps then pull a body-glued block back out of it
     /// ([`Self::partition_body_gap_comments`]). Destructuring the tuple here is how the
     /// third bucket got bound to `_` and every comment in it silently dropped, so the

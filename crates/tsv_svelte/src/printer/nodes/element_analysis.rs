@@ -59,7 +59,8 @@ struct MultilineInputs {
     /// Whether block-flow children force this element multiline —
     /// [`Printer::block_flow_forces_multiline`] gated on the element having any.
     /// Cached by `analyze_element` rather than asked here: it is a non-trivial
-    /// traversal and `will_go_multiline` reads the same combination.
+    /// traversal, and the caller holds the `has_block_flow_children` gate that
+    /// decides whether to run it at all.
     block_flow_multiline: bool,
     /// Whether all content children are text nodes
     only_text_content: bool,
@@ -495,8 +496,8 @@ impl<'a> Printer<'a> {
         };
 
         // Block flow children → whether they force multiline. Computed once here (a non-trivial
-        // traversal) and cached, since `will_go_multiline` and `compute_multiline_cause` both
-        // read exactly this combination.
+        // traversal) and passed in, so the `any()` gate deciding whether to run it at all sits
+        // beside it rather than inside `compute_multiline_cause`.
         let has_block_flow_children = nodes.iter().any(super::helpers::is_control_flow_block);
         let block_flow_multiline =
             has_block_flow_children && self.block_flow_forces_multiline(nodes);

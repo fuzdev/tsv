@@ -1234,7 +1234,8 @@ impl<'a> Printer<'a> {
     /// to indent. Indenting per gap compounds: two broken gaps would put the keyword's
     /// last word two levels deep, below the value that follows it at one.
     ///
-    /// Two callers: [`build_keyword_words_doc`](Self::build_keyword_words_doc) for a
+    /// Two multi-gap callers beyond that parent:
+    /// [`build_keyword_words_doc`](Self::build_keyword_words_doc) for a
     /// keyword's interior gaps, and the import-equals header — the one multi-gap header
     /// whose words aren't contiguous (its name sits between `import` and `=`), so it
     /// drives this directly instead.

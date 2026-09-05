@@ -30,12 +30,12 @@ use member_only::{
 };
 
 use super::analysis::should_merge_first_groups;
+use super::inline_lookups::{InlineLookups, resolve_inline_lookups};
 use super::printing::{
     chain_gap_any, has_inside_bracket_comments, member_lookup_group, node_comment_gap, print_group,
     print_group_expanded, print_group_standard_expanded, print_node_inner,
 };
 use super::types::{ChainGroup, ChainNode};
-use super::{InlineLookups, resolve_inline_lookups};
 use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression};
 use crate::printer::Printer;
 

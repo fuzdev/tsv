@@ -524,7 +524,7 @@ impl<'a> Printer<'a> {
                 let (type_doc, run_handed) = self.build_union_value_doc(eq_pos + 1, u);
                 let make_rhs =
                     |rhs: DocId| -> DocId { if run_handed { rhs } else { make_rhs(rhs) } };
-                // `union_prints_hugged`, not the bare syntactic `should_hug_union_type`:
+                // `union_prints_hugged`, not the bare syntactic `union_hug_shape`:
                 // this must agree with the layout `build_union_type_doc` just chose. A
                 // comment can make it decline the hug and expand, and then the `=` has
                 // to break like any other non-hugging union.

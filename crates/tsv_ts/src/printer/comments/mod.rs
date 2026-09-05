@@ -296,7 +296,7 @@ impl<'a> Printer<'a> {
     /// keeps the comment inline (`a /* c */ b`), matching prettier, which collapses both
     /// `a,⏎/* c */ b` and `a /* c */,⏎b` back to the inline form. The shared rule behind
     /// the intersection member break gates, the import-attribute gaps, and the first-param
-    /// leading-run collapse (`build_param_leading_comments_doc`).
+    /// leading-run collapse (`build_leading_param_comments`).
     ///
     /// ⚠️ **Both halves read the SOURCE, and that is the whole predicate.** This is
     /// prettier's `printLeadingComment` hardline condition transcribed —
