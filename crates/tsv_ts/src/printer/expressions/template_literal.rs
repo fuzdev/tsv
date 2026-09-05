@@ -78,9 +78,13 @@ impl<'a> Printer<'a> {
                 // freeze — they are the position's, so the frozen and unfrozen forms cannot
                 // disagree about the shell (the rule `Printer::build_frozen_value_doc`
                 // states for the heads that reach it through that helper).
+                // `build_flat_chain_expression_doc`: a template-literal interpolation is
+                // a `shouldNotIndent` position (`parent.type === "TemplateLiteral"`,
+                // binaryish.js:113), so a binary here keeps its continuation lines at the
+                // interpolation's own column.
                 let expr_inner = match frozen {
                     Some(frozen) => self.build_frozen_expression_doc(expr, frozen),
-                    None => self.build_expression_doc(expr),
+                    None => self.build_flat_chain_expression_doc(expr),
                 };
                 let expr_doc = if self.needs_parens(expr, ParenContext::TemplateLiteralExpression) {
                     d.parens(expr_inner)

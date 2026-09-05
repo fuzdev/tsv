@@ -61,7 +61,7 @@ impl<'a> Printer<'a> {
             value_span.start,
             |keyword_end| {
                 let value = self.build_value_head_doc(keyword_end, &decl.expression, || {
-                    self.build_continuation_indent_expression_doc(&decl.expression)
+                    self.build_expression_doc(&decl.expression)
                 });
                 // An assignment as the exported value takes clarity parens, the same
                 // answer every other value position gives (`ParenContext::ExportAssignment`).
@@ -427,9 +427,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match &decl.declaration {
             internal::ExportDefaultValue::Expression(expr) => {
-                let mut expr_doc = self.build_value_head_doc(keyword_end, expr, || {
-                    self.build_continuation_indent_expression_doc(expr)
-                });
+                let mut expr_doc = self
+                    .build_value_head_doc(keyword_end, expr, || self.build_expression_doc(expr));
                 // Prettier wraps the exported expression when its leftmost
                 // (first-printed) token is a function/class keyword — else
                 // `export default function () {}.m()` reparses the function as a

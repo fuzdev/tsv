@@ -4,6 +4,7 @@
 // for-in/for-of left/right printing.
 
 use crate::ast::internal::{self, Expression, Statement};
+use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::StatementContext;
 use crate::printer::statements::variable::{DeclaratorEqGap, DeclaratorInitInputs};
 use crate::printer::{
@@ -999,8 +1000,11 @@ impl<'a> Printer<'a> {
         seq: &internal::SequenceExpression<'_>,
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
-        let d = self.d();
         let mut docs = DocBuf::new();
+        // Where the FIRST operand's docs end — `build_sequence_layout_doc`'s `first_end`,
+        // tracked rather than assumed to be 1 so the layout does not depend on how many
+        // docs an operand pushes.
+        let mut first_end = 0;
         for (i, e) in seq.expressions.iter().enumerate() {
             let frozen = if i > 0 {
                 let prev_end = seq.expressions[i - 1].span().end;
@@ -1016,10 +1020,17 @@ impl<'a> Printer<'a> {
                 || build_elem(e),
                 |frozen| self.build_frozen_expression_doc(e, frozen),
             ));
+            if i == 0 {
+                first_end = docs.len();
+            }
         }
-        // Group + indent so a line-comment break continuation-indents one level,
-        // matching the multi-declarator init clause.
-        d.group(d.indent(d.concat(&docs)))
+        // Prettier's `ForStatement` arm of `printSequenceExpression` — the same geometry
+        // the general sequence printer states once, so this clause cannot answer it
+        // differently: the indent starts AFTER the first operand, and an operand that
+        // breaks internally keeps its own lines at the clause's base column. Wrapping the
+        // whole run instead added a level to the FIRST operand's internals, visible on a
+        // plain call (`for (fn(⏎…⏎), cc; ;)`) as well as on a binary.
+        self.build_sequence_layout_doc(&docs, first_end, SeqLayout::Indented)
     }
 
     /// Render a for-header init/update clause expression. A `SequenceExpression`
@@ -1035,10 +1046,20 @@ impl<'a> Printer<'a> {
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
         if let Expression::SequenceExpression(seq) = expr {
-            self.build_for_sequence_clause_doc(seq, build_elem)
-        } else {
-            build_elem(expr)
+            // A sequence's ELEMENTS are not `shouldNotIndent`: their parent is the
+            // sequence, not the `for`, so a binary element keeps the continuation-indent
+            // default — which is why the mark below is on the clause and not inside
+            // `build_elem`.
+            return self.build_for_sequence_clause_doc(seq, build_elem);
         }
+        // The clause itself is `shouldNotIndent`'s own `ForStatement` term (`node !==
+        // parent.body && parent.type === "ForStatement"`, binaryish.js:106), so a binary
+        // clause is FLAT. Marked rather than built directly because the builder is the
+        // caller's — the init clause wraps each operand for `[~In]`, the update clause does
+        // not (`Printer::mark_flat_chain`). `build_elem` runs immediately below, so nothing
+        // can clear the mark in between.
+        self.mark_flat_chain(expr);
+        build_elem(expr)
     }
 
     /// Build a Doc for a for loop update expression
@@ -1213,9 +1234,11 @@ impl<'a> Printer<'a> {
     /// layouts share `parenthesize_ternary_branch`. A bare `build_expression_doc`
     /// in each is how the pair goes missing from both.
     fn build_for_in_of_right_doc(&self, right: &Expression<'_>) -> DocId {
-        // A continuation-indent position — unlike the C-style header's clauses, which are
-        // `shouldNotIndent`'s own `ForStatement` term.
-        let doc = self.build_continuation_indent_expression_doc(right);
+        // A binary iterable takes the continuation-indent default — unlike the C-style
+        // header's clauses, which are `shouldNotIndent`'s own `ForStatement` term
+        // (`node !== parent.body && parent.type === "ForStatement"`, which a
+        // ForOf/ForIn statement is not).
+        let doc = self.build_expression_doc(right);
         if needs_parens(right, ParenContext::ForInOfRight, self.in_for_init.get()) {
             self.d().parens(doc)
         } else {

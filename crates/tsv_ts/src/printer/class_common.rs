@@ -363,9 +363,10 @@ impl<'a> Printer<'a> {
     /// `extends ((a) => b)`, …). A bare `Base<T>` keeps `Base` unwrapped — its type
     /// arguments are rendered separately via `super_type_parameters`.
     fn build_super_class_doc(&self, super_class: &internal::Expression<'_>) -> DocId {
-        // A continuation-indent position; the parens below are the PRINTER's and stay
-        // outside the operand's own doc.
-        let doc = self.build_continuation_indent_expression_doc(super_class);
+        // The ordinary dispatch — a binary superclass takes the continuation-indent
+        // default. The parens below are the PRINTER's and stay outside the operand's own
+        // doc.
+        let doc = self.build_expression_doc(super_class);
         if self.needs_parens(super_class, super::ParenContext::SuperClass) {
             // A decorated class expression breaks its parens open and indents the
             // content (prettier), the decorators forcing the break:

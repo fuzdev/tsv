@@ -388,6 +388,29 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// An object property's value doc for an arm that does NOT route through
+    /// [`Printer::build_assignment_layout`] — the arms below that emit their own
+    /// `key: value` shell.
+    ///
+    /// That builder marks the value for itself; every other arm owes the same mark,
+    /// because `isObjectProperty` is one of prettier's `shouldIndentIfInlining` parents
+    /// (binaryish.js:122) and the mark is the only way a binary value learns it
+    /// ([`Printer::mark_assignment_value`] — tsv has no parent pointer). An arm that
+    /// skipped it printed the property's chain with the continuation indent of an
+    /// UNEXEMPT position while its sibling arm printed the same property flush, which is
+    /// one construct with two layouts.
+    fn build_object_property_value_doc(
+        &self,
+        value: &Expression<'_>,
+        frozen: Option<Span>,
+    ) -> DocId {
+        self.mark_assignment_value(value);
+        match frozen {
+            Some(frozen) => self.build_frozen_expression_doc(value, frozen),
+            None => self.build_expression_doc(value),
+        }
+    }
+
     /// Build a Doc for a single property
     ///
     /// `has_comments` is the object-wide comment-presence flag: when it is false,
@@ -494,7 +517,7 @@ impl<'a> Printer<'a> {
                 d.concat(&parts)
             } else {
                 // Fallback for malformed AST
-                let value_doc = self.build_expression_doc(prop.value);
+                let value_doc = self.build_object_property_value_doc(prop.value, None);
                 d.concat(&[key_doc, d.text(": "), value_doc])
             }
         } else if prop.shorthand {
@@ -528,7 +551,7 @@ impl<'a> Printer<'a> {
                 return if needs_parens {
                     let value_doc = d.concat(&[
                         d.text("("),
-                        self.build_expression_doc(prop.value),
+                        self.build_object_property_value_doc(prop.value, None),
                         d.text(")"),
                     ]);
                     d.concat(&[key_doc, d.text(": "), value_doc])
@@ -558,7 +581,7 @@ impl<'a> Printer<'a> {
             // layout below; a glued block stays inline via the ordinary path.
             if self.comments_force_own_line_between(key_region_end, colon_pos) {
                 let value_doc = {
-                    let v = self.build_expression_doc(prop.value);
+                    let v = self.build_object_property_value_doc(prop.value, None);
                     let v = if self
                         .needs_parens(prop.value, super::ParenContext::ObjectPropertyValue)
                     {
@@ -625,7 +648,7 @@ impl<'a> Printer<'a> {
                     // Build manually with parens
                     let value_doc = d.concat(&[
                         d.text("("),
-                        self.build_expression_doc(prop.value),
+                        self.build_object_property_value_doc(prop.value, None),
                         d.text(")"),
                     ]);
                     d.concat(&[key_doc, d.text(": "), value_doc])
@@ -660,6 +683,9 @@ impl<'a> Printer<'a> {
                     // cast here reflows its comment→`(` break like any other value's.
                     // Without the mark the cast took the width-decided soft `line` and this
                     // arm's own hang then split the comment from its `(`.
+                    // …and the assignment-value mark for the same reason: a `:`→value
+                    // gap is an `isObjectProperty` value gap whichever arm prints it, so
+                    // the chain here is FLAT like its sibling arms', not indented.
                     self.mark_jsdoc_cast_value_gap(prop.value);
                     let comments_doc = self
                         .build_value_gap_comments_opt(colon_pos + 1, value_start)
@@ -668,10 +694,8 @@ impl<'a> Printer<'a> {
                     if needs_parens {
                         value_parts.push(d.text("("));
                     }
-                    value_parts.push(match value_frozen {
-                        Some(frozen) => self.build_frozen_expression_doc(prop.value, frozen),
-                        None => self.build_expression_doc(prop.value),
-                    });
+                    value_parts
+                        .push(self.build_object_property_value_doc(prop.value, value_frozen));
                     if needs_parens {
                         value_parts.push(d.text(")"));
                     }
@@ -717,7 +741,7 @@ impl<'a> Printer<'a> {
                             parts.push(rc);
                         }
                         parts.push(d.text("("));
-                        parts.push(self.build_expression_doc(prop.value));
+                        parts.push(self.build_object_property_value_doc(prop.value, None));
                         parts.push(d.text(")"));
                         d.concat(&parts)
                     } else {
