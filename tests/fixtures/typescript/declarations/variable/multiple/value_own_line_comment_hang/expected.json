@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 395,
+	"end": 427,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -28,9 +28,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " its line — whether the gap emits the comment or the value OWNS it.",
+			"value": " its line — whether the gap emits the comment or the value OWNS it. The hung value",
 			"start": 99,
-			"end": 168,
+			"end": 183,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,71 +38,87 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 70
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " sits one level past the declarator, two past the keyword.",
+			"start": 185,
+			"end": 245,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 61
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "* @type {A} ",
-			"start": 185,
-			"end": 201,
+			"start": 263,
+			"end": 279,
 			"loc": {
 				"start": {
-					"line": 5,
-					"column": 2
+					"line": 6,
+					"column": 3
 				},
 				"end": {
-					"line": 5,
-					"column": 18
+					"line": 6,
+					"column": 19
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": "*\n * c\n ",
-			"start": 239,
-			"end": 255,
+			"start": 319,
+			"end": 337,
 			"loc": {
 				"start": {
-					"line": 10,
-					"column": 2
+					"line": 11,
+					"column": 3
 				},
 				"end": {
-					"line": 12,
-					"column": 5
+					"line": 13,
+					"column": 6
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " The gap-emitted spelling, unchanged: the anchor the two owned ones now match.",
-			"start": 270,
-			"end": 350,
+			"value": " The gap-emitted spelling.",
+			"start": 352,
+			"end": 380,
 			"loc": {
 				"start": {
-					"line": 15,
+					"line": 16,
 					"column": 1
 				},
 				"end": {
-					"line": 15,
-					"column": 81
+					"line": 16,
+					"column": 29
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 366,
-			"end": 370,
+			"start": 397,
+			"end": 401,
 			"loc": {
 				"start": {
-					"line": 17,
-					"column": 2
+					"line": 18,
+					"column": 3
 				},
 				"end": {
-					"line": 17,
-					"column": 6
+					"line": 18,
+					"column": 7
 				}
 			}
 		}
@@ -110,63 +126,63 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 394,
+		"end": 426,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 385,
+			"end": 417,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 20,
+					"line": 21,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 170,
-					"end": 220,
+					"start": 247,
+					"end": 299,
 					"loc": {
 						"start": {
-							"line": 4,
+							"line": 5,
 							"column": 1
 						},
 						"end": {
-							"line": 7,
+							"line": 8,
 							"column": 8
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 176,
-							"end": 210,
+							"start": 253,
+							"end": 289,
 							"loc": {
 								"start": {
-									"line": 4,
+									"line": 5,
 									"column": 7
 								},
 								"end": {
-									"line": 6,
-									"column": 8
+									"line": 7,
+									"column": 9
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 176,
-								"end": 180,
+								"start": 253,
+								"end": 257,
 								"loc": {
 									"start": {
-										"line": 4,
+										"line": 5,
 										"column": 7
 									},
 									"end": {
-										"line": 4,
+										"line": 5,
 										"column": 11
 									}
 								},
@@ -174,16 +190,16 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 205,
-								"end": 209,
+								"start": 284,
+								"end": 288,
 								"loc": {
 									"start": {
-										"line": 6,
-										"column": 3
+										"line": 7,
+										"column": 4
 									},
 									"end": {
-										"line": 6,
-										"column": 7
+										"line": 7,
+										"column": 8
 									}
 								},
 								"name": "expr",
@@ -191,37 +207,37 @@
 									{
 										"type": "Block",
 										"value": "* @type {A} ",
-										"start": 185,
-										"end": 201
+										"start": 263,
+										"end": 279
 									}
 								]
 							}
 						},
 						{
 							"type": "VariableDeclarator",
-							"start": 214,
-							"end": 219,
+							"start": 293,
+							"end": 298,
 							"loc": {
 								"start": {
-									"line": 7,
+									"line": 8,
 									"column": 2
 								},
 								"end": {
-									"line": 7,
+									"line": 8,
 									"column": 7
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 214,
-								"end": 215,
+								"start": 293,
+								"end": 294,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 8,
 										"column": 2
 									},
 									"end": {
-										"line": 7,
+										"line": 8,
 										"column": 3
 									}
 								},
@@ -229,15 +245,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 218,
-								"end": 219,
+								"start": 297,
+								"end": 298,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 8,
 										"column": 6
 									},
 									"end": {
-										"line": 7,
+										"line": 8,
 										"column": 7
 									}
 								},
@@ -256,52 +272,58 @@
 						},
 						{
 							"type": "Line",
-							"value": " its line — whether the gap emits the comment or the value OWNS it.",
+							"value": " its line — whether the gap emits the comment or the value OWNS it. The hung value",
 							"start": 99,
-							"end": 168
+							"end": 183
+						},
+						{
+							"type": "Line",
+							"value": " sits one level past the declarator, two past the keyword.",
+							"start": 185,
+							"end": 245
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 223,
-					"end": 267,
+					"start": 302,
+					"end": 349,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 10,
 							"column": 1
 						},
 						"end": {
-							"line": 13,
+							"line": 14,
 							"column": 8
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 229,
-							"end": 257,
+							"start": 308,
+							"end": 339,
 							"loc": {
 								"start": {
-									"line": 9,
+									"line": 10,
 									"column": 7
 								},
 								"end": {
-									"line": 12,
-									"column": 7
+									"line": 13,
+									"column": 8
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 229,
-								"end": 234,
+								"start": 308,
+								"end": 313,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 10,
 										"column": 7
 									},
 									"end": {
-										"line": 9,
+										"line": 10,
 										"column": 12
 									}
 								},
@@ -309,16 +331,16 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 256,
-								"end": 257,
+								"start": 338,
+								"end": 339,
 								"loc": {
 									"start": {
-										"line": 12,
-										"column": 6
+										"line": 13,
+										"column": 7
 									},
 									"end": {
-										"line": 12,
-										"column": 7
+										"line": 13,
+										"column": 8
 									}
 								},
 								"value": 1,
@@ -327,37 +349,37 @@
 									{
 										"type": "Block",
 										"value": "*\n * c\n ",
-										"start": 239,
-										"end": 255
+										"start": 319,
+										"end": 337
 									}
 								]
 							}
 						},
 						{
 							"type": "VariableDeclarator",
-							"start": 261,
-							"end": 266,
+							"start": 343,
+							"end": 348,
 							"loc": {
 								"start": {
-									"line": 13,
+									"line": 14,
 									"column": 2
 								},
 								"end": {
-									"line": 13,
+									"line": 14,
 									"column": 7
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 261,
-								"end": 262,
+								"start": 343,
+								"end": 344,
 								"loc": {
 									"start": {
-										"line": 13,
+										"line": 14,
 										"column": 2
 									},
 									"end": {
-										"line": 13,
+										"line": 14,
 										"column": 3
 									}
 								},
@@ -365,15 +387,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 265,
-								"end": 266,
+								"start": 347,
+								"end": 348,
 								"loc": {
 									"start": {
-										"line": 13,
+										"line": 14,
 										"column": 6
 									},
 									"end": {
-										"line": 13,
+										"line": 14,
 										"column": 7
 									}
 								},
@@ -386,44 +408,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 352,
-					"end": 384,
+					"start": 382,
+					"end": 416,
 					"loc": {
 						"start": {
-							"line": 16,
+							"line": 17,
 							"column": 1
 						},
 						"end": {
-							"line": 19,
+							"line": 20,
 							"column": 8
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 358,
-							"end": 374,
+							"start": 388,
+							"end": 406,
 							"loc": {
 								"start": {
-									"line": 16,
+									"line": 17,
 									"column": 7
 								},
 								"end": {
-									"line": 18,
-									"column": 3
+									"line": 19,
+									"column": 4
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 358,
-								"end": 361,
+								"start": 388,
+								"end": 391,
 								"loc": {
 									"start": {
-										"line": 16,
+										"line": 17,
 										"column": 7
 									},
 									"end": {
-										"line": 16,
+										"line": 17,
 										"column": 10
 									}
 								},
@@ -431,16 +453,16 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 373,
-								"end": 374,
+								"start": 405,
+								"end": 406,
 								"loc": {
 									"start": {
-										"line": 18,
-										"column": 2
+										"line": 19,
+										"column": 3
 									},
 									"end": {
-										"line": 18,
-										"column": 3
+										"line": 19,
+										"column": 4
 									}
 								},
 								"value": 1,
@@ -449,37 +471,37 @@
 									{
 										"type": "Line",
 										"value": " c",
-										"start": 366,
-										"end": 370
+										"start": 397,
+										"end": 401
 									}
 								]
 							}
 						},
 						{
 							"type": "VariableDeclarator",
-							"start": 378,
-							"end": 383,
+							"start": 410,
+							"end": 415,
 							"loc": {
 								"start": {
-									"line": 19,
+									"line": 20,
 									"column": 2
 								},
 								"end": {
-									"line": 19,
+									"line": 20,
 									"column": 7
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 378,
-								"end": 379,
+								"start": 410,
+								"end": 411,
 								"loc": {
 									"start": {
-										"line": 19,
+										"line": 20,
 										"column": 2
 									},
 									"end": {
-										"line": 19,
+										"line": 20,
 										"column": 3
 									}
 								},
@@ -487,15 +509,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 382,
-								"end": 383,
+								"start": 414,
+								"end": 415,
 								"loc": {
 									"start": {
-										"line": 19,
+										"line": 20,
 										"column": 6
 									},
 									"end": {
-										"line": 19,
+										"line": 20,
 										"column": 7
 									}
 								},
@@ -508,9 +530,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " The gap-emitted spelling, unchanged: the anchor the two owned ones now match.",
-							"start": 270,
-							"end": 350
+							"value": " The gap-emitted spelling.",
+							"start": 352,
+							"end": 380
 						}
 					]
 				}

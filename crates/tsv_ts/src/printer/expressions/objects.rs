@@ -235,14 +235,12 @@ impl<'a> Printer<'a> {
             if must_break {
                 // Forced multiline - use hardlines for predictable formatting
                 let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
-                let (indented_content, closing_line) =
-                    self.wrap_with_decl_indent(inner, d.hardline());
 
                 self.build_delimited_doc(
                     d.text("{"),
                     brace_line_prefix,
-                    indented_content,
-                    closing_line,
+                    d.indent(inner),
+                    d.hardline(),
                     d.text("}"),
                 )
             } else {
@@ -250,9 +248,8 @@ impl<'a> Printer<'a> {
                 // width-based breaking: a space when flat (`{ foo }`), a newline when
                 // it breaks (brace_line_prefix is `None` here — pulling implies must_break).
                 let inner = d.concat(&[d.line(), d.concat(&parts)]);
-                let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.line());
 
-                self.wrap_object_braces(indented_content, closing_line, has_source_newline)
+                self.wrap_object_braces(d.indent(inner), d.line(), has_source_newline)
             }
         } else {
             // No comments, no forced multiline: use width-based wrapping with soft lines
@@ -305,9 +302,8 @@ impl<'a> Printer<'a> {
             // Width-based wrapping: bracketSpacing boundaries (space when flat
             // `{ foo }`, newline when broken).
             let inner = d.concat(&[d.line(), d.concat(&parts)]);
-            let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.line());
 
-            self.wrap_object_braces(indented_content, closing_line, has_source_newline)
+            self.wrap_object_braces(d.indent(inner), d.line(), has_source_newline)
         }
     }
 

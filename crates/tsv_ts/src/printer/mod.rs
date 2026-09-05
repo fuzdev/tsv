@@ -214,10 +214,6 @@ pub struct Printer<'a> {
     /// gated here — or deliberately paired and left un-erased, as the mapped-type
     /// residual is (see `types::composite::build_mapped_type_doc`).
     pub(crate) canonical: bool,
-    /// Extra indent depth for declaration contexts (0 normally, 1+ in multi-declarator)
-    /// When > 0, multiline objects/arrays get extra indentation
-    /// Uses Cell for interior mutability so doc builders (&self) can set this
-    pub(crate) declaration_indent_depth: Cell<usize>,
     /// Whether we're currently inside an expression statement (for chain merging decisions)
     /// Uses Cell for interior mutability so doc builders (&self) can set this
     pub(crate) is_expression_statement: Cell<bool>,
@@ -309,6 +305,14 @@ pub struct Printer<'a> {
     /// operand, a non-null assertion's operand). Keyed by span and not consumed, like
     /// the two targets above.
     pub(crate) ternary_hang_target: Cell<Option<Span>>,
+    /// Span of the value an ASSIGNMENT position is building — a declarator's
+    /// initializer, an assignment's RHS, an object property's value, a class property's
+    /// initializer: the parents prettier's binaryish `shouldIndentIfInlining` names.
+    /// Recorded by `Printer::mark_assignment_value`, read by the binary chain builder for
+    /// the one layout arm keyed on it (an inlining logical chain with earlier operators,
+    /// `build_binary_chain_doc_core`). Keyed by span and not consumed, like the targets
+    /// above.
+    pub(crate) assignment_value_target: Cell<Option<Span>>,
     /// Span of a JSDoc cast sitting directly in a **value gap**, whose comment→`(`
     /// separator therefore reflows to a space instead of taking the soft `line`
     /// ([`Printer::build_jsdoc_cast_doc`]).
@@ -548,7 +552,6 @@ impl<'a> Printer<'a> {
             // leaves this one real (see `set_canonical`).
             comment_line_breaks: inputs.line_table,
             canonical: false,
-            declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
             in_top_level_assignment: Cell::new(false),
             in_stacked_arrow_chain: Cell::new(false),
@@ -558,6 +561,7 @@ impl<'a> Printer<'a> {
             arrow_body_object_parens_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
             ternary_hang_target: Cell::new(None),
+            assignment_value_target: Cell::new(None),
             jsdoc_cast_value_gap_target: Cell::new(None),
             jsdoc_cast_cannot_hang_target: Cell::new(None),
             inline_every_member_lookup: Cell::new(None),
@@ -869,30 +873,6 @@ impl<'a> Printer<'a> {
             start,
             end,
         )
-    }
-
-    /// Wrap content and closing line with declaration indent depth handling
-    ///
-    /// In multi-declarator contexts (declaration_indent_depth > 0), content gets
-    /// double-indented and the closing line gets single extra indent. This creates
-    /// the proper visual alignment for:
-    /// ```javascript
-    /// const a = {
-    ///         prop: value,
-    ///     },
-    ///     b = 2;
-    /// ```
-    pub(crate) fn wrap_with_decl_indent(
-        &self,
-        inner: DocId,
-        closing_line: DocId,
-    ) -> (DocId, DocId) {
-        let d = self.d();
-        if self.declaration_indent_depth.get() > 0 {
-            (d.indent(d.indent(inner)), d.indent(closing_line))
-        } else {
-            (d.indent(inner), closing_line)
-        }
     }
 
     /// The share-map key for `node` under `builder`, or `None` when no member chain is

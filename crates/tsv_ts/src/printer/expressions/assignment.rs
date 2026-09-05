@@ -1080,6 +1080,19 @@ impl RhsCommentInfo {
 }
 
 impl<'a> Printer<'a> {
+    /// Record `value` as the value an ASSIGNMENT position is building — the parents
+    /// prettier's binaryish `shouldIndentIfInlining` names (a declarator's initializer, an
+    /// assignment's RHS, an object property's value, a class property's initializer). The
+    /// binary chain builder reads it for the one layout arm keyed on that position: an
+    /// inlining logical chain with earlier operators indents them
+    /// (`build_binary_chain_doc_core`). Called by [`Self::build_assignment_layout`] and by
+    /// the two declarator value builders, which build their value without it.
+    ///
+    /// Keyed by span and not consumed, like `mark_ternary_extra_indent`.
+    pub(in crate::printer) fn mark_assignment_value(&self, value: &Expression<'_>) {
+        self.assignment_value_target.set(Some(value.span()));
+    }
+
     /// Build a Doc for an assignment (variable declaration or object property)
     ///
     /// This is the unified entry point that matches prettier's `printAssignment`.
@@ -1199,8 +1212,9 @@ impl<'a> Printer<'a> {
             ArrowChainContext::None
         };
         // Every gap routed through this builder is a value gap
-        // (`mark_jsdoc_cast_value_gap`).
+        // (`mark_jsdoc_cast_value_gap`), and every value built here is an assignment's.
         self.mark_jsdoc_cast_value_gap(right_expr);
+        self.mark_assignment_value(right_expr);
         let right_doc = self.build_with_arrow_chain_context(chain_context, || {
             if let Some(boundary) = rhs_info.boundary {
                 self.build_expression_doc_with_paren_comments(right_expr, boundary, false)
