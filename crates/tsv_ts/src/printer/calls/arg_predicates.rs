@@ -47,38 +47,6 @@ pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
     matches!(expr, Expression::ObjectExpression(obj) if !obj.properties.is_empty())
 }
 
-/// Check if an array is "concisely printed" — all elements are numeric literals.
-///
-/// Prettier formats these arrays with fill layout, which prevents the
-/// expand-last-arg pattern from working (the expanded doc has different
-/// break characteristics). When true, the array should NOT use expand-last-arg
-/// and instead falls through to the normal inline-or-expand-all path.
-pub(super) fn is_concise_numeric_array(expr: &Expression<'_>) -> bool {
-    if let Expression::ArrayExpression(arr) = expr {
-        !arr.elements.is_empty()
-            && arr
-                .elements
-                .iter()
-                .all(|elem| elem.as_ref().is_some_and(is_numeric_expression))
-    } else {
-        false
-    }
-}
-
-/// Check if an expression is a numeric literal (including unary +/- prefix).
-fn is_numeric_expression(expr: &Expression<'_>) -> bool {
-    match expr {
-        Expression::Literal(lit) => matches!(lit.value, internal::LiteralValue::Number(_)),
-        Expression::UnaryExpression(unary) => {
-            matches!(
-                unary.operator,
-                internal::UnaryOperator::Minus | internal::UnaryOperator::Plus
-            ) && is_numeric_expression(unary.argument)
-        }
-        _ => false,
-    }
-}
-
 /// Check if a second argument is "short" enough for the "expand first arg" pattern.
 ///
 /// Used when the first arg is a block function and we want to keep the second arg
@@ -459,22 +427,6 @@ mod tests {
             Expression::CallExpression(call) => call.arguments,
             other => panic!("expected a call expression, got: {other:?}"),
         }
-    }
-
-    #[test]
-    fn concise_numeric_array_detection() {
-        let arena = Bump::new();
-        assert!(is_concise_numeric_array(&parse_expr(&arena, "[1, 2, 3]")));
-        // Unary +/- prefixes still count as numeric.
-        assert!(is_concise_numeric_array(&parse_expr(&arena, "[-1, +2]")));
-        // Empty array is not concise-numeric.
-        assert!(!is_concise_numeric_array(&parse_expr(&arena, "[]")));
-        // A non-numeric element disqualifies it.
-        assert!(!is_concise_numeric_array(&parse_expr(&arena, "[1, 'x']")));
-        // A hole is not a numeric element (unlike is_simple_call_argument).
-        assert!(!is_concise_numeric_array(&parse_expr(&arena, "[1, , 2]")));
-        // Non-array expressions are never concise-numeric.
-        assert!(!is_concise_numeric_array(&parse_expr(&arena, "foo")));
     }
 
     #[test]

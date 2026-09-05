@@ -8,8 +8,7 @@
 
 use super::arg_comments::{any_comment_forces_expansion_slice, last_arg_has_comments};
 use super::arg_predicates::{
-    arrow_body_is_call_through_non_null, is_array_or_object_unwrapped, is_concise_numeric_array,
-    is_ternary_arrow_body,
+    arrow_body_is_call_through_non_null, is_array_or_object_unwrapped, is_ternary_arrow_body,
 };
 use super::arg_wrapping::{
     ArgOpener, arrow_body_expands_internally, arrow_hug_refused_by_comments, build_args_split_last,
@@ -111,8 +110,9 @@ pub(super) fn try_expand_last_arg(
     );
     // Prettier excludes "concise" arrays (all numeric literals) — those use fill layout, whose
     // break characteristics the hug states can't express.
-    let last_is_collection = last_arg
-        .is_some_and(|arg| is_array_or_object_unwrapped(arg) && !is_concise_numeric_array(arg));
+    let last_is_collection = last_arg.is_some_and(|arg| {
+        is_array_or_object_unwrapped(arg) && !printer.arg_is_concisely_printed_array(arg)
+    });
     if !(last_is_function || last_is_collection) {
         return None;
     }

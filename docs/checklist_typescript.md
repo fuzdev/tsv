@@ -149,6 +149,9 @@ written in the flags position) is not a flags production at all and is rejected,
 - Trailing commas (`[1, 2,]`)
 - Sparse arrays / elisions (`[1, , 3]`)
 - Spread elements (`[...arr]`)
+- Numbers-only arrays pack as a fill (prettier's `isConciselyPrintedArray`), each item measured WITH its comma — a line breaks where the next item's comma would pass column 100, and a glued block comment travels with its item; pinned by [arrays/fill_long](../tests/fixtures/typescript/expressions/arrays/fill_long/) and [arrays/fill_glued_comment_long](../tests/fixtures/typescript/expressions/arrays/fill_glued_comment_long/)
+- A blank line the author left between two fill items survives, and its hard break expands the array ([arrays/fill_blank_lines](../tests/fixtures/typescript/expressions/arrays/fill_blank_lines/))
+- A comment inside a signed literal's own argument (`-/* c */ 1`) refuses the fill — the array prints one per line — and a doubled sign (`- -1`) is not a signed number at all ([arrays/fill_signed_operand](../tests/fixtures/typescript/expressions/arrays/fill_signed_operand/))
 
 ### Object Literals
 
