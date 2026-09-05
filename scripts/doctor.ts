@@ -449,7 +449,8 @@ for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) 
 
 section('Corpus entries (gates + conformance views)');
 try {
-	const { corpus_missing_entries } = await import('../benches/js/lib/corpus.ts');
+	const { corpus_missing_entries, corpus_untiered_collections } =
+		await import('../benches/js/lib/corpus.ts');
 	for (const view of ['gates', 'conformance'] as const) {
 		const { missing, optional_missing, total } = await corpus_missing_entries(view);
 		if (missing.length > 0) {
@@ -463,11 +464,22 @@ try {
 		for (const o of optional_missing)
 			info(`${view} view: optional entry absent (fail-open, disclosed): ${o}`);
 	}
+	// A collection the snapshot vendors that no tier places is in no bench or gate view
+	// — vendored ahead of its triage, read only by the whole-snapshot sweeps. Listed so
+	// it is a standing question rather than a forgotten one.
+	const untiered = await corpus_untiered_collections();
+	if (untiered.length > 0) {
+		info(
+			`${untiered.length} snapshot collection(s) in no tier (whole-snapshot sweeps only): ` +
+				untiered.join(', ')
+		);
+	}
 } catch (e) {
-	warn(
-		`cannot load the corpus entry list (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
-			'usually node_modules missing; run deno task bench:install'
-	);
+	// The entry list is derived from the snapshot's manifest, so this is also where a
+	// checkout whose manifest this reader can't take (or a tier table naming a collection
+	// the manifest dropped) surfaces — the message names which; a bare import failure is
+	// usually node_modules missing (deno task bench:install).
+	warn(`cannot load the corpus entry list: ${e instanceof Error ? e.message.split('\n')[0] : e}`);
 }
 
 // --- Build artifacts (informational) --------------------------------------------

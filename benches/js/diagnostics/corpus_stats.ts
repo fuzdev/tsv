@@ -1,6 +1,6 @@
 /**
  * Corpus stats — size up the perf corpus, or a candidate directory before it
- * joins `CORPUS_ENTRIES`, so inclusion decisions go on numbers rather than a
+ * joins the corpus entries, so inclusion decisions go on numbers rather than a
  * hunch. Reports per-entry / per-subtree file counts, the language split, file
  * SIZE distribution (median/p90/p99/max — the current `corpus_sources`
  * disclosure only carries bare counts), the largest files, and the
