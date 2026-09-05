@@ -7,7 +7,7 @@
 // - Assignment expressions: `a = b` with width-based wrapping and chain detection
 // - Rest elements: `...rest`
 
-use super::assignment::RhsCommentInfo;
+use super::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use crate::printer::comments::next_real_element_start;
 use crate::printer::layout::hang_after_operator;
@@ -27,11 +27,9 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// Chain formatting is ONLY used when the parent is another assignment expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AssignmentContext {
-    /// Default context - parent is unknown or non-assignment
+    /// Parent is anything but an assignment expression — a statement, a declaration, an
+    /// argument, an operand. Regular grouped layout.
     None,
-    /// Parent is ExpressionStatement or VariableDeclaration
-    /// → Do NOT use chain formatting (use regular grouped layout)
-    TopLevel,
     /// Parent is an assignment expression
     /// → Use chain formatting (ungrouped with line elements)
     Chain,
@@ -126,15 +124,11 @@ impl<'a> Printer<'a> {
         &self,
         assign: &internal::AssignmentExpression<'_>,
     ) -> DocId {
-        // Determine initial context based on whether we're at top level
-        let initial_context = if self.in_top_level_assignment.get() {
-            AssignmentContext::TopLevel
-        } else {
-            AssignmentContext::None
-        };
         // Assignment RHS — an `ancestorNameMap` value position.
         self.mark_ternary_extra_indent(assign.right);
-        self.build_assignment_doc_with_context(assign, initial_context)
+        // Every parent that reaches this entry point is a NON-assignment one: the chain
+        // context is set by exactly one caller, the recursive one below.
+        self.build_assignment_doc_with_context(assign, AssignmentContext::None)
     }
 
     /// Build a Doc for an assignment expression with chain context
@@ -171,15 +165,17 @@ impl<'a> Printer<'a> {
         // And the value is an assignment value — prettier's `shouldIndentIfInlining` keys
         // on the PARENT being an `AssignmentExpression`, not on which layout tsv picked,
         // so the mark belongs to the CONSTRUCT and not to one arm. It sits here for the
-        // same reason as the line above, and covers all six of this function's
+        // same reason as the line above, and covers all five of this function's
         // value-building arms: the operator→value continuation, the assignment chain, the
-        // ObjectPattern target, the two `=`-comment arms and the ordinary layout. Anchored
-        // to a single arm instead, the other five printed a binary value with the
-        // continuation indent of an unexempt position while their sibling printed the same
-        // construct flush — one construct, two answers, which is the exact drift this mark
-        // exists to prevent. `build_assignment_layout` re-marks the same span when it is
-        // the arm that runs; a redundant store is the price of the mark being the
-        // construct's.
+        // two `=`-comment arms and the ordinary layout. Anchored to a single arm instead,
+        // the other four printed a binary value with the continuation indent of an unexempt
+        // position while their sibling printed the same construct flush — one construct,
+        // two answers, which is the exact drift this mark exists to prevent. Two of the
+        // five build their value outside `build_assignment_layout` and so read no other
+        // mark — the continuation and the chain, pinned by the `chain_binary_value_long`
+        // and `before_operator_line_comment_long_prettier_divergence` fixtures. The layout
+        // re-marks the same span when it is the arm that runs; a redundant store is the
+        // price of the mark being the construct's.
         self.mark_assignment_value(assign.right);
 
         // Extract inline comments between operator and RHS
@@ -265,12 +261,29 @@ impl<'a> Printer<'a> {
         // nested assignment, so a chain freezes from the directive down.
         let rhs_frozen = self.value_head_frozen_span(effective_rhs_start, assign.right.span());
 
+        // The operator→RHS gap's facts, stated once for both of the layout's call sites
+        // below — the 2-segment chain and the ordinary value. They differ in nothing but
+        // the guard that reaches them.
+        let rhs_info = || RhsCommentInfo {
+            comments: rhs_comments,
+            has_line_comment: rhs_has_line_comment,
+            pinned: rhs_pinned,
+            boundary: Some(assign.span.end),
+            frozen: rhs_frozen,
+        };
+        // What the LEFT is, for the layout's own arm ([`AssignmentLeft`]). A complex
+        // destructuring target answers the layout on its own, ahead of the value.
+        let left = if self.is_complex_destructuring_target(assign.left) {
+            AssignmentLeft::ComplexPattern
+        } else {
+            AssignmentLeft::Plain
+        };
+
         // For 2-segment chains at top level (a = b = value), use unified assignment layout.
         // Prettier only uses chain formatting for 3+ segments (assignment.js:113-125).
         // A 2-segment chain has rhs_is_assignment=true but the inner RHS is NOT an assignment.
         if !matches!(context, AssignmentContext::Chain)
             && rhs_is_assignment
-            && !matches!(assign.left, Expression::ObjectPattern(_))
             && let Expression::AssignmentExpression(inner) = assign.right
         {
             let inner_rhs_is_assignment =
@@ -280,24 +293,23 @@ impl<'a> Printer<'a> {
                     left_doc,
                     assign.operator.doc_with_leading_space(d),
                     assign.right,
-                    false,
-                    RhsCommentInfo {
-                        comments: rhs_comments,
-                        has_line_comment: rhs_has_line_comment,
-                        pinned: rhs_pinned,
-                        boundary: Some(assign.span.end),
-                        frozen: rhs_frozen,
-                    },
+                    left,
+                    rhs_info(),
                 );
             }
         }
 
-        // Use unified assignment layout for simple (non-chain, non-pattern) cases.
+        // Use unified assignment layout for simple (non-chain) cases.
         // build_assignment_layout builds right_doc internally and handles rhs_comments.
-        if !matches!(context, AssignmentContext::Chain)
-            && !matches!(assign.left, Expression::ObjectPattern(_))
-            && !rhs_is_assignment
-        {
+        //
+        // A DESTRUCTURING target is not special here. Prettier's `printAssignment` chooses
+        // the layout from the VALUE — a non-inlining binaryish RHS breaks after the
+        // operator whatever the left is — so `({ a } = x ?? y ?? z)` hangs its value like
+        // every other assignment host, and the value's own chain then indents (or not) by
+        // the mark above. Excluding a pattern target here sends it to the assignment-chain
+        // fall-through at the bottom of this function instead, which is keyed on an
+        // assignment RHS and answers nothing about a value's own width.
+        if !matches!(context, AssignmentContext::Chain) && !rhs_is_assignment {
             // A block run the author broke AFTER (`w = /* c */⏎<value>`): the shared
             // `=` broke-after arm ([`Printer::broke_after_operator_rhs_doc`] — the
             // two-half rule, its declines, and what falls through live there),
@@ -355,14 +367,8 @@ impl<'a> Printer<'a> {
                 left_doc,
                 assign.operator.doc_with_leading_space(d),
                 assign.right,
-                false,
-                RhsCommentInfo {
-                    comments: rhs_comments,
-                    has_line_comment: rhs_has_line_comment,
-                    pinned: rhs_pinned,
-                    boundary: Some(assign.span.end),
-                    frozen: rhs_frozen,
-                },
+                left,
+                rhs_info(),
             );
         }
 
@@ -408,25 +414,6 @@ impl<'a> Printer<'a> {
                 right_doc,
                 segment,
             )
-        } else if matches!(assign.left, Expression::ObjectPattern(_)) {
-            // Object patterns on LHS - never break after operator, EXCEPT under an honored
-            // directive: gluing the run to the operator would leave the directive trailing
-            // `=`, an inert placement, so the freeze would die on the second pass. Hang the
-            // value instead, as every other assignment host does.
-            if rhs_frozen.is_some() {
-                self.build_frozen_assignment_shape(
-                    left_doc,
-                    assign.operator.doc_with_leading_space(d),
-                    right_doc,
-                )
-            } else {
-                d.concat(&[
-                    left_doc,
-                    assign.operator.doc_with_leading_space(d),
-                    d.text(" "),
-                    right_doc,
-                ])
-            }
         } else {
             // RHS is a chain - group + indent (chain formatting from recursive call)
             d.group(d.concat(&[
