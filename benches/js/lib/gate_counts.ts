@@ -383,10 +383,16 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// lists are file-for-file identical (pre-change tree vs tip, `--all --json` set-diffed).
 	// The third fix in that round — prettier refuses the fill when a signed literal's own
 	// argument carries a comment — moves no count: no corpus file spells one.
-	// ⚠️ That same measurement read css `match` 131 BEFORE and after this change — two below
-	// the 133 floor, a pre-existing drop unrelated to this entry and deliberately not re-pinned
-	// there. It does NOT reproduce on the merged tip, which reads css 133 and holds the floor;
-	// whatever the 131 tree was measuring is still unexplained, so leave the floor as found.
+	// ⚠️ That same measurement read css `match` 131 — two below the floor — and recorded it
+	// here as a pre-existing tree drop. It was not one: the machine's `svelte_styles` cache
+	// held 18 concats where the perf view has 20 collections, so `earbetter.css` and
+	// `cosmicplayground.css` were absent from the corpus entirely (css `total` 216, not 218).
+	// Both match, and `deno task bench:harvest:svelte-styles` restores them and the floor — the
+	// merged tip, harvested, reads css 133. The harvest is a CORPUS INPUT, not a measurement of
+	// tsv, so a short cache understates every css count at once and reads exactly like a
+	// regression — a standalone `corpus:compare:format --all` is the one entry point that does
+	// not chain it (`conformance` does, late, beside the legs that read it). Re-harvest before
+	// believing a css shortfall.
 	//
 	// ⚠️ The two entries above landed on SEPARATE branches, each measured against 5124 in its
 	// own tree, so their deltas are NOT composable in general. **5134 is the re-measurement on

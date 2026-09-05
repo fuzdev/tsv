@@ -54,6 +54,20 @@ function run_pattern(pattern_id: string, ctx: DetectionContext): DivergenceMatch
 	return pattern.detect(ctx);
 }
 
+/**
+ * Assert that OURS really did emit an over-width line in this context.
+ *
+ * The shape check every forced-overrun test needs before its verdict means anything: a
+ * synthetic whose ours side happens to fit proves nothing about the width guard either
+ * way, and silently passes as a negative.
+ */
+function assert_ours_overruns(ctx: DetectionContext): void {
+	assertEquals(
+		ctx.hunks.some((h) => h.added_lines.some((l) => visual_width(l) > 100)),
+		true
+	);
+}
+
 // ─── svelte_element_this_string ──────────────────────────────────
 
 Deno.test('svelte_element_this_string: positive - brace-wrapped literal re-quoted', () => {
@@ -1084,12 +1098,28 @@ Deno.test('bom_strip: negative - no BOM in source', () => {
 // ─── fill_after_inline ──────────────────────────────────────────────────────
 
 Deno.test('fill_after_inline: positive - long line with inline close tag', () => {
+	// 70 chars of content puts prettier's packed line at 128 and OURS at 98 — the shape the
+	// divergence actually takes. A content run wide enough to leave ours over the limit too
+	// would be a formatter defect, and the ours-side width guard rejects it (below).
+	const longContent = 'x'.repeat(70);
+	const prettier = `\t<p>Some text <span>${longContent}</span> more text after the inline</p>`;
+	const ours = `\t<p>Some text <span>${longContent}</span>\n\tmore text after the inline</p>`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(visual_width(ours.split('\n')[0]) <= 100, true);
+	const match = run_pattern('fill_after_inline', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('fill_after_inline: negative - ours re-wrapped but its own line still overruns', () => {
+	// Same shape at 90 chars of content: ours breaks the trailing text off and STILL emits a
+	// 118-column line with a fill seam in it (` <span>`). Re-wrapping is not the claim — the
+	// claim is that ours spent the breaks it had, and this one did not.
 	const longContent = 'x'.repeat(90);
 	const prettier = `\t<p>Some text <span>${longContent}</span> more text after the inline</p>`;
 	const ours = `\t<p>Some text <span>${longContent}</span>\n\tmore text after the inline</p>`;
 	const ctx = make_context(ours, prettier, 'svelte');
-	const match = run_pattern('fill_after_inline', ctx);
-	assertNotEquals(match, null);
+	assertEquals(visual_width(ours.split('\n')[0]) > 100, true);
+	assertEquals(run_pattern('fill_after_inline', ctx), null);
 });
 
 Deno.test('fill_after_inline: negative - inline close tag under 100 chars', () => {
@@ -1129,6 +1159,43 @@ Deno.test('css_value_wrap: negative - short CSS property value', () => {
 	const ctx = make_context(ours, prettier, 'css');
 	const match = run_pattern('css_value_wrap', ctx);
 	assertEquals(match, null);
+});
+
+Deno.test('css_value_wrap: positive - the over-width ours line is one component value', () => {
+	// The forced-overrun licence in CSS. `prettier/tests/format/css/parens/parens.css` is this
+	// shape: the IE `filter` value is a SINGLE function, so its only whitespace sits inside the
+	// parens where no formatter breaks, and the declaration stands at 112 columns. Ours broke
+	// the sibling declaration it could break; the strict "every ours line <= 100" reading filed
+	// the whole file unexplained.
+	const atom = `progid:DXImageTransform.Microsoft.gradient(${'startColorstr=#fffffff, '.repeat(4)}x=1)`;
+	const prettier = `.bar {\n\tfilter: ${atom} ${atom};\n}`;
+	const ours = `.bar {\n\tfilter: ${atom}\n\t\t${atom};\n}`;
+	const ctx = make_context(ours, prettier, 'css');
+	assert_ours_overruns(ctx);
+	assertNotEquals(run_pattern('css_value_wrap', ctx), null);
+});
+
+Deno.test('css_value_wrap: negative - the over-width ours line still has a top-level seam', () => {
+	// The over-match rejection for the licence above: same widths, but each ours line carries a
+	// depth-0 space between two component values — a seam the space-separated list wrap would
+	// have taken. Only a value with NO top-level separator is an atom.
+	const half = `url(${'a'.repeat(88)}) center`;
+	const prettier = `.bar {\n\tbackground: ${half} ${half};\n}`;
+	const ours = `.bar {\n\tbackground: ${half}\n\t\t${half};\n}`;
+	const ctx = make_context(ours, prettier, 'css');
+	assert_ours_overruns(ctx);
+	assertEquals(run_pattern('css_value_wrap', ctx), null);
+});
+
+Deno.test('css_value_wrap: negative - a top-level COMMA is a seam too', () => {
+	// The comma half of the same rule — the comma-separated list wrap. A depth-0 comma with no
+	// space after it (which prettier's own `parens.css` spells) must still read as a seam.
+	const half = `${'a'.repeat(52)},${'b'.repeat(52)}`;
+	const prettier = `.bar {\n\tgrid-template-areas: ${half} ${half};\n}`;
+	const ours = `.bar {\n\tgrid-template-areas: ${half}\n\t\t${half};\n}`;
+	const ctx = make_context(ours, prettier, 'css');
+	assert_ours_overruns(ctx);
+	assertEquals(run_pattern('css_value_wrap', ctx), null);
 });
 
 // ─── member_expression_call ─────────────────────────────────────────────────
@@ -2234,7 +2301,7 @@ Deno.test('block_comment_computed_member: positive - regular block comment (not 
 // ─── fill_after_inline (additional) ───────────────────────────────────────
 
 Deno.test('fill_after_inline: positive - <mark> element (expanded inline list)', () => {
-	const longContent = 'x'.repeat(90);
+	const longContent = 'x'.repeat(70);
 	const prettier = `\t<p>Text <mark>${longContent}</mark> trailing text after inline element</p>`;
 	const ours = `\t<p>Text <mark>${longContent}</mark>\n\ttrailing text after inline element</p>`;
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2451,6 +2518,25 @@ Deno.test('short_expr_100: negative - bug in 101-110 band without legitimate bre
 	assertEquals(match, null);
 });
 
+Deno.test(
+	'short_expr_100: negative - ours broke the block and still left an over-width line',
+	() => {
+		// The other half of the guard, and the one this detector hand-rolled its way around: ours
+		// DOES break the condition out (more added lines than removed) and still emits a
+		// 131-column line with spaces in it. Re-breaking is not the claim.
+		const expr = 'a'.repeat(65);
+		const prettier = `{#if typeof ${expr} === 'string'}content{/if}`;
+		const wide = `\ttypeof ${expr} === 'string' && ${'b'.repeat(40)}`;
+		const ours = `{#if\n${wide}\n}content{/if}`;
+		const ctx = make_context(ours, prettier, 'svelte');
+		const vw = visual_width(prettier);
+		assertEquals(vw > 100 && vw <= 110, true, `Expected width 101-110, got ${vw}`);
+		assert_ours_overruns(ctx);
+		assertEquals(ctx.hunks[0].added_lines.length > ctx.hunks[0].removed_lines.length, true);
+		assertEquals(run_pattern('short_expr_100', ctx), null);
+	}
+);
+
 Deno.test('fill_after_inline: negative - long inline-close line, ours did not re-wrap', () => {
 	// Prettier's line has a long inline close tag (> 100), but ours emitted the
 	// same long line (no legitimate fill break — a different edit on it). Without
@@ -2463,9 +2549,109 @@ Deno.test('fill_after_inline: negative - long inline-close line, ours did not re
 	assertEquals(match, null);
 });
 
+/**
+ * A 104-column run of four-letter words — over the limit with a fill seam every fifth
+ * column, so `overrun_is_forced` can never excuse it. The width tests that mean "tsv
+ * declined a break it had" use this rather than a bare `'y'.repeat(105)`, which is a
+ * single word and therefore a genuinely unbreakable atom.
+ */
+const breakable_over_width = Array.from({ length: 21 }, () => 'yyyy').join(' ');
+
+Deno.test('fill_101_boundary: negative - we break more but still leave an over-width line', () => {
+	// prettier [6, 100, 5] vs ours [6, 104, 12, 5]: tsv breaks the 100-column line into
+	// MORE lines than prettier had and still emits one at 104 that had breaks to spend. The
+	// old case-1 arm ("added_lines.length > removed_lines.length") graded nobody's width, so
+	// this filed a real over-width bug as the sanctioned print-width divergence — exactly the
+	// laundering `width:audit` cannot see off the fixture tree. The ours-side width check
+	// rejects it.
+	const prettier = `before\n${'x'.repeat(100)}\nafter`;
+	const ours = `before\n${breakable_over_width}\n${'z'.repeat(12)}\nafter`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	// Confirm the shape: one hunk, ours added MORE lines than it removed, one of them wide.
+	assertEquals(ctx.hunks.length, 1);
+	assertEquals(ctx.hunks[0].added_lines.length > ctx.hunks[0].removed_lines.length, true);
+	assertEquals(
+		ctx.hunks[0].added_lines.some((l) => visual_width(l) > 100),
+		true
+	);
+	assertEquals(run_pattern('fill_101_boundary', ctx), null);
+});
+
+Deno.test('fill_101_boundary: positive - the over-width ours line is an unbreakable atom', () => {
+	// The forced-overrun licence: ours moved the glued comment+word unit to its own line
+	// (spending the only break the run had) and it still lands at 101, because the comment
+	// alone is wider than print width. `svelte/elements/…/fill_after_comment_glued_midline`
+	// case 3 is this shape; the strict "every ours line <= 100" reading filed it unexplained.
+	const unit = `<!--${'pad '.repeat(23)}pad-->text1`;
+	const prettier = `<p>\n\tfoo ${unit}\n\ttext2\n</p>`;
+	const ours = `<p>\n\tfoo\n\t${unit}\n\ttext2\n</p>`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	// Confirm the shape: ours really does still exceed the limit on the moved unit.
+	assert_ours_overruns(ctx);
+	assertNotEquals(run_pattern('fill_101_boundary', ctx), null);
+});
+
+Deno.test('fill_101_boundary: negative - a {tag} outside the comment is a seam', () => {
+	// The over-match rejection for the licence above. Same shape, but the moved unit carries
+	// a `{tag}` outside the comment, which breaks internally — a seam tsv declined. Only the
+	// comment's own interior is un-re-wrappable, never the markup around it.
+	const unit = `<!--${'pad '.repeat(21)}pad-->{some.long.member.chain}`;
+	const prettier = `<p>\n\tfoo ${unit}\n\ttext2\n</p>`;
+	const ours = `<p>\n\tfoo\n\t${unit}\n\ttext2\n</p>`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	assert_ours_overruns(ctx);
+	assertEquals(run_pattern('fill_101_boundary', ctx), null);
+});
+
+Deno.test('fill_101_boundary: negative - the atom licence does not reach into a <script>', () => {
+	// REGION SCOPING, held against its own control. A seam-free line is an atom in Svelte TEXT
+	// and means nothing two lines away: a member chain breaks with no whitespace in it at all.
+	// The SAME 111-column, whitespace-free line is claimed in the template (the control) and
+	// must not be inside a `<script>`, so the region is the only thing separating them.
+	const chain = `${'a.bbbbbbbbb'.repeat(9)}.cccccccc;`;
+	assertEquals(visual_width(`\t${chain}`) > 100, true);
+
+	const in_text = make_context(
+		`<p>\n\tfoo\n\t${chain}\n</p>`,
+		`<p>\n\tfoo ${chain}\n</p>`,
+		'svelte'
+	);
+	assertNotEquals(run_pattern('fill_101_boundary', in_text), null);
+
+	const in_script = make_context(
+		`<script>\n\t${chain}\n</script>`,
+		`<script>\n\tx;\n\t${'y'.repeat(99)};\n</script>`,
+		'svelte'
+	);
+	assert_ours_overruns(in_script);
+	assertEquals(run_pattern('fill_101_boundary', in_script), null);
+});
+
+Deno.test(
+	'fill_101_boundary: negative - a truncated <script> region does not open the licence',
+	() => {
+		// The region scanner is non-greedy, so a `</script>` written inside a STRING closes the
+		// region early and strands the rest of the script OUTSIDE it — which would hand the tail's
+		// JS the Svelte-text atom licence. Proven reachable before the reliability check went in:
+		// this same member chain was claimed. The markers no longer pair up, so the whole file
+		// falls back to the strict reading.
+		const chain = `${'a.bbbbbbbbb'.repeat(9)}.cccccccc;`;
+		const lead = `\tconst s = '</script>';`;
+		const ctx = make_context(
+			`<script>\n${lead}\n\t${chain}\n</script>`,
+			`<script>\n${lead}\n\tx;\n\t${'y'.repeat(99)};\n</script>`,
+			'svelte'
+		);
+		// Confirm the shape: the region really is truncated, so the chain looks like template.
+		assertEquals(ctx.ours_code_regions_reliable, false);
+		assert_ours_overruns(ctx);
+		assertEquals(run_pattern('fill_101_boundary', ctx), null);
+	}
+);
+
 Deno.test('fill_101_boundary: negative - removal-only hunk (empty added_lines)', () => {
 	// A prettier line >= 100 chars that we simply DELETED (no added lines). The
-	// Case-2 `added_lines.every(...)` guard is vacuously true for empty arrays —
+	// `added_lines.every(...)` width guard is vacuously true for empty arrays —
 	// requiring added_lines.length > 0 keeps a deleted long line from being
 	// claimed as a print-width rewrap.
 	const longLine = '\t' + 'x'.repeat(103); // visual width 105
