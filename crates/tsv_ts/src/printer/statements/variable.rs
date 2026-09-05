@@ -17,7 +17,7 @@ use smallvec::smallvec;
 use std::cell::LazyCell;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
-use tsv_lang::{INDENT, PRINT_WIDTH, Span};
+use tsv_lang::{PRINT_WIDTH, Span};
 
 /// Build the fluid assignment layout: break after `=` only when the full line
 /// exceeds print_width. Uses indentIfBreak so the RHS is evaluated independently.
@@ -69,13 +69,6 @@ pub(in crate::printer) struct DeclaratorInitInputs<'e, 'a> {
     pub id_doc: DocId,
     /// The `=` and what the gaps on either side of it hold.
     pub gap: DeclaratorEqGap,
-    /// Whether the declaration hardline-separates its declarators (a multi-declarator
-    /// statement with initializers). Always `false` under a for header, which separates
-    /// on width.
-    pub should_break: bool,
-    /// Whether this is the declaration's FIRST declarator — the break-lhs arms apply to it
-    /// alone unless the list is already broken.
-    pub is_first: bool,
 }
 
 impl<'a> Printer<'a> {
@@ -122,8 +115,6 @@ impl<'a> Printer<'a> {
                     has_comments_before_eq,
                     has_comments_after_eq,
                 },
-            should_break,
-            is_first,
         } = inputs;
         // `can_break(id_doc)` — prettier's `canBreak(leftDoc)`, which decides the fluid arm.
         // Asked at most once and only where an arm reads it (each read below keeps it LAST
@@ -387,7 +378,6 @@ impl<'a> Printer<'a> {
         // Excludes is_expandable_member_call: when the call head fits, the call's own
         // arg-expansion handles line breaking via default layout.
         let needs_fluid_for_breakable_lhs = is_layout_eligible
-            && !should_break
             && !is_break_after_op_rhs
             && !is_expandable_member_call
             && !init_pinned_to_eq
@@ -403,20 +393,17 @@ impl<'a> Printer<'a> {
 
         let is_simple_rhs_with_breakable_lhs = is_simple_self_expanding(init) && *can_break_left;
 
-        // `should_break` (a multi-declarator with initializers) withholds the
-        // width-decided break at `=` because the declarators are hardline-separated
-        // already — but an owned comment that HANGS is not width-decided. Its break
-        // is inside the value's doc whatever this layout picks, so withholding the
-        // hang only strands what follows the comment at the declarator list's own
-        // indent: for a cast, a form the next pass reads as mid-line and collapses,
-        // leaving that authoring no fixed point at all. The gap-emitted spelling of
-        // the same comment already hangs here (`build_eq_comment_break_rhs`, the
-        // first branch below, which `should_break` does not gate), so this is the
-        // owned half catching up to it
-        // (`multiple/value_own_line_comment_hang_prettier_divergence`).
-        let needs_break_after_operator = (!should_break
-            || owned_comment_effect == Some(OwnedCommentEffect::Hangs))
-            && (is_break_after_op_rhs || is_simple_rhs_with_breakable_lhs)
+        // Answered per declarator, exactly as prettier's `printAssignment` is: a
+        // multi-declarator list does NOT withhold the width-decided break at `=` from its
+        // declarators. It used to, because the list carried its continuation indent as
+        // literal text and a hang inside a declarator therefore landed at the statement's
+        // column — the list is a doc-tree `indent` now
+        // (`build_variable_declaration_doc`), so the hang sits one level past the
+        // declarator, where prettier puts it (`multiple/init_long`). The owned-comment
+        // hang (`OwnedCommentEffect::Hangs`) is part of `is_break_after_op_rhs` and rides
+        // the same arm.
+        let needs_break_after_operator = (is_break_after_op_rhs
+            || is_simple_rhs_with_breakable_lhs)
             && !d.will_break(id_doc)
             && !has_complex_type_annotation
             && !has_complex_destructuring
@@ -473,13 +460,11 @@ impl<'a> Printer<'a> {
                 lhs_doc_with_comments(id_doc),
                 init_doc,
             ));
-        } else if (has_complex_type_annotation
+        } else if has_complex_type_annotation
             || has_complex_destructuring
-            || is_arrow_with_breakable_left)
-            && (should_break || is_first)
+            || is_arrow_with_breakable_left
         {
             // Break-lhs layout: LHS breaks internally, `=` stays on same line with RHS
-            // Only applies to first declarator or multi-declarator with breaks
             //
             // For complex type annotations, rebuild with wrapping type.
             // Complex destructuring and arrow with breakable left already have correct id_doc.
@@ -607,6 +592,9 @@ impl<'a> Printer<'a> {
         // itself; `VariableDeclarator` is `VariableDeclarator` to prettier either way, so
         // unlike the `[~In]` asymmetry above, the two DO have to agree here.
         self.mark_member_call_tail_operand(init);
+        // And an assignment's value (`mark_assignment_value`) — the for-header declarator
+        // marks this one itself too, for the same reason.
+        self.mark_assignment_value(init);
         let position_parens =
             needs_parens(init, ParenContext::VariableInit, self.in_for_init.get());
         let inner = match frozen {
@@ -719,16 +707,22 @@ impl<'a> Printer<'a> {
         let has_any_init = decl.declarations.iter().any(|d| d.init.is_some());
         let should_break = is_multi_declarator && has_any_init;
 
-        // The continuation indent the broken declarators carry. Normally explicit `INDENT`
-        // text, because these declarators aren't wrapped in a `d.indent()` — but when the
-        // keyword→first-declarator gap breaks, `build_keyword_to_name_continuation` wraps the
-        // whole continuation in one, and emitting both puts every declarator after the first
-        // two levels deep.
-        let continuation_indent = if self.keyword_gap_breaks(keyword_end, first_decl_start) {
-            d.empty()
-        } else {
-            d.text(INDENT)
-        };
+        // Prettier's `printVariableDeclaration` shape: `[kind, " ", indent(first),
+        // indent([",", <break>, rest…])]`. BOTH wrappers are doc-tree `indent`s, so a
+        // declarator that breaks INSIDE — a hung binary, a call's arguments, a ternary's
+        // branches — keeps its continuation one level past the declarator's own line, and
+        // the first declarator's content sits at the same depth as the others'. A literal
+        // indent TEXT after each hardline put every declarator on the right column and
+        // every break inside one at the STATEMENT's column, below the declarator it
+        // belonged to; only objects and arrays escaped, through a per-printer compensation
+        // that has since been retired with it.
+        //
+        // The one exception: a keyword→first-declarator gap that breaks already wraps the
+        // whole continuation in the one indent the list wants
+        // (`build_keyword_to_name_continuation`), so neither wrapper is added there —
+        // stacked on it, the declarators after the first would sit two levels deep.
+        let list_indents =
+            is_multi_declarator && !self.keyword_gap_breaks(keyword_end, first_decl_start);
 
         // The Rule A gap anchors, in the shared closure form `list_item_frozen` takes. The
         // first declarator's gap opens past the keyword, so a directive written between
@@ -738,15 +732,10 @@ impl<'a> Printer<'a> {
         // second pass.
         let item_span = |j: usize| decl.declarations[j].span;
 
-        // When breaking to multiple lines, multiline objects/arrays get extra indentation
-        // Use save/restore pattern for nested multi-declarator safety
-        let old_indent_depth = self.declaration_indent_depth.get();
-        if should_break {
-            self.declaration_indent_depth.set(old_indent_depth + 1);
-        }
-
-        // Build continuation declarators for the non-break case (no initializers)
-        // These get wrapped in indent() so when the group breaks, they get continuation indent
+        // Every declarator after the first, each behind its own separator — a hardline
+        // when the list has an initializer, a soft `line` when it has none — wrapped in
+        // the list's `indent()` after the loop. `parts` holds the first declarator alone
+        // until then.
         let mut rest_parts = DocBuf::new();
 
         // Set top-level assignment flag for chain detection
@@ -775,35 +764,44 @@ impl<'a> Printer<'a> {
                 // declarator. (Only consulted when `has_gap_comment`.)
                 let comma_pos = self.comma_between(prev_end, curr_start);
 
-                if should_break {
-                    if has_line_comment {
-                        // Line comment(s) between declarators: the comma must go before
-                        // the first line comment, block comments go before the comma.
-                        // e.g. `a = 1 /* c1 */,\n// c2\nb = 2` or `a = 1, // c1\n// c2\nb = 2`.
-                        // The gap owns its own break, so it carries the continuation indent.
-                        self.push_inter_item_line_comment_gap(
-                            &mut parts,
-                            prev_end,
-                            comma_pos,
-                            curr_start,
-                            Some(continuation_indent),
-                        );
-                    } else {
-                        // Block comment(s) before the comma trail the previous init
-                        // (`a = 1 /* c */,`); after-comma comments lead the next
-                        // declarator (below the break). Prettier preserves the side.
-                        if has_gap_comment {
-                            self.push_before_comma_blocks(&mut parts, prev_end, comma_pos);
-                        }
-                        parts.push(d.text(","));
+                // The whole gap lands in `rest_parts`, wrapped in the list's `indent()`
+                // below — so every break here takes its continuation indent from the doc
+                // tree and carries none of its own. The comma goes there too: nothing
+                // breaks before it, so the enclosing indent is inert on it.
+                if has_line_comment {
+                    // Line comment(s) between declarators: the comma must go before the
+                    // first line comment, block comments go before the comma — a `//`
+                    // runs to EOL, so a comma after it would be commented out and a soft
+                    // `line` would let it absorb the next declarator.
+                    // e.g. `a = 1 /* c1 */,\n// c2\nb = 2` or `a = 1, // c1\n// c2\nb = 2`.
+                    self.push_inter_item_line_comment_gap(
+                        &mut rest_parts,
+                        prev_end,
+                        comma_pos,
+                        curr_start,
+                    );
+                } else {
+                    // Block comment(s) before the comma trail the previous declarator
+                    // (`a = 1 /* c */,`); after-comma comments lead the next one.
+                    // Prettier preserves the side.
+                    if has_gap_comment {
+                        self.push_before_comma_blocks(&mut rest_parts, prev_end, comma_pos);
+                    }
+                    rest_parts.push(d.text(","));
+                    if should_break {
                         // A stranded after-comma block (on the comma's line, but a
                         // newline before the next declarator) trails the comma —
                         // preserving the author's placement (prettier relocates it
-                        // before the comma). Emitted before the break below.
-                        self.push_stranded_after_comma_blocks(&mut parts, comma_pos, curr_start);
-                        // Break to new line with indentation for next declarator
-                        parts.push(d.hardline());
-                        parts.push(continuation_indent);
+                        // before the comma). Emitted before the break below. Only the
+                        // hardline-separated list takes this rule: a width-separated one
+                        // collapses when it fits, where the block hugs the next declarator
+                        // and both formatters agree.
+                        self.push_stranded_after_comma_blocks(
+                            &mut rest_parts,
+                            comma_pos,
+                            curr_start,
+                        );
+                        rest_parts.push(d.hardline());
                         if has_gap_comment {
                             // After-comma block comment(s) lead the next declarator. A
                             // stranded block already trailed the comma above.
@@ -814,38 +812,14 @@ impl<'a> Printer<'a> {
                                 })
                                 .collect();
                             self.push_leading_comment_run(
-                                &mut parts,
+                                &mut rest_parts,
                                 comments.iter().copied(),
                                 curr_start,
                                 LeadingGlue::Adjacent,
-                                Some(continuation_indent),
                             );
                         }
-                    }
-                } else {
-                    // Non-break case (no initializers): every continuation declarator
-                    // lives in `rest_parts`, which is wrapped in `d.indent()` below — so
-                    // the continuation indent comes from the doc tree and each break here
-                    // carries an empty one. The comma goes there too: nothing breaks
-                    // before it, so the enclosing indent is inert on it.
-                    if has_line_comment {
-                        // A line comment runs to EOL, so the comma must precede it and the
-                        // next declarator must drop below — the soft `line` used for the
-                        // comment-free case would let the comment absorb both.
-                        self.push_inter_item_line_comment_gap(
-                            &mut rest_parts,
-                            prev_end,
-                            comma_pos,
-                            curr_start,
-                            None,
-                        );
                     } else {
-                        // Block comments keep their side of the comma (preserve position).
-                        if has_gap_comment {
-                            self.push_before_comma_blocks(&mut rest_parts, prev_end, comma_pos);
-                        }
-                        rest_parts.push(d.text(","));
-                        // Soft break for declarations without initializers
+                        // Soft break for declarations without initializers.
                         rest_parts.push(d.line());
                         if has_gap_comment {
                             self.push_leading_comment_run(
@@ -853,38 +827,27 @@ impl<'a> Printer<'a> {
                                 self.comments_to_emit_between(comma_pos, curr_start),
                                 curr_start,
                                 LeadingGlue::Adjacent,
-                                None,
                             );
                         }
                     }
                 }
             }
 
-            // A continuation declarator with no initializer is the one case that lives in
-            // `rest_parts` (wrapped in `d.indent()` after the loop); everything else feeds
-            // `parts`. Named once, then reused by the freeze arm and the plain-`id_doc` arms.
-            let goes_in_parts = should_break || i == 0;
+            // The first declarator is `parts`; every later one is `rest_parts`, behind the
+            // separator emitted above. Named once, then reused by the freeze arm and the
+            // value arms.
+            let target: &mut DocBuf = if i == 0 { &mut parts } else { &mut rest_parts };
 
             // Rule A: an own-line directive in an inter-declarator gap freezes the FOLLOWING
             // declarator over its own node span — the annotation, `=`, and initializer all
             // ride inside it; the separating `,` is parent-owned and was emitted above.
             if self.list_item_frozen(keyword_end, &item_span, i) {
-                let frozen_doc = self.build_frozen_node_doc(declarator.span);
-                if goes_in_parts {
-                    parts.push(frozen_doc);
-                } else {
-                    rest_parts.push(frozen_doc);
-                }
+                target.push(self.build_frozen_node_doc(declarator.span));
                 continue;
             }
 
             // Build id doc once for reuse and analysis
             let id_doc = self.build_variable_binding_doc(declarator.id, declarator.definite);
-
-            if !should_break && i > 0 {
-                // Non-break continuation declarators go to rest_parts (never have inits)
-                rest_parts.push(id_doc);
-            }
 
             // Initializer with comment handling around =
             if let Some(init) = &declarator.init {
@@ -962,12 +925,12 @@ impl<'a> Printer<'a> {
                         },
                     )
                 {
-                    parts.push(id_doc);
-                    parts.push(cont);
+                    target.push(id_doc);
+                    target.push(cont);
                     continue;
                 }
 
-                parts.push(self.build_declarator_init_doc(
+                target.push(self.build_declarator_init_doc(
                     &DeclaratorInitInputs {
                         declarator,
                         init,
@@ -980,20 +943,41 @@ impl<'a> Printer<'a> {
                             has_comments_before_eq,
                             has_comments_after_eq,
                         },
-                        should_break,
-                        is_first: i == 0,
                     },
                     &|| self.build_init_value_doc(init, declarator.span.end, init_frozen),
                 ));
-            } else if should_break || i == 0 {
+            } else {
                 // No initializer: push id_doc directly
-                parts.push(id_doc);
+                target.push(id_doc);
             }
         }
 
-        // For non-break multi-declarator, add rest_parts wrapped in indent
-        if !should_break && !rest_parts.is_empty() {
-            parts.push(d.indent(d.concat(&rest_parts)));
+        // The list's two indents — prettier's `indent(first)` and `indent(rest)` — or
+        // neither under a broken keyword gap (see `list_indents`). A single declarator takes
+        // no wrapper.
+        //
+        // TODO: prettier's own gate on the first is `printed.length === 1 &&
+        // !hasComment(declarations[0])` — so it also indents a LONE declarator that carries a
+        // comment of its own, i.e. one written past the keyword: `const /* c */ x = <a value
+        // that breaks>` hangs its value two levels there and one here. Only that attachment
+        // counts, which is why the rest of the family already agrees: a comment between the
+        // name and `=`, or trailing the value, belongs to a child node, not to the
+        // declarator. Fixtures-first — the gate has to ask what the declarator OWNS, not what
+        // the surrounding gaps hold.
+        let first_doc = d.concat(&parts);
+        parts.clear();
+        parts.push(if list_indents {
+            d.indent(first_doc)
+        } else {
+            first_doc
+        });
+        if !rest_parts.is_empty() {
+            let rest_doc = d.concat(&rest_parts);
+            parts.push(if list_indents {
+                d.indent(rest_doc)
+            } else {
+                rest_doc
+            });
         }
 
         // Comments between the last declarator and the `;`, with the `;` bound to the
@@ -1015,8 +999,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Restore context flags — the PREVIOUS values, not constants (see the set above).
-        self.declaration_indent_depth.set(old_indent_depth);
+        // Restore the context flag — the PREVIOUS value, not a constant (see the set above).
         self.in_top_level_assignment.set(prev_top_level_assignment);
 
         let continuation = if should_break {

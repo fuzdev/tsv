@@ -536,6 +536,12 @@ impl<'a> Printer<'a> {
         binary: &internal::BinaryExpression<'_>,
         style: BinaryChainStyle,
     ) -> DocId {
+        // Whether THIS chain is the value an assignment position is building — asked
+        // BEFORE the operands are built: an operand's own assignment positions (an object
+        // literal's property values) re-mark the target as they build, so a read after
+        // the collection below would answer for the last property instead of the chain.
+        let at_assignment_value = self.assignment_value_target.get() == Some(binary.span);
+
         // Collect all operands (with spans) and operators in the chain
         let mut operands: OperandBuf = OperandBuf::new();
         let mut operators: OperatorBuf = OperatorBuf::new();
@@ -545,6 +551,46 @@ impl<'a> Printer<'a> {
             // Single operand, shouldn't happen but handle gracefully
             return self.build_expression_doc(binary.left);
         }
+
+        // shouldInlineLogicalExpression: when the outermost logical has a non-empty
+        // object/array on the right, keep operator and RHS on the same line.
+        // Prettier ref: binaryish.js:275, 361
+        let should_inline_last = super::assignment::should_inline_logical_expression(binary);
+
+        // At an ASSIGNMENT position (`assignment_value_target`) an inlining chain is flat:
+        // the assignment withholds its break-after-operator for it, and prettier's
+        // binaryish printer answers `shouldIndentIfInlining` with a bare `group(parts)` —
+        // UNLESS the chain has earlier operators whose lines need a home, prettier's
+        // `samePrecedenceSubExpression` arm, `group([head, indent(rest)])`:
+        // ```text
+        // const a = b ??
+        //     c ?? [1];
+        // ```
+        // Prettier keys that arm on `node.left` being a same-precedence chain; tsv keys it
+        // on the FLATTENED operand count — the same question for a left-nested chain, which
+        // is every authoring of `a ?? b ?? [1]` but the paren-nested one
+        // (`logical/inline_chain_long`). A two-operand inlining chain has no line for either
+        // answer to act on.
+        //
+        // TODO: `a ?? (b ?? [1])` is a live divergence, and the tell is that the two halves
+        // of prettier's one rule are keyed here on two different structures. Prettier prints
+        // that authoring exactly as it prints the left-nested spelling, in a SINGLE pass —
+        // its inner node answers this arm on its own. tsv flattens the chain, so the count
+        // sees it, but `should_inline_logical_expression` still asks `binary.right` (the
+        // inner chain, not an array): `should_inline_last` reads false, `choose_layout`
+        // takes break-after-operator, and tsv's own second pass rewrites the result — a
+        // non-idempotent authoring. Asking that predicate about the flattened chain's LAST
+        // OPERAND closes both halves at once and is a no-op for every left-nested chain, but
+        // it moves the assignment layout too, so: fixtures-first, then a corpus A/B.
+        let style = if matches!(style, BinaryChainStyle::Grouped)
+            && should_inline_last
+            && operands.len() > 2
+            && at_assignment_value
+        {
+            BinaryChainStyle::ContinuationIndent
+        } else {
+            style
+        };
 
         // Compute shouldGroup from the original binary expression.
         // This matches Prettier's shouldGroup in printBinaryishExpressions:
@@ -569,11 +615,6 @@ impl<'a> Printer<'a> {
         } else {
             Self::should_group_binary_continuation(binary)
         };
-
-        // shouldInlineLogicalExpression: when the outermost logical has a non-empty
-        // object/array on the right, keep operator and RHS on the same line.
-        // Prettier ref: binaryish.js:275, 361
-        let should_inline_last = super::assignment::should_inline_logical_expression(binary);
 
         // For the continuation-indent styles, we separate first operand from the rest
         // For other styles, we build a flat parts list
@@ -866,13 +907,21 @@ impl<'a> Printer<'a> {
         // multi-line call expression) and forces the entire group to Break mode,
         // even when the continuation (e.g., `?? 'text'`) fits on the closing line.
         //
-        // When should_inline_last is true, skip indent entirely — matching prettier's
-        // early return of group(parts) with no indent wrapper (binaryish.js:131-134).
-        // The inlined last operand (object/array) handles its own indentation.
-        let continuation_doc = if should_inline_last {
-            d.concat(&continuation_parts)
-        } else {
+        // An inlining chain (`should_inline_last`: the last operand hugs its operator with
+        // a space in place of a line) is flat when that hug is ALL the continuation holds
+        // — prettier's `shouldInline && !samePrecedence` arm, a bare `group(parts)` — so
+        // the hugged object's body sits one level past the chain, not two
+        // (`svelte/expressions/logical_object_attr`). With earlier operators in the
+        // chain the continuation takes the indent, hug included: prettier's
+        // `samePrecedenceSubExpression` arm, `indent(rest)`, at every position this style
+        // serves — a nested operand, a cast operand, a return-ternary's test, the Svelte
+        // expression root. Keyed on the flattened operand count rather than on `left`
+        // for the reason `build_binary_chain_doc_core` gives.
+        let indent_continuation = !should_inline_last || operands.len() > 2;
+        let continuation_doc = if indent_continuation {
             d.indent(d.concat(&continuation_parts))
+        } else {
+            d.concat(&continuation_parts)
         };
         let continuation_doc = if should_group {
             d.group(continuation_doc)

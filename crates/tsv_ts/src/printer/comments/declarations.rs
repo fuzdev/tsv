@@ -1623,7 +1623,6 @@ impl<'a> Printer<'a> {
                         leading.iter().copied(),
                         heritage.span.start,
                         LeadingGlue::Adjacent,
-                        None,
                     );
                 }
 
@@ -1659,7 +1658,6 @@ impl<'a> Printer<'a> {
                             item_end,
                             comma_pos,
                             next.span.start,
-                            None,
                         );
                     } else {
                         // Before-comma block(s) trail this item; a **hugging** after-comma
@@ -1886,7 +1884,6 @@ impl<'a> Printer<'a> {
             self.comments_to_emit_between(search_start, star_pos),
             star_pos,
             LeadingGlue::Adjacent,
-            None,
         );
         parts.push(d.text("*"));
         // Comments between the `*` and the key trail it (bounded at `[` for a
@@ -1898,7 +1895,6 @@ impl<'a> Printer<'a> {
                 self.comments_to_emit_between(star + 1, name_bound),
                 name_bound,
                 LeadingGlue::Adjacent,
-                None,
             );
         }
     }

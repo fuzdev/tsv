@@ -360,7 +360,6 @@ impl<'a> Printer<'a> {
             leading_comments.iter().copied(),
             expr_start,
             crate::printer::comments::LeadingGlue::Adjacent,
-            None,
         );
 
         // Expression

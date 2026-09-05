@@ -320,7 +320,6 @@ impl<'a> Printer<'a> {
                 self.comments_to_emit_between(colon_end, body_start),
                 body_start,
                 LeadingGlue::AdjacentAnchorLine,
-                None,
             );
             tail_parts.push(d.group(d.concat(&run)));
             tail_parts.push(self.build_statement_doc(stmt.body, ctx.labeled_body()));

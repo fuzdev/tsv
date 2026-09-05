@@ -139,7 +139,6 @@ impl<'a> Printer<'a> {
                 .filter(|c| !skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, c))),
             end,
             LeadingGlue::Adjacent,
-            None,
         );
         parts
     }
@@ -186,13 +185,7 @@ impl<'a> Printer<'a> {
         element: DocId,
     ) -> DocId {
         let mut leading = DocBuf::new();
-        self.push_leading_comment_run(
-            &mut leading,
-            comments,
-            element_start,
-            LeadingGlue::Adjacent,
-            None,
-        );
+        self.push_leading_comment_run(&mut leading, comments, element_start, LeadingGlue::Adjacent);
         self.build_list_element_group(leading, element)
     }
 
@@ -815,7 +808,6 @@ impl<'a> Printer<'a> {
             comments.iter().copied(),
             target_start,
             LeadingGlue::Adjacent,
-            None,
         );
     }
 
@@ -849,7 +841,6 @@ impl<'a> Printer<'a> {
             leading.iter().copied(),
             last.span.start,
             LeadingGlue::Adjacent,
-            None,
         );
         parts.push(self.build_comment_doc(last));
         if self.has_blank_line_between(last.span.end, gap_end) {

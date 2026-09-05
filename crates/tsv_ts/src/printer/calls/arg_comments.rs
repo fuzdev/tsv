@@ -1322,7 +1322,6 @@ impl<'a> PartitionedComments<'a> {
             self.leading.iter().copied(),
             self.end,
             LeadingGlue::AdjacentStrippedParen,
-            None,
         );
     }
 }

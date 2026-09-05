@@ -900,7 +900,6 @@ impl<'a> Printer<'a> {
             run.iter().copied(),
             clause_start,
             LeadingGlue::Adjacent,
-            None,
         );
         self.push_glued_comment_run(parts, &hug);
     }
@@ -1382,7 +1381,6 @@ impl<'a> Printer<'a> {
             leading_run.iter().copied(),
             spans.left_start,
             LeadingGlue::Adjacent,
-            None,
         );
         self.push_glued_comment_run(&mut inner, &leading_glued);
 
@@ -1712,7 +1710,7 @@ impl<'a> Printer<'a> {
             // A line comment forces the break, which the gap owns. The whole declarator
             // run is wrapped in a `d.indent()` by the caller, so continuation lines need
             // no explicit indent text (empty).
-            self.push_inter_item_line_comment_gap(decl_docs, prev_end, comma_pos, curr_start, None);
+            self.push_inter_item_line_comment_gap(decl_docs, prev_end, comma_pos, curr_start);
         } else {
             // Blocks only: a before-comma block trails the previous initializer; the
             // width-based `line` separates; after-comma blocks lead the next
@@ -1734,7 +1732,6 @@ impl<'a> Printer<'a> {
                 after.iter().copied(),
                 curr_start,
                 LeadingGlue::Adjacent,
-                None,
             );
         }
     }
@@ -1850,8 +1847,10 @@ impl<'a> Printer<'a> {
                         // call-object clause keys on the `VariableDeclarator` parent and
                         // never asks where the declaration sits, so this marks exactly
                         // what the statement-level twin marks
-                        // (`build_init_value_doc` → [`Printer::mark_member_call_tail_operand`]).
+                        // (`build_init_value_doc` → [`Printer::mark_member_call_tail_operand`]),
+                        // the assignment-value mark included.
                         self.mark_member_call_tail_operand(init);
+                        self.mark_assignment_value(init);
                         let build_value = || {
                             let inner = self.build_for_init_value_doc(
                                 init,
@@ -1921,10 +1920,6 @@ impl<'a> Printer<'a> {
                                         has_comments_before_eq: before_eq,
                                         has_comments_after_eq: after_eq,
                                     },
-                                    // A header separates its declarators on WIDTH, never with
-                                    // hardlines — prettier's `hasValue && !isParentForLoop`.
-                                    should_break: false,
-                                    is_first: i == 0,
                                 },
                                 &build_value,
                             )

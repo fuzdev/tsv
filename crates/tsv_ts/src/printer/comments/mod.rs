@@ -876,10 +876,9 @@ impl<'a> Printer<'a> {
     /// the comma's line and the leading run is a bare `hardline` — prettier drops an
     /// author blank line there (it belongs to the item join, not to the run).
     ///
-    /// `continuation` is emitted after each own-line break: the variable-declaration
-    /// site passes `INDENT` text (its declarators aren't wrapped in `d.indent()`), the
-    /// for-init and heritage sites pass an empty doc (their runs are). Shared by the
-    /// variable-declarator, for-init, and heritage inter-item sites.
+    /// Every break here takes its continuation indent from the doc tree — each caller's
+    /// run sits inside the list's own `indent()`. Shared by the variable-declarator,
+    /// for-init, and heritage inter-item sites.
     ///
     /// Callers gate on the gap holding a line comment (`has_line_comments_between`) —
     /// a block-only gap has no forced break and belongs to their own path.
@@ -889,7 +888,6 @@ impl<'a> Printer<'a> {
         prev_end: u32,
         comma_pos: u32,
         next_start: u32,
-        continuation: Option<DocId>,
     ) {
         let d = self.d();
         let comments: CommentVec<'_> = self
@@ -926,15 +924,11 @@ impl<'a> Printer<'a> {
             first_line_idx
         };
         parts.push(d.hardline());
-        if let Some(continuation) = continuation {
-            parts.push(continuation);
-        }
         self.push_leading_comment_run(
             parts,
             comments[run_start..].iter().copied(),
             next_start,
             LeadingGlue::Adjacent,
-            continuation,
         );
     }
 
@@ -1945,7 +1939,6 @@ impl<'a> Printer<'a> {
         comments: impl Iterator<Item = &'c Comment>,
         terminal_pos: u32,
         glue: LeadingGlue,
-        continuation: Option<DocId>,
     ) -> bool {
         let d = self.d();
         let mut forces_break = false;
@@ -2024,17 +2017,11 @@ impl<'a> Printer<'a> {
                 // preserves, and does not in a value gap, where the blank sits inside a
                 // break already judged unforced.
                 parts.push(d.line());
-                if let Some(continuation) = continuation {
-                    parts.push(continuation);
-                }
             } else {
                 // Line comment, or an own-line block: keep them on separate lines
                 // (preserve the author's layout; a line comment must break so it
                 // can't absorb the value).
                 self.push_blank_preserving_hardline(parts, comment.span.end, next);
-                if let Some(continuation) = continuation {
-                    parts.push(continuation);
-                }
                 forces_break = true;
             }
         }
@@ -2091,7 +2078,6 @@ impl<'a> Printer<'a> {
             interior.iter().copied(),
             last.span.start,
             LeadingGlue::Adjacent,
-            None,
         );
         parts.push(self.build_comment_doc(last));
         Some(last)
@@ -2385,7 +2371,6 @@ impl<'a> Printer<'a> {
                 .filter(|c| !skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, c))),
             end,
             glue,
-            None,
         );
         (!parts.is_empty()).then(|| (self.d().concat(&parts), forces_break))
     }

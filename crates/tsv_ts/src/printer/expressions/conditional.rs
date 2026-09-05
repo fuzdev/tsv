@@ -131,6 +131,34 @@ fn spine_ternary(expr: &internal::Expression<'_>) -> Option<(Span, bool)> {
     }
 }
 
+/// Where a conditional sits relative to an enclosing conditional — the axis prettier's
+/// `printTernaryOld` keys a nested ternary's TEST geometry on (`printTernaryTest` +
+/// `printBranch`). The `?`/`:` lines land one level past the parent's either way; only
+/// the test's continuation differs.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TernaryNesting {
+    /// Not a branch of another conditional: the ternary groups itself and indents its own
+    /// `?`/`:` lines.
+    Root,
+    /// A parent's consequent — `a ? (b ? c : d) : e`. Prettier's `printBranch` indents the
+    /// whole nested ternary under the `? `, so its test continues one level past the `?`.
+    Consequent,
+    /// A parent's alternate — the chain `a ? b : c ? d : e`. `printBranch` indents it the
+    /// same way and `printTernaryTest` adds an `align(2)` under the `: `, so the test
+    /// continues one level plus two columns past the `:`; a call's arguments inside it
+    /// flush that align to a whole tab (two levels), its `)` back at the two-column offset.
+    Alternate,
+}
+
+impl TernaryNesting {
+    /// Nested in another conditional's branch (prettier's `forceNoIndent` /
+    /// `parent === firstNonConditionalParent` axis): no group of its own, and the parent's
+    /// break decision cascades.
+    fn is_chained(self) -> bool {
+        self != Self::Root
+    }
+}
+
 /// What a chain base's left-spine ternary wants from the parens around it — see
 /// [`Printer::chain_base_ternary`].
 #[derive(Clone, Copy)]
@@ -310,6 +338,25 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Give a nested ternary's TEST the geometry its position takes ([`TernaryNesting`]).
+    /// The shared seam for both layouts, applied to the finished test doc — parens, the
+    /// for-init `in` shell and the stripped-paren comments included, since prettier's
+    /// `print("test")` carries all of those inside its `align`.
+    ///
+    /// tsv keeps a nested ternary's `?`/`:` lines under its OWN `indent` rather than under
+    /// the parent branch's (`build_conditional_doc_impl`), which lands them where prettier's
+    /// do — but leaves the test at the parent's level, one indent short of prettier's
+    /// `printBranch`. This is that indent, plus the alternate's `align(2)`
+    /// (`ternary/nested_test_long`).
+    fn place_nested_ternary_test(&self, nesting: TernaryNesting, test: DocId) -> DocId {
+        let d = self.d();
+        match nesting {
+            TernaryNesting::Root => test,
+            TernaryNesting::Consequent => d.indent(test),
+            TernaryNesting::Alternate => d.indent(d.align(2, test)),
+        }
+    }
+
     /// Build a Doc for a conditional expression — the default layout.
     ///
     /// The paired [`Self::build_conditional_doc_with_binary_test_indent`] is the same
@@ -318,7 +365,7 @@ impl<'a> Printer<'a> {
         &self,
         cond: &internal::ConditionalExpression<'_>,
     ) -> DocId {
-        self.build_conditional_doc_impl(cond, false, false)
+        self.build_conditional_doc_impl(cond, TernaryNesting::Root, false)
     }
 
     /// Build a Doc for a conditional expression in return/throw/call/new context.
@@ -331,25 +378,29 @@ impl<'a> Printer<'a> {
         &self,
         cond: &internal::ConditionalExpression<'_>,
     ) -> DocId {
-        self.build_conditional_doc_impl(cond, false, true)
+        self.build_conditional_doc_impl(cond, TernaryNesting::Root, true)
     }
 
     /// Implementation of conditional doc building
     ///
-    /// `is_chained` indicates this conditional is nested within a parent conditional
-    /// (either in consequent when broken, or in alternate). When chained, we don't
-    /// wrap in a new group, so the parent's break decision cascades to this one.
+    /// `nesting` says whether this conditional is a branch of a parent conditional, and
+    /// which ([`TernaryNesting`]). A nested one takes no group of its own, so the parent's
+    /// break decision cascades to it, and its test takes the position's geometry.
     ///
     /// `indent_binary_test` indicates the ternary is inside a return/throw/call/new
-    /// statement, so binary expressions in the test position should use continuation
-    /// indent (matching Prettier's shouldNotIndent = false for these grandparents).
+    /// statement, so binary expressions in the test AND branch positions use continuation
+    /// indent (matching Prettier's shouldNotIndent = false for these grandparents). It
+    /// applies to THIS ternary's own positions only: a nested ternary's binaries have the
+    /// outer ternary for a grandparent, never the return or the call, so the recursion
+    /// below always passes `false` (`ternary/nested_binary_branch_long`).
     fn build_conditional_doc_impl(
         &self,
         cond: &internal::ConditionalExpression<'_>,
-        is_chained: bool,
+        nesting: TernaryNesting,
         indent_binary_test: bool,
     ) -> DocId {
         let d = self.d();
+        let is_chained = nesting.is_chained();
         let test_end = cond.test.span().end;
         let consequent_start = cond.consequent.span().start;
         let consequent_end = cond.consequent.span().end;
@@ -389,7 +440,7 @@ impl<'a> Printer<'a> {
             || has_blank_separated_comment
             || has_multiline_template
         {
-            return self.build_conditional_doc_with_line_comments(cond, is_chained);
+            return self.build_conditional_doc_with_line_comments(cond, nesting);
         }
 
         // Prettier's shouldNotIndent (binaryish.js:109-113) exempts binaries whose
@@ -426,6 +477,7 @@ impl<'a> Printer<'a> {
         // parenthesized (the two starts coincide).
         let test =
             self.prepend_removed_paren_comments(cond.span.start, cond.test.span().start, test);
+        let test = self.place_nested_ternary_test(nesting, test);
         // Prettier's shouldNotIndent (binaryish.js:109-113) also applies to binaries
         // in consequent/alternate positions: when parent is ConditionalExpression and
         // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
@@ -498,9 +550,11 @@ impl<'a> Printer<'a> {
             let run = question_pos.and_then(|q| {
                 self.build_branch_comment_run(q + 1, consequent_start, d.indent(d.line()))
             });
-            // Broken version: continue chain without parens
+            // Broken version: continue chain without parens. The nested ternary's own
+            // binaries have THIS ternary for a grandparent, so `indent_binary_test` stops
+            // here.
             let broken_consequent =
-                self.build_conditional_doc_impl(nested, true, indent_binary_test);
+                self.build_conditional_doc_impl(nested, TernaryNesting::Consequent, false);
             let broken_consequent = self.prepend_opt(run, broken_consequent);
             if d.will_break(consequent) {
                 // Consequent forces breaking (e.g., line comments produce hardlines).
@@ -533,9 +587,11 @@ impl<'a> Printer<'a> {
             let run = colon_pos.and_then(|c| {
                 self.build_branch_comment_run(c + 1, alternate_start, d.indent(d.line()))
             });
-            // Recursively build as chained (no group wrapper, no parens)
-            // No indent wrapper - nested conditional has its own structure
-            let nested_doc = self.build_conditional_doc_impl(nested, true, indent_binary_test);
+            // Recursively build as chained (no group wrapper, no parens). No indent
+            // wrapper — the nested conditional indents its own `?`/`:` lines and places
+            // its test for this position. `indent_binary_test` stops here (see above).
+            let nested_doc =
+                self.build_conditional_doc_impl(nested, TernaryNesting::Alternate, false);
             self.prepend_opt(run, nested_doc)
         } else {
             let run = colon_pos
@@ -598,7 +654,7 @@ impl<'a> Printer<'a> {
     fn build_conditional_doc_with_line_comments(
         &self,
         cond: &internal::ConditionalExpression<'_>,
-        _is_chained: bool,
+        nesting: TernaryNesting,
     ) -> DocId {
         let d = self.d();
         let test_end = cond.test.span().end;
@@ -618,6 +674,7 @@ impl<'a> Printer<'a> {
         // `build_conditional_doc`; both layouts must emit them or the comment is lost.
         let test =
             self.prepend_removed_paren_comments(cond.span.start, cond.test.span().start, test);
+        let test = self.place_nested_ternary_test(nesting, test);
 
         // Find the ? and : positions for proper comment categorization
         let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
@@ -660,7 +717,8 @@ impl<'a> Printer<'a> {
             if let Some(frozen) = self.frozen_ternary_branch_doc(cond.consequent, question_pos) {
                 (frozen, false)
             } else if let internal::Expression::ConditionalExpression(nested) = cond.consequent {
-                let chained = self.build_conditional_doc_impl(nested, true, false);
+                let chained =
+                    self.build_conditional_doc_impl(nested, TernaryNesting::Consequent, false);
                 (d.group_break(chained), true)
             } else {
                 // Clarity parens (`(a ?? b)`, `(x as T)`) exactly as the inline layout
@@ -712,7 +770,7 @@ impl<'a> Printer<'a> {
                 d.indent(frozen)
             } else if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
                 // Recursively use breaking layout - no indent wrapper (has its own structure)
-                self.build_conditional_doc_with_line_comments(nested, true)
+                self.build_conditional_doc_with_line_comments(nested, TernaryNesting::Alternate)
             } else {
                 // Regular expressions get indent wrapper, plus the same clarity parens
                 // the inline layout applies (`(a ?? b)`, `(x as T)`).

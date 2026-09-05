@@ -1168,7 +1168,6 @@ impl<'a> Printer<'a> {
                     comments.iter().copied(),
                     member_start,
                     LeadingGlue::Adjacent,
-                    None,
                 );
 
                 // A preceding format-ignore directive keeps the member's source

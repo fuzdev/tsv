@@ -608,7 +608,6 @@ impl<'a> Printer<'a> {
                         }),
                     key_start,
                     LeadingGlue::Adjacent,
-                    None,
                 );
                 (!lead_parts.is_empty()).then(|| d.concat(&lead_parts))
             }

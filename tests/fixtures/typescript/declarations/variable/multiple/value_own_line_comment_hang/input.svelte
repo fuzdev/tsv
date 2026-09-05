@@ -1,6 +1,7 @@
 <script>
 	// An own-line comment in a multi-declarator's value gap hangs the value — the `=` ends
-	// its line — whether the gap emits the comment or the value OWNS it.
+	// its line — whether the gap emits the comment or the value OWNS it. The hung value
+	// sits one level past the declarator, two past the keyword.
 	const cast =
 			/** @type {A} */
 			(expr),
@@ -12,7 +13,7 @@
 			 */ 1,
 		b = 2;
 
-	// The gap-emitted spelling, unchanged: the anchor the two owned ones now match.
+	// The gap-emitted spelling.
 	const gap =
 			// c
 			1,

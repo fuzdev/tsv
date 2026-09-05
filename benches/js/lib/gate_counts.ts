@@ -329,7 +329,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// layercake 159 of 177, svelte-ux 161 of 198, svelte-maplibre 72 of 90), 438 are `known`
 	// (prettier-shaped code the ecosystem repos never carry), and 5 are `unknown` — see the
 	// unknown pin, which names them. `partial` is unmoved and SAFETY is 0 over every file.
-	svelte: 2701,
+	//
+	// 2701 → 2703: `flowbite-svelte/.../dialog/Dialog.svelte` and
+	// `.../bottom-navigation/BottomNavItem.svelte` arrive from `unknown` (5 → 3 there, which
+	// names the change and the measurement).
+	svelte: 2703,
 	// 2332 → 2334: two reproducible files, `prettier/tests/format/js/comments/11273.js` and
 	// `.../trailing-jsdocs.js`, whose divergence was a container-end trailing comment RUN the
 	// author glued onto one line and tsv split onto two. That run's separator now asks the
@@ -357,7 +361,13 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// `known`, 11 `unknown` (named on the unknown pin); 8 of its 13 css files match and the
 	// other 5, all layerchart's, are `known`.
 	//
-	// 5124 → 5130: the numbers-only array fill is prettier's `printArrayElementsConcisely`
+	// 5124 → 5128: `language-tools/…/svelte-check/src/incremental.ts`,
+	// `language-tools/…/svelte2tsx/nodes/ExportedNames.ts`,
+	// `prettier/tests/format/js/binary-expressions/inline-object-array.js` and
+	// `prettier/tests/format/js/variable_declarator/multiple.js` arrive from `unknown`
+	// (114 → 110 there, which names the change and the measurement).
+	//
+	// 5128 → 5134: the numbers-only array fill is prettier's `printArrayElementsConcisely`
 	// in both halves it was missing. (a) Each item's comma moved INSIDE the fill content
 	// (`[print(item), ","]` then a bare `line`), so the fill's pairwise measure counts the
 	// next item's comma and the break lands where that comma would pass column 100 — before,
@@ -373,10 +383,18 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// lists are file-for-file identical (pre-change tree vs tip, `--all --json` set-diffed).
 	// The third fix in that round — prettier refuses the fill when a signed literal's own
 	// argument carries a comment — moves no count: no corpus file spells one.
-	// ⚠️ That same measurement reads css `match` 131 BEFORE and after this change — two below
+	// ⚠️ That same measurement read css `match` 131 BEFORE and after this change — two below
 	// the 133 floor, a pre-existing drop unrelated to this entry and deliberately not re-pinned
-	// here.
-	typescript: 5130,
+	// there. It does NOT reproduce on the merged tip, which reads css 133 and holds the floor;
+	// whatever the 131 tree was measuring is still unexplained, so leave the floor as found.
+	//
+	// ⚠️ The two entries above landed on SEPARATE branches, each measured against 5124 in its
+	// own tree, so their deltas are NOT composable in general. **5134 is the re-measurement on
+	// the merged tip**, not a sum — it happens to equal 5124 + 4 + 6 because the two mover sets
+	// are disjoint (the binaryish four are the two language-tools files plus prettier's
+	// `binary-expressions/inline-object-array.js` and `variable_declarator/multiple.js`; the
+	// fill six are numeric-array files and the one `partial`).
+	typescript: 5134,
 	css: 133
 };
 
@@ -439,7 +457,19 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//   `layerchart/packages/layerchart/src/lib/components/Text/Text.html.svelte` — whitespace
 	//     only: a multi-line class value's `{expr}` continuation line keeps the author's SPACE
 	//     indentation where prettier re-indents it with tabs.
-	svelte: 5,
+	//
+	// 5 → 3: `Dialog.svelte` and `BottomNavItem.svelte` LEAVE the bucket by MATCHING (`match`
+	// 2701 → 2703). The multi-declarator list is a doc-tree `indent` now rather than literal
+	// indent text after each hardline, so a break INSIDE a declarator lands one level past it
+	// instead of at the statement's column (`declarations/variable/multiple/init_long`); and a
+	// NESTED ternary's branch binaries no longer inherit the outer ternary's return/call
+	// continuation indent (`expressions/ternary/nested_binary_branch_long`). Measured by
+	// formatting every gates-view file with the pre-change and post-change binaries and
+	// diffing the outputs: six files in the whole view change at all (these two, the two
+	// typescript movers below, and two prettier-suite files that also leave `unknown` for
+	// `match` — see the typescript pin), so nothing arrived in any bucket and `partial` /
+	// `safety` / `errors` are unmoved.
+	svelte: 3,
 	// 109 records a drop of five from 114, in two steps, each verified by diffing the
 	// `unknown` lists before and after rather than by the count alone:
 	//   -2  a binary operand of an `as`/`satisfies` cast takes prettier's continuation
@@ -699,14 +729,36 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//     at 101 columns: the fill's fits check omits the item's trailing comma — an OVER-WIDTH
 	//     output, the one real bug of the eleven, of a kind no fixture carries.
 	//
-	// 114 → 109: five files LEAVE for `match` — the numbers-fill round. Four to the comma
+	// 114 → 110: FOUR files LEAVE the bucket by MATCHING (`match` 5124 → 5128), the
+	// binaryish continuation-indent cluster. `language-tools/…/svelte-check/src/incremental.ts`
+	// — an inlining logical chain with earlier operators at an assignment position takes
+	// prettier's `samePrecedenceSubExpression` indent (`expressions/logical/inline_chain_long`).
+	// `language-tools/…/svelte2tsx/nodes/ExportedNames.ts` — an alternate-nested ternary's
+	// test takes prettier's `printBranch` indent plus `printTernaryTest`'s `align(2)`
+	// (`expressions/ternary/nested_test_long`; it did reproduce minimally after all). Two
+	// prettier-suite files leave on the same change as `Dialog.svelte` (the multi-declarator
+	// list as a doc-tree `indent`): `js/binary-expressions/inline-object-array.js` — a hugged
+	// object in a non-first declarator's `||` chain now sits one level past the declarator —
+	// and `js/variable_declarator/multiple.js` — an arrow body inside a multi-declarator. Same
+	// measurement as the svelte pin: these four plus the two svelte movers are the only six
+	// files in the whole gates view whose output changes, so nothing arrived anywhere.
+	//
+	// 110 → 105: five files LEAVE for `match` — the numbers-fill round. Four to the comma
 	// fix, whose fill content now carries its comma so the pairwise measure sees the next
 	// item's (`layercake/src/_data/unemployment.js` above, and prettier's
 	// `js/arrays/numbers-in-args.js`, `numbers-in-assignment.js`, `numbers3.js`, all lines the
 	// old measure packed one item too far); one to the blank-line separator
 	// (`js/arrays/preserve_empty_lines.js`, whose authored blanks the fill packed through).
 	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`; `partial` moves one the same way.
-	typescript: 109,
+	//
+	// ⚠️ The two entries above landed on SEPARATE branches, each measured against 114 in its
+	// own tree, so their deltas are NOT composable in general. **105 is the re-measurement on
+	// the merged tip**, not a sum — it happens to equal 114 − 4 − 5 because the nine movers are
+	// disjoint. Three of the `third_party` files named in the list above are among them
+	// (`ExportedNames.ts` and `incremental.ts` to the binaryish cluster, `unemployment.js` to
+	// the fill round — the last of those was the one OVER-WIDTH output of that group, not a
+	// layout choice), so read the list as the state before both steps.
+	typescript: 105,
 	css: 23
 };
 
