@@ -121,9 +121,9 @@ pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
 /// `<…>` itself never needs a break point.
 ///
 /// **Deliberately stricter than** prettier's `isObjectLikeType`, which also accepts a bare
-/// `TSTypeReference`: excluding it is the sanctioned `return_type_generic_union` print-width
-/// family (a `Promise<…> | null` argument keeps its break point). Don't widen it to match
-/// prettier.
+/// `TSTypeReference`: excluding it is the sanctioned `return_type_generic_union_long`
+/// print-width family (a `Promise<…> | null` argument keeps its break point). Don't widen it
+/// to match prettier.
 ///
 /// Sole caller is
 /// [`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged)

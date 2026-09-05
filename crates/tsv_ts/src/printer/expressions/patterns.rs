@@ -77,8 +77,9 @@ struct PatternTail<'a> {
 
 /// Layout role of an assignment-chain segment's right side (`a = b = value`).
 ///
-/// Collapses the former `is_tail` / `is_arrow_chain` bool pair — `is_arrow_chain`
-/// was only ever consulted when `is_tail` held, so the two flags encode three states.
+/// Three mutually exclusive roles, so an enum rather than a tail-ness / arrow-ness bool
+/// pair: arrow-ness is meaningful only at the tail, and a pair makes the fourth
+/// combination — an arrow chain that is not the tail — expressible and meaningless.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ChainSegment {
     /// Chain middle (`a =` in `a = b = value`) — soft line break, no indent.
@@ -850,9 +851,10 @@ impl<'a> Printer<'a> {
 
     /// Check if object pattern has any own-line single-line block comments
     ///
-    /// Mirrors `array_pattern_has_own_line_block_comments`: an own-line block
-    /// comment (between, before, or after properties) forces expansion, matching
-    /// prettier.
+    /// Mirrors the array pattern's own-line gate
+    /// ([`Self::has_own_line_block_comments_in_bracket_list`], asked inline in
+    /// [`Self::build_array_pattern_doc`]): an own-line block comment (between, before, or
+    /// after properties) forces expansion, matching prettier.
     fn object_pattern_has_own_line_block_comments(
         &self,
         obj: &internal::ObjectPattern<'_>,

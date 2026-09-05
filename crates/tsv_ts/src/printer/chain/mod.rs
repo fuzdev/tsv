@@ -51,7 +51,6 @@ pub use analysis::{
 };
 pub(crate) use analysis::{call_callee_paren_leading_start, tag_paren_leading_start};
 pub use builder::build_chain_doc;
-pub(crate) use inline_lookups::{InlineLookups, resolve_inline_lookups};
 pub(crate) use printing::find_bracket_position;
 #[cfg(feature = "buffer_stats")]
 pub use types::ChainGroupVec;

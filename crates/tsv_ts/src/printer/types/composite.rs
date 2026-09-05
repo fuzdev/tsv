@@ -91,7 +91,7 @@ pub(in crate::printer) enum ArraySuffixLayout {
 }
 
 /// Whether each conditional branch gap holds an alone-on-line format-ignore directive
-/// — the ROUTING verdicts, resolved by `build_conditional_type_doc`'s break gate (the
+/// — the ROUTING verdicts, resolved by `build_conditional_type_doc_inner`'s break gate (the
 /// directive forces the broken layout) and handed to the broken builder rather than
 /// re-derived there, so the gate and the emission can never disagree about a branch.
 #[derive(Clone, Copy)]
@@ -2105,7 +2105,7 @@ impl<'a> Printer<'a> {
             // The `[` is FOUND, never computed from `arr.span.end - 2`: the brackets
             // may hold a comment (`string[/* c */]`) and the gap before them
             // whitespace or another comment, so the arithmetic form lands mid-token
-            // (`span_arithmetic_needs_byte_check`).
+            // (fixture `array_bracket_comment`).
             && let Some(bracket_open) = find_char_skipping_comments(
                 self.source.as_bytes(),
                 elem_end as usize,

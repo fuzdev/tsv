@@ -587,7 +587,7 @@ impl<'a> Printer<'a> {
             // (it hugs even behind a very long method name), so there is no
             // break-after-colon fallback. `union_return_hugs` scopes it: a
             // `Promise<…> | null` `TSTypeReference` member is excluded (the sanctioned
-            // `return_type_generic_union` print-width family, handled by the
+            // `return_type_generic_union_long` print-width family, handled by the
             // `union_prints_hugged` branch below), and any comment that makes the printer
             // decline the hug disqualifies it here too.
             if self.union_return_hugs(value_type, colon_end, value_type_start) {

@@ -254,7 +254,7 @@ impl<'a> Printer<'a> {
             // trails the `}`, the same layout the type-alias RHS / `as` cast use
             // (`build_union_type_doc`'s hug path). See `union_return_hugs` for the
             // scope: a `Promise<…> | null` `TSTypeReference` member is deliberately
-            // NOT hugged (the sanctioned `return_type_generic_union` print-width
+            // NOT hugged (the sanctioned `return_type_generic_union_long` print-width
             // family), and a member/gap comment disqualifies the hug — those fall
             // through to the break-after-operator layout that matches prettier there.
             if self.union_return_hugs(value_type, arrow_end, type_start) {
