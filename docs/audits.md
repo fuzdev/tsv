@@ -1200,11 +1200,16 @@ the default width).
 # SAFETY is char-frequency, BLIND to delimiter/structure corruption. Two phases
 # (tsv-self pre-filter → canonical confirm via sidecar): parse input and formatted
 # output, reduce each to a STRUCTURAL SKELETON (node-tree shape + `type`, erasing
-# reformattable leaf scalars + acorn `extra`), compare — so legit reformatting
-# doesn't read as corruption. Buckets: {tsv,canonical}_unreparseable (the prize —
-# output the parser rejects) and {tsv,canonical}_divergent (structural change).
-# Zero false positives on real formatted code; point it at the delimiter-dense
-# prettier suites for the work-list.
+# reformattable leaf scalars, acorn `extra`, and per-node comment ATTACHMENT — the root
+# `comments` array still pins every comment's presence + kind, the leaf check its text),
+# compare — so legit reformatting doesn't read as corruption. Buckets:
+# {tsv,canonical}_unreparseable (the prize — output the parser rejects) and
+# {tsv,canonical}_divergent (structural change). The gate buckets read zero on real
+# formatted code; the divergent bucket there holds a handful of template files where a
+# whitespace Text node appears or vanishes beside a BLOCK element — real document drift
+# for this audit's deliberately narrower question (see `render_browser`'s module doc),
+# render-free for the compiler (`render:audit` grades the same files equivalent) — so
+# point it at the delimiter-dense prettier suites for the work-list.
 cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
 cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../corpora/collections/zzz/src
 # --gate fails ONLY on the *_unreparseable buckets (the reliable half — divergent is
@@ -1415,7 +1420,7 @@ cargo run -p tsv_debug fuzz --iterations 0 ../corpora/collections/zzz/src       
 
 ## F1 Idempotency Sweep (`idempotency:sweep`)
 
-The fuzzer's pristine pass, pointed at the `robustness` corpus view (the `../corpora` snapshot's real code + the live diff: the files of this machine's working trees of the same repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `live_diff_files`) — `format(format(x)) == format(x)` on every real file. NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
+The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, the six third-party Svelte libraries outside the bench views included, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `real` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file. NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
 
 ```bash
 deno task idempotency:sweep
@@ -1425,13 +1430,13 @@ deno task idempotency:sweep
 
 ## The Corpus Bundle (`audit:corpus`)
 
-The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `deno task check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `swallow_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `census_audit` + `fabrication_audit` + `fuzz --iterations 0`, over the `robustness` corpus view (the `../corpora` snapshot + the live working trees' diff against it) + the pinned prettier suites. Pure Rust; absent working trees warn-skip (floor = the snapshot). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
+The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `deno task check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `swallow_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `census_audit` + `fabrication_audit` + `fuzz --iterations 0`, over the `robustness` corpus view (the whole `../corpora` snapshot + the `svelte_styles` cache + the live working trees' diff against the snapshot) + the pinned prettier suites. Pure Rust; absent working trees warn-skip (floor = the whole snapshot). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
 
 ```bash
 deno task audit:corpus
 ```
 
-**Two of the three as-authored ratchets are legs here; the third cannot be.** `census_audit` and `fabrication_audit` both assert a **zero** — off their default corpus the snapshot is not consulted and `grade_narrowed_strictly` fails every finding, pinned or not — and the corpus currently holds that zero over all ~5,800 files, at about the cost of a leg already in the bundle. The census in particular is the leg whose own module doc names external corpora as its discovery arm, so its absence was a hole rather than a policy.
+**Two of the three as-authored ratchets are legs here; the third cannot be.** `census_audit` and `fabrication_audit` both assert a **zero** — off their default corpus the snapshot is not consulted and `grade_narrowed_strictly` fails every finding, pinned or not — and the corpus currently holds that zero over all ~6,700 files, at about the cost of a leg already in the bundle. The census in particular is the leg whose own module doc names external corpora as its discovery arm, so its absence was a hole rather than a policy.
 
 `width_audit` stays out **structurally**, not by omission: it has no zero to grade against (the sanctioned overruns are everywhere, which is why a narrowed run reports and exits 0 by design). Gating it here would need a second snapshot pinned over this corpus — and the `robustness` view includes the LIVE working trees, so that snapshot would churn with ordinary work: over the svelte + zzz sources alone, 83 of 91 shapes are absent from the committed fixtures snapshot and 25 pinned shapes never fire. That is the re-pin treadmill the format count pins escaped by gating on the pinned `../corpora` snapshot ([gate_counts.md](gate_counts.md)). A real-code width run stays a **triage** command.
 

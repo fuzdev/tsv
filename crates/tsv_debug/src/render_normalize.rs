@@ -70,6 +70,19 @@ pub fn normalize_pair(a: Value, b: Value, render: bool) -> (Value, Value) {
 /// `parenthesized` / `parenStart`, `raw` — so its *key presence* itself flips
 /// under formatting and would otherwise read as a shape change.
 ///
+/// **Comment attachment** — a node's `leadingComments` / `trailingComments`, which
+/// Svelte's parser attaches to the nearest node (acorn-typescript attaches none, and
+/// tsv's wire mirrors each) — is dropped the same way. Where a comment ATTACHES is a
+/// placement record, not shape: a same-line block comment before a statement's `;`
+/// legitimately trails past it (`a /* c */;` → `a; /* c */`, tsv's terminator-gap rule
+/// and prettier's), re-attaching from the expression to the statement with no node
+/// added, lost or re-typed. The comment itself stays pinned: the root `comments` array
+/// keeps its length and each entry's `type` here, and its text is a conserved leaf
+/// (`leaf_conservation_diff`), so a dropped, doubled or re-kinded comment still reads as
+/// a divergence — only its attachment does not. A comment whose placement IS semantic
+/// (a bundler annotation crossing a synthesized paren) is invisible to this skeleton
+/// either way, since a grouping paren is not a node: that is `binding_audit`'s question.
+///
 /// Used by `roundtrip_audit`'s corruption hunt (a re-quoted `attr='a"b'` →
 /// `attr="a"b"` reparses to two attributes, an array-length change the skeleton
 /// catches while ignoring the legitimate leaf-content reformatting around it).
@@ -84,8 +97,9 @@ pub fn structural_skeleton(v: &Value) -> Value {
         Value::Object(map) => {
             let mut out = serde_json::Map::with_capacity(map.len());
             for (k, val) in map {
-                if k == "extra" {
-                    // Parser source-metadata — omit the key on both sides.
+                if k == "extra" || k == "leadingComments" || k == "trailingComments" {
+                    // Parser source-metadata / comment attachment — omit the key on both
+                    // sides (see above).
                     continue;
                 }
                 // `type` is the node discriminator — a change (Attribute →
@@ -319,6 +333,8 @@ pub(crate) mod test_ast {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::test_ast::*;
     use super::*;
 
@@ -412,6 +428,57 @@ mod tests {
         // And the nbsp survives unchanged.
         let small = &frag_nodes(&nbsp)[0];
         assert_eq!(frag_nodes(small)[0]["data"], "a\u{a0}b");
+    }
+
+    /// Comment ATTACHMENT is not shape: the per-node placement arrays are dropped like
+    /// `extra`, so a comment that legitimately trails past a `;` reads equal, while the
+    /// root `comments` array still pins the count and the kind of every comment.
+    #[test]
+    fn skeleton_erases_comment_attachment_but_not_the_comment() {
+        let comment = json!({"type": "Block", "value": " c "});
+        let on_expression = json!({
+            "type": "Program",
+            "body": [{
+                "type": "ExpressionStatement",
+                "expression": {"type": "Identifier", "name": "a", "trailingComments": [comment]}
+            }],
+            "comments": [comment]
+        });
+        let on_statement = json!({
+            "type": "Program",
+            "body": [{
+                "type": "ExpressionStatement",
+                "trailingComments": [comment],
+                "expression": {"type": "Identifier", "name": "a"}
+            }],
+            "comments": [comment]
+        });
+        assert_eq!(
+            structural_skeleton(&on_expression),
+            structural_skeleton(&on_statement)
+        );
+
+        // A dropped comment still changes the skeleton (the root array's length)…
+        let dropped = json!({
+            "type": "Program",
+            "body": [{"type": "ExpressionStatement", "expression": {"type": "Identifier", "name": "a"}}],
+            "comments": []
+        });
+        assert_ne!(
+            structural_skeleton(&on_expression),
+            structural_skeleton(&dropped)
+        );
+        // …and so does a comment whose KIND changed (`type` is kept, not erased).
+        let line = json!({"type": "Line", "value": " c "});
+        let re_kinded = json!({
+            "type": "Program",
+            "body": [{"type": "ExpressionStatement", "expression": {"type": "Identifier", "name": "a"}}],
+            "comments": [line]
+        });
+        assert_ne!(
+            structural_skeleton(&on_statement),
+            structural_skeleton(&re_kinded)
+        );
     }
 
     #[test]

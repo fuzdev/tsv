@@ -100,42 +100,42 @@ fn class_text_is_normalized(raw: &str) -> bool {
 /// - Preserves leading whitespace (spaces before first non-ws char on each line)
 /// - Preserves newlines as-is
 ///
-/// `is_last_part`: when false, preserves one trailing space (for separation from
-/// subsequent expression tags in mixed-content attributes like `class="a {expr}"`).
+/// `is_last_part`: when false, keeps one trailing space to separate the text from the
+/// `{expr}` that follows (`class="a {expr}"`). The separator rule is keyed on the text's
+/// **last line**, never on the whole part — prettier's `([^ \t\n])[ \t]+$` fires only
+/// where the trailing run follows content on its own line. An indentation-only last
+/// line (`class="a⏎    {expr}"`) is leading whitespace and stays as authored; pushing a
+/// separator there would deepen the continuation line by one column on every pass.
 fn normalize_class_text(raw: &str, is_last_part: bool) -> String {
+    const CLASS_WS: [char; 2] = [' ', '\t'];
     let mut result = String::with_capacity(raw.len());
-    let mut had_non_ws = false;
     for (line_idx, line) in raw.split('\n').enumerate() {
         if line_idx > 0 {
             result.push('\n');
         }
-        let mut in_leading = true;
-        let mut pending_space = false;
-        for ch in line.chars() {
-            if ch == ' ' || ch == '\t' {
-                if in_leading {
-                    result.push(ch);
-                } else {
-                    pending_space = true;
-                }
-            } else {
-                in_leading = false;
-                had_non_ws = true;
-                if pending_space {
-                    result.push(' ');
-                    pending_space = false;
-                }
-                result.push(ch);
+        // Leading whitespace is kept verbatim; after it, every `[ \t]+` run collapses to
+        // one space and the trailing run is dropped.
+        let content = line.trim_start_matches(CLASS_WS);
+        result.push_str(&line[..line.len() - content.len()]);
+        let mut words = content.split(CLASS_WS).filter(|word| !word.is_empty());
+        if let Some(first) = words.next() {
+            result.push_str(first);
+            for word in words {
+                result.push(' ');
+                result.push_str(word);
             }
         }
-        // Trailing whitespace per line is dropped (pending_space not flushed)
     }
 
-    // For non-last parts with content, keep one trailing space for separation
-    // from subsequent expression tags (e.g., class="text {expr}")
-    // All-whitespace text (e.g., " ") passes through unchanged — the regex-based
-    // approach in prettier-plugin-svelte only matches after non-ws characters.
-    if !is_last_part && had_non_ws && raw.ends_with([' ', '\t']) {
+    // The separator space: a non-last part whose LAST line ends content with whitespace
+    // keeps one space before the `{expr}` (`class="text {expr}"`). A last line with no
+    // content — all-whitespace text (" ") or a continuation line's indentation — is
+    // leading whitespace, already pushed verbatim above, and gets no separator.
+    let last_line = raw.rsplit_once('\n').map_or(raw, |(_, last)| last);
+    if !is_last_part
+        && last_line.ends_with(CLASS_WS)
+        && !last_line.trim_matches(CLASS_WS).is_empty()
+    {
         result.push(' ');
     }
 
@@ -1467,6 +1467,18 @@ mod tests {
         assert_eq!(normalize_class_text("text ", false), "text ");
         // Last part drops the trailing space.
         assert_eq!(normalize_class_text("text ", true), "text");
+    }
+
+    #[test]
+    fn separator_space_is_keyed_on_the_last_line() {
+        // A continuation line's indentation before `{expr}` is leading whitespace, not
+        // a separator: it stays as authored (a separator would grow it every pass).
+        assert_eq!(normalize_class_text("a b\n    ", false), "a b\n    ");
+        assert_eq!(normalize_class_text("a b\n\t", false), "a b\n\t");
+        // Trailing whitespace before the newline is still dropped on the way.
+        assert_eq!(normalize_class_text("a b  \n    ", false), "a b\n    ");
+        // Content on the last line keeps the separator.
+        assert_eq!(normalize_class_text("a\n  b ", false), "a\n  b ");
     }
 
     #[test]

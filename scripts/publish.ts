@@ -410,12 +410,13 @@ if (no_check) {
 // Step 3c: Corpus robustness audit
 //
 // The pure-Rust content-loss / panic / non-idempotency audits over REAL code (the robustness
-// corpus view — the ../corpora snapshot plus the live diff of this machine's working trees
-// against it — and the pinned Prettier suites). This is the
+// corpus view — the WHOLE ../corpora snapshot, every collection it vendors, plus the
+// svelte_styles cache and the live diff of this machine's working trees against the snapshot
+// — and the pinned Prettier suites). This is the
 // extension-robustness bar: `tests/fixtures` is format-stable by construction, so `deno task check`
 // is structurally blind to a content-loss / panic / reflow bug in real code — every such bug this
 // cycle was found by a corpus audit or a wide fuzz seed, never by `check`. `deno task audit:corpus`
-// warn-skips absent working trees, so its reproducible floor is the ../corpora snapshot;
+// warn-skips absent working trees, so its reproducible floor is the whole ../corpora snapshot;
 // like Step 3b, a --wetrun without that floor BLOCKS (releasing without the audit needs --no-check),
 // a dry-run warn-and-skips. The FFI/prettier SAFETY half (content loss vs prettier) rides Step 3b's
 // corpus:compare:format --all; this is the pure-Rust half those gates can't reach.
