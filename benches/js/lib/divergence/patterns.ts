@@ -37,6 +37,11 @@ export interface DetectionContext {
 	/** Pre-computed <script>/<style> regions for Svelte files (char + line spans) */
 	ours_code_regions?: CodeRegion[];
 	prettier_code_regions?: CodeRegion[];
+	/**
+	 * Whether `ours_code_regions` sliced cleanly — see [`code_regions_are_reliable`].
+	 * Read only by the consumer whose safe direction is a BIGGER region.
+	 */
+	ours_code_regions_reliable?: boolean;
 }
 
 export interface DivergenceMatch {
@@ -157,7 +162,9 @@ function ours_lines_in_hunk(ours_lines: string[], hunk: DiffHunk): string[] {
 }
 
 /**
- * Does OURS hold the print-width limit across everything it emitted in this hunk?
+ * Did OURS spend every break this hunk offered it — holding the print-width limit
+ * wherever it could, and overrunning only where [`overrun_is_forced`] says no break
+ * existed?
  *
  * The ours-side half of every "prettier overran the width, we broke" claim, and the
  * one that carries it: a wide PRETTIER line says only that the divergence is
@@ -172,36 +179,179 @@ function ours_lines_in_hunk(ours_lines: string[], hunk: DiffHunk): string[] {
  * Empty `added_lines` is the vacuity trap — `every` is true of nothing, so a
  * removal-only hunk (a wide prettier line we simply DELETED) would otherwise read as
  * a print-width rewrap. Zero lines cannot hold a limit, so it is asked explicitly.
+ *
+ * `regime` says where the hunk is standing, because the seam test cannot be written
+ * once — see [`OverrunRegime`]. Everything below this function exists to answer it.
+ */
+function ours_spent_every_break(hunk: HunkLines, regime: OverrunRegime): boolean {
+	return (
+		hunk.added_lines.length > 0 &&
+		hunk.added_lines.every((l) => visual_width(l) <= PRINT_WIDTH || overrun_is_forced(l, regime))
+	);
+}
+
+/**
+ * The strict reading of [`ours_spent_every_break`]: ours ended up UNDER the limit on
+ * every line it emitted, no forced-overrun licence granted. For a caller whose claim is
+ * that width, rather than that ours left no break unspent.
  */
 function ours_holds_print_width(hunk: HunkLines): boolean {
-	return (
-		hunk.added_lines.length > 0 && hunk.added_lines.every((l) => visual_width(l) <= PRINT_WIDTH)
-	);
+	return ours_spent_every_break(hunk, 'none');
+}
+
+/**
+ * The layout regime an over-width ours line's break opportunities are judged against.
+ *
+ * Break opportunities are language- AND region-specific, so there is no one test:
+ * whitespace is the fill's seam in Svelte text and means nothing two lines away in a
+ * `<script>`, where a member chain breaks with no whitespace at all. `'none'` is the
+ * regime for every position with no sound seam test — it grants no licence, which is
+ * why it is also what the strict [`ours_holds_print_width`] asks for.
+ */
+type OverrunRegime = 'css' | 'svelte_text' | 'none';
+
+/** Which regime governs the ours lines of `hunk`. See [`OverrunRegime`]. */
+function overrun_regime(hunk: DiffHunk, ctx: DetectionContext): OverrunRegime {
+	if (is_in_css_context(hunk, ctx)) return 'css';
+	// `svelte_text` is the one regime whose safe direction is a BIGGER code region, so it is
+	// the one that has to ask whether the slicing held ([`code_regions_are_reliable`]).
+	if (
+		ctx.language === 'svelte' &&
+		ctx.ours_code_regions_reliable === true &&
+		!overlaps_code_region(hunk.ours_range, ctx.ours_code_regions ?? [])
+	) {
+		return 'svelte_text';
+	}
+	return 'none';
+}
+
+/** A `<!-- … -->` comment, whose interior no formatter re-wraps. */
+const html_comment = /<!--[\s\S]*?-->/g;
+
+/** A declaration's `prop:` head, which is not itself a seam. See [`css_line_has_seam`]. */
+const css_declaration_head = /^-{0,2}[A-Za-z_][A-Za-z0-9_-]*:[ \t]+/;
+
+/**
+ * Does this CSS line still carry a break opportunity tsv declined to take?
+ *
+ * The seams a CSS value has are a top-level space and a top-level comma (the
+ * space- and comma-separated list wraps); everything nested inside `(…)`, `[…]` or a
+ * string is a component value's interior, which neither formatter breaks. So the scan
+ * is depth- and quote-aware and asks only about depth 0.
+ *
+ * The `prop:` head is stripped first, and that is the load-bearing half: the space
+ * after the colon is a seam only for a value with two or more top-level parts (the
+ * value group has to break for the head to hang), so counting it would call every
+ * single-value declaration breakable. What is left after the strip is the value, and
+ * a value with no depth-0 separator is one component — an unbreakable atom, whatever
+ * its width. Only one head is stripped, so `filter: progid:…` loses `filter:` and
+ * keeps the `progid:` that is part of the value.
+ */
+function css_line_has_seam(line: string): boolean {
+	const body = line.trim().replace(css_declaration_head, '');
+	let depth = 0;
+	let quote = '';
+	for (let i = 0; i < body.length; i++) {
+		const c = body[i];
+		if (quote !== '') {
+			if (c === '\\') i++;
+			else if (c === quote) quote = '';
+			continue;
+		}
+		if (c === "'" || c === '"') quote = c;
+		else if (c === '(' || c === '[') depth++;
+		else if (c === ')' || c === ']') depth = Math.max(0, depth - 1);
+		else if (depth === 0 && (c === ' ' || c === '\t' || c === ',')) return true;
+	}
+	return false;
+}
+
+/**
+ * Does this Svelte TEMPLATE line still carry a break opportunity tsv declined to take?
+ *
+ * Deliberately the narrowest sound reading rather than "has no whitespace": a fill's
+ * seams ARE whitespace, but they are not its only ones — a `{…}` tag breaks internally,
+ * a tag's attribute list breaks, and two glued BLOCK elements separate with no
+ * whitespace between them. So the atom this grants is the only one with no seam of any
+ * kind: after the comment interiors are removed (the one span no formatter re-wraps),
+ * what is left must be bare text — no whitespace, no `{`/`}`, no `<`/`>`. That is a
+ * single word, possibly welded to comments across a boundary that carries no
+ * whitespace and so cannot be broken
+ * (`svelte/elements/fill_after_comment_glued_midline_long_prettier_divergence`).
+ *
+ * An empty remainder is the comment-only line, forced for the same reason.
+ *
+ * A comment tsv emitted across several lines leaves an unmatched `<!--` here, which
+ * reads as a seam and simply goes unclaimed — this errs toward under-claiming
+ * everywhere it is unsure, which is the safe direction for a licence.
+ */
+function svelte_text_has_seam(line: string): boolean {
+	const body = line.trim().replace(html_comment, '');
+	return /[\s<>{}]/.test(body);
+}
+
+/**
+ * Is this over-width ours line one tsv could not have made narrower?
+ *
+ * The third thing between "ours holds the limit" (which files a forced overrun as
+ * unexplained) and "ours re-wrapped something" (which grades nobody's width): a line
+ * whose content offers tsv no break at all. §Print Width Philosophy sanctions exactly
+ * this class — *a line tsv **can** break is a line tsv **does** break*, so a line it
+ * cannot break stands — and `width_audit_known.txt` pins ~34 such shapes off the
+ * corpus. Without it the `url(data:…)` at 123 columns and the IE `filter: progid:…`
+ * at 112 read as unexplained divergences, which is false.
+ *
+ * Every regime's test names a seam tsv WOULD have taken, so an unrecognized position
+ * (`'none'`) grants nothing. A wrong answer here is a laundered over-width bug, so
+ * each test is written to fail closed.
+ */
+function overrun_is_forced(line: string, regime: OverrunRegime): boolean {
+	switch (regime) {
+		case 'css':
+			return !css_line_has_seam(line);
+		case 'svelte_text':
+			return !svelte_text_has_seam(line);
+		default:
+			return false;
+	}
 }
 
 /**
  * The recurring long-line divergence shape: a print-width-driven re-wrap.
  *
- * A hunk matches when prettier has a line satisfying `line_predicate` that
- * exceeds `min_width`, AND ours genuinely re-wrapped it — more added lines than
- * removed. The re-wrap evidence is the load-bearing guard: matching solely on a
- * wide prettier line (with no proof OURS broke it into the benign divergent
- * form) is exactly the over-match class that lets a real bug — or worse, a
- * data-loss reclassified as `known_divergence` — slip through. Centralizing the
- * shape here makes the missing-guard mistake structurally hard to reintroduce.
+ * A hunk matches when prettier has a line satisfying `line_predicate` past print width,
+ * AND ours genuinely re-wrapped it: more added lines than removed, every one of them
+ * spending the breaks it had ([`ours_spent_every_break`]). `max_width` caps the prettier
+ * side for a claim that owns only a band; the LOWER bound is not a knob, it is the
+ * constant this whole family is named after.
+ *
+ * The ours-side evidence is the load-bearing guard: matching solely on a wide prettier
+ * line (with no proof OURS broke it into the benign divergent form) is exactly the
+ * over-match class that lets a real bug — or worse, a data-loss reclassified as
+ * `known_divergence` — slip through. Centralizing the shape here makes the missing-guard
+ * mistake structurally hard to reintroduce.
+ *
+ * The line count is HALF that guard and grades nobody's width: a hunk where tsv breaks
+ * MORE lines than prettier and still leaves one at 105 satisfies "we re-wrapped" and is
+ * exactly the shape that filed a real over-width bug as this sanctioned divergence. The
+ * width half is what answers it, and the count half stays because "ours ended up
+ * narrower without adding a line" is a different divergence than this one.
  */
 function long_line_rewrapped(
 	hunk: DiffHunk,
-	prettier_lines: string[],
-	options: { min_width?: number; line_predicate: (line: string) => boolean }
+	ctx: DetectionContext,
+	options: { max_width?: number; line_predicate: (line: string) => boolean }
 ): boolean {
-	const min_width = options.min_width ?? PRINT_WIDTH;
-	const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
-	const has_long_match = p_lines.some(
-		(l) => options.line_predicate(l) && visual_width(l) > min_width
-	);
+	const max_width = options.max_width ?? Infinity;
+	const p_lines = prettier_lines_in_hunk(ctx.prettier_lines!, hunk);
+	const has_long_match = p_lines.some((l) => {
+		if (!options.line_predicate(l)) return false;
+		const w = visual_width(l);
+		return w > PRINT_WIDTH && w <= max_width;
+	});
 	if (!has_long_match) return false;
-	return hunk.added_lines.length > hunk.removed_lines.length;
+	if (hunk.added_lines.length <= hunk.removed_lines.length) return false;
+	return ours_spent_every_break(hunk, overrun_regime(hunk, ctx));
 }
 
 /**
@@ -277,6 +427,32 @@ function overlaps_code_region(
 	);
 }
 
+/** A `<script`/`<style` open or close marker — the tags [`raw_code_regions`] pairs up. */
+const raw_code_region_markers = /<\/?(?:script|style)\b/gi;
+
+/**
+ * Did every `<script`/`<style` marker in `text` land INSIDE one of `regions`?
+ *
+ * [`raw_code_regions`] is non-greedy, so a `</script>` written inside a STRING closes the
+ * region early and strands the real script tail outside it. That errs toward a smaller
+ * region, which under-claims for a consumer asking "is this in a `<style>`?" — and
+ * OVER-claims for one asking "is this in the template?", where a truncated region hands a
+ * run of JS the Svelte-text atom licence ([`overrun_regime`]). Proven reachable: a
+ * whitespace-free member chain at 111 columns after such a string reads as one bare word.
+ *
+ * Rather than teach the region scanner to lex JS strings, the consumer whose safe
+ * direction is a BIGGER region asks this and falls back to `'none'` when it answers false.
+ * In a clean slice each marker opens or closes its own region and so lies within it; a
+ * marker outside one means the pairing did not line up, whatever the cause (a stray
+ * closer, an unclosed opener), and the whole file's slicing is untrustworthy.
+ */
+function code_regions_are_reliable(text: string, regions: CodeRegion[]): boolean {
+	for (const m of text.matchAll(raw_code_region_markers)) {
+		if (!regions.some((r) => m.index >= r.start && m.index < r.end)) return false;
+	}
+	return true;
+}
+
 /**
  * Pre-compute cached fields on a DetectionContext.
  * Called by detect_divergences before running patterns.
@@ -287,9 +463,11 @@ export function enrich_detection_context(ctx: DetectionContext): void {
 	if (ctx.language === 'svelte') {
 		ctx.ours_code_regions = compute_code_regions(ctx.ours);
 		ctx.prettier_code_regions = compute_code_regions(ctx.prettier);
+		ctx.ours_code_regions_reliable = code_regions_are_reliable(ctx.ours, ctx.ours_code_regions);
 	} else {
 		ctx.ours_code_regions = [];
 		ctx.prettier_code_regions = [];
+		ctx.ours_code_regions_reliable = true;
 	}
 }
 
@@ -1104,13 +1282,12 @@ const css_atrule_long_wrap: DivergencePattern = {
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
 
-		const prettier_lines = ctx.prettier_lines!;
 		const atrule_pattern = /@(?:container|media|import|supports)/;
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			if (!is_in_css_context(hunk, ctx)) return false;
 			// Prettier has a long at-rule line (> 100 chars) that ours wrapped.
-			return long_line_rewrapped(hunk, prettier_lines, {
+			return long_line_rewrapped(hunk, ctx, {
 				line_predicate: (l) => atrule_pattern.test(l)
 			});
 		});
@@ -1481,12 +1658,13 @@ const template_literal_width: DivergencePattern = {
 			// the nested `${[`…`]}` (or `` ${`…` `` ) construct inline past print
 			// width; ours breaks the inner bracket. The end-of-line `${` / `}`` markers
 			// never appear here, so reuse the shared `long_line_rewrapped` shape —
-			// which carries the ours-side re-wrap guard (more added than removed
-			// lines) — keyed on a prettier line exhibiting the nested-template
-			// interpolation. Without the re-wrap guard, a bug that mangled a wide
-			// nested-template line in place would be claimed purely from its width.
+			// which carries the ours-side re-wrap guard (every ours line holds print
+			// width, a script region having no atom licence) — keyed on a prettier line
+			// exhibiting the nested-template interpolation. Without the re-wrap guard, a
+			// bug that mangled a wide nested-template line in place would be claimed
+			// purely from its width.
 			if (
-				long_line_rewrapped(hunk, prettier_lines, {
+				long_line_rewrapped(hunk, ctx, {
 					line_predicate: (l) => nested_template_interpolation.test(l)
 				})
 			) {
@@ -1639,14 +1817,12 @@ const return_type_generic_union: DivergencePattern = {
 	conformance_sections: ['TypeScript'],
 	fixtures: ['typescript/declarations/function/return_type_generic_union_long_prettier_divergence'],
 	detect(ctx) {
-		const prettier_lines = ctx.prettier_lines!;
-
 		// Look for generic types with union (| null, | void, | undefined) in hunks
 		// where prettier's line exceeds 100 chars and ours re-wrapped it.
 		const union_in_generic = /[<>].*\|\s*(?:null|void|undefined)/;
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) =>
-			long_line_rewrapped(hunk, prettier_lines, {
+			long_line_rewrapped(hunk, ctx, {
 				line_predicate: (l) => union_in_generic.test(l)
 			})
 		);
@@ -1831,18 +2007,16 @@ const fill_after_inline: DivergencePattern = {
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
-		const prettier_lines = ctx.prettier_lines!;
 		const inline_close_tag =
 			/<\/(?:span|a|strong|em|code|b|i|small|abbr|sub|sup|mark|cite|q|time|data|kbd|samp|var|dfn|ins|del|u|s)>/;
 
 		// Check each hunk for prettier lines with long inline element lines.
 		// Ours-side evidence guard (shared shape): a long prettier line with an
-		// inline close tag is not enough — require that ours actually re-wrapped it
-		// (more added than removed lines). Without this, a bug where ours emits the
-		// same long line (no legitimate fill break) would be claimed solely from
-		// prettier's width.
+		// inline close tag is not enough — require that ours spent every break it had.
+		// Without this, a bug where ours emits the same long line (no legitimate fill
+		// break) would be claimed solely from prettier's width.
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) =>
-			long_line_rewrapped(hunk, prettier_lines, {
+			long_line_rewrapped(hunk, ctx, {
 				line_predicate: (l) => inline_close_tag.test(l)
 			})
 		);
@@ -1969,22 +2143,19 @@ const short_expr_100: DivergencePattern = {
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
-		const prettier_lines = ctx.prettier_lines!;
 		const block_expr_pattern = /\{#(?:if|each|await|key)/;
 
-		// Check each hunk for block expressions that exceed 100 chars in prettier range.
-		// Ours-side evidence guard: a 101-110 wide prettier block line is not enough —
-		// require that ours actually broke it (more added than removed lines). Without
-		// this, a bug somewhere in the 101-110 band gets claimed purely from prettier's
-		// width even though ours did not legitimately re-break the block condition.
-		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
-			const has_short_overflow_block = p_lines.some(
-				(l) => block_expr_pattern.test(l) && visual_width(l) > 100 && visual_width(l) <= 110
-			);
-			if (!has_short_overflow_block) return false;
-			return hunk.added_lines.length > hunk.removed_lines.length;
-		});
+		// Check each hunk for block expressions in prettier's 101-110 band. The ours-side
+		// evidence guard is the shared `long_line_rewrapped` shape — a wide prettier block
+		// line is not enough; ours must have re-broken it AND spent every break it had.
+		// This detector hand-rolled the count half alone, so a bug that left its own
+		// over-width line in the same band was claimed purely from prettier's width.
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) =>
+			long_line_rewrapped(hunk, ctx, {
+				max_width: PRINT_WIDTH + 10,
+				line_predicate: (l) => block_expr_pattern.test(l)
+			})
+		);
 
 		if (hunk_indices.length > 0) {
 			return {
@@ -2553,7 +2724,7 @@ const tag_break_is_forced = (lines: string[], at: number, brace: number): boolea
 				depth--;
 				if (depth === 0) {
 					const indent = first.slice(0, first.length - first.trimStart().length);
-					return visual_width(indent) + visual_width(flat) > 100;
+					return visual_width(indent) + visual_width(flat) > PRINT_WIDTH;
 				}
 			}
 		}
@@ -2658,7 +2829,7 @@ const spaced_tag_travel: DivergencePattern = {
 				);
 				if (
 					visual_width(added_indent) + visual_width(weld_expression_lines(hunk.added_lines)) <=
-					100
+					PRINT_WIDTH
 				) {
 					return false;
 				}
@@ -2919,13 +3090,12 @@ const css_value_wrap: DivergencePattern = {
 		'css/values/lists/space_separated_long_wrap_prettier_divergence'
 	],
 	detect(ctx) {
-		const prettier_lines = ctx.prettier_lines!;
-
 		// Check each hunk for long CSS property values in prettier's range
-		// AND verify we actually wrapped (more lines than prettier)
+		// AND verify we actually wrapped — every ours line under the limit, save one
+		// with no seam to break at (the IE `filter: progid:…` value is one atom).
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			if (!is_in_css_context(hunk, ctx)) return false;
-			return long_line_rewrapped(hunk, prettier_lines, {
+			return long_line_rewrapped(hunk, ctx, {
 				line_predicate: (l) => /^\t+[\w-]+:\s*.+/.test(l)
 			});
 		});
@@ -2962,16 +3132,18 @@ const fill_101_boundary: DivergencePattern = {
 		const prettier_lines = ctx.prettier_lines!;
 		let longest_prettier_overflow = 0;
 
-		// A hunk matches when prettier ran to (or past) print width here and every line
-		// ours emitted holds it. One walk of the prettier lines answers both the gate and
-		// the reason string: the widest line IS the widest overflow once it clears the limit.
+		// A hunk matches when prettier ran to (or past) print width here and ours spent
+		// every break it had — holding the limit everywhere it could, and overrunning only
+		// on a line with no seam (a glued comment+word unit is one such atom). One walk of
+		// the prettier lines answers both the gate and the reason string: the widest line
+		// IS the widest overflow once it clears the limit.
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
 			const widest_prettier = p_lines.reduce((w, l) => Math.max(w, visual_width(l)), 0);
 			// >= PRINT_WIDTH: includes lines at exactly print width, since the divergence
 			// is that prettier fills right up to the limit while we break earlier.
 			if (widest_prettier < PRINT_WIDTH) return false;
-			if (!ours_holds_print_width(hunk)) return false;
+			if (!ours_spent_every_break(hunk, overrun_regime(hunk, ctx))) return false;
 
 			longest_prettier_overflow = Math.max(longest_prettier_overflow, widest_prettier);
 			return true;
