@@ -488,8 +488,12 @@ pub(super) fn build_call_doc_with_wrapping(
         return doc;
     }
 
-    // Build args with line separators (one per line when broken)
-    // Boolean() calls don't get extra indent on binary continuation lines
+    // Build args with line separators (one per line when broken).
+    //
+    // A `Boolean()` argument is one of prettier's `shouldNotIndent` terms (`key ===
+    // "arguments" && isBooleanTypeCoercion(parent)`, binaryish.js:115), so its binary
+    // chain takes no continuation indent — the argument list already supplies a level,
+    // exactly as for the `!!()` coercion this mirrors.
     let use_arg_indent = !is_boolean_call(call, printer);
     let arg_parts = d.join_doc(
         call.arguments.iter().map(|arg| {
@@ -499,7 +503,7 @@ pub(super) fn build_call_doc_with_wrapping(
                 if use_arg_indent {
                     printer.build_arg_expression_doc(arg)
                 } else {
-                    printer.build_expression_doc(arg)
+                    printer.build_flat_chain_expression_doc(arg)
                 }
             })
         }),
@@ -605,10 +609,10 @@ fn try_single_arg_comment_paths(
         // Own-line comments each take their own line (author blanks preserved); a
         // block that hugs the arg stays inline with it (`/* b */ a`).
         gap_pc.emit_leading_comments_inline_aware(&mut inner, printer);
-        // Use the argument-context builder so a binary/logical chain (or
-        // conditional) gets its continuation indent — matching the no-leading-
-        // comment path. `build_expression_doc` would emit the Grouped chain
-        // (flush continuation), losing the indent prettier applies here.
+        // Use the argument-context builder so a binary/logical chain (or conditional)
+        // takes the ARGUMENT group structure — matching the no-leading-comment path.
+        // (Both builders indent the continuation; they differ in whether a forced break
+        // reaches every operand — see `Printer::build_arg_expression_doc_uncached`.)
         // An own-line directive in the gap freezes the argument verbatim (Rule A);
         // this branch already keeps such a comment on its own line.
         inner.push(build_joined_argument_doc(

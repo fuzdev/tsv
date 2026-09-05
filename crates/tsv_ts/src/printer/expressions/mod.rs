@@ -108,8 +108,9 @@ impl<'a> Printer<'a> {
     /// the style (assignment layouts flush, call args and array elements indent),
     /// mirroring prettier's parent-keyed shouldNotIndent chain (binaryish.js:97) — which
     /// is what keeps TS formatting context-free below the root. A Standalone-mode root
-    /// (`{@const}`'s init, inheriting the host document's mode) stays Grouped: its
-    /// assignment layout owns the indent, and ContinuationIndent would stack on top.
+    /// (`{@const}`'s init, inheriting the host document's mode) takes the ordinary
+    /// dispatch, where the host's assignment-value mark answers FLAT: that layout owns the
+    /// indent, and a continuation indent would stack on top.
     ///
     /// Also where the embed's other build-time field lands: a host that cannot hang a
     /// leading cast (`EmbedContext::jsdoc_cast_cannot_hang` — a Svelte braced head) has
@@ -118,14 +119,38 @@ impl<'a> Printer<'a> {
     /// entries — this doc builder and `print_expression`'s string path — pass through
     /// here, so the flag cannot behave differently per entry.
     ///
-    /// Only the Embedded-root *question* lives here; the answer is
-    /// `build_continuation_indent_expression_doc`, shared with the cast operand.
+    /// The root NAMES the style rather than leaning on that default, for one reason: it
+    /// must override the assignment-value mark a host may have set on the same expression
+    /// (`build_assignment_value_expression_doc`), which would otherwise answer flat.
     pub(crate) fn build_root_expression_doc(&self, expr: &Expression<'_>) -> DocId {
         if self.embed.jsdoc_cast_cannot_hang {
             self.mark_jsdoc_cast_cannot_hang_gap(expr);
         }
-        if self.embed.is_embedded() {
-            return self.build_continuation_indent_expression_doc(expr);
+        if !self.embed.is_embedded() {
+            return self.build_expression_doc(expr);
+        }
+        if let Expression::BinaryExpression(binary) = expr {
+            // The owned-comment obligation `build_flat_chain_expression_doc` states, on the
+            // other style: reaching past `build_expression_doc` means discharging it here.
+            let doc = self.build_binary_chain_doc_with_continuation_indent(binary);
+            return self.prepend_owned_leading_comment(expr, doc);
+        }
+        // ⚠️ A SEQUENCE root does NOT join the binary above by default, though it is the
+        // same shape of chain: prettier's svelte expression-root wrapper reaches the
+        // continuation indent through the binaryish parent rule, which a sequence's
+        // `group(join([",", line]))` never consults — so prettier breaks `{(a,⏎b)}` flush
+        // and tsv matches it at every head prettier width-wraps. The one head it does not
+        // wrap at all — a block head — asks for the indent explicitly
+        // (`EmbedContext::root_sequence_indents`), since there tsv's wrap is its own and
+        // owes its own geometry rather than a shape inherited from a position prettier
+        // answered.
+        if self.embed.root_sequence_indents
+            && let Expression::SequenceExpression(seq) = expr
+        {
+            // `build_sequence_doc` is not `build_expression_doc`, so the owned leading
+            // comment seam is this caller's too, exactly as in the binary arm above.
+            let doc = self.build_sequence_doc(seq, SeqLayout::Indented);
+            return self.prepend_owned_leading_comment(expr, doc);
         }
         self.build_expression_doc(expr)
     }
@@ -143,60 +168,52 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[d.indent(d.concat(&[d.softline(), content])), d.softline()]))
     }
 
-    /// `build_expression_doc` for a position whose binary chain takes **continuation
-    /// indent** — the positions where prettier's shouldNotIndent chain yields false
-    /// (binaryish.js:96-115), so the chain renders as `group([first, indent(rest)])` and
-    /// its continuation lines sit one level past the first operand.
+    /// `build_expression_doc` for a position whose binary chain takes **no continuation
+    /// indent** — prettier's `shouldNotIndent` (binaryish.js:96-115), so the chain renders
+    /// as `group(parts)` and its continuation lines sit at the first operand's own column.
     ///
-    /// **Every position that routes here**, stated once so the call sites need not each
-    /// restate the rule. Prettier's is a fall-through, so the entry for each is only "this
-    /// parent is named in neither exempt list": a type assertion's operand (`(a ??\n\tb) as T`
-    /// — without this the continuation lands at the *statement's* own column, where it reads
-    /// as a sibling statement), an `await` / `yield` / `yield*` argument, a `case` test, a
-    /// `for…of` or `for…in` right (`shouldNotIndent` names `ForStatement`, and neither of
-    /// those is one — the C-style header's clauses really are exempt), a `class extends`
-    /// superclass, a bare expression statement (hence a labeled statement's body too), an
-    /// `export default` / `export =` value, a default parameter value (`AssignmentPattern` is
-    /// deliberately absent from `shouldIndentIfInlining`, so it indents for the inlining and
-    /// non-inlining spellings alike), and an Embedded expression root (a Svelte `{expr}`
-    /// value, where prettier reaches the same shape through its svelte expression-root
-    /// wrapper). A non-binary expression is unaffected and takes the ordinary path.
+    /// With [`Printer::mark_flat_chain`], the only way to reach the flat layout, which is
+    /// no longer any position's default (`Printer::build_binary_chain_doc` states the rule
+    /// and both exempt buckets).
     ///
-    /// ⚠️ **The list is not closed.** tsv's default is FLAT (`build_binary_chain_doc`) where
-    /// prettier's is indent, so a new binary-holding position lands on the wrong side by
-    /// omission — check its parent against binaryish.js:96-115 rather than inheriting the
-    /// default. Every entry above was once missing for exactly that reason.
+    /// **THE `shouldNotIndent` POSITION LIST LIVES HERE**, whole and count-free — every
+    /// other site that needs it points at this one, because a membership copied is a
+    /// membership that goes stale on its own. Each entry is a term read off binaryish.js:
     ///
-    /// ⚠️ The chain builder does **not** prepend an owned leading comment (a JSDoc cast
-    /// or bundler annotation glued to the first operand) — `build_expression_doc` owns
-    /// that seam — so calling it directly means replicating the prepend here, or the
-    /// comment is dropped (`docs/comments.md` hazard 1). That is the whole reason this
-    /// is a shared seam rather than two call sites: the obligation is easy to forget,
-    /// and every new continuation-indent position inherits it by construction.
-    pub(in crate::printer) fn build_continuation_indent_expression_doc(
+    /// - an arrow function's expression body (`node === parent.body && parent.type ===
+    ///   "ArrowFunctionExpression"`);
+    /// - a template-literal interpolation (`parent.type === "TemplateLiteral"`);
+    /// - a `Boolean()` argument (`key === "arguments" && isBooleanTypeCoercion(parent)`);
+    /// - a `return`/`throw` argument in the hanging-paren form
+    ///   (`isReturnOrThrowStatement(parent)` — the ordinary form's parent owns the group,
+    ///   so it takes `build_binary_chain_doc_ungrouped` instead);
+    /// - a unary operand carrying a comment (`key === "argument" && parent.type ===
+    ///   "UnaryExpression"`; the uncommented one takes prettier's earlier expanding-paren
+    ///   return, which `build_unary_doc` spells with `build_binary_chain_doc_ungrouped`);
+    /// - a ternary test whose ternary is not itself a return/throw/call/new value
+    ///   (`parent.type === "ConditionalExpression"` with the grandparent exclusions).
+    ///
+    /// Two positions reach the same layout through [`Printer::mark_flat_chain`] instead,
+    /// because they hand their value to a generic builder and cannot name one: a ternary
+    /// *branch* (its value goes through the paren shell, which owns the gap after it) and
+    /// a C-style `for` header clause (`node !== parent.body && parent.type ===
+    /// "ForStatement"`; the clause's builder belongs to its caller, and a sequence clause's
+    /// ELEMENTS are deliberately not marked — their parent is the sequence).
+    ///
+    /// A non-binary expression is unaffected and takes the ordinary path.
+    ///
+    /// ⚠️ The chain builder does **not** prepend an owned leading comment (a JSDoc cast or
+    /// bundler annotation glued to the first operand) — `build_expression_doc` owns that
+    /// seam — so a position that reaches past it must discharge the obligation itself, or
+    /// the comment is DROPPED (`docs/comments.md` hazard 1). That is the whole reason this
+    /// is a shared seam rather than one call per site: the obligation is easy to forget,
+    /// and every `shouldNotIndent` position inherits it by construction.
+    pub(in crate::printer) fn build_flat_chain_expression_doc(
         &self,
         expr: &Expression<'_>,
     ) -> DocId {
         if let Expression::BinaryExpression(binary) = expr {
-            let doc = self.build_binary_chain_doc_with_continuation_indent(binary);
-            return self.prepend_owned_leading_comment(expr, doc);
-        }
-        // ⚠️ A SEQUENCE root does NOT join the binary here by default, though it is the
-        // same shape of chain: prettier's svelte expression-root wrapper reaches the
-        // continuation indent through the binaryish parent rule, which a sequence's
-        // `group(join([",", line]))` never consults — so prettier breaks `{(a,⏎b)}` flush
-        // and tsv matches it at every head prettier width-wraps. The one head it does not
-        // wrap at all — a block head — asks for the indent explicitly
-        // (`EmbedContext::root_sequence_indents`), since there tsv's wrap is its own and
-        // owes its own geometry rather than a shape inherited from a position prettier
-        // answered.
-        if self.embed.root_sequence_indents
-            && let Expression::SequenceExpression(seq) = expr
-        {
-            // `build_sequence_doc` is not `build_expression_doc`, so the owned leading
-            // comment seam is this caller's (docs/comments.md hazard 1) — exactly the
-            // obligation the binary arm above discharges with its own prepend.
-            let doc = self.build_sequence_doc(seq, SeqLayout::Indented);
+            let doc = self.build_binary_chain_doc_flat(binary);
             return self.prepend_owned_leading_comment(expr, doc);
         }
         self.build_expression_doc(expr)
@@ -603,7 +620,15 @@ impl<'a> Printer<'a> {
 
         match expr {
             Expression::BinaryExpression(binary) => {
-                // Use indented binary chain - continuation lines get extra indent
+                // NOT an opt-in to continuation indent — that is the default now
+                // ([`Printer::build_binary_chain_doc`]). This builder differs in GROUP
+                // STRUCTURE: it puts each continuation directly in the outer group, so a
+                // break forced there breaks every operand, where the default's sub-group
+                // lets the continuation re-evaluate and stay flat. Collapsing the two was
+                // tried and measured: the whole fixture corpus stayed green and
+                // `prettier/tests/format/js/comments/binary-expressions-parens.js` moved
+                // match → unknown, where a multiline block comment ahead of the argument
+                // forces the break prettier propagates through the chain.
                 self.build_binary_chain_doc_indented(binary)
             }
             Expression::ConditionalExpression(cond) => {
@@ -949,7 +974,7 @@ impl<'a> Printer<'a> {
             // an arrow body, an inner `await`) re-marks the target, so a read afterwards
             // would see the nested answer instead of this operand's.
             let expands = needs_parens && self.ternary_takes_extra_indent(expression);
-            let operand = self.build_continuation_indent_expression_doc(expression);
+            let operand = self.build_expression_doc(expression);
             parts.push(if expands {
                 self.build_expanding_parens_body_doc(operand)
             } else {

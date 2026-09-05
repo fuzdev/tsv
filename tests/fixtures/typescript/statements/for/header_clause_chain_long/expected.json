@@ -1,0 +1,979 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1404,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A C-style for header IS a ForStatement, so an init clause chain stays flush with",
+			"start": 10,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the clause (prettier's shouldNotIndent names it; the for-in/of iterable is not one)",
+			"start": 95,
+			"end": 181,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The update clause is the same term",
+			"start": 306,
+			"end": 343,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A sequence clause's ELEMENTS are not that term — their parent is the sequence — so an",
+			"start": 471,
+			"end": 559,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " element chain takes the continuation indent, one level past the clause",
+			"start": 561,
+			"end": 634,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The sequence clause's own indent starts AFTER the first operand, so a first operand",
+			"start": 768,
+			"end": 854,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " that breaks internally keeps its lines at the clause column",
+			"start": 856,
+			"end": 918,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars - the header stays inline",
+			"start": 1063,
+			"end": 1101,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - the header breaks onto its own lines; the clause itself still fits",
+			"start": 1204,
+			"end": 1285,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 1
+				},
+				"end": {
+					"line": 44,
+					"column": 82
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1403,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1394,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 49,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 183,
+					"end": 303,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 5
+						}
+					},
+					"init": {
+						"type": "LogicalExpression",
+						"start": 191,
+						"end": 292,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 7,
+								"column": 5
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 191,
+							"end": 283,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 48
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 191,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 42
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 237,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 48
+									}
+								},
+								"name": "cccccccccccccccccccccccccccccccccccccccccccccc"
+							}
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 289,
+							"end": 292,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 5
+								}
+							},
+							"name": "ddd"
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 301,
+						"end": 303,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 3
+							},
+							"end": {
+								"line": 9,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A C-style for header IS a ForStatement, so an init clause chain stays flush with",
+							"start": 10,
+							"end": 93
+						},
+						{
+							"type": "Line",
+							"value": " the clause (prettier's shouldNotIndent names it; the for-in/of iterable is not one)",
+							"start": 95,
+							"end": 181
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 345,
+					"end": 468,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 5
+						}
+					},
+					"init": null,
+					"test": null,
+					"update": {
+						"type": "LogicalExpression",
+						"start": 361,
+						"end": 462,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 2
+							},
+							"end": {
+								"line": 17,
+								"column": 5
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 361,
+							"end": 453,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 48
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 361,
+								"end": 401,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 42
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 407,
+								"end": 453,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 48
+									}
+								},
+								"name": "cccccccccccccccccccccccccccccccccccccccccccccc"
+							}
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 459,
+							"end": 462,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 5
+								}
+							},
+							"name": "ddd"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 466,
+						"end": 468,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 3
+							},
+							"end": {
+								"line": 18,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The update clause is the same term",
+							"start": 306,
+							"end": 343
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 636,
+					"end": 765,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 5
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 644,
+						"end": 754,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 2
+							},
+							"end": {
+								"line": 26,
+								"column": 5
+							}
+						},
+						"expressions": [
+							{
+								"type": "LogicalExpression",
+								"start": 644,
+								"end": 747,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 6
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 644,
+									"end": 737,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 49
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 644,
+										"end": 684,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 42
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 691,
+										"end": 737,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 3
+											},
+											"end": {
+												"line": 24,
+												"column": 49
+											}
+										},
+										"name": "cccccccccccccccccccccccccccccccccccccccccccccc"
+									}
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 744,
+									"end": 747,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 3
+										},
+										"end": {
+											"line": 25,
+											"column": 6
+										}
+									},
+									"name": "ddd"
+								}
+							},
+							{
+								"type": "Identifier",
+								"start": 752,
+								"end": 754,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 3
+									},
+									"end": {
+										"line": 26,
+										"column": 5
+									}
+								},
+								"name": "bb"
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 763,
+						"end": 765,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 3
+							},
+							"end": {
+								"line": 28,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A sequence clause's ELEMENTS are not that term — their parent is the sequence — so an",
+							"start": 471,
+							"end": 559
+						},
+						{
+							"type": "Line",
+							"value": " element chain takes the continuation indent, one level past the clause",
+							"start": 561,
+							"end": 634
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 920,
+					"end": 1060,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 5
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 928,
+						"end": 1049,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 2
+							},
+							"end": {
+								"line": 37,
+								"column": 5
+							}
+						},
+						"expressions": [
+							{
+								"type": "CallExpression",
+								"start": 928,
+								"end": 1042,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 2
+									},
+									"end": {
+										"line": 36,
+										"column": 3
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 928,
+									"end": 963,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 2
+										},
+										"end": {
+											"line": 33,
+											"column": 37
+										}
+									},
+									"name": "fnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 968,
+										"end": 996,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 3
+											},
+											"end": {
+												"line": 34,
+												"column": 31
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 1001,
+										"end": 1038,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 3
+											},
+											"end": {
+												"line": 35,
+												"column": 40
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								],
+								"optional": false
+							},
+							{
+								"type": "Identifier",
+								"start": 1047,
+								"end": 1049,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 3
+									},
+									"end": {
+										"line": 37,
+										"column": 5
+									}
+								},
+								"name": "bb"
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 1058,
+						"end": 1060,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 3
+							},
+							"end": {
+								"line": 39,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The sequence clause's own indent starts AFTER the first operand, so a first operand",
+							"start": 768,
+							"end": 854
+						},
+						{
+							"type": "Line",
+							"value": " that breaks internally keeps its lines at the clause column",
+							"start": 856,
+							"end": 918
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 1103,
+					"end": 1201,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 99
+						}
+					},
+					"init": {
+						"type": "LogicalExpression",
+						"start": 1108,
+						"end": 1194,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 6
+							},
+							"end": {
+								"line": 42,
+								"column": 92
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 1108,
+							"end": 1187,
+							"loc": {
+								"start": {
+									"line": 42,
+									"column": 6
+								},
+								"end": {
+									"line": 42,
+									"column": 85
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 1108,
+								"end": 1148,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 6
+									},
+									"end": {
+										"line": 42,
+										"column": 46
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 1152,
+								"end": 1187,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 50
+									},
+									"end": {
+										"line": 42,
+										"column": 85
+									}
+								},
+								"name": "ccccccccccccccccccccccccccccccccccc"
+							}
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 1191,
+							"end": 1194,
+							"loc": {
+								"start": {
+									"line": 42,
+									"column": 89
+								},
+								"end": {
+									"line": 42,
+									"column": 92
+								}
+							},
+							"name": "ddd"
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 1199,
+						"end": 1201,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 97
+							},
+							"end": {
+								"line": 42,
+								"column": 99
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 100 chars - the header stays inline",
+							"start": 1063,
+							"end": 1101
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 1287,
+					"end": 1393,
+					"loc": {
+						"start": {
+							"line": 45,
+							"column": 1
+						},
+						"end": {
+							"line": 48,
+							"column": 5
+						}
+					},
+					"init": {
+						"type": "LogicalExpression",
+						"start": 1295,
+						"end": 1382,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 2
+							},
+							"end": {
+								"line": 46,
+								"column": 89
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 1295,
+							"end": 1375,
+							"loc": {
+								"start": {
+									"line": 46,
+									"column": 2
+								},
+								"end": {
+									"line": 46,
+									"column": 82
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 1295,
+								"end": 1335,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 2
+									},
+									"end": {
+										"line": 46,
+										"column": 42
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 1339,
+								"end": 1375,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 46
+									},
+									"end": {
+										"line": 46,
+										"column": 82
+									}
+								},
+								"name": "cccccccccccccccccccccccccccccccccccc"
+							}
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 1379,
+							"end": 1382,
+							"loc": {
+								"start": {
+									"line": 46,
+									"column": 86
+								},
+								"end": {
+									"line": 46,
+									"column": 89
+								}
+							},
+							"name": "ddd"
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 1391,
+						"end": 1393,
+						"loc": {
+							"start": {
+								"line": 48,
+								"column": 3
+							},
+							"end": {
+								"line": 48,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - the header breaks onto its own lines; the clause itself still fits",
+							"start": 1204,
+							"end": 1285
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
