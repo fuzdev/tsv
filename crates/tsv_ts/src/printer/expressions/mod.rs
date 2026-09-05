@@ -183,7 +183,6 @@ impl<'a> Printer<'a> {
     /// - an arrow function's expression body (`node === parent.body && parent.type ===
     ///   "ArrowFunctionExpression"`);
     /// - a template-literal interpolation (`parent.type === "TemplateLiteral"`);
-    /// - a `Boolean()` argument (`key === "arguments" && isBooleanTypeCoercion(parent)`);
     /// - a `return`/`throw` argument in the hanging-paren form
     ///   (`isReturnOrThrowStatement(parent)` — the ordinary form's parent owns the group,
     ///   so it takes `build_binary_chain_doc_ungrouped` instead);
@@ -193,12 +192,17 @@ impl<'a> Printer<'a> {
     /// - a ternary test whose ternary is not itself a return/throw/call/new value
     ///   (`parent.type === "ConditionalExpression"` with the grandparent exclusions).
     ///
-    /// Two positions reach the same layout through [`Printer::mark_flat_chain`] instead,
+    /// Three positions reach the same layout through [`Printer::mark_flat_chain`] instead,
     /// because they hand their value to a generic builder and cannot name one: a ternary
-    /// *branch* (its value goes through the paren shell, which owns the gap after it) and
-    /// a C-style `for` header clause (`node !== parent.body && parent.type ===
+    /// *branch* (its value goes through the paren shell, which owns the gap after it), a
+    /// C-style `for` header clause (`node !== parent.body && parent.type ===
     /// "ForStatement"`; the clause's builder belongs to its caller, and a sequence clause's
-    /// ELEMENTS are deliberately not marked — their parent is the sequence).
+    /// ELEMENTS are deliberately not marked — their parent is the sequence), and a
+    /// `Boolean()` coercion's argument (`key === "arguments" &&
+    /// isBooleanTypeCoercion(parent)`, marked by `calls::mark_boolean_coercion_argument`
+    /// at both call-argument entry points; every call layout — plain or member-chain,
+    /// commented or not — reaches the argument through
+    /// [`Printer::build_arg_expression_doc`], which reads the mark).
     ///
     /// A non-binary expression is unaffected and takes the ordinary path.
     ///
@@ -619,6 +623,18 @@ impl<'a> Printer<'a> {
         }
 
         match expr {
+            // A `Boolean()` coercion's lone argument — the one argument position in
+            // prettier's `shouldNotIndent` — arrives marked by its call printer
+            // (`Printer::mark_flat_chain`, set at both call-argument entry points), and
+            // takes the flat layout through the seam that owns the owned-comment prepend.
+            // Read here, at the builder every argument layout shares, rather than at each
+            // layout arm: the arms that named a flat builder themselves covered one layout
+            // in six.
+            Expression::BinaryExpression(binary)
+                if self.flat_chain_target.get() == Some(binary.span) =>
+            {
+                self.build_flat_chain_expression_doc(expr)
+            }
             Expression::BinaryExpression(binary) => {
                 // NOT an opt-in to continuation indent — that is the default now
                 // ([`Printer::build_binary_chain_doc`]). This builder differs in GROUP
