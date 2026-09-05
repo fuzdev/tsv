@@ -14,7 +14,7 @@
  * into `for (let of foo);` — output tsv's own parser rejects — and it sat behind a green
  * `deno task check` for a whole PR. Three prettier-suite files caught it on the first run;
  * nothing in `tests/fixtures` could. The same sweep is a leg of `audit:corpus`, but that
- * runs at release cadence over machine-dependent dev repos and takes minutes.
+ * runs at release cadence over the sibling snapshot + working trees and takes minutes.
  *
  * Cost is ~0.1 s for ~2,350 files (pure Rust, no sidecar, reparse-only fast path), on a
  * binary the preceding `roundtrip:audit` leg has already built with the same profile and

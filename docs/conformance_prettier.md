@@ -755,7 +755,7 @@ than repeating three times.
 **Corpus comparison** validates formatting against Prettier on real codebases:
 
 ```bash
-deno task corpus:compare:format --all --explain           # The gates corpus view (~6,200 files: real repos + prettier suites)
+deno task corpus:compare:format --all --explain           # The gates corpus view (~6,200 files: the ../corpora snapshot + prettier suites)
 deno task corpus:compare:format ../project --explain  # Single project (scans all files recursively)
 ```
 

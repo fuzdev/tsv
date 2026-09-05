@@ -95,9 +95,12 @@ Things the published numbers measure that aren't quite what they look like.
   Documented in the report footnotes.
 - **Self-corpus / representativeness.** The perf corpus is real-world code only
   (fixture suites live in the `gates`/`conformance` views — [corpus
-  views](../benches/js/CLAUDE.md#corpus)), but it's dominated by
+  views](../benches/js/CLAUDE.md#corpus)), read from the pinned `fuzdev/corpora`
+  snapshot (the report's `corpus_snapshot` names the one commit; each source's
+  `repo` names the upstream it vendored), but it's dominated by
   the author's own fuz ecosystem plus svelte/kit source — the same code tsv is
-  developed and fixture-tuned against. Throughput tracks the syntactic mix of
+  developed and fixture-tuned against, and mostly tsv-formatted already (the
+  snapshot tags each collection `shaped_by`). Throughput tracks the syntactic mix of
   _this_ corpus, so ratios are "N× on this corpus," not universal. CSS is by far
   the weakest sample: only a few dozen real standalone files exist in this
   ecosystem (most CSS is authored inside `.svelte` `<style>` blocks), so the

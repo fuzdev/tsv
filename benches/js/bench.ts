@@ -77,12 +77,13 @@ import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import {
 	corpus_missing_entries,
+	type CorpusRepoRef,
 	type CorpusSource,
-	DevReposLoader,
+	CorpusLoader,
 	format_mb,
 	group_by_language
 } from './lib/corpus.ts';
-import { enrich_source_repos } from './lib/corpus_repos.ts';
+import { detect_corpus_snapshot, enrich_source_repos } from './lib/corpus_repos.ts';
 import { PERF_OMITS, type PerfOmit, perf_omit_matches, stale_perf_omits } from './lib/perf_omit.ts';
 import {
 	get_alternative_versions,
@@ -433,7 +434,7 @@ const RESULTS_DIR = './benches/js/results';
 //
 
 log('Loading corpus...\n');
-const corpus_loader = new DevReposLoader(CORPUS_MODE, {
+const corpus_loader = new CorpusLoader(CORPUS_MODE, {
 	// The bench loads EVERY language, so it has no `{ complete_for }` posture to
 	// take here — `enforce_css_reject_pin` asks the per-language completeness
 	// question separately, and degrades that one pin to "not graded" rather than
@@ -1910,8 +1911,18 @@ interface BaselineVersions extends ReportVersions {
  * 13: `output_digest_ungraded` — files a byte-graded row accepted whose output the
  * byte-parity check could not digest, keyed `"<group>/<row>"`. Records a
  * measurement the run could not make, where every other field records one it did.
+ *
+ * 14: `corpus_snapshot` — the `fuzdev/corpora` checkout (URL + commit) every
+ * `real`/`framework` source was read from: one roll-up commit for the whole
+ * real-code corpus, so the numbers are reproducible with one clone. Absent on a
+ * conformance-only run (no real code) or when the snapshot isn't checked out. A
+ * COMMIT, where the gate pin (`GATE_CHECKOUT_IDS['../corpora']`) is that
+ * checkout's `collections/` TREE id: a reader clones a commit and the commit fixes
+ * the tree, so the two agree by construction — but several commits can name one
+ * tree (the snapshot repo's own tooling commits do), so this field moving between
+ * two reports does not by itself mean the corpus did.
  */
-const REPORT_SCHEMA_VERSION = 13;
+const REPORT_SCHEMA_VERSION = 14;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -1951,6 +1962,16 @@ interface Baseline {
 	 * produced on a partial machine would be indistinguishable from a full one.
 	 */
 	corpus_sources: CorpusSource[];
+	/**
+	 * The real-code snapshot the `real`/`framework` sources were read from — the
+	 * `fuzdev/corpora` checkout at its commit (`subpath` empty). One roll-up commit
+	 * for every real-code source (each source's own `repo` names the upstream that
+	 * commit vendored); the commit, not the `collections/` tree id the corpus gates
+	 * pin, since a tree id names bytes but cannot be cloned (see
+	 * `REPORT_SCHEMA_VERSION` 14). Absent when there is no real code in the corpus
+	 * (conformance runs) or the snapshot isn't checked out.
+	 */
+	corpus_snapshot?: CorpusRepoRef;
 	/**
 	 * Per-corpus-source coverage — `group → source → impl → {processed, total}`,
 	 * the machine-readable half of the report's per-source tables. Present on
@@ -2184,6 +2205,7 @@ async function build_results_data(
 		machine: current_machine(),
 		corpus,
 		corpus_sources: corpus_loader.sources,
+		corpus_snapshot: (await detect_corpus_snapshot(corpus_loader.sources)) ?? undefined,
 		// Per-source coverage, the JSON half of the markdown tables. Coverage-only
 		// runs only: on the perf surface every cell would read 100% by construction
 		// (an unlisted per-file failure hard-fails the run instead).
@@ -2245,6 +2267,15 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 			`${corpus.css} CSS (${format_mb(corpus_bytes.css)}) — ` +
 			`${total_files} files, ${format_mb(total_bytes)} total\n`
 	);
+	// The one commit that reproduces every real-code source below (each of them a
+	// collection of the snapshot, linked to its own upstream in the sources table).
+	if (data.corpus_snapshot) {
+		const snap = data.corpus_snapshot;
+		lines.push(
+			`**Corpus snapshot:** [${snap.slug}@${snap.commit.slice(0, 9)}](${snap.url}/tree/${snap.commit}) — ` +
+				`the real-code sources are its collections, vendored at this commit\n`
+		);
+	}
 	if (corpus_loader.sources.length > 0) {
 		lines.push(
 			`**Sources:** ${corpus_loader.sources.map((s) => `${s.path} (${s.files})`).join(', ')}\n`

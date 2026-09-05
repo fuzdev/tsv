@@ -2,7 +2,7 @@
 
 > The standing correctness audits over the formatter, the parsers and their wire contract, the Svelte compiler, and the canonical oracles all of them are graded against — what each proves, what it is blind to, how to run it, and where it gates. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
 
-Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, `../svelte/packages/svelte/src`, sibling dev repos): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`swallow_check` / `comment_check`) build via the `audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported instead of killing the process; plain `--release` is `panic = "abort"`). ⚠️ A **stack overflow** is the one failure this containment cannot reach — it is not a panic, so no `catch_unwind` sees it and the sweep dies outright rather than reporting one file. That is why `tsv_debug`'s dispatch runs on the same stated reservation the `tsv` binary does (`tsv_cli::cli::stack`), which puts the depth an audit survives out of reach of ordinary input and, more to the point, makes it the same on every machine; see [cli.md §Recursion Depth](./cli.md#recursion-depth).
+Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, the `../corpora` snapshot's collections, the `live` working trees): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`swallow_check` / `comment_check`) build via the `audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported instead of killing the process; plain `--release` is `panic = "abort"`). ⚠️ A **stack overflow** is the one failure this containment cannot reach — it is not a panic, so no `catch_unwind` sees it and the sweep dies outright rather than reporting one file. That is why `tsv_debug`'s dispatch runs on the same stated reservation the `tsv` binary does (`tsv_cli::cli::stack`), which puts the depth an audit survives out of reach of ordinary input and, more to the point, makes it the same on every machine; see [cli.md §Recursion Depth](./cli.md#recursion-depth).
 
 The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, the validation-suite ratchet, the differential compile fuzzer — are not audits in this sense and are not gated here; they live in [compile_tooling.md](compile_tooling.md) and [compile_validation_ratchet.md](compile_validation_ratchet.md). The compile fixtures are the one split case: their parity legs are pure Rust and gate in `check`, their oracle-freshness leg needs the sidecar and gates in `conformance`, so both are documented [below](#compile-fixture-validation-compilefixturesvalidate).
 
@@ -24,10 +24,11 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates | `deno task check` |
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
+| [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
-| [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; commit drift (warn) | `deno task conformance` (preflight) |
+| [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `deno task conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check`; `audit:corpus` (real code) |
 | [Razor sweep](#print-width-razor-sweep-razoraudit) | `razor:audit` | width-keyed layout bugs — an F1 break at some column, and the stray line-head boundary space that is its OWN fixed point | `deno task check` |
 | [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present); `audit:corpus` (real code) |
@@ -72,7 +73,7 @@ whitespace edit across many fixtures, run all four.
 # content loss). Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files
 # to audit real code. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug --features audits swallow_audit                # audit all fixtures
-cargo run --profile corpus -p tsv_debug --features audits swallow_audit ../zzz/src  # audit a real codebase
+cargo run --profile corpus -p tsv_debug --features audits swallow_audit ../corpora/collections/zzz/src  # audit a real codebase
 # Also: --json. The check lives in tsv_lang::doc::swallow behind the `swallow_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND
 # default tsv_debug builds (profile/perf sessions measure production-shaped render
@@ -122,7 +123,7 @@ The print-once comment ledger: every comment a document PARSES must be EMITTED e
 # DOUBLE-PRINTED. Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files to
 # audit real code. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug --features audits comment_audit                # audit all fixtures
-cargo run --profile corpus -p tsv_debug --features audits comment_audit ../zzz/src  # audit a real codebase
+cargo run --profile corpus -p tsv_debug --features audits comment_audit ../corpora/collections/zzz/src  # audit a real codebase
 # Also: --json. The ledger lives in tsv_lang::comment_ledger behind the `comment_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND default
 # tsv_debug builds (profile/perf sessions measure production-shaped code). The
@@ -150,7 +151,7 @@ Full reference — flags, the ratchet, reading a finding, triage + re-pin workfl
 # AUTHORED, so a gap no fixture puts a comment in is one it never checks (eight such
 # drops were found BY HAND, all green on every gate). Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits gap_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits gap_audit ../zzz/src
+cargo run --profile corpus -p tsv_debug --features audits gap_audit ../corpora/collections/zzz/src
 # Also: --json, --jobs N, --limit N, --payload <one>, --all-bytes, --update.
 # Build with `--profile corpus` (optimized + panic=unwind): plain `--release` is
 # panic=abort, so a formatter panic kills the process instead of being caught + reported.
@@ -428,7 +429,7 @@ Full reference — flags, the ratchet, the absorb pin, reading a finding, the si
 # 1-4 are the shared `f1_check` (also driving `fuzz`); 5 is the print-once ledger;
 # 6 is a region-scoped output scan. Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits blank_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits blank_audit ../zzz/src
+cargo run --profile corpus -p tsv_debug --features audits blank_audit ../corpora/collections/zzz/src
 # Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile
 # corpus` (optimized + panic=unwind) so a formatter panic is caught + reported.
 #
@@ -474,7 +475,7 @@ Why it needs its own gate. A fabricated blank is indistinguishable from an autho
 # holds that the input did not, minus three structurally sanctioned layout rules.
 # Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files to audit real code.
 cargo run --profile corpus -p tsv_debug --features audits fabrication_audit
-cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../zzz/src
+cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../corpora/collections/zzz/src
 # Also: --json, --update. ~0.2 s over tests/fixtures.
 #
 # GATED as a RATCHET over `fabrication_audit_known.txt`, keyed by the SHAPE of the two
@@ -516,7 +517,7 @@ Why it needs its own gate: every other comment instrument reads a channel the pa
 # MISSING = dropped comment; EXTRA = duplicated/fabricated one; a merge or interior
 # rewrite shows as a MISSING + EXTRA pair. Pure Rust, no Deno.
 cargo run --profile corpus -p tsv_debug --features audits census_audit                # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits census_audit ../zzz/src  # a real codebase
+cargo run --profile corpus -p tsv_debug --features audits census_audit ../corpora/collections/zzz/src  # a real codebase
 # Also: --json, --update. ~0.35 s over tests/fixtures.
 #
 # GATED as a RATCHET over `census_audit_known.txt`, keyed (path, bucket, direction) —
@@ -564,7 +565,7 @@ Two real bugs (the mid-run comment weld and its leading twin) shipped an over-wi
 # width_audit - format each seed and report every output line over PRINT_WIDTH,
 # rolled up by shape. Pure Rust, no Deno, no instrumentation feature.
 cargo run --profile corpus -p tsv_debug --features audits width_audit
-cargo run --profile corpus -p tsv_debug --features audits width_audit ../zzz/src
+cargo run --profile corpus -p tsv_debug --features audits width_audit ../corpora/collections/zzz/src
 # Also: --json, --verbose (every line, not the per-shape rollup), --limit N, --update.
 # A narrowed run (explicit paths / --limit) reports and exits 0 without grading — the
 # snapshot pins the full default run — and says so, so it cannot read as a green gate.
@@ -629,7 +630,7 @@ The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` pos
 # would grade that decided wider freeze as a finding. Honoring stays per-candidate.
 # A cheaper per-injection battery (<= 4 formats) than blank_audit's F1. Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits ignore_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits ignore_audit ../zzz/src
+cargo run --profile corpus -p tsv_debug --features audits ignore_audit ../corpora/collections/zzz/src
 # Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile corpus`
 # (optimized + panic=unwind) so a formatter panic is caught + reported.
 #
@@ -749,8 +750,8 @@ deno task format:audit
   was found here first.
 
 **Why it is not redundant with the corpus gates.** `corpus:compare:format` and the
-conformance gates read **other** repositories (framework checkouts, prettier
-suites, the live dev repos). None of them read tsv's own `benches/js`, `scripts`,
+conformance gates read **other** repositories (the `../corpora` snapshot, prettier
+suites, the live working trees). None of them read tsv's own `benches/js`, `scripts`,
 or `crates/**/npm` sources, so nothing else covers this tree.
 
 **Scope.** The root `.formatignore` prunes `tests/fixtures/` and
@@ -767,6 +768,41 @@ own TS never writes stays invisible here. The injection audits (`gaps:audit`,
 
 **Build world.** Runs `tsv_cli` under `--profile corpus`, the single build world
 every `deno task check` audit shares, so it adds no separate compile.
+
+## Corpus Discovery Parity Audit (`discovery:audit`)
+
+```bash
+deno task discovery:audit
+```
+
+**What it proves.** The real-code corpus every gate and bench reads is DEFINED by the
+`../corpora` snapshot's committed tree — its materializer lists tracked files at the
+pinned upstream commits — and never by tsv's own discovery, so a tsv discovery bug
+cannot silently shrink every consumer's corpus. This leg makes that separation
+observable: it runs the production discovery (`tsv format --list ../corpora/collections`
+— `tsv_cli`'s walk, ignore-file and safety-net handling included) and compares the
+result with `git ls-files` over the same tree filtered to the extensions tsv formats
+(`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`/`.svelte`/`.css`). The two lists must be
+identical. A snapshot file tsv does not list is a **discovery finding** — a prune firing
+on real code (a directory name a safety net or the build-output heuristic claims), or an
+extension tsv stopped formatting. A listed file the snapshot does not hold is a
+**bookkeeping finding** — an extension tsv formats that the probe's list does not name
+(update `TSV_EXTENSIONS` in `scripts/discovery_audit.ts`), or an untracked file. The
+extension list is restated in the script on purpose: read from the Rust side, the probe
+would agree with tsv by construction.
+
+**Blind spots.** It grades the snapshot only, so a prune that fires on a directory shape
+no collection contains stays unseen until a collection carries it — the corpus growing
+is what widens this audit. It says nothing about what tsv does WITH a file (the corpus
+gates own that); only that discovery reaches it.
+
+**Gating.** In `deno task check` beside `roundtrip:audit:prettier`, with the same
+opportunistic posture: `../corpora` present ⇒ it gates, absent ⇒ a loud `NOT RUN` line
+and exit 0 (the CI `check` job has no sibling checkouts). An invariant, not a count pin,
+so a smaller corpus can only cost coverage. A **dirty** checkout is refused rather than
+graded — `git ls-files` describes the commit, the walk describes the disk, and a local
+modification would otherwise read as a tsv finding (`deno task doctor` reports the same
+state). ~0.1 s on the `--profile corpus` `tsv_cli` binary `format:audit` already built.
 
 ## Doc-Link Audit (`docs:audit`)
 
@@ -1024,11 +1060,12 @@ would be pure collateral damage: the chain halts and the real regressions go unr
 preflights `deno task conformance` instead, whose legs do read them; `doctor` reports both
 modes ahead of time. Passing neither flag runs both, which is what `doctor` does.
 
-**Commit drift is warn-only, by design.** A version string only bumps at release, so upstream
+**Checkout drift is warn-only, by design.** A version string only bumps at release, so upstream
 commits landing in between change a graded suite with no version signal at all — precisely how
-the count pins went stale unnoticed. Each checkout's HEAD is compared against the commit
-`GATE_CHECKOUT_COMMITS` records it was measured at ([gate_counts.md](gate_counts.md)) and a
-move is reported, never failed: the count pins are the gate, this is the diagnosis, so when one
+the count pins went stale unnoticed. Each checkout's HEAD — or, for the `../corpora` snapshot,
+the id of its `collections/` tree, so the snapshot repo's tooling commits are not moves — is
+compared against the id `GATE_CHECKOUT_IDS` records it was measured at
+([gate_counts.md](gate_counts.md)) and a move is reported, never failed: the count pins are the gate, this is the diagnosis, so when one
 trips "the corpus moved" is distinguishable from "tsv regressed" at a glance rather than by
 reverse-engineering.
 
@@ -1080,7 +1117,7 @@ never graded and carries no ratchet file.
 # ONLY, so point it at a real codebase too: findings live there (a non-idempotent fill
 # 2-cycle was green on fixtures while failing on ../zzz).
 cargo run -p tsv_debug authoring_audit                  # audit tests/fixtures (pure Rust)
-cargo run -p tsv_debug authoring_audit ../zzz/src    # audit a real codebase
+cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src    # audit a real codebase
 # Pure-Rust verdict per site: converge / diverge (dual-stable) / diverge
 # (NON-IDEMPOTENT); exits 1 on any non-idempotency — site-level, and also a
 # base-non-idempotent FILE (one whose own format isn't a fixed point). Such a file
@@ -1094,7 +1131,7 @@ cargo run -p tsv_debug authoring_audit ../zzz/src    # audit a real codebase
 # diverge (sanctioned, e.g. Tier-2 element expansion). --dump-dir writes byte-exact
 # repro artifacts per hard finding — the basis for a fixtures-first fix.
 # Also: --json, --verbose, --limit N (sites/file), --examples N.
-cargo run -p tsv_debug authoring_audit ../zzz/src --prettier --dump-dir /tmp/audit
+cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src --prettier --dump-dir /tmp/audit
 ```
 
 ## Print-Width Razor Sweep (`razor:audit`)
@@ -1105,7 +1142,7 @@ cargo run -p tsv_debug authoring_audit ../zzz/src --prettier --dump-dir /tmp/aud
 # seeds only. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug razor_audit                 # sweep all fixtures
 cargo run --profile corpus -p tsv_debug razor_audit --width 8       # cheaper/narrower sweep
-cargo run --profile corpus -p tsv_debug razor_audit ../zzz/src   # sweep a real codebase
+cargo run --profile corpus -p tsv_debug razor_audit ../corpora/collections/zzz/src   # sweep a real codebase
 # Also: --json, --limit N.
 ```
 
@@ -1169,7 +1206,7 @@ the default width).
 # Zero false positives on real formatted code; point it at the delimiter-dense
 # prettier suites for the work-list.
 cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
-cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../zzz/src
+cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../corpora/collections/zzz/src
 # --gate fails ONLY on the *_unreparseable buckets (the reliable half — divergent is
 # render-model noise over tests/fixtures). Bare --gate runs phase 1 only via a
 # reparse-only fast path (pure Rust, no sidecar) — the `deno task roundtrip:audit`
@@ -1272,14 +1309,16 @@ cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 # the very whitespace that carries the meaning, and authoring_audit asks the
 # CONVERGENCE question (do two authorings reach one fixed point), never whether that
 # fixed point renders like the input.
-cargo run --profile corpus -p tsv_debug --quiet render_audit ../zzz/src
+cargo run --profile corpus -p tsv_debug --quiet render_audit ../corpora/collections/zzz/src
 deno task render:audit ../svelte/packages/svelte/tests   # (--gate baked in)
 # Also: --gate (exit 1 on findings), --json, --limit N (0 = unlimited, as in every
 # other audit). Needs the Deno sidecar, so
 # NOT in `deno task check` — and not in the pure-Rust `audit:corpus` either. It is
 # release-gated as a leg of `deno task conformance` (the one leg that runs as a
-# subprocess), scoped there to the version-pinned `framework` + `suite` checkouts so
-# a live working tree can't move a release verdict; run it standalone on any corpus
+# subprocess), scoped there to the WHOLE `../corpora` snapshot (every collection it
+# vendors — the third-party Svelte libraries the bench views leave out included, since
+# this leg pins no count) plus the version-pinned `suite` checkout, so a live working
+# tree can't move a release verdict; run it standalone on any corpus
 # after a printer change. Files whose format is a no-op skip the ORACLE (trivially
 # render-equal by identity) but still carry a verdict, so they count toward the
 # vacuity floor; files Svelte's semantic ANALYZER rejects are counted as
@@ -1358,7 +1397,7 @@ cargo run -p tsv_debug neutrality_audit ../svelte/packages/svelte/src
 # unmutated file on disk), so it is listed rather than dumped. HARD verdicts fail.
 cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
 cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --evolve --minimize --dump-dir /tmp/fz  # discovery
-cargo run -p tsv_debug fuzz --iterations 0 ../zzz/src       # pristine pass only = an F1 sweep
+cargo run -p tsv_debug fuzz --iterations 0 ../corpora/collections/zzz/src       # pristine pass only = an F1 sweep
 # HARD findings (exit 1): panic / unreparseable / non_idempotent / format_error —
 # always real bugs. SOFT findings (reported, non-fatal): structural_divergence — the
 # render-model-noisy bucket that needs canonical confirmation (roundtrip_audit
@@ -1376,7 +1415,7 @@ cargo run -p tsv_debug fuzz --iterations 0 ../zzz/src       # pristine pass only
 
 ## F1 Idempotency Sweep (`idempotency:sweep`)
 
-The fuzzer's pristine pass, pointed at the `perf` corpus view (the sibling dev repos + upstream framework source) — `format(format(x)) == format(x)` on every real file. NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
+The fuzzer's pristine pass, pointed at the `robustness` corpus view (the `../corpora` snapshot's real code + the live diff: the files of this machine's working trees of the same repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `live_diff_files`) — `format(format(x)) == format(x)` on every real file. NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
 
 ```bash
 deno task idempotency:sweep
@@ -1386,7 +1425,7 @@ deno task idempotency:sweep
 
 ## The Corpus Bundle (`audit:corpus`)
 
-The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `deno task check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `swallow_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `census_audit` + `fabrication_audit` + `fuzz --iterations 0`, over the `perf` corpus view + the pinned prettier suites. Pure Rust; absent dev repos warn-skip (floor = `../svelte` src). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
+The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `deno task check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `swallow_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `census_audit` + `fabrication_audit` + `fuzz --iterations 0`, over the `robustness` corpus view (the `../corpora` snapshot + the live working trees' diff against it) + the pinned prettier suites. Pure Rust; absent working trees warn-skip (floor = the snapshot). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
 
 ```bash
 deno task audit:corpus
@@ -1394,7 +1433,7 @@ deno task audit:corpus
 
 **Two of the three as-authored ratchets are legs here; the third cannot be.** `census_audit` and `fabrication_audit` both assert a **zero** — off their default corpus the snapshot is not consulted and `grade_narrowed_strictly` fails every finding, pinned or not — and the corpus currently holds that zero over all ~5,800 files, at about the cost of a leg already in the bundle. The census in particular is the leg whose own module doc names external corpora as its discovery arm, so its absence was a hole rather than a policy.
 
-`width_audit` stays out **structurally**, not by omission: it has no zero to grade against (the sanctioned overruns are everywhere, which is why a narrowed run reports and exits 0 by design). Gating it here would need a second snapshot pinned over this corpus — and that corpus is the LIVE dev repos, so the snapshot would churn with ordinary work: over `../svelte/packages/svelte/src` + `../zzz/src` alone, 83 of 91 shapes are absent from the committed fixtures snapshot and 25 pinned shapes never fire. That is the re-pin treadmill the format count pins escaped by moving to the reproducible subset ([gate_counts.md](gate_counts.md)). A real-code width run stays a **triage** command.
+`width_audit` stays out **structurally**, not by omission: it has no zero to grade against (the sanctioned overruns are everywhere, which is why a narrowed run reports and exits 0 by design). Gating it here would need a second snapshot pinned over this corpus — and the `robustness` view includes the LIVE working trees, so that snapshot would churn with ordinary work: over the svelte + zzz sources alone, 83 of 91 shapes are absent from the committed fixtures snapshot and 25 pinned shapes never fire. That is the re-pin treadmill the format count pins escaped by gating on the pinned `../corpora` snapshot ([gate_counts.md](gate_counts.md)). A real-code width run stays a **triage** command.
 
 ## Differential Lexer Harness (`lex_diff`)
 
@@ -1406,8 +1445,8 @@ deno task audit:corpus
 # (.ts/.mts/.cts/.js/.mjs/.cjs, .svelte.ts and .d.ts included — the whole family
 # dispatches to one lexer) plus .css.
 # Pure Rust, no Deno.
-cargo run -p tsv_debug lex_diff ../zzz/src --golden /tmp/lex.golden --write  # capture golden
-cargo run -p tsv_debug lex_diff ../zzz/src --golden /tmp/lex.golden          # check against it
+cargo run -p tsv_debug lex_diff ../corpora/collections/zzz/src --golden /tmp/lex.golden --write  # capture golden
+cargo run -p tsv_debug lex_diff ../corpora/collections/zzz/src --golden /tmp/lex.golden          # check against it
 # Options: --write (capture instead of check), --verbose (first divergent line per file)
 ```
 
@@ -1604,7 +1643,7 @@ cargo run -p tsv_debug compile_conformance_audit
 # tests/fixtures_compile (fast); point it at real corpora for the full sweep.
 cargo run -p tsv_debug canonicalize_audit                              # default scope (tests/fixtures only)
 cargo run -p tsv_debug canonicalize_audit tests/fixtures tests/fixtures_compile  # the check-gate scope
-cargo run -p tsv_debug canonicalize_audit ../zzz/src ../gro/src  # real-corpus sweep
+cargo run -p tsv_debug canonicalize_audit ../corpora/collections/zzz/src ../corpora/collections/gro/src  # real-corpus sweep
 # Also: --json
 ```
 

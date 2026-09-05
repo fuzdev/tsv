@@ -14,13 +14,13 @@
  *   benches/js/diagnostics/wasm_json_probe.ts 2>&1 >/dev/null
  */
 
-import { DevReposLoader, group_by_language } from '../lib/corpus.ts';
+import { CorpusLoader, group_by_language } from '../lib/corpus.ts';
 import { init_implementations } from '../lib/implementations.ts';
 
 const ITERS = 5;
 
 const [files, impls] = await Promise.all([
-	new DevReposLoader('gates').load((m) => console.error(m)),
+	new CorpusLoader('gates').load((m) => console.error(m)),
 	init_implementations({ logger: (m) => console.error(m) })
 ]);
 const ts = group_by_language(files).typescript;

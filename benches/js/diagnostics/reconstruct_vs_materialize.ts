@@ -36,7 +36,7 @@
  */
 
 import { create_locator } from '../../../crates/tsv_wasm/npm/locations.js';
-import { DevReposLoader, group_by_language } from '../lib/corpus.ts';
+import { CorpusLoader, group_by_language } from '../lib/corpus.ts';
 import { init_implementations } from '../lib/implementations.ts';
 import type { Language } from '../lib/types.ts';
 
@@ -74,7 +74,7 @@ function bench(fn: () => void, samples = 21, block_ms = 10): number {
 const impls = await init_implementations({ logger: (m) => console.error(m) });
 const native = impls.native;
 
-const files = await new DevReposLoader('perf').load((m) => console.error(m));
+const files = await new CorpusLoader('perf').load((m) => console.error(m));
 const by_lang = group_by_language(files);
 
 interface Totals {

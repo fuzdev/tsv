@@ -209,6 +209,7 @@ deno task scan:audit                 # no new raw find/rfind/match_indices subst
 deno task fanout:audit               # no super-linear doc-node rebuild fanout (per-layout-candidate blowup)
 deno task roundtrip:audit            # format(tests/fixtures) must reparse — pure-Rust tripwire, real yield on external corpora
 deno task roundtrip:audit:prettier   # the same audit over the pinned prettier suites — `check`'s ONLY non-format-stable corpus, so the only leg there that can reach a valid→unreparseable regression. ~0.1 s; warn-skips when `../prettier` is absent (sibling checkout, so `check` still runs on a bare clone)
+deno task discovery:audit            # `tsv format --list ../corpora/collections` must name EXACTLY the snapshot's committed files in tsv's extensions — the corpus is defined by the snapshot's tree, not by tsv's discovery, and this is what keeps a discovery prune from silently shrinking every consumer's corpus. Refuses a dirty checkout. ~0.1 s; warn-skips when `../corpora` is absent
 deno task binding:audit              # comment↔token re-binding (HARD fails the gate, SOFT informational)
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: one fixed point per document
 deno task fuzz:audit                 # seeded mutational fuzzer (fixed seed/iterations): no-panic + idempotency + structural reparse
@@ -226,7 +227,7 @@ deno task idempotency:sweep          # F1 idempotency sweep over the real-code c
 deno task audit:corpus               # the standing content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
 deno task wire:audit                 # WIRE-INJECTION: whitespace injected into every Svelte tag/block head, the resulting wire graded against the canonical parser — the parse-side sibling of gaps/blanks, which grade the formatter. Each variant is graded against its OWN base, so a deliberate divergence fixture contributes nothing. Runs as a CENSUS (`--inject-limit 0`, every site) — the sampled form hid 8x its findings and redrew its sample on every fixture edit, so only a census is gradeable. ⚠️ RED BY DESIGN (a discovery tool, like compile:fuzz); needs the canonical parser, so NOT in check
 deno task wire:audit:terminators     # the same harness, injecting a lone CR / U+2028 / U+2029 anywhere in the document — the spellings on which the two `loc` line classes DISAGREE. The ONLY grader of that model: no fixture can carry a raw CR (the format path folds it) and no real repo has one. Its sites are ~57x denser, so it stays a strided SAMPLE and therefore CANNOT be ratcheted — the stride divisor is each file's own site count, so an unrelated fixture edit redraws it. ⚠️ RED BY DESIGN
-deno task compile:corpus:compare     # compile-parity wide net over real repos + Svelte suites (sidecar, on demand; ./docs/compile_tooling.md)
+deno task compile:corpus:compare     # compile-parity wide net over the whole ../corpora snapshot, the private live roots and Svelte's suites (sidecar, on demand; ./docs/compile_tooling.md)
 deno task compile:validation         # validation-suite RATCHET over Svelte's compiler-errors + validator suites (sidecar, on demand; :update re-pins, never a MISMATCH; ./docs/compile_validation_ratchet.md)
 deno task compile:fuzz               # differential compile fuzzer over feature cross-products — a discovery tool, currently RED by design (sidecar, on demand; ./docs/compile_tooling.md)
 ```
@@ -309,10 +310,10 @@ deno task validate:artifacts             # tight wasm size bounds + Deno smoke o
 
 ### Corpus Comparison
 
-Compare formatting against Prettier, and parse output against the canonical parsers, on real codebases. Full runs enforce **pinned expected counts**: the format `--all` counts hold over the reproducible subset (version-pinned framework + prettier checkouts; live dev repos are a non-gating WARN, SAFETY still gates every file); parse `compared` counts + committed fixtures are live-growth minimums. See `benches/js/lib/gate_counts.ts` and ./docs/gate_counts.md.
+Compare formatting against Prettier, and parse output against the canonical parsers, on real codebases. The real code is the `../corpora` snapshot (`fuzdev/corpora` — the author's repos + kit/svelte/svelte.dev source, one collection per upstream, the whole `collections/` tree pinned by its git tree id in `GATE_CHECKOUT_IDS`, so a tooling commit in the snapshot repo moves nothing here), so full runs enforce **pinned expected counts** over the whole `gates` view: exact format `unknown`/`partial` and parse `compared`/tsv-failure counts, a `match` minimum, SAFETY over every file. A snapshot refresh is a deliberate re-pin. See `benches/js/lib/gate_counts.ts` and ./docs/gate_counts.md.
 
 ```bash
-deno task corpus:compare:format ../some-project  # single project, or --all for the gates corpus (real repos + prettier suites)
+deno task corpus:compare:format ../some-project  # single project, or --all for the gates corpus (the ../corpora snapshot + prettier suites)
 # Options: --explain (patterns matched), --summary (compact), --json (stats + safety/partial/unknown/error lists; logs → stderr)
 
 deno task corpus:compare:parse --all   # deep-diff parse ASTs vs acorn-typescript/svelte/parseCss
@@ -357,7 +358,7 @@ Divergence detection identifies known differences documented in the `conformance
 
 **Cross-runtime.** One harness runs under **Deno, Node, and Bun** — each emits its own runtime-labeled report (`report.{deno,node,bun}.{json,md}`), never merged; `deno task bench:compose` folds them into the combined `report.{json,md}` (what tsv.fuz.dev consumes). The native row is **FFI** under Deno, **N-API** under Node/Bun; everything else is shared runtime-neutral code. Full detail: ./benches/js/CLAUDE.md §Cross-Runtime.
 
-**Perf vs conformance surfaces.** `bench:perf` measures a **real-world-only** corpus (app + framework source) — the throughput headline; every in-scope tool must fully process every file or the run fails (`benches/js/lib/perf_omit.ts`), so coverage is 100% by construction. `bench:conformance` measures per-tool **parse coverage** over a **disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the wpt-css/test262/tsc-corpus harvests; the Svelte and tsc sets exclude what their own canonical parser rejects) — **coverage-only and node-only by design** (no timed phase; runtime-invariant). Its report splits coverage **per corpus source**, since a group's aggregate blends corpora that answer different questions (`parse/typescript` is mostly test262, i.e. ECMAScript) and each filtered set scores its own oracle at 100% by construction. Coverage counts accepts and so can only reward permissiveness; the opposite axis has a task per surface, both read inverted as profiles rather than gates — `deno task ts-repo:over-acceptance` (per-tool accepts over the files tsc's parser rejects) and `deno task css:over-acceptance` (over the files `parseCss` rejects; its reject-count pin is what makes the CSS reference row's grammar moving visible, since that surface is deliberately unfiltered — the pin alone is `css:over-acceptance:pin`, a stamped `bench:pins:suites` leg, and the conformance coverage run grades the same count). `deno task bench` = perf across all three runtimes + compose + the node coverage run. The correctness gates keep their own unchanged corpus scope. Full detail: ./benches/js/CLAUDE.md §Corpus.
+**Perf vs conformance surfaces.** `bench:perf` measures a **real-world-only** corpus (app + framework source, read from the pinned `../corpora` snapshot so one commit names the whole corpus — the report's `corpus_snapshot`) — the throughput headline; every in-scope tool must fully process every file or the run fails (`benches/js/lib/perf_omit.ts`), so coverage is 100% by construction. `bench:conformance` measures per-tool **parse coverage** over a **disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the wpt-css/test262/tsc-corpus harvests; the Svelte and tsc sets exclude what their own canonical parser rejects) — **coverage-only and node-only by design** (no timed phase; runtime-invariant). Its report splits coverage **per corpus source**, since a group's aggregate blends corpora that answer different questions (`parse/typescript` is mostly test262, i.e. ECMAScript) and each filtered set scores its own oracle at 100% by construction. Coverage counts accepts and so can only reward permissiveness; the opposite axis has a task per surface, both read inverted as profiles rather than gates — `deno task ts-repo:over-acceptance` (per-tool accepts over the files tsc's parser rejects) and `deno task css:over-acceptance` (over the files `parseCss` rejects; its reject-count pin is what makes the CSS reference row's grammar moving visible, since that surface is deliberately unfiltered — the pin alone is `css:over-acceptance:pin`, a stamped `bench:pins:suites` leg, and the conformance coverage run grades the same count). `deno task bench` = perf across all three runtimes + compose + the node coverage run. The correctness gates keep their own unchanged corpus scope. Full detail: ./benches/js/CLAUDE.md §Corpus.
 
 ```bash
 # One-time: install the harness's npm deps (package.json is the source of truth; both runtimes
@@ -392,8 +393,10 @@ deno task bench:pins:suites        # the conformance-view group: the four SUITE 
                                    # svelte-rejects) + the CSS reject pin (`css:over-acceptance:pin`). All freshness-stamped
                                    # (--force after harvest-logic changes) and `--if-present`. The PIN-FRESHNESS preflight of
                                    # `deno task conformance`; `deno task doctor` reports a stamp behind its checkout
-deno task bench:harvest:svelte-styles # the PERF-view CSS cache: no stamp (live dev repos), always re-harvests ~2 s, and REQUIRES every
-                                   # dev repo, so it fails rather than warn-skips. Chained by `bench:perf`, and by `conformance` late,
+deno task bench:harvest:svelte-styles # the PERF-view CSS cache: stamped on the ../corpora `collections/` tree id + its EXACT block pin + the
+                                   # perf view's entry list (skips when none moved), and REQUIRES every snapshot collection, so it fails
+                                   # rather than warn-skips.
+                                   # Chained by `bench:perf`, and by `conformance` late,
                                    # beside the `gates`-view corpus legs that read it (benches/js/CLAUDE.md §Harvests)
 
 deno task bench:deno:run -- --verbose   # per-file skip detail (counts always shown; paths/errors opt-in)
@@ -410,11 +413,11 @@ Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API
 ### Performance Profiling
 
 ```bash
-cargo run --release -p tsv_debug -- profile ../zzz/src/lib        # profile a directory
+cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib        # profile a directory
 cargo run --release -p tsv_debug -- profile file.ts --iterations 20  # more iterations
 # Also: --json (machine-readable)
 
-cargo run --release -p tsv_debug -- json_profile ../zzz/src/lib   # parse vs wire-JSON write timing
+cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib   # parse vs wire-JSON write timing
 
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile vs the format wall
 ```
@@ -423,7 +426,7 @@ For function-level hotspots, use `perf` with the `profiling` cargo profile:
 
 ```bash
 cargo build --profile profiling -p tsv_debug
-perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ../zzz/src/lib
+perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ../corpora/collections/zzz/src/lib
 perf report --stdio     # function-level hotspots
 # line-level within a function — -s takes the EXACT demangled name from perf report
 # (a substring silently annotates nothing; see docs/performance.md §perf)
@@ -682,7 +685,7 @@ cargo run --profile corpus -p tsv_debug compile_fuzz
 # erase_comment_census - size the type-eraser's comment-refusal haircut over a corpus (pure Rust):
 # per lang="ts" component, comments intersecting an erased span's refusal window. The rate is a
 # LOWER BOUND. Also: --verbose, --json. Full detail: ./docs/compile_tooling.md
-cargo run --release -p tsv_debug -- erase_comment_census ../fuz_ui ../zzz
+cargo run --release -p tsv_debug -- erase_comment_census ../corpora/collections/fuz_ui ../corpora/collections/zzz
 
 # format_prettier - format using prettier (line widths by default; --no-line-widths to hide)
 cargo run -p tsv_debug format_prettier file.svelte
@@ -784,13 +787,13 @@ deno task conformance:tsc-check:update  # re-pin the run's snapshot counts after
 **Performance Profiling Commands** (all pure Rust, no Deno — full reference: ./docs/performance.md):
 
 ```bash
-cargo run -p tsv_debug profile ../zzz/src/lib                    # parse vs format phase timing (--iterations, --json, --flow-stats)
-cargo run -p tsv_debug profile --bind ../zzz/src                 # parse vs lower+bind timing (TS-only) + peak RSS (§1)
-cargo run --release -p tsv_debug -- json_profile ../zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
-cargo run -p tsv_debug buffer_sizes ../zzz/src ../gro/src     # printer SmallVec sizing histograms (§8)
-cargo run -p tsv_debug arena_stats ../zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
+cargo run -p tsv_debug profile ../corpora/collections/zzz/src/lib                    # parse vs format phase timing (--iterations, --json, --flow-stats)
+cargo run -p tsv_debug profile --bind ../corpora/collections/zzz/src                 # parse vs lower+bind timing (TS-only) + peak RSS (§1)
+cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
+cargo run -p tsv_debug buffer_sizes ../corpora/collections/zzz/src ../corpora/collections/gro/src     # printer SmallVec sizing histograms (§8)
+cargo run -p tsv_debug arena_stats ../corpora/collections/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile against the format wall (§9)
-cargo run --release -p tsv_debug -- ast_census ../zzz/src        # per-node-kind population (--bytes joins the size board, --slots) (§10)
+cargo run --release -p tsv_debug -- ast_census ../corpora/collections/zzz/src        # per-node-kind population (--bytes joins the size board, --slots) (§10)
 cargo run -p tsv_debug type_sizes                                # the `size_of` board: every public AST type's width (§10)
 ```
 

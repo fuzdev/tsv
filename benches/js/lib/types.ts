@@ -94,20 +94,11 @@ export interface SourceFile {
 	 */
 	bytes: number;
 	/**
-	 * True when this file comes from a version-pinned, `pins:audit`-tracked
-	 * checkout (the `framework` + `prettier_fixture` tiers) rather than a live dev
-	 * repo. The format gate's count pins (match/unknown/partial) are enforced over
-	 * the reproducible subset only, so live-repo churn can't shift them; SAFETY
-	 * still gates over every file. Set by `DevReposLoader`; undefined for a
-	 * `DirectoryLoader` single-repo run (which isn't gated). See `lib/corpus.ts`.
-	 */
-	reproducible?: boolean;
-	/**
 	 * Which `CORPUS_ENTRIES` entry this file came from (its `path`/`files_from`,
 	 * project-root-relative) — the key the conformance report's per-source coverage
 	 * breakdown groups by, so an entry whose reading is special (the tsc corpus,
 	 * where `tsc` is the oracle rather than a competitor) can be read on its own
-	 * instead of averaged into the group. Set by `DevReposLoader`; undefined for a
+	 * instead of averaged into the group. Set by `CorpusLoader`; undefined for a
 	 * `DirectoryLoader` single-repo run.
 	 */
 	source?: string;

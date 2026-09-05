@@ -1,7 +1,7 @@
 /**
  * Harvest the canonical-reject cache for the conformance corpus's **Svelte** set:
  * the files `svelte/compiler`'s modern parser rejects. Writes their paths to
- * `benches/js/.cache/svelte_parse_rejects.json`, which `DevReposLoader`
+ * `benches/js/.cache/svelte_parse_rejects.json`, which `CorpusLoader`
  * (conformance view) then excludes — so the parse-COVERAGE headline measures
  * fidelity on *valid* Svelte, not permissiveness over an adversarial corpus that
  * deliberately bundles error fixtures (svelte's `compiler-errors/`, `loose-*`,
@@ -28,10 +28,10 @@
  * re-harvests despite a fresh stamp (default runs skip when the ../svelte +
  * ../prettier + ../prettier-plugin-svelte commits, the svelte oracle pin, and the
  * rejects pin all match — see `lib/harvest_stamp.ts`; all three checkouts ship
- * Svelte-language corpus, so all three are stamped). The stamp deliberately
- * ignores the live dev repos in the conformance view: their Svelte is valid by
- * assumption (rejects come from the suite trees), and the exact rejects pin
- * re-validates whenever the harvest does run.
+ * Svelte-language corpus, so all three are stamped). The conformance view holds
+ * no real code (the snapshot's Svelte is valid by assumption — rejects come from
+ * the suite trees), and the exact rejects pin re-validates whenever the harvest
+ * does run.
  *
  * Run (from repo root):
  *   deno run --allow-read --allow-write=benches/js/.cache --allow-env --allow-net \
@@ -43,7 +43,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 
 import { CanonicalImplementation } from '../lib/canonical.ts';
-import { load_pinned_language_corpus } from '../lib/corpus.ts';
+import { corpus_view_paths, load_pinned_language_corpus } from '../lib/corpus.ts';
 import { SVELTE_REJECTS_PIN } from '../lib/gate_counts.ts';
 import {
 	git_head,
@@ -70,7 +70,10 @@ async function main(): Promise<void> {
 	// plus the rejects pin match the stamp. All three checkouts are stamped
 	// because all three produce rejects (98 / 40 / 7 of the pinned count): a
 	// contributor left out is one whose pull leaves this stamp reading fresh over
-	// a corpus that moved under it.
+	// a corpus that moved under it. The conformance view's ENTRY LIST is stamped
+	// too: a suite entry added to or dropped from `CORPUS_ENTRIES` changes what is
+	// graded while every checkout stays put, and a stamp keyed on checkouts alone
+	// would skip that re-harvest and leave the cache short under a green stamp.
 	const svelte_commit = git_head('../svelte');
 	const stamp_inputs: StampInputs = {
 		harvest: 'svelte-rejects',
@@ -78,7 +81,8 @@ async function main(): Promise<void> {
 		prettier_commit: git_head('../prettier'),
 		prettier_plugin_svelte_commit: git_head('../prettier-plugin-svelte'),
 		svelte_oracle: versions.canonical.svelte,
-		rejects_pin: SVELTE_REJECTS_PIN
+		rejects_pin: SVELTE_REJECTS_PIN,
+		conformance_entries: corpus_view_paths('conformance').join(' ')
 	};
 	if (
 		!force &&

@@ -25,7 +25,14 @@
  */
 
 import { probe_node_modules } from '../benches/js/lib/check_node_modules.ts';
-import { git_head, HARVEST_STAMPS, short_commit } from '../benches/js/lib/harvest_stamp.ts';
+import { CORPORA_ROOT, CORPORA_TREE, CORPORA_URL } from '../benches/js/lib/corpora.ts';
+import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
+import {
+	checkout_hash,
+	checkout_label,
+	HARVEST_STAMPS,
+	short_commit
+} from '../benches/js/lib/harvest_stamp.ts';
 import { native_library_filename } from '../benches/js/lib/runtime.ts';
 import { type AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
 
@@ -59,6 +66,20 @@ function run_version(cmd: string, args: string[] = ['--version']): string | null
 		return new TextDecoder().decode(out.stdout).trim().split('\n')[0];
 	} catch {
 		return null;
+	}
+}
+
+/** Whether `git status` reports any change under `subpath` of the checkout at `repo`. */
+function git_dirty(repo: string, subpath: string): boolean {
+	try {
+		const out = new Deno.Command('git', {
+			args: ['-C', repo, 'status', '--porcelain', '--', subpath],
+			stdout: 'piped',
+			stderr: 'null'
+		}).outputSync();
+		return out.success && out.stdout.length > 0;
+	} catch {
+		return false;
 	}
 }
 
@@ -292,6 +313,34 @@ else warn(
 if (exists('../wpt/css')) ok('../wpt/css checkout (sparse)');
 else warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual-cadence tool)');
 
+// The real-code corpus snapshot: every `real`/`framework` corpus entry reads one of
+// its collections, and the corpus count pins were measured at the `collections/` tree
+// id `GATE_CHECKOUT_IDS` records — so a checkout whose collections are at any
+// other id grades a different corpus than the pins describe (a refresh re-pins;
+// anything else is skew). The tree, not the commit: the snapshot repo's tooling
+// commits move HEAD without moving a corpus byte.
+const corpora_pin = GATE_CHECKOUT_IDS[CORPORA_ROOT].hash;
+const corpora_head = checkout_hash({ path: CORPORA_ROOT, tree: CORPORA_TREE });
+if (corpora_head === null) {
+	warn(
+		`${CORPORA_ROOT} checkout missing — the bench + corpus:compare gates read the real-code snapshot ` +
+			`(git clone ${CORPORA_URL} ${CORPORA_ROOT})`
+	);
+} else if (!corpora_head.startsWith(corpora_pin)) {
+	warn(
+		`${CORPORA_ROOT}:${CORPORA_TREE} is at ${short_commit(corpora_head)} but the corpus pins were measured at ${corpora_pin} — ` +
+			'a snapshot refresh re-runs the corpus gates and re-pins; otherwise check out the pinned snapshot'
+	);
+} else if (git_dirty(CORPORA_ROOT, CORPORA_TREE)) {
+	// The gates read the working tree, so bytes the pinned commit doesn't hold would
+	// be graded under its name. Nothing in tsv writes there; a stray `tsv format` on a
+	// collection is the way this happens.
+	warn(
+		`${CORPORA_ROOT} is at pinned ${corpora_pin} but ${CORPORA_TREE}/ has local modifications — ` +
+			`the corpus gates would grade bytes that commit does not hold (git -C ${CORPORA_ROOT} checkout -- ${CORPORA_TREE})`
+	);
+} else ok(`${CORPORA_ROOT} snapshot (${CORPORA_TREE}/ at pinned ${corpora_pin}, clean)`);
+
 // --- Optional: the experimental typechecker's oracle -----------------------------
 //
 // `../typescript-go` feeds ONLY the on-demand `conformance:tsc-roundtrip` /
@@ -335,11 +384,13 @@ if (exists('../typescript-go')) {
 
 // --- Harvest stamps -------------------------------------------------------------
 //
-// Each stamped grade records the checkout commit(s) it ran against. A stamp whose
-// commit no longer matches its checkout's HEAD means the pin it graded describes the
-// PREVIOUS corpus: `bench:pins:suites` (a `conformance` preflight) re-derives it,
-// but nothing in `check` does, so name it here ahead of a release run. Only the
-// commit inputs are compared — the oracle-version and pin inputs are `pins:audit`'s.
+// Each stamped grade records the checkout object(s) it ran against — a HEAD commit,
+// or for the corpora snapshot its `collections/` tree id. A stamp whose recorded id
+// no longer matches the checkout means the pin it graded describes the PREVIOUS
+// corpus: `bench:pins:suites` (a `conformance` preflight) re-derives the suite pins
+// and `bench:harvest:svelte-styles` the styles one, but nothing in `check` does, so
+// name it here ahead of a release run. Only the checkout inputs are compared — the
+// oracle-version and pin inputs are `pins:audit`'s.
 //
 // Graded PER CHECKOUT, never all-or-nothing on the first absent one. Two reasons,
 // both of which the earlier short-circuit got wrong: an absent checkout would hide
@@ -349,12 +400,14 @@ if (exists('../typescript-go')) {
 // with that checkout gone. So report the fact observed here, and leave the task's
 // own `--if-present` verdict to the task.
 
-section('Harvest stamps (bench:pins:suites — the pin-freshness preflight)');
+section(
+	'Harvest stamps (bench:pins:suites — the pin-freshness preflight — + bench:harvest:svelte-styles)'
+);
 for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) {
-	const heads = Object.entries(checkouts).map(([key, repo]) => ({
+	const heads = Object.entries(checkouts).map(([key, input]) => ({
 		key,
-		repo,
-		head: git_head(repo)
+		repo: checkout_label(input),
+		head: checkout_hash(input)
 	}));
 	const absent = heads.filter((h) => h.head === null);
 	const gradable = heads.filter((h) => h.head !== null);

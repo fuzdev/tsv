@@ -113,6 +113,12 @@ interface Report {
 	entries: Entry[];
 	/** Absent on pre-`version` 10 siblings — read as "not recorded", never as "none". */
 	unavailable?: UnavailableImpl[];
+	/**
+	 * The `fuzdev/corpora` commit the sibling's real-code corpus was read from. Absent
+	 * on pre-`version` 14 siblings (and on a machine without the snapshot) — read as
+	 * "not recorded", which the vintage key below spells `?`.
+	 */
+	corpus_snapshot?: { commit: string };
 }
 
 const results_dir = fileURLToPath(new URL('./results/', import.meta.url));
@@ -211,8 +217,8 @@ for (const r of present) {
 }
 
 // Provenance per source, plus a loud flag when the siblings come from
-// different commits/versions. The composer folds whatever reports exist, so a
-// fresh `report.deno.json` can otherwise sit silently next to a stale
+// different commits/versions/corpora. The composer folds whatever reports exist,
+// so a fresh `report.deno.json` can otherwise sit silently next to a stale
 // `report.node.json` — and cross-runtime ratios are only meaningful on
 // same-vintage siblings.
 const sources = present.map((r) => ({
@@ -220,6 +226,11 @@ const sources = present.map((r) => ({
 	timestamp: reports.get(r)!.timestamp,
 	git_commit: reports.get(r)!.git_commit,
 	tsv: reports.get(r)!.versions?.tsv ?? null,
+	// The real-code snapshot commit — a corpus axis the tsv commit does not fix:
+	// the bench reads whatever `../corpora` has checked out, so two siblings at one
+	// tsv commit can have measured two corpora (a refresh between runs). `null` when
+	// the sibling predates the field.
+	corpus_snapshot: reports.get(r)!.corpus_snapshot?.commit ?? null,
 	machine: reports.get(r)!.machine ?? null,
 	// Per-sibling, because this is exactly a per-runtime fact: an impl that loads
 	// under Deno and not under Bun leaves a row in one sibling and none in the
@@ -275,7 +286,8 @@ const unavailable_by_runtime = [...unavailable_rows_by_runtime].flatMap(([runtim
 	rows === null || rows.size === 0 ? [] : [{ runtime, rows: [...rows] }]
 );
 const mixed_vintage =
-	new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}`)).size > 1;
+	new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}@${s.corpus_snapshot ?? '?'}`))
+		.size > 1;
 
 /**
  * The conformance surface's vintage, beside the perf siblings'. It is NOT folded
@@ -451,8 +463,13 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * timestamp / tsv version and whether it is `stale` against the perf siblings
  * (`null` when that report is absent). The one report published beside these that
  * `mixed_vintage` could not see.
+ *
+ * 14: `sources[].corpus_snapshot` — the `fuzdev/corpora` commit each sibling's
+ * real-code corpus was read from (`null` on a pre-14 sibling), and a third axis of
+ * `mixed_vintage`: siblings at one tsv commit over two snapshots are not comparable
+ * either.
  */
-const COMBINED_SCHEMA_VERSION = 13;
+const COMBINED_SCHEMA_VERSION = 14;
 
 // JSON: metadata + provenance per source + the comparison rows.
 /**
@@ -584,7 +601,8 @@ for (const s of sources) {
 	const rt_ver = s.machine ? ` ${s.machine.runtime_version}` : '';
 	md.push(
 		`- \`${s.runtime}\`${rt_ver}: ${s.git_commit ?? 'unknown commit'} @ ${s.timestamp}` +
-			`${s.tsv ? ` (tsv ${s.tsv})` : ''}`
+			`${s.tsv ? ` (tsv ${s.tsv})` : ''}` +
+			`${s.corpus_snapshot ? ` — corpora ${s.corpus_snapshot.slice(0, 9)}` : ''}`
 	);
 }
 if (conformance_vintage) {
@@ -610,7 +628,7 @@ if (mixed_machine) {
 if (mixed_vintage) {
 	md.push(
 		'⚠ **Mixed vintages** — the sibling reports above come from different ' +
-			'commits/versions, so the cross-runtime ratios are unreliable; re-run the ' +
+			'commits/versions/corpus snapshots, so the cross-runtime ratios are unreliable; re-run the ' +
 			'stale runtimes (`deno task bench:perf` refreshes all three).\n'
 	);
 }
@@ -723,7 +741,13 @@ await writeFile(`${results_dir}report.md`, md.join('\n'));
 if (mixed_vintage) {
 	console.error(
 		'⚠ compose: sibling reports have MIXED VINTAGES (' +
-			sources.map((s) => `${s.runtime}=${(s.git_commit ?? '?').slice(0, 8)}`).join(' ') +
+			sources
+				.map(
+					(s) =>
+						`${s.runtime}=${(s.git_commit ?? '?').slice(0, 8)}` +
+						`/corpora ${(s.corpus_snapshot ?? '?').slice(0, 8)}`
+				)
+				.join(' ') +
 			') — cross-runtime ratios unreliable; re-run the stale runtimes.'
 	);
 }

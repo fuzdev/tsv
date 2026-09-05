@@ -199,6 +199,7 @@ Instance-script statements are borrowed verbatim (with the rune rewrites applied
 - **Refused**: `runes-invalid import of {name} from svelte` — a named `beforeUpdate`/`afterUpdate` import from `svelte` (the oracle rejects them in runes mode); an escaped imported name from `svelte` refuses conservatively. A string-literal imported name is skipped exactly as the oracle skips it (its check matches identifier names only).
 - **Refused**: `lang="{lang}" script` — only `ts`/`js` are supported; any `lang` other than `ts`/`js`/empty (on the instance **or** module script). The oracle's TypeScript flag tests `lang === 'ts'` **exactly** (case-sensitive), so `lang="typescript"` / `lang="TS"` are plain JS to it; rather than compile them as JS on a guess, tsv refuses.
 - **Refused**: `generics attribute on <script> (implies TypeScript)` — an open type-parameter *binding*, not annotation erasure (a separate slice).
+- **Mismatch (open)**: a `$derived` binding read inside a **labeled statement** — the oracle compiles it as a plain identifier (`label: if (value) …`) where tsv emits the derived read `value()`. Svelte's own `runtime-runes/samples/labeled-statement-derived` is the case.
 - **Refused**: `generated name {name} collides with a user binding` — a user binding named `each_array`/`$$index`-family
 
 ### Module Scripts (`<script module>` / `<script context="module">`) — Supported (plain)
@@ -1098,6 +1099,7 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 - **Refused**: `bind: directive on <{name}> component` — the oracle emits a `do…while` settle loop.
 - **Refused**: `directive on <{name}> component` — a non-`bind:` directive (`use:`/`transition:`/…; mostly oracle-rejected input).
 - **Supported**: carried script comments alongside a component invocation — the component call's prop values are template-region borrows, so no comment window sweeps a script comment (see [Comment placement classes](#comment-placement-classes)).
+- **Mismatch (open)**: the compiled default export's **name collides with an imported component** — a component whose module imports `Input` (flowbite-svelte's `Input` component, used by 35 of its files) is named `Input` by tsv where the oracle deduplicates it to `Input_1`. The largest open mismatch class by file count.
 
 ### Attributes
 

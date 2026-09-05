@@ -40,6 +40,7 @@
  * lands.
  */
 
+import { CORPORA_COLLECTIONS, CORPORA_ROOT } from '../benches/js/lib/corpora.ts';
 import { format_size, gzip_size } from './size.ts';
 
 const KNOWN_FLAGS = new Set(['--wetrun', '--no-check', '--no-git', '--bump']);
@@ -354,9 +355,9 @@ if (no_check) {
 // structurally blind to. Skipped by --no-check alongside Step 3.
 //
 // The gates need the ../svelte + ../acorn-typescript + ../typescript +
-// ../test262 checkouts, the corpus legs' pinned repos (../prettier,
-// ../prettier-plugin-svelte, ../kit, ../svelte.dev — DevReposLoader fails fast
-// on a missing non-optional entry), and the benches/js `node_modules` sidecar
+// ../test262 checkouts, the corpus legs' pinned inputs (../corpora — the real-code
+// snapshot — plus ../prettier and ../prettier-plugin-svelte; CorpusLoader fails
+// fast on a missing non-optional entry), and the benches/js `node_modules` sidecar
 // (`deno task bench:install`). The probe must cover every oracle the aggregate's legs need
 // — the gates themselves fail closed on a missing checkout, so the probe is the
 // ONE tolerance point: a dry-run warn-and-skips (clean machines can still
@@ -376,8 +377,7 @@ if (no_check) {
 		exists('../test262/test') ? null : '../test262 checkout',
 		exists('../prettier/tests/format') ? null : '../prettier checkout',
 		exists('../prettier-plugin-svelte/test') ? null : '../prettier-plugin-svelte checkout',
-		exists('../kit/packages/kit/src') ? null : '../kit checkout',
-		exists('../svelte.dev/apps/svelte.dev/src') ? null : '../svelte.dev checkout',
+		exists(CORPORA_COLLECTIONS) ? null : `${CORPORA_ROOT} checkout (the real-code snapshot)`,
 		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)'
 	].filter((m): m is string => m !== null);
 	if (missing.length > 0 && wetrun) {
@@ -409,12 +409,13 @@ if (no_check) {
 
 // Step 3c: Corpus robustness audit
 //
-// The pure-Rust content-loss / panic / non-idempotency audits over REAL code (the perf corpus
-// view — live dev repos + pinned framework source — plus the pinned Prettier suites). This is the
+// The pure-Rust content-loss / panic / non-idempotency audits over REAL code (the robustness
+// corpus view — the ../corpora snapshot plus the live diff of this machine's working trees
+// against it — and the pinned Prettier suites). This is the
 // extension-robustness bar: `tests/fixtures` is format-stable by construction, so `deno task check`
 // is structurally blind to a content-loss / panic / reflow bug in real code — every such bug this
 // cycle was found by a corpus audit or a wide fuzz seed, never by `check`. `deno task audit:corpus`
-// warn-skips absent dev-repo checkouts, so its reproducible floor is the ../svelte framework source;
+// warn-skips absent working trees, so its reproducible floor is the ../corpora snapshot;
 // like Step 3b, a --wetrun without that floor BLOCKS (releasing without the audit needs --no-check),
 // a dry-run warn-and-skips. The FFI/prettier SAFETY half (content loss vs prettier) rides Step 3b's
 // corpus:compare:format --all; this is the pure-Rust half those gates can't reach.
@@ -424,8 +425,8 @@ if (no_check) {
 	audit_corpus_skip_reason = '--no-check';
 } else {
 	console.log('\n=== Step 3c: Corpus robustness audit (deno task audit:corpus) ===');
-	if (!exists('../svelte/packages/svelte/src')) {
-		audit_corpus_skip_reason = 'missing ../svelte checkout (the reproducible corpus floor)';
+	if (!exists(CORPORA_COLLECTIONS)) {
+		audit_corpus_skip_reason = `missing ${CORPORA_ROOT} checkout (the real-code snapshot — the corpus floor)`;
 		if (wetrun) {
 			console.error(
 				`  FAIL: ${audit_corpus_skip_reason} — the corpus audit cannot run over real code. ` +

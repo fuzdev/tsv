@@ -100,7 +100,7 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files_named};
 /// confirms the suspects (or every file, with `--canonical-all`) against the
 /// canonical parsers via the sidecar. Defaults to `tests/fixtures` when no paths
 /// are given — point it at the corpus (`../prettier/tests/format/{css,js,typescript,html}`,
-/// `../zzz/src`, `../svelte/packages/svelte/src`, …) to generate the work-list.
+/// `../corpora/collections/zzz/src`, `../corpora/collections/svelte/packages/svelte/src`, …) to generate the work-list.
 ///
 /// `--gate` restricts the failing set to the reliable `*_unreparseable` buckets
 /// (the divergent buckets are render-model noise over `tests/fixtures`); a bare

@@ -32,7 +32,7 @@ use super::profile::{is_ts_family, resolve_seed_files_named};
 ///
 /// Pure Rust, no sidecar. Exits 1 on any failure. The `canonicalize:audit` deno
 /// task gates this over `tests/fixtures` in `deno task check`; point it at real
-/// corpora on demand (`canonicalize_audit ../zzz/src ../gro/src`).
+/// corpora on demand (`canonicalize_audit ../corpora/collections/zzz/src ../corpora/collections/gro/src`).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "canonicalize_audit")]
 pub struct CanonicalizeAuditCommand {

@@ -21,7 +21,7 @@
  *
  * The gate fails (exit 1) only on an **untracked over-rejection** — a tsv
  * parse gap on valid input in neither `SANCTIONED` nor `KNOWN_GAPS`. Point it at a corpus
- * with a directory argument (defaults to the ~/dev repos):
+ * with a directory argument (defaults to the `gates` corpus view — the ../corpora snapshot + prettier suites):
  *
  *   # real source — expect green (valid code parses in both)
  *   deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys \
@@ -33,7 +33,7 @@
  * Full JSON to stdout, summary to stderr (`2>/dev/null` for a clean stream).
  */
 
-import { DevReposLoader, DirectoryLoader, group_by_language } from '../lib/corpus.ts';
+import { CorpusLoader, DirectoryLoader, group_by_language } from '../lib/corpus.ts';
 import { init_implementations } from '../lib/implementations.ts';
 import {
 	type KnownGap,
@@ -176,7 +176,7 @@ const KNOWN_GAPS: KnownGap[] = [
 const corpus_path = Deno.args.find((a) => !a.startsWith('-'));
 
 const [files, impls] = await Promise.all([
-	(corpus_path ? new DirectoryLoader(corpus_path) : new DevReposLoader('gates')).load((m) =>
+	(corpus_path ? new DirectoryLoader(corpus_path) : new CorpusLoader('gates')).load((m) =>
 		console.error(m)
 	),
 	init_implementations({ logger: (m) => console.error(m) })
