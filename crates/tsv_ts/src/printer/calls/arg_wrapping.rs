@@ -1065,42 +1065,31 @@ fn prebuild_arrow_gap_break_body(
 /// type cast (`callee({ … })`, `callee([ … ])`, `callee({ … } as T)`). Shared by the plain-call
 /// and `new` single-argument printers.
 ///
-/// Two things the `new` twin's hand-rolled arm answered differently, both of them here:
+/// **The cast is looked through** by the caller's guard
+/// ([`super::arg_predicates::is_array_or_object_unwrapped`], prettier's `couldExpandArg`
+/// reading past `as` / `satisfies` / `<T>x`) — the `new` twin's hand-rolled arm matched the raw
+/// node kind instead, which left `new A({ … } as T)` off the hug entirely, so it broke out
+/// where the plain call expanded the object inside the cast.
 ///
-/// - **The cast is looked through** ([`super::arg_predicates::is_array_or_object_unwrapped`],
-///   prettier's `couldExpandArg` reading past `as` / `satisfies` / `<T>x`). Matching the raw
-///   node kind instead left `new A({ … } as T)` off the hug entirely, so it broke out where
-///   the plain call expanded the object inside the cast.
-/// - **A truly empty container keeps the call's softlines** instead of hugging. The hug has no
-///   break point of its own, so an enclosing fluid assignment measures the whole flat width and
-///   breaks at `=`; with softlines the call breaks its own parens instead
-///   (`const a: T =⏎\tnew A({});` vs prettier's `… = new A(⏎\t{}⏎);`). "Truly" empty means no
-///   elements or properties AND no comments inside — a comment-only container produces
-///   hardlines, which already give the enclosing layout its break point, so it hugs like a
-///   non-empty one. The emptiness question is asked of the RAW node, so a cast container is
-///   never "empty" and always hugs, exactly as before.
+/// The hug itself is prettier's three-state ladder ([`ArgOpener::lone_hug_ladder`]), which is
+/// the whole of this function. ⚠️ An `is_truly_empty` special case used to stand here, routing
+/// `callee({})` / `callee([])` to a soft-wrapped group so the call had *some* break point (an
+/// unconditional hug has none, so an enclosing fluid assignment measured the whole flat width
+/// and broke at `=` instead). The ladder answers that structurally and for every argument, not
+/// just an empty one: an argument with nothing to break renders its hug state identically to
+/// its flat state, so both fail the same fits check and the last state takes it. That also
+/// reaches the case the predicate could not see — a NON-empty container whose hug's own first
+/// line is already past the width (`calls/chain_single_arg_hug_long`,
+/// `new/single_arg_container_long`, and flowbite-svelte's TimelineStepper.svelte in the
+/// corpus).
 pub(super) fn build_single_container_arg_doc(
     printer: &Printer<'_>,
     callee: DocId,
     arg: &internal::Expression<'_>,
 ) -> DocId {
     let d = printer.d();
-    let is_truly_empty = match arg {
-        internal::Expression::ArrayExpression(arr) => {
-            arr.elements.is_empty()
-                && !printer.has_comments_to_emit_between(arr.span.start, arr.span.end)
-        }
-        internal::Expression::ObjectExpression(obj) => {
-            obj.properties.is_empty()
-                && !printer.has_comments_to_emit_between(obj.span.start, obj.span.end)
-        }
-        _ => false,
-    };
     let arg_doc = printer.build_expression_doc(arg);
-    if is_truly_empty {
-        return wrap_call_with_soft_breaks(d, callee, arg_doc);
-    }
-    d.concat(&[callee, d.text("("), arg_doc, d.text(")")])
+    ArgOpener::Callee(callee).lone_hug_ladder(d, arg_doc, false)
 }
 
 /// Prettier's `lastArg` — the hugged argument printed with `expandLastArg: true`, the
@@ -1322,15 +1311,10 @@ fn build_single_arrow_arg_states(
     body_expands_internally: bool,
 ) -> DocId {
     if !body_expands_internally {
-        // The broken-out state uses SOFT lines: with no middle state to fall through to it
-        // must still be able to collapse, so it re-measures rather than rendering broken.
-        let state_broken_out = d.concat(&[
-            opener.open_prefix(d),
-            d.indent(d.concat(&[d.softline(), docs.printed])),
-            d.softline(),
-            d.text(")"),
+        return d.conditional_group(&[
+            opener.inline(d, &[], docs.expanded),
+            opener.break_out(d, docs.printed),
         ]);
-        return d.conditional_group(&[opener.inline(d, &[], docs.expanded), state_broken_out]);
     }
     opener.inline_hug_or_expand_all(d, &[], docs.expanded, docs.printed)
 }
@@ -1417,6 +1401,52 @@ impl ArgOpener {
     #[inline]
     fn hug(self, d: &DocArena, head_parts: &[DocId], last_arg_doc: DocId) -> DocId {
         self.inline(d, head_parts, d.group_break(last_arg_doc))
+    }
+
+    /// The LONE argument on its own line, with SOFT lines rather than [`Self::expand_all`]'s
+    /// forced ones: a one-argument list has no middle state to fall through to, so this state
+    /// must still be able to collapse and re-measures instead of rendering broken.
+    ///
+    /// Also the whole layout wherever the hug is refused outright (a comment forcing the
+    /// callback's parameter list multiline).
+    #[inline]
+    pub(super) fn break_out(self, d: &DocArena, printed: DocId) -> DocId {
+        d.concat(&[
+            self.open_prefix(d),
+            d.indent(d.concat(&[d.softline(), printed])),
+            d.softline(),
+            d.text(")"),
+        ])
+    }
+
+    /// The ladder for a LONE huggable argument, in prettier's own shape: flat, hugged with the
+    /// argument's own group broken (`group(lastArg, { shouldBreak: true })`), then
+    /// `allArgsBrokenOut()`.
+    ///
+    /// `params_render_flat` folds in the one case with no middle state — prettier renders
+    /// that parameter list flat in both hug states, so the hug is bit-for-bit its own flat
+    /// state ([`super::arg_predicates::lone_arg_params_render_flat`]). Answered by the caller
+    /// because prettier's gate is `isCallExpression(parent)`: the plain-call and member-chain
+    /// spellings ask the predicate, the `new` twin passes `false`.
+    ///
+    /// ⚠️ **One seam for three printers.** Each of them hand-rolled a bare `callee(arg)` concat
+    /// here, and a concat has no state below the hug: an argument with nothing to break inside
+    /// it — `{}`, `[]`, `function () {}`, `class {}` — ran past the print width instead of
+    /// dropping to its own line (`calls/single_arg_function_expression_long`,
+    /// `calls/chain_single_arg_hug_long`). One `printCallArguments` prints all three, so none
+    /// of them may answer this alone.
+    #[inline]
+    pub(super) fn lone_hug_ladder(
+        self,
+        d: &DocArena,
+        arg_doc: DocId,
+        params_render_flat: bool,
+    ) -> DocId {
+        if params_render_flat {
+            self.inline_or_expand_all(d, &[], arg_doc, arg_doc)
+        } else {
+            self.inline_hug_or_expand_all(d, &[], arg_doc, arg_doc)
+        }
     }
 
     /// Prettier's `allArgsBrokenOut()` — every argument on its own line.

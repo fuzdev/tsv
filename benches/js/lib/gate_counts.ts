@@ -333,7 +333,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 2701 → 2703: `flowbite-svelte/.../dialog/Dialog.svelte` and
 	// `.../bottom-navigation/BottomNavItem.svelte` arrive from `unknown` (5 → 3 there, which
 	// names the change and the measurement).
-	svelte: 2703,
+	//
+	// 2703 → 2704: `flowbite-svelte/.../stepper/TimelineStepper.svelte` arrives from
+	// `unknown` — the lone-container hug reaching its last state. Reasoning on
+	// `CORPUS_FORMAT_UNKNOWN_PIN`.
+	svelte: 2704,
 	// 2332 → 2334: two reproducible files, `prettier/tests/format/js/comments/11273.js` and
 	// `.../trailing-jsdocs.js`, whose divergence was a container-end trailing comment RUN the
 	// author glued onto one line and tsv split onto two. That run's separator now asks the
@@ -440,7 +444,23 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// the two mover sets are disjoint: the binaryish four are prettier-suite files in the
 	// binary/conformance/arrow subtrees, the cast-seed four are options.ts, notes.ts and
 	// prettier's two `argument-expansion` tests.
-	typescript: 5139,
+	//
+	// 5139 → 5140: the lone-literal call argument keeps its break point.
+	// `language-tools/…/svelte2tsx/src/svelte2tsx/addComponentExport.ts` arrives from
+	// `unknown` — its `${returnType(⏎'events'⏎)}` interpolation spans lines, so `${` hugs a
+	// non-qualifying expression and the call is the only thing that can break. Reasoning on
+	// `CORPUS_FORMAT_UNKNOWN_PIN`. ONE mover in any bucket: measured by diffing the
+	// `--all --json` bucket lists across a pre-change and a tip `--profile corpus` build over
+	// the whole 9,305-file gates view, where `partial` / `safety` / `errors` /
+	// `expected_errors` come back identical file-for-file.
+	//
+	// ⚠️ The same branch carries two corpus-NEUTRAL siblings of that fix, both found by
+	// sweeping every lone-argument kind across every call position at the 100/101 boundary
+	// rather than by this gate: the lone-`function`-expression ladder (plain call, `new`, and
+	// the member-chain spelling) and prettier's flat-parameter rule for it. Their shapes are
+	// `fn(function () {})` and `obj.m({})` past the print width, which no gates-view file
+	// holds — the +1 above is the literal fix alone.
+	typescript: 5140,
 	css: 133
 };
 
@@ -515,7 +535,17 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// typescript movers below, and two prettier-suite files that also leave `unknown` for
 	// `match` — see the typescript pin), so nothing arrived in any bucket and `partial` /
 	// `safety` / `errors` are unmoved.
-	svelte: 3,
+	//
+	// 3 → 2: `TimelineStepper.svelte` LEAVES for `match` (`match` 2703 → 2704) — "the
+	// most-expanded hug fallback past width", now reached. Its `{circle({ status, class: … })}`
+	// sits at column 186 inside a class attribute, so the hug's OWN first line is over width
+	// and prettier drops the object into broken parens; tsv's lone-container arm was an
+	// unconditional hug with no state below it, and an `is_truly_empty` special case that saw
+	// only the empty containers. Both are retired for prettier's three-state ladder
+	// (`ArgOpener::lone_hug_ladder`, shared with the plain-call / `new` / member-chain
+	// function-expression arms). ONE mover in any bucket, by the same `--all --json`
+	// bucket-list diff described on `CORPUS_FORMAT_MATCH_MIN`.
+	svelte: 2,
 	// 109 records a drop of five from 114, in two steps, each verified by diffing the
 	// `unknown` lists before and after rather than by the count alone:
 	//   -2  a binary operand of an `as`/`satisfies` cast takes prettier's continuation
@@ -824,7 +854,17 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//
 	// Both entries above measured against 105 in their own tree; 101 is the
 	// merged-tip re-measurement (disjoint mover sets — see `CORPUS_FORMAT_MATCH_MIN`).
-	typescript: 101,
+	//
+	// 101 → 100: `language-tools/…/svelte2tsx/src/svelte2tsx/addComponentExport.ts` LEAVES for
+	// `match`. A lone LITERAL argument no longer costs the call its break point: the printer
+	// spelled prettier's 25-char `LONE_SHORT_ARGUMENT_THRESHOLD_RATE` at the wrong layer —
+	// that threshold belongs to the ASSIGNMENT layout (`isPoorlyBreakableMemberOrCallChain`),
+	// which chooses between breaking at the operator and breaking the call, never that the
+	// call has no break at all — and emitted a group-free, line-free doc, so `fn('short')`
+	// could not break once nothing above it could. Prettier has no such arm: every non-hug
+	// argument ends at `printCallArguments`' soft-break group. Nothing arrived in `unknown`,
+	// and the same one-mover byte-diff is described on `CORPUS_FORMAT_MATCH_MIN`.
+	typescript: 100,
 	css: 23
 };
 
