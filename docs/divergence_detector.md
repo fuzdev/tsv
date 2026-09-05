@@ -315,6 +315,67 @@ The `'|'×2 (ours 28, prettier 26)` reads as: of the 28 pipes our output dropped
 26 are shared with prettier (a normalization, not loss) and only 2 are real. The
 `(2, 0)` entries are fully real — prettier dropped none.
 
+### The ours-side width guard (print-width laundering)
+
+Every "prettier overran the width, we broke it" pattern needs an ours-side half, and it
+is a **width** test, not a line count. A hunk where tsv breaks *more* lines than prettier
+and still leaves one at 105 satisfies "we re-wrapped" while grading nobody's column, so a
+count-only guard files a real over-width line as the sanctioned print-width divergence.
+That laundering has no other instrument: `width:audit` is the only gate that measures a
+column and it runs over `tests/fixtures` alone, so real-code over-width is visible only
+here. `ours_holds_print_width` (strict) and `ours_spent_every_break` (below) are that
+half, and `long_line_rewrapped` bundles it for the five long-line patterns.
+
+**The forced overrun.** "Ours holds 100 everywhere" is too strong on its own, because
+[§Print Width Philosophy](./conformance_prettier.md#print-width-philosophy) sanctions a
+line tsv *cannot* break — *a line tsv can break is a line tsv does break*, so an
+unbreakable atom stands, and `width_audit_known.txt` pins ~34 such shapes. The middle
+term is `overrun_is_forced(line, regime)`: an over-width ours line is excused only when
+its content offers tsv **no seam at all**.
+
+There is no one seam test, so the regime is chosen per hunk (`overrun_regime`) by
+language AND region:
+
+| regime | seam | atom it admits |
+| --- | --- | --- |
+| `css` | a space or comma at paren/bracket depth 0, after the `prop:` head is stripped | one component value — `url(data:…)` at 123 columns, the IE `filter: progid:…(…)` at 112 |
+| `svelte_text` | any whitespace, `{`/`}` or `<`/`>` left after the comment interiors are removed | a bare word, alone or welded to a comment across a boundary that carries no whitespace |
+| `none` | — | nothing; the strict reading, and what every unrecognized position gets |
+
+The regime is why the test cannot be written once: whitespace is the fill's seam in
+Svelte text and means nothing two lines away in a `<script>`, where a member chain breaks
+with no whitespace in it at all. Each test is written to fail closed — an unmatched
+`<!--`, a torn-open tag, a `{tag}` that breaks internally all read as seams and simply go
+unclaimed — because a wrong answer here is a laundered over-width bug.
+
+**`svelte_text` inverts the code-region scanner's safe direction, and has to say so.**
+`raw_code_regions` is non-greedy, so a `</script>` written inside a *string* closes the
+region early. That errs toward a smaller region, which under-claims for a consumer asking
+"is this in a `<style>`?" — and *over*-claims for one asking "is this in the template?",
+where the stranded script tail is handed the Svelte-text licence. Reachable, not
+hypothetical: a whitespace-free member chain at 111 columns after such a string reads as
+one bare word and was claimed. `code_regions_are_reliable` closes it — every
+`<script`/`<style` marker must land inside a computed region, and a file where one does
+not falls back to `'none'` wholesale.
+
+**Residuals, stated rather than papered over.** This is a silhouette argument on finished
+text, the same kind [audits.md §Print width](./audits.md#print-width-audit-widthaudit)
+calls unclosable in general — *nothing in the finished text distinguishes a seam tsv
+declined from one it never had*. What makes it usable here is that it whitelists shapes
+that are atomic under any layout (one CSS component value; a bare word) instead of trying
+to read the seam, and that every unsure case answers "seam". Two known narrowings live
+with it: a hunk straddling a `</style>` boundary takes the CSS regime for all its lines
+(`is_in_css_context` keys on the hunk's first line — pre-existing, shared with seven other
+detectors), and a comment tsv split across lines reads as a seam on each of them.
+
+**Every long-line pattern routes through the helper.** `short_expr_100` hand-rolled the
+count arm alone (`{#if}` in prettier's 101–110 band, `added_lines.length >
+removed_lines.length`) and carried the same hole; it takes the shared shape via
+`max_width`. `member_expression_call` still guards on the count alone — it makes no
+prettier-width claim at all, so the width half needs its own rationale rather than being
+folded in silently; today it claims one corpus file, whose only over-width line is an
+unbreakable URL comment identical on both sides and so in no hunk.
+
 ## Overmatching Audit
 
 A pattern that matches a hunk it shouldn't will mark a real bug (or real data loss) as
