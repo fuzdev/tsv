@@ -34,7 +34,7 @@
  *   benches/js/diagnostics/no_locations_parity.ts 2>&1 | tail -30
  */
 
-import { DevReposLoader, group_by_language } from '../lib/corpus.ts';
+import { CorpusLoader, group_by_language } from '../lib/corpus.ts';
 import { init_implementations } from '../lib/implementations.ts';
 import type { Language } from '../lib/types.ts';
 
@@ -272,7 +272,7 @@ function walk(
 const impls = await init_implementations({ logger: (m) => console.error(m) });
 const native = impls.native;
 
-const files = await new DevReposLoader('gates').load((m) => console.error(m));
+const files = await new CorpusLoader('gates').load((m) => console.error(m));
 const by_lang = group_by_language(files);
 
 let any_mismatch = false;

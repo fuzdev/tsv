@@ -17,15 +17,14 @@ real move in a number is a deliberate, visible edit.
   tsc-VALID files tsv accepts and leave the split of the rest free; the fixtures
   gates carry it for the same reason, a new over-acceptance there coming out of
   `parity` and moving neither of their other two),
-  `corpus:compare:parse --all` (minimum per-language `compared`
+  `corpus:compare:parse --all` (EXACT per-language `compared`
   + EXACT per-language tsv-side parse-failure counts), `corpus:compare:format
   --all` (minimum per-language `match` + EXACT per-language `unknown`/`partial`
   counts — the un-triaged divergence backlog is pinned, so a new unexplained
   divergence fails until fixed/cataloged and a shrink is re-pinned to record the
   win), and the five harvests (wpt block count, test262 positive count, the
-  ts-repo corpus + rejects counts, svelte-rejects count — exact; svelte-styles block
-  count — a live-corpus MINIMUM with a drift band, since its source is the perf-view
-  dev repos: a small shrink warns and still writes, only a >10% collapse fails), plus
+  ts-repo corpus + rejects counts, svelte-rejects count, svelte-styles block count
+  — all exact; the last one over the `../corpora` snapshot's perf view), plus
   the CSS reject count `diagnostics/css_over_acceptance.ts` grades over — derived
   live from pinned inputs rather than harvested, and the one pin whose list filters
   nothing (see `CSS_REJECTS_PIN`), but stamped and graded on the harvests' cadence
@@ -35,13 +34,17 @@ real move in a number is a deliberate, visible edit.
   with the corpus unchanged.
 
   **The suite-derived pins have exactly one cadence.** Every count above that is
-  measured over a sibling checkout (the four harvests' plus the CSS reject count) is
-  re-derived by `deno task bench:pins:suites` and by nothing in `deno task
-  check`, whose one sibling-checkout leg (`roundtrip:audit:prettier`) re-derives no pin — so a checkout that moves leaves the pin
+  measured over a sibling checkout (the four suite harvests' plus the CSS reject
+  count) is re-derived by `deno task bench:pins:suites` and by nothing in `deno task
+  check`, whose two sibling-checkout legs (`roundtrip:audit:prettier`, `discovery:audit`) re-derive no pin — so a checkout that moves leaves the pin
   describing the previous corpus with every committed-tree gate green until that
-  group runs. Two things make that safe rather than merely documented: the group is
+  group runs. (The svelte-styles block count is the one sibling-measured pin outside
+  that group: the same stamp-and-fail-before-writing posture, re-derived by `deno task
+  bench:harvest:svelte-styles`, which `conformance` chains later beside the corpus
+  legs that read its cache.) Two things make that safe rather than merely documented: the group is
   a preflight of `deno task conformance` (so a release cannot ship the old number),
-  and each leg is freshness-stamped on the checkout COMMIT — **every** checkout it
+  and each leg is freshness-stamped on the checkout's git OBJECT — its HEAD commit,
+  or for the `../corpora` snapshot its `collections/` tree id — **every** checkout it
   reads, which for the two reject pins is three apiece and neither list is the one
   the pin is named after (CSS: `../svelte`, `../prettier`, `../wpt`; Svelte:
   `../svelte`, `../prettier`, `../prettier-plugin-svelte`, since both prettier
@@ -57,7 +60,7 @@ real move in a number is a deliberate, visible edit.
   `TEST262_POSITIVES_PIN` by `conformance:test262` (its Rust twin) and
   `CSS_REJECTS_PIN` by the conformance coverage run (`bench:conformance`), whose
   oracle row's `parse/css` skips are the reject set. `deno task doctor` reports a
-  stamp whose recorded commit is behind its checkout.
+  stamp whose recorded checkout id is behind its checkout.
 - **Rust-side counts are consts** — grep `REGRESSION PIN`. test262 (discovered +
   graded-manifest + the `--gate` positive count, `POSITIVE_PASSED_PIN`), `fixtures_validate`
   (total fixtures — protecting the primary gate against a discovery collapse) and
@@ -95,43 +98,36 @@ real move in a number is a deliberate, visible edit.
   drop is a regression or gutted input, a rise is a suite refresh or behavior
   change; both must be re-pinned deliberately. No slack: slack lets small
   regressions creep and silently widens after every refresh.
-- **Minimums** (shrink fails, growth passes; carve-out:
-  `SVELTE_STYLES_BLOCKS_MIN` warns on a small shrink and fails only on a >10%
-  collapse, since it counts pure input material off daily-churning repos). Two
-  cases, differing in WHY a minimum is right:
-  1. `CORPUS_FORMAT_MATCH_MIN` is over the **reproducible** subset (pinned
-     framework + prettier), so it's really exact-on-aligned-checkouts — the minimum
-     exists only so a fixed win needn't re-pin; over pinned inputs a `match` DROP is
-     always a real regression. ⚠️ It is NOT a live-growth minimum. The tempting
-     framing — "the corpus is LIVE dev repos that GROW with ordinary work, so a
-     minimum stays tight" — is FALSE, and is what drives a re-pin treadmill: a
-     minimum is only sound if the metric can't decrease, but `match` **shrinks** the
-     moment a live edit adds a divergence. That is why the format pins sit on the
-     reproducible subset.
-  2. `CORPUS_PARSE_COMPARED_MIN` and the committed-fixtures audits
-     (`fixtures_validate`, `swallow_audit`) ARE genuine growth minimums —
-     `compared`/fixture counts only grow with reviewed additions, and shrinkage is
-     the discovery regression the pin guards.
+- **Minimums** (shrink fails, growth passes). Two cases, differing in WHY a
+  minimum is right:
+  1. `CORPUS_FORMAT_MATCH_MIN` is over the whole `gates` view, every file of which
+     comes from a pinned checkout (the `../corpora` real-code snapshot + the prettier
+     suites), so it's really exact-on-aligned-checkouts — the minimum exists only so
+     a fixed win needn't re-pin; over pinned inputs a `match` DROP is always a real
+     regression. ⚠️ It is NOT a live-growth minimum, and the corpus is no longer
+     live: the author's dev repos used to sit in the gate as working trees, whose
+     ordinary edits shrank `match` and drove a re-pin treadmill (re-pinned 3× in 2
+     days). The snapshot is what ended that — a minimum is only sound if the metric
+     can't decrease, and over pinned inputs it can't except by regression.
+  2. The committed-fixtures audits (`fixtures_validate`, `swallow_audit`) ARE
+     genuine growth minimums — fixture counts only grow with reviewed additions,
+     and shrinkage is the discovery regression the pin guards.
 - **Failure-bucket pins** (exact `!==`): the `corpus:compare:* --all` triage
-  buckets. The **format** `unknown`/`partial` pins are over the **reproducible**
-  subset (deterministic on aligned checkouts — live dev-repo divergences are a
-  non-gating WARN); the **parse** tsv-side parse-failure pin stays over the live
-  corpus (a tsv over-rejection of real code is a regression wherever it occurs). A
-  rise fails until triaged (fix it, add a divergence detector/sanction, or
-  consciously re-pin a legitimately-unsupported new file); a drop also fails, so a
-  fixed divergence ratchets the pin DOWN deliberately.
+  buckets and `compared`. All of them hold over the whole `gates` view (deterministic
+  on aligned checkouts). A rise fails until triaged (fix it, add a divergence
+  detector/sanction, or consciously re-pin a legitimately-unsupported new file); a
+  drop also fails, so a fixed divergence ratchets the pin DOWN deliberately. A
+  snapshot refresh moves all of them at once and is re-pinned as one deliberate
+  corpus move, beside the new `../corpora` `collections/` tree id in `GATE_CHECKOUT_IDS`.
 
 **SAFETY always gates** — content loss fails `corpus:compare:format --all` over
-EVERY file, reproducible or live. Data loss is never churn; the reproducibility
-split is only about the layout/count pins.
+EVERY file. Data loss is never churn.
 
 Pins apply only to FULL runs (default suite root, `--all`, default harvest source) —
 subtree and filtered runs legitimately grade a slice. Harvest pins fail **before**
 writing, so a wrong cache never replaces a good one — except the wpt harvest, which writes
 first and REMOVES the whole cache on a pin miss, so loaders see absent rather than
-wrong-sized (the `SVELTE_STYLES_BLOCKS_MIN`
-drift band still holds this: only a collapse fails-before-writing; a small shrink
-warns and writes valid data). CI runs only the committed-tree pins (`check.yml` is a
+wrong-sized. CI runs only the committed-tree pins (`check.yml` is a
 clean checkout — no sibling clones); the rest are dev-machine gates at
 conformance/publish cadence.
 
@@ -151,8 +147,9 @@ the **commit message**. What stays in-file is the sentence a reader needs to kno
 the number counts — including a harvest pin's provenance stamp (`Measured <date>:
 ../wpt at <commit>`), which is the pin's identity, not its history.
 
-When a checkout moves, re-record its **commit** in `GATE_CHECKOUT_COMMITS` in the
-same change (`git -C ../<repo> rev-parse --short HEAD`) — that struct is the single
+When a checkout moves, re-record its **id** (its HEAD commit; for `../corpora`, the `collections/` tree id) in `GATE_CHECKOUT_IDS` in the
+same change (`git -C ../<repo> rev-parse --short HEAD`; for the snapshot,
+`git -C ../corpora rev-parse --short HEAD:collections`) — that struct is the single
 provenance record for what a pin was measured against (upstream version files only
 bump at release) — and run `deno task bench:pins:suites` there too, so the
 suite-derived pins move with it. Each entry's `pins` list is graded by
@@ -177,11 +174,11 @@ say nothing. ⚠️ `git archive` stamps commit-time mtimes, so a scratch tree s
 `touch` the extracted tree, or give it its own target dir, and confirm the binary is
 actually fresh rather than trusting cargo's exit code.
 
-**Re-measure at re-pin time.** The corpus legs read live working trees, so their counts
-drift with ordinary work in the scanned repos and a number cited from an earlier run is
-already a guess. Take the reading in the same change that writes the constant, and
-re-pin as one deliberate corpus refresh — the checkout commits, the counts, and the
-attribution note landing together.
+**Re-measure at re-pin time.** The corpus legs read pinned checkouts, but a number
+cited from an earlier run on another machine is still a guess about this one's
+alignment. Take the reading in the same change that writes the constant, and re-pin as
+one deliberate corpus refresh — the checkout ids (the `../corpora` snapshot's
+`collections/` tree id above all), the counts, and the attribution note landing together.
 
 ## Why both the pins AND the checkout alignment exist
 

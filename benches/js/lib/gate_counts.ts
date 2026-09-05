@@ -8,16 +8,15 @@
  *
  * Three pin categories, chosen per surface — exact pins (`*_PINS` / `*_PIN`),
  * minimums (`*_MIN`), and failure-bucket pins (exact two-sided `!==`). What each
- * means, which surface takes which, and why (the reproducible-subset rule, the
- * `SVELTE_STYLES_BLOCKS_MIN` drift band, SAFETY gating over EVERY file) is stated
+ * means, which surface takes which, and why (the pinned-snapshot rule, SAFETY
+ * gating over EVERY file) is stated
  * once in docs/gate_counts.md §Semantics; the per-constant docstrings below carry
  * only what is specific to that constant.
  *
  * Pins are enforced only on FULL runs (default suite root, `--all`, default
  * harvest source) — a subtree or filtered run legitimately grades a slice.
  * Harvest pins fail BEFORE writing, so a wrong cache never replaces a good
- * one (the `SVELTE_STYLES_BLOCKS_MIN` drift band still holds this: only a
- * collapse fails-before-writing; a small shrink warns and writes valid data).
+ * one.
  * CI note: `.github/workflows/check.yml` runs on a clean checkout (no
  * sibling clones), so of these only the committed-tree Rust pins
  * (fixtures_validate via the integration test, swallow_audit) execute in CI —
@@ -26,9 +25,10 @@
  * Update ritual: the failure message prints expected vs got — update the
  * constant and say why in the COMMIT MESSAGE (that is where a pin move's
  * history lives — do NOT narrate it as an in-file comment; keep these
- * docstrings semantic). When a checkout moves, re-record its commit in
- * `GATE_CHECKOUT_COMMITS` in the same change (`git -C ../<repo> rev-parse
- * --short HEAD`) — that struct is the single provenance record for what a pin
+ * docstrings semantic). When a checkout moves, re-record its id in
+ * `GATE_CHECKOUT_IDS` in the same change (`git -C ../<repo> rev-parse
+ * --short HEAD`; for the `../corpora` snapshot, `HEAD:collections`) — that struct
+ * is the single provenance record for what a pin
  * was measured against. When re-pinning after a suite refresh, glance at the
  * full bucket table, not
  * just the changed number — a count move can mask offsetting changes (the
@@ -47,58 +47,74 @@
  * slack drift apart. See docs/gate_counts.md.
  */
 
+import { CORPORA_ROOT, CORPORA_TREE } from './corpora.ts';
 import type { Language } from './types.ts';
 
 /**
- * The sibling checkouts the counts below were measured against, by git commit.
+ * The sibling checkouts the counts below were measured against, by git object: the
+ * checkout's HEAD commit, or — with `tree` set — the id of that subtree at HEAD
+ * (`git rev-parse HEAD:<tree>`), for a checkout whose corpus is one subtree and whose
+ * other commits must not read as a corpus move. Both abbreviated; compared by prefix.
  *
  * The counts are only meaningful relative to the inputs that produced them, and an
  * upstream `package.json` version bumps only at RELEASE — so commits landing between
  * releases change the graded suite without changing the version. `pins:audit`'s version
  * check is blind to that window, which is exactly how these pins went stale silently: a
- * `../svelte` pull added three test inputs at the same declared version, and `../kit` +
- * `../svelte.dev` moved under the corpus pins with no version signal at all.
+ * `../svelte` pull added three test inputs at the same declared version.
  *
- * So `pins:audit` also compares each checkout's HEAD against the commit recorded here and
- * WARNS on a move. That is deliberately a warning, not a failure: the count pins are the
+ * So `pins:audit:checkouts` also compares each checkout's git object against the id recorded
+ * here and WARNS on a move. That is deliberately a warning, not a failure: the count pins are the
  * gate (they fail on any real move in what's graded), and this exists to make a count-pin
  * trip *diagnosable* — "the corpus moved" vs "tsv regressed" is otherwise a reverse-
  * engineering exercise. An absent checkout, or one that isn't a git repo, is skipped, so
  * clean machines and CI still pass.
  *
- * Re-record a commit in the same change that re-pins the counts it explains. The
+ * `../corpora` is the real-code snapshot (`fuzdev/corpora`): every `real` and
+ * `framework` corpus entry reads one of its collections, and one object id pins them
+ * all — the author's dev repos included, which as live working trees could not be
+ * pinned at all (their counts were "live-growth minimums" and a re-pin treadmill). The
+ * id is its `collections/` TREE's, not a commit's: the corpus is those bytes, and the
+ * snapshot repo's tooling and doc commits — two landed on the snapshot's first day, each
+ * with a byte-identical tree — must not move every pin here. A snapshot refresh is a
+ * corpus move like any other: re-record the tree id here, re-run the corpus gates, re-pin.
+ *
+ * Re-record an id in the same change that re-pins the counts it explains. The
  * harvest-derived pins named beside each checkout ({@link SVELTE_REJECTS_PIN},
  * {@link CSS_REJECTS_PIN}, {@link TS_REPO_CORPUS_PIN}, {@link TS_REPO_REJECTS_PIN},
  * {@link WPT_CSS_HARVEST_PIN}, {@link TEST262_POSITIVES_PIN}) are re-derived by
  * `deno task bench:pins:suites` — a `deno task conformance` preflight, and nothing
  * in `deno task check` — so run it in that same change rather than leaving the move
- * for the conformance cadence to find (docs/gate_counts.md §Where the numbers live).
+ * for the conformance cadence to find (docs/gate_counts.md §Where the numbers live);
+ * {@link SVELTE_STYLES_BLOCKS_PIN} rides `bench:harvest:svelte-styles` the same way.
  *
  * `pins` is graded by `gate_counts_test.ts`: every pin exported here must be named
  * (or glob-matched) by some checkout, and every name here must exist — so a new pin
  * cannot land without saying which checkout it was measured against, and a rename
- * cannot leave a ghost. The one export outside the map is
- * {@link SVELTE_STYLES_BLOCKS_MIN}, measured over the live dev repos, which have no
- * commit to record (`UNTRACKED_PINS` in the test carries that reason).
+ * cannot leave a ghost.
  */
-export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: readonly string[] }> = {
-	'../svelte': {
-		commit: '5ccdfe355',
-		pins: [
-			'SVELTE_FIXTURES_PINS',
-			'SVELTE_REJECTS_PIN',
-			'CSS_REJECTS_PIN',
-			'CORPUS_FORMAT_*',
-			'CORPUS_PARSE_*'
-		]
+export const GATE_CHECKOUT_IDS: Record<
+	string,
+	{ hash: string; tree?: string; pins: readonly string[] }
+> = {
+	// The real-code snapshot: every `real` + `framework` corpus entry, so every corpus
+	// pin plus the styles harvest measured over the perf view. Pinned by its
+	// `collections/` tree (see above); what each collection vendors is its manifest.
+	[CORPORA_ROOT]: {
+		tree: CORPORA_TREE,
+		hash: '5f40c547c',
+		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*', 'SVELTE_STYLES_BLOCKS_PIN']
 	},
-	'../acorn-typescript': { commit: '923b213', pins: ['TS_FIXTURES_PINS'] },
+	// `../svelte` feeds the conformance view only now (its `tests` tree); its
+	// `packages/svelte/src` is the snapshot's `svelte` collection.
+	'../svelte': {
+		hash: '5ccdfe355',
+		pins: ['SVELTE_FIXTURES_PINS', 'SVELTE_REJECTS_PIN', 'CSS_REJECTS_PIN']
+	},
+	'../acorn-typescript': { hash: '923b213', pins: ['TS_FIXTURES_PINS'] },
 	'../typescript': {
-		commit: '637d5746b',
+		hash: '637d5746b',
 		pins: ['TS_REPO_PINS', 'TS_REPO_CORPUS_PIN', 'TS_REPO_REJECTS_PIN']
 	},
-	'../kit': { commit: 'c0c936124', pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*'] },
-	'../svelte.dev': { commit: '996bd63e4', pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*'] },
 	// Both prettier suites are Svelte-language inputs in the conformance view —
 	// prettier's `tests/format/html` and the plugin's `test` are `.html` files the
 	// loader reads as Svelte — so both feed {@link SVELTE_REJECTS_PIN} as well as
@@ -107,18 +123,18 @@ export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: reado
 	// over, not just the one it is named after; `gate_counts_test.ts` grades that
 	// each pin names at least one, which cannot see a missing second.
 	'../prettier': {
-		commit: '1dcd0b05d',
+		hash: '1dcd0b05d',
 		pins: ['SVELTE_REJECTS_PIN', 'CSS_REJECTS_PIN', 'CORPUS_FORMAT_*', 'CORPUS_PARSE_*']
 	},
 	'../prettier-plugin-svelte': {
-		commit: '7809486',
+		hash: '7809486',
 		pins: ['SVELTE_REJECTS_PIN', 'CORPUS_FORMAT_*', 'CORPUS_PARSE_*']
 	},
 	// The two suite-only checkouts: no version file to align, so their harvest
 	// stamps are the only other place the commit is recorded — listed here so
 	// `pins:audit:checkouts` names them when they move, like every other input.
-	'../wpt': { commit: '7437c7bc7', pins: ['WPT_CSS_HARVEST_PIN', 'CSS_REJECTS_PIN'] },
-	'../test262': { commit: '7153986fc', pins: ['TEST262_POSITIVES_PIN'] }
+	'../wpt': { hash: '7437c7bc7', pins: ['WPT_CSS_HARVEST_PIN', 'CSS_REJECTS_PIN'] },
+	'../test262': { hash: '7153986fc', pins: ['TEST262_POSITIVES_PIN'] }
 };
 
 /** Exact expected counts for a fixtures parse-conformance gate (`lib/fixtures_gate.ts`). */
@@ -142,7 +158,7 @@ export interface GatePins {
 	over_acceptance: number;
 }
 
-/** conformance:svelte-fixtures — `scanned` suite inputs + `both_accept`; provenance in `GATE_CHECKOUT_COMMITS`. */
+/** conformance:svelte-fixtures — `scanned` suite inputs + `both_accept`; provenance in `GATE_CHECKOUT_IDS`. */
 export const SVELTE_FIXTURES_PINS: GatePins = {
 	// 3392 → 3406 / 3297 → 3308 / 16 → 17: a `../svelte` pull (20b341f10 → 5ccdfe355) added 14
 	// graded `.svelte` inputs — the version-window this file's header describes, since the
@@ -163,12 +179,12 @@ export const SVELTE_FIXTURES_PINS: GatePins = {
 	over_acceptance: 17
 };
 
-/** conformance:ts-fixtures — provenance in `GATE_CHECKOUT_COMMITS` (../acorn-typescript, oracle @sveltejs/acorn-typescript). */
+/** conformance:ts-fixtures — provenance in `GATE_CHECKOUT_IDS` (../acorn-typescript, oracle @sveltejs/acorn-typescript). */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over_acceptance: 8 };
 
 /**
  * conformance:ts-repo — `scanned` corpus files + `accept_parity` (tsv/tsc-baseline agreement);
- * provenance in `GATE_CHECKOUT_COMMITS` (../typescript). A rise on the pinned corpus is a parity
+ * provenance in `GATE_CHECKOUT_IDS` (../typescript). A rise on the pinned corpus is a parity
  * gain, not a suite refresh; a drop is USUALLY a regression — but read the other buckets before
  * treating it as one, because `accept_parity` counts only the agreeing-ACCEPT half. A file leaving
  * for `parity reject` — tsv learning to refuse something tsc's baseline refuses too — drops this
@@ -198,14 +214,34 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
 export const TS_REPO_PINS = { scanned: 13708, accept_parity: 12284, over_acceptance: 487 };
 
 /**
- * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides
- * parsed and the ASTs diffed); the corpus is live dev repos, so growth passes
- * and any drop fails.
+ * corpus:compare:parse --all — EXACT per-language `compared` (both sides parsed and
+ * the ASTs diffed) over the gates view: the `../corpora` snapshot + the prettier
+ * suites, all pinned, so any move is a corpus refresh (re-pin with the new
+ * `GATE_CHECKOUT_IDS` commit) or a one-language parse collapse that the
+ * cross-language total would hide.
  */
-export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
-	svelte: 1371,
-	typescript: 4356,
-	css: 168
+export const CORPUS_PARSE_COMPARED_PIN: Record<Language, number> = {
+	// 1371 / 4356 / 168 → 1178 / 4175 / 166: the corpus moved from the live working trees to
+	// the `../corpora` snapshot, which leaves the upstreams' own test-fixture subtrees behind
+	// (svelte-docinfo's, gro's, mdz's, fuz_gitops's, fuz_css's and fuz_code's `src/test/fixtures`;
+	// kit's `core/*/fixtures` + `test/samples`) — 274 svelte / 388 typescript / 3 css files, of
+	// which these are the ones both parsers accepted; the rest were parse-fail-skipped, as
+	// intentionally-invalid fixtures are. No file of real code left; the tsv-side failure
+	// counts below did not move.
+	//
+	// 1178 / 4175 / 166 → 1353 / 4285 / 172: earbetter (44 / 26 / 2) and cosmicplayground
+	// (131 / 84 / 2) join `REAL_REPOS`, plus their two `svelte_styles` concats (css +2) — every
+	// one of the 291 new files compared, so the tsv-side failure counts did not move.
+	//
+	// typescript 4285 → 4289: the loader walks the whole JS/TS family `tsv format` discovers
+	// (`.mts`/`.cts`/`.mjs`/`.cjs` joined `.ts`/`.js`), which admits five prettier-suite files:
+	// `typescript/top-level-await/test.{mts,cts}`, `js/top-level-await/test.{mjs,cjs}` (all four
+	// compared) and `js/babel-plugins/pipeline-operator-hack.cjs` (rejected by both parsers, so
+	// counted nowhere). Two more on disk sit under the excluded `_errors_/`. The snapshot holds
+	// none yet; a collection gaining one now grades instead of being skipped.
+	svelte: 1353,
+	typescript: 4289,
+	css: 172
 };
 
 /**
@@ -222,16 +258,14 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 };
 
 /**
- * corpus:compare:format --all — per-language MINIMUM exact-`match` count, enforced over
- * the REPRODUCIBLE subset only: the version-pinned `framework` + `prettier_fixture` tiers
- * (../kit, ../svelte, ../svelte.dev, ../prettier, ../prettier-plugin-svelte — the checkouts
- * `GATE_CHECKOUT_COMMITS` tracks and `pins:audit` verifies). The live dev repos are a
- * NON-GATING WARN (`corpus_compare_format.ts`), so their churn never shifts a pin — an
- * aligned machine measures these EXACTLY. A shrink fails (a formatter/oracle collapse in
- * pinned code); a rise re-pins to keep the floor tight. It stays a minimum (not exact) only
- * so a fixed win needn't re-pin to pass — over pinned inputs a `match` DROP is always a real
- * regression, never live-corpus growth. Provenance in `GATE_CHECKOUT_COMMITS`; split rationale
- * in docs/gate_counts.md.
+ * corpus:compare:format --all — per-language MINIMUM exact-`match` count over the whole
+ * gates view: the `../corpora` snapshot (the author's repos + the framework source) and
+ * the prettier suites — every one a checkout `GATE_CHECKOUT_IDS` tracks and
+ * `pins:audit:checkouts` verifies, so an aligned machine measures these EXACTLY. A shrink
+ * fails (a formatter/oracle collapse in pinned code); a rise re-pins to keep the floor
+ * tight. It stays a minimum (not exact) only so a fixed win needn't re-pin to pass — over
+ * pinned inputs a `match` DROP is always a real regression. Provenance in
+ * `GATE_CHECKOUT_IDS`; rationale in docs/gate_counts.md.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 500 → 499: one reproducible file, `svelte.dev/.../lib/components/PageControls.svelte`,
@@ -269,7 +303,16 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// svelte files whose tsv output changes at all — an A/B of every file under the framework
 	// roots and both `.html` suites against a pre-change binary. The floor it replaces was
 	// four below the tree's real 502, which is why a three-file drop cleared it; 499 is tight.
-	svelte: 499,
+	//
+	// 499 → 931: the author's own repos join the pinned corpus (the `../corpora` snapshot —
+	// they were a non-gating live tier before). Not a behavior change: the framework +
+	// prettier subset the old floor measured is unchanged, and the newcomers arrive with zero
+	// `unknown`.
+	//
+	// 931 → 1047: earbetter (33 of 44) and cosmicplayground (83 of 131) join `REAL_REPOS`;
+	// their other 59 svelte files are all `known` divergences (prettier-shaped code, mostly
+	// `self_closing_nonvoid` / `inline_content_block_style`), none `unknown`.
+	svelte: 1047,
 	// 2332 → 2334: two reproducible files, `prettier/tests/format/js/comments/11273.js` and
 	// `.../trailing-jsdocs.js`, whose divergence was a container-end trailing comment RUN the
 	// author glued onto one line and tsv split onto two. That run's separator now asks the
@@ -279,18 +322,30 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 2334 → 2335: `prettier/tests/format/js/sequence-break/break.js`, which leaves `unknown`
 	// by matching once a sequence breaks on width. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`,
 	// which moves the other way in the same step.
-	typescript: 2335,
-	css: 89
+	//
+	// 2335 → 4059 and (css) 89 → 120: the author's repos join the pinned corpus — see svelte.
+	//
+	// 4059 → 4165 and (css) 120 → 125: earbetter + cosmicplayground join `REAL_REPOS` (106 of
+	// their 110 typescript files match, 3 `known`, 1 `partial` — see the partial pin; 5 of 6 css,
+	// 1 `known`).
+	//
+	// 4165 → 4169: the loader walks the whole JS/TS family `tsv format` discovers (see the parse
+	// `compared` pin): the four `top-level-await/test.{mts,cts,mjs,cjs}` prettier files all match,
+	// and `pipeline-operator-hack.cjs` is an expected error (both sides reject) — `unknown` and
+	// `partial` unmoved.
+	typescript: 4169,
+	css: 125
 };
 
 /**
  * corpus:compare:format --all — EXACT per-language `unknown` divergence count over the
- * REPRODUCIBLE subset (framework + prettier suites; see `CORPUS_FORMAT_MATCH_MIN`). Both
+ * gates view (the snapshot + prettier suites; see `CORPUS_FORMAT_MATCH_MIN`). Both
  * directions fail: a rise = a new unexplained divergence (fix it, catalog a detector in
  * `lib/divergence/patterns.ts`, or consciously re-pin a legitimately-unsupported new pinned
- * suite file); a drop = the backlog shrank, re-pin to record the win. Live dev-repo unknowns
- * are the non-gating WARN, not here. A single-run trip can be the FFI/sidecar heisenbug —
- * confirm on the single repo first. Same reproducible subset + provenance as
+ * file); a drop = the backlog shrank, re-pin to record the win. The author's own repos are
+ * in here too now — their unknowns were a non-gating WARN while they were live working
+ * trees, and are pinned since the snapshot. A single-run trip can be the FFI/sidecar
+ * heisenbug — confirm on the single repo first. Same corpus + provenance as
  * `CORPUS_FORMAT_MATCH_MIN`.
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
@@ -304,8 +359,8 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// `f4929877a` (the previous green read) corpus-profile FFI build and the tip: these two
 	// are the ONLY movers among the reproducible files, nothing arrived in `unknown`, and
 	// `safety` / `errors` / `expected_errors` are identical file-for-file. The same diff
-	// moves one LIVE file, `zzz/src/lib/CapabilityWebsocket.svelte`, into `partial` — the
-	// unpinned dev-repo tier, reported as a WARN and not part of this count.
+	// moves one file, `zzz/src/lib/CapabilityWebsocket.svelte`, into `partial` — then an
+	// unpinned live-tier WARN, and since the snapshot a gated arrival (see the partial pin).
 	//
 	// 5 → 0: the bucket EMPTIES, by one formatter rule and two detector arms. The three
 	// `prettier-plugin-svelte/test/**/region-markers*.html` files leave for **match**: a
@@ -543,12 +598,13 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 
 /**
  * corpus:compare:format --all — EXACT per-language `partial` divergence count over the
- * REPRODUCIBLE subset (same semantics as `CORPUS_FORMAT_UNKNOWN_PIN`). svelte carries ONE
- * gated partial; the live svelte partials — the fuz fill-family `.svelte` pages — sit in the
- * non-gating WARN, not the gate.
+ * gates view (same semantics as `CORPUS_FORMAT_UNKNOWN_PIN`). The author's repos are gated
+ * here since the snapshot brought them into the pinned corpus; each arrival is named below.
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
-	svelte: 1,
+	// 1 → 2: the author's repos join the pinned corpus; `zzz/src/lib/CapabilityWebsocket.svelte`
+	// arrives from the former non-gating WARN (its explained hunk is `spaced_tag_travel`).
+	svelte: 2,
 	// 37 → 34: the three `js/comments/between-head-and-body/*.js` files are `with`-statement
 	// comment tests, so all three now land in `errors` rather than being partially compared
 	// through a call-expression misparse.
@@ -595,23 +651,39 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other way in the same step;
 	// the arrival is a gain (the file's arrow hunks are now explained) held short of `known`
 	// by an uncataloged block-body residue in the same file.
-	typescript: 25,
+	//
+	// 25 → 26: the author's repos join the pinned corpus; `fuz_ui/src/lib/project_stats_data.ts`
+	// arrives from the former non-gating WARN (its explained hunk is `fill_101_boundary`).
+	//
+	// 26 → 27: cosmicplayground joins `REAL_REPOS`; `cosmicplayground/src/lib/notes.ts` arrives
+	// with 3 of 5 hunks explained (`fill_101_boundary`, `comment_position`) and two unexplained:
+	// `chromas.reduce((result, chroma) => {…}, {} as Record<Chroma, Hue>)` — prettier hugs the
+	// FIRST argument when the last is a short type-asserted object seed, tsv breaks every
+	// argument. A real backlog item (the first-argument hug with an `as`-asserted trailing arg).
+	typescript: 27,
 	css: 9
 };
 
 /**
- * bench:harvest:svelte-styles — MINIMUM extracted `<style>` block count. Live
- * corpus like `CORPUS_PARSE_COMPARED_MIN`, but with a DRIFT BAND: the perf-view
- * source is the author's own daily-churning repos and the count is pure input
- * material (not a tsv success count), so an ordinary refactor dropping a
- * `<style>` block is benign — unlike the other minimums, a small shrink here
- * isn't a regression. Growth always passes; a shrink within 10% of the pin WARNS
- * and still writes (re-pin here when convenient to silence it); only a COLLAPSE
- * below 90% — broken extraction or a gutted corpus — fails before the cache is
- * written. The harvest owns that band (`* 0.9`); this stays the exact measured
- * value.
+ * bench:harvest:svelte-styles — EXACT extracted `<style>` block count over the perf
+ * view, i.e. the `../corpora` snapshot's `.svelte` files. Pure input material (not a
+ * tsv success count), and pinned like the suite harvests: the source is a pinned
+ * snapshot, so a move is a snapshot refresh (re-pin with the new `collections/` tree
+ * id), a collection joining `REAL_REPOS`, or a broken extraction, and the harvest fails
+ * BEFORE writing so a wrong cache never replaces a good one. Stamped on the snapshot's
+ * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
+ * Measured 2026-09-05: ../corpora `collections/` at 5f40c547c, over the perf view's
+ * 951 `.svelte` files.
+ *
+ * 264 → 278: the first EXACT measurement, over the `../corpora` snapshot at its first
+ * commit. The 264 was a live-tree MINIMUM whose growth passed silently, so the move is
+ * the corpus catching up with itself, not a change in what the harvest extracts.
+ *
+ * 278 → 401: earbetter and cosmicplayground join `REAL_REPOS`, so the perf view gains
+ * their `.svelte` files (58 + 65 blocks) with the snapshot's tree id unmoved — the
+ * view-composition move the stamp's `perf_entries` input exists to notice.
  */
-export const SVELTE_STYLES_BLOCKS_MIN = 264;
+export const SVELTE_STYLES_BLOCKS_PIN = 401;
 
 /** bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured 2026-07-06: ../wpt at 7437c7bc. */
 export const WPT_CSS_HARVEST_PIN = 22_310;
@@ -652,7 +724,7 @@ export const TS_REPO_REJECTS_PIN = 519;
  * more = it started rejecting wholesale — either way the cache would corrupt the
  * published coverage number. Re-derived by `bench:pins:suites` (see there).
  *
- * Moves with THREE checkout commits in {@link GATE_CHECKOUT_COMMITS}, not just the
+ * Moves with THREE checkout commits in {@link GATE_CHECKOUT_IDS}, not just the
  * one it is named after: the Svelte-language conformance corpus is the svelte
  * suite plus both prettier suites' `.html` (which the loader reads as Svelte), and
  * the split of the 145 is 98 / 40 / 7. The harvest stamps all three, so a pull of
@@ -673,7 +745,7 @@ export const SVELTE_REJECTS_PIN = 145;
  * The conformance CSS corpus's REJECT count — files `svelte/compiler`'s `parseCss`
  * refuses — which `diagnostics/css_over_acceptance.ts` grades every `parse/css`
  * tool over. Deterministic given the inputs that build the corpus: the ../prettier,
- * ../svelte AND ../wpt checkout commits ({@link GATE_CHECKOUT_COMMITS} — the svelte
+ * ../svelte AND ../wpt checkout commits ({@link GATE_CHECKOUT_IDS} — the svelte
  * suite ships `.css` files of its own, so this pin moves with that checkout exactly
  * as {@link SVELTE_REJECTS_PIN} does), and the svelte oracle version.
  * {@link WPT_CSS_HARVEST_PIN} is one more input but NOT a substitute for ../wpt's

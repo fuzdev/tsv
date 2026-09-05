@@ -58,7 +58,11 @@
  */
 
 import { CanonicalImplementation } from '../lib/canonical.ts';
-import { corpus_missing_entries, load_pinned_language_corpus } from '../lib/corpus.ts';
+import {
+	corpus_missing_entries,
+	corpus_view_paths,
+	load_pinned_language_corpus
+} from '../lib/corpus.ts';
 import { CSS_REJECTS_PIN, WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
 import {
 	git_head,
@@ -95,7 +99,11 @@ const STAMP_PATH = HARVEST_STAMPS['css-rejects'].path;
 // pin is stamped too but cannot stand in for the commit: wpt supplies 22310 of the
 // 22642 CSS files, and an edit to an existing test moves content without moving the
 // count — so a wpt pull would re-run `bench:harvest:wpt`, rewrite the cache, and
-// leave this grade stamped fresh over a corpus that changed under it.
+// leave this grade stamped fresh over a corpus that changed under it. The
+// conformance view's ENTRY LIST is stamped too (the whole view's, not only the
+// CSS-bearing entries — one spelling, at the cost of a needless re-grade when a
+// non-CSS suite joins): an entry added to or dropped from `CORPUS_ENTRIES` changes
+// the graded corpus while every checkout stays put.
 const versions = await load_all_versions();
 const svelte_commit = git_head('../svelte');
 const stamp_inputs: StampInputs = {
@@ -105,7 +113,8 @@ const stamp_inputs: StampInputs = {
 	wpt_commit: git_head('../wpt'),
 	svelte_oracle: versions.canonical.svelte,
 	wpt_pin: WPT_CSS_HARVEST_PIN,
-	rejects_pin: CSS_REJECTS_PIN
+	rejects_pin: CSS_REJECTS_PIN,
+	conformance_entries: corpus_view_paths('conformance').join(' ')
 };
 
 /**
@@ -202,8 +211,8 @@ const accepts = (impl: TsvImplementation, source: string): boolean => {
 };
 
 // The conformance view is the surface this profile explains — prettier's CSS
-// suite plus the wpt-css harvest, both pinned. The `gates`/`perf` views would
-// fold in live dev repos, whose churn the pin cannot survive.
+// suite plus the wpt-css harvest, both pinned. The `gates`/`perf` views hold the
+// real-code snapshot, a different question from over-acceptance on suites.
 //
 // `load_pinned_language_corpus` in BOTH modes, and the profile mode is why it is
 // here rather than folded into the `--pin-only` probe above: the wpt-css cache is

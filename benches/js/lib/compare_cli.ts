@@ -17,7 +17,7 @@ import process from 'node:process';
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import { z } from 'zod';
 
-import { DevReposLoader, DirectoryLoader } from './corpus.ts';
+import { CorpusLoader, DirectoryLoader } from './corpus.ts';
 import { CanonicalImplementation } from './canonical.ts';
 import { is_native_panic_error } from './divergence/panic_errors.ts';
 import { NativeImplementation } from './ffi.ts';
@@ -98,8 +98,8 @@ export function emit_json_stdout(report: Record<string, unknown>): void {
 export function create_compare_loader(
 	use_all: boolean,
 	base_path: string
-): DevReposLoader | DirectoryLoader {
-	return use_all ? new DevReposLoader('gates') : new DirectoryLoader(base_path);
+): CorpusLoader | DirectoryLoader {
+	return use_all ? new CorpusLoader('gates') : new DirectoryLoader(base_path);
 }
 
 /** The pair of implementations a comparison run holds open for its lifetime. */

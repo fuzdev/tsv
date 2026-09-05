@@ -46,12 +46,13 @@
 
 import { resolve } from 'node:path';
 
+import { CORPORA_COLLECTIONS } from '../lib/corpora.ts';
 import { DirectoryLoader, group_by_language } from '../lib/corpus.ts';
 import { LANGUAGES } from '../lib/types.ts';
 import type { Language, SourceFile } from '../lib/types.ts';
 
 const DEFAULT_CURRENT = 'crates/tsv_wasm/pkg/all/deno/tsv_wasm.js';
-const DEFAULT_CORPUS = '../zzz/src/lib';
+const DEFAULT_CORPUS = `${CORPORA_COLLECTIONS}/zzz/src/lib`;
 const PAGE = 65536;
 
 // ---- arg parsing (positional corpus dir + flags), mirrors wasm_format_probe ----

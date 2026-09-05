@@ -36,18 +36,23 @@ alloc/wall delta, never a static spill rate: a high spill *rate* over a small
 *population* (comment-collect spills are a fraction of a percent of all
 allocations) is a negligible absolute change.
 
-- **Headline rate / profile** — `../zzz/src/lib`. Typical app code,
+Every corpus below is a collection of the `../corpora` snapshot (`fuzdev/corpora`), so
+a profile names one pinned commit and two sessions measure the same bytes; the live
+working trees of the same repos (`../zzz/src/lib`, …) work too, but drift.
+
+- **Headline rate / profile** — `../corpora/collections/zzz/src/lib`. Typical app code,
   comment-sparse; the per-byte baseline the tables here track.
-- **Comment- / alloc-dense stress** — `../fuz_app/src/lib`. TSDoc-dense
+- **Comment- / alloc-dense stress** — `../corpora/collections/fuz_app/src/lib`. TSDoc-dense
   library code; the extreme for comment-path and allocation changes (zzz's
   comment density is a fraction of fuz_app's, so zzz alone under-represents
   these paths).
-- **Svelte-component-dense** — `../fuz_ui/src/lib`. Mostly `.svelte`
+- **Svelte-component-dense** — `../corpora/collections/fuz_ui/src/lib`. Mostly `.svelte`
   components with a thin `.ts` slice — the markup-heavy complement to
   fuz_app's TSDoc-dense TS, and a stable in-ecosystem stand-in for the
   external `.svelte` slices below.
-- **Representative real-world** — `../svelte/packages/svelte/src`,
-  `../kit/packages/kit/src`, and `../svelte-docinfo/src`. Large, diverse
+- **Representative real-world** — `../corpora/collections/svelte/packages/svelte/src`,
+  `../corpora/collections/kit/packages/kit/src`, and
+  `../corpora/collections/svelte-docinfo/src`. Large, diverse
   sources at moderate comment density — the middle ground the two app corpora
   bracket. svelte and kit are mostly `.js`, which
   tsv formats like the rest of the JS/TS family (parsed as TypeScript), so all
@@ -61,7 +66,7 @@ drivers beside its `.css` fixtures. Copy only the target extension into a
 scratch directory and profile that.
 
 **There is no CSS corpus in the list above, and the obvious guess is a trap.**
-`../fuz_css/src` is a CSS *framework*, but by bytes it is ~92% TypeScript —
+`../corpora/collections/fuz_css/src` is a CSS *framework*, but by bytes it is ~92% TypeScript —
 profiling it measures the TS path and reads a CSS change as noise, which is
 exactly how a real CSS win gets mistaken for a placement artifact (and a CSS
 *regression* gets missed).
@@ -79,8 +84,8 @@ taken on — enough to hold a sub-percent read steady:
    ecosystem repos — the product's own gitignore-aware scope rule, never a bare
    `find`, which pulls in minified build bundles.
 3. **Add `benches/js/.cache/svelte_styles/`** (`deno task
-   bench:harvest:svelte-styles`), whose per-repo concatenations cover repos that
-   may not be checked out.
+   bench:harvest:svelte-styles`), the snapshot's `.svelte` `<style>` blocks
+   concatenated one file per collection.
 4. **Add vendored-but-authored stylesheets** — icon fonts, map widgets,
    `fuz_css/dist/{theme,style}.css`.
 
@@ -117,16 +122,16 @@ add `--flow-stats` for its deterministic flow-construction counters.
 
 ```bash
 # Profile a directory
-cargo run --release -p tsv_debug -- profile ../zzz/src/lib
+cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib
 
 # Profile specific files
 cargo run --release -p tsv_debug -- profile file1.ts file2.svelte
 
 # More iterations for stability (default: 10)
-cargo run --release -p tsv_debug -- profile ../zzz/src/lib --iterations 20
+cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib --iterations 20
 
 # JSON output for scripting
-cargo run --release -p tsv_debug -- profile ../zzz/src/lib --json
+cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib --json
 ```
 
 Output shows per-file and aggregate timing, plus normalized rates. The
@@ -171,10 +176,10 @@ Pure Rust, no external dependencies.
 
 ```bash
 # Profile a directory (aggregate report per language)
-cargo run --release -p tsv_debug -- json_profile ../zzz/src/lib
+cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib
 
 # JSON output with per-file data (e.g. to split costs by multibyte flag)
-cargo run --release -p tsv_debug -- json_profile ../zzz/src/lib --json
+cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib --json
 # Also: --iterations <n> (default: 5)
 ```
 
@@ -216,7 +221,7 @@ Once phase timing identifies _which_ phase to optimize, `perf` identifies _which
 ```bash
 # Record samples while profiling a workload
 cargo build --profile profiling -p tsv_debug
-perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ../zzz/src/lib
+perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ../corpora/collections/zzz/src/lib
 
 # Function-level hotspots (text output)
 perf report --stdio
@@ -344,7 +349,7 @@ instructions run), so it separates real added work from a frontend/i-cache effec
 ```bash
 # Deterministic counts (±0.00% across -r runs); compare two binaries, one workload
 perf stat -r 4 -e instructions,cycles,branches,branch-misses \
-  target/profiling/tsv_debug profile ../fuz_app/src/lib --iterations 30
+  target/profiling/tsv_debug profile ../corpora/collections/fuz_app/src/lib --iterations 30
 ```
 
 A near-flat instruction delta (e.g. ≤0.1%) paired with a larger cycles delta and a
@@ -375,7 +380,7 @@ For visual flamegraphs (useful for humans, not Claude):
 
 ```bash
 cargo install flamegraph
-cargo flamegraph --profile profiling -p tsv_debug -- profile ../zzz/src/lib
+cargo flamegraph --profile profiling -p tsv_debug -- profile ../corpora/collections/zzz/src/lib
 ```
 
 On Debian, `perf` ships in the `linux-perf` package (there is no package named
@@ -495,7 +500,7 @@ validated:
 ```bash
 # Record (build with the profiling profile for symbols)
 cargo build --profile profiling -p tsv_debug
-heaptrack -o /tmp/heaptrack_tsv target/profiling/tsv_debug profile ../zzz/src/lib --iterations 2
+heaptrack -o /tmp/heaptrack_tsv target/profiling/tsv_debug profile ../corpora/collections/zzz/src/lib --iterations 2
 
 # Bounded textual report (top allocators / peaks / temporaries)
 heaptrack_print /tmp/heaptrack_tsv.zst -n 30 > report.txt
@@ -568,7 +573,7 @@ and compare pair medians, not absolute readings:
 
 ```bash
 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libmimalloc.so.3 \
-  target/profiling/tsv_debug profile ../zzz/src/lib --iterations 20 --json
+  target/profiling/tsv_debug profile ../corpora/collections/zzz/src/lib --iterations 20 --json
 ```
 
 Run an A/A control (same binary on both sides of each pair) to calibrate the
@@ -604,8 +609,8 @@ deno run --allow-read --allow-env --allow-net --allow-sys \
   --baseline crates/tsv_wasm/pkg/all/deno.baseline/tsv_wasm.js
 ```
 
-Defaults to `../zzz/src/lib` (the corpus the native profiling tools use, for
-comparability); pass a directory to override, or `--lang`, `--pairs`, `--warmup`,
+Defaults to `../corpora/collections/zzz/src/lib` (the corpus the native profiling tools
+use, for comparability); pass a directory to override, or `--lang`, `--pairs`, `--warmup`,
 `--control` (a separate identical-code copy for a two-instance floor).
 
 Omit `--baseline` for an **A/A-only run**: no comparison, just the current
@@ -660,7 +665,7 @@ a moving `Static` count is a collision draw, not a code change. Under
 binaries prices their layout term without touching the PMU.
 
 ```bash
-cargo run -p tsv_debug arena_stats ../zzz/src/lib ../fuz_css/src/lib
+cargo run -p tsv_debug arena_stats ../corpora/collections/zzz/src/lib ../corpora/collections/fuz_css/src/lib
 cargo run -p tsv_debug arena_stats <paths> --json
 cargo run -p tsv_debug arena_stats <paths> --reuse         # reset()-reuse high-water
 cargo run -p tsv_debug arena_stats <paths> --list-errors   # list parse-skipped files
@@ -686,7 +691,7 @@ buffers). Prints percentiles + spill rate at candidate inline N. For sizing,
 exclude the prettier/svelte test suites (edge-case skew). Pure Rust, no Deno.
 
 ```bash
-cargo run -p tsv_debug buffer_sizes ../zzz/src ../gro/src
+cargo run -p tsv_debug buffer_sizes ../corpora/collections/zzz/src ../corpora/collections/gro/src
 cargo run -p tsv_debug --features buffer_stats buffer_sizes <paths>  # + chain/comment histograms
 cargo run -p tsv_debug buffer_sizes <paths> --json
 ```
@@ -748,8 +753,8 @@ above.
 
 ```bash
 cargo run -p tsv_debug type_sizes --min 96              # the wide end of the board
-cargo run --release -p tsv_debug -- ast_census ../fuz_app/src --bytes --top 20
-cargo run --release -p tsv_debug -- ast_census ../fuz_app/src --slots
+cargo run --release -p tsv_debug -- ast_census ../corpora/collections/fuz_app/src --bytes --top 20
+cargo run --release -p tsv_debug -- ast_census ../corpora/collections/fuz_app/src --slots
 ```
 
 ⚠️ **Counts come off the wire AST**, which the writer emits by walking the

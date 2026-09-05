@@ -8,48 +8,47 @@
  * file, a template/scaffolding tree, a fixture-like `tests/` subtree) which
  * skew a perf corpus meant to be representative real-world code.
  *
- * Reuses the REAL loaders/filters (`lib/corpus.ts`) so the numbers match what
- * the bench would actually measure — a directory is streamed via
- * `stream_perf_candidate` (the exact perf-view filtering: curated exclusions,
- * no build-output prune, the fixture/samples prune applied), not a raw walk.
+ * Reuses the REAL loader/filters (`lib/corpus.ts`) so the numbers match what the
+ * bench would actually measure — a directory is streamed via `stream_entry_candidate`,
+ * exactly as `CorpusLoader` would load it as an entry (curated exclusions, no
+ * build-output prune, and no fixture prune: the snapshot's manifest owns that policy
+ * as explicit `exclude` prefixes, so fixture-like bulk shows up here as a WATCH flag
+ * for a human to spell into the manifest, never as a heuristic's silent drop).
  * Pure read-only; no parsing, no FFI. Deno-idiomatic like the other
  * `diagnostics/` entries.
  *
  *   deno task corpus:stats                     # perf view (the bench corpus)
  *   deno task corpus:stats --view gates        # + prettier fixture suites
- *   deno task corpus:stats ../language-tools/packages/svelte2tsx/src  # a candidate
- *   deno task corpus:stats ../cli/packages/sv/src --raw   # unfiltered walk (see what the prune drops)
+ *   deno task corpus:stats ../language-tools/packages/svelte2tsx/src  # a live candidate
+ *   deno task corpus:stats ../corpora/collections/layerchart          # a materialized one
  *   deno task corpus:stats --json 2>/dev/null  # machine-readable to stdout, logs to stderr
  *
  * Run directly (from repo root):
  *   deno run --allow-read --allow-env --allow-sys --config benches/js/deno.json \
- *     benches/js/diagnostics/corpus_stats.ts [dir] [--view v] [--raw] [--json] [--largest N] [--big BYTES]
+ *     benches/js/diagnostics/corpus_stats.ts [dir] [--view v] [--json] [--largest N] [--big BYTES]
  */
 
 import { parseArgs } from 'node:util';
 import { dirname, relative, resolve, sep } from 'node:path';
 
-import {
-	type CorpusView,
-	DevReposLoader,
-	DirectoryLoader,
-	format_mb,
-	stream_perf_candidate
-} from '../lib/corpus.ts';
+import { type CorpusView, CorpusLoader, format_mb, stream_entry_candidate } from '../lib/corpus.ts';
 import { LANGUAGES, type Language, type SourceFile } from '../lib/types.ts';
 
 /** Directory-name segments worth calling out when a candidate carries them — the
  * usual homes of non-representative bulk (generated data, scaffolding, snapshots,
- * fixture-like trees). `fixtures` / `test/samples` are already pruned by the
- * perf-candidate stream, so these are the ones that SURVIVE and need a human call. */
+ * fixture trees). Nothing prunes them here: a hit is the human's cue to decide whether
+ * the upstream means it as a fixture (→ a manifest `exclude`) or as real code (tests
+ * and harnesses stay). */
 const WATCH_SEGMENTS = [
+	'fixtures',
+	'__fixtures__',
+	'samples',
 	'templates',
 	'template',
 	'tests',
 	'snapshots',
 	'__snapshots__',
-	'generated',
-	'__fixtures__'
+	'generated'
 ];
 
 const SMALL_FILE_BYTES = 256;
@@ -168,18 +167,14 @@ function watch_hits(files: SourceFile[]): Array<{ segment: string; files: number
 async function collect_view(
 	view: CorpusView
 ): Promise<{ files: SourceFile[]; entry_paths: string[] }> {
-	const loader = new DevReposLoader(view);
+	const loader = new CorpusLoader(view);
 	const files = await loader.load(() => {}); // silent — this tool prints its own summary
 	return { files, entry_paths: loader.sources.map((s) => resolve(s.path)) };
 }
 
-async function collect_dir(dir: string, raw: boolean): Promise<SourceFile[]> {
+async function collect_dir(dir: string): Promise<SourceFile[]> {
 	const files: SourceFile[] = [];
-	if (raw) {
-		for await (const f of new DirectoryLoader(dir).stream(() => {})) files.push(f);
-	} else {
-		for await (const f of stream_perf_candidate(resolve(dir))) files.push(f);
-	}
+	for await (const f of stream_entry_candidate(resolve(dir))) files.push(f);
 	return files;
 }
 
@@ -209,7 +204,6 @@ function main(): void {
 		allowPositionals: true,
 		options: {
 			view: { type: 'string', default: 'perf' },
-			raw: { type: 'boolean', default: false },
 			json: { type: 'boolean', default: false },
 			largest: { type: 'string', default: '12' },
 			big: { type: 'string', default: '65536' }
@@ -232,9 +226,9 @@ function main(): void {
 		let title: string;
 		let entry_paths: string[] = [];
 		if (dir) {
-			files = await collect_dir(dir, values.raw!);
+			files = await collect_dir(dir);
 			root = resolve(dir);
-			title = `directory ${dir}${values.raw ? ' (raw walk)' : ' (perf-view filters)'}`;
+			title = `directory ${dir} (as a corpus entry)`;
 		} else {
 			const view = values.view as CorpusView;
 			if (!['perf', 'gates', 'conformance'].includes(view)) {

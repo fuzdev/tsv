@@ -50,7 +50,7 @@ import {
 	resolve_compare_base_path,
 	run_compare_main
 } from './lib/compare_cli.ts';
-import { CORPUS_PARSE_COMPARED_MIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
+import { CORPUS_PARSE_COMPARED_PIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
 	type InjectKind,
@@ -724,13 +724,24 @@ interface DiffGroup {
 	samples: { path: string; entry: DiffEntry }[];
 }
 
-/** Group stored diff entries across files by (language, signature). */
+/**
+ * Group stored diff entries across files by (language, signature, documented-as).
+ *
+ * The matcher is part of the key, not only the signature: a signature erases array
+ * indices, and a matcher can accept one index and refuse its sibling (the
+ * instance-comment matcher admits a comment that sits BEFORE the instance script and
+ * refuses one inside it), so keyed on the signature alone an undocumented
+ * `trailingComments[1]` entry folded into the documented `trailingComments[]` group
+ * — the run failed with "1 UNDOCUMENTED", the group listing showed only documented
+ * groups, the JSON `groups` carried no undocumented entry, and only `--verbose`
+ * named the file. Undocumented entries always form their own group now.
+ */
 function build_groups(results: Map<Language, FileResult[]>): DiffGroup[] {
 	const groups = new Map<string, DiffGroup>();
 	for (const lang of LANGUAGES) {
 		for (const r of results.get(lang)!) {
 			for (const entry of r.diffs) {
-				const key = `${lang}:${entry.signature}`;
+				const key = `${lang}:${entry.signature}:${entry.documented ?? ''}`;
 				let group = groups.get(key);
 				if (!group) {
 					group = {
@@ -788,7 +799,7 @@ Options:
 Examples:
   deno task corpus:compare:parse --all
   deno task corpus:compare:parse --all --multibyte-only
-  deno task corpus:compare:parse ../zzz --filter typescript --limit 100
+  deno task corpus:compare:parse ../corpora/collections/zzz --filter typescript --limit 100
   deno task corpus:compare:parse tests/fixtures --filter svelte --inject
   deno task corpus:compare:parse tests/fixtures --filter svelte --inject-terminators
   deno task corpus:compare:parse --all --json 2>/dev/null | jq '.stats.total'
@@ -1190,19 +1201,19 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		exit_compare_failure(impls);
 	}
 
-	// Pinned counts (--all only — see lib/gate_counts.ts): per-language MINIMUM
-	// `compared` (the corpus is LIVE dev repos, so growth passes; a drop means a
-	// one-language parse collapse that can't hide under the cross-language
-	// total), and EXACT per-language tsv-side parse-failure counts (up = a new
-	// over-rejection on real code — triage with diagnostics/skip_triage.ts;
-	// down = a gap closed, re-pin to record the win).
+	// Pinned counts (--all only — see lib/gate_counts.ts): EXACT per-language
+	// `compared` (the corpus is the pinned `../corpora` snapshot + the prettier
+	// suites, so any move is a corpus refresh or a one-language parse collapse that
+	// can't hide under the cross-language total), and EXACT per-language tsv-side
+	// parse-failure counts (up = a new over-rejection on real code — triage with
+	// diagnostics/skip_triage.ts; down = a gap closed, re-pin to record the win).
 	if (use_all_repos) {
 		const pin_failures = [
 			...LANGUAGES.filter(
-				(lang) => stats.get(lang)!.compared < CORPUS_PARSE_COMPARED_MIN[lang]
+				(lang) => stats.get(lang)!.compared !== CORPUS_PARSE_COMPARED_PIN[lang]
 			).map(
 				(lang) =>
-					`${lang} compared ${stats.get(lang)!.compared} < pinned minimum ${CORPUS_PARSE_COMPARED_MIN[lang]}`
+					`${lang} compared ${stats.get(lang)!.compared} ≠ pinned ${CORPUS_PARSE_COMPARED_PIN[lang]}`
 			),
 			...LANGUAGES.filter(
 				(lang) => stats.get(lang)!.tsv_errors !== CORPUS_PARSE_TSV_ERRORS_PIN[lang]

@@ -59,18 +59,19 @@
  * the pinned npm prettier (no path-keyed ledger to rot), and the checkout
  * legitimately rides `-dev` versions — `deno task doctor` reports it instead.
  *
- * **3. Checkout COMMIT drift** (warn-only) — a version string only bumps at
+ * **3. Checkout drift** (warn-only) — a version string only bumps at
  * release, so upstream commits landing in between change a graded suite or
  * corpus with no version signal at all. That window is precisely how the count
- * pins went stale unnoticed. So each checkout's HEAD is also compared against
- * the commit `benches/js/lib/gate_counts.ts` records it was measured at
- * (`GATE_CHECKOUT_COMMITS`), and a move is reported. Deliberately a WARNING:
+ * pins went stale unnoticed. So each checkout's git object — its HEAD, or for the
+ * `../corpora` snapshot the id of its `collections/` tree — is also compared
+ * against the id `benches/js/lib/gate_counts.ts` records it was measured at
+ * (`GATE_CHECKOUT_IDS`), and a move is reported. Deliberately a WARNING:
  * the count pins are the gate — this exists so that when one trips, "the corpus
  * moved" is distinguishable from "tsv regressed" at a glance instead of by
  * reverse-engineering. Absent / non-git checkouts are skipped.
  */
 
-import { GATE_CHECKOUT_COMMITS } from '../benches/js/lib/gate_counts.ts';
+import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
 
 const MODE_FLAGS = ['--pins', '--checkouts'] as const;
 
@@ -331,7 +332,7 @@ function check_prettier_option_agreement(): void {
 // hits the temporal dead zone, where the version checks' hoisted helpers do not.
 if (run_pins) check_prettier_option_agreement();
 
-// --- Checkout alignment + commit drift (header docstring, halves 2 and 3) ------
+// --- Checkout alignment + checkout drift (header docstring, halves 2 and 3) ----
 
 const CHECKOUT_ALIGNMENT: {
 	pkg_json: string;
@@ -341,11 +342,14 @@ const CHECKOUT_ALIGNMENT: {
 	{ pkg_json: '../acorn-typescript/package.json', npm_package: '@sveltejs/acorn-typescript' }
 ];
 
-/** Resolve a checkout's HEAD, or `null` when it is absent / not a git repo. */
-const head_commit = (repo: string): string | null => {
+/**
+ * Resolve a git object of a checkout — `HEAD` (the commit) or `HEAD:<tree>` (a
+ * subtree's id) — or `null` when it is absent / not a git repo.
+ */
+const rev_parse = (repo: string, rev: string): string | null => {
 	try {
 		const { success, stdout } = new Deno.Command('git', {
-			args: ['-C', repo, 'rev-parse', 'HEAD'],
+			args: ['-C', repo, 'rev-parse', rev],
 			stdout: 'piped',
 			stderr: 'null'
 		}).outputSync();
@@ -356,12 +360,12 @@ const head_commit = (repo: string): string | null => {
 };
 
 if (run_checkouts) {
-	// Without `--allow-run=git` every `head_commit` throws and the drift half reads
+	// Without `--allow-run=git` every `rev_parse` throws and the drift half reads
 	// as "all checkouts absent" — silently inert, which is exactly how it sat
 	// unnoticed in `doctor`'s invocation. Say so instead of reporting nothing.
 	const can_run_git = Deno.permissions.querySync({ name: 'run', command: 'git' }).state;
 	if (can_run_git !== 'granted') {
-		checkout_notes.push('commit drift not checked — this invocation lacks --allow-run=git');
+		checkout_notes.push('checkout drift not checked — this invocation lacks --allow-run=git');
 	}
 
 	for (const { pkg_json, npm_package } of CHECKOUT_ALIGNMENT) {
@@ -383,18 +387,21 @@ if (run_checkouts) {
 	}
 
 	// Skipped wholesale rather than per-repo: without the permission every
-	// `head_commit` returns `null`, which would read as "every checkout absent".
+	// `rev_parse` returns `null`, which would read as "every checkout absent".
 	if (can_run_git === 'granted') {
-		for (const [repo, { commit, pins }] of Object.entries(GATE_CHECKOUT_COMMITS)) {
-			const head = head_commit(repo);
-			if (head === null) {
-				checkout_notes.push(`${repo} absent — commit drift not checked`);
+		for (const [repo, { hash, tree, pins }] of Object.entries(GATE_CHECKOUT_IDS)) {
+			// A `tree` pin compares that subtree's id at HEAD, so a commit that touches
+			// nothing under it is not a move (the corpora snapshot's tooling commits).
+			const what = tree === undefined ? repo : `${repo}:${tree}`;
+			const current = rev_parse(repo, tree === undefined ? 'HEAD' : `HEAD:${tree}`);
+			if (current === null) {
+				checkout_notes.push(`${repo} absent — drift not checked`);
 				continue;
 			}
-			// The recorded commits are abbreviated, so compare on the prefix.
-			if (!head.startsWith(commit)) {
+			// The recorded ids are abbreviated, so compare on the prefix.
+			if (!current.startsWith(hash)) {
 				drifted.push(
-					`${repo}: measured at ${commit}, now at ${head.slice(0, commit.length)} — pins: ${pins.join(', ')}`
+					`${what}: measured at ${hash}, now at ${current.slice(0, hash.length)} — pins: ${pins.join(', ')}`
 				);
 			}
 		}
@@ -423,7 +430,7 @@ if (drifted.length > 0) {
 	for (const d of drifted) console.warn(`  · ${d}`);
 	console.warn(
 		'  The count pins are the gate; this is the diagnosis. If one trips, suspect corpus movement\n' +
-			'  before a tsv regression — and re-record the commit in GATE_CHECKOUT_COMMITS when you re-pin.'
+			'  before a tsv regression — and re-record the id in GATE_CHECKOUT_IDS when you re-pin.'
 	);
 }
 const done: string[] = [];

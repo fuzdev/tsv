@@ -18,6 +18,7 @@ import {
 	type TsvImplementation
 } from './types.ts';
 import { CanonicalImplementation } from './canonical.ts';
+import { check_executed_artifacts } from './check_artifact_freshness.ts';
 import { NativeImplementation } from './ffi.ts';
 import { NapiImplementation } from './napi.ts';
 import { WasmImplementation } from './wasm.ts';
@@ -295,6 +296,15 @@ async function init_optional<T extends { init: () => Promise<void> }>(
 /**
  * Initialize all benchmark implementations.
  *
+ * Runs the executed-artifact freshness guard first (`check_executed_artifacts`:
+ * this runtime's native binding + its `all` WASM bundle, the two `init_required`
+ * loads below). The bench and smoke entry points also call it themselves, earlier,
+ * so they abort before a corpus load; the guard lives here too because the
+ * `diagnostics/` scripts reach these bindings through this function alone, and a
+ * stale native library loaded through `Deno.dlopen` does not fail with a message —
+ * it segfaulted at init, twelve days behind its sources, with nothing naming the
+ * cause. `BENCH_STALE_OK=1` downgrades stale to a warning here as everywhere.
+ *
  * @example
  * ```ts
  * const impls = await init_implementations({ logger: console.log });
@@ -307,6 +317,8 @@ export async function init_implementations(
 	options: InitOptions = {}
 ): Promise<InitializedImplementations> {
 	const { logger = console.log } = options;
+
+	await check_executed_artifacts();
 
 	// Load all versions once from package.json
 	const versions = await load_all_versions();

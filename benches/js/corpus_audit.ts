@@ -4,8 +4,9 @@
  * `deno task check` gates `tests/fixtures`, which is format-stable by construction, so it
  * structurally cannot catch a content-loss / panic / non-idempotency bug in real code — every
  * such bug this cycle was found by a corpus audit or a wide fuzz seed, never by `check`. This
- * driver runs the pure-Rust content-loss audits over the `perf` corpus view (the live dev repos +
- * the pinned framework source) plus the version-pinned Prettier format suites, so a robustness
+ * driver runs the pure-Rust content-loss audits over the `robustness` corpus view (the ../corpora snapshot's
+ * real code + the live diff of this machine's working trees against it) plus the version-pinned Prettier
+ * format suites, so a robustness
  * regression fails loudly instead of shipping in the VS Code extension's format-on-save.
  *
  * `check`'s `roundtrip:audit:prettier` leg shares this driver's prettier suites (one list,
@@ -47,21 +48,23 @@
  * ratchet, but unlike the two above it has no zero to grade against — most over-width lines are the
  * overruns `conformance_prettier.md` §Print Width Philosophy sanctions, so a strict-zero run is
  * meaningless and the audit reports-and-exits-0 off its default corpus by design. Grading it here
- * would need a SECOND snapshot pinned over this corpus, and that snapshot would sit on the LIVE dev
- * repos: measured over `../svelte/packages/svelte/src` + `../zzz/src` alone, 83 of the 91 shapes are
- * absent from the committed fixtures snapshot and 25 pinned shapes never fire, and every ordinary
- * edit to a dev repo would move it — the re-pin treadmill the format count pins were moved to the
- * reproducible subset to escape (see `lib/gate_counts.ts`).
+ * would need a SECOND snapshot pinned over this corpus, and this view includes the LIVE working
+ * trees: measured over the svelte + zzz sources alone, 83 of the 91 shapes are absent from the
+ * committed fixtures snapshot and 25 pinned shapes never fire, and every ordinary edit to a dev
+ * repo would move it — the re-pin treadmill the count pins escaped by gating on the pinned
+ * `../corpora` snapshot instead (see `lib/gate_counts.ts`).
  *
  * NOT here: `corpus:compare:format --all` SAFETY (content loss vs prettier) needs the FFI + prettier
  * sidecar and already gates every file in `conformance:all` (publish Step 3b) — this driver is the
  * pure-Rust half. Together they are the "did we actually look over real code" bar.
  *
- * Absent corpus dirs are skipped with a warning (sibling checkouts are legitimately
- * machine-dependent), matching `idempotency:sweep`. A run that finds NO corpus at all fails. The
- * audits themselves are invariant checks (content loss / panic / non-idempotency are real bugs on
- * any machine), so unlike the count-pinned `corpus:compare:*` gates they need no reproducible-subset
- * split — a finding fails wherever it occurs.
+ * Absent corpus dirs are skipped with a warning (the snapshot may not be cloned; the live working
+ * trees are whichever repos this machine has), matching `idempotency:sweep`. A run that finds NO
+ * corpus at all fails. The audits themselves are invariant checks (content loss / panic /
+ * non-idempotency are real bugs on any machine), so unlike the count-pinned `corpus:compare:*`
+ * gates they read the unpinned working trees too — as a DIFF against the snapshot (only the files
+ * that differ from or are absent in their collection; `lib/corpus.ts` `live_diff_files`), since a
+ * finding fails wherever it occurs and a byte the snapshot holds has already been graded.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -69,12 +72,14 @@ import { existsSync } from 'node:fs';
 
 import { PRETTIER_ROUNDTRIP_SUITES } from '../../scripts/roundtrip_audit_prettier.ts';
 
-import { corpus_present_dirs } from './lib/corpus.ts';
+import { corpus_robustness_seeds } from './lib/corpus.ts';
 
 const log = (...args: unknown[]) => console.error(...args);
 
-// Real code: the live dev repos + the pinned framework source (the `perf` view).
-const real_dirs = await corpus_present_dirs('perf', log);
+// Real code: the pinned snapshot's directories + the live working trees' DIFF against it
+// (the `robustness` view) — directories and files alike are seeds to the Rust audits.
+const { dirs: snapshot_dirs, live_files } = await corpus_robustness_seeds(log);
+const real_seeds = [...snapshot_dirs, ...live_files];
 
 // The version-pinned Prettier format suites (adversarial edge cases). Present-only. Shared
 // with the `roundtrip:audit:prettier` leg of `deno task check`, which audits the same suites
@@ -85,12 +90,12 @@ const prettier_suites = PRETTIER_ROUNDTRIP_SUITES.filter((p) => {
 	return false;
 });
 
-if (real_dirs.length === 0) {
-	log('Error: no corpus directories present — nothing to audit.');
+if (real_seeds.length === 0) {
+	log('Error: no real-code corpus present — nothing to audit.');
 	process.exit(1);
 }
 
-const all_dirs = [...real_dirs, ...prettier_suites];
+const all_seeds = [...real_seeds, ...prettier_suites];
 
 // Build the audit binary once (`audits` umbrella = swallow_check + comment_check), then invoke it
 // per leg via `cargo run` (a no-op re-check once built) so only `cargo` needs `--allow-run`.
@@ -119,7 +124,8 @@ const cargo_run = [
 interface Leg {
 	name: string;
 	args: string[];
-	dirs: string[];
+	/** Directories and/or files — the audits' seed resolution takes both. */
+	seeds: string[];
 	/** A gating leg fails the run on a non-zero exit; a report-only leg is informational. */
 	gating: boolean;
 	note?: string;
@@ -129,45 +135,45 @@ const legs: Leg[] = [
 	{
 		name: 'roundtrip_audit --gate',
 		args: ['roundtrip_audit', '--gate'],
-		dirs: all_dirs,
+		seeds: all_seeds,
 		gating: true
 	},
-	{ name: 'comment_audit', args: ['comment_audit'], dirs: all_dirs, gating: true },
-	{ name: 'swallow_audit', args: ['swallow_audit'], dirs: all_dirs, gating: true },
+	{ name: 'comment_audit', args: ['comment_audit'], seeds: all_seeds, gating: true },
+	{ name: 'swallow_audit', args: ['swallow_audit'], seeds: all_seeds, gating: true },
 	{
 		name: 'binding_audit --gate (real code)',
 		args: ['binding_audit', '--gate'],
-		dirs: real_dirs,
+		seeds: real_seeds,
 		gating: true
 	},
 	{
 		name: 'binding_audit --gate (prettier suites)',
 		args: ['binding_audit', '--gate'],
-		dirs: prettier_suites,
+		seeds: prettier_suites,
 		gating: false,
 		note: 'report-only: a few known adversarial philosophy HARDs (plain comments tsv preserves in place)'
 	},
-	{ name: 'authoring_audit', args: ['authoring_audit'], dirs: real_dirs, gating: true },
+	{ name: 'authoring_audit', args: ['authoring_audit'], seeds: real_seeds, gating: true },
 	// The two as-authored ratchets that CAN hold a zero off their default corpus: with explicit
 	// paths the snapshot is not consulted and every finding fails, pinned or not.
-	{ name: 'census_audit', args: ['census_audit'], dirs: all_dirs, gating: true },
-	{ name: 'fabrication_audit', args: ['fabrication_audit'], dirs: all_dirs, gating: true },
+	{ name: 'census_audit', args: ['census_audit'], seeds: all_seeds, gating: true },
+	{ name: 'fabrication_audit', args: ['fabrication_audit'], seeds: all_seeds, gating: true },
 	{
 		name: 'fuzz --iterations 0 (F1 sweep)',
 		args: ['fuzz', '--iterations', '0'],
-		dirs: real_dirs,
+		seeds: real_seeds,
 		gating: true
 	}
 ];
 
 let failed = false;
 for (const leg of legs) {
-	if (leg.dirs.length === 0) {
-		log(`\n─ ${leg.name}: SKIPPED (no dirs present)`);
+	if (leg.seeds.length === 0) {
+		log(`\n─ ${leg.name}: SKIPPED (no seeds present)`);
 		continue;
 	}
 	log(`\n─ ${leg.name}${leg.gating ? '' : ' [report-only]'}${leg.note ? ` — ${leg.note}` : ''}`);
-	const { status } = spawnSync('cargo', [...cargo_run, ...leg.args, ...leg.dirs], {
+	const { status } = spawnSync('cargo', [...cargo_run, ...leg.args, ...leg.seeds], {
 		stdio: 'inherit'
 	});
 	if (status !== 0) {

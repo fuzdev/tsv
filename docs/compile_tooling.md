@@ -42,8 +42,8 @@ None of these run in `deno task check` — the first two need the Deno sidecar, 
 # COMPILE, so its residual error is not one-directional. Subtracting would raise the published parity
 # rate with zero behavior change, on a partial and unsigned signal.
 # Exit codes: 0 clean, 1 FAILURE (mismatch or over-acceptance), 2 harness error. Sidecar-dependent —
-# kept out of `deno task check`; the `compile:corpus:compare` deno task points it at the real-repo
-# corpus + Svelte suites. `--json` carries the full per-file path list per refusal / oracle-reject /
+# kept out of `deno task check`; the `compile:corpus:compare` deno task points it at the whole
+# `../corpora` snapshot (every collection), the private live roots it cannot carry, and the Svelte suites. `--json` carries the full per-file path list per refusal / oracle-reject /
 # over-acceptance bucket plus the `target_set` object, so a bucket's population (and a change's parity
 # estimate) is checkable.
 cargo run -p tsv_debug compile_corpus_compare <paths...>
@@ -158,6 +158,6 @@ deno task compile:fuzz                                              # the on-dem
 # Also flags cheaply-detectable non-TS blockers (directives/spread, special elements, module
 # scripts, option/select, instance exports) to approximate "type stripping is this file's only
 # blocker"; runes/derived/evaluator refusals are NOT detected, so that bucket is an approximation.
-cargo run --release -p tsv_debug -- erase_comment_census ../fuz_ui ../zzz
+cargo run --release -p tsv_debug -- erase_comment_census ../corpora/collections/fuz_ui ../corpora/collections/zzz
 # Also: --verbose (per exposed file), --json.
 ```

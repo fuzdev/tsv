@@ -11,13 +11,13 @@ fixture-first TDD flow rather than this file's hunk workflow.
 Exit-code notes for `--all` runs: besides SAFETY (which always gates), the
 tools fail on an empty scope, an all-errored / zero-compared run (systemic
 sidecar/FFI failure), and on the **pinned per-language counts**
-(`benches/js/lib/gate_counts.ts` — see [gate_counts.md](gate_counts.md)): a minimum on `compared` (live corpus — growth passes,
-drops fail), a minimum on `match` (over the **reproducible subset** — the
-version-pinned framework + prettier checkouts; live dev repos are a non-gating
-WARN), and exact pins on the negative buckets (parse's tsv-failure pin over the
-live corpus; format's `unknown`/`partial` pins over the reproducible subset — a
-new one fails until triaged; fixing some means re-pinning to record the win,
-which is exactly the loop this document drives).
+(`benches/js/lib/gate_counts.ts` — see [gate_counts.md](gate_counts.md)): exact pins on
+`compared` and on the negative buckets (parse's tsv-failure count; format's
+`unknown`/`partial` counts — a new one fails until triaged; fixing some means
+re-pinning to record the win, which is exactly the loop this document drives), and a
+minimum on `match`. All of them hold over the whole `gates` view, because every file in
+it comes from a pinned checkout: the `../corpora` real-code snapshot plus the prettier
+suites. A snapshot refresh is the one legitimate corpus move, re-pinned deliberately.
 
 Repeat runs are cheap: prettier outputs are served from a content-addressed
 cache (../benches/js/CLAUDE.md §Prettier-output cache), so the
@@ -56,10 +56,10 @@ deno task corpus:compare:format:run --all --exit-on-first
 
 ```bash
 # Detailed diff for the file
-cargo run -p tsv_debug compare ../zzz/src/path/to/file.svelte
+cargo run -p tsv_debug compare ../corpora/collections/zzz/src/path/to/file.svelte
 
 # Check if the divergence detector recognizes it
-deno task corpus:compare:format:run ../zzz --explain --exit-on-first
+deno task corpus:compare:format:run ../corpora/collections/zzz --explain --exit-on-first
 ```
 
 Read `docs/conformance_prettier.md` plus the catalog for the language you're triaging (its
@@ -171,18 +171,18 @@ DISCOVER → CATEGORIZE → CHECK FIXTURES → CREATE FIXTURE (if missing) → I
 
 ```bash
 # Full comparison - builds FFI first (all languages)
-deno task corpus:compare:format ../zzz
+deno task corpus:compare:format ../corpora/collections/zzz
 
 # Filtered by language
-deno task corpus:compare:format ../zzz --filter svelte
-deno task corpus:compare:format ../zzz --filter typescript
-deno task corpus:compare:format ../zzz --filter css
+deno task corpus:compare:format ../corpora/collections/zzz --filter svelte
+deno task corpus:compare:format ../corpora/collections/zzz --filter typescript
+deno task corpus:compare:format ../corpora/collections/zzz --filter css
 
 # Verbose mode (see each file as processed)
-deno task corpus:compare:format ../zzz --verbose
+deno task corpus:compare:format ../corpora/collections/zzz --verbose
 
 # Skip rebuild (if FFI already up-to-date)
-deno task corpus:compare:format:run ../zzz
+deno task corpus:compare:format:run ../corpora/collections/zzz
 
 # Machine-readable: single JSON report on stdout (stats + safety/partial/unknown/
 # error lists), human output on stderr. Combine with --all / --safety-only / --filter.
@@ -240,7 +240,7 @@ The default output shows every unexplained diff — partial file hunks and full 
 deno task corpus:compare:format --all
 
 # Single project
-deno task corpus:compare:format ../zzz
+deno task corpus:compare:format ../corpora/collections/zzz
 
 # Compact output without diffs
 deno task corpus:compare:format --all --summary
@@ -254,7 +254,7 @@ This replaces manually running `cargo run -p tsv_debug compare <file>` on each u
 
 ```bash
 # Use --explain to also list known divergences with their patterns
-deno task corpus:compare:format ../zzz --explain
+deno task corpus:compare:format ../corpora/collections/zzz --explain
 
 # Check the conformance docs for detailed rationale (frame + the language's catalog)
 cat docs/conformance_prettier.md docs/conformance_prettier_svelte.md
@@ -482,7 +482,7 @@ Once the fix works, add the normalization variants — both formatters must redu
 ### Re-run Corpus Comparison
 
 ```bash
-deno task corpus:compare:format ../zzz --filter [language]
+deno task corpus:compare:format ../corpora/collections/zzz --filter [language]
 ```
 
 Confirm:
@@ -521,7 +521,7 @@ deno task corpus:compare:format <path> [options]      # Scans <path> recursively
 deno task corpus:compare:format:run <path> [options]  # Skip FFI build (faster iteration)
 
 Options:
-  --all             Compare the gates corpus view (~6,200 files: real repos + the
+  --all             Compare the gates corpus view (~6,200 files: the ../corpora snapshot + the
                     prettier fixture suites — see benches/js/CLAUDE.md §Corpus)
   --filter <lang>   Only compare files of this language (svelte, typescript, css)
   --limit <n>       Limit to first n files per language

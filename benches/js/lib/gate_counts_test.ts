@@ -1,5 +1,5 @@
 /**
- * `GATE_CHECKOUT_COMMITS.pins` is the provenance record for every pinned count —
+ * `GATE_CHECKOUT_IDS.pins` is the provenance record for every pinned count —
  * which checkout each was measured against — and it is a hand-maintained list, so
  * this grades it in both directions against the module's own exports: a pin that
  * names no checkout has no recorded provenance (the shape that once let three
@@ -12,16 +12,18 @@
 import { deepStrictEqual, ok } from 'node:assert';
 import { readFileSync } from 'node:fs';
 
-import { GATE_CHECKOUT_COMMITS } from './gate_counts.ts';
+import { GATE_CHECKOUT_IDS } from './gate_counts.ts';
 
 /**
  * Pins measured over inputs that have no checkout commit to record — each with the
  * reason, so an addition here is an argument rather than an exemption.
  */
-const UNTRACKED_PINS: Record<string, string> = {
-	SVELTE_STYLES_BLOCKS_MIN:
-		'a MINIMUM over the live dev repos (perf-view `real` tier), which are unversioned working trees'
-};
+const UNTRACKED_PINS: Record<string, string> =
+	{
+		// Empty since the real-code corpus became the pinned `../corpora` snapshot: the
+		// one former entry (the svelte-styles block count, a minimum over live working
+		// trees) is now an exact pin measured at that checkout's commit.
+	};
 
 /**
  * Exported constants that are NOT pinned counts — each with the reason, same posture
@@ -32,7 +34,7 @@ const UNTRACKED_PINS: Record<string, string> = {
  * the same missing-provenance shape this file exists to close.
  */
 const NON_PIN_EXPORTS: Record<string, string> = {
-	GATE_CHECKOUT_COMMITS: 'the provenance table itself — what the pins are graded against'
+	GATE_CHECKOUT_IDS: 'the provenance table itself — what the pins are graded against'
 };
 
 const source = readFileSync(new URL('./gate_counts.ts', import.meta.url), 'utf8');
@@ -46,7 +48,7 @@ const exported_pins = [...source.matchAll(/^export const ([A-Za-z0-9_]+)\b/gm)]
 const names = (entry: string, pin: string): boolean =>
 	entry.endsWith('*') ? pin.startsWith(entry.slice(0, -1)) : entry === pin;
 
-const all_entries = Object.entries(GATE_CHECKOUT_COMMITS).flatMap(([repo, { pins }]) =>
+const all_entries = Object.entries(GATE_CHECKOUT_IDS).flatMap(([repo, { pins }]) =>
 	pins.map((entry) => ({ repo, entry }))
 );
 
@@ -73,7 +75,7 @@ Deno.test('every exported pin names the checkout it was measured against', () =>
 	deepStrictEqual(
 		orphans,
 		[],
-		`pins with no checkout in GATE_CHECKOUT_COMMITS (add them to a checkout's \`pins\`, ` +
+		`pins with no checkout in GATE_CHECKOUT_IDS (add them to a checkout's \`pins\`, ` +
 			`or to UNTRACKED_PINS with a reason): ${orphans.join(', ')}`
 	);
 });
@@ -83,7 +85,7 @@ Deno.test('every listed pin name resolves to an export', () => {
 	deepStrictEqual(
 		ghosts.map(({ repo, entry }) => `${repo}: ${entry}`),
 		[],
-		'GATE_CHECKOUT_COMMITS names a pin gate_counts.ts no longer exports'
+		'GATE_CHECKOUT_IDS names a pin gate_counts.ts no longer exports'
 	);
 });
 

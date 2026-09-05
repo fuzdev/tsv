@@ -32,7 +32,7 @@
 
 import { spawnSync } from 'node:child_process';
 
-import { corpus_present_dirs_for_tiers } from './lib/corpus.ts';
+import { corpus_present_dirs_for_tiers, corpus_snapshot_dir } from './lib/corpus.ts';
 import { run_fixtures_gate } from './lib/fixtures_gate.ts';
 import { run_corpus_compare_format } from './corpus_compare_format.ts';
 import { run_corpus_compare_parse } from './corpus_compare_parse.ts';
@@ -64,16 +64,20 @@ if (Deno.args.length > 0) {
  * over a curated corpus, which makes them a regression guard; real code is the
  * exposure.
  *
- * Scoped by TIER — `framework` + `suite` (`../svelte` src and tests, svelte.dev,
- * kit), a pair no single view carries — rather than by view: those checkouts are
- * version-pinned by `pins:audit`, so a release verdict can't turn on a machine's
- * live `real` dev-repo working tree (which every `.svelte`-bearing view includes
- * — hence the tier selection). Absent
- * checkouts warn-skip, and a scope with no dirs at all fails — a leg that graded
- * nothing must not read as a pass.
+ * Scoped to the WHOLE `../corpora` snapshot plus the `suite` tier (`../svelte`'s
+ * tests) — not to a view: the bench and gate views read a curated subset of the
+ * snapshot because every entry there re-pins every corpus count, and this leg pins
+ * nothing, so it reads every collection the snapshot vendors (the third-party Svelte
+ * libraries hold two thirds of its components). Both inputs are version-pinned
+ * (`pins:audit:checkouts`), so a release verdict can't turn on a machine's unpinned
+ * `live` working trees, which only the `robustness` view holds. Absent checkouts
+ * warn-skip, and a scope with no dirs at all fails — a leg that graded nothing must
+ * not read as a pass.
  */
 async function run_render_audit(): Promise<void> {
-	const dirs = await corpus_present_dirs_for_tiers(['framework', 'suite'], console.error);
+	const snapshot = await corpus_snapshot_dir(console.error);
+	const suites = await corpus_present_dirs_for_tiers(['suite'], console.error);
+	const dirs = [...(snapshot === null ? [] : [snapshot]), ...suites];
 	if (dirs.length === 0) {
 		throw new Error('no pinned corpus checkouts present — nothing to audit');
 	}

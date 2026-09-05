@@ -1,15 +1,18 @@
 /**
  * F1 (idempotency) sweep over the **real-code** corpus.
  *
- * Drives every file of the `perf` view (the `real` tier — the sibling dev repos +
- * upstream framework source) through `tsv_debug fuzz --iterations 0`: the fuzzer's
+ * Drives every file of the `robustness` view — the `../corpora` snapshot's real code
+ * plus the live diff (the files of this machine's working trees of the same repos that
+ * differ from, or are absent in, the snapshot) — through `tsv_debug fuzz --iterations 0`:
+ * the fuzzer's
  * pristine pass, which asserts the three invariants on each seed **as authored**,
  * with no mutation. The load-bearing one here is **F1** — `format(format(x)) ==
  * format(x)`, tsv's core "input always formats to itself" invariant — alongside
  * no-panic and structural reparse.
  *
- * Why this isn't in `deno task check`: the corpus is sibling checkouts (legitimately
- * machine-dependent) and the sweep is minutes, not seconds. `check`'s `fuzz:audit`
+ * Why this isn't in `deno task check`: the corpus is sibling checkouts (the snapshot
+ * is not cloned in CI; the working trees are machine-dependent) and the sweep is
+ * minutes, not seconds. `check`'s `fuzz:audit`
  * covers `tests/fixtures`; this covers real code, which is a different risk surface —
  * a formatter can be idempotent on every curated fixture and still reflow a real
  * component on the second pass. Run it at conformance/release cadence, or after any
@@ -22,16 +25,19 @@
 
 import { spawnSync } from 'node:child_process';
 
-import { corpus_present_dirs } from './lib/corpus.ts';
+import { corpus_robustness_seeds } from './lib/corpus.ts';
 
-const dirs = await corpus_present_dirs('perf', (...args) => console.error(...args));
+const { dirs, live_files } = await corpus_robustness_seeds((...args) => console.error(...args));
+const seeds = [...dirs, ...live_files];
 
-if (dirs.length === 0) {
-	console.error('Error: no corpus directories present — nothing to sweep.');
+if (seeds.length === 0) {
+	console.error('Error: no corpus present — nothing to sweep.');
 	process.exit(1);
 }
 
-console.error(`idempotency sweep over ${dirs.length} corpus directories\n`);
+console.error(
+	`idempotency sweep over ${dirs.length} snapshot directories + ${live_files.length} live-diff files\n`
+);
 
 const { status } = spawnSync(
 	'cargo',
@@ -46,7 +52,7 @@ const { status } = spawnSync(
 		'fuzz',
 		'--iterations',
 		'0',
-		...dirs
+		...seeds
 	],
 	{ stdio: 'inherit' }
 );
