@@ -356,7 +356,27 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 66, svelte-ux 100 of 100, svelte-maplibre 57 of 57, language-tools 207 of 215), none
 	// `known`, 11 `unknown` (named on the unknown pin); 8 of its 13 css files match and the
 	// other 5, all layerchart's, are `known`.
-	typescript: 5124,
+	//
+	// 5124 → 5130: the numbers-only array fill is prettier's `printArrayElementsConcisely`
+	// in both halves it was missing. (a) Each item's comma moved INSIDE the fill content
+	// (`[print(item), ","]` then a bare `line`), so the fill's pairwise measure counts the
+	// next item's comma and the break lands where that comma would pass column 100 — before,
+	// a `comma_line` separator measured the next item bare and the line ran to 101. (b) An
+	// author's blank line between two items now separates them with the blank pair rather
+	// than a `line` (prettier's `isLineAfterElementEmpty` → `[hardline, hardline]`), so the
+	// blank survives and its hard break expands the array — before, the fill packed straight
+	// through it. Six files leave for `match`, five from `unknown`
+	// (`layercake/src/_data/unemployment.js` and prettier's `js/arrays/numbers-in-args.js`,
+	// `numbers-in-assignment.js`, `numbers3.js` for (a); `js/arrays/preserve_empty_lines.js`
+	// for (b)) and one from `partial` (`fuz_ui/src/lib/project_stats_data.ts`, whose explained
+	// hunk was `fill_101_boundary`); nothing arrives anywhere, and the svelte + css bucket
+	// lists are file-for-file identical (pre-change tree vs tip, `--all --json` set-diffed).
+	// The third fix in that round — prettier refuses the fill when a signed literal's own
+	// argument carries a comment — moves no count: no corpus file spells one.
+	// ⚠️ That same measurement reads css `match` 131 BEFORE and after this change — two below
+	// the 133 floor, a pre-existing drop unrelated to this entry and deliberately not re-pinned
+	// here.
+	typescript: 5130,
 	css: 133
 };
 
@@ -678,7 +698,15 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//   `layercake/src/_data/unemployment.js` — a numeric array fill that lands several lines
 	//     at 101 columns: the fill's fits check omits the item's trailing comma — an OVER-WIDTH
 	//     output, the one real bug of the eleven, of a kind no fixture carries.
-	typescript: 114,
+	//
+	// 114 → 109: five files LEAVE for `match` — the numbers-fill round. Four to the comma
+	// fix, whose fill content now carries its comma so the pairwise measure sees the next
+	// item's (`layercake/src/_data/unemployment.js` above, and prettier's
+	// `js/arrays/numbers-in-args.js`, `numbers-in-assignment.js`, `numbers3.js`, all lines the
+	// old measure packed one item too far); one to the blank-line separator
+	// (`js/arrays/preserve_empty_lines.js`, whose authored blanks the fill packed through).
+	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`; `partial` moves one the same way.
+	typescript: 109,
 	css: 23
 };
 
@@ -746,7 +774,11 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// `chromas.reduce((result, chroma) => {…}, {} as Record<Chroma, Hue>)` — prettier hugs the
 	// FIRST argument when the last is a short type-asserted object seed, tsv breaks every
 	// argument. A real backlog item (the first-argument hug with an `as`-asserted trailing arg).
-	typescript: 27,
+	//
+	// 27 → 26: `fuz_ui/src/lib/project_stats_data.ts` leaves for `match` — its one explained
+	// hunk was `fill_101_boundary`, the numbers-fill over-width the content-carried comma fixes.
+	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`, which moves +5 in the same step.
+	typescript: 26,
 	css: 9
 };
 
