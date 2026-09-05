@@ -575,6 +575,14 @@ impl<'a> Printer<'a> {
         value: &internal::Expression<'_>,
         facts: PropertyValueFacts,
     ) -> DocId {
+        // Every arm reaching here emits its own `= value` shell instead of routing
+        // through [`Printer::build_assignment_layout`], which marks the value itself — so
+        // they owe the mark here. A class property is one of prettier's
+        // `shouldIndentIfInlining` parents (`PropertyDefinition` /
+        // `ClassPrivateProperty`, binaryish.js:117-121), and the mark is the only way a
+        // binary value learns it: without it the comment arms printed a chain indented
+        // while the no-comment arm printed the same property flush.
+        self.mark_assignment_value(value);
         let doc = match facts.frozen {
             Some(frozen) => self.build_frozen_expression_doc(value, frozen),
             None => self.build_expression_doc(value),

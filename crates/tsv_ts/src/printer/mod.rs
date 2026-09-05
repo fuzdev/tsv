@@ -308,11 +308,25 @@ pub struct Printer<'a> {
     /// Span of the value an ASSIGNMENT position is building — a declarator's
     /// initializer, an assignment's RHS, an object property's value, a class property's
     /// initializer: the parents prettier's binaryish `shouldIndentIfInlining` names.
-    /// Recorded by `Printer::mark_assignment_value`, read by the binary chain builder for
-    /// the one layout arm keyed on it (an inlining logical chain with earlier operators,
-    /// `build_binary_chain_doc_core`). Keyed by span and not consumed, like the targets
-    /// above.
+    /// Recorded by `Printer::mark_assignment_value`, read by `Printer::build_binary_chain_doc`
+    /// — where it carries the WHOLE `shouldIndentIfInlining` exemption, since the chain's
+    /// default is continuation indent and this mark is what makes such a value flat. (The
+    /// one arm keyed on more than the mark is an inlining chain with earlier operators,
+    /// which indents; `build_binary_chain_doc_core` resolves it.) Keyed by span and not
+    /// consumed, like the targets above.
     pub(crate) assignment_value_target: Cell<Option<Span>>,
+    /// Span of a binary chain whose position is one of prettier's `shouldNotIndent`
+    /// parents (binaryish.js:96-115), so the chain takes the FLAT layout instead of the
+    /// continuation-indent default.
+    ///
+    /// The other half of the rule `assignment_value_target` carries, and recorded the same
+    /// way ([`Printer::mark_flat_chain`]) for the same reason: tsv has no parent pointer.
+    /// Only for a position that hands its value to a **generic value builder** and so
+    /// cannot name the style at the build site; a position that builds the expression
+    /// itself says so directly instead. Both the setters and the full `shouldNotIndent`
+    /// position list are on [`Printer::build_flat_chain_expression_doc`]. Keyed by span and
+    /// not consumed, like the targets above.
+    pub(crate) flat_chain_target: Cell<Option<Span>>,
     /// Span of a JSDoc cast sitting directly in a **value gap**, whose comment→`(`
     /// separator therefore reflows to a space instead of taking the soft `line`
     /// ([`Printer::build_jsdoc_cast_doc`]).
@@ -562,6 +576,7 @@ impl<'a> Printer<'a> {
             expr_stmt_paren_target: Cell::new(None),
             ternary_hang_target: Cell::new(None),
             assignment_value_target: Cell::new(None),
+            flat_chain_target: Cell::new(None),
             jsdoc_cast_value_gap_target: Cell::new(None),
             jsdoc_cast_cannot_hang_target: Cell::new(None),
             inline_every_member_lookup: Cell::new(None),

@@ -168,6 +168,19 @@ impl<'a> Printer<'a> {
         // Marked AFTER the target is built, since a nested assignment inside the target
         // marks its own operands; every branch below builds the value after this point.
         self.mark_member_call_tail_operand(assign.right);
+        // And the value is an assignment value — prettier's `shouldIndentIfInlining` keys
+        // on the PARENT being an `AssignmentExpression`, not on which layout tsv picked,
+        // so the mark belongs to the CONSTRUCT and not to one arm. It sits here for the
+        // same reason as the line above, and covers all six of this function's
+        // value-building arms: the operator→value continuation, the assignment chain, the
+        // ObjectPattern target, the two `=`-comment arms and the ordinary layout. Anchored
+        // to a single arm instead, the other five printed a binary value with the
+        // continuation indent of an unexempt position while their sibling printed the same
+        // construct flush — one construct, two answers, which is the exact drift this mark
+        // exists to prevent. `build_assignment_layout` re-marks the same span when it is
+        // the arm that runs; a redundant store is the price of the mark being the
+        // construct's.
+        self.mark_assignment_value(assign.right);
 
         // Extract inline comments between operator and RHS
         // Uses line-comment-safe spacing: block comments get trailing space,
@@ -1523,9 +1536,11 @@ impl<'a> Printer<'a> {
             // the next line (it can't share the `//` line). Prettier instead moves a
             // block before `=` (`a /* c */ = b`) or floats a line past the value
             // (`a = b // c`) — see param_default_*_comment_prettier_divergence.
-            // A continuation-indent position: `AssignmentPattern` is deliberately absent from
-            // prettier's `shouldIndentIfInlining`, so this is NOT an assignment value.
-            let rhs_doc = self.build_continuation_indent_expression_doc(pattern.right);
+            // The ordinary dispatch, so a binary default takes the continuation-indent
+            // default: `AssignmentPattern` is deliberately absent from prettier's
+            // `shouldIndentIfInlining`, so this is NOT an assignment value and must not be
+            // marked as one (`Printer::mark_assignment_value`).
+            let rhs_doc = self.build_expression_doc(pattern.right);
             let rhs_doc = if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
                 d.parens(rhs_doc)
             } else {

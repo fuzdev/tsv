@@ -1265,17 +1265,13 @@ impl<'a> Printer<'a> {
             let init_doc =
                 self.build_value_head_doc(eq_pos + 1, init, || self.build_expression_doc(init));
 
-            // The post-`=` value content (shared by the inline and the
-            // continuation forms). For binary expressions, indent so wrapped
-            // continuations align under the value; any `=`→value block comment
-            // leads it. A frozen value is unaffected either way — a verbatim slice
-            // holds no `line` for the indent to act on.
-            let init_with_indent = if matches!(init, internal::Expression::BinaryExpression(_)) {
-                d.indent(init_doc)
-            } else {
-                init_doc
-            };
-            let value_doc = self.prepend_rhs_comments(init_with_indent, eq_pos + 1, init_start);
+            // The post-`=` value content (shared by the inline and the continuation
+            // forms); any `=`→value block comment leads it. A binary's wrapped
+            // continuations align under the value without an indent of this position's
+            // own: `TSEnumMember` is in neither of prettier's exempt lists, so the chain
+            // takes the continuation-indent default (`Printer::build_binary_chain_doc`).
+            // A hand-rolled `indent` here would stack a second level on top of it.
+            let value_doc = self.prepend_rhs_comments(init_doc, eq_pos + 1, init_start);
 
             // A line comment between the name and `=` keeps the comment after the
             // name and drops `= value` to a continuation line indented one level
@@ -1316,7 +1312,7 @@ impl<'a> Printer<'a> {
                 // then collapses. The helper cannot drift that way: it decides the layout
                 // from the comment's authored position and emits the matching shape.
                 if let Some(rhs) =
-                    self.build_eq_comment_break_rhs(eq_pos, init_start, " =", || init_with_indent)
+                    self.build_eq_comment_break_rhs(eq_pos, init_start, " =", || init_doc)
                 {
                     d.concat(&[id_doc, rhs])
                 } else if self.is_own_line_jsdoc_cast(init) {

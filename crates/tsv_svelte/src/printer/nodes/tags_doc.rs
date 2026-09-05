@@ -101,9 +101,10 @@ impl<'a> Printer<'a> {
         let break_after_op = Self::const_should_break_after_op(init)
             || self.gap_comment_hangs_value(binding_end, init.span().start);
 
-        // Build init with LayoutMode::Standalone so a ROOT binary init uses Grouped
-        // style (not ContinuationIndent). The assignment layout handles indentation —
-        // ContinuationIndent would double-indent continuation lines.
+        // Build init with LayoutMode::Standalone so a ROOT binary init is NOT forced onto
+        // ContinuationIndent by the embedded-root question. The init is an assignment
+        // value, so `build_assignment_value_expression_doc`'s mark answers it flat and the
+        // assignment layout handles the indentation; ContinuationIndent would stack on top.
         let init_doc = self.build_const_init_doc(
             init,
             binding_end, // scan from after the binding so a comment between `=` and init survives
@@ -215,10 +216,11 @@ impl<'a> Printer<'a> {
     ///
     /// Like `build_expression_with_comments_doc` but **without** its
     /// `mode: LayoutMode::Embedded` — inheriting the host's Standalone mode is what keeps
-    /// a ROOT binary init on Grouped style rather than ContinuationIndent, since the
-    /// expression-root entry (`build_root_expression_doc`) reads
-    /// `EmbedContext::is_embedded()`. The @const assignment layout handles indentation;
-    /// ContinuationIndent would stack on top of it.
+    /// the expression-root entry (`build_root_expression_doc`, which reads
+    /// `EmbedContext::is_embedded()`) from forcing ContinuationIndent on a ROOT binary
+    /// init. Left Standalone, the init's own assignment-value mark answers it flat; the
+    /// @const assignment layout handles indentation, and ContinuationIndent would stack on
+    /// top of it.
     ///
     /// The `=`→value head: an own-line directive anywhere in the binding→value gap
     /// freezes the whole value. The window is the whole gap rather than the part past
@@ -243,7 +245,8 @@ impl<'a> Printer<'a> {
 
         let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
-        // mode defaults to Standalone: a root binary uses Grouped style, not ContinuationIndent
+        // mode defaults to Standalone: the embedded-root question does not fire, so a root
+        // binary takes whatever its own position says rather than ContinuationIndent
         let embed = tsv_lang::EmbedContext {
             first_line_offset: 0,
             ..self.embed

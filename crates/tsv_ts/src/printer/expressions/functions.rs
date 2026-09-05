@@ -1882,7 +1882,7 @@ impl<'a> Printer<'a> {
         // object nested deeper (e.g. a call argument). Saved/restored for nested arrows.
         if let Some(obj_span) = leftmost_object_span(expr) {
             let prev = self.arrow_body_object_parens_target.replace(Some(obj_span));
-            let doc = self.build_expression_doc(expr);
+            let doc = self.build_flat_chain_expression_doc(expr);
             self.arrow_body_object_parens_target.set(prev);
             return prepend(doc);
         }
@@ -1920,11 +1920,17 @@ impl<'a> Printer<'a> {
             return prepend(self.build_sequence_doc(seq, SeqLayout::Hanging));
         }
 
-        // Standard cases: objects and assignments always need parens
+        // Standard cases: objects and assignments always need parens.
+        //
+        // `build_flat_chain_expression_doc`, not `build_expression_doc`: an arrow body is
+        // a `shouldNotIndent` position (`node === parent.body && parent.type ===
+        // "ArrowFunctionExpression"`, binaryish.js:105), so its binary chain's
+        // continuation lines stay at the body's own column — the `=>` already put the body
+        // one level in.
         if self.needs_parens(expr, ParenContext::ArrowBody) {
-            prepend(d.parens(self.build_expression_doc(expr)))
+            prepend(d.parens(self.build_flat_chain_expression_doc(expr)))
         } else {
-            prepend(self.build_expression_doc(expr))
+            prepend(self.build_flat_chain_expression_doc(expr))
         }
     }
 

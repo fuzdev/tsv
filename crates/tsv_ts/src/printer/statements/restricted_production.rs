@@ -384,7 +384,12 @@ impl<'a> Printer<'a> {
             Some(frozen) => self.build_frozen_node_doc(frozen),
             None => match arg {
                 Expression::SequenceExpression(seq) => self.build_sequence_doc_bare(seq),
-                _ => self.build_expression_doc(arg),
+                // A return/throw argument is `shouldNotIndent` (binaryish.js:97) whichever
+                // form it takes: these hanging parens supply the one level, exactly as the
+                // `if_break` pair does on the ordinary path
+                // (`Self::build_binary_paren_doc`, which reaches the same layout through
+                // the ungrouped builder because there the group is the parent's).
+                _ => self.build_flat_chain_expression_doc(arg),
             },
         };
         let mut body = DocBuf::new();

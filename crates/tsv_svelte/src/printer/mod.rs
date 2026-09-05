@@ -557,7 +557,7 @@ impl<'a> Printer<'a> {
     ///
     /// - the **`EmbedContext`** — three distinct recipes. The braced heads (block heads
     ///   and prefixed tags alike) share one, [`Self::head_embed`]; `{@const}`'s init
-    ///   inherits the host's Standalone mode so a root binary stays Grouped under the
+    ///   inherits the host's Standalone mode so a root binary stays flat under the
     ///   assignment layout; an attribute value starts from [`EmbedContext::default`],
     ///   not the host's.
     /// - the **post-processing** — `remove_lines` for an inline block head,
@@ -630,8 +630,8 @@ impl<'a> Printer<'a> {
     /// cannot drift.
     ///
     /// `mode` is the load-bearing field: the expression-ROOT entry
-    /// (`build_root_expression_doc`) reads `is_embedded()` to pick ContinuationIndent over
-    /// Grouped style for a root binary.
+    /// (`build_root_expression_doc`) reads `is_embedded()` to force ContinuationIndent on a
+    /// root binary, overriding whatever its own position would otherwise answer.
     ///
     /// `first_line_offset` is a width estimate that reaches **nothing** on this path — it is
     /// read only by `tsv_ts`'s own render entry (`write_arena_doc`, which a Svelte-embedded

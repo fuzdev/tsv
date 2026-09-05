@@ -451,16 +451,15 @@ impl<'a> Printer<'a> {
         // (context-free: a template call arg indents its test the same as a
         // `<script>` one; at a template expression ROOT the generic
         // `build_conditional_doc` passes false, matching the plugin's flush test).
-        let test = if let internal::Expression::BinaryExpression(binary) = cond.test {
-            if indent_binary_test {
-                // Grandparent is return/throw/call/new: shouldNotIndent = false
-                self.build_binary_chain_doc_with_continuation_indent(binary)
-            } else {
-                // Default: shouldNotIndent = true (grandparent is assignment, variable, etc.)
-                self.build_binary_chain_doc(binary)
-            }
-        } else {
+        let test = if indent_binary_test {
+            // The term does not fire, so the ordinary dispatch's continuation-indent
+            // default is already the answer.
             self.build_expression_doc(cond.test)
+        } else {
+            // shouldNotIndent = true (grandparent is assignment, variable, etc.) — an
+            // explicit opt-out, through the seam that owns the owned-comment prepend so
+            // the two arms cannot disagree about it.
+            self.build_flat_chain_expression_doc(cond.test)
         };
         // Several test-position expressions get parens (Prettier: needs-parentheses.js).
         // See `ternary_test_needs_parens` for the arrow/yield semantics vs the
@@ -990,31 +989,42 @@ impl<'a> Printer<'a> {
 
     /// Build expression doc for a ternary branch (consequent/alternate).
     ///
-    /// When `indent_binary` is true (grandparent is return/throw/call/new),
-    /// binary expressions use continuation indent matching Prettier's
-    /// shouldNotIndent=false for these contexts (binaryish.js:109-113).
+    /// A branch is one of prettier's `shouldNotIndent` positions, so a binary here is
+    /// FLAT — except when `indent_binary` (the ternary is itself a return/throw/call/new
+    /// value), where the term does not fire and the continuation-indent default stands.
+    /// The verdict is routed by [`Printer::mark_flat_chain`], not by naming a builder;
+    /// that seam says why.
     fn build_ternary_branch_expr_doc(
         &self,
         expr: &internal::Expression<'_>,
         indent_binary: bool,
         boundary_end: u32,
     ) -> DocId {
-        let doc = if indent_binary && let internal::Expression::BinaryExpression(binary) = expr {
-            self.build_binary_chain_doc_with_continuation_indent(binary)
-        } else {
-            // `position_parens: false` — deliberately, not by oversight. It says "the
-            // calling position does NOT parenthesize this value anyway", and at a branch
-            // that is true of the *same-line block* case, which is the only one the flag
-            // moves: a terminator-adjacent alternate defers that block past the `;` and
-            // prints no pair, in tsv AND in prettier (`cond ? 0 : (b = c /* c */)` →
-            // `cond ? 0 : (b = c); /* c */`, its fixed point at every branch kind that
-            // takes clarity parens). Setting it would keep the comment inside instead and
-            // manufacture a divergence where the two agree.
-            //
-            // The pair `parenthesize_ternary_branch` then adds is answered against this
-            // same `false` — see that seam — so the two cannot double it.
-            self.build_expression_doc_with_paren_comments(expr, boundary_end, false)
-        };
+        // A branch is a `shouldNotIndent` position whenever the test is (both are
+        // `parent.type === "ConditionalExpression"`, binaryish.js:109-112), so a binary here
+        // takes the flat chain — except under `indent_binary`, where the term does not fire
+        // and the ordinary dispatch's continuation-indent default is already the answer.
+        //
+        // MARKED rather than built directly: the shell below owns the gap between the value
+        // and the `:` / terminator, and a builder named here would have to reach past it and
+        // take that gap's comments with it (`docs/comments.md` hazard 4) — which is what the
+        // indent arm used to do, for no reason of its own once the chain style stopped
+        // needing a builder.
+        if !indent_binary {
+            self.mark_flat_chain(expr);
+        }
+        // `position_parens: false` — deliberately, not by oversight. It says "the
+        // calling position does NOT parenthesize this value anyway", and at a branch
+        // that is true of the *same-line block* case, which is the only one the flag
+        // moves: a terminator-adjacent alternate defers that block past the `;` and
+        // prints no pair, in tsv AND in prettier (`cond ? 0 : (b = c /* c */)` →
+        // `cond ? 0 : (b = c); /* c */`, its fixed point at every branch kind that
+        // takes clarity parens). Setting it would keep the comment inside instead and
+        // manufacture a divergence where the two agree.
+        //
+        // The pair `parenthesize_ternary_branch` then adds is answered against this
+        // same `false` — see that seam — so the two cannot double it.
+        let doc = self.build_expression_doc_with_paren_comments(expr, boundary_end, false);
         // Parenthesize an `in` consequent/alternate inside a for-header init
         // (`for (a = c ? (b in c) : 0;…)`); a no-op elsewhere. Prettier wraps every
         // `in` under the init; the alternate is `[~In]` so there it is load-bearing.
