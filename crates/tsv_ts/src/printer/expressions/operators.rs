@@ -567,21 +567,13 @@ impl<'a> Printer<'a> {
         //     c ?? [1];
         // ```
         // Prettier keys that arm on `node.left` being a same-precedence chain; tsv keys it
-        // on the FLATTENED operand count — the same question for a left-nested chain, which
-        // is every authoring of `a ?? b ?? [1]` but the paren-nested one
-        // (`logical/inline_chain_long`). A two-operand inlining chain has no line for either
-        // answer to act on.
-        //
-        // TODO: `a ?? (b ?? [1])` is a live divergence, and the tell is that the two halves
-        // of prettier's one rule are keyed here on two different structures. Prettier prints
-        // that authoring exactly as it prints the left-nested spelling, in a SINGLE pass —
-        // its inner node answers this arm on its own. tsv flattens the chain, so the count
-        // sees it, but `should_inline_logical_expression` still asks `binary.right` (the
-        // inner chain, not an array): `should_inline_last` reads false, `choose_layout`
-        // takes break-after-operator, and tsv's own second pass rewrites the result — a
-        // non-idempotent authoring. Asking that predicate about the flattened chain's LAST
-        // OPERAND closes both halves at once and is a no-op for every left-nested chain, but
-        // it moves the assignment layout too, so: fixtures-first, then a corpus A/B.
+        // on the FLATTENED operand count. Both halves of the rule read the same structure:
+        // prettier's parse postprocess rebalances `a ?? (b ?? [1])` into `(a ?? b) ?? [1]`
+        // before the printer runs, so its `node.left` is a chain exactly when tsv's chain
+        // has 3+ operands, and its `node.right` is the last operand — which is what
+        // `should_inline_logical_expression` reads (`rebalanced_logical_right`). A
+        // two-operand inlining chain has no line for either answer to act on.
+        // Fixtures: `logical/inline_chain_long`, `logical/inline_chain_paren_nested_long`.
         let style = if matches!(style, BinaryChainStyle::Grouped)
             && should_inline_last
             && operands.len() > 2
@@ -691,6 +683,10 @@ impl<'a> Printer<'a> {
     /// When shouldGroup is true, the continuation gets its own group, allowing it
     /// to independently evaluate whether it fits on the current line when the outer
     /// group breaks (e.g., due to a multi-line parenthesized left operand).
+    ///
+    /// Unlike `should_inline_logical_expression` this needs no rebalanced view: a right
+    /// operand prettier would rebalance away is same-category by definition, and the
+    /// rebalanced tree's LEFT is then same-category too — so both trees answer false.
     pub(in crate::printer) fn should_group_binary_continuation(
         binary: &internal::BinaryExpression<'_>,
     ) -> bool {
@@ -1149,13 +1145,12 @@ impl<'a> Printer<'a> {
         // Add current operator
         operators.push(expr.operator);
 
-        // Also flatten right side for truly associative operators (removes redundant parens)
-        // e.g., `a && (b && c)` becomes `a && b && c`
-        // Only logical operators are truly associative; arithmetic preserves right-side parens
+        // Also flatten the right side where prettier REBALANCES it, which removes the
+        // redundant parens: `a && (b && c)` becomes `a && b && c`
+        // ([`BinaryOperator::rebalances_with`] — logical operators only; arithmetic
+        // preserves right-side parens).
         if let Expression::BinaryExpression(right_binary) = expr.right
-            && expr.operator.can_flatten_with(right_binary.operator)
-            && expr.operator.is_logical()
-            && right_binary.operator.is_logical()
+            && expr.operator.rebalances_with(right_binary.operator)
         {
             self.collect_binary_chain_with_spans(right_binary, operands, operators);
             return;
