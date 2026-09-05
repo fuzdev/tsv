@@ -4,7 +4,7 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
-use crate::printer::expressions::assignment::RhsCommentInfo;
+use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::printer::{
     ClassMemberModifiers, ContinuationValue, MemberBlankScan, MemberBody, MemberFloor,
     MemberFreeze, MemberSeam,
@@ -652,7 +652,7 @@ impl<'a> Printer<'a> {
                     left_doc,
                     d.text(" ="),
                     value,
-                    false,
+                    AssignmentLeft::Plain,
                     RhsCommentInfo {
                         comments: rhs_comments,
                         has_line_comment: false,

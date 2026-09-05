@@ -222,7 +222,7 @@ impl<'a> Printer<'a> {
         //     x: number,
         //   ) => void = (x) => {};
         let has_complex_type_annotation = self.id_has_complex_type_annotation(declarator.id);
-        let has_complex_destructuring = self.id_has_complex_destructuring(declarator.id);
+        let has_complex_destructuring = self.is_complex_destructuring_target(declarator.id);
         let is_arrow_with_breakable_left =
             matches!(init, Expression::ArrowFunctionExpression(_)) && *can_break_left;
 
@@ -753,18 +753,6 @@ impl<'a> Printer<'a> {
         // until then.
         let mut rest_parts = DocBuf::new();
 
-        // Set top-level assignment flag for chain detection
-        // Short 2-segment assignment chains in variable declarations should not use chain formatting
-        //
-        // SAVED, not just set: a declarator's initializer can contain another declaration
-        // (`const a = () => { const b = 1; }, c = …`), and `build_block_statement_doc`'s
-        // save/restore covers `is_expression_statement` only. Restoring the constant `false`
-        // therefore left every declarator AFTER such an initializer building in the wrong
-        // context — an authoring-ORDER dependence. Reached 7,314× over ~23k real files, and
-        // observably neutral there (0 movers), so this is a correct-by-construction fix
-        // rather than a repair: the stale value is never read back today.
-        let prev_top_level_assignment = self.in_top_level_assignment.replace(true);
-
         // Declarators
         for (i, declarator) in decl.declarations.iter().enumerate() {
             if i > 0 {
@@ -1004,9 +992,6 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(";"));
             }
         }
-
-        // Restore the context flag — the PREVIOUS value, not a constant (see the set above).
-        self.in_top_level_assignment.set(prev_top_level_assignment);
 
         let continuation = if should_break {
             // Multi-declarator with initializers: hardline breaks already inserted

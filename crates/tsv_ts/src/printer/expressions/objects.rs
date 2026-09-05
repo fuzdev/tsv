@@ -8,7 +8,7 @@
 // - Blank line preservation between properties
 
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
-use crate::printer::expressions::assignment::RhsCommentInfo;
+use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, Printer, StandaloneGlue};
@@ -562,7 +562,7 @@ impl<'a> Printer<'a> {
                         key_doc,
                         d.text(":"),
                         prop.value,
-                        is_short_key,
+                        AssignmentLeft::short_key(is_short_key),
                         RhsCommentInfo::frozen_only(None),
                     )
                 };
@@ -659,7 +659,7 @@ impl<'a> Printer<'a> {
                         key_doc,
                         d.text(":"),
                         prop.value,
-                        is_short_key,
+                        AssignmentLeft::short_key(is_short_key),
                         RhsCommentInfo::frozen_only(value_frozen),
                     )
                 }
@@ -753,7 +753,7 @@ impl<'a> Printer<'a> {
                             lhs_doc,
                             d.text(":"),
                             prop.value,
-                            is_short_key,
+                            AssignmentLeft::short_key(is_short_key),
                             RhsCommentInfo {
                                 comments: rhs_comments,
                                 has_line_comment: false,
