@@ -1213,7 +1213,9 @@ impl<'a> Printer<'a> {
     /// layouts share `parenthesize_ternary_branch`. A bare `build_expression_doc`
     /// in each is how the pair goes missing from both.
     fn build_for_in_of_right_doc(&self, right: &Expression<'_>) -> DocId {
-        let doc = self.build_expression_doc(right);
+        // A continuation-indent position — unlike the C-style header's clauses, which are
+        // `shouldNotIndent`'s own `ForStatement` term.
+        let doc = self.build_continuation_indent_expression_doc(right);
         if needs_parens(right, ParenContext::ForInOfRight, self.in_for_init.get()) {
             self.d().parens(doc)
         } else {

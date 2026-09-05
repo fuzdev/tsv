@@ -400,7 +400,28 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// are disjoint (the binaryish four are the two language-tools files plus prettier's
 	// `binary-expressions/inline-object-array.js` and `variable_declarator/multiple.js`; the
 	// fill six are numeric-array files and the one `partial`).
-	typescript: 5134,
+	//
+	// 5134 → 5136: the binaryish CONTINUATION-INDENT batch — ten parent positions that took no
+	// continuation indent where prettier's binaryish fall-through gives one (`yield` / `yield*`
+	// argument, `case` test, `for…of` / `for…in` right, `class extends`, bare expression
+	// statement, labeled-statement body, `export default`, `export =`, a default parameter
+	// value). Four files move, ALL in the prettier suite, each verified per file:
+	//   `js/binary-expressions/short-right.js` → **match** (a bare `Math.abs(…) > 1;`
+	//     statement — the expression-statement position).
+	//   `typescript/conformance/types/functions/functionImplementationErrors.ts` → **match**.
+	//   `typescript/conformance/types/functions/functionImplementations.ts` → `known` (what is
+	//     left of it is detector-explained).
+	//   `typescript/arrow/16067.ts` → `partial` → `unknown`, an improvement read backwards: its
+	//     `a || …` statement hunk is FIXED, and the residue is the pre-existing curried-arrow
+	//     body indent, which no detector explains — so the file stops being partly-explained
+	//     and becomes wholly-unexplained. `compare` on it shows only that class.
+	// ⚠️ All four are INVISIBLE to the standard staged-tree corpus A/B: `tsv format --list`
+	// honors `.gitignore` / `.prettierignore` and the prettier repo ignores its own test
+	// fixtures, so that rig enumerates 8,500 files where this view holds 9,305. The A/B read
+	// ZERO movers; this gate is what caught them. Measured by diffing the `--all --json` bucket
+	// lists across the two corpus-profile builds — these four are the only moves in any bucket,
+	// and `safety` / `errors` / `expected_errors` are identical file-for-file.
+	typescript: 5136,
 	css: 133
 };
 
@@ -764,7 +785,12 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// (`ExportedNames.ts` and `incremental.ts` to the binaryish cluster, `unemployment.js` to
 	// the fill round — the last of those was the one OVER-WIDTH output of that group, not a
 	// layout choice), so read the list as the state before both steps.
-	typescript: 105,
+	//
+	// 105 → 104: the binaryish continuation-indent batch. `js/binary-expressions/short-right.js`
+	// and `…/functionImplementationErrors.ts` LEAVE for `match`, and `typescript/arrow/16067.ts`
+	// ARRIVES from `partial` because the hunk a detector explained is the one that got fixed.
+	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`.
+	typescript: 104,
 	css: 23
 };
 
@@ -836,7 +862,11 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// 27 → 26: `fuz_ui/src/lib/project_stats_data.ts` leaves for `match` — its one explained
 	// hunk was `fill_101_boundary`, the numbers-fill over-width the content-carried comma fixes.
 	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`, which moves +5 in the same step.
-	typescript: 26,
+	//
+	// 26 → 24: the binaryish continuation-indent batch — `typescript/arrow/16067.ts` leaves for
+	// `unknown` (its explained hunk is fixed) and `…/functionImplementations.ts` leaves for
+	// `known`. Reasoning on `CORPUS_FORMAT_MATCH_MIN`.
+	typescript: 24,
 	css: 9
 };
 

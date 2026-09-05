@@ -1,0 +1,372 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 520,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 125,
+				"end": 127,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An exported default expression's chain takes a continuation indent - an",
+			"start": 137,
+			"end": 211,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ExportDefaultDeclaration parent is in neither of prettier's exempt lists. The",
+			"start": 213,
+			"end": 293,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " module script above is the 100-char case and stays inline; this one is 101",
+			"start": 295,
+			"end": 372,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " chars, so the chain breaks.",
+			"start": 374,
+			"end": 404,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 31
+				}
+			}
+		}
+	],
+	"module": {
+		"type": "Script",
+		"start": 0,
+		"end": 125,
+		"context": "module",
+		"content": {
+			"type": "Program",
+			"start": 15,
+			"end": 116,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 17,
+					"end": 115,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 99
+						}
+					},
+					"declaration": {
+						"type": "LogicalExpression",
+						"start": 32,
+						"end": 114,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 98
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 32,
+							"end": 107,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 16
+								},
+								"end": {
+									"line": 2,
+									"column": 91
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 32,
+								"end": 72,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 16
+									},
+									"end": {
+										"line": 2,
+										"column": 56
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 76,
+								"end": 107,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 60
+									},
+									"end": {
+										"line": 2,
+										"column": 91
+									}
+								},
+								"name": "ccccccccccccccccccccccccccccccc"
+							}
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 111,
+							"end": 114,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 95
+								},
+								"end": {
+									"line": 2,
+									"column": 98
+								}
+							},
+							"name": "ddd"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 14,
+				"name": "module",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 14,
+						"character": 14
+					}
+				},
+				"value": true
+			}
+		]
+	},
+	"instance": {
+		"type": "Script",
+		"start": 127,
+		"end": 519,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 135,
+			"end": 510,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 406,
+					"end": 509,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 6
+						}
+					},
+					"declaration": {
+						"type": "LogicalExpression",
+						"start": 421,
+						"end": 508,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 16
+							},
+							"end": {
+								"line": 12,
+								"column": 5
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 421,
+							"end": 499,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 16
+								},
+								"end": {
+									"line": 11,
+									"column": 34
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 421,
+								"end": 461,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 16
+									},
+									"end": {
+										"line": 10,
+										"column": 56
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 467,
+								"end": 499,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 34
+									}
+								},
+								"name": "cccccccccccccccccccccccccccccccc"
+							}
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 505,
+							"end": 508,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 2
+								},
+								"end": {
+									"line": 12,
+									"column": 5
+								}
+							},
+							"name": "ddd"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An exported default expression's chain takes a continuation indent - an",
+							"start": 137,
+							"end": 211
+						},
+						{
+							"type": "Line",
+							"value": " ExportDefaultDeclaration parent is in neither of prettier's exempt lists. The",
+							"start": 213,
+							"end": 293
+						},
+						{
+							"type": "Line",
+							"value": " module script above is the 100-char case and stays inline; this one is 101",
+							"start": 295,
+							"end": 372
+						},
+						{
+							"type": "Line",
+							"value": " chars, so the chain breaks.",
+							"start": 374,
+							"end": 404
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

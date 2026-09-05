@@ -1244,9 +1244,13 @@ impl<'a> Printer<'a> {
         // every route to the operand's doc carries it — the grouping parens `await` needs are
         // the PRINTER's and stay outside the slice, exactly as at every other value head.
         let frozen = self.value_head_frozen_span(keyword_end, await_expr.argument.span());
+        // A continuation-indent position ([`Printer::build_continuation_indent_expression_doc`],
+        // which lists them and owns the hazard-1 prepend). The grouping parens the operand
+        // needs are the PRINTER's and stay outside this doc. Only the ordinary route wants
+        // the seam — a FROZEN operand emits the author's bytes, where no layout rule applies.
         let operand_doc = || {
             frozen.map_or_else(
-                || self.build_expression_doc(await_expr.argument),
+                || self.build_continuation_indent_expression_doc(await_expr.argument),
                 |frozen| self.build_frozen_expression_doc(await_expr.argument, frozen),
             )
         };
@@ -1404,8 +1408,13 @@ impl<'a> Printer<'a> {
         // keeping the author's break — the break would be ASI, not layout.
         let leading_comments_opt = self.build_rhs_comments_glued_opt(keyword_end, argument_start);
 
+        // A continuation-indent position, exactly as `await`'s is. Every arm below routes
+        // through the one closure, so the parens two of them emit stay outside the operand's
+        // own doc and the three cannot drift.
+        let operand_doc = || self.build_continuation_indent_expression_doc(arg);
+
         if leading_comments_opt.is_some() || has_trailing_comments {
-            let inner = self.build_expression_doc(arg);
+            let inner = operand_doc();
             let body = match leading_comments_opt {
                 Some(comments) => d.concat(&[comments, inner]),
                 None => inner,
@@ -1428,10 +1437,10 @@ impl<'a> Printer<'a> {
         } else if self.needs_parens(arg, ParenContext::YieldArgument) {
             // Assignment needs parens: `yield (x ??= y)`
             parts.push(d.text("("));
-            parts.push(self.build_expression_doc(arg));
+            parts.push(operand_doc());
             parts.push(d.text(")"));
         } else {
-            parts.push(self.build_expression_doc(arg));
+            parts.push(operand_doc());
         }
 
         d.concat(&parts)

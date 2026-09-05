@@ -1521,7 +1521,9 @@ impl<'a> Printer<'a> {
             // the next line (it can't share the `//` line). Prettier instead moves a
             // block before `=` (`a /* c */ = b`) or floats a line past the value
             // (`a = b // c`) — see param_default_*_comment_prettier_divergence.
-            let rhs_doc = self.build_expression_doc(pattern.right);
+            // A continuation-indent position: `AssignmentPattern` is deliberately absent from
+            // prettier's `shouldIndentIfInlining`, so this is NOT an assignment value.
+            let rhs_doc = self.build_continuation_indent_expression_doc(pattern.right);
             let rhs_doc = if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
                 d.parens(rhs_doc)
             } else {

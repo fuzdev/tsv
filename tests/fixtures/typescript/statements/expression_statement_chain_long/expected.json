@@ -1,0 +1,568 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 761,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A bare expression statement's chain takes a continuation indent - an",
+			"start": 10,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ExpressionStatement parent is in neither of prettier's exempt lists",
+			"start": 83,
+			"end": 153,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A labeled statement wraps an ordinary expression statement, so it takes the same shape",
+			"start": 274,
+			"end": 363,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars - stays inline",
+			"start": 484,
+			"end": 511,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - the chain breaks",
+			"start": 614,
+			"end": 645,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 32
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 760,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 751,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 155,
+					"end": 271,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "LogicalExpression",
+						"start": 155,
+						"end": 270,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 5
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 155,
+							"end": 261,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 62
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 155,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 1
+									},
+									"end": {
+										"line": 4,
+										"column": 41
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 201,
+								"end": 261,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 62
+									}
+								},
+								"name": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+							}
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 267,
+							"end": 270,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 5
+								}
+							},
+							"name": "ddd"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A bare expression statement's chain takes a continuation indent - an",
+							"start": 10,
+							"end": 81
+						},
+						{
+							"type": "Line",
+							"value": " ExpressionStatement parent is in neither of prettier's exempt lists",
+							"start": 83,
+							"end": 153
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 365,
+					"end": 481,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 6
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 370,
+						"end": 481,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 11,
+								"column": 6
+							}
+						},
+						"expression": {
+							"type": "LogicalExpression",
+							"start": 370,
+							"end": 480,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 6
+								},
+								"end": {
+									"line": 11,
+									"column": 5
+								}
+							},
+							"left": {
+								"type": "LogicalExpression",
+								"start": 370,
+								"end": 471,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 6
+									},
+									"end": {
+										"line": 10,
+										"column": 57
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 370,
+									"end": 410,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 6
+										},
+										"end": {
+											"line": 9,
+											"column": 46
+										}
+									},
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 416,
+									"end": 471,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 57
+										}
+									},
+									"name": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+								}
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 477,
+								"end": 480,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 5
+									}
+								},
+								"name": "ddd"
+							}
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 365,
+						"end": 368,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 4
+							}
+						},
+						"name": "lab"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A labeled statement wraps an ordinary expression statement, so it takes the same shape",
+							"start": 274,
+							"end": 363
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 513,
+					"end": 611,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 99
+						}
+					},
+					"expression": {
+						"type": "LogicalExpression",
+						"start": 513,
+						"end": 610,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 98
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 513,
+							"end": 603,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 91
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 513,
+								"end": 553,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 1
+									},
+									"end": {
+										"line": 14,
+										"column": 41
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 557,
+								"end": 603,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 45
+									},
+									"end": {
+										"line": 14,
+										"column": 91
+									}
+								},
+								"name": "cccccccccccccccccccccccccccccccccccccccccccccc"
+							}
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 607,
+							"end": 610,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 95
+								},
+								"end": {
+									"line": 14,
+									"column": 98
+								}
+							},
+							"name": "ddd"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 100 chars - stays inline",
+							"start": 484,
+							"end": 511
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 647,
+					"end": 750,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "LogicalExpression",
+						"start": 647,
+						"end": 749,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 19,
+								"column": 5
+							}
+						},
+						"left": {
+							"type": "LogicalExpression",
+							"start": 647,
+							"end": 740,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 18,
+									"column": 49
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 647,
+								"end": 687,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 1
+									},
+									"end": {
+										"line": 17,
+										"column": 41
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 693,
+								"end": 740,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 49
+									}
+								},
+								"name": "ccccccccccccccccccccccccccccccccccccccccccccccc"
+							}
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 746,
+							"end": 749,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 2
+								},
+								"end": {
+									"line": 19,
+									"column": 5
+								}
+							},
+							"name": "ddd"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - the chain breaks",
+							"start": 614,
+							"end": 645
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

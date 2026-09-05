@@ -1262,7 +1262,8 @@ impl<'a> Printer<'a> {
             // own trailing scan claims the value→`,` gap
             // (`Printer::collect_trailing_comments`, anchored past the frozen slice), so
             // there is no paren shell here for the freeze to ride inside.
-            let init_doc = self.build_value_head_doc(eq_pos + 1, init);
+            let init_doc =
+                self.build_value_head_doc(eq_pos + 1, init, || self.build_expression_doc(init));
 
             // The post-`=` value content (shared by the inline and the
             // continuation forms). For binary expressions, indent so wrapped

@@ -589,15 +589,24 @@ impl<'a> Printer<'a> {
     /// through here would silently substitute the plain one. The statement analog
     /// ([`Self::build_statement_head_doc`]) takes its ordinary builder lazily for exactly
     /// that reason — every statement head has a different one.
+    /// `ordinary` is taken LAZILY, for the same reason the statement analog takes its own
+    /// ([`Self::build_statement_head_doc`]): the positions sharing this seam do not share a
+    /// value builder. An enum member's initializer wants the plain
+    /// [`Self::build_expression_doc`] — it supplies its own indent around the value — while
+    /// `export default` and `export =` are continuation-indent positions and want
+    /// [`Self::build_continuation_indent_expression_doc`]. A fixed builder here would silently
+    /// substitute the plain one at a position that is not, which is exactly the bug the
+    /// paragraph above warns about; making each caller name its builder retires the class.
     #[inline]
     pub(in crate::printer) fn build_value_head_doc(
         &self,
         gap_start: u32,
         value: &internal::Expression<'_>,
+        ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
         match self.value_head_frozen_span(gap_start, value.span()) {
             Some(frozen) => self.build_frozen_expression_doc(value, frozen),
-            None => self.build_expression_doc(value),
+            None => ordinary(),
         }
     }
 

@@ -253,7 +253,7 @@ impl<'a> Printer<'a> {
         // not call): here the paren is fully redundant and prettier drops it (`{@const a = (b = c)}` →
         // `{@const a = b = c}`), so the frozen arm drops it too — consistent with this
         // site's own unfrozen normalization, which is what the freeze must not contradict.
-        let expr_doc = self.build_head_value_doc(expr, frozen, &embed);
+        let expr_doc = self.build_assignment_value_doc(expr, frozen, &embed);
 
         // The run's last comment supplies the break the tag's `}` reuses —
         // `build_assignment_tag_doc` places that `}` in all three of its layouts, and

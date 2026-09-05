@@ -148,11 +148,24 @@ impl<'a> Printer<'a> {
     /// (binaryish.js:96-115), so the chain renders as `group([first, indent(rest)])` and
     /// its continuation lines sit one level past the first operand.
     ///
-    /// The two callers are a type assertion's operand (`(a ??\n\tb) as T` — without this
-    /// the continuation lands at the *statement's* own column, where it reads as a
-    /// sibling statement) and an Embedded expression root (a Svelte `{expr}` value,
-    /// where prettier reaches the same shape through its svelte expression-root
+    /// **Every position that routes here**, stated once so the call sites need not each
+    /// restate the rule. Prettier's is a fall-through, so the entry for each is only "this
+    /// parent is named in neither exempt list": a type assertion's operand (`(a ??\n\tb) as T`
+    /// — without this the continuation lands at the *statement's* own column, where it reads
+    /// as a sibling statement), an `await` / `yield` / `yield*` argument, a `case` test, a
+    /// `for…of` or `for…in` right (`shouldNotIndent` names `ForStatement`, and neither of
+    /// those is one — the C-style header's clauses really are exempt), a `class extends`
+    /// superclass, a bare expression statement (hence a labeled statement's body too), an
+    /// `export default` / `export =` value, a default parameter value (`AssignmentPattern` is
+    /// deliberately absent from `shouldIndentIfInlining`, so it indents for the inlining and
+    /// non-inlining spellings alike), and an Embedded expression root (a Svelte `{expr}`
+    /// value, where prettier reaches the same shape through its svelte expression-root
     /// wrapper). A non-binary expression is unaffected and takes the ordinary path.
+    ///
+    /// ⚠️ **The list is not closed.** tsv's default is FLAT (`build_binary_chain_doc`) where
+    /// prettier's is indent, so a new binary-holding position lands on the wrong side by
+    /// omission — check its parent against binaryish.js:96-115 rather than inheriting the
+    /// default. Every entry above was once missing for exactly that reason.
     ///
     /// ⚠️ The chain builder does **not** prepend an owned leading comment (a JSDoc cast
     /// or bundler annotation glued to the first operand) — `build_expression_doc` owns
@@ -160,7 +173,10 @@ impl<'a> Printer<'a> {
     /// comment is dropped (`docs/comments.md` hazard 1). That is the whole reason this
     /// is a shared seam rather than two call sites: the obligation is easy to forget,
     /// and every new continuation-indent position inherits it by construction.
-    fn build_continuation_indent_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(in crate::printer) fn build_continuation_indent_expression_doc(
+        &self,
+        expr: &Expression<'_>,
+    ) -> DocId {
         if let Expression::BinaryExpression(binary) = expr {
             let doc = self.build_binary_chain_doc_with_continuation_indent(binary);
             return self.prepend_owned_leading_comment(expr, doc);
