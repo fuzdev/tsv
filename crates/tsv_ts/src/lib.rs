@@ -827,6 +827,42 @@ pub fn build_expression_doc(
     })
 }
 
+/// Build a DocId for an expression the host is printing as an **assignment value**, in
+/// the caller's arena — `build_expression_doc` plus the position mark
+/// (`Printer::mark_assignment_value`).
+///
+/// The one position-keyed layout rule a host would otherwise miss: an *inlining* logical
+/// chain (`a ?? b ?? [1]`) whose earlier operators need a home takes prettier's
+/// `samePrecedenceSubExpression` arm, `group([head, indent(rest)])`, and reaches it only
+/// where the value's parent is one of prettier's `shouldIndentIfInlining` nodes. tsv_svelte's
+/// `{@const}` tag is exactly that parent — prettier-plugin-svelte prints the tag's body as a
+/// VariableDeclarator — while `{const}`/`{let}` get the mark for free through
+/// [`build_variable_declaration_doc`]. Without it the two sibling tags disagree on one shape.
+///
+/// Three obligations on the caller, none of which the type system states:
+///
+/// - `expression` must be the value of a real assignment position in the host's syntax, not
+///   merely a value the host places after an `=`-like token. The mark is what tells the chain
+///   builder the enclosing layout has *withheld* its break-after-operator for this value; a
+///   host that breaks after its own operator anyway would stack a second indent.
+/// - `embed.mode` should be `LayoutMode::Standalone`. An Embedded root already takes
+///   continuation indent from the root question itself, so the mark is inert there — passing
+///   Embedded is not wrong, but it is not what this seam is for.
+/// - Nothing else is marked: the target is keyed by `expression`'s own span and the printer
+///   is fresh per call, so a nested binary (a ternary's test, an operand's own sub-chain)
+///   reads `false` exactly as it does inside a `<script>`.
+pub fn build_assignment_value_expression_doc(
+    arena: &DocArena,
+    expression: &Expression<'_>,
+    inputs: &PrinterInputs<'_>,
+    embed: EmbedContext,
+) -> DocId {
+    with_doc_printer(arena, inputs, embed, |printer| {
+        printer.mark_assignment_value(expression);
+        printer.build_root_expression_doc(expression)
+    })
+}
+
 /// Build a DocId for a single comment (`/* … */` / `// …`) in the caller's arena,
 /// through the same rendering the standalone TS printer uses.
 ///
