@@ -21,6 +21,34 @@ fn array_gap_end(arr: &internal::ArrayExpression<'_>, i: usize) -> u32 {
     next_real_element_start(arr.elements, i).unwrap_or(arr.span.end - 1)
 }
 
+/// The SHAPE half of prettier's `isConciselyPrintedArray` (`print/array.js`): a non-empty
+/// array whose every element is a numeric literal, or a SIGNED one — prettier's
+/// `isSignedNumericLiteral`, `+`/`-` over a numeric literal and deliberately NOT recursive,
+/// so `- -1` is not a signed number and its array is not concise.
+///
+/// A hole is not an element, so any elision disqualifies the array — which is what keeps
+/// the fill printer, whose slot builder has nothing to push for a hole, off a sparse one.
+///
+/// Free and shape-only so it can be read (and tested) without a printer; the comment clause
+/// that completes the predicate needs the comment array and lives on
+/// [`Printer::is_concisely_printed_array`], the one entry every caller asks.
+fn array_elements_are_signed_numbers(arr: &internal::ArrayExpression<'_>) -> bool {
+    !arr.elements.is_empty()
+        && arr.elements.iter().all(|elem| match elem {
+            Some(Expression::Literal(lit)) => matches!(lit.value, LiteralValue::Number(_)),
+            Some(Expression::UnaryExpression(unary)) => {
+                matches!(
+                    unary.operator,
+                    internal::UnaryOperator::Minus | internal::UnaryOperator::Plus
+                ) && matches!(
+                    unary.argument,
+                    Expression::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
+                )
+            }
+            _ => false,
+        })
+}
+
 impl<'a> Printer<'a> {
     /// Check if array should force break based on Prettier's heuristic
     ///
@@ -520,15 +548,14 @@ impl<'a> Printer<'a> {
             return self.build_array_doc_with_expanding_comments(arr);
         }
 
-        // Check if this is a "numbers-only" array (use fill) vs other (one-per-line)
+        // A concisely printed array (numbers only) packs as a fill; everything else goes
+        // one per line.
         //
         // An element carrying its own newline — a line-continuation string, a multiline
         // template — needs no arm of its own: its text node reports
         // `CachedWidth::HasNewline`, so `will_break` breaks the group below exactly as
         // prettier's `literalline`-borne `breakParent` does.
-        let is_numbers_only = self.is_numbers_only_array(arr);
-
-        if is_numbers_only {
+        if self.is_concisely_printed_array(arr) {
             // Use fill for greedy packing of numbers
             self.build_array_fill_doc(arr, has_comments)
         } else {
@@ -554,45 +581,91 @@ impl<'a> Printer<'a> {
         self.has_own_line_block_comments_in_bracket_list(arr.span, &non_null, |e| e.span())
     }
 
-    /// Check if array contains only numeric literals (for fill behavior)
-    fn is_numbers_only_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
-        arr.elements.iter().all(|elem| match elem {
-            Some(Expression::Literal(lit)) => {
-                matches!(lit.value, LiteralValue::Number(_))
-            }
-            Some(Expression::UnaryExpression(unary)) => {
-                // -1, +1 are also numeric
-                matches!(
-                    unary.operator,
-                    internal::UnaryOperator::Minus | internal::UnaryOperator::Plus
-                ) && matches!(
-                    unary.argument,
-                    Expression::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
-                )
-            }
-            _ => false,
-        })
+    /// Prettier's `isConciselyPrintedArray` (`print/array.js`) — the ONE reading of "this
+    /// array packs as a fill", at all three sites prettier asks it: the array printer's own
+    /// fill-vs-group choice below, and the two call-argument sites that refuse the
+    /// expand-last hug over one (`call-arguments.js`'s `!(args.length > 1 &&
+    /// isConciselyPrintedArray(lastArg, options))`), whose break characteristics the hug
+    /// states can't express — reached through [`Self::arg_is_concisely_printed_array`].
+    ///
+    /// [`array_elements_are_signed_numbers`] is the shape half; the rest is prettier's
+    /// comment clause, `!hasComment(element.argument)`. A comment INSIDE a signed literal
+    /// binds to its argument and refuses the fill (`[-/* c */ 1, …]` prints one per line);
+    /// one past the element binds to the element and does not (`[-1 /* c */, …]` still
+    /// packs). The element's own span is exactly that line — it closes on the argument, or
+    /// on a retained paren shell around it (`-(1 /* c */)`, which prettier also refuses).
+    /// Only a signed literal has room for one: a bare numeric literal's span is the number.
+    ///
+    /// Prettier's other clause — a same-line trailing LINE comment refuses too — needs no
+    /// arm here: a line comment anywhere in the array diverts it to
+    /// [`Self::build_array_doc_with_expanding_comments`] before either caller asks.
+    ///
+    /// No array-wide zero-comment gate: the per-element ask is a signed literal's own span,
+    /// which for all but a huge number is narrower than a comment can be, so
+    /// `range_too_narrow_for_a_comment` answers it at the call site without a search.
+    fn is_concisely_printed_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
+        array_elements_are_signed_numbers(arr)
+            && !arr.elements.iter().flatten().any(|elem| {
+                matches!(elem, Expression::UnaryExpression(_))
+                    && self.has_comments_on_page_between(elem.span().start, elem.span().end)
+            })
+    }
+
+    /// [`Self::is_concisely_printed_array`] read off a call ARGUMENT, which the caller holds
+    /// as a bare expression: a non-array is never concisely printed.
+    pub(in crate::printer) fn arg_is_concisely_printed_array(&self, expr: &Expression<'_>) -> bool {
+        matches!(expr, Expression::ArrayExpression(arr) if self.is_concisely_printed_array(arr))
     }
 
     /// Build fill doc for numbers-only arrays (greedy packing)
     ///
     /// Includes inline block comments between elements.
     /// Uses binary search to find comments: O(log n + k)
+    ///
+    /// The fill's content/separator alternation is prettier's
+    /// (`printArrayElementsConcisely`): each content is the slot's element, its glued
+    /// comments AND — every slot but the last — its comma as ONE doc. The comma must sit
+    /// in the content, not the separator, because the fill's pairwise measure is
+    /// `[content, separator, next content]` — with a `comma_line` separator the next item
+    /// is measured without ITS comma, so an item whose comma would land on column 101
+    /// still "fits" and the break lands one item late (the numbers-fill 101-column line).
+    ///
+    /// The separator is a `line`, except across an author's blank line
+    /// ([`Self::has_blank_line_after_slot`], prettier's `isLineAfterElementEmpty`), where
+    /// it is the group builder's blank pair — `literalline` for the empty line, `hardline`
+    /// for the indented one. Both are hard, so the pair also expands the array, exactly as
+    /// the `breakParent` in prettier's `[hardline, hardline]` does. Prettier's third
+    /// spelling — a `hardline` when the next element carries a leading LINE comment —
+    /// cannot be reached here: a line comment anywhere in the array diverts it to
+    /// [`Self::build_array_doc_with_expanding_comments`] before the fill is built.
     fn build_array_fill_doc(
         &self,
         arr: &internal::ArrayExpression<'_>,
         has_comments: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
+        let last = arr.elements.len() - 1;
+        let mut parts = DocBuf::with_capacity(arr.elements.len() * 2);
+        // One slot's docs — element, glued comments, comma — assembled into a single
+        // fill content; the buffer is reused across slots.
+        let mut slot = DocBuf::new();
 
         for i in 0..arr.elements.len() {
+            slot.clear();
             // Elements and their glued comments (a hole pushes nothing — though
-            // `is_numbers_only_array` already excludes elisions from this path).
-            self.push_array_element_with_inline_comments(arr, i, has_comments, &mut parts);
+            // `is_concisely_printed_array` already excludes elisions from this path).
+            self.push_array_element_with_inline_comments(arr, i, has_comments, &mut slot);
 
-            if i < arr.elements.len() - 1 {
-                parts.push(d.comma_line());
+            if i < last {
+                slot.push(d.text(","));
+            }
+            parts.push(d.concat(&slot));
+            if i < last {
+                parts.push(if self.has_blank_line_after_slot(arr, i, None) {
+                    d.concat(&[d.literalline(), d.hardline()])
+                } else {
+                    d.line()
+                });
             }
         }
 
@@ -611,10 +684,10 @@ impl<'a> Printer<'a> {
     /// trailing side (the leading side is owned by the element and rides inside its own
     /// doc), so the pairing is an invariant worth having one home rather than three.
     ///
-    /// TODO: in the fill printer the pushed comment docs land in the fill's
-    /// content/separator alternation as items of their own, so the fill neither measures
-    /// nor breaks on a trailing block comment (a 100+ col numbers array ending
-    /// `n /* c */` renders over-width instead of wrapping).
+    /// In the fill printer the slot's pushed docs — comments included — fold into ONE fill
+    /// content ([`Self::build_array_fill_doc`]), so a glued trailing block comment is
+    /// measured with its element and wraps with it, rather than landing in the fill's
+    /// content/separator alternation as an item of its own that nothing measures.
     ///
     /// Takes the slot INDEX rather than the element, and resolves it here: the comment
     /// lookups are keyed on `(arr, i)` while the doc comes from the element, so handing
@@ -1179,5 +1252,58 @@ impl<'a> Printer<'a> {
             d.hardline(),
             d.text("]"),
         ])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bumpalo::Bump;
+
+    /// Parse a bare array expression to its internal AST node (spans index into `src`),
+    /// allocated in the caller-supplied `arena`.
+    fn parse_array<'a>(arena: &'a Bump, src: &str) -> internal::ArrayExpression<'a> {
+        match crate::parse_expression_with_comments(src, 0, arena)
+            .expect("expression should parse")
+            .0
+        {
+            Expression::ArrayExpression(arr) => arr,
+            other => panic!("expected an array expression, got: {other:?}"),
+        }
+    }
+
+    /// The shape half alone — the comment clause it composes with is
+    /// `Printer::is_concisely_printed_array`, pinned by the `arrays/fill_signed_operand`
+    /// fixture.
+    #[test]
+    fn concise_array_shape_detection() {
+        let arena = Bump::new();
+        assert!(array_elements_are_signed_numbers(&parse_array(
+            &arena,
+            "[1, 2, 3]"
+        )));
+        // A single +/- prefix over a numeric literal is a signed number.
+        assert!(array_elements_are_signed_numbers(&parse_array(
+            &arena, "[-1, +2]"
+        )));
+        // …but the rule is NOT recursive (prettier's `isSignedNumericLiteral`), so a
+        // doubled sign is not one.
+        assert!(!array_elements_are_signed_numbers(&parse_array(
+            &arena,
+            "[- -1, -2]"
+        )));
+        // An empty array is not concisely printed.
+        assert!(!array_elements_are_signed_numbers(&parse_array(
+            &arena, "[]"
+        )));
+        // A non-numeric element disqualifies it.
+        assert!(!array_elements_are_signed_numbers(&parse_array(
+            &arena, "[1, 'x']"
+        )));
+        // A hole is not a numeric element (unlike is_simple_call_argument) — the fill
+        // printer has nothing to push for one.
+        assert!(!array_elements_are_signed_numbers(&parse_array(
+            &arena, "[1, , 2]"
+        )));
     }
 }

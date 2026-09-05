@@ -18,8 +18,8 @@ use super::arg_comments::{
     has_inter_argument_comments, has_trailing_comments_on_args, last_arg_has_comments,
 };
 use super::arg_predicates::{
-    arrow_body_is_call_through_non_null, is_block_function, is_concise_numeric_array,
-    is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
+    arrow_body_is_call_through_non_null, is_block_function, is_function_composition_args,
+    is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
     ArgOpener, ChainArgKind, arrow_body_expands_internally, arrow_body_tail_has_comments,
@@ -1433,7 +1433,10 @@ fn build_chain_args_multi(
     // Skip when last two args have the same outer type - use expand-all instead.
     if call.arguments.len() >= 2
         && last_arg_is_array_or_object(call.arguments)
-        && !call.arguments.last().is_some_and(is_concise_numeric_array)
+        && !call
+            .arguments
+            .last()
+            .is_some_and(|arg| printer.arg_is_concisely_printed_array(arg))
         && !comments_force_expansion
         // `has_any_comment_text` (on page), not `has_any_comments` (to emit): an owned
         // comment leading the last array/object argument defeats the expand-last hug just
