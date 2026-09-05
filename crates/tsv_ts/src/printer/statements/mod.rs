@@ -331,23 +331,16 @@ impl<'a> Printer<'a> {
             && self.has_comments_to_emit_between(stmt.span.start + 1, expr_start);
 
         // Build the expression once — or not at all, when the freeze replaces its doc
-        // with the verbatim slice. Context flags for chain handling:
-        // is_expression_statement allows short identifier names to merge with the
-        // first call; in_top_level_assignment selects the regular assignment
-        // layout (not chain formatting). The matching node's doc builder consumes the
-        // (non-consuming, span-matched) paren target and wraps itself; clear it
-        // afterward so it can't leak into a sibling statement.
+        // with the verbatim slice. `is_expression_statement` is the context flag for chain
+        // handling: it allows short identifier names to merge with the first call. The
+        // matching node's doc builder consumes the (non-consuming, span-matched) paren
+        // target and wraps itself; clear it afterward so it can't leak into a sibling
+        // statement.
         let expr_doc = match frozen {
             Some(span) => self.build_frozen_expression_doc(stmt.expression, span),
             None => {
                 self.expr_stmt_paren_target.set(nested_paren);
                 self.is_expression_statement.set(true);
-                // Saved rather than set: an expression statement nested inside this one's
-                // expression (a function body) runs the same pair, and restoring the
-                // constant `false` left the outer statement's remaining work in the wrong
-                // context. Reached 16,391× over ~23k real files, neutral at every one — see
-                // `build_variable_declaration_doc`, which carries the same pair.
-                let prev_top_level_assignment = self.in_top_level_assignment.replace(true);
                 let doc = match &stmt.expression {
                     // One of prettier's two `printSequenceExpression` parent arms (the `for`
                     // head is the other): the operands after the first take a continuation
@@ -363,7 +356,6 @@ impl<'a> Printer<'a> {
                     // body IS an expression statement, so it rides along).
                     expr => self.build_expression_doc(expr),
                 };
-                self.in_top_level_assignment.set(prev_top_level_assignment);
                 self.is_expression_statement.set(false);
                 self.expr_stmt_paren_target.set(None);
                 doc

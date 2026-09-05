@@ -217,11 +217,6 @@ pub struct Printer<'a> {
     /// Whether we're currently inside an expression statement (for chain merging decisions)
     /// Uses Cell for interior mutability so doc builders (&self) can set this
     pub(crate) is_expression_statement: Cell<bool>,
-    /// Whether we're in a top-level assignment context (ExpressionStatement or VariableDeclaration)
-    /// Used for assignment chain detection - assignments at top level use regular grouped layout,
-    /// only nested assignments (where parent is another assignment) use chain formatting
-    /// Uses Cell for interior mutability so doc builders (&self) can set this
-    pub(crate) in_top_level_assignment: Cell<bool>,
     /// Whether we're inside a curried arrow chain that `arrow_chain_should_break` forced
     /// open, on the DEFAULT arrow path (the flattened `build_arrow_chain_doc` never sets it —
     /// it stacks the heads itself). When true, every nested arrow breaks after its `=>`
@@ -567,7 +562,6 @@ impl<'a> Printer<'a> {
             comment_line_breaks: inputs.line_table,
             canonical: false,
             is_expression_statement: Cell::new(false),
-            in_top_level_assignment: Cell::new(false),
             in_stacked_arrow_chain: Cell::new(false),
             skip_arrow_chain: Cell::new(false),
             expand_last_arg_flat_params: Cell::new(false),
@@ -1023,14 +1017,18 @@ impl<'a> Printer<'a> {
             .any(|param| param.constraint.is_some() || param.default.is_some())
     }
 
-    /// Check if identifier has complex destructuring pattern
+    /// Whether `expr` is a COMPLEX destructuring target — prettier's
+    /// `isComplexDestructuring`: an object pattern with more than two properties, at
+    /// least one of which is renamed (not shorthand) or carries a default.
     ///
-    /// Corresponds to prettier's `isComplexDestructuring`:
-    /// - ObjectPattern with >2 properties
-    /// - At least one property has a default value OR is not shorthand
+    /// Example: `const { a, b = 1, c } = obj` — 3 properties, one has a default.
     ///
-    /// Example: `const { a, b = 1, c } = obj` - 3 properties, one has default
-    pub(crate) fn id_has_complex_destructuring(&self, expr: &internal::Expression<'_>) -> bool {
+    /// The two hosts prettier asks it for are the two this serves: a declarator's `id`
+    /// and an assignment expression's `left` (`isAssignmentOrVariableDeclarator`). Both
+    /// answer it the same way — `AssignmentLeft::ComplexPattern` / the declarator's
+    /// break-lhs arm — so keep them in step: a rule added to one is a rule missing from
+    /// the other.
+    pub(crate) fn is_complex_destructuring_target(&self, expr: &internal::Expression<'_>) -> bool {
         let internal::Expression::ObjectPattern(obj) = expr else {
             return false;
         };

@@ -56,6 +56,51 @@ pub enum AssignmentLayout {
     /// Fluid layout - breaks after operator only if needed
     /// Structure: group([left, op, group(indent(line)), indentIfBreak(right)])
     Fluid,
+
+    /// Break the LEFT, keep the value on the operator's line.
+    /// Structure: group([left, op, " ", group(right)])
+    ///
+    /// The mirror of `NeverBreakAfterOperator`, and the difference is which side is
+    /// grouped: there the LEFT gets its own group (so it breaks on its own width) and the
+    /// value rides bare; here the left is bare — it breaks with the outer group, which is
+    /// the whole point — and the VALUE gets the group. Prettier spells both, one line
+    /// apart (`assignment.js` `break-lhs` / `never-break-after-operator`).
+    BreakLhs,
+}
+
+/// What the assignment's LEFT is, for the two `choose_layout` arms that ask.
+///
+/// The two facts are mutually exclusive — a property key is never a destructuring
+/// pattern — so they are one parameter rather than two bools that could both be set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssignmentLeft {
+    /// Nothing the layout keys on.
+    Plain,
+
+    /// An object-literal key shorter than `tabWidth + MIN_OVERLAP_FOR_BREAK`
+    /// (prettier's `isObjectPropertyWithShortKey`): wrapping the value under such a key
+    /// buys nothing, so an unbreakable value welds to the `:`.
+    ShortKey,
+
+    /// A COMPLEX destructuring target (prettier's `isComplexDestructuring`): an object
+    /// pattern with more than two properties, one of which is renamed or carries a
+    /// default. Prettier breaks the target and keeps the value on the operator's line,
+    /// and it decides this **before** it looks at the value at all — so the answer is
+    /// the same for every RHS kind ([`Printer::is_complex_destructuring_target`]).
+    ComplexPattern,
+}
+
+impl AssignmentLeft {
+    /// The object-literal property's spelling: `ShortKey` when its key is short enough
+    /// for prettier's `isObjectPropertyWithShortKey`, `Plain` otherwise. A property key
+    /// is never a destructuring pattern, so this is the whole of that caller's answer.
+    pub fn short_key(is_short_key: bool) -> Self {
+        if is_short_key {
+            Self::ShortKey
+        } else {
+            Self::Plain
+        }
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -164,9 +209,9 @@ pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> boo
 /// broke correctly. Add a `chooseLayout` fact to one and check the other — same standing hazard
 /// as the two call-argument printers.
 ///
-/// `is_short_key`: True for property keys shorter than `tabWidth + MIN_OVERLAP_FOR_BREAK`.
-/// Short keys don't benefit from breaking after the colon. For non-property assignments
-/// (e.g., `x = value`), pass `false`.
+/// `left` is what the LHS is ([`AssignmentLeft`]) — the two facts any arm here keys on.
+/// `AssignmentLeft::ComplexPattern` answers on its own, ahead of everything; `ShortKey`
+/// is read by one `never-break-after-operator` arm. A plain `x = value` is `Plain`.
 ///
 /// `can_break_left`: Whether the printed left-hand side contains a break point
 /// (prettier's `canBreakLeftDoc`). It gates the `never-break-after-operator` cases: an
@@ -176,16 +221,28 @@ pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> boo
 ///
 /// Only the two `never-break-after-operator` arms read it, and every arm above them
 /// returns without looking, so the caller asks the doc only when one of those arms can be
-/// reached (`is_short_key`, or a simple value) — see [`Printer::build_assignment_layout`].
+/// reached (a short key, or a simple value) — see [`Printer::build_assignment_layout`].
 /// Prettier computes `canBreakLeftDoc` eagerly; on a real corpus two thirds of those
 /// answers went unread, a doc walk apiece.
 pub fn choose_layout(
     right_expr: &Expression<'_>,
-    is_short_key: bool,
+    left: AssignmentLeft,
     can_break_left: bool,
     print_width: usize,
     printer: &Printer<'_>,
 ) -> AssignmentLayout {
+    // A COMPLEX destructuring target decides the layout on its own, ahead of every arm
+    // below — prettier asks it before `shouldBreakAfterOperator` (`assignment.js`
+    // chooseLayout), so the target breaks and the value stays on the operator's line
+    // whatever the value is: a logical chain, a call, an object literal, an arrow, a
+    // string. Placing it after any RHS-keyed arm would answer only the kinds that fall
+    // through that arm, and this path would then disagree with the declarator's — which
+    // asks the same question at the same point (`build_variable_declaration_doc`) — on
+    // every other RHS kind.
+    if left == AssignmentLeft::ComplexPattern {
+        return AssignmentLayout::BreakLhs;
+    }
+
     // A curried arrow chain (`(a) => (b) => …`) with no head triggering prettier's
     // `shouldBreakChain` uses fluid layout: break after `=` only when the signature heads
     // don't fit on the operator line, letting a hugging body (object/array/block) expand in
@@ -245,7 +302,7 @@ pub fn choose_layout(
 
     // Short property keys → never break after operator
     // (wrapping object properties with very short keys usually doesn't add much value)
-    if is_short_key && !can_break_left {
+    if left == AssignmentLeft::ShortKey && !can_break_left {
         return AssignmentLayout::NeverBreakAfterOperator;
     }
 
@@ -439,7 +496,7 @@ pub fn is_simple_self_expanding(expr: &Expression<'_>) -> bool {
 /// - Poorly breakable chains (member-only chains, trivial call chains)
 /// - String literals (can't break internally)
 ///
-/// Precondition: Only called when is_short_key is false (checked in choose_layout)
+/// Precondition: Only called when the left is not a short key (checked in choose_layout)
 ///
 /// Note: Prettier does NOT include RegexLiteral here. Regex falls through to
 /// Fluid layout, which produces the same output since regex can't break internally.
@@ -1103,8 +1160,8 @@ impl<'a> Printer<'a> {
     ///
     /// This is the unified entry point that matches prettier's `printAssignment`.
     ///
-    /// `is_short_key`: True for property keys shorter than `tabWidth + MIN_OVERLAP_FOR_BREAK`.
-    /// For non-property assignments (e.g., `x = value`), pass `false`.
+    /// `left` is what the LHS is ([`AssignmentLeft`]): a short object-literal key, a
+    /// complex destructuring target, or `Plain` for everything else (`x = value`).
     ///
     /// `rhs_info` carries the operator→RHS gap's facts — inline comments, whether the gap
     /// forces `BreakAfterOperator`, a stripped-paren boundary to scan, and the value-head
@@ -1119,7 +1176,7 @@ impl<'a> Printer<'a> {
         left_doc: DocId,
         operator: DocId,
         right_expr: &Expression<'_>,
-        is_short_key: bool,
+        left: AssignmentLeft,
         rhs_info: RhsCommentInfo,
     ) -> DocId {
         let d = self.d();
@@ -1143,8 +1200,9 @@ impl<'a> Printer<'a> {
         // thirds of the asks. A gated bool rather than a lazy cell: this frame sits on the
         // object-literal recursion (property → value → property), where a memo cell's
         // extra words cost ~1% of the nesting depth the formatter survives.
-        let can_break_left = (is_short_key || is_simple_value(right_expr)) && d.can_break(left_doc);
-        let mut layout = choose_layout(right_expr, is_short_key, can_break_left, PRINT_WIDTH, self);
+        let can_break_left = (left == AssignmentLeft::ShortKey || is_simple_value(right_expr))
+            && d.can_break(left_doc);
+        let mut layout = choose_layout(right_expr, left, can_break_left, PRINT_WIDTH, self);
 
         // Override layout based on comments:
         //
@@ -1315,6 +1373,28 @@ impl<'a> Printer<'a> {
                 ]))
             }
 
+            AssignmentLayout::BreakLhs => {
+                // Break the left, keep the value on the operator's line - matches
+                // prettier: group([leftDoc, operator, " ", group(rightDoc)])
+                //
+                // `left_doc` is not merely left ungrouped here — the group its own
+                // builder put on it is STRIPPED. Both halves matter: an inner group
+                // answers the fit check on its own content, so the pattern stays flat
+                // while the line overflows and the break lands on the value instead,
+                // which is the exact break this layout exists to force. Prettier reaches
+                // the same shape from the other side: `printObject` returns the pattern's
+                // content *ungrouped* when its parent is an `AssignmentExpression` or a
+                // `VariableDeclarator` ("printAssignment is responsible for adding a group
+                // if needed", `print/object.js`). The declarator's hand-rolled twin
+                // strips it the same way (`build_variable_declaration_doc`).
+                d.group(d.concat(&[
+                    d.unwrap_group(left_doc),
+                    operator,
+                    d.text(" "),
+                    d.group(right_doc_with_comments),
+                ]))
+            }
+
             AssignmentLayout::Fluid => {
                 // Fluid layout - break after operator only if needed
                 // Matches Prettier's assignment.js lines 59-67 exactly:
@@ -1369,22 +1449,6 @@ impl<'a> Printer<'a> {
             Some(comments_doc) => d.concat(&[comments_doc, frozen_doc]),
             None => frozen_doc,
         };
-        self.build_frozen_assignment_shape(left_doc, operator, rhs)
-    }
-
-    /// The doc shape [`Self::build_frozen_assignment_doc`] emits, over an RHS the caller
-    /// already built: `group([group(left), operator, hang(rhs)])`.
-    ///
-    /// Split out for the one host that arrives with its RHS in hand — an object-pattern
-    /// left, whose ordinary arm deliberately never breaks after the operator and so builds
-    /// the value on its own path — so the frozen layout is still stated once.
-    pub(in crate::printer) fn build_frozen_assignment_shape(
-        &self,
-        left_doc: DocId,
-        operator: DocId,
-        rhs: DocId,
-    ) -> DocId {
-        let d = self.d();
         d.group(d.concat(&[d.group(left_doc), operator, hang_after_operator(d, rhs)]))
     }
 
