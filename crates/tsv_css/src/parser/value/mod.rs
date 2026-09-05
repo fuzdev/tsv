@@ -18,13 +18,12 @@ use crate::parser::value::lists::ValueSeparator;
 use bumpalo::Bump;
 use tsv_lang::Span;
 
-// Re-export public functions
-pub use colors::{parse_color, parse_color_function};
-pub use dimensions::parse_dimension;
-pub use functions::parse_function_arguments;
-pub use strings::parse_string_literal;
-
-// Note: classify_separators is used internally by ValueParser but not exported publicly
+// The per-kind parsers the dispatch below calls. Internal to the value parser — like
+// `classify_separators`, none of them is part of the crate's surface.
+use colors::{parse_color, parse_color_function};
+use dimensions::parse_dimension;
+use functions::parse_function_arguments;
+use strings::parse_string_literal;
 
 /// Parse a CSS value into a structured CssValue
 ///

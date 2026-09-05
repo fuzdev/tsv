@@ -1025,8 +1025,9 @@ impl<'a> Printer<'a> {
     /// Get the formatted output
     ///
     /// Simply extracts the buffer. Whitespace stripping is handled by the doc rendering layer:
-    /// - Normal elements: rendered with `print_doc_with_indent_resolved()` which strips
-    /// - Whitespace-sensitive elements: rendered with `print_doc_with_indent_resolved_preserve_whitespace()` which preserves
+    /// - Normal elements: rendered with `arena_print_doc_with_indent_resolved_into` which strips
+    /// - Whitespace-sensitive elements: rendered with
+    ///   `arena_print_doc_with_indent_resolved_preserve_whitespace_into` which preserves
     pub(crate) fn into_string(self) -> String {
         // Park the line-break scratch back on the arena for the next format
         // (capacity retained, filled or not; see `with_embed`).

@@ -1269,7 +1269,7 @@ impl<'a> Printer<'a> {
     ///
     /// The single source of truth for that question, because two places must agree on
     /// it: the union printer (which lays the members out) and the type-alias RHS
-    /// (`build_type_alias_doc`, which decides whether to break after `=`). Asking the
+    /// (`build_type_alias_eq_value_doc`, which decides whether to break after `=`). Asking the
     /// bare syntactic [`union_hug_shape`] at the alias while the printer declines
     /// the hug for a comment splits them — the alias keeps `= ` while the union expands,
     /// yielding `type A = | // c⏎{ a: 1 }⏎| null` where a non-hugging union of the same

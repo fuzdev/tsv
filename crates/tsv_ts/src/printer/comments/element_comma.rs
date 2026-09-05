@@ -134,8 +134,8 @@ impl TrailingComments<'_> {
     /// land on the same output, and both are fixed points: a comment printed onto a fresh
     /// line is own-line when it is reparsed.
     ///
-    /// `element_defers_line_comment` is the question already answered by the caller,
-    /// which is the only place that knows the element's node type.
+    /// `element_defers_line` is the question already answered by the caller, which is the
+    /// only place that knows the element's node type.
     pub(in crate::printer) fn demote_line_after_deferred(&mut self, element_defers_line: bool) {
         self.line_demoted = element_defers_line;
     }

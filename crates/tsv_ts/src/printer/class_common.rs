@@ -413,9 +413,9 @@ impl<'a> Printer<'a> {
     ///
     /// The header→body `{` gap is resolved here for **every** class shape, declaration and
     /// expression alike — bare name, anonymous, heritage, type params. Gating it
-    /// by an `emit_pre_body_comments` flag a class-expression printer sets false for its
-    /// bare-name / anonymous forms, emitting the gap itself, has those two routes
-    /// answer it differently from their own siblings (collapsing a broke-after multiline
+    /// behind a "the caller emits this gap itself" flag a class-expression printer sets
+    /// false for its bare-name / anonymous forms has those two routes answer it
+    /// differently from their own siblings (collapsing a broke-after multiline
     /// block, and emitting a stray space before the brace). A flag meaning "another emitter
     /// already claimed this range" is the `docs/comments.md` §3 hazard, not a knob.
     pub(in crate::printer) fn build_class_header_doc(

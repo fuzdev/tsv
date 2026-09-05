@@ -700,9 +700,9 @@ impl<'a> Printer<'a> {
         q_parts.push(d.text("?"));
 
         // Comments between ? and consequent: first trails `?` inline, later ones take
-        // their own indented line (author blanks preserved). `consequent_on_own_line`
-        // is set when a comment can't share the consequent's line (the blank, if any,
-        // is preserved below).
+        // their own indented line (author blanks preserved). The placement's
+        // `on_own_line` is set when a comment can't share the consequent's line (the
+        // blank, if any, is preserved below).
         let consequent_placement =
             self.emit_ternary_branch_comments(&mut q_parts, question_pos, consequent_start);
 
