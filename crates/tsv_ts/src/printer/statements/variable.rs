@@ -721,8 +721,23 @@ impl<'a> Printer<'a> {
         // whole continuation in the one indent the list wants
         // (`build_keyword_to_name_continuation`), so neither wrapper is added there —
         // stacked on it, the declarators after the first would sit two levels deep.
-        let list_indents =
-            is_multi_declarator && !self.keyword_gap_breaks(keyword_end, first_decl_start);
+        //
+        // The wrapper is not the *list's* alone: prettier's gate on it is
+        // `printed.length === 1 && !hasComment(node.declarations[0])` → bare, else
+        // `indent(printed[0])`, so a LONE declarator that carries a comment of its own takes
+        // it too and hangs its value two levels. "Of its own" is the keyword→declarator gap
+        // and nothing else — the declarator's span opens at its binding, so a comment written
+        // before that binding is what prettier attaches to the declarator, while one between
+        // the name and `=`, one after the `=`, one inside the value and one trailing it all
+        // belong to a child node. Probed against prettier at each of those five positions;
+        // only this one moves. The **on page** axis, because the question is a layout one and
+        // the comment is glued to the binding, hence owned — `const /* c */ a` prints it from
+        // the declarator's own doc, and an emit-keyed ask would answer `false` for the very
+        // comment prettier keys on.
+        let first_declarator_owns_comment = !is_multi_declarator
+            && self.has_comments_on_page_between(keyword_end, first_decl_start);
+        let list_indents = (is_multi_declarator || first_declarator_owns_comment)
+            && !self.keyword_gap_breaks(keyword_end, first_decl_start);
 
         // The Rule A gap anchors, in the shared closure form `list_item_frozen` takes. The
         // first declarator's gap opens past the keyword, so a directive written between
@@ -954,16 +969,7 @@ impl<'a> Printer<'a> {
 
         // The list's two indents — prettier's `indent(first)` and `indent(rest)` — or
         // neither under a broken keyword gap (see `list_indents`). A single declarator takes
-        // no wrapper.
-        //
-        // TODO: prettier's own gate on the first is `printed.length === 1 &&
-        // !hasComment(declarations[0])` — so it also indents a LONE declarator that carries a
-        // comment of its own, i.e. one written past the keyword: `const /* c */ x = <a value
-        // that breaks>` hangs its value two levels there and one here. Only that attachment
-        // counts, which is why the rest of the family already agrees: a comment between the
-        // name and `=`, or trailing the value, belongs to a child node, not to the
-        // declarator. Fixtures-first — the gate has to ask what the declarator OWNS, not what
-        // the surrounding gaps hold.
+        // no wrapper unless it carries a comment of its own.
         let first_doc = d.concat(&parts);
         parts.clear();
         parts.push(if list_indents {

@@ -567,21 +567,13 @@ impl<'a> Printer<'a> {
         //     c ?? [1];
         // ```
         // Prettier keys that arm on `node.left` being a same-precedence chain; tsv keys it
-        // on the FLATTENED operand count — the same question for a left-nested chain, which
-        // is every authoring of `a ?? b ?? [1]` but the paren-nested one
-        // (`logical/inline_chain_long`). A two-operand inlining chain has no line for either
-        // answer to act on.
-        //
-        // TODO: `a ?? (b ?? [1])` is a live divergence, and the tell is that the two halves
-        // of prettier's one rule are keyed here on two different structures. Prettier prints
-        // that authoring exactly as it prints the left-nested spelling, in a SINGLE pass —
-        // its inner node answers this arm on its own. tsv flattens the chain, so the count
-        // sees it, but `should_inline_logical_expression` still asks `binary.right` (the
-        // inner chain, not an array): `should_inline_last` reads false, `choose_layout`
-        // takes break-after-operator, and tsv's own second pass rewrites the result — a
-        // non-idempotent authoring. Asking that predicate about the flattened chain's LAST
-        // OPERAND closes both halves at once and is a no-op for every left-nested chain, but
-        // it moves the assignment layout too, so: fixtures-first, then a corpus A/B.
+        // on the FLATTENED operand count. Both halves of the rule read the same structure:
+        // prettier's parse postprocess rebalances `a ?? (b ?? [1])` into `(a ?? b) ?? [1]`
+        // before the printer runs, so its `node.left` is a chain exactly when tsv's chain
+        // has 3+ operands, and its `node.right` is the last operand — which is what
+        // `should_inline_logical_expression` reads (`rebalanced_logical_right`). A
+        // two-operand inlining chain has no line for either answer to act on.
+        // Fixtures: `logical/inline_chain_long`, `logical/inline_chain_paren_nested_long`.
         let style = if matches!(style, BinaryChainStyle::Grouped)
             && should_inline_last
             && operands.len() > 2
@@ -691,6 +683,10 @@ impl<'a> Printer<'a> {
     /// When shouldGroup is true, the continuation gets its own group, allowing it
     /// to independently evaluate whether it fits on the current line when the outer
     /// group breaks (e.g., due to a multi-line parenthesized left operand).
+    ///
+    /// Unlike `should_inline_logical_expression` this needs no rebalanced view: a right
+    /// operand prettier would rebalance away is same-category by definition, and the
+    /// rebalanced tree's LEFT is then same-category too — so both trees answer false.
     pub(in crate::printer) fn should_group_binary_continuation(
         binary: &internal::BinaryExpression<'_>,
     ) -> bool {
@@ -1149,13 +1145,12 @@ impl<'a> Printer<'a> {
         // Add current operator
         operators.push(expr.operator);
 
-        // Also flatten right side for truly associative operators (removes redundant parens)
-        // e.g., `a && (b && c)` becomes `a && b && c`
-        // Only logical operators are truly associative; arithmetic preserves right-side parens
+        // Also flatten the right side where prettier REBALANCES it, which removes the
+        // redundant parens: `a && (b && c)` becomes `a && b && c`
+        // ([`BinaryOperator::rebalances_with`] — logical operators only; arithmetic
+        // preserves right-side parens).
         if let Expression::BinaryExpression(right_binary) = expr.right
-            && expr.operator.can_flatten_with(right_binary.operator)
-            && expr.operator.is_logical()
-            && right_binary.operator.is_logical()
+            && expr.operator.rebalances_with(right_binary.operator)
         {
             self.collect_binary_chain_with_spans(right_binary, operands, operators);
             return;
@@ -1249,9 +1244,13 @@ impl<'a> Printer<'a> {
         // every route to the operand's doc carries it — the grouping parens `await` needs are
         // the PRINTER's and stay outside the slice, exactly as at every other value head.
         let frozen = self.value_head_frozen_span(keyword_end, await_expr.argument.span());
+        // A continuation-indent position ([`Printer::build_continuation_indent_expression_doc`],
+        // which lists them and owns the hazard-1 prepend). The grouping parens the operand
+        // needs are the PRINTER's and stay outside this doc. Only the ordinary route wants
+        // the seam — a FROZEN operand emits the author's bytes, where no layout rule applies.
         let operand_doc = || {
             frozen.map_or_else(
-                || self.build_expression_doc(await_expr.argument),
+                || self.build_continuation_indent_expression_doc(await_expr.argument),
                 |frozen| self.build_frozen_expression_doc(await_expr.argument, frozen),
             )
         };
@@ -1409,8 +1408,13 @@ impl<'a> Printer<'a> {
         // keeping the author's break — the break would be ASI, not layout.
         let leading_comments_opt = self.build_rhs_comments_glued_opt(keyword_end, argument_start);
 
+        // A continuation-indent position, exactly as `await`'s is. Every arm below routes
+        // through the one closure, so the parens two of them emit stay outside the operand's
+        // own doc and the three cannot drift.
+        let operand_doc = || self.build_continuation_indent_expression_doc(arg);
+
         if leading_comments_opt.is_some() || has_trailing_comments {
-            let inner = self.build_expression_doc(arg);
+            let inner = operand_doc();
             let body = match leading_comments_opt {
                 Some(comments) => d.concat(&[comments, inner]),
                 None => inner,
@@ -1433,10 +1437,10 @@ impl<'a> Printer<'a> {
         } else if self.needs_parens(arg, ParenContext::YieldArgument) {
             // Assignment needs parens: `yield (x ??= y)`
             parts.push(d.text("("));
-            parts.push(self.build_expression_doc(arg));
+            parts.push(operand_doc());
             parts.push(d.text(")"));
         } else {
-            parts.push(self.build_expression_doc(arg));
+            parts.push(operand_doc());
         }
 
         d.concat(&parts)

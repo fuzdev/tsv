@@ -1,0 +1,789 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 745,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A yield operand's chain takes a continuation indent, like every other nested",
+			"start": 28,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " binary operand - a YieldExpression parent is in neither of prettier's exempt lists",
+			"start": 110,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The delegating spelling takes the same shape",
+			"start": 306,
+			"end": 353,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars - stays inline",
+			"start": 464,
+			"end": 491,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - the chain breaks",
+			"start": 594,
+			"end": 625,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 33
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 744,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 735,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 734,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 20,
+						"end": 21,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 11
+							},
+							"end": {
+								"line": 2,
+								"column": 12
+							}
+						},
+						"name": "g"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 24,
+						"end": 734,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 198,
+								"end": 302,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 7
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 204,
+										"end": 301,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 8
+											},
+											"end": {
+												"line": 7,
+												"column": 6
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 204,
+											"end": 205,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 8
+												},
+												"end": {
+													"line": 5,
+													"column": 9
+												}
+											},
+											"name": "a"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 208,
+											"end": 301,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 12
+												},
+												"end": {
+													"line": 7,
+													"column": 6
+												}
+											},
+											"delegate": false,
+											"argument": {
+												"type": "LogicalExpression",
+												"start": 214,
+												"end": 301,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 18
+													},
+													"end": {
+														"line": 7,
+														"column": 6
+													}
+												},
+												"left": {
+													"type": "LogicalExpression",
+													"start": 214,
+													"end": 291,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 18
+														},
+														"end": {
+															"line": 6,
+															"column": 33
+														}
+													},
+													"left": {
+														"type": "Identifier",
+														"start": 214,
+														"end": 254,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 18
+															},
+															"end": {
+																"line": 5,
+																"column": 58
+															}
+														},
+														"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+													},
+													"operator": "??",
+													"right": {
+														"type": "Identifier",
+														"start": 261,
+														"end": 291,
+														"loc": {
+															"start": {
+																"line": 6,
+																"column": 3
+															},
+															"end": {
+																"line": 6,
+																"column": 33
+															}
+														},
+														"name": "cccccccccccccccccccccccccccccc"
+													}
+												},
+												"operator": "??",
+												"right": {
+													"type": "Identifier",
+													"start": 298,
+													"end": 301,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 3
+														},
+														"end": {
+															"line": 7,
+															"column": 6
+														}
+													},
+													"name": "ddd"
+												}
+											}
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A yield operand's chain takes a continuation indent, like every other nested",
+										"start": 28,
+										"end": 107
+									},
+									{
+										"type": "Line",
+										"value": " binary operand - a YieldExpression parent is in neither of prettier's exempt lists",
+										"start": 110,
+										"end": 195
+									}
+								]
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 356,
+								"end": 460,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 7
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 362,
+										"end": 459,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 8
+											},
+											"end": {
+												"line": 12,
+												"column": 6
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 362,
+											"end": 363,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 8
+												},
+												"end": {
+													"line": 10,
+													"column": 9
+												}
+											},
+											"name": "b"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 366,
+											"end": 459,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 12
+												},
+												"end": {
+													"line": 12,
+													"column": 6
+												}
+											},
+											"delegate": true,
+											"argument": {
+												"type": "LogicalExpression",
+												"start": 373,
+												"end": 459,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 19
+													},
+													"end": {
+														"line": 12,
+														"column": 6
+													}
+												},
+												"left": {
+													"type": "LogicalExpression",
+													"start": 373,
+													"end": 449,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 19
+														},
+														"end": {
+															"line": 11,
+															"column": 33
+														}
+													},
+													"left": {
+														"type": "Identifier",
+														"start": 373,
+														"end": 412,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 19
+															},
+															"end": {
+																"line": 10,
+																"column": 58
+															}
+														},
+														"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+													},
+													"operator": "??",
+													"right": {
+														"type": "Identifier",
+														"start": 419,
+														"end": 449,
+														"loc": {
+															"start": {
+																"line": 11,
+																"column": 3
+															},
+															"end": {
+																"line": 11,
+																"column": 33
+															}
+														},
+														"name": "cccccccccccccccccccccccccccccc"
+													}
+												},
+												"operator": "??",
+												"right": {
+													"type": "Identifier",
+													"start": 456,
+													"end": 459,
+													"loc": {
+														"start": {
+															"line": 12,
+															"column": 3
+														},
+														"end": {
+															"line": 12,
+															"column": 6
+														}
+													},
+													"name": "ddd"
+												}
+											}
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The delegating spelling takes the same shape",
+										"start": 306,
+										"end": 353
+									}
+								]
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 494,
+								"end": 590,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 98
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 500,
+										"end": 589,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 8
+											},
+											"end": {
+												"line": 15,
+												"column": 97
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 500,
+											"end": 501,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 8
+												},
+												"end": {
+													"line": 15,
+													"column": 9
+												}
+											},
+											"name": "c"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 504,
+											"end": 589,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 12
+												},
+												"end": {
+													"line": 15,
+													"column": 97
+												}
+											},
+											"delegate": false,
+											"argument": {
+												"type": "LogicalExpression",
+												"start": 510,
+												"end": 589,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 18
+													},
+													"end": {
+														"line": 15,
+														"column": 97
+													}
+												},
+												"left": {
+													"type": "LogicalExpression",
+													"start": 510,
+													"end": 582,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 18
+														},
+														"end": {
+															"line": 15,
+															"column": 90
+														}
+													},
+													"left": {
+														"type": "Identifier",
+														"start": 510,
+														"end": 550,
+														"loc": {
+															"start": {
+																"line": 15,
+																"column": 18
+															},
+															"end": {
+																"line": 15,
+																"column": 58
+															}
+														},
+														"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+													},
+													"operator": "??",
+													"right": {
+														"type": "Identifier",
+														"start": 554,
+														"end": 582,
+														"loc": {
+															"start": {
+																"line": 15,
+																"column": 62
+															},
+															"end": {
+																"line": 15,
+																"column": 90
+															}
+														},
+														"name": "cccccccccccccccccccccccccccc"
+													}
+												},
+												"operator": "??",
+												"right": {
+													"type": "Identifier",
+													"start": 586,
+													"end": 589,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 94
+														},
+														"end": {
+															"line": 15,
+															"column": 97
+														}
+													},
+													"name": "ddd"
+												}
+											}
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " 100 chars - stays inline",
+										"start": 464,
+										"end": 491
+									}
+								]
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 628,
+								"end": 731,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 7
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 634,
+										"end": 730,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 8
+											},
+											"end": {
+												"line": 20,
+												"column": 6
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 634,
+											"end": 635,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 8
+												},
+												"end": {
+													"line": 18,
+													"column": 9
+												}
+											},
+											"name": "d"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 638,
+											"end": 730,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 12
+												},
+												"end": {
+													"line": 20,
+													"column": 6
+												}
+											},
+											"delegate": false,
+											"argument": {
+												"type": "LogicalExpression",
+												"start": 644,
+												"end": 730,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 18
+													},
+													"end": {
+														"line": 20,
+														"column": 6
+													}
+												},
+												"left": {
+													"type": "LogicalExpression",
+													"start": 644,
+													"end": 720,
+													"loc": {
+														"start": {
+															"line": 18,
+															"column": 18
+														},
+														"end": {
+															"line": 19,
+															"column": 32
+														}
+													},
+													"left": {
+														"type": "Identifier",
+														"start": 644,
+														"end": 684,
+														"loc": {
+															"start": {
+																"line": 18,
+																"column": 18
+															},
+															"end": {
+																"line": 18,
+																"column": 58
+															}
+														},
+														"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+													},
+													"operator": "??",
+													"right": {
+														"type": "Identifier",
+														"start": 691,
+														"end": 720,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 3
+															},
+															"end": {
+																"line": 19,
+																"column": 32
+															}
+														},
+														"name": "ccccccccccccccccccccccccccccc"
+													}
+												},
+												"operator": "??",
+												"right": {
+													"type": "Identifier",
+													"start": 727,
+													"end": 730,
+													"loc": {
+														"start": {
+															"line": 20,
+															"column": 3
+														},
+														"end": {
+															"line": 20,
+															"column": 6
+														}
+													},
+													"name": "ddd"
+												}
+											}
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " 101 chars - the chain breaks",
+										"start": 594,
+										"end": 625
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

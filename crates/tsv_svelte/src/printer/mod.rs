@@ -598,6 +598,31 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// [`Self::build_head_value_doc`] for the one head whose value is an **assignment
+    /// value** — `{@const}`'s initializer, which prettier prints as a VariableDeclarator's.
+    ///
+    /// The tag's own layout (`build_assignment_tag_doc`) is prettier's assignment layout, so
+    /// the value owes the position-keyed rules an assignment value owes: an inlining logical
+    /// chain with earlier operators indents them rather than sitting flat at the tag's column
+    /// (`tsv_ts::build_assignment_value_expression_doc`, whose doc states the contract).
+    /// `{const}`/`{let}` reach the same rules through `tsv_ts::build_variable_declaration_doc`,
+    /// which marks the position itself — the two tags print one shape and must agree on it.
+    ///
+    /// The frozen arm is deliberately shared with the plain head: an honored directive emits
+    /// the author's bytes, where no layout rule applies.
+    pub(in crate::printer) fn build_assignment_value_doc(
+        &self,
+        expr: &Expression<'_>,
+        frozen: bool,
+        embed: &EmbedContext,
+    ) -> DocId {
+        if frozen {
+            self.build_frozen_node_doc(expr.span())
+        } else {
+            tsv_ts::build_assignment_value_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
+        }
+    }
+
     /// The [`EmbedContext`] every **braced head** builds its value under — a block head
     /// (`{#if …}`, `{#each …}`, an `{#each}` key) and a prefixed tag (`{@html …}`,
     /// `{@render …}`) alike. `opening_offset` is the width of the text before the

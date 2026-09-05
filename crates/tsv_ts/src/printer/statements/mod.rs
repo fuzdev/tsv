@@ -357,7 +357,10 @@ impl<'a> Printer<'a> {
                     Expression::SequenceExpression(seq) => {
                         self.build_sequence_doc(seq, SeqLayout::Indented)
                     }
-                    expr => self.build_expression_doc(expr),
+                    // A continuation-indent position — the binaryish counterpart of the
+                    // sequence arm above. A labeled statement's body IS an expression
+                    // statement, so it rides here too.
+                    expr => self.build_continuation_indent_expression_doc(expr),
                 };
                 self.in_top_level_assignment.set(prev_top_level_assignment);
                 self.is_expression_statement.set(false);

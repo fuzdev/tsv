@@ -318,13 +318,19 @@ pub fn is_self_expanding_value(expr: &Expression<'_>) -> bool {
 /// non-empty array, or JSX element on the right side. These cases should NOT use
 /// BreakAfterOperator — the RHS handles its own expansion.
 ///
+/// The right operand asked about is [`internal::BinaryExpression::rebalanced_right`], not
+/// `binary.right`: prettier normalizes a same-operator right-nested logical tree away at
+/// PARSE time, so `a ?? (b ?? [1])` is `(a ?? b) ?? [1]` at every question the printer asks.
+/// Reading `binary.right` here is what made the paren-nested authoring diverge AND rewrite
+/// its own output on a second pass (`logical/inline_chain_paren_nested_long`).
+///
 /// Prettier ref: `shouldInlineLogicalExpression` (binaryish.js:361)
 pub fn should_inline_logical_expression(binary: &internal::BinaryExpression<'_>) -> bool {
     if !binary.operator.is_logical() {
         return false;
     }
 
-    match binary.right {
+    match binary.rebalanced_right() {
         Expression::ObjectExpression(obj) => !obj.properties.is_empty(),
         Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
         // Note: Prettier also checks isJsxElement, but JSX is not supported in tsv
@@ -1089,7 +1095,7 @@ impl<'a> Printer<'a> {
     /// the two declarator value builders, which build their value without it.
     ///
     /// Keyed by span and not consumed, like `mark_ternary_extra_indent`.
-    pub(in crate::printer) fn mark_assignment_value(&self, value: &Expression<'_>) {
+    pub(crate) fn mark_assignment_value(&self, value: &Expression<'_>) {
         self.assignment_value_target.set(Some(value.span()));
     }
 

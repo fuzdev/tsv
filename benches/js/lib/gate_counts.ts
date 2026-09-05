@@ -401,21 +401,46 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// `binary-expressions/inline-object-array.js` and `variable_declarator/multiple.js`; the
 	// fill six are numeric-array files and the one `partial`).
 	//
-	// 5134 → 5137: three files arrive from `unknown` on the cast-seed first-argument hug
+	// 5134 → 5136: the binaryish CONTINUATION-INDENT batch — ten parent positions that took no
+	// continuation indent where prettier's binaryish fall-through gives one (`yield` / `yield*`
+	// argument, `case` test, `for…of` / `for…in` right, `class extends`, bare expression
+	// statement, labeled-statement body, `export default`, `export =`, a default parameter
+	// value). Four files move, ALL in the prettier suite, each verified per file:
+	//   `js/binary-expressions/short-right.js` → **match** (a bare `Math.abs(…) > 1;`
+	//     statement — the expression-statement position).
+	//   `typescript/conformance/types/functions/functionImplementationErrors.ts` → **match**.
+	//   `typescript/conformance/types/functions/functionImplementations.ts` → `known` (what is
+	//     left of it is detector-explained).
+	//   `typescript/arrow/16067.ts` → `partial` → `unknown`, an improvement read backwards: its
+	//     `a || …` statement hunk is FIXED, and the residue is the pre-existing curried-arrow
+	//     body indent, which no detector explains — so the file stops being partly-explained
+	//     and becomes wholly-unexplained. `compare` on it shows only that class.
+	// ⚠️ All four are INVISIBLE to the standard staged-tree corpus A/B: `tsv format --list`
+	// honors `.gitignore` / `.prettierignore` and the prettier repo ignores its own test
+	// fixtures, so that rig enumerates 8,500 files where this view holds 9,305. The A/B read
+	// ZERO movers; this gate is what caught them. Measured by diffing the `--all --json` bucket
+	// lists across the two corpus-profile builds — these four are the only moves in any bucket,
+	// and `safety` / `errors` / `expected_errors` are identical file-for-file.
+	//
+	// 5134 → 5137: the cast-seed first-argument hug. Three files arrive from `unknown`
 	// (`language-tools/…/svelte-check/src/options.ts` and prettier's own tests for the rule,
 	// `typescript/argument-expansion/argument_expansion.ts` +
 	// `typescript/satisfies-operators/argument-expansion.ts`); a fourth,
 	// `cosmicplayground/src/lib/notes.ts`, leaves `partial` for `known`. Reasoning on
 	// `CORPUS_FORMAT_UNKNOWN_PIN`. Measured by formatting the gates view with a pre-change and
 	// a tip `--profile corpus` CLI and byte-diffing the two trees: those four are the ONLY
-	// movers among the 9,060 files `tsv format` accepts (every gates file but the ~245 `.html`
-	// the harness routes through the Svelte printer, whose every bucket is unmoved), so
-	// nothing arrives anywhere else.
-	// ⚠️ Measured on this branch alone, against 5134 / 105 / 26. Another branch re-pinning the
-	// same constants must RE-MEASURE the merged tip rather than compose the two deltas — that
-	// the movers here are all cast-seed shapes is a fact about this change, not a guarantee the
-	// two mover sets are disjoint (the entry above this one is the standing precedent).
-	typescript: 5137,
+	// movers among the 9,060 files `tsv format` accepts — every gates file but the ~245 `.html`
+	// the harness routes through the Svelte printer, whose every bucket is unmoved. That rig
+	// reaches the prettier suite by enumerating it with `find` rather than `--list`, which is
+	// exactly the blind slice the entry above ran into.
+	//
+	// ⚠️ The two entries above are again SEPARATE branches, each measured against 5134 in its
+	// own tree, so their deltas are NOT composable in general. **5139 is the
+	// re-measurement on the merged tip**, not a sum — it happens to equal 5134 + 2 + 3 because
+	// the two mover sets are disjoint: the binaryish four are prettier-suite files in the
+	// binary/conformance/arrow subtrees, the cast-seed four are options.ts, notes.ts and
+	// prettier's two `argument-expansion` tests.
+	typescript: 5139,
 	css: 133
 };
 
@@ -778,6 +803,11 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// the fill round — the last of those was the one OVER-WIDTH output of that group, not a
 	// layout choice), so read the list as the state before both steps.
 	//
+	// 105 → 104: the binaryish continuation-indent batch. `js/binary-expressions/short-right.js`
+	// and `…/functionImplementationErrors.ts` LEAVE for `match`, and `typescript/arrow/16067.ts`
+	// ARRIVES from `partial` because the hunk a detector explained is the one that got fixed.
+	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`.
+	//
 	// 105 → 102: three files LEAVE for `match` — the cast-seed first-argument hug. Prettier's
 	// `isHopefullyShortCallArgument` reads an `as` / `satisfies` seed through a cast branch of
 	// its own (array element unwrapped, a lone type argument descended into, then `isSimpleType`
@@ -789,9 +819,12 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// and `[] satisfies unknown satisfies number[]` seeds need the second half of the same
 	// change: `isSimpleCallArgument` strips only the chain-element wrappers, so a cast OPERAND
 	// is not simple either. `partial` moves one the other way in the same step (notes.ts, to
-	// `known`), and the byte-diff over the whole gates view names those four as the only movers
+	// `known`), and the byte-diff over the gates view names those four as the only movers
 	// (measurement on `CORPUS_FORMAT_MATCH_MIN`).
-	typescript: 102,
+	//
+	// Both entries above measured against 105 in their own tree; 101 is the
+	// merged-tip re-measurement (disjoint mover sets — see `CORPUS_FORMAT_MATCH_MIN`).
+	typescript: 101,
 	css: 23
 };
 
@@ -863,12 +896,19 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// hunk was `fill_101_boundary`, the numbers-fill over-width the content-carried comma fixes.
 	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`, which moves +5 in the same step.
 	//
+	// 26 → 24: the binaryish continuation-indent batch — `typescript/arrow/16067.ts` leaves for
+	// `unknown` (its explained hunk is fixed) and `…/functionImplementations.ts` leaves for
+	// `known`. Reasoning on `CORPUS_FORMAT_MATCH_MIN`.
+	//
 	// 26 → 25: `cosmicplayground/src/lib/notes.ts` leaves for `known` — those two hunks are
 	// FIXED, and what is left of the file is the explained pair it arrived with. `Record<K, V>`
 	// carries two type arguments, so prettier's cast branch descends into nothing simple and it
 	// refuses the first-argument hug; tsv now refuses it too. Reasoning on
 	// `CORPUS_FORMAT_UNKNOWN_PIN`, which moves −3 in the same step.
-	typescript: 25,
+	//
+	// Both entries above measured against 26 in their own tree; 23 is the
+	// merged-tip re-measurement (disjoint mover sets — see `CORPUS_FORMAT_MATCH_MIN`).
+	typescript: 23,
 	css: 9
 };
 
