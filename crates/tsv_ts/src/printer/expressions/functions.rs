@@ -2864,7 +2864,6 @@ impl<'a> Printer<'a> {
             comments.iter().copied(),
             param_render_start,
             LeadingGlue::Adjacent,
-            None,
         );
         d.concat(&parts)
     }

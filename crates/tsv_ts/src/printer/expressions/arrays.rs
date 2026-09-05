@@ -597,9 +597,8 @@ impl<'a> Printer<'a> {
         }
 
         let inner = d.concat(&[d.softline(), d.fill(&parts)]);
-        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.softline());
 
-        d.group(d.concat(&[d.text("["), indented_content, closing_line, d.text("]")]))
+        d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]))
     }
 
     /// Push slot `i`'s element doc plus its inline leading/trailing block comments.
@@ -805,10 +804,9 @@ impl<'a> Printer<'a> {
         }
 
         let inner = d.concat(&inner_parts);
-        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.softline());
 
         // Build group contents
-        let group_contents = d.concat(&[d.text("["), indented_content, closing_line, d.text("]")]);
+        let group_contents = d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]);
 
         // Use group_break() when shouldBreak heuristic matched or spread comments force it.
         // This sets shouldBreak on the GROUP ITSELF rather than using break_parent().
@@ -1123,13 +1121,12 @@ impl<'a> Printer<'a> {
         }
 
         let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
-        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
 
         self.build_delimited_doc(
             d.text("["),
             bracket_line_prefix,
-            indented_content,
-            closing_line,
+            d.indent(inner),
+            d.hardline(),
             d.text("]"),
         )
     }

@@ -329,7 +329,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// layercake 159 of 177, svelte-ux 161 of 198, svelte-maplibre 72 of 90), 438 are `known`
 	// (prettier-shaped code the ecosystem repos never carry), and 5 are `unknown` — see the
 	// unknown pin, which names them. `partial` is unmoved and SAFETY is 0 over every file.
-	svelte: 2701,
+	//
+	// 2701 → 2703: `flowbite-svelte/.../dialog/Dialog.svelte` and
+	// `.../bottom-navigation/BottomNavItem.svelte` arrive from `unknown` (5 → 3 there, which
+	// names the change and the measurement).
+	svelte: 2703,
 	// 2332 → 2334: two reproducible files, `prettier/tests/format/js/comments/11273.js` and
 	// `.../trailing-jsdocs.js`, whose divergence was a container-end trailing comment RUN the
 	// author glued onto one line and tsv split onto two. That run's separator now asks the
@@ -356,7 +360,13 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 66, svelte-ux 100 of 100, svelte-maplibre 57 of 57, language-tools 207 of 215), none
 	// `known`, 11 `unknown` (named on the unknown pin); 8 of its 13 css files match and the
 	// other 5, all layerchart's, are `known`.
-	typescript: 5124,
+	//
+	// 5124 → 5128: `language-tools/…/svelte-check/src/incremental.ts`,
+	// `language-tools/…/svelte2tsx/nodes/ExportedNames.ts`,
+	// `prettier/tests/format/js/binary-expressions/inline-object-array.js` and
+	// `prettier/tests/format/js/variable_declarator/multiple.js` arrive from `unknown`
+	// (114 → 110 there, which names the change and the measurement).
+	typescript: 5128,
 	css: 133
 };
 
@@ -419,7 +429,19 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//   `layerchart/packages/layerchart/src/lib/components/Text/Text.html.svelte` — whitespace
 	//     only: a multi-line class value's `{expr}` continuation line keeps the author's SPACE
 	//     indentation where prettier re-indents it with tabs.
-	svelte: 5,
+	//
+	// 5 → 3: `Dialog.svelte` and `BottomNavItem.svelte` LEAVE the bucket by MATCHING (`match`
+	// 2701 → 2703). The multi-declarator list is a doc-tree `indent` now rather than literal
+	// indent text after each hardline, so a break INSIDE a declarator lands one level past it
+	// instead of at the statement's column (`declarations/variable/multiple/init_long`); and a
+	// NESTED ternary's branch binaries no longer inherit the outer ternary's return/call
+	// continuation indent (`expressions/ternary/nested_binary_branch_long`). Measured by
+	// formatting every gates-view file with the pre-change and post-change binaries and
+	// diffing the outputs: six files in the whole view change at all (these two, the two
+	// typescript movers below, and two prettier-suite files that also leave `unknown` for
+	// `match` — see the typescript pin), so nothing arrived in any bucket and `partial` /
+	// `safety` / `errors` are unmoved.
+	svelte: 3,
 	// 109 records a drop of five from 114, in two steps, each verified by diffing the
 	// `unknown` lists before and after rather than by the count alone:
 	//   -2  a binary operand of an `as`/`satisfies` cast takes prettier's continuation
@@ -678,7 +700,21 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//   `layercake/src/_data/unemployment.js` — a numeric array fill that lands several lines
 	//     at 101 columns: the fill's fits check omits the item's trailing comma — an OVER-WIDTH
 	//     output, the one real bug of the eleven, of a kind no fixture carries.
-	typescript: 114,
+	//
+	// 114 → 110: FOUR files LEAVE the bucket by MATCHING (`match` 5124 → 5128), the
+	// binaryish continuation-indent cluster. `language-tools/…/svelte-check/src/incremental.ts`
+	// — an inlining logical chain with earlier operators at an assignment position takes
+	// prettier's `samePrecedenceSubExpression` indent (`expressions/logical/inline_chain_long`).
+	// `language-tools/…/svelte2tsx/nodes/ExportedNames.ts` — an alternate-nested ternary's
+	// test takes prettier's `printBranch` indent plus `printTernaryTest`'s `align(2)`
+	// (`expressions/ternary/nested_test_long`; it did reproduce minimally after all). Two
+	// prettier-suite files leave on the same change as `Dialog.svelte` (the multi-declarator
+	// list as a doc-tree `indent`): `js/binary-expressions/inline-object-array.js` — a hugged
+	// object in a non-first declarator's `||` chain now sits one level past the declarator —
+	// and `js/variable_declarator/multiple.js` — an arrow body inside a multi-declarator. Same
+	// measurement as the svelte pin: these four plus the two svelte movers are the only six
+	// files in the whole gates view whose output changes, so nothing arrived anywhere.
+	typescript: 110,
 	css: 23
 };
 
