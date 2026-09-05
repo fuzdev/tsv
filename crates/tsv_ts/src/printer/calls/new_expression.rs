@@ -271,16 +271,15 @@ impl<'a> Printer<'a> {
                 arg if is_array_or_object_unwrapped(arg) && !single_arg_leading_on_page_comment => {
                     return build_single_container_arg_doc(self, callee_with_types, arg);
                 }
-                // Function-expression argument: hug it — the body handles its own formatting.
+                // Function-expression argument: the shared lone-argument ladder
+                // ([`ArgOpener::lone_hug_ladder`]), always with its middle state — prettier's
+                // flat-parameter rule gates on `isCallExpression(parent)`, and a `new` is not
+                // one, so a `new`'s callback keeps a breakable parameter list at every width.
                 internal::Expression::FunctionExpression(_)
                     if !single_arg_leading_on_page_comment =>
                 {
-                    return d.concat(&[
-                        callee_with_types,
-                        d.text("("),
-                        self.build_expression_doc(&new_expr.arguments[0]),
-                        d.text(")"),
-                    ]);
+                    let arg_doc = self.build_expression_doc(&new_expr.arguments[0]);
+                    return ArgOpener::Callee(callee_with_types).lone_hug_ladder(d, arg_doc, false);
                 }
                 // Block arrow (or expandable arrow chain): use conditional_group to let Doc decide hug vs wrap
                 internal::Expression::ArrowFunctionExpression(arrow)

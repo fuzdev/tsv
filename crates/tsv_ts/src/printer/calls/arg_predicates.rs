@@ -503,6 +503,29 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
     }
 }
 
+/// Whether a LONE call argument's own doc renders with its parameter list FLAT inside the
+/// hug states — prettier's `printFunction` `shouldExpandParameters` (`print/function.js`),
+/// which under `expandLastArg` hands `printFunctionParameters` a `removeLines`'d list so
+/// neither hug state can break it.
+///
+/// Only a `FunctionExpression` can answer yes — an arrow prints through
+/// `printArrowFunction`, which has no such rule — and only when every parameter is a plain
+/// `Identifier` with no type annotation. A default value, a destructuring pattern, a rest
+/// element or a type annotation each leave the list breakable, so the function hugs and its
+/// parameters break inside it; an all-plain-identifier list cannot break there, so the whole
+/// argument drops to its own line instead.
+///
+/// ⚠️ Prettier's full condition is "the parent call has more than one argument, OR every
+/// parameter is a plain identifier". This spells the one-argument half, the only half a lone
+/// argument can be asked about. The other half of its gate is `isCallExpression(parent)`,
+/// which a `new` is not — so the `new` printer passes `false` to
+/// [`super::arg_wrapping::ArgOpener::lone_hug_ladder`] rather than asking this.
+pub(super) fn lone_arg_params_render_flat(arg: &Expression<'_>) -> bool {
+    matches!(arg, Expression::FunctionExpression(func) if func.params.iter().all(|param| {
+        matches!(param, Expression::Identifier(id) if id.type_annotation().is_none())
+    }))
+}
+
 /// Check if arguments form a "function composition" pattern that forces expansion.
 ///
 /// Matches Prettier's `isFunctionCompositionArgs` logic:
@@ -562,6 +585,33 @@ mod tests {
             Expression::CallExpression(call) => call.arguments,
             other => panic!("expected a call expression, got: {other:?}"),
         }
+    }
+
+    /// The argument shapes whose parameter list stays breakable inside the hug — everything
+    /// but a function expression whose parameters are all plain, unannotated identifiers.
+    #[test]
+    fn lone_arg_params_render_flat_only_for_plain_identifiers() {
+        let arena = Bump::new();
+        let flat = |src| lone_arg_params_render_flat(&parse_expr(&arena, src));
+
+        // Plain identifiers — including none at all.
+        assert!(flat("(function () {})"));
+        assert!(flat("(function (a, b) {})"));
+
+        // Anything the list can break around leaves it breakable.
+        assert!(!flat("(function (a: T) {})"));
+        assert!(!flat("(function (a = 1) {})"));
+        assert!(!flat("(function ({ a }) {})"));
+        assert!(!flat("(function ([a]) {})"));
+        assert!(!flat("(function (...a) {})"));
+        // One non-plain parameter is enough.
+        assert!(!flat("(function (a, b: T, c) {})"));
+
+        // Only a function expression answers yes at all — an arrow prints through
+        // `printArrowFunction`, which has no such rule.
+        assert!(!flat("((a, b) => {})"));
+        assert!(!flat("({ a: b })"));
+        assert!(!flat("(class {})"));
     }
 
     #[test]

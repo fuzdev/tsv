@@ -1,0 +1,375 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 786,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A call's lone literal argument breaks like any other argument once the call runs past",
+			"start": 10,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " print width. The <=25-char short-literal threshold is the ASSIGNMENT layout's",
+			"start": 100,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (calls/string_arg_long); with no operator to break at, the call breaks its own argument.",
+			"start": 182,
+			"end": 273,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Boundary: exactly 100 chars - fits, stays on one line.",
+			"start": 276,
+			"end": 333,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Boundary: exactly 101 chars - over width, the argument breaks onto its own line.",
+			"start": 436,
+			"end": 519,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A numeric literal takes the same path.",
+			"start": 628,
+			"end": 669,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 42
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 785,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 776,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 335,
+					"end": 433,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 99
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 335,
+						"end": 432,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 98
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 335,
+							"end": 423,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 89
+								}
+							},
+							"name": "functionNameAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 424,
+								"end": 431,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 90
+									},
+									"end": {
+										"line": 7,
+										"column": 97
+									}
+								},
+								"value": "short",
+								"raw": "'short'"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A call's lone literal argument breaks like any other argument once the call runs past",
+							"start": 10,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " print width. The <=25-char short-literal threshold is the ASSIGNMENT layout's",
+							"start": 100,
+							"end": 180
+						},
+						{
+							"type": "Line",
+							"value": " (calls/string_arg_long); with no operator to break at, the call breaks its own argument.",
+							"start": 182,
+							"end": 273
+						},
+						{
+							"type": "Line",
+							"value": " Boundary: exactly 100 chars - fits, stays on one line.",
+							"start": 276,
+							"end": 333
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 521,
+					"end": 625,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 521,
+						"end": 624,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 521,
+							"end": 610,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 1
+								},
+								"end": {
+									"line": 10,
+									"column": 90
+								}
+							},
+							"name": "functionNameAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 614,
+								"end": 621,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 9
+									}
+								},
+								"value": "short",
+								"raw": "'short'"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Boundary: exactly 101 chars - over width, the argument breaks onto its own line.",
+							"start": 436,
+							"end": 519
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 671,
+					"end": 775,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 671,
+						"end": 774,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 671,
+							"end": 762,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 1
+								},
+								"end": {
+									"line": 15,
+									"column": 92
+								}
+							},
+							"name": "functionNameAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 766,
+								"end": 771,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 7
+									}
+								},
+								"value": 12345,
+								"raw": "12345"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A numeric literal takes the same path.",
+							"start": 628,
+							"end": 669
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
