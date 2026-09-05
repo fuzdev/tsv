@@ -1,7 +1,8 @@
 <script lang="ts">
 	// A block-body first callback expands "first" and keeps a SHORT tail arg inline
 	// after `}`. A call/new tail with more than one argument is not "hopefully short"
-	// (isHopefullyShortCallArgument), so all args break instead.
+	// (isHopefullyShortCallArgument), so all args break instead. A dynamic `import()` is
+	// call-like too, and its specifier plus optional options object are its arguments.
 
 	// tail is a call with 1 arg — short, so expand-first keeps it inline
 	foo(() => {
@@ -27,5 +28,18 @@
 			doThing();
 		},
 		new Bar(x, y)
+	);
+
+	// tail is an `import()` with only a specifier — short, stays inline
+	foo(() => {
+		doThing();
+	}, import('./a'));
+
+	// tail is an `import()` with an options object too — not short, so all args break
+	foo(
+		() => {
+			doThing();
+		},
+		import('./a', { with: { type: 'json' } })
 	);
 </script>

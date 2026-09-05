@@ -75,25 +75,44 @@ pub fn unwrap_parenthesized<'a>(ts_type: &'a TSType<'a>) -> &'a TSType<'a> {
     }
 }
 
-/// Prettier's `isSimpleType` inline/hug criterion for a single type argument: an
-/// atomic type that never benefits from breaking — a primitive keyword, a plain
-/// literal (string / number / bigint / negative), `this`, or a bare type reference
-/// with no type arguments of its own (a nested `Array<X>` is *not* simple).
-/// Parenthesized wrappers are unwrapped first. The single source of truth shared by
-/// the call/`new`/instantiation type-argument builder and the type-position builder so
-/// the two agree by construction. Prettier ref: `utilities/is-simple-type.js` (booleans
-/// are `TSType::Keyword` here, so they fall under the keyword arm rather than `Literal`).
+/// Prettier's **`isSimpleType`** (`utilities/is-simple-type.js`): an atomic type that
+/// never benefits from breaking — a primitive keyword, a literal (string / number /
+/// bigint / negative / template), `this`, or a bare type reference with no type arguments
+/// of its own (a nested `Array<X>` is *not* simple). Booleans are `TSType::Keyword` here,
+/// so they fall under the keyword arm rather than `Literal`.
+///
+/// Parenthesized wrappers are unwrapped first: prettier's TS AST carries no
+/// `TSParenthesizedType` node, so `(T)` reaches its check already as the bare reference.
+///
+/// Two callers ask it for different reasons — the type-argument hug via
+/// [`is_simple_type_arg`], and the cast-seed shortness rule in
+/// [`is_hopefully_short_arg`](crate::printer::calls::arg_predicates) — so it lives here as
+/// one body rather than two spellings that could drift.
+pub fn is_simple_type(ty: &TSType<'_>) -> bool {
+    match unwrap_parenthesized(ty) {
+        TSType::Keyword(_) | TSType::ThisType(_) | TSType::Literal(_) => true,
+        TSType::TypeReference(reference) => reference.type_arguments.is_none(),
+        _ => false,
+    }
+}
+
+/// [`is_simple_type`] as the inline/hug criterion for a single **type argument** — the
+/// single source of truth shared by the call/`new`/instantiation type-argument builder and
+/// the type-position builder so the two agree by construction.
 ///
 /// Template-literal types are **excluded** even though Prettier's `isSimpleType` accepts
 /// them: tsv's template-literal-type printer carries an internal `${…}` break point, so
 /// inlining the `<…>` would let the template break *there* (defeating the atomicity the
 /// caller relies on). They stay in the breakable group path — a residual divergence
-/// pending an atomic template-literal-type printer.
+/// pending an atomic template-literal-type printer. That narrowing is this caller's alone;
+/// don't push it down into [`is_simple_type`].
 pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
     let unwrapped = unwrap_parenthesized(ty);
-    matches!(unwrapped, TSType::Keyword(_) | TSType::ThisType(_))
-        || matches!(unwrapped, TSType::Literal(lit) if !matches!(lit, TSLiteralType::TemplateLiteral(_)))
-        || matches!(unwrapped, TSType::TypeReference(r) if r.type_arguments.is_none())
+    is_simple_type(unwrapped)
+        && !matches!(
+            unwrapped,
+            TSType::Literal(TSLiteralType::TemplateLiteral(_))
+        )
 }
 
 /// Whether any union member is **brace-delimited** (`TypeLiteral`/`Mapped`) — the extra

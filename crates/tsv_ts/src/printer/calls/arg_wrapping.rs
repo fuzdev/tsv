@@ -2113,34 +2113,16 @@ pub(super) fn should_expand_first_arg(
         return false;
     }
 
-    // Prettier's couldExpandArg returns true for a bare object/array with a leading
-    // comment (`hasComment(node)`), so `!couldExpandArg(secondArg)` is false and it
-    // breaks all args. tsv matches by blocking expand-first here. A cast-wrapped
-    // collection (`/* c */ {} as T`) is deliberately NOT blocked — prettier's comment
-    // attaches to the cast, `couldExpandArg` stays false, and it expand-firsts; the
-    // expand-first path carries the inter-arg leading comment through the shared
-    // argument-gap seam (`build_arg_gap_docs`).
+    // Second arg must be short/simple. `couldExpandArg`'s `hasComment(node)` needs to see
+    // the argument's leading gap, so the previous argument's end goes with it — a comment
+    // there attaches to a BARE collection (blocking the hug) but to the CAST of a wrapped
+    // one (`/* c */ {} as T` still hugs); the predicate owns that asymmetry. The expand-first
+    // path then carries the inter-arg leading comment through the shared argument-gap seam
+    // (`build_arg_gap_docs`).
     //
-    // A JSDoc cast never reaches this gate, and must not be added to it: prettier keeps
-    // the cast's parens, so its `couldExpandArg` sees an opaque paren node rather than the
-    // collection inside, and it expands-first even for a non-empty one. The transparency a
-    // cast does get is in `is_hopefully_short_arg`, not here — pinned by
-    // `calls/expand_first_jsdoc_cast_second_arg`.
-    //
-    // **on page** (both probes): prettier's `couldExpandArg` asks `hasComment(node)`, a
-    // pure layout question — an owned annotation is on the page and blocks the hug just
-    // like any other comment. Kept in lockstep with the twin guard in
-    // `chain_args::should_expand_first_arg_for_chain`.
-    if matches!(
-        &args[1],
-        internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
-    ) && printer.has_comments_on_page_between(args[0].span().end, args[1].span().start)
-    {
-        return false;
-    }
-
-    // Second arg must be short/simple
-    is_short_second_arg_for_expand_first(&args[1], |start, end| {
+    // **on page**: `hasComment` is a pure layout question, so an owned annotation blocks the
+    // hug just like any other comment.
+    is_short_second_arg_for_expand_first(&args[1], args[0].span().end, |start, end| {
         printer.has_comments_on_page_between(start, end)
     })
 }
