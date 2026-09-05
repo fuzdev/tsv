@@ -516,12 +516,12 @@ Full algorithm, character sets, and how to read a violation:
 ### Corpus Compare Options
 
 ```bash
-deno task corpus:compare:format --all [options]       # the gates corpus view (~6,200 files)
+deno task corpus:compare:format --all [options]       # the gates corpus view (~9,300 files)
 deno task corpus:compare:format <path> [options]      # Scans <path> recursively
 deno task corpus:compare:format:run <path> [options]  # Skip FFI build (faster iteration)
 
 Options:
-  --all             Compare the gates corpus view (~6,200 files: the ../corpora snapshot + the
+  --all             Compare the gates corpus view (~9,300 files: the ../corpora snapshot + the
                     prettier fixture suites — see benches/js/CLAUDE.md §Corpus)
   --filter <lang>   Only compare files of this language (svelte, typescript, css)
   --limit <n>       Limit to first n files per language

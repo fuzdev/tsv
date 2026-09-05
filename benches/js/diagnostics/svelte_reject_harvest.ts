@@ -22,7 +22,7 @@
  * sidecar or ANY Svelte-contributing checkout is absent (`../svelte`,
  * `../prettier`, `../prettier-plugin-svelte` — the refusal comes from the
  * loader's `{ complete_for: 'svelte' }` policy, so the list is derived from
- * `CORPUS_ENTRIES` rather than restated here), leaving no cache — the loader then
+ * the corpus entries rather than restated here), leaving no cache — the loader then
  * fails open to the un-filtered corpus (disclosed in its log). A manual run
  * WITHOUT the flag fails closed instead, matching the wpt/test262 harvests. `--force`
  * re-harvests despite a fresh stamp (default runs skip when the ../svelte +
@@ -71,7 +71,7 @@ async function main(): Promise<void> {
 	// because all three produce rejects (98 / 40 / 7 of the pinned count): a
 	// contributor left out is one whose pull leaves this stamp reading fresh over
 	// a corpus that moved under it. The conformance view's ENTRY LIST is stamped
-	// too: a suite entry added to or dropped from `CORPUS_ENTRIES` changes what is
+	// too: a suite entry added to or dropped from the corpus entries changes what is
 	// graded while every checkout stays put, and a stamp keyed on checkouts alone
 	// would skip that re-harvest and leave the cache short under a green stamp.
 	const svelte_commit = git_head('../svelte');
@@ -82,7 +82,7 @@ async function main(): Promise<void> {
 		prettier_plugin_svelte_commit: git_head('../prettier-plugin-svelte'),
 		svelte_oracle: versions.canonical.svelte,
 		rejects_pin: SVELTE_REJECTS_PIN,
-		conformance_entries: corpus_view_paths('conformance').join(' ')
+		conformance_entries: (await corpus_view_paths('conformance')).join(' ')
 	};
 	if (
 		!force &&

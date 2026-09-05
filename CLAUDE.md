@@ -310,7 +310,7 @@ deno task validate:artifacts             # tight wasm size bounds + Deno smoke o
 
 ### Corpus Comparison
 
-Compare formatting against Prettier, and parse output against the canonical parsers, on real codebases. The real code is the `../corpora` snapshot (`fuzdev/corpora` — the author's repos + kit/svelte/svelte.dev source, one collection per upstream, the whole `collections/` tree pinned by its git tree id in `GATE_CHECKOUT_IDS`, so a tooling commit in the snapshot repo moves nothing here), so full runs enforce **pinned expected counts** over the whole `gates` view: exact format `unknown`/`partial` and parse `compared`/tsv-failure counts, a `match` minimum, SAFETY over every file. A snapshot refresh is a deliberate re-pin. See `benches/js/lib/gate_counts.ts` and ./docs/gate_counts.md.
+Compare formatting against Prettier, and parse output against the canonical parsers, on real codebases. The real code is the `../corpora` snapshot (`fuzdev/corpora` — the author's repos, kit/svelte/svelte.dev source and six third-party Svelte libraries, one collection per upstream, each placed in a corpus tier by `benches/js/lib/corpus.ts` and spelled from the snapshot's manifest, the whole `collections/` tree pinned by its git tree id in `GATE_CHECKOUT_IDS`, so a tooling commit in the snapshot repo moves nothing here), so full runs enforce **pinned expected counts** over the whole `gates` view: exact format `unknown`/`partial` and parse `compared`/tsv-failure counts, a `match` minimum, SAFETY over every file. A snapshot refresh is a deliberate re-pin. See `benches/js/lib/gate_counts.ts` and ./docs/gate_counts.md.
 
 ```bash
 deno task corpus:compare:format ../some-project  # single project, or --all for the gates corpus (the ../corpora snapshot + prettier suites)

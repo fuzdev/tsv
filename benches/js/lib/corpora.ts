@@ -1,9 +1,11 @@
 /**
- * The real-code snapshot every `real` / `framework` corpus entry reads: where the
- * `fuzdev/corpora` checkout sits, which tree inside it consumers walk, and the reader
- * for its recipe (`manifest.json`). One spelling of the path, so the loader, the
- * report's source links, the styles harvest and its stamp, the checkout pin and the
- * doctor cannot name the snapshot three different ways.
+ * The real-code snapshot every `real` / `framework` / `third_party` corpus entry reads:
+ * where the `fuzdev/corpora` checkout sits, which tree inside it consumers walk, and
+ * the reader for its recipe (`manifest.json`) — the recipe is also where a collection's
+ * subpaths are spelled, so the corpus entries are derived from it rather than restated.
+ * One spelling of the path, so the loader, the report's source links, the styles
+ * harvest and its stamp, the checkout pin and the doctor cannot name the snapshot three
+ * different ways.
  *
  * Node builtins only, so `scripts/` and the node-modules-free bench core can import it.
  */
@@ -56,12 +58,19 @@ export function split_collection_path(path: string): { name: string; subpath: st
 		: { name: rest.slice(0, slash), subpath: rest.slice(slash + 1) };
 }
 
-/** One collection's provenance and filter, as far as consumers here need them. */
+/** One collection's provenance, extent and filter, as far as consumers here need them. */
 export interface CorporaCollection {
 	/** The upstream's canonical https GitHub URL. */
 	url: string;
 	/** The upstream commit the collection was vendored at (full SHA). */
 	commit: string;
+	/**
+	 * The upstream-relative directories the snapshot vendors, in manifest order — what a
+	 * consumer walks (`collections/<name>/<subpath>`), and what a live working tree of
+	 * the same repo is diffed under. Spelled once, here, so a corpus entry never restates
+	 * an upstream's layout (`corpus.ts` derives its entries from this list).
+	 */
+	subpaths: string[];
 	/**
 	 * Upstream-relative path prefixes the snapshot leaves out — the upstream's own test
 	 * fixtures and vendored bundles. What a live working tree of the same repo must drop
@@ -90,41 +99,48 @@ export function is_under(path: string, prefix: string): boolean {
  */
 function read_collection(raw: unknown): ({ name: string } & CorporaCollection) | null {
 	if (typeof raw !== 'object' || raw === null) return null;
-	const { name, url, commit, exclude } = raw as Record<string, unknown>;
+	const { name, url, commit, subpaths, exclude } = raw as Record<string, unknown>;
 	if (typeof name !== 'string' || typeof url !== 'string' || typeof commit !== 'string') {
 		return null;
 	}
+	const is_string_list = (v: unknown): v is string[] =>
+		Array.isArray(v) && v.every((e) => typeof e === 'string');
+	// A collection with no subpath vendors nothing a consumer could walk.
+	if (!is_string_list(subpaths) || subpaths.length === 0) return null;
 	const excludes = exclude === undefined ? [] : exclude;
-	if (!Array.isArray(excludes) || !excludes.every((e): e is string => typeof e === 'string')) {
-		return null;
-	}
-	return { name, url, commit, exclude: excludes };
+	if (!is_string_list(excludes)) return null;
+	return { name, url, commit, subpaths, exclude: excludes };
 }
 
-let manifest_promise: Promise<Map<string, CorporaCollection> | null> | undefined;
-
 /**
- * The snapshot's collections by name, read once; `null` when the snapshot is absent
- * (silently — the loader discloses that) or its manifest is one this reader can't
- * read (a version it doesn't know, or a collection missing a field it needs — warned,
- * since that is drift, not absence). The caller then falls back to whatever the
- * checkout itself can say (see `corpus_repos.ts`) and applies no `exclude`
- * (`live_diff_files`).
+ * What reading the manifest found. `absent` is no file at all — the snapshot is not
+ * checked out, which the corpus loader discloses in its own terms; `unreadable` is a
+ * file this reader can't take (a version it doesn't know, or a collection missing a
+ * field it needs) — drift, not absence, warned once here and refused by every consumer
+ * that would derive a corpus from it.
  */
-export function load_corpora_manifest(): Promise<Map<string, CorporaCollection> | null> {
-	manifest_promise ??= (async () => {
+export type CorporaManifestRead =
+	| { status: 'ok'; collections: Map<string, CorporaCollection> }
+	| { status: 'absent' }
+	| { status: 'unreadable'; reason: string };
+
+let manifest_promise: Promise<CorporaManifestRead> | undefined;
+
+/** The snapshot's collections by name, read once — see `CorporaManifestRead` for the two ways there are none. */
+export function load_corpora_manifest(): Promise<CorporaManifestRead> {
+	manifest_promise ??= (async (): Promise<CorporaManifestRead> => {
 		let text: string;
 		try {
 			text = await readFile(resolve(CORPORA_MANIFEST), 'utf8');
 		} catch {
-			return null;
+			return { status: 'absent' };
 		}
-		const unreadable = (what: string): null => {
+		const unreadable = (reason: string): CorporaManifestRead => {
 			console.warn(
-				`  ⚠ ${CORPORA_MANIFEST} ${what} — sources will link to the snapshot repo, not their ` +
-					'upstreams, and the live diff applies no `exclude`'
+				`  ⚠ ${CORPORA_MANIFEST} ${reason} — no corpus entry can be derived from it, and ` +
+					'sources link to the snapshot repo rather than their upstreams'
 			);
-			return null;
+			return { status: 'unreadable', reason };
 		};
 		let json: unknown;
 		try {
@@ -154,7 +170,7 @@ export function load_corpora_manifest(): Promise<Map<string, CorporaCollection> 
 			const { name, ...collection } = c;
 			collections.set(name, collection);
 		}
-		return collections;
+		return { status: 'ok', collections };
 	})();
 	return manifest_promise;
 }

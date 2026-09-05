@@ -65,10 +65,10 @@ if (Deno.args.length > 0) {
  * exposure.
  *
  * Scoped to the WHOLE `../corpora` snapshot plus the `suite` tier (`../svelte`'s
- * tests) — not to a view: the bench and gate views read a curated subset of the
- * snapshot because every entry there re-pins every corpus count, and this leg pins
- * nothing, so it reads every collection the snapshot vendors (the third-party Svelte
- * libraries hold two thirds of its components). Both inputs are version-pinned
+ * tests) — not to a view: the bench and gate views read the collections a tier places,
+ * because every collection there re-pins every corpus count, and this leg pins
+ * nothing, so it reads every collection the snapshot vendors as one root, placed or
+ * not. Both inputs are version-pinned
  * (`pins:audit:checkouts`), so a release verdict can't turn on a machine's unpinned
  * `live` working trees, which only the `robustness` view holds. Absent checkouts
  * warn-skip, and a scope with no dirs at all fails — a leg that graded nothing must

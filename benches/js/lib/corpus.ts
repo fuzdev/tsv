@@ -1,18 +1,20 @@
 /**
  * Corpus loading for benchmarks and comparison.
  *
- * One tagged entry list (`CORPUS_ENTRIES`), four views:
+ * One tagged entry list (`corpus_entries` — the `../corpora` snapshot's collections,
+ * each placed in a tier by `COLLECTION_TIERS` and spelled from the snapshot's own
+ * manifest, plus the pinned suite checkouts and the derived caches), four views:
  *
  * - `perf` — real-world code only (app + upstream framework source from the
  *   `../corpora` snapshot, whose manifest already leaves the upstreams' test
  *   fixtures behind; `*.test.ts` stays). The
  *   `deno task bench` corpus, so throughput reflects real code rather than formatter
  *   edge-case suites — and one pinned commit names all of it.
- * - `gates` — real + the prettier fixture suites: exactly the pre-split default
- *   corpus. The correctness gates (`corpus:compare:*` `--all`, `skip_triage`,
- *   `wasm_json_probe`) keep this scope — their sanction lists and coverage were
- *   reviewed against it. Every file here comes from a pinned checkout, so every
- *   count pin gates over the whole view.
+ * - `gates` — every snapshot tier (`perf`'s two plus the `third_party` libraries) +
+ *   the prettier fixture suites. The correctness gates (`corpus:compare:*` `--all`,
+ *   `skip_triage`, `wasm_json_probe`) keep this scope — their sanction lists and
+ *   coverage were reviewed against it. Every file here comes from a pinned checkout,
+ *   so every count pin gates over the whole view.
  * - `conformance` — the hard parse cases only: the prettier fixture suites plus
  *   the parse-conformance suites (Svelte's compiler tests, the wpt-css harvest
  *   cache, test262 graded positives). Deliberately EXCLUDES the `real` perf tier,
@@ -23,16 +25,15 @@
  *   (`deno task bench:conformance`).
  * - `robustness` — the real-code robustness sweeps' scope (`audit:corpus`,
  *   `idempotency:sweep`): the WHOLE snapshot — every collection `../corpora` vendors,
- *   the third-party Svelte libraries outside the bench views included, since a sweep
- *   grades an invariant rather than a pinned count — plus the `svelte_styles` harvest
- *   cache, PLUS the live DIFF — the files of the `real` repos' working trees (the `live`
- *   tier) whose bytes differ from, or are absent in, their collection, minus what the
- *   snapshot's manifest excludes and what git ignores. That is where new syntax shows up
- *   before any refresh, at a cost proportional to the drift.
- *   The snapshot root and the cache as directories plus the live file list
- *   (`corpus_robustness_seeds`), nothing counted or pinned.
+ *   placed in a tier or not, as one root, since a sweep grades an invariant rather than
+ *   a pinned count — plus the `svelte_styles` harvest cache, PLUS the live DIFF — the
+ *   files of the `real` repos' working trees (the `live` tier) whose bytes differ from,
+ *   or are absent in, their collection, minus what the snapshot's manifest excludes and
+ *   what git ignores. That is where new syntax shows up before any refresh, at a cost
+ *   proportional to the drift. The snapshot root and the cache as directories plus the
+ *   live file list (`corpus_robustness_seeds`), nothing counted or pinned.
  *
- * - CorpusLoader: loads one view of CORPUS_ENTRIES (the `../corpora` snapshot's
+ * - CorpusLoader: loads one view of the entries (the `../corpora` snapshot's
  *   collections, the pinned suite checkouts beside it, and the derived harvest caches)
  * - DirectoryLoader: loads from a single directory path
  *
@@ -46,7 +47,14 @@ import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 
-import { CORPORA_COLLECTIONS, is_under, load_corpora_manifest } from './corpora.ts';
+import {
+	CORPORA_COLLECTIONS,
+	CORPORA_MANIFEST,
+	CORPORA_ROOT,
+	type CorporaCollection,
+	is_under,
+	load_corpora_manifest
+} from './corpora.ts';
 import { clone_hint } from './corpus_repos.ts';
 import type { Language, Logger, ParseGoal, SourceFile } from './types.ts';
 
@@ -116,7 +124,7 @@ const DEFAULT_EXCLUSIONS = [
 /**
  * Build-output patterns, applied only to UNCURATED walks (`DirectoryLoader` —
  * arbitrary project scans that may contain compiled artifacts). The curated
- * `CORPUS_ENTRIES` point at reviewed `src/` trees where a `build/` segment is
+ * corpus entries point at reviewed `src/` trees where a `build/` segment is
  * real source (kit's `src/exports/vite/build/`), so `CorpusLoader` opts out.
  */
 const BUILD_OUTPUT_EXCLUSIONS = ['/build/', '/dist/'];
@@ -338,12 +346,19 @@ export function group_by_language(files: SourceFile[]): Record<Language, SourceF
  *
  * - `real` — the author's own application/library source (zzz, the fuz ecosystem,
  *   gro, the personal sites), read from the `../corpora` snapshot
- *   (`collections/<name>/src`). Every collection there is pinned at once by the id of
- *   the snapshot's `collections/` tree, recorded in `GATE_CHECKOUT_IDS['../corpora']`
- *   and verified by `deno task pins:audit:checkouts` — real code the perf numbers
- *   reflect, AND a reproducible tier the count pins hold over.
+ *   (`collections/<name>/<subpath>`, the subpaths from its manifest). Every collection
+ *   there is pinned at once by the id of the snapshot's `collections/` tree, recorded in
+ *   `GATE_CHECKOUT_IDS['../corpora']` and verified by `deno task pins:audit:checkouts` —
+ *   real code the perf numbers reflect, AND a reproducible tier the count pins hold over.
  * - `framework` — upstream framework source (kit, svelte, the svelte.dev subpaths),
  *   from the same snapshot. Real code in the perf view, reproducible in the gate.
+ * - `third_party` — third-party Svelte libraries and tooling (flowbite-svelte,
+ *   layerchart, layercake, svelte-ux, svelte-maplibre, language-tools), from the same
+ *   snapshot: the gates' breadth — most of the snapshot's `.svelte`, and prettier-shaped
+ *   code whose divergences the ecosystem repos never carry — and reproducible there. NOT
+ *   the perf view: the throughput headline is ecosystem + framework code by design
+ *   (flowbite alone would be a large share of its `.svelte`), and the perf invariant
+ *   that every in-scope tool fully processes every file is unmeasured over these.
  * - `live` — the `real` repos as WORKING TREES (`../zzz/src`, …): unpinned,
  *   machine-dependent, and in no bench or gate view. Read only by the real-code
  *   robustness sweeps (the `robustness` view), and only as a DIFF against the
@@ -361,9 +376,10 @@ export function group_by_language(files: SourceFile[]): Record<Language, SourceF
  * so the count pins gate over whole views and no per-file reproducibility flag is
  * needed; `live` is the one unpinned tier and sits only in `robustness`.
  */
-export type CorpusTier = 'real' | 'framework' | 'live' | 'prettier_fixture' | 'suite';
+export type CorpusTier =
+	'real' | 'framework' | 'third_party' | 'live' | 'prettier_fixture' | 'suite';
 
-/** A named subset of `CORPUS_ENTRIES` — see the module doc for what each view is for. */
+/** A named subset of the corpus entries — see the module doc for what each view is for. */
 export type CorpusView = 'perf' | 'gates' | 'conformance' | 'robustness';
 
 /** Fields shared by every corpus entry, whatever its file source. */
@@ -439,157 +455,319 @@ export async function* stream_entry_candidate(dir: string): AsyncGenerator<Sourc
 	yield* walk_corpus(dir, { prune_build_output: false });
 }
 
+/** The tiers a snapshot collection can land in — the `CorpusTier`s read from `../corpora`. */
+type CollectionTier = Extract<CorpusTier, 'real' | 'framework' | 'third_party'>;
+
 /**
- * The author's own repos in the `real` tier, by collection name — each is
- * `collections/<name>/src` in the snapshot (one pinned tree id for all of them,
- * `GATE_CHECKOUT_IDS[CORPORA_ROOT]`) and `../<name>/src` as a live working tree.
- * Deliberately NOT every collection the snapshot vendors: the six third-party
- * collections (flowbite-svelte, layerchart, layercake, svelte-ux, svelte-maplibre,
- * language-tools — two thirds of the snapshot's `.svelte`) are read by the consumers
- * that pin no count (`corpus_snapshot_dir`) and stay out of this list because a `real`
- * entry lands in `perf` too, where the throughput headline is ecosystem + framework
- * code by design. Their seat is a `third_party` tier in the gates (every add there
- * re-pins every corpus count).
+ * The tier of every snapshot collection a bench or gate view reads, by collection
+ * name — the ONE table that places a collection (`TIERS_BY_VIEW` says which views each
+ * tier reaches). The entries themselves are DERIVED from the snapshot's manifest
+ * (`corpus_entries`): one per `subpath` the manifest names for the collection, so an
+ * upstream's layout is spelled once, in the snapshot's own recipe (language-tools alone
+ * has six subpaths), and a collection whose layout moves upstream re-spells nothing here.
+ *
+ * Every collection the manifest vendors is placed here today, but the table need not
+ * name them all: a collection vendored ahead of its triage stays out of the views (as
+ * earbetter and cosmicplayground once did) and is read only by the consumers that pin
+ * no count (`corpus_snapshot_dir`); `corpus_untiered_collections` names such
+ * collections for the doctor. The reverse — a name here the manifest no longer vendors —
+ * is a refusal, since a view that quietly lost a collection would grade less than its
+ * pins claim.
+ *
+ * - `real` and `framework` land in `perf` too, so an add there moves the throughput
+ *   headline and the styles harvest as well as every corpus count pin.
+ * - `third_party` lands in the gates only, so an add there re-pins the corpus counts and
+ *   nothing else — see `CorpusTier`.
  */
-const REAL_REPOS: readonly string[] = [
+const COLLECTION_TIERS: Record<string, CollectionTier> = {
 	// Large apps
-	'zzz',
+	zzz: 'real',
 	// Fuz ecosystem
-	'fuz_app',
-	'fuz_blog',
-	'fuz_code',
-	'fuz_css',
-	'fuz_docs',
-	'fuz_gitops',
-	'fuz_mastodon',
-	'fuz_template',
-	'fuz_ui',
-	'fuz_util',
-	'mdz',
+	fuz_app: 'real',
+	fuz_blog: 'real',
+	fuz_code: 'real',
+	fuz_css: 'real',
+	fuz_docs: 'real',
+	fuz_gitops: 'real',
+	fuz_mastodon: 'real',
+	fuz_template: 'real',
+	fuz_ui: 'real',
+	fuz_util: 'real',
+	mdz: 'real',
 	// Build tooling
-	'gro',
-	'svelte-docinfo',
-	'tsv.fuz.dev',
+	gro: 'real',
+	'svelte-docinfo': 'real',
+	'tsv.fuz.dev': 'real',
 	// Personal sites (public repos beyond the fuz ecosystem)
-	'ryanatkn.com',
-	'webdevladder.net',
+	'ryanatkn.com': 'real',
+	'webdevladder.net': 'real',
 	// Personal apps (public, The Unlicense; prettier-shaped, so their divergences carry
 	// third-party-shaped signal the fuz repos cannot)
-	'earbetter',
-	'cosmicplayground'
-];
+	earbetter: 'real',
+	cosmicplayground: 'real',
+	// Upstream framework source — each subpath a reviewed package `src/` tree, never a
+	// whole monorepo, so build output and scaffolding stay out
+	kit: 'framework',
+	svelte: 'framework',
+	'svelte.dev': 'framework',
+	// Third-party Svelte libraries and tooling — the gates' breadth, not the perf corpus
+	'flowbite-svelte': 'third_party',
+	layerchart: 'third_party',
+	layercake: 'third_party',
+	'svelte-ux': 'third_party',
+	'svelte-maplibre': 'third_party',
+	'language-tools': 'third_party'
+};
 
 /**
- * The tagged corpus entry list, relative to project root (cwd).
- * A missing entry fails the load unless marked `optional` — see `CorpusLoader`.
+ * Which collections' WORKING TREES the `live` tier diffs against the snapshot
+ * (`live_diff_files`), by tier: a tier here claims its sibling checkouts (`../<name>`)
+ * are edited ahead of the snapshot, which is what makes the diff an early warning. The
+ * author's `real` repos are; the `framework` and `third_party` checkouts are pulled,
+ * not edited, so a diff over them is empty until an upstream pull — when it is a whole
+ * release at once, which `pins:audit:checkouts` already names for `../svelte`. Adding a
+ * tier here is the entire change if that trade-off is ever wanted.
  */
-const CORPUS_ENTRIES: CorpusEntry[] = [
-	...REAL_REPOS.map((name): CorpusEntry => ({
-		path: `${CORPORA_COLLECTIONS}/${name}/src`,
-		tier: 'real'
-	})),
-	// Real-authored CSS extracted from the perf-view `.svelte` files' <style>
-	// blocks, concatenated per source collection (bench:harvest:svelte-styles).
-	// Derived but real content: ~3×es the otherwise-tiny standalone-CSS sample with
-	// naturally-sized files, and in the gates view exercises the *standalone* CSS
-	// path on real content (embedded CSS rides EmbedContext — a different path).
-	// The same bytes are also timed in the svelte rows; rows are never summed.
-	{
-		path: 'benches/js/.cache/svelte_styles',
-		tier: 'real',
-		extensions: ['css'],
-		optional: true,
-		hint: 'run `deno task bench:harvest:svelte-styles`'
-	},
-	// External projects (monorepo subpaths), vendored in the snapshot. Each entry
-	// is a reviewed package `src/` tree — never a whole monorepo — so build output
-	// and scaffolding stay out, and the snapshot's manifest leaves the upstream's own
-	// test fixtures behind.
-	{ path: `${CORPORA_COLLECTIONS}/kit/packages/kit/src`, tier: 'framework' },
-	{ path: `${CORPORA_COLLECTIONS}/svelte/packages/svelte/src`, tier: 'framework' },
-	{ path: `${CORPORA_COLLECTIONS}/svelte.dev/apps/svelte.dev/src`, tier: 'framework' },
-	{ path: `${CORPORA_COLLECTIONS}/svelte.dev/packages/repl/src`, tier: 'framework' },
-	{ path: `${CORPORA_COLLECTIONS}/svelte.dev/packages/site-kit/src`, tier: 'framework' },
-	// The same repos as live working trees — the `live` tier, `robustness` view only.
-	// Optional: whichever of them this machine has cloned.
-	...REAL_REPOS.map((name): CorpusEntry => ({
-		path: `../${name}/src`,
-		tier: 'live',
-		optional: true,
-		hint: 'a sibling working tree — absent is fine'
-	})),
-	// prettier-plugin-svelte test cases (.html treated as Svelte, skip non-default options)
-	{
-		path: '../prettier-plugin-svelte/test',
-		tier: 'prettier_fixture',
-		extensions: ['html'],
-		skip: has_companion_options
-	},
-	// Prettier test cases (formatting edge cases and regression tests)
-	{ path: '../prettier/tests/format/typescript', tier: 'prettier_fixture' },
-	{ path: '../prettier/tests/format/js', tier: 'prettier_fixture' },
-	{ path: '../prettier/tests/format/css', tier: 'prettier_fixture' },
-	{ path: '../prettier/tests/format/html', tier: 'prettier_fixture', extensions: ['html'] },
-	// '../prettier/tests/format/jsx' is deliberately absent: tsv rejects JSX by design
-	// (drop-in for Svelte's parser; acorn without the JSX plugin rejects it too), so the
-	// suite's 91 files would grade as always-reject noise, not conformance signal.
-	// Parse-conformance suites (`conformance` view only)
-	{ path: '../svelte/packages/svelte/tests', tier: 'suite', skip: svelte_tests_skip },
-	{
-		path: 'benches/js/.cache/wpt_css',
-		tier: 'suite',
-		extensions: ['css'],
-		optional: true,
-		hint: 'run `deno task bench:harvest:wpt` (needs ../wpt)'
-	},
-	{
-		files_from: 'benches/js/.cache/test262_files.json',
-		tier: 'suite',
-		// Declared on the path-list entries too (the harvests write homogeneous
-		// lists), so a per-language probe (`corpus_missing_entries`) can tell which
-		// absent cache withholds which language; `load_file_list` enforces it.
-		extensions: ['js'],
-		optional: true,
-		hint: 'run `deno task bench:harvest:test262` (needs ../test262)'
-	},
-	// The tsc corpus — TypeScript's own test cases, filtered to what tsc's parser
-	// AND tsc's `.errors.txt` baselines both call well-formed (harvest_ts_repo.ts).
-	// The TypeScript-SPECIFIC conformance inputs: without it the `parse/typescript`
-	// group is ~95% test262, i.e. ECMAScript, with prettier's ~800 format fixtures
-	// as its only TS. A bare path list, NOT goal-tagged like test262: tsc's
-	// module-vs-script reading is semantic and never gates syntax, so feeding it to
-	// parsers that take `sourceType` as a grammar switch would score them for
-	// something tsc doesn't do (the measurement is in the harvest). Its REJECTS
-	// sibling cache is deliberately not an entry — see the harvest.
-	{
-		files_from: 'benches/js/.cache/ts_repo_files.json',
-		tier: 'suite',
-		extensions: ['ts'],
-		optional: true,
-		hint: 'run `deno task bench:harvest:ts-repo` (needs ../typescript)'
+const LIVE_DIFF_TIERS: readonly CollectionTier[] = ['real'];
+
+/** A `live` working tree standing in for one collection subpath (`live_diff_files`). */
+interface LiveTree {
+	/** The collection name. */
+	name: string;
+	/** The upstream-relative subpath both sides are compared under (`<name>/<subpath>`). */
+	subpath: string;
+	/** The collection's manifest `exclude` prefixes. */
+	exclude: string[];
+	/** The sibling checkout standing in for the collection, `../<name>` (project-root-relative). */
+	checkout: string;
+	/** The tree to walk, `<checkout>/<subpath>` — also the `live` entry's path. */
+	path: string;
+}
+
+/** A collection the tier table places, joined with what the manifest says it vendors. */
+interface PlacedCollection extends CorporaCollection {
+	name: string;
+	tier: CollectionTier;
+}
+
+/** Everything derived from the snapshot's manifest plus the static entries, built once. */
+interface CorpusCatalog {
+	/** The tagged entry list every view selects from. */
+	entries: CorpusEntry[];
+	/** The `live` tier's trees, one per subpath of each `LIVE_DIFF_TIERS` collection. */
+	live_trees: LiveTree[];
+	/** Manifest collections `COLLECTION_TIERS` does not place — vendored, in no view. */
+	untiered: string[];
+}
+
+let catalog_promise: Promise<CorpusCatalog> | undefined;
+
+/**
+ * The catalog, built once per process from the manifest (`load_corpora_manifest`).
+ *
+ * With the snapshot ABSENT (no checkout, so no manifest), every placed collection is
+ * emitted as a single entry at its collection root — a path that does not exist, so each
+ * consumer refuses or discloses it in its own terms (the loader's fail-fast with the
+ * clone hint, the doctor's missing-entry list), and the views that read no collection
+ * (`conformance`) are unaffected. A checkout WITHOUT a manifest, or one this reader
+ * can't take, is drift rather than absence and throws: nothing can say what such a
+ * checkout vendors, and walking a collection root on a guess would grade a corpus the
+ * pins never described.
+ */
+function corpus_catalog(): Promise<CorpusCatalog> {
+	catalog_promise ??= build_catalog();
+	return catalog_promise;
+}
+
+async function build_catalog(): Promise<CorpusCatalog> {
+	const read = await load_corpora_manifest();
+	if (read.status === 'unreadable') {
+		throw new Error(
+			`${CORPORA_MANIFEST} ${read.reason} — no snapshot collection's entries can be derived from it`
+		);
 	}
-];
+	if (read.status === 'absent') {
+		if (await fs_exists(resolve(CORPORA_ROOT))) {
+			throw new Error(
+				`${CORPORA_ROOT} is checked out but has no ${basename(CORPORA_MANIFEST)} — the snapshot's ` +
+					'recipe is what says which subpaths each collection vendors, so nothing can be graded ' +
+					'from it (restore the checkout, or clone it afresh)'
+			);
+		}
+		// Absent snapshot: one placeholder per placed collection, at its root.
+		const placeholders = (tier: CollectionTier): CorpusEntry[] =>
+			placed_names(tier).map((name) => ({ path: `${CORPORA_COLLECTIONS}/${name}`, tier }));
+		return { entries: assemble_entries(placeholders, []), live_trees: [], untiered: [] };
+	}
+	const { collections } = read;
+	const placed: PlacedCollection[] = [];
+	const dropped: string[] = [];
+	for (const [name, tier] of Object.entries(COLLECTION_TIERS)) {
+		const collection = collections.get(name);
+		if (collection) placed.push({ name, tier, ...collection });
+		else dropped.push(name);
+	}
+	if (dropped.length > 0) {
+		throw new Error(
+			`COLLECTION_TIERS places collections the snapshot's manifest no longer vendors: ` +
+				`${dropped.join(', ')} — remove them from the table, or restore them in ${CORPORA_ROOT}`
+		);
+	}
+	// One entry per manifest subpath, in table order then manifest order — the ORDER is
+	// part of the perf view's stamped entry list (`corpus_view_paths`), so it is a
+	// deliberate property of this derivation, not an incidental one.
+	const snapshot_entries = (tier: CollectionTier): CorpusEntry[] =>
+		placed
+			.filter((c) => c.tier === tier)
+			.flatMap((c) =>
+				c.subpaths.map((subpath) => ({ path: `${CORPORA_COLLECTIONS}/${c.name}/${subpath}`, tier }))
+			);
+	const live_trees = placed
+		.filter((c) => LIVE_DIFF_TIERS.includes(c.tier))
+		.flatMap(({ name, subpaths, exclude }) =>
+			subpaths.map((subpath): LiveTree => ({
+				name,
+				subpath,
+				exclude,
+				checkout: `../${name}`,
+				path: `../${name}/${subpath}`
+			}))
+		);
+	const untiered = [...collections.keys()].filter((name) => !(name in COLLECTION_TIERS));
+	return { entries: assemble_entries(snapshot_entries, live_trees), live_trees, untiered };
+}
+
+/** The names `COLLECTION_TIERS` places in `tier`, in table order. */
+function placed_names(tier: CollectionTier): string[] {
+	return Object.entries(COLLECTION_TIERS)
+		.filter(([, t]) => t === tier)
+		.map(([name]) => name);
+}
+
+/**
+ * The tagged corpus entry list, relative to project root (cwd): the snapshot tiers
+ * (derived), the derived caches, the same `real` repos as live working trees, and the
+ * pinned suite checkouts. A missing entry fails the load unless marked `optional` — see
+ * `CorpusLoader`.
+ */
+function assemble_entries(
+	snapshot_entries: (tier: CollectionTier) => CorpusEntry[],
+	live_trees: LiveTree[]
+): CorpusEntry[] {
+	return [
+		...snapshot_entries('real'),
+		// Real-authored CSS extracted from the perf-view `.svelte` files' <style>
+		// blocks, concatenated per source collection (bench:harvest:svelte-styles).
+		// Derived but real content: ~3×es the otherwise-tiny standalone-CSS sample with
+		// naturally-sized files, and in the gates view exercises the *standalone* CSS
+		// path on real content (embedded CSS rides EmbedContext — a different path).
+		// The same bytes are also timed in the svelte rows; rows are never summed.
+		{
+			path: 'benches/js/.cache/svelte_styles',
+			tier: 'real',
+			extensions: ['css'],
+			optional: true,
+			hint: 'run `deno task bench:harvest:svelte-styles`'
+		},
+		...snapshot_entries('framework'),
+		...snapshot_entries('third_party'),
+		// The `real` repos as live working trees — the `live` tier, `robustness` view only,
+		// one entry per collection subpath. Optional: whichever of them this machine has cloned.
+		...live_trees.map(({ path }): CorpusEntry => ({
+			path,
+			tier: 'live',
+			optional: true,
+			hint: 'a sibling working tree — absent is fine'
+		})),
+		// prettier-plugin-svelte test cases (.html treated as Svelte, skip non-default options)
+		{
+			path: '../prettier-plugin-svelte/test',
+			tier: 'prettier_fixture',
+			extensions: ['html'],
+			skip: has_companion_options
+		},
+		// Prettier test cases (formatting edge cases and regression tests)
+		{ path: '../prettier/tests/format/typescript', tier: 'prettier_fixture' },
+		{ path: '../prettier/tests/format/js', tier: 'prettier_fixture' },
+		{ path: '../prettier/tests/format/css', tier: 'prettier_fixture' },
+		{ path: '../prettier/tests/format/html', tier: 'prettier_fixture', extensions: ['html'] },
+		// '../prettier/tests/format/jsx' is deliberately absent: tsv rejects JSX by design
+		// (drop-in for Svelte's parser; acorn without the JSX plugin rejects it too), so the
+		// suite's 91 files would grade as always-reject noise, not conformance signal.
+		// Parse-conformance suites (`conformance` view only)
+		{ path: '../svelte/packages/svelte/tests', tier: 'suite', skip: svelte_tests_skip },
+		{
+			path: 'benches/js/.cache/wpt_css',
+			tier: 'suite',
+			extensions: ['css'],
+			optional: true,
+			hint: 'run `deno task bench:harvest:wpt` (needs ../wpt)'
+		},
+		{
+			files_from: 'benches/js/.cache/test262_files.json',
+			tier: 'suite',
+			// Declared on the path-list entries too (the harvests write homogeneous
+			// lists), so a per-language probe (`corpus_missing_entries`) can tell which
+			// absent cache withholds which language; `load_file_list` enforces it.
+			extensions: ['js'],
+			optional: true,
+			hint: 'run `deno task bench:harvest:test262` (needs ../test262)'
+		},
+		// The tsc corpus — TypeScript's own test cases, filtered to what tsc's parser
+		// AND tsc's `.errors.txt` baselines both call well-formed (harvest_ts_repo.ts).
+		// The TypeScript-SPECIFIC conformance inputs: without it the `parse/typescript`
+		// group is ~95% test262, i.e. ECMAScript, with prettier's ~800 format fixtures
+		// as its only TS. A bare path list, NOT goal-tagged like test262: tsc's
+		// module-vs-script reading is semantic and never gates syntax, so feeding it to
+		// parsers that take `sourceType` as a grammar switch would score them for
+		// something tsc doesn't do (the measurement is in the harvest). Its REJECTS
+		// sibling cache is deliberately not an entry — see the harvest.
+		{
+			files_from: 'benches/js/.cache/ts_repo_files.json',
+			tier: 'suite',
+			extensions: ['ts'],
+			optional: true,
+			hint: 'run `deno task bench:harvest:ts-repo` (needs ../typescript)'
+		}
+	];
+}
+
+/** The tagged corpus entry list — see `assemble_entries`; built once, from the snapshot's manifest. */
+export async function corpus_entries(): Promise<CorpusEntry[]> {
+	return (await corpus_catalog()).entries;
+}
+
+/**
+ * Collections the snapshot vendors that `COLLECTION_TIERS` does not place — in no bench
+ * or gate view, read only by the whole-snapshot consumers (`corpus_snapshot_dir`). For
+ * `scripts/doctor.ts`, so a collection waiting on its triage is listed rather than
+ * forgotten. Empty when the snapshot is absent.
+ */
+export async function corpus_untiered_collections(): Promise<string[]> {
+	return (await corpus_catalog()).untiered;
+}
 
 const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
-	// Both are real code from the pinned snapshot — the throughput headline.
+	// Both are real code from the pinned snapshot — the throughput headline. NOT
+	// `third_party`: see `CorpusTier`.
 	perf: ['real', 'framework'],
-	// The snapshot tiers plus the prettier suites. Every file in this view comes
+	// Every snapshot tier plus the prettier suites. Every file in this view comes
 	// from a pinned checkout, so every count pin gates over the whole view.
-	gates: ['real', 'framework', 'prettier_fixture'],
-	// deliberately NO `real`/`framework`: the conformance coverage surface and the perf corpus
+	gates: ['real', 'framework', 'third_party', 'prettier_fixture'],
+	// deliberately NO snapshot tier: the conformance coverage surface and the perf corpus
 	// are mutually exclusive sets. perf is the "every in-scope tool must fully
 	// process it" corpus (bench.ts hard-fails an unlisted failure); conformance is
 	// the hard-cases-only surface where sub-100% coverage is the measurement.
 	conformance: ['prettier_fixture', 'suite'],
 	// The real-code robustness sweeps: the WHOLE snapshot AND the live working trees'
 	// diff. Not a bench or gate view — nothing here is counted or pinned, so the sweeps
-	// read the snapshot ROOT (every collection, in a tier or not) rather than the tiers'
-	// entries; the tiers listed here contribute only what lies OUTSIDE that root (the
-	// `svelte_styles` harvest cache, a `real` entry) and the `live` diff's FILES
-	// (`corpus_robustness_seeds`). The `live` seat is also what refuses loading the view
-	// whole (`CorpusLoader.stream`) or walking it as directories
+	// read the snapshot ROOT (every collection, placed in a tier or not) rather than the
+	// tiers' entries; the tiers listed here declare the view's scope and contribute only
+	// what lies OUTSIDE that root (the `svelte_styles` harvest cache, a `real` entry) and
+	// the `live` diff's FILES (`corpus_robustness_seeds`). The `live` seat is also what
+	// refuses loading the view whole (`CorpusLoader.stream`) or walking it as directories
 	// (`corpus_present_dirs_for_tiers`).
-	robustness: ['real', 'framework', 'live']
+	robustness: ['real', 'framework', 'third_party', 'live']
 };
 
 /**
@@ -684,13 +862,14 @@ function entry_holds_language(entry: CorpusEntry, language: Language): boolean {
 
 /**
  * A view's entry paths as declared, present or not — the view's COMPOSITION, for a
- * stamp that must record what a harvest read: a collection joining `REAL_REPOS`
+ * stamp that must record what a harvest read: a collection joining a perf tier
  * changes the perf view without moving any checkout, and a stamp keyed on checkouts
- * alone would skip the re-harvest that change requires.
+ * alone would skip the re-harvest that change requires. The ORDER is part of the
+ * stamp, and `corpus_entries` keeps it stable (table order, then manifest order).
  */
-export function corpus_view_paths(view: CorpusView): string[] {
+export async function corpus_view_paths(view: CorpusView): Promise<string[]> {
 	const tiers = TIERS_BY_VIEW[view];
-	return CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier)).map(entry_source);
+	return (await corpus_entries()).filter((e) => tiers.includes(e.tier)).map(entry_source);
 }
 
 /**
@@ -715,7 +894,7 @@ export async function corpus_missing_entries(
 	language?: Language
 ): Promise<{ missing: string[]; optional_missing: string[]; total: number }> {
 	const tiers = TIERS_BY_VIEW[view];
-	const entries = CORPUS_ENTRIES.filter(
+	const entries = (await corpus_entries()).filter(
 		(e) => tiers.includes(e.tier) && (language === undefined || entry_holds_language(e, language))
 	);
 	const missing: string[] = [];
@@ -765,7 +944,7 @@ export async function corpus_present_dirs_for_tiers(
 	}
 	const outside = options?.outside;
 	const dirs: string[] = [];
-	for (const entry of CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier))) {
+	for (const entry of (await corpus_entries()).filter((e) => tiers.includes(e.tier))) {
 		if (entry.path === undefined) continue;
 		if (outside !== undefined && is_under(entry.path, outside)) continue;
 		if (await fs_exists(resolve(entry.path))) {
@@ -779,13 +958,14 @@ export async function corpus_present_dirs_for_tiers(
 
 /**
  * The WHOLE snapshot as one directory seed — every collection `../corpora` vendors,
- * the six third-party Svelte libraries outside `REAL_REPOS` included — for a
- * Rust-side sweep that grades an invariant rather than a pinned count: the count
- * pins are why the bench and gate views read a curated subset (every `real` entry
- * re-pins every corpus count), and a no-panic / render / round-trip verdict carries
- * no such cost, so it reads everything the snapshot holds — `render:audit`'s
- * conformance leg, and the robustness sweeps through `corpus_robustness_seeds`.
- * `null`, with a warning, when the snapshot is not checked out.
+ * placed in a tier or not (`COLLECTION_TIERS`) — for a Rust-side sweep that grades an
+ * invariant rather than a pinned count: the count pins are why the bench and gate views
+ * read the tiers' entries (every collection there re-pins every corpus count, so a
+ * collection waits on its triage before it is placed), and a no-panic / render /
+ * round-trip verdict carries no such cost, so it reads everything the snapshot holds as
+ * one root rather than thirty subpaths — `render:audit`'s conformance leg, and the
+ * robustness sweeps through `corpus_robustness_seeds`. `null`, with a warning, when the
+ * snapshot is not checked out.
  */
 export async function corpus_snapshot_dir(logger: Logger = console.log): Promise<string | null> {
 	if (await fs_exists(resolve(CORPORA_COLLECTIONS))) return CORPORA_COLLECTIONS;
@@ -839,39 +1019,37 @@ async function git_ignored_files(repo_root: string, subdir: string): Promise<Set
 
 /**
  * The `live` tier as a DIFF against the snapshot: every file of a present working tree
- * (`../<name>/src`) whose bytes differ from, or have no counterpart at,
- * `collections/<name>/<same upstream-relative path>` — minus that collection's manifest
- * `exclude` prefixes, so the fixtures the snapshot leaves out stay out here too, and
- * minus what git ignores in the tree, which the snapshot (materialized from git
- * objects) cannot hold by construction and which is scratch, not new code. This
- * is the whole early-warning value of the working trees (code written since the last
- * refresh) at a cost proportional to the drift: sweeping the trees whole re-grades
- * thousands of files the snapshot has just graded for the few dozen that differ.
- * Without a snapshot to diff against (no counterparts) every live file is a candidate
- * and the trees are swept whole, as before the snapshot; without a readable manifest
- * no `exclude` applies — each disclosed in the log rather than silently.
+ * (`../<name>/<subpath>`, one tree per subpath of each `LIVE_DIFF_TIERS` collection)
+ * whose bytes differ from, or have no counterpart at, `collections/<name>/<same
+ * upstream-relative path>` — minus that collection's manifest `exclude` prefixes, so the
+ * fixtures the snapshot leaves out stay out here too, and minus what git ignores in the
+ * tree, which the snapshot (materialized from git objects) cannot hold by construction
+ * and which is scratch, not new code. This is the whole early-warning value of the
+ * working trees (code written since the last refresh) at a cost proportional to the
+ * drift: sweeping the trees whole re-grades thousands of files the snapshot has just
+ * graded for the few dozen that differ. The trees are spelled from the snapshot's
+ * manifest, so without it there are none to diff (disclosed); with the manifest but no
+ * materialized counterparts every live file is a candidate and the trees are swept
+ * whole, as before the snapshot — disclosed in the log rather than silently.
  */
 export async function live_diff_files(logger: Logger = console.log): Promise<LiveDiff> {
-	const manifest = await load_corpora_manifest();
+	const { live_trees } = await corpus_catalog();
 	const diff: LiveDiff = { files: [], trees: 0, unchanged: 0, excluded: 0, ignored: 0 };
 	let absent = 0;
 	let counterparts = 0;
 	let git_unanswered = 0;
-	for (const entry of CORPUS_ENTRIES.filter((e) => e.tier === 'live')) {
-		if (entry.path === undefined) continue;
-		const tree = resolve(entry.path);
+	for (const { name, subpath, exclude, checkout, path } of live_trees) {
+		// Both sides are compared by the path beneath the checkout — the upstream-relative
+		// path the manifest's `exclude` prefixes are spelled against, however deep the
+		// subpath (`packages/kit/src`) sits.
+		const repo_root = resolve(checkout);
+		const tree = resolve(path);
 		if (!(await fs_exists(tree))) {
 			absent++;
 			continue;
 		}
 		diff.trees++;
-		// A live entry is `../<name>/src`: the collection is `<name>`, and both sides are
-		// compared by their upstream-relative path (`src/…`), which is what the manifest's
-		// `exclude` prefixes are spelled against.
-		const repo_root = dirname(tree);
-		const name = basename(repo_root);
-		const exclude = manifest?.get(name)?.exclude ?? [];
-		const ignored = await git_ignored_files(repo_root, basename(tree));
+		const ignored = await git_ignored_files(repo_root, subpath);
 		if (ignored === null) git_unanswered++;
 		for await (const file of walk_corpus(tree, { prune_build_output: false })) {
 			const rel = relative(repo_root, file.path).split(sep).join('/');
@@ -891,18 +1069,19 @@ export async function live_diff_files(logger: Logger = console.log): Promise<Liv
 				// valid UTF-8 compares unequal and is swept — the safe direction.
 				same = snapshot.equals(Buffer.from(file.content, 'utf8'));
 			} catch {
-				// no counterpart in the snapshot — a new file, or no snapshot at all
+				// no counterpart in the snapshot — a new file, or an unmaterialized collection
 			}
 			if (same) diff.unchanged++;
 			else diff.files.push(file.path);
 		}
 	}
-	if (diff.trees === 0) {
+	if (live_trees.length === 0) {
+		logger('  live diff: no snapshot manifest, so no working trees to diff against it');
+	} else if (diff.trees === 0) {
 		logger(`  live diff: no working trees present (${absent} declared) — snapshot only`);
 	} else {
 		const notes = [
 			counterparts === 0 ? '⚠ no snapshot counterparts, so the trees are swept WHOLE' : null,
-			manifest === null ? '⚠ no readable snapshot manifest, so no `exclude` applied' : null,
 			git_unanswered > 0
 				? `⚠ git could not list the ignored files of ${git_unanswered} tree(s), so theirs are swept too`
 				: null
@@ -919,12 +1098,12 @@ export async function live_diff_files(logger: Logger = console.log): Promise<Liv
 
 /**
  * The seeds of a real-code robustness sweep (`audit:corpus`, `idempotency:sweep`): the
- * WHOLE snapshot as one directory (`corpus_snapshot_dir` — every collection, the
- * third-party Svelte libraries outside the bench views included), the `robustness`
- * view's pinned-tier directories that lie OUTSIDE that root (today the `svelte_styles`
- * harvest cache — a collection directory is already walked by the root), plus the `live`
- * tier's diff FILES (`live_diff_files`). Hand all of them to a Rust audit — its seed
- * resolution takes directories and files alike. Nothing here is counted or pinned.
+ * WHOLE snapshot as one directory (`corpus_snapshot_dir` — every collection, placed in
+ * a tier or not), the `robustness` view's pinned-tier directories that lie OUTSIDE that
+ * root (today the `svelte_styles` harvest cache — a collection directory is already
+ * walked by the root), plus the `live` tier's diff FILES (`live_diff_files`). Hand all
+ * of them to a Rust audit — its seed resolution takes directories and files alike.
+ * Nothing here is counted or pinned.
  *
  * With the snapshot absent (warned once by `corpus_snapshot_dir`) what IS here — the
  * cache, the live diff — is still swept.
@@ -968,7 +1147,7 @@ export async function corpus_robustness_seeds(
 export type MissingEntryPolicy = 'fail' | 'tolerate' | { complete_for: Language };
 
 /**
- * Loads one view of `CORPUS_ENTRIES`.
+ * Loads one view of the corpus entries (`corpus_entries`).
  * Paths are relative to cwd. Missing entries FAIL FAST (before any file is
  * yielded) per the `missing` policy above — a silently smaller corpus makes perf
  * numbers non-comparable and lets a correctness gate pass while grading less than
@@ -1018,7 +1197,7 @@ export class CorpusLoader {
 					'the snapshot (`corpus_robustness_seeds`), never loaded whole'
 			);
 		}
-		const entries = CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier));
+		const entries = (await corpus_entries()).filter((e) => tiers.includes(e.tier));
 
 		// Fail fast on missing entries — all existence checks up front, before
 		// any file is yielded, so a partial corpus can't be half-processed. Which

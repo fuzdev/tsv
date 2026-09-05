@@ -94,7 +94,7 @@ export interface SourceFile {
 	 */
 	bytes: number;
 	/**
-	 * Which `CORPUS_ENTRIES` entry this file came from (its `path`/`files_from`,
+	 * Which corpus entry (`corpus_entries`) this file came from (its `path`/`files_from`,
 	 * project-root-relative) — the key the conformance report's per-source coverage
 	 * breakdown groups by, so an entry whose reading is special (the tsc corpus,
 	 * where `tsc` is the oracle rather than a competitor) can be read on its own

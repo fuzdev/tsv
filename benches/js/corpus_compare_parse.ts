@@ -319,43 +319,52 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		// shared root.comments queue (acorn.js get_comment_handlers/add_comments),
 		// so a module-region comment — a module-script comment, or a leading
 		// fragment HTML comment (`<!-- @component -->`) — is also attached to the
-		// instance script's Program or its first statement. tsv attaches each
-		// comment once, in its source region. The comment is never lost (it stays
-		// on its module/fragment home), so this is a pure cross-script duplication.
-		// Two shapes: (1) tsv has no leading comment at that slot, so the shifted
+		// instance script: ahead of its first statement's own leading comments, or,
+		// when the script holds no statement, ahead of the Program's own trailing
+		// comments (`add_comments`'s root special case). tsv attaches each comment
+		// once, in its source region. The comment is never lost (it stays on its
+		// module/fragment home), so this is a pure cross-script duplication.
+		// Two shapes: (1) tsv has no comment array at that slot, so the shifted
 		// comment is a plain `missing_ours` on the array; (2) tsv DOES have its own
-		// leading comment there, so index [0] is a `value_mismatch` on the comment's
-		// fields (svelte's module-shifted comment vs tsv's own). The [0] case is
-		// gated on the canonical comment's span lying BEFORE the instance script —
-		// the module/fragment region — so a genuine instance-internal per-comment
-		// attachment bug (canonical comment inside the instance script) stays
-		// undocumented.
+		// comments there, and the copies form a PREFIX of the canonical array — the
+		// module-region comments in source order, then the instance's own — so
+		// every index reads one whole prefix later: canonical `[i]` is tsv's
+		// `[i − shift]`, a `value_mismatch` on each of the comment's fields at EVERY
+		// index, not only `[0]`. The arm counts that prefix (the canonical comments
+		// whose span lies BEFORE the instance script) and admits an entry only when
+		// OUR value is the same field of canonical's comment at `[i + shift]` — so a
+		// genuine instance-internal attachment difference (a comment tsv lists at
+		// `[i]` that canonical never lists after the prefix) stays undocumented.
 		name: 'svelte_instance_comment_duplication',
 		conformance_section: 'Comment Attachment Differences',
-		matches: (entry, canonical_parent, ctx) => {
+		matches: (entry, _canonical_parent, ctx) => {
 			if (
 				entry.kind === 'missing_ours' &&
 				/^instance\.content(\.body\[0\])?\.(leadingComments|trailingComments)$/.test(entry.path)
 			) {
 				return true;
 			}
-			if (
-				entry.kind === 'value_mismatch' &&
-				/^instance\.content(\.body\[0\])?\.(leadingComments|trailingComments)\[\d+\]\.(type|value|start|end)$/.test(
+			const shifted =
+				/^(instance\.content(?:\.body\[0\])?\.(?:leadingComments|trailingComments))\[(\d+)\]\.(type|value|start|end)$/.exec(
 					entry.path
-				)
-			) {
-				const comment = canonical_parent as { start?: number } | null;
+				);
+			if (entry.kind === 'value_mismatch' && shifted) {
+				const [, array_path, index, field] = shifted;
+				const arr = get_at_path(ctx.canonical_root, array_path) as Record<string, unknown>[] | null;
 				const instance = get_at_path(ctx.canonical_root, 'instance.content') as {
 					start?: number;
 				} | null;
-				return (
-					comment != null &&
-					typeof comment.start === 'number' &&
-					instance != null &&
-					typeof instance.start === 'number' &&
-					comment.start < instance.start
-				);
+				if (!Array.isArray(arr) || instance == null || typeof instance.start !== 'number') {
+					return false;
+				}
+				const instance_start = instance.start;
+				const in_module_region = (comment: Record<string, unknown> | undefined): boolean =>
+					typeof comment?.start === 'number' && comment.start < instance_start;
+				let shift = 0;
+				while (in_module_region(arr[shift])) shift++;
+				if (shift === 0) return false;
+				const twin = arr[Number(index) + shift];
+				return twin != null && twin[field] === entry.ours;
 			}
 			return false;
 		}
@@ -729,8 +738,8 @@ interface DiffGroup {
  *
  * The matcher is part of the key, not only the signature: a signature erases array
  * indices, and a matcher can accept one index and refuse its sibling (the
- * instance-comment matcher admits a comment that sits BEFORE the instance script and
- * refuses one inside it), so keyed on the signature alone an undocumented
+ * instance-comment matcher admits the indices a module-region prefix shifts and
+ * refuses any other), so keyed on the signature alone an undocumented
  * `trailingComments[1]` entry folded into the documented `trailingComments[]` group
  * — the run failed with "1 UNDOCUMENTED", the group listing showed only documented
  * groups, the JSON `groups` carried no undocumented entry, and only `--verbose`

@@ -102,7 +102,7 @@ const STAMP_PATH = HARVEST_STAMPS['css-rejects'].path;
 // leave this grade stamped fresh over a corpus that changed under it. The
 // conformance view's ENTRY LIST is stamped too (the whole view's, not only the
 // CSS-bearing entries — one spelling, at the cost of a needless re-grade when a
-// non-CSS suite joins): an entry added to or dropped from `CORPUS_ENTRIES` changes
+// non-CSS suite joins): an entry added to or dropped from the corpus entries changes
 // the graded corpus while every checkout stays put.
 const versions = await load_all_versions();
 const svelte_commit = git_head('../svelte');
@@ -114,7 +114,7 @@ const stamp_inputs: StampInputs = {
 	svelte_oracle: versions.canonical.svelte,
 	wpt_pin: WPT_CSS_HARVEST_PIN,
 	rejects_pin: CSS_REJECTS_PIN,
-	conformance_entries: corpus_view_paths('conformance').join(' ')
+	conformance_entries: (await corpus_view_paths('conformance')).join(' ')
 };
 
 /**

@@ -14,7 +14,7 @@
  *   for every real-code source.
  * - Any other checkout is **git-detected**: the URL from its `origin` remote and the
  *   commit from `HEAD`, so the link pins to the exact code and can't fall out of
- *   sync with `CORPUS_ENTRIES`.
+ *   sync with the corpus entries (`corpus_entries`).
  *
  * The only declared data is {@link CLONE_URL_BY_PREFIX} — the canonical clone URLs
  * for the *absent* checkouts a fresh machine is missing, where nothing can be
@@ -114,7 +114,8 @@ function checkout_prefix(source_path: string): string {
 async function detect_collection_upstream(source_path: string): Promise<CorpusRepoRef | null> {
 	const split = split_collection_path(source_path);
 	if (!split) return null;
-	const collection = (await load_corpora_manifest())?.get(split.name);
+	const manifest = await load_corpora_manifest();
+	const collection = manifest.status === 'ok' ? manifest.collections.get(split.name) : undefined;
 	if (!collection) return null;
 	return {
 		url: collection.url,

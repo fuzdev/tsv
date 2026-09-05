@@ -24,8 +24,8 @@
  *
  * Stamped like the suite harvests (`lib/harvest_stamp.ts`): the perf view is the
  * pinned `../corpora` snapshot, so the stamp records its `collections/` tree id, the
- * pinned block count, and the perf view's entry list (a collection joining
- * `REAL_REPOS` changes the input with no checkout moving), and an unchanged triple
+ * pinned block count, and the perf view's entry list (a collection joining a perf
+ * tier changes the input with no checkout moving), and an unchanged triple
  * skips the walk. The count is an EXACT pin (`SVELTE_STYLES_BLOCKS_PIN`): a move is a
  * snapshot refresh or a view change (re-pin) or a broken extraction, and either fails
  * BEFORE writing so a wrong cache never replaces a good one. `--force` re-harvests
@@ -75,7 +75,7 @@ async function main(): Promise<void> {
 	const inputs = {
 		corpora_tree,
 		blocks_pin: SVELTE_STYLES_BLOCKS_PIN,
-		perf_entries: corpus_view_paths('perf').join(' ')
+		perf_entries: (await corpus_view_paths('perf')).join(' ')
 	};
 	if (!force && (await harvest_up_to_date(stamp.path, inputs, [CACHE_DIR]))) {
 		console.error(
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
 			`FAIL: ${blocks} style blocks ≠ pinned ${SVELTE_STYLES_BLOCKS_PIN}; cache not written. ` +
 				`${checkout_label(tree_input)} is at ${short_commit(corpora_tree)}, the pin was measured at ${pinned_at}` +
 				(aligned
-					? ' — same tree, so either the perf view changed (a collection joined REAL_REPOS: re-pin ' +
+					? ' — same tree, so either the perf view changed (a collection joined a perf tier: re-pin ' +
 						'SVELTE_STYLES_BLOCKS_PIN in lib/gate_counts.ts) or the extraction broke: investigate first.'
 					: ' — a snapshot refresh moves this deliberately (re-pin SVELTE_STYLES_BLOCKS_PIN in ' +
 						'lib/gate_counts.ts beside the new tree id); otherwise check out the pinned snapshot.')
