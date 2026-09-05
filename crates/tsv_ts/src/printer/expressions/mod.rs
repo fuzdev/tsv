@@ -1537,12 +1537,11 @@ impl<'a> Printer<'a> {
         // Add current operator
         operators.push(expr.operator);
 
-        // Also flatten right side for truly associative operators (removes redundant parens)
-        // Only logical operators are truly associative; arithmetic preserves right-side parens
+        // Also flatten the right side where prettier REBALANCES it, removing the redundant
+        // parens ([`BinaryOperator::rebalances_with`] — logical operators only; arithmetic
+        // preserves right-side parens).
         if let Expression::BinaryExpression(right_binary) = expr.right
-            && expr.operator.can_flatten_with(right_binary.operator)
-            && expr.operator.is_logical()
-            && right_binary.operator.is_logical()
+            && expr.operator.rebalances_with(right_binary.operator)
         {
             self.collect_binary_operands_for_indent(right_binary, operands, operators);
             return;
