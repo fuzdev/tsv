@@ -2,8 +2,8 @@
  * F1 (idempotency) sweep over the **real-code** corpus.
  *
  * Drives every file of the `robustness` view — the WHOLE `../corpora` snapshot (every
- * collection it vendors, the third-party Svelte libraries outside the bench views
- * included), the `svelte_styles` cache, plus the live diff (the files of this machine's
+ * collection it vendors, placed in a corpus tier or not), the `svelte_styles` cache,
+ * plus the live diff (the files of this machine's
  * working trees of the `real` repos that differ from, or are absent in, the snapshot) —
  * through `tsv_debug fuzz --iterations 0`:
  * the fuzzer's

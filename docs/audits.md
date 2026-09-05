@@ -1321,8 +1321,8 @@ deno task render:audit ../svelte/packages/svelte/tests   # (--gate baked in)
 # NOT in `deno task check` — and not in the pure-Rust `audit:corpus` either. It is
 # release-gated as a leg of `deno task conformance` (the one leg that runs as a
 # subprocess), scoped there to the WHOLE `../corpora` snapshot (every collection it
-# vendors — the third-party Svelte libraries the bench views leave out included, since
-# this leg pins no count) plus the version-pinned `suite` checkout, so a live working
+# vendors, placed in a corpus tier or not, since this leg pins no count) plus the
+# version-pinned `suite` checkout, so a live working
 # tree can't move a release verdict; run it standalone on any corpus
 # after a printer change. Files whose format is a no-op skip the ORACLE (trivially
 # render-equal by identity) but still carry a verdict, so they count toward the
@@ -1420,7 +1420,7 @@ cargo run -p tsv_debug fuzz --iterations 0 ../corpora/collections/zzz/src       
 
 ## F1 Idempotency Sweep (`idempotency:sweep`)
 
-The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, the six third-party Svelte libraries outside the bench views included, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `real` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file. NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
+The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed in a corpus tier or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `real` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file. NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
 
 ```bash
 deno task idempotency:sweep

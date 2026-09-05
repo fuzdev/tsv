@@ -96,9 +96,10 @@ export const GATE_CHECKOUT_IDS: Record<
 	string,
 	{ hash: string; tree?: string; pins: readonly string[] }
 > = {
-	// The real-code snapshot: every `real` + `framework` corpus entry, so every corpus
-	// pin plus the styles harvest measured over the perf view. Pinned by its
-	// `collections/` tree (see above); what each collection vendors is its manifest.
+	// The real-code snapshot: every snapshot-tier corpus entry (`real`, `framework`,
+	// `third_party`), so every corpus pin plus the styles harvest measured over the perf
+	// view. Pinned by its `collections/` tree (see above); what each collection vendors is
+	// its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
 		hash: '5f40c547c',
@@ -230,7 +231,7 @@ export const CORPUS_PARSE_COMPARED_PIN: Record<Language, number> = {
 	// counts below did not move.
 	//
 	// 1178 / 4175 / 166 → 1353 / 4285 / 172: earbetter (44 / 26 / 2) and cosmicplayground
-	// (131 / 84 / 2) join `REAL_REPOS`, plus their two `svelte_styles` concats (css +2) — every
+	// (131 / 84 / 2) join the `real` tier, plus their two `svelte_styles` concats (css +2) — every
 	// one of the 291 new files compared, so the tsv-side failure counts did not move.
 	//
 	// typescript 4285 → 4289: the loader walks the whole JS/TS family `tsv format` discovers
@@ -239,9 +240,19 @@ export const CORPUS_PARSE_COMPARED_PIN: Record<Language, number> = {
 	// compared) and `js/babel-plugins/pipeline-operator-hack.cjs` (rejected by both parsers, so
 	// counted nowhere). Two more on disk sit under the excluded `_errors_/`. The snapshot holds
 	// none yet; a collection gaining one now grades instead of being skipped.
-	svelte: 1353,
-	typescript: 4289,
-	css: 172
+	//
+	// 1353 / 4289 / 172 → 3450 / 5255 / 185: the six third-party collections join the gates as
+	// the `third_party` tier (flowbite-svelte, layerchart, layercake, svelte-ux, svelte-maplibre,
+	// language-tools — 2097 / 966 / 13 files), every one of them compared, and no group
+	// undocumented: the one file that was, `svelte-ux/…/src/docs/Layout.svelte`, is the
+	// module-comment duplication onto a statement-less instance script, whose shifted indices
+	// the `svelte_instance_comment_duplication` matcher now admits (docs/conformance_svelte.md
+	// §Comment Attachment Differences). The tsv-side failure counts below did not move, and
+	// neither did the snapshot's `collections/` tree id — nothing it vendors changed, only
+	// which of it the view reads.
+	svelte: 3450,
+	typescript: 5255,
+	css: 185
 };
 
 /**
@@ -259,8 +270,8 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 
 /**
  * corpus:compare:format --all — per-language MINIMUM exact-`match` count over the whole
- * gates view: the `../corpora` snapshot (the author's repos + the framework source) and
- * the prettier suites — every one a checkout `GATE_CHECKOUT_IDS` tracks and
+ * gates view: the `../corpora` snapshot (the author's repos, the framework source and
+ * the third-party libraries) and the prettier suites — every one a checkout `GATE_CHECKOUT_IDS` tracks and
  * `pins:audit:checkouts` verifies, so an aligned machine measures these EXACTLY. A shrink
  * fails (a formatter/oracle collapse in pinned code); a rise re-pins to keep the floor
  * tight. It stays a minimum (not exact) only so a fixed win needn't re-pin to pass — over
@@ -309,10 +320,16 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// prettier subset the old floor measured is unchanged, and the newcomers arrive with zero
 	// `unknown`.
 	//
-	// 931 → 1047: earbetter (33 of 44) and cosmicplayground (83 of 131) join `REAL_REPOS`;
+	// 931 → 1047: earbetter (33 of 44) and cosmicplayground (83 of 131) join the `real` tier;
 	// their other 59 svelte files are all `known` divergences (prettier-shaped code, mostly
 	// `self_closing_nonvoid` / `inline_content_block_style`), none `unknown`.
-	svelte: 1047,
+	//
+	// 1047 → 2701: the six third-party collections join the gates as the `third_party` tier;
+	// 1654 of their 2097 svelte files match (flowbite-svelte 929 of 1296, layerchart 333 of 336,
+	// layercake 159 of 177, svelte-ux 161 of 198, svelte-maplibre 72 of 90), 438 are `known`
+	// (prettier-shaped code the ecosystem repos never carry), and 5 are `unknown` — see the
+	// unknown pin, which names them. `partial` is unmoved and SAFETY is 0 over every file.
+	svelte: 2701,
 	// 2332 → 2334: two reproducible files, `prettier/tests/format/js/comments/11273.js` and
 	// `.../trailing-jsdocs.js`, whose divergence was a container-end trailing comment RUN the
 	// author glued onto one line and tsv split onto two. That run's separator now asks the
@@ -325,7 +342,7 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	//
 	// 2335 → 4059 and (css) 89 → 120: the author's repos join the pinned corpus — see svelte.
 	//
-	// 4059 → 4165 and (css) 120 → 125: earbetter + cosmicplayground join `REAL_REPOS` (106 of
+	// 4059 → 4165 and (css) 120 → 125: earbetter + cosmicplayground join the `real` tier (106 of
 	// their 110 typescript files match, 3 `known`, 1 `partial` — see the partial pin; 5 of 6 css,
 	// 1 `known`).
 	//
@@ -333,8 +350,14 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// `compared` pin): the four `top-level-await/test.{mts,cts,mjs,cjs}` prettier files all match,
 	// and `pipeline-operator-hack.cjs` is an expected error (both sides reject) — `unknown` and
 	// `partial` unmoved.
-	typescript: 4169,
-	css: 125
+	//
+	// 4169 → 5124 and (css) 125 → 133: the `third_party` tier — see svelte. 955 of its 966
+	// typescript files match (flowbite-svelte 338 of 338, layerchart 188 of 190, layercake 65 of
+	// 66, svelte-ux 100 of 100, svelte-maplibre 57 of 57, language-tools 207 of 215), none
+	// `known`, 11 `unknown` (named on the unknown pin); 8 of its 13 css files match and the
+	// other 5, all layerchart's, are `known`.
+	typescript: 5124,
+	css: 133
 };
 
 /**
@@ -375,7 +398,28 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// the pre-change corpus-profile FFI build and this one (`match` 1190 → 1193, `known`
 	// 235 → 237): these five are the ONLY movers, nothing arrived in any bucket, and
 	// `partial` / `safety` / `errors` / `expected_errors` are identical file-for-file.
-	svelte: 0,
+	//
+	// 0 → 5: the `third_party` tier arrives with five, each a real backlog item and none of
+	// them given a detector on purpose (a detector would assert a sanction nothing has decided):
+	//   `flowbite-svelte/src/lib/bottom-navigation/BottomNavItem.svelte` — a `&&` inside a
+	//     nested ternary's branch: prettier does not indent the operand's continuation there
+	//     (its binaryish `shouldNotIndent` conditional arm), tsv does.
+	//   `flowbite-svelte/src/lib/dialog/Dialog.svelte` — a multi-declarator `const a = …, b =
+	//     <&& chain>`: prettier breaks after the second `=` and indents the chain; tsv keeps
+	//     the first operand on the `=` line and DEDENTS the continuation below the declarator.
+	//   `flowbite-svelte/src/lib/forms/button-toggle/ButtonToggle.svelte` — a seven-key
+	//     shorthand object pattern assigned an object literal: prettier keeps the pattern flat
+	//     (it fits) and breaks after `=`; tsv breaks the pattern and hugs the literal — the
+	//     pattern group's fits walk measures what follows flat, where prettier's stops at the
+	//     first line of the rest in break mode.
+	//   `flowbite-svelte/src/lib/stepper/TimelineStepper.svelte` — a `{circle({…})}` at the
+	//     end of a class value already past print width: prettier's conditional group falls
+	//     through to its most expanded state (every argument broken out) when no state fits;
+	//     tsv hugs the sole object argument.
+	//   `layerchart/packages/layerchart/src/lib/components/Text/Text.html.svelte` — whitespace
+	//     only: a multi-line class value's `{expr}` continuation line keeps the author's SPACE
+	//     indentation where prettier re-indents it with tabs.
+	svelte: 5,
 	// 109 records a drop of five from 114, in two steps, each verified by diffing the
 	// `unknown` lists before and after rather than by the count alone:
 	//   -2  a binary operand of an `as`/`satisfies` cast takes prettier's continuation
@@ -592,7 +636,49 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// byte-identical file-for-file. (Same class as the CSS-side trims that moved in the same
 	// round — the wire's `trim_wire*` and the printer's `trim_property_part` — which move no
 	// count here because no corpus file carries one.)
-	typescript: 103,
+	//
+	// 103 → 114: eleven arrive with the `third_party` tier. language-tools' eight are the
+	// cluster its perf onboarding was deferred on — member-chain, assignment and binaryish
+	// break priority — pinned here as the gate's backlog rather than sanctioned:
+	//   `language-tools/…/typescript/features/CompletionProvider.ts` — a declarator whose init
+	//     is a `this.x.call()?.a?.b…` chain: prettier keeps the head on the `=` line and breaks
+	//     the chain; tsv breaks after `=` and indents the whole chain.
+	//   `language-tools/…/typescript/features/FoldingRangeProvider.ts` — `!!this.x.call()?.a
+	//     ?.b?.c` in a declarator: a one-call chain is poorly breakable, so prettier breaks
+	//     after `=` and keeps it whole; tsv breaks before the last `?.prop`.
+	//   `language-tools/…/typescript/features/RenameProvider.ts` — `lang.call(a, b)
+	//     ?.definitions?.[0]`: prettier keeps the call flat and breaks before `?.definitions`;
+	//     tsv breaks the call's arguments.
+	//   `language-tools/…/svelte2tsx/addComponentExport.ts` — a `${returnType('events')}`
+	//     interpolation whose SOURCE already spans lines: prettier keeps the call breakable and
+	//     breaks its argument; tsv atomizes it.
+	//   `language-tools/…/svelte2tsx/nodes/ExportedNames.ts` — an `||` test inside a nested
+	//     ternary chain: prettier indents its continuation one level deeper than tsv.
+	//   `language-tools/…/typescript-plugin/src/source-mapper.ts` — a for-of head
+	//     destructuring `{0: a, 2: b, 3: c}` of `this.mappings[i]`: prettier keeps the pattern
+	//     flat and breaks the member; tsv breaks the pattern (the ButtonToggle.svelte fits-walk
+	//     difference again, see the svelte pin).
+	//   `language-tools/…/svelte-check/src/incremental.ts` — `a ?? b ?? ['.']` in a declarator:
+	//     inlinable (the last operand is an array) but with a same-precedence left operand, so
+	//     prettier still indents the continuation (binaryish.js `samePrecedenceSubExpression`);
+	//     tsv prints it at the statement's own indent.
+	//   `language-tools/…/svelte-check/src/options.ts` — `.reduce((s, x) => {…}, <T>{})`:
+	//     prettier refuses the first-argument hug for an angle-bracket-asserted seed
+	//     (`isHopefullyShortCallArgument` knows only `as` / `satisfies`) and breaks every
+	//     argument; tsv hugs. The mirror of `cosmicplayground/src/lib/notes.ts` (`{} as T`,
+	//     where prettier hugs and tsv breaks — see the partial pin).
+	//   `layerchart/…/components/Chart/Chart.shared.svelte.ts` — a type alias with three
+	//     constrained or defaulted params: prettier's `isComplexTypeAliasParams` takes
+	//     `break-lhs` (the params break, `=` stays on the closing line); tsv keeps them flat
+	//     and breaks after `=`.
+	//   `layerchart/…/utils/canvas.svelte.test.ts` — a hugged last-argument `function (this:
+	//     T, ...args: any) {…}` whose params do not fit: prettier keeps the hug and breaks the
+	//     params (its expanded-state fits measures nested groups in break mode); tsv breaks
+	//     every argument.
+	//   `layercake/src/_data/unemployment.js` — a numeric array fill that lands several lines
+	//     at 101 columns: the fill's fits check omits the item's trailing comma — an OVER-WIDTH
+	//     output, the one real bug of the eleven, of a kind no fixture carries.
+	typescript: 114,
 	css: 23
 };
 
@@ -655,7 +741,7 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// 25 → 26: the author's repos join the pinned corpus; `fuz_ui/src/lib/project_stats_data.ts`
 	// arrives from the former non-gating WARN (its explained hunk is `fill_101_boundary`).
 	//
-	// 26 → 27: cosmicplayground joins `REAL_REPOS`; `cosmicplayground/src/lib/notes.ts` arrives
+	// 26 → 27: cosmicplayground joins the `real` tier; `cosmicplayground/src/lib/notes.ts` arrives
 	// with 3 of 5 hunks explained (`fill_101_boundary`, `comment_position`) and two unexplained:
 	// `chromas.reduce((result, chroma) => {…}, {} as Record<Chroma, Hue>)` — prettier hugs the
 	// FIRST argument when the last is a short type-asserted object seed, tsv breaks every
@@ -669,7 +755,7 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
  * view, i.e. the `../corpora` snapshot's `.svelte` files. Pure input material (not a
  * tsv success count), and pinned like the suite harvests: the source is a pinned
  * snapshot, so a move is a snapshot refresh (re-pin with the new `collections/` tree
- * id), a collection joining `REAL_REPOS`, or a broken extraction, and the harvest fails
+ * id), a collection joining a perf tier, or a broken extraction, and the harvest fails
  * BEFORE writing so a wrong cache never replaces a good one. Stamped on the snapshot's
  * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
  * Measured 2026-09-05: ../corpora `collections/` at 5f40c547c, over the perf view's
@@ -679,7 +765,7 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
  * commit. The 264 was a live-tree MINIMUM whose growth passed silently, so the move is
  * the corpus catching up with itself, not a change in what the harvest extracts.
  *
- * 278 → 401: earbetter and cosmicplayground join `REAL_REPOS`, so the perf view gains
+ * 278 → 401: earbetter and cosmicplayground join the `real` tier, so the perf view gains
  * their `.svelte` files (58 + 65 blocks) with the snapshot's tree id unmoved — the
  * view-composition move the stamp's `perf_entries` input exists to notice.
  */
