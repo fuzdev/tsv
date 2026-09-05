@@ -509,7 +509,19 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// carries two type arguments, so prettier's cast branch descends into nothing simple and it
 	// refuses the first-argument hug; tsv now refuses it too. Reasoning on
 	// `CORPUS_FORMAT_UNKNOWN_PIN`, which moves −3 in the same step.
-	typescript: 23,
+	//
+	// 23 → 22: `prettier/tests/format/js/if/condition-break/boolean-expression.js` leaves for
+	// `known` — its `Boolean?.(a || b || c)` hunk is FIXED (an optional call is not prettier's
+	// `isBooleanTypeCoercion`, so the chain indents; tsv read the callee name alone), and what
+	// is left is the two cataloged delimiter-line `comment_position` hunks it already carried.
+	// The ONLY mover in any bucket: `--all --json` bucket lists set-diffed across a pre-change
+	// and a tip `--profile corpus` build over the whole 9,305-file gates view — `unknown`,
+	// `safety`, `errors` and `expected_errors` identical file-for-file, `match` unmoved at
+	// 5140. The same change also fixes the chain-headed spelling (`Boolean(a || b).c()`, flat
+	// where the member-chain printer never asked) and the two-argument one, neither of which
+	// any gates file spells at breaking width; `js/call/boolean/boolean.js` holds all three
+	// and stays `unknown` on its separately filed callee-paren shape.
+	typescript: 22,
 	css: 9
 };
 

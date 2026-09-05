@@ -526,10 +526,12 @@ impl<'a> Printer<'a> {
     /// the same shape of caller: a position that hands its value to a **generic value
     /// builder** and so cannot name the chain style at the build site — a ternary branch
     /// (its value goes through the paren shell, which owns the gap between the value and
-    /// the `:` / terminator and must keep owning it) and a C-style `for` header clause
-    /// (whose element builder belongs to its caller). Every other `shouldNotIndent`
-    /// position builds its own value and says so directly; the list of them all lives on
-    /// [`Printer::build_flat_chain_expression_doc`].
+    /// the `:` / terminator and must keep owning it), a C-style `for` header clause
+    /// (whose element builder belongs to its caller), and a `Boolean()` coercion's
+    /// argument (whose builder, [`Printer::build_arg_expression_doc`], is shared by every
+    /// call layout and marked by both call-argument printers). Every other
+    /// `shouldNotIndent` position builds its own value and says so directly; the list of
+    /// them all lives on [`Printer::build_flat_chain_expression_doc`].
     ///
     /// Keyed by span and not consumed, like `mark_assignment_value`. Mark immediately
     /// before building the value: the cell holds one span, so anything built in between

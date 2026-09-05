@@ -1,8 +1,59 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
 use crate::ast::internal::{self, Expression, TSType};
+use crate::printer::Printer;
 use crate::printer::needs_parens::strip_non_null_wrappers;
 use crate::printer::types::helpers::{is_simple_type, unwrap_parenthesized};
+
+/// Prettier's `isBooleanTypeCoercion` (`utils/is-boolean-type-coercion.js`): a plain
+/// `Boolean(x)` call — the `!!x` coercion spelled as a call.
+///
+/// A `shouldNotIndent` term (`key === "arguments" && isBooleanTypeCoercion(parent)`,
+/// binaryish.js), so its argument's binary chain takes no continuation indent, exactly as
+/// `!!(a || b)`'s operand does. Every conjunct is prettier's, and a wrong answer is a wrong
+/// indent in one direction or the other:
+///
+/// - the callee is the bare identifier `Boolean` — `new Boolean(…)` is a `NewExpression`,
+///   not a call, and indents like any other argument position;
+/// - **exactly one argument** — `Boolean(a || b, c)` is not a coercion, so its chain
+///   indents;
+/// - **not optional** — `Boolean?.(a || b)` is read as an ordinary optional call by
+///   prettier and indents.
+///
+/// Asked through [`mark_boolean_coercion_argument`] alone, which is how the answer reaches
+/// the argument.
+fn is_boolean_type_coercion(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
+    if call.optional || call.arguments.len() != 1 {
+        return false;
+    }
+    let Expression::Identifier(id) = call.callee else {
+        return false;
+    };
+    printer.with_ident_name(id, |s| s == "Boolean")
+}
+
+/// Route a `Boolean()` coercion's lone argument to the flat chain layout
+/// ([`is_boolean_type_coercion`]), as a [`Printer::mark_flat_chain`] mark on the argument.
+///
+/// Called ONCE per call by each call-argument entry point — the plain call's
+/// `build_call_doc_with_wrapping` and the member chain's `build_call_args_doc_for_chain_impl`
+/// (per `conditional_group` candidate, since each re-enters it) — ahead of every layout. A
+/// mark rather than a flat builder named at a layout site: the six argument layouts (the
+/// plain default list, the plain comment paths, the freeze-aware item builder, the chain's
+/// single-argument, force-expanded and comment arms) all bottom out in
+/// `Printer::build_arg_expression_doc`, which reads the mark, so a commented or chain-headed
+/// coercion answers exactly as the plain default one does. Prettier reaches the same answer
+/// from the other side — its member-chain printer reprints a call's arguments through the
+/// same `printCallArguments`, where the parent is still the `Boolean(…)` call. A no-op for
+/// every other call, `new Boolean(…)` included.
+pub(super) fn mark_boolean_coercion_argument(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+) {
+    if is_boolean_type_coercion(call, printer) {
+        printer.mark_flat_chain(&call.arguments[0]);
+    }
+}
 
 /// Check if an argument is "hopefully short" enough to stay inline
 ///

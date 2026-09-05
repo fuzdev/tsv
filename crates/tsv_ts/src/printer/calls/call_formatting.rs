@@ -13,6 +13,7 @@ use super::arg_comments::{
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_array_or_object_unwrapped,
     is_function_composition_args, is_ternary_arrow_body, lone_arg_params_render_flat,
+    mark_boolean_coercion_argument,
 };
 use super::arg_wrapping::{
     ArgOpener, append_type_args_with_gap_comments, arg_needs_soft_wrap,
@@ -26,7 +27,7 @@ use super::arg_wrapping::{
     try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
-use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
+use super::module_paths::{get_module_path_chain_break, is_module_path_no_break};
 use super::test_patterns::{
     build_test_callee_flat_doc, is_test_call, test_call_flat_layout_applies,
 };
@@ -170,6 +171,15 @@ pub(super) fn build_call_doc_with_wrapping(
     }
 
     let paren_open = gap.paren_open(call);
+
+    // A `Boolean()` coercion's argument is a `shouldNotIndent` position (`key === "arguments"
+    // && isBooleanTypeCoercion(parent)`, binaryish.js:115): its binary chain takes no
+    // continuation indent, the argument list already supplying the level, exactly as the
+    // `!!()` coercion it mirrors. Marked ONCE here, ahead of every layout below, because they
+    // all reach the argument through the shared `build_arg_expression_doc`, which reads the
+    // mark — a per-arm spelling left every arm but the default list blind. The member-chain
+    // printer marks at the same point of its own entry, so a chain HEAD answers alike.
+    mark_boolean_coercion_argument(printer, call);
 
     // Single template literal argument with embedded newlines on the same line as `(` — hug
     // it. A template on its own line declines and falls through to the layouts below, whose
@@ -488,24 +498,14 @@ pub(super) fn build_call_doc_with_wrapping(
         return doc;
     }
 
-    // Build args with line separators (one per line when broken).
-    //
-    // A `Boolean()` argument is one of prettier's `shouldNotIndent` terms (`key ===
-    // "arguments" && isBooleanTypeCoercion(parent)`, binaryish.js:115), so its binary
-    // chain takes no continuation indent — the argument list already supplies a level,
-    // exactly as for the `!!()` coercion this mirrors.
-    let use_arg_indent = !is_boolean_call(call, printer);
+    // Build args with line separators (one per line when broken). A `Boolean()` coercion's
+    // argument goes flat here through the mark set at the top of this function, not through
+    // a builder named at this site.
     let arg_parts = d.join_doc(
         call.arguments.iter().map(|arg| {
             // This is prettier's `printedArguments` — printed with no `expandLastArg`, so a
             // curried chain takes the progressive layout (`build_printed_argument_doc`).
-            build_printed_argument_doc(printer, arg, || {
-                if use_arg_indent {
-                    printer.build_arg_expression_doc(arg)
-                } else {
-                    printer.build_flat_chain_expression_doc(arg)
-                }
-            })
+            build_printed_argument_doc(printer, arg, || printer.build_arg_expression_doc(arg))
         }),
         d.comma_line(),
     );
