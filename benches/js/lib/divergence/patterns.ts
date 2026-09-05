@@ -81,6 +81,9 @@ export interface DivergencePattern {
 	detect: (ctx: DetectionContext) => DivergenceMatch | null;
 }
 
+/** tsv's print width — the column every ours-side width test is asked against. */
+const PRINT_WIDTH = 100;
+
 /**
  * Calculate visual width of a line (tabs = 2 spaces).
  *
@@ -154,6 +157,29 @@ function ours_lines_in_hunk(ours_lines: string[], hunk: DiffHunk): string[] {
 }
 
 /**
+ * Does OURS hold the print-width limit across everything it emitted in this hunk?
+ *
+ * The ours-side half of every "prettier overran the width, we broke" claim, and the
+ * one that carries it: a wide PRETTIER line says only that the divergence is
+ * width-shaped, so without this the pattern grades nobody's width and files a real
+ * tsv over-width line as the sanctioned divergence. That laundering has no other
+ * instrument — `width:audit` is the only gate that measures a column and it runs over
+ * `tests/fixtures` alone, so real-code over-width is visible only here.
+ *
+ * A line COUNT is not a substitute: a hunk where tsv breaks more lines than prettier
+ * and still leaves one at 105 satisfies "we re-wrapped" and fails this.
+ *
+ * Empty `added_lines` is the vacuity trap — `every` is true of nothing, so a
+ * removal-only hunk (a wide prettier line we simply DELETED) would otherwise read as
+ * a print-width rewrap. Zero lines cannot hold a limit, so it is asked explicitly.
+ */
+function ours_holds_print_width(hunk: HunkLines): boolean {
+	return (
+		hunk.added_lines.length > 0 && hunk.added_lines.every((l) => visual_width(l) <= PRINT_WIDTH)
+	);
+}
+
+/**
  * The recurring long-line divergence shape: a print-width-driven re-wrap.
  *
  * A hunk matches when prettier has a line satisfying `line_predicate` that
@@ -169,7 +195,7 @@ function long_line_rewrapped(
 	prettier_lines: string[],
 	options: { min_width?: number; line_predicate: (line: string) => boolean }
 ): boolean {
-	const min_width = options.min_width ?? 100;
+	const min_width = options.min_width ?? PRINT_WIDTH;
 	const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
 	const has_long_match = p_lines.some(
 		(l) => options.line_predicate(l) && visual_width(l) > min_width
@@ -2224,7 +2250,7 @@ const inline_sibling_newline_flow: DivergencePattern = {
 			if (hunk.added_lines.length === hunk.removed_lines.length) {
 				return (
 					ours_trimmed[0].startsWith(prettier_trimmed[0] + ' ') &&
-					hunk.added_lines.every((l) => visual_width(l) <= 100) &&
+					ours_holds_print_width(hunk) &&
 					prettier_weld === ours_weld
 				);
 			}
@@ -2600,7 +2626,7 @@ const spaced_tag_travel: DivergencePattern = {
 			if (!prettier_midline) return false;
 
 			// OURS side: the traveled layout never overruns print width…
-			if (hunk.added_lines.some((l) => visual_width(l) > 100)) return false;
+			if (!ours_holds_print_width(hunk)) return false;
 
 			// …and never tears open a tag that could have rendered flat. An unmatched `{` on
 			// an our-line is legitimate only where the expression is FORCED to break — wider
@@ -2936,31 +2962,18 @@ const fill_101_boundary: DivergencePattern = {
 		const prettier_lines = ctx.prettier_lines!;
 		let longest_prettier_overflow = 0;
 
-		// For each hunk, check if prettier lines in that hunk's range exceed 100 chars
-		// AND the difference looks like a print-width boundary divergence.
-		// Two cases: (1) we produce more lines (broke the long line), or
-		// (2) same/fewer lines but all our lines fit within 100 chars (rewrapped at print width).
+		// A hunk matches when prettier ran to (or past) print width here and every line
+		// ours emitted holds it. One walk of the prettier lines answers both the gate and
+		// the reason string: the widest line IS the widest overflow once it clears the limit.
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
-			// >= 100: includes lines at exactly print width, since the divergence is
-			// that prettier fills right up to the limit while we break earlier.
-			const has_long_line = p_lines.some((l) => visual_width(l) >= 100);
-			if (!has_long_line) return false;
+			const widest_prettier = p_lines.reduce((w, l) => Math.max(w, visual_width(l)), 0);
+			// >= PRINT_WIDTH: includes lines at exactly print width, since the divergence
+			// is that prettier fills right up to the limit while we break earlier.
+			if (widest_prettier < PRINT_WIDTH) return false;
+			if (!ours_holds_print_width(hunk)) return false;
 
-			// Case 1: We have more lines (we broke prettier's long line)
-			const we_break_more = hunk.added_lines.length > hunk.removed_lines.length;
-			// Case 2: Same or fewer lines, but all our lines fit within print width.
-			// Require at least one added line — `every` is vacuously true for a
-			// removal-only hunk (empty added_lines), which would otherwise claim a
-			// prettier line we simply DELETED as a print-width rewrap.
-			const ours_all_fit =
-				hunk.added_lines.length > 0 && hunk.added_lines.every((l) => visual_width(l) <= 100);
-			if (!we_break_more && !ours_all_fit) return false;
-
-			for (const l of p_lines) {
-				const w = visual_width(l);
-				if (w >= 100) longest_prettier_overflow = Math.max(longest_prettier_overflow, w);
-			}
+			longest_prettier_overflow = Math.max(longest_prettier_overflow, widest_prettier);
 			return true;
 		});
 
