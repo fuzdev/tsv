@@ -1,0 +1,969 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 872,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Object-pattern target with a logical value - fits inline (100 chars)",
+			"start": 10,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Object-pattern target with a logical value - breaks after the operator (101 chars)",
+			"start": 184,
+			"end": 269,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The value's own operands break flush on the continuation line",
+			"start": 375,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A member chain and a string value break after the operator the same way",
+			"start": 568,
+			"end": 642,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 75
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 871,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 862,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 83,
+					"end": 181,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 84,
+						"end": 179,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 2
+							},
+							"end": {
+								"line": 3,
+								"column": 97
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 84,
+							"end": 98,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 2
+								},
+								"end": {
+									"line": 3,
+									"column": 16
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 86,
+									"end": 96,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 4
+										},
+										"end": {
+											"line": 3,
+											"column": 14
+										}
+									},
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 86,
+										"end": 96,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 4
+											},
+											"end": {
+												"line": 3,
+												"column": 14
+											}
+										},
+										"name": "aaaaaaaaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 86,
+										"end": 96,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 4
+											},
+											"end": {
+												"line": 3,
+												"column": 14
+											}
+										},
+										"name": "aaaaaaaaaa"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "LogicalExpression",
+							"start": 101,
+							"end": 179,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 19
+								},
+								"end": {
+									"line": 3,
+									"column": 97
+								}
+							},
+							"left": {
+								"type": "LogicalExpression",
+								"start": 101,
+								"end": 153,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 19
+									},
+									"end": {
+										"line": 3,
+										"column": 71
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 101,
+									"end": 125,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 19
+										},
+										"end": {
+											"line": 3,
+											"column": 43
+										}
+									},
+									"name": "xxxxxxxxxxxxxxxxxxxxxxxx"
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 129,
+									"end": 153,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 47
+										},
+										"end": {
+											"line": 3,
+											"column": 71
+										}
+									},
+									"name": "yyyyyyyyyyyyyyyyyyyyyyyy"
+								}
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 157,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 75
+									},
+									"end": {
+										"line": 3,
+										"column": 97
+									}
+								},
+								"name": "zzzzzzzzzzzzzzzzzzzzzz"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Object-pattern target with a logical value - fits inline (100 chars)",
+							"start": 10,
+							"end": 81
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 271,
+					"end": 372,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 83
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 272,
+						"end": 370,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 7,
+								"column": 81
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 272,
+							"end": 286,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 16
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 274,
+									"end": 284,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 4
+										},
+										"end": {
+											"line": 6,
+											"column": 14
+										}
+									},
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 274,
+										"end": 284,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 4
+											},
+											"end": {
+												"line": 6,
+												"column": 14
+											}
+										},
+										"name": "aaaaaaaaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 274,
+										"end": 284,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 4
+											},
+											"end": {
+												"line": 6,
+												"column": 14
+											}
+										},
+										"name": "aaaaaaaaaa"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "LogicalExpression",
+							"start": 291,
+							"end": 370,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 81
+								}
+							},
+							"left": {
+								"type": "LogicalExpression",
+								"start": 291,
+								"end": 343,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 54
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 291,
+									"end": 315,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 26
+										}
+									},
+									"name": "xxxxxxxxxxxxxxxxxxxxxxxx"
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 319,
+									"end": 343,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 30
+										},
+										"end": {
+											"line": 7,
+											"column": 54
+										}
+									},
+									"name": "yyyyyyyyyyyyyyyyyyyyyyyy"
+								}
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 347,
+								"end": 370,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 58
+									},
+									"end": {
+										"line": 7,
+										"column": 81
+									}
+								},
+								"name": "zzzzzzzzzzzzzzzzzzzzzzz"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Object-pattern target with a logical value - breaks after the operator (101 chars)",
+							"start": 184,
+							"end": 269
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 441,
+					"end": 565,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 34
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 442,
+						"end": 563,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 2
+							},
+							"end": {
+								"line": 13,
+								"column": 32
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 442,
+							"end": 456,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 16
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 444,
+									"end": 454,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 4
+										},
+										"end": {
+											"line": 10,
+											"column": 14
+										}
+									},
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 444,
+										"end": 454,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 4
+											},
+											"end": {
+												"line": 10,
+												"column": 14
+											}
+										},
+										"name": "aaaaaaaaaa"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 444,
+										"end": 454,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 4
+											},
+											"end": {
+												"line": 10,
+												"column": 14
+											}
+										},
+										"name": "aaaaaaaaaa"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "LogicalExpression",
+							"start": 461,
+							"end": 563,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 32
+								}
+							},
+							"left": {
+								"type": "LogicalExpression",
+								"start": 461,
+								"end": 527,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 32
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 461,
+									"end": 491,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 32
+										}
+									},
+									"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 497,
+									"end": 527,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 32
+										}
+									},
+									"name": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+								}
+							},
+							"operator": "??",
+							"right": {
+								"type": "Identifier",
+								"start": 533,
+								"end": 563,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 32
+									}
+								},
+								"name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The value's own operands break flush on the continuation line",
+							"start": 375,
+							"end": 439
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 644,
+					"end": 752,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 90
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 645,
+						"end": 750,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 2
+							},
+							"end": {
+								"line": 17,
+								"column": 88
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 645,
+							"end": 659,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 16
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 647,
+									"end": 657,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 4
+										},
+										"end": {
+											"line": 16,
+											"column": 14
+										}
+									},
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 647,
+										"end": 657,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 4
+											},
+											"end": {
+												"line": 16,
+												"column": 14
+											}
+										},
+										"name": "bbbbbbbbbb"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 647,
+										"end": 657,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 4
+											},
+											"end": {
+												"line": 16,
+												"column": 14
+											}
+										},
+										"name": "bbbbbbbbbb"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 664,
+							"end": 750,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 88
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 664,
+								"end": 723,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 61
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 664,
+									"end": 694,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 32
+										}
+									},
+									"name": "cccccccccccccccccccccccccccccc"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 695,
+									"end": 723,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 33
+										},
+										"end": {
+											"line": 17,
+											"column": 61
+										}
+									},
+									"name": "dddddddddddddddddddddddddddd"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 724,
+								"end": 750,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 62
+									},
+									"end": {
+										"line": 17,
+										"column": 88
+									}
+								},
+								"name": "eeeeeeeeeeeeeeeeeeeeeeeeee"
+							},
+							"computed": false,
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A member chain and a string value break after the operator the same way",
+							"start": 568,
+							"end": 642
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 754,
+					"end": 861,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 93
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 755,
+						"end": 859,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 2
+							},
+							"end": {
+								"line": 19,
+								"column": 91
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 755,
+							"end": 765,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 2
+								},
+								"end": {
+									"line": 18,
+									"column": 12
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 757,
+									"end": 763,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 4
+										},
+										"end": {
+											"line": 18,
+											"column": 10
+										}
+									},
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 757,
+										"end": 763,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 4
+											},
+											"end": {
+												"line": 18,
+												"column": 10
+											}
+										},
+										"name": "length"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 757,
+										"end": 763,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 4
+											},
+											"end": {
+												"line": 18,
+												"column": 10
+											}
+										},
+										"name": "length"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Literal",
+							"start": 770,
+							"end": 859,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 2
+								},
+								"end": {
+									"line": 19,
+									"column": 91
+								}
+							},
+							"value": "a string literal that is long enough not to fit on the statement line at all on its own",
+							"raw": "'a string literal that is long enough not to fit on the statement line at all on its own'"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
