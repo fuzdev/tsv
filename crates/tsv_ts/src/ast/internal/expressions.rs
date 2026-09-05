@@ -525,6 +525,26 @@ impl BinaryOperator {
         crate::ast::precedence::should_flatten(*self, other)
     }
 
+    /// Whether a RIGHT operand carrying `other` joins this operator's chain.
+    ///
+    /// Prettier's `isUnbalancedLogicalTree` (`parse/postprocess/index.js`), which
+    /// REBALANCES `a op (b op c)` into `(a op b) op c` at parse time for a LogicalExpression
+    /// whose right operand carries the same operator — recursively, before the printer runs.
+    /// tsv keeps the authored tree and answers the same question here, so the flattened
+    /// chain and every rule keyed on it (`should_inline_logical_expression`,
+    /// `build_binary_chain_doc_core`'s operand count) see prettier's rebalanced shape.
+    ///
+    /// Only the logical operators are associative this way — arithmetic keeps its right
+    /// parens (`a + (b + c)` is not `a + b + c` for every operand type), and prettier
+    /// rebalances no BinaryExpression. Among `&&` / `||` / `??` each has its own
+    /// precedence level, so "same operator" is exactly what `can_flatten_with` says there.
+    #[inline]
+    pub const fn rebalances_with(self, other: BinaryOperator) -> bool {
+        // `as u8` and not `==`: `PartialEq` is not const, and `#[repr(u8)]` with no explicit
+        // discriminants gives each variant its own value, so the casts compare variants.
+        self.is_logical() && self as u8 == other as u8
+    }
+
     /// Check if this is a logical operator (&&, ||, ??)
     #[inline]
     pub const fn is_logical(self) -> bool {
@@ -558,6 +578,38 @@ pub struct BinaryExpression<'arena> {
     pub operator: BinaryOperator,
     pub right: &'arena Expression<'arena>,
     pub span: Span,
+}
+
+impl<'arena> BinaryExpression<'arena> {
+    /// The right operand of prettier's REBALANCED tree: the deepest right of the spine
+    /// [`BinaryOperator::rebalances_with`] joins, which is this chain's LAST operand.
+    ///
+    /// ⚠️ **A rule prettier asks of a logical node must ask this, not `self.right`** —
+    /// prettier rebalances at parse time, so `a ?? (b ?? [1])` is `(a ?? b) ?? [1]` at every
+    /// question its printer asks, and a rule keyed on `self.right` is asking about a tree
+    /// prettier does not have. That is a whole class of bug: it can only show up on the
+    /// paren-nested twin of an authoring, and it shows up as a divergence AND a
+    /// non-idempotency, since tsv's own reparse of its output sees the left-nested shape.
+    ///
+    /// tsv cannot rebalance the tree itself — `parse` is a drop-in replacement for acorn's
+    /// public JSON AST, and acorn keeps `a ?? (b ?? c)` right-nested. So the normalization
+    /// lives here and in the printer's chain flattening, which is the same rule
+    /// ([`BinaryOperator::rebalances_with`]).
+    ///
+    /// Not every rule needs it: one that is symmetric in the two operands
+    /// (`should_group_binary_continuation`, `is_simple_call_argument`) answers the same on
+    /// both trees. Verify, don't assume.
+    #[must_use]
+    pub fn rebalanced_right(&self) -> &'arena Expression<'arena> {
+        let mut right = self.right;
+        while let Expression::BinaryExpression(inner) = right {
+            if !self.operator.rebalances_with(inner.operator) {
+                break;
+            }
+            right = inner.right;
+        }
+        right
+    }
 }
 
 /// Call expression: `foo()`, `obj.method(arg1, arg2)`, `fn<T>()`
