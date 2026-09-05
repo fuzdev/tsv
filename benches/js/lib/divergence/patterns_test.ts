@@ -2463,9 +2463,28 @@ Deno.test('fill_after_inline: negative - long inline-close line, ours did not re
 	assertEquals(match, null);
 });
 
+Deno.test('fill_101_boundary: negative - we break more but still leave an over-width line', () => {
+	// prettier [6, 100, 5] vs ours [6, 105, 12, 5]: tsv breaks the 100-column line into
+	// MORE lines than prettier had and still emits one at 105. The old case-1 arm
+	// ("added_lines.length > removed_lines.length") graded nobody's width, so this filed a
+	// real over-width bug as the sanctioned print-width divergence — exactly the laundering
+	// `width:audit` cannot see off the fixture tree. The ours-side width check rejects it.
+	const prettier = `before\n${'x'.repeat(100)}\nafter`;
+	const ours = `before\n${'y'.repeat(105)}\n${'z'.repeat(12)}\nafter`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	// Confirm the shape: one hunk, ours added MORE lines than it removed, one of them wide.
+	assertEquals(ctx.hunks.length, 1);
+	assertEquals(ctx.hunks[0].added_lines.length > ctx.hunks[0].removed_lines.length, true);
+	assertEquals(
+		ctx.hunks[0].added_lines.some((l) => visual_width(l) > 100),
+		true
+	);
+	assertEquals(run_pattern('fill_101_boundary', ctx), null);
+});
+
 Deno.test('fill_101_boundary: negative - removal-only hunk (empty added_lines)', () => {
 	// A prettier line >= 100 chars that we simply DELETED (no added lines). The
-	// Case-2 `added_lines.every(...)` guard is vacuously true for empty arrays —
+	// `added_lines.every(...)` width guard is vacuously true for empty arrays —
 	// requiring added_lines.length > 0 keeps a deleted long line from being
 	// claimed as a print-width rewrap.
 	const longLine = '\t' + 'x'.repeat(103); // visual width 105
