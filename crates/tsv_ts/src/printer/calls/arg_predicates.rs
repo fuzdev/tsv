@@ -1,6 +1,8 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
-use crate::ast::internal::{self, Expression};
+use crate::ast::internal::{self, Expression, TSType};
+use crate::printer::needs_parens::strip_non_null_wrappers;
+use crate::printer::types::helpers::{is_simple_type, unwrap_parenthesized};
 
 /// Check if an argument is "hopefully short" enough to stay inline
 ///
@@ -8,6 +10,8 @@ use crate::ast::internal::{self, Expression};
 /// than `isSimpleCallArgument`. Key differences:
 /// - Call expressions with > 1 argument are NOT short (even if structurally simple)
 /// - Binary expressions check both sides with depth=1
+/// - An `as` / `satisfies` cast is short only under [`cast_is_hopefully_short`]; an
+///   angle-bracket assertion (`<T>x`) is never short
 /// - A JSDoc cast is transparent: the question is re-asked of the wrapped expression,
 ///   so the rules above still fire through it (`is_simple_call_argument` has no such
 ///   case, which is what keeps the transparency one level deep)
@@ -23,9 +27,25 @@ fn is_hopefully_short_arg(expr: &Expression<'_>) -> bool {
         // another argument stays opaque, matching prettier.
         Expression::JsdocCast(cast) => is_hopefully_short_arg(cast.inner),
 
+        // Prettier: `isBinaryCastExpression(node) || node.type === "TypeCastExpression"` —
+        // the `as` / `satisfies` pair (the Flow spellings have no tsv equivalent).
+        Expression::TSAsExpression(cast) => {
+            cast_is_hopefully_short(cast.type_annotation, cast.expression)
+        }
+        Expression::TSSatisfiesExpression(cast) => {
+            cast_is_hopefully_short(cast.type_annotation, cast.expression)
+        }
+
+        // An angle-bracket assertion (`<T>x`) is NEVER short: prettier's
+        // `isBinaryCastExpression` does not list `TSTypeAssertion`, so it falls past the cast
+        // branch to `isSimpleCallArgument`, which has no case for it either. Stated here
+        // rather than left to the fallthrough (which now answers the same) because the
+        // asymmetry with the two arms above IS the rule, and it is asked about exactly here:
+        // `<T>{}` and `{} as T` are one seed written two ways, and only one of them hugs.
+        Expression::TSTypeAssertion(_) => false,
+
         // Prettier: if (isCallLikeExpression(node) && getCallArguments(node).length > 1) return false
-        Expression::CallExpression(call) if call.arguments.len() > 1 => false,
-        Expression::NewExpression(new_expr) if new_expr.arguments.len() > 1 => false,
+        _ if CallLikeArguments::of(expr).is_some_and(|arguments| arguments.len() > 1) => false,
 
         // Prettier: if (isBinaryish(node)) check both sides with depth=1
         // Note: Our AST uses BinaryExpression for logical ops (&&, ||, ??) too
@@ -41,68 +61,184 @@ fn is_hopefully_short_arg(expr: &Expression<'_>) -> bool {
     }
 }
 
-/// Check if an expression is an object that could expand (has properties)
-/// Used for "expand last arg" pattern in import expressions
-pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
-    matches!(expr, Expression::ObjectExpression(obj) if !obj.properties.is_empty())
+/// Prettier's **cast branch of `isHopefullyShortCallArgument`**: an `as` / `satisfies`
+/// cast is short when its target type is simple and the expression it wraps is a simple
+/// call argument at depth 1.
+///
+/// The type is read through two rewrites before [`is_simple_type`] sees it, both
+/// prettier's:
+///
+/// 1. **Array element**, at most twice — `T[]` and `T[][]` are as short as `T`, `T[][][]`
+///    is not (prettier stops after two, and so does this).
+/// 2. **A lone type argument** of a type reference — `A<B>` is as short as `B`, while
+///    `A<B, C>` keeps the reference itself, which is never simple once it carries type
+///    arguments. That one-argument boundary is the whole reason `{} as Record<K, V>`
+///    breaks all args where `{} as T` hugs.
+///
+/// Parens are unwrapped at each step because prettier's TS AST has no
+/// `TSParenthesizedType` node — `(T)[]` reaches its check already as `T[]`.
+fn cast_is_hopefully_short(type_annotation: &TSType<'_>, expression: &Expression<'_>) -> bool {
+    let mut ty = unwrap_parenthesized(type_annotation);
+    for _ in 0..2 {
+        let TSType::Array(array) = ty else { break };
+        ty = unwrap_parenthesized(array.element_type);
+    }
+    if let TSType::TypeReference(reference) = ty
+        && let Some(type_arguments) = &reference.type_arguments
+        && let [lone] = type_arguments.params
+    {
+        ty = lone;
+    }
+
+    is_simple_type(ty) && is_simple_call_argument(expression, 1)
 }
 
-/// Check if a second argument is "short" enough for the "expand first arg" pattern.
+/// The **call-like family** prettier's `isCallLikeExpression` names — a call, a `new`, or a
+/// dynamic `import(…)` — read through its `getCallArguments`. An import's "arguments" are its
+/// specifier plus the optional options object, which is why this is not simply a slice.
 ///
-/// Used when the first arg is a block function and we want to keep the second arg
-/// inline after the closing `}`. Returns false for expressions that would expand.
+/// One spelling of a closed list that both [`is_hopefully_short_arg`] and
+/// [`is_simple_call_argument`] ask about. A member present in one of them and missing from
+/// the other is exactly the drift this exists to prevent — `import(…)` was missing from both.
+#[derive(Clone, Copy)]
+enum CallLikeArguments<'a> {
+    /// A call's or `new`'s callee and argument list.
+    Called {
+        callee: &'a Expression<'a>,
+        arguments: &'a [Expression<'a>],
+    },
+    /// A dynamic import's specifier and optional options object. It has **no callee**, and
+    /// prettier's simplicity test skips the callee arm for it rather than failing on it.
+    Imported {
+        source: &'a Expression<'a>,
+        options: Option<&'a Expression<'a>>,
+    },
+}
+
+impl<'a> CallLikeArguments<'a> {
+    /// The call-like reading of `expr`, or `None` when it is not call-like.
+    fn of(expr: &'a Expression<'a>) -> Option<Self> {
+        match expr {
+            Expression::CallExpression(call) => Some(Self::Called {
+                callee: call.callee,
+                arguments: call.arguments,
+            }),
+            Expression::NewExpression(new_expr) => Some(Self::Called {
+                callee: new_expr.callee,
+                arguments: new_expr.arguments,
+            }),
+            Expression::ImportExpression(import_expr) => Some(Self::Imported {
+                source: import_expr.source,
+                options: import_expr.options,
+            }),
+            _ => None,
+        }
+    }
+
+    /// Prettier's `getCallArguments(node).length`.
+    fn len(self) -> usize {
+        match self {
+            Self::Called { arguments, .. } => arguments.len(),
+            Self::Imported { options, .. } => 1 + usize::from(options.is_some()),
+        }
+    }
+
+    /// The callee whose own simplicity prettier tests, or `None` where it has none to test.
+    fn callee(self) -> Option<&'a Expression<'a>> {
+        match self {
+            Self::Called { callee, .. } => Some(callee),
+            Self::Imported { .. } => None,
+        }
+    }
+
+    /// Whether every argument satisfies `predicate`.
+    fn all(self, mut predicate: impl FnMut(&'a Expression<'a>) -> bool) -> bool {
+        match self {
+            Self::Called { arguments, .. } => arguments.iter().all(predicate),
+            Self::Imported { source, options } => {
+                predicate(source) && options.is_none_or(predicate)
+            }
+        }
+    }
+}
+
+/// Whether a second argument keeps the "expand first arg" hug — prettier's
+/// `shouldExpandFirstArg` minus its first-argument half, i.e. its three named refusals plus
+/// `isHopefullyShortCallArgument(secondArg) && !couldExpandArg(secondArg)`.
 ///
-/// The `has_comments_to_emit_between` closure checks for comments inside empty containers
-/// (typically `printer.has_comments_to_emit_between`).
-pub(super) fn is_short_second_arg_for_expand_first<F>(arg: &Expression<'_>, has_comments: F) -> bool
+/// `leading_gap_start` is where this argument's leading gap opens (the previous argument's
+/// printed end) — [`could_expand_collection_arg`] needs it to ask prettier's
+/// `hasComment(node)` of a bare collection.
+///
+/// The `has_comments` closure answers whether a comment OCCUPIES THE PAGE in a range — the
+/// on-page axis, since `hasComment` is a pure layout question that an owned annotation
+/// satisfies. Callers pass `printer.has_comments_on_page_between`.
+pub(super) fn is_short_second_arg_for_expand_first<F>(
+    arg: &Expression<'_>,
+    leading_gap_start: u32,
+    has_comments: F,
+) -> bool
 where
     F: Fn(u32, u32) -> bool,
 {
     match arg {
-        // Functions, ternaries, spreads - these should expand all args
+        // The three kinds prettier's `shouldExpandFirstArg` names outright. A spread needs
+        // no arm of its own: `isSimpleCallArgument` has no case for one either, so it is
+        // refused below exactly as prettier refuses it.
         Expression::ArrowFunctionExpression(_)
         | Expression::FunctionExpression(_)
-        | Expression::ConditionalExpression(_)
-        | Expression::SpreadElement(_) => false,
-        // Non-empty objects expand - use "expand all args" instead
-        Expression::ObjectExpression(obj) if !obj.properties.is_empty() => false,
-        // Non-empty arrays expand - use "expand all args" instead
-        Expression::ArrayExpression(arr) if !arr.elements.is_empty() => false,
-        // Empty {} or [] with comments inside should expand
-        Expression::ObjectExpression(obj) if has_comments(obj.span.start, obj.span.end) => false,
-        Expression::ArrayExpression(arr) if has_comments(arr.span.start, arr.span.end) => false,
-        // Truly empty {} and [] are short
-        Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => true,
-        // TS cast wrappers (`as` / `satisfies` / `<T>`, never `!`): mirror prettier's
-        // couldExpandArg, which looks through the cast to a non-empty (or commented)
-        // object/array and expands all args rather than expand-first.
-        Expression::TSAsExpression(_)
-        | Expression::TSSatisfiesExpression(_)
-        | Expression::TSTypeAssertion(_)
-            if cast_wraps_expandable_object_or_array(arg, &has_comments) =>
-        {
-            false
-        }
-        // Other args: check if "hopefully short"
+        | Expression::ConditionalExpression(_) => false,
+        // `!couldExpandArg(secondArg)`
+        _ if could_expand_collection_arg(arg, leading_gap_start, &has_comments) => false,
+        // `isHopefullyShortCallArgument(secondArg)`. A truly empty, uncommented `{}` / `[]`
+        // reaches this arm and is simple by the vacuous `all` over its members — as it is in
+        // prettier, which likewise gives an empty collection no arm of its own.
         _ => is_hopefully_short_arg(arg),
     }
 }
 
-/// Whether a TS cast-wrapped arg (`as` / `satisfies` / `<T>`, never non-null) wraps an
-/// object or array prettier's `couldExpandArg` would expand — a non-empty, or
-/// comment-bearing, object/array. Such a second arg forces expand-all rather than
-/// expand-first, mirroring `!couldExpandArg`. An empty, uncommented wrapped collection
-/// (`{} as T`) stays "short" and still expands-first, matching prettier.
-fn cast_wraps_expandable_object_or_array<F>(arg: &Expression<'_>, has_comments: &F) -> bool
+/// Prettier's **`couldExpandArg` collection arms**: an object or array that would expand —
+/// non-empty, or carrying a comment — asked through the `as` / `satisfies` / `<T>` casts
+/// `couldExpandArg` recurses into (never through `!`, which it does not look past).
+///
+/// **Which comments count depends on the spelling, and that asymmetry is prettier's.**
+/// `hasComment` is asked of whatever the recursion landed on, so for a BARE collection a
+/// comment written before it attaches to the collection and blocks the hug, while for a
+/// cast-wrapped one it attaches to the **cast** — which is why `/* c */ {} as T` still hugs
+/// and `/* c */ {}` does not. Hence the range: `leading_gap_start` for a bare collection,
+/// the collection's own start for a wrapped one.
+///
+/// A JSDoc cast is deliberately absent: prettier keeps its parens, so `couldExpandArg` sees
+/// an opaque paren node rather than the collection inside and expands-first even for a
+/// non-empty one. The transparency a cast does get is in [`is_hopefully_short_arg`] —
+/// pinned by `calls/expand_first_jsdoc_cast_second_arg`.
+fn could_expand_collection_arg<F>(
+    arg: &Expression<'_>,
+    leading_gap_start: u32,
+    has_comments: &F,
+) -> bool
 where
     F: Fn(u32, u32) -> bool,
 {
-    match unwrap_ts_type_wrappers(arg) {
+    let (collection, comments_from) = match arg {
+        Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => {
+            (arg, leading_gap_start)
+        }
+        Expression::TSAsExpression(_)
+        | Expression::TSSatisfiesExpression(_)
+        | Expression::TSTypeAssertion(_) => {
+            let inner = unwrap_ts_type_wrappers(arg);
+            (inner, inner.span().start)
+        }
+        _ => return false,
+    };
+
+    match collection {
         Expression::ObjectExpression(obj) => {
-            !obj.properties.is_empty() || has_comments(obj.span.start, obj.span.end)
+            !obj.properties.is_empty() || has_comments(comments_from, obj.span.end)
         }
         Expression::ArrayExpression(arr) => {
-            !arr.elements.is_empty() || has_comments(arr.span.start, arr.span.end)
+            !arr.elements.is_empty() || has_comments(comments_from, arr.span.end)
         }
         _ => false,
     }
@@ -114,10 +250,7 @@ where
 /// `couldExpandArg`: `(x) => fn()` and `(x) => fn()!` are both call bodies, so the
 /// arrow hugs the call's open paren rather than breaking at it.
 pub(super) fn arrow_body_is_call_through_non_null(body: &Expression<'_>) -> bool {
-    matches!(
-        crate::printer::needs_parens::strip_non_null_wrappers(body),
-        Expression::CallExpression(_)
-    )
+    matches!(strip_non_null_wrappers(body), Expression::CallExpression(_))
 }
 
 /// Check if an arrow function body is a ternary expression
@@ -131,6 +264,15 @@ pub(super) fn arrow_body_is_call_through_non_null(body: &Expression<'_>) -> bool
 /// Call expressions, objects, and arrays are handled by other code paths.
 pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
     matches!(body, Expression::ConditionalExpression(_))
+}
+
+/// Whether an expression is an object literal with properties — the narrow
+/// `couldExpandArg` an `import(…)`'s **options** argument asks for its expand-last states.
+/// Deliberately not [`could_expand_collection_arg`]: that one answers the expand-FIRST
+/// question, which looks through casts and counts comments; this one is a plain shape test
+/// on the last argument.
+pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
+    matches!(expr, Expression::ObjectExpression(obj) if !obj.properties.is_empty())
 }
 
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
@@ -154,23 +296,14 @@ pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>) -> bool {
 /// (`as`/`satisfies`) and `TSTypeAssertion` (`<T>x`) but NOT `TSNonNullExpression`: a
 /// `{...}!` / `[...]!` argument is not treated as an expandable object/array, so it does
 /// not hug the call parens.
-fn unwrap_ts_type_wrappers<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    match expr {
-        Expression::TSAsExpression(e) => unwrap_ts_type_wrappers(e.expression),
-        Expression::TSSatisfiesExpression(e) => unwrap_ts_type_wrappers(e.expression),
-        Expression::TSTypeAssertion(e) => unwrap_ts_type_wrappers(e.expression),
-        _ => expr,
-    }
-}
-
-/// Get the inner expression if this is a TS type wrapper, otherwise None.
-fn get_ts_type_wrapper_inner<'a>(expr: &'a Expression<'a>) -> Option<&'a Expression<'a>> {
-    match expr {
-        Expression::TSAsExpression(e) => Some(e.expression),
-        Expression::TSSatisfiesExpression(e) => Some(e.expression),
-        Expression::TSTypeAssertion(e) => Some(e.expression),
-        Expression::TSNonNullExpression(e) => Some(e.expression),
-        _ => None,
+fn unwrap_ts_type_wrappers<'a>(mut expr: &'a Expression<'a>) -> &'a Expression<'a> {
+    loop {
+        expr = match expr {
+            Expression::TSAsExpression(cast) => cast.expression,
+            Expression::TSSatisfiesExpression(cast) => cast.expression,
+            Expression::TSTypeAssertion(cast) => cast.expression,
+            _ => return expr,
+        };
     }
 }
 
@@ -244,13 +377,16 @@ pub(super) fn is_hook_callback_with_deps(callback: &Expression<'_>, deps: &Expre
 /// deep structures. Returns false at depth 0.
 ///
 /// Simple cases:
-/// - Literals, identifiers, `this`, `super`, meta properties
+/// - Literals, identifiers, `this`, `super`
 /// - Template literals without newlines (with simple expressions)
 /// - Objects with simple property values
 /// - Arrays with simple elements
-/// - Call/new expressions with simple callee and few simple args
+/// - Call-like nodes ([`CallLikeArguments`]) with a simple callee and few simple arguments
 /// - Member expressions with simple object and property
-/// - Unary/update expressions with simple arguments
+/// - Update expressions, and unary ones over `!` / `-` / `+` / `~`
+///
+/// Everything else is NOT simple — notably a TS cast, a meta property, and `typeof` / `void` /
+/// `delete`, each of which prettier leaves to its own closing `return false`.
 ///
 /// Reference: prettier/src/language-js/utils/index.js `isSimpleCallArgument`
 pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
@@ -258,9 +394,27 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
         return false;
     }
 
-    // Unwrap TS type wrappers (as, satisfies, <T>, !) - same depth, just unwrapping
-    if let Some(inner) = get_ts_type_wrapper_inner(expr) {
-        return is_simple_call_argument(inner, depth);
+    // Prettier opens with `node = stripChainElementWrappers(node)` — the chain-element
+    // wrappers ONLY, at the same depth. A cast (`as` / `satisfies` / `<T>`) is deliberately
+    // not looked through: prettier has no case for one, so it falls to the closing
+    // `_ => false`. That refusal is load-bearing at both callers — a cast argument is what
+    // force-expands a 3+ call member chain
+    // (`call_has_complex_args`) and what refuses the expand-first hug through
+    // `is_hopefully_short_arg`.
+    let expr = strip_non_null_wrappers(expr);
+
+    // Call-like nodes: the callee must be simple at THIS depth, the arguments must fit within
+    // the remaining depth, and each must be simple one level shallower. Prettier skips the
+    // callee arm for a dynamic `import(…)`
+    // (`node.type === "ImportExpression" || isSimpleCallArgument(node.callee, depth)`) rather
+    // than failing on it — it has no callee. Answered ahead of the match because a match guard
+    // cannot bind; the family is disjoint from every arm below.
+    if let Some(arguments) = CallLikeArguments::of(expr) {
+        return arguments
+            .callee()
+            .is_none_or(|callee| is_simple_call_argument(callee, depth))
+            && arguments.len() <= depth
+            && arguments.all(|argument| is_simple_call_argument(argument, depth - 1));
     }
 
     match expr {
@@ -271,12 +425,13 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
         // Uses the precomputed pattern width so this stays source-free.
         Expression::RegexLiteral(regex) => usize::from(regex.pattern_width) <= 5,
 
-        // Single-word types are simple (Prettier: isSingleWordType)
-        // Includes: Identifier, ThisExpression, Super, MetaProperty
-        Expression::Identifier(_)
-        | Expression::ThisExpression(_)
-        | Expression::Super(_)
-        | Expression::MetaProperty(_) => true,
+        // Single-word types are simple (Prettier: `isSingleWordType`). A meta property
+        // (`import.meta`, `new.target`) is deliberately NOT one — prettier lists neither it
+        // nor any `Meta*` node in `isSingleWordType` or `isLiteral`, so it falls to the
+        // closing `_ => false`. `PrivateIdentifier` is on prettier's list but unreachable
+        // here: a bare `#x` is only ever the left side of `#x in o`, and `a.#b` is answered
+        // by the member arm's non-computed short-circuit before it asks.
+        Expression::Identifier(_) | Expression::ThisExpression(_) | Expression::Super(_) => true,
 
         // Template literals: simple if no newlines and expressions are simple
         Expression::TemplateLiteral(template) => {
@@ -326,27 +481,9 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
                 )
         }
 
-        // Call expressions: callee must be simple, args count <= depth, all args simple
-        Expression::CallExpression(call) => {
-            is_simple_call_argument(call.callee, depth)
-                && call.arguments.len() <= depth
-                && call
-                    .arguments
-                    .iter()
-                    .all(|arg| is_simple_call_argument(arg, depth - 1))
-        }
-
-        // New expressions: same logic as calls
-        Expression::NewExpression(new_expr) => {
-            is_simple_call_argument(new_expr.callee, depth)
-                && new_expr.arguments.len() <= depth
-                && new_expr
-                    .arguments
-                    .iter()
-                    .all(|arg| is_simple_call_argument(arg, depth - 1))
-        }
-
-        // Unary expressions with simple operands (Prettier checks specific operators)
+        // Unary expressions with simple operands. Prettier's
+        // `simpleCallArgumentUnaryOperators` is exactly these four — `typeof`, `void` and
+        // `delete` are all absent, so a `typeof x` argument is NOT simple.
         Expression::UnaryExpression(unary) => {
             matches!(
                 unary.operator,
@@ -354,8 +491,6 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
                     | internal::UnaryOperator::Plus
                     | internal::UnaryOperator::Bang
                     | internal::UnaryOperator::Tilde
-                    | internal::UnaryOperator::Typeof
-                    | internal::UnaryOperator::Void
             ) && is_simple_call_argument(unary.argument, depth)
         }
 
@@ -445,6 +580,59 @@ mod tests {
         assert!(is_simple_call_argument(&parse_expr(&arena, "f(a)"), 2));
         // Spread elements are never simple.
         assert!(!is_simple_call_argument(&parse_expr(&arena, "[...x]"), 2));
+    }
+
+    #[test]
+    fn simple_call_argument_looks_through_only_the_chain_wrappers() {
+        let arena = Bump::new();
+        let simple = |src: &str| is_simple_call_argument(&parse_expr(&arena, src), 2);
+        // `!` is prettier's `stripChainElementWrappers`, so `x!` is as simple as `x`.
+        assert!(simple("x!"));
+        // A TS cast is not looked through — prettier has no case for one.
+        assert!(!simple("x as T"));
+        assert!(!simple("x satisfies T"));
+        assert!(!simple("<T>x"));
+        // Only four unary operators are simple; `typeof` / `void` / `delete` are not.
+        assert!(simple("-x"));
+        assert!(simple("!x"));
+        assert!(!simple("typeof x"));
+        assert!(!simple("void x"));
+        assert!(!simple("delete x.y"));
+        // A dynamic import is call-like: its specifier plus optional options object are its
+        // arguments, and it has no callee to test.
+        assert!(simple("import('a')"));
+        assert!(simple("import(a, b)"));
+        // …and the argument count is still held to the depth.
+        assert!(!is_simple_call_argument(
+            &parse_expr(&arena, "import(a, b)"),
+            1
+        ));
+    }
+
+    #[test]
+    fn hopefully_short_reads_a_cast_through_its_type() {
+        let arena = Bump::new();
+        let short = |src: &str| is_hopefully_short_arg(&parse_expr(&arena, src));
+        // A bare type reference is simple, so the cast-wrapped seed stays short.
+        assert!(short("{} as T"));
+        assert!(short("{} satisfies T"));
+        // A lone type argument is descended into; two of them are not.
+        assert!(short("{} as A<B>"));
+        assert!(!short("{} as A<B, C>"));
+        // An array element type is unwrapped, at most twice.
+        assert!(short("{} as T[]"));
+        assert!(short("{} as T[][]"));
+        assert!(!short("{} as T[][][]"));
+        // The wrapped expression must itself be simple at depth 1.
+        assert!(!short("fn(a) as T"));
+        assert!(!short("({} as A) as B"));
+        // An angle-bracket assertion is never short, whatever its type says.
+        assert!(!short("<T>{}"));
+        // A call-like argument with more than one argument is never short.
+        assert!(short("fn(a)"));
+        assert!(!short("fn(a, b)"));
+        assert!(short("import('a')"));
+        assert!(!short("import('a', b)"));
     }
 
     #[test]

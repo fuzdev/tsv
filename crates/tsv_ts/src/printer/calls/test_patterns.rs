@@ -262,8 +262,8 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
     // member-chain parts against the pattern list directly — span-identity slices,
     // a stack-only `SmallVec` — instead of building and immediately discarding a
     // dotted callee `String` on every test-shaped call (hot waste).
-    // `callee_chain_string` stays for the actual-test-call
-    // flat-layout path, which needs the owned text.
+    // The flat-layout path (`build_test_callee_flat_doc`) builds no owned text either —
+    // it emits the same parts as `source_span` + dotted-pair docs.
     let Some(parts) = get_member_chain_parts(call.callee) else {
         return false;
     };
