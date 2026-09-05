@@ -4,9 +4,9 @@
  * `deno task check` gates `tests/fixtures`, which is format-stable by construction, so it
  * structurally cannot catch a content-loss / panic / non-idempotency bug in real code — every
  * such bug this cycle was found by a corpus audit or a wide fuzz seed, never by `check`. This
- * driver runs the pure-Rust content-loss audits over the `robustness` corpus view (the ../corpora snapshot's
- * real code + the live diff of this machine's working trees against it) plus the version-pinned Prettier
- * format suites, so a robustness
+ * driver runs the pure-Rust content-loss audits over the `robustness` corpus view (the WHOLE ../corpora
+ * snapshot + the `svelte_styles` cache + the live diff of this machine's working trees against the
+ * snapshot) plus the version-pinned Prettier format suites, so a robustness
  * regression fails loudly instead of shipping in the VS Code extension's format-on-save.
  *
  * `check`'s `roundtrip:audit:prettier` leg shares this driver's prettier suites (one list,
@@ -76,8 +76,9 @@ import { corpus_robustness_seeds } from './lib/corpus.ts';
 
 const log = (...args: unknown[]) => console.error(...args);
 
-// Real code: the pinned snapshot's directories + the live working trees' DIFF against it
-// (the `robustness` view) — directories and files alike are seeds to the Rust audits.
+// Real code: the whole pinned snapshot (one root) + the svelte_styles cache + the live working
+// trees' DIFF against the snapshot (the `robustness` view) — directories and files alike are
+// seeds to the Rust audits.
 const { dirs: snapshot_dirs, live_files } = await corpus_robustness_seeds(log);
 const real_seeds = [...snapshot_dirs, ...live_files];
 
