@@ -22,12 +22,15 @@
  *   where sub-100% coverage is the metric. The per-tool parse coverage surface
  *   (`deno task bench:conformance`).
  * - `robustness` — the real-code robustness sweeps' scope (`audit:corpus`,
- *   `idempotency:sweep`): the snapshot's real code PLUS the live DIFF — the files of
- *   the same repos' working trees (the `live` tier) whose bytes differ from, or are
- *   absent in, their collection, minus what the snapshot's manifest excludes and what git
- *   ignores. That is where new syntax shows up before any refresh, at a cost proportional
- *   to the drift.
- *   Directories plus a file list (`corpus_robustness_seeds`), nothing counted or pinned.
+ *   `idempotency:sweep`): the WHOLE snapshot — every collection `../corpora` vendors,
+ *   the third-party Svelte libraries outside the bench views included, since a sweep
+ *   grades an invariant rather than a pinned count — plus the `svelte_styles` harvest
+ *   cache, PLUS the live DIFF — the files of the `real` repos' working trees (the `live`
+ *   tier) whose bytes differ from, or are absent in, their collection, minus what the
+ *   snapshot's manifest excludes and what git ignores. That is where new syntax shows up
+ *   before any refresh, at a cost proportional to the drift.
+ *   The snapshot root and the cache as directories plus the live file list
+ *   (`corpus_robustness_seeds`), nothing counted or pinned.
  *
  * - CorpusLoader: loads one view of CORPUS_ENTRIES (the `../corpora` snapshot's
  *   collections, the pinned suite checkouts beside it, and the derived harvest caches)
@@ -578,10 +581,14 @@ const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
 	// process it" corpus (bench.ts hard-fails an unlisted failure); conformance is
 	// the hard-cases-only surface where sub-100% coverage is the measurement.
 	conformance: ['prettier_fixture', 'suite'],
-	// The real-code robustness sweeps: the snapshot AND the live working trees' diff.
-	// Not a bench or gate view — nothing here is counted or pinned; the sweeps take the
-	// present snapshot DIRECTORIES plus the live diff's FILES (`corpus_robustness_seeds`)
-	// and grade invariants that hold on any machine.
+	// The real-code robustness sweeps: the WHOLE snapshot AND the live working trees'
+	// diff. Not a bench or gate view — nothing here is counted or pinned, so the sweeps
+	// read the snapshot ROOT (every collection, in a tier or not) rather than the tiers'
+	// entries; the tiers listed here contribute only what lies OUTSIDE that root (the
+	// `svelte_styles` harvest cache, a `real` entry) and the `live` diff's FILES
+	// (`corpus_robustness_seeds`). The `live` seat is also what refuses loading the view
+	// whole (`CorpusLoader.stream`) or walking it as directories
+	// (`corpus_present_dirs_for_tiers`).
 	robustness: ['real', 'framework', 'live']
 };
 
@@ -732,9 +739,13 @@ export async function corpus_missing_entries(
  * Selected by TIER rather than by view because neither consumer's scope is one:
  * `conformance`'s `render:audit` leg wants the `suite` tier (`../svelte`'s test
  * tree) beside the whole snapshot (`corpus_snapshot_dir`), and the robustness
- * sweeps (`corpus_robustness_seeds`) want the `robustness` view minus its `live`
- * tier. A tier set holding `live` is refused: that tier is swept as a diff, never
- * as directories.
+ * sweeps (`corpus_robustness_seeds`) want the `robustness` view's pinned tiers beside
+ * that same root, keeping only what lies outside it. A tier set holding `live` is
+ * refused: that tier is swept as a diff, never as directories. A caller that already
+ * seeds a whole root passes it as `outside` to skip the entries beneath it: a
+ * collection is walked by the root when present and disclosed by the root's own
+ * warning when absent, so probing it here again would only repeat that warning per
+ * collection.
  *
  * Absent entries are skipped with a warning rather than failing the run: the
  * snapshot may not be cloned, and a sweep over what IS present is still worth
@@ -743,7 +754,8 @@ export async function corpus_missing_entries(
  */
 export async function corpus_present_dirs_for_tiers(
 	tiers: readonly CorpusTier[],
-	logger: Logger = console.log
+	logger: Logger = console.log,
+	options?: { outside?: string }
 ): Promise<string[]> {
 	if (tiers.includes('live')) {
 		throw new Error(
@@ -751,9 +763,11 @@ export async function corpus_present_dirs_for_tiers(
 				'use `corpus_robustness_seeds`'
 		);
 	}
+	const outside = options?.outside;
 	const dirs: string[] = [];
 	for (const entry of CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier))) {
 		if (entry.path === undefined) continue;
+		if (outside !== undefined && is_under(entry.path, outside)) continue;
 		if (await fs_exists(resolve(entry.path))) {
 			dirs.push(entry.path);
 		} else {
@@ -769,8 +783,9 @@ export async function corpus_present_dirs_for_tiers(
  * Rust-side sweep that grades an invariant rather than a pinned count: the count
  * pins are why the bench and gate views read a curated subset (every `real` entry
  * re-pins every corpus count), and a no-panic / render / round-trip verdict carries
- * no such cost, so it reads everything the snapshot holds. `null`, with a warning,
- * when the snapshot is not checked out.
+ * no such cost, so it reads everything the snapshot holds — `render:audit`'s
+ * conformance leg, and the robustness sweeps through `corpus_robustness_seeds`.
+ * `null`, with a warning, when the snapshot is not checked out.
  */
 export async function corpus_snapshot_dir(logger: Logger = console.log): Promise<string | null> {
 	if (await fs_exists(resolve(CORPORA_COLLECTIONS))) return CORPORA_COLLECTIONS;
@@ -904,17 +919,26 @@ export async function live_diff_files(logger: Logger = console.log): Promise<Liv
 
 /**
  * The seeds of a real-code robustness sweep (`audit:corpus`, `idempotency:sweep`): the
- * present snapshot DIRECTORIES of the `robustness` view's pinned tiers, plus the `live`
- * tier's diff FILES (`live_diff_files`). Hand both to a Rust audit — its seed resolution
- * takes directories and files alike. Nothing here is counted or pinned.
+ * WHOLE snapshot as one directory (`corpus_snapshot_dir` — every collection, the
+ * third-party Svelte libraries outside the bench views included), the `robustness`
+ * view's pinned-tier directories that lie OUTSIDE that root (today the `svelte_styles`
+ * harvest cache — a collection directory is already walked by the root), plus the `live`
+ * tier's diff FILES (`live_diff_files`). Hand all of them to a Rust audit — its seed
+ * resolution takes directories and files alike. Nothing here is counted or pinned.
+ *
+ * With the snapshot absent (warned once by `corpus_snapshot_dir`) what IS here — the
+ * cache, the live diff — is still swept.
  */
 export async function corpus_robustness_seeds(
 	logger: Logger = console.log
 ): Promise<{ dirs: string[]; live_files: string[] }> {
-	const dirs = await corpus_present_dirs_for_tiers(
+	const root = await corpus_snapshot_dir(logger);
+	const outside = await corpus_present_dirs_for_tiers(
 		TIERS_BY_VIEW.robustness.filter((t) => t !== 'live'),
-		logger
+		logger,
+		{ outside: CORPORA_COLLECTIONS }
 	);
+	const dirs = root === null ? outside : [root, ...outside];
 	const { files: live_files } = await live_diff_files(logger);
 	return { dirs, live_files };
 }

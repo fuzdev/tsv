@@ -60,6 +60,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Standard attributes (`name="value"`)
 - Empty string values (`attr=""`)
 - Boolean attributes (`disabled`, `checked`)
+- `class` whitespace on HTML elements (prettier-plugin-svelte's two regexes): runs collapse to one space, trailing whitespace per line and at the value's end is dropped, leading whitespace and newlines stay — and the one separator space before a following `{expr}` is keyed on the text's LAST line, so an `{expr}` on its own indented continuation line keeps that indentation (`svelte/attributes/class_whitespace`, `svelte/attributes/class_multiline_expression`). Components are never normalized; `<svelte:element>` is normalized on purpose where prettier leaves it verbatim (a cataloged divergence)
 - Names with non-identifier chars (`a%b`, directive `on:click%x`) — read up to `[\s=/>"']`, mirroring Svelte's `read_tag`. ⚠️ The run is measured from the name's **first byte**, never resumed from the lexer token's end: the marker braces are one token *across* the gap (`{ #` tokenizes like `{#`, mirroring Svelte's `tag()`), so in a top-level `<script>`/`<style>` head — the one place a `{` is an ordinary name character — resuming there folded the author's whitespace into the name (`<script { #a}>` read `{ #a}` where Svelte reads `{` then `#a}`) and stepped over the `/` in `{/a}`, a terminator Svelte stops at, so a head canonical rejects parsed. Pinned by `svelte/script/brace_attribute_literal/`
 
 ### Dynamic Attributes

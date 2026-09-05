@@ -36,8 +36,8 @@ grades); the reference halves live in `docs/`:
 | **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save two opportunistic sibling-checkout legs: `roundtrip:audit:prettier` gates the pinned `../prettier` format suites, and `discovery:audit` checks `tsv format --list` over the `../corpora` snapshot against its committed file list (each a loud skip when its checkout is absent; ~0.1 s) | every commit; the CI `check` job |
 | **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache), then `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,650; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
-| **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`robustness`** view (the `../corpora` snapshot + the live working trees' DIFF against it; absent dirs skipped with a warning) | after a printer change; conformance cadence |
-| **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the snapshot + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
+| **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, the six third-party Svelte libraries outside the bench views included — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
+| **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the whole snapshot + the `svelte_styles` cache + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the whole `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
 | **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules. **Needs the Deno sidecar** (`svelte compile`), so it is deliberately not a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead | standalone: any `.svelte` corpus, given explicitly. As a `conformance` leg: the WHOLE `../corpora` snapshot (every collection, the third-party Svelte libraries outside the bench views included — this leg pins no count, so the curated subset's reason doesn't apply) + the `suite` checkout, both version-pinned, so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
 
 **JS parser (test262) IS release-gated** — `conformance:test262` (`tsv_debug
@@ -1129,19 +1129,28 @@ only and only as a diff against the snapshot (below). **SAFETY (content loss) ga
   regenerable (gitignored); absent = fail-open to the un-filtered corpus (disclosed
   in the load log). The **`gates` view is untouched**, so `corpus:compare:*` /
   `skip_triage` still see the error fixtures they need.
-- **`robustness`** — `real` + `framework` + `live`: the snapshot's real code plus the
-  **live diff** — the files of the same repos' working trees (`../zzz/src`, …) whose
-  bytes differ from, or are absent in, their collection, minus the manifest's `exclude`
-  prefixes and minus what git ignores there (`git ls-files -o -i --exclude-standard` per
-  tree: a `*.local.ts` scratch file is absent from a git-object snapshot by construction,
-  not new code) — for the real-code robustness sweeps (`audit:corpus`, `idempotency:sweep`).
-  Snapshot directories plus a live file list (`corpus_robustness_seeds`); nothing here is
-  counted or pinned, and the `live` entries are `optional` (whichever repos this machine
-  has cloned). The working trees are where new syntax shows up before any snapshot
-  refresh does, and a content-loss or panic finding is a bug wherever it occurs — but a
-  file the snapshot already holds byte-for-byte has already been swept, so the tier is
-  a diff: measured a day after vendoring, the whole trees were 3,102 files for 22 that
-  differed (455 of the rest fixtures the manifest excludes), an 81% surcharge per leg.
+- **`robustness`** — the WHOLE snapshot + the `svelte_styles` cache + the **live diff**,
+  for the real-code robustness sweeps (`audit:corpus`, `idempotency:sweep`). The snapshot
+  is read as one ROOT (`corpus_snapshot_dir`: every collection `../corpora` vendors, the
+  six third-party Svelte libraries the bench views leave out included — ~6,700 files where
+  the `gates` view reads ~6,200 — because a sweep grades an invariant, not a pinned count,
+  so the curated subset's reason does not apply); the cache is the one `real` entry outside
+  that root. The live diff is the files of the `real` repos' working trees (`../zzz/src`,
+  …) whose bytes differ from, or are absent in, their collection, minus the manifest's
+  `exclude` prefixes and minus what git ignores there (`git ls-files -o -i
+  --exclude-standard` per tree: a `*.local.ts` scratch file is absent from a git-object
+  snapshot by construction, not new code). `TIERS_BY_VIEW.robustness` still declares
+  `real` + `framework` + `live`: the tiers contribute only what lies outside the root (the
+  cache) and the diff, and the `live` seat is what makes the loader refuse the view whole
+  and `corpus_present_dirs_for_tiers` refuse it as directories. Two directory seeds plus
+  the live file list (`corpus_robustness_seeds`) — so the ARG_MAX exposure of handing
+  files as argv is the diff's alone, ~1 KB today; nothing here is counted or pinned, and
+  the `live` entries are `optional` (whichever repos this machine has cloned). The working
+  trees are where new syntax shows up before any snapshot refresh does, and a content-loss
+  or panic finding is a bug wherever it occurs — but a file the snapshot already holds
+  byte-for-byte has already been swept, so the tier is a diff: measured a day after
+  vendoring, the whole trees were 3,102 files for 22 that differed (455 of the rest
+  fixtures the manifest excludes), an 81% surcharge per leg.
 
 **Missing entries fail fast** — the loader checks every entry up front and throws
 listing the missing paths, so a partial checkout can't silently shrink a perf number

@@ -58,6 +58,11 @@
 //! as divergent, and leaf-corruption is reserved for the genuinely skeleton-blind
 //! same-shape value change.
 //!
+//! **Comment attachment** is not shape either: `structural_skeleton` drops each node's
+//! `leadingComments` / `trailingComments` (Svelte's parser attaches them, tsv's wire
+//! mirrors it), so a comment that legitimately trails past a `;` reads Clean, while its
+//! presence, kind and text stay pinned by the root `comments` array and the leaf check.
+//!
 //! ## `--gate` (the `deno task check` guard)
 //!
 //! `--gate` fails on the `*_unreparseable` and `*_leaf_corruption` buckets (the

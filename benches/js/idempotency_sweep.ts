@@ -1,9 +1,11 @@
 /**
  * F1 (idempotency) sweep over the **real-code** corpus.
  *
- * Drives every file of the `robustness` view — the `../corpora` snapshot's real code
- * plus the live diff (the files of this machine's working trees of the same repos that
- * differ from, or are absent in, the snapshot) — through `tsv_debug fuzz --iterations 0`:
+ * Drives every file of the `robustness` view — the WHOLE `../corpora` snapshot (every
+ * collection it vendors, the third-party Svelte libraries outside the bench views
+ * included), the `svelte_styles` cache, plus the live diff (the files of this machine's
+ * working trees of the `real` repos that differ from, or are absent in, the snapshot) —
+ * through `tsv_debug fuzz --iterations 0`:
  * the fuzzer's
  * pristine pass, which asserts the three invariants on each seed **as authored**,
  * with no mutation. The load-bearing one here is **F1** — `format(format(x)) ==
@@ -36,7 +38,7 @@ if (seeds.length === 0) {
 }
 
 console.error(
-	`idempotency sweep over ${dirs.length} snapshot directories + ${live_files.length} live-diff files\n`
+	`idempotency sweep over ${dirs.length} directory seeds + ${live_files.length} live-diff files\n`
 );
 
 const { status } = spawnSync(
