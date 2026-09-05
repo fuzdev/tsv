@@ -12,17 +12,6 @@
 use super::super::{Printer, is_string_literal};
 use crate::ast::internal;
 
-/// Check if this is a `Boolean(...)` call
-///
-/// Prettier doesn't add continuation indent for binary expressions inside Boolean() calls.
-/// This appears to be a specific quirk, treating Boolean() like !!() for type coercion.
-pub(super) fn is_boolean_call(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
-    if let internal::Expression::Identifier(id) = call.callee {
-        return printer.with_ident_name(id, |s| s == "Boolean");
-    }
-    false
-}
-
 /// These calls keep the module path on the same line as the method.
 ///
 /// Patterns:

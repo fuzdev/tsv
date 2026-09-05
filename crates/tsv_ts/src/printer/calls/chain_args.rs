@@ -20,6 +20,7 @@ use super::arg_comments::{
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_function_composition_args,
     is_ternary_arrow_body, last_arg_is_array_or_object, lone_arg_params_render_flat,
+    mark_boolean_coercion_argument,
 };
 use super::arg_wrapping::{
     ArgOpener, ChainArgKind, arrow_body_expands_internally, arrow_body_tail_has_comments,
@@ -426,6 +427,14 @@ fn build_call_args_doc_for_chain_impl(
         standard_expansion,
         leading_comment_doc,
     };
+
+    // A `Boolean()` coercion heading this chain: its argument is a `shouldNotIndent`
+    // position, marked here exactly as the plain call marks it, so the chain's flat, expanded
+    // and standard-expanded candidates all print the argument flat (each re-enters here, so
+    // each re-marks; every branch builder below bottoms out in the builder that reads it).
+    // Only the chain HEAD can be one — a link's callee is a member expression — and with one
+    // argument only the single-argument and force-expanded builders ever hold it.
+    mark_boolean_coercion_argument(printer, call);
 
     // Prettier's React-hook deps-array layout — the FIRST thing `printCallArguments` asks,
     // above `anyArgEmptyLine` and every specialized layout, and above the chain's own
