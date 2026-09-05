@@ -2,8 +2,8 @@
 	// at exactly 100 the whole declaration fits, so nothing breaks
 	const aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: T = new A({});
 
-	// at 101 an empty container argument keeps softlines, so the call breaks its own
-	// parens rather than the assignment breaking at =
+	// at 101 an empty container has nothing to break inside it, so the ladder's last state
+	// puts it on its own line rather than the assignment breaking at =
 	const bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: T = new A(
 		{}
 	);
@@ -14,6 +14,14 @@
 	// control: the plain call breaks the same way
 	const ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd: T = fn1(
 		{}
+	);
+
+	// a hug whose own first line is already past the width drops the argument to its own line
+	new BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA(
+		{ bbb: ccc, ddd: eee }
+	);
+	fn2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA(
+		{ bbb: ccc, ddd: eee }
 	);
 
 	// a container behind a type cast hugs, and expands inside the cast

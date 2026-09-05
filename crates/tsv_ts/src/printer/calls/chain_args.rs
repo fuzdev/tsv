@@ -19,7 +19,7 @@ use super::arg_comments::{
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_function_composition_args,
-    is_ternary_arrow_body, last_arg_is_array_or_object,
+    is_ternary_arrow_body, last_arg_is_array_or_object, lone_arg_params_render_flat,
 };
 use super::arg_wrapping::{
     ArgOpener, ChainArgKind, arrow_body_expands_internally, arrow_body_tail_has_comments,
@@ -1162,21 +1162,27 @@ fn build_chain_args_single(
             opener.wrap_soft(d, arg_with_comments)
         }
         ChainArgKind::HugsNaturally => {
-            // A curried arrow chain is the one shape here whose hug has to be MEASURED.
-            // Prettier reaches it through `shouldExpandLastArg`'s conditionalGroup, whose
-            // hug states print the argument with `expandLastArg: true` — heads welded onto
-            // the callee's line, which is what has to fit — and whose last state is
-            // `allArgsBrokenOut()`, printed from `printedArguments`. An unconditional hug
-            // measures the wrong thing: `arg_with_comments` already carries the progressive
-            // layout, whose short first line always fits, so the call hugs where prettier
-            // breaks out. Everything else here (objects, arrays, blocks, `function`s) hugs
-            // unconditionally in prettier too, so it keeps the single state.
+            // A curried arrow chain is the one shape here whose hug has to be MEASURED
+            // against the SOFT-wrapped fallback rather than the ladder below. Prettier
+            // reaches it through `shouldExpandLastArg`'s conditionalGroup, whose hug states
+            // print the argument with `expandLastArg: true` — heads welded onto the callee's
+            // line, which is what has to fit — and whose last state is `allArgsBrokenOut()`,
+            // printed from `printedArguments`. An unconditional hug measures the wrong
+            // thing: `arg_with_comments` already carries the progressive layout, whose short
+            // first line always fits, so the call hugs where prettier breaks out.
             if is_curried_arrow_chain(arg) {
                 let state_hug = d.concat(&[prefix, arg_with_comments, d.text(")")]);
                 d.conditional_group(&[state_hug, opener.wrap_soft(d, arg_with_comments)])
             } else {
-                // Objects/arrays/blocks that hug naturally
-                d.concat(&[prefix, arg_with_comments, d.text(")")])
+                // Objects, arrays, blocks and `function`s hug — but through prettier's own
+                // ladder, not an unconditional hug. ⚠️ The bare `prefix arg )` concat that
+                // stood here had NO state below the hug, so an argument with nothing to break
+                // inside it — `{}`, `[]`, `function () {}`, `class {}` — ran past the print
+                // width instead of dropping to its own line
+                // (`calls/chain_single_arg_hug_long`). The plain-call and `new` spellings of
+                // this same question are `call_formatting.rs`'s and `new_expression.rs`'s
+                // single-argument arms; one `printCallArguments` prints all three.
+                opener.lone_hug_ladder(d, arg_with_comments, lone_arg_params_render_flat(arg))
             }
         }
     };

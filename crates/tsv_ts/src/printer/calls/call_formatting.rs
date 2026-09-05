@@ -12,7 +12,7 @@ use super::arg_comments::{
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_array_or_object_unwrapped,
-    is_function_composition_args, is_ternary_arrow_body,
+    is_function_composition_args, is_ternary_arrow_body, lone_arg_params_render_flat,
 };
 use super::arg_wrapping::{
     ArgOpener, append_type_args_with_gap_comments, arg_needs_soft_wrap,
@@ -751,23 +751,21 @@ fn try_single_arg_hug(
             return Some(build_block_arrow_hug_states(printer, callee, arrow, arg));
         }
 
-        // Regular function expression: keep hugged (block body handles own formatting),
-        // unless a comment forces its parameter list multiline — the same refusal the block
-        // arrow one arm up makes (`build_block_arrow_hug_states`). The hug renders the
-        // callee and the signature's head on one line; a forced break inside that signature
-        // invalidates it, so the call expands instead.
+        // Regular function expression: the shared lone-argument ladder
+        // ([`ArgOpener::lone_hug_ladder`]). Its middle state is what lets a long PARAMETER
+        // list break while `callee(function name(` stays on one line
+        // (`prettier/tests/format/js/last-argument-expansion/overflow.js`).
+        //
+        // A comment forcing the parameter list multiline refuses the hug outright: every hug
+        // state renders the callee and the signature's head on one line, which the break makes
+        // impossible.
         internal::Expression::FunctionExpression(func) => {
             let arg_doc = printer.build_expression_doc(arg);
+            let opener = ArgOpener::Callee(callee);
             if function_signature_has_breaking_comments(printer, func) {
-                return Some(d.concat(&[
-                    callee,
-                    d.text("("),
-                    d.indent(d.concat(&[d.softline(), arg_doc])),
-                    d.softline(),
-                    d.text(")"),
-                ]));
+                return Some(opener.break_out(d, arg_doc));
             }
-            return Some(d.concat(&[callee, d.text("("), arg_doc, d.text(")")]));
+            return Some(opener.lone_hug_ladder(d, arg_doc, lone_arg_params_render_flat(arg)));
         }
 
         // Object/array literals, and type assertions wrapping them — the shared arm, so the
@@ -777,23 +775,20 @@ fn try_single_arg_hug(
             return Some(build_single_container_arg_doc(printer, callee, arg));
         }
 
-        // Short literals (non-string or short string): hug them
-        // Long string literals and multiline strings should use standard wrapping
-        internal::Expression::Literal(lit) => {
-            let span_len = (lit.span.end - lit.span.start) as usize;
-            let raw = lit.span.extract(printer.source);
-            let is_multiline = raw.contains('\n');
-            // Hug short, single-line literals (<=25 chars)
-            if span_len <= 25 && !is_multiline {
-                return Some(d.concat(&[
-                    callee,
-                    d.text("("),
-                    printer.build_expression_doc(arg),
-                    d.text(")"),
-                ]));
-            }
-            // Long or multiline string - fall through to standard wrapping
-        }
+        // No arm for a lone LITERAL argument: prettier has none either
+        // (`printCallArguments` ends at its soft-break group for every non-hug argument), so
+        // a literal falls through to `wrap_call_with_soft_breaks` like any other. ⚠️ A hug
+        // keyed on a short literal used to live here, and it was prettier's 25-char
+        // `LONE_SHORT_ARGUMENT_THRESHOLD_RATE` read at the wrong layer: that threshold is the
+        // ASSIGNMENT layout's (`isPoorlyBreakableMemberOrCallChain`, tsv's
+        // `is_poorly_breakable_chain`, pinned by `calls/string_arg_long`), which chooses
+        // between breaking at the operator and breaking the call — it never says the call has
+        // NO break point. Spelling it here emitted a group-free, line-free doc, so
+        // `fn('short')` could not break at all once nothing above it could: a statement-position
+        // call ran past the print width (`calls/literal_arg_statement_long`), and so did a
+        // template interpolation whose source spans lines, where `${` hugs a non-qualifying
+        // expression and the call is the only thing left that can break
+        // (`literals/template/interpolation_call_newline_long`).
 
         // Expression arrow whose body is neither a block nor expandable — an object or array
         // body cannot reach here, since [`could_expand_arrow_chain`] claims it for the first

@@ -1,0 +1,1149 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1028,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An interpolation whose SOURCE spans lines is not atomized: `${` hugs (a CallExpression is",
+			"start": 20,
+			"end": 112,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 93
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " non-qualifying) and the call breaks its own arguments, exactly as prettier does.",
+			"start": 114,
+			"end": 197,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Compact source: every interpolation is atomized, so the line stays inline past width.",
+			"start": 200,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Source newline in the middle interpolation: that call breaks its lone short argument",
+			"start": 407,
+			"end": 494,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " while its compact neighbors stay inline.",
+			"start": 496,
+			"end": 539,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Boundary: exactly 100 chars flat - fits, so the source newline collapses.",
+			"start": 663,
+			"end": 739,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Boundary: exactly 101 chars flat - over width, so the call breaks.",
+			"start": 842,
+			"end": 911,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 70
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1027,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1018,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 290,
+					"end": 404,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 115
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 296,
+							"end": 403,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 114
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 296,
+								"end": 297,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 300,
+								"end": 403,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 114
+									}
+								},
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 364,
+										"end": 373,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 75
+											},
+											"end": {
+												"line": 6,
+												"column": 84
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 364,
+											"end": 366,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 75
+												},
+												"end": {
+													"line": 6,
+													"column": 77
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 367,
+												"end": 372,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 78
+													},
+													"end": {
+														"line": 6,
+														"column": 83
+													}
+												},
+												"value": "aaa",
+												"raw": "'aaa'"
+											}
+										],
+										"optional": false
+									},
+									{
+										"type": "CallExpression",
+										"start": 378,
+										"end": 387,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 89
+											},
+											"end": {
+												"line": 6,
+												"column": 98
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 378,
+											"end": 380,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 89
+												},
+												"end": {
+													"line": 6,
+													"column": 91
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 381,
+												"end": 386,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 92
+													},
+													"end": {
+														"line": 6,
+														"column": 97
+													}
+												},
+												"value": "bbb",
+												"raw": "'bbb'"
+											}
+										],
+										"optional": false
+									},
+									{
+										"type": "CallExpression",
+										"start": 392,
+										"end": 401,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 103
+											},
+											"end": {
+												"line": 6,
+												"column": 112
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 392,
+											"end": 394,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 103
+												},
+												"end": {
+													"line": 6,
+													"column": 105
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 395,
+												"end": 400,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 106
+													},
+													"end": {
+														"line": 6,
+														"column": 111
+													}
+												},
+												"value": "ccc",
+												"raw": "'ccc'"
+											}
+										],
+										"optional": false
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 301,
+										"end": 362,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 12
+											},
+											"end": {
+												"line": 6,
+												"column": 73
+											}
+										},
+										"value": {
+											"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 ",
+											"cooked": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 374,
+										"end": 376,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 85
+											},
+											"end": {
+												"line": 6,
+												"column": 87
+											}
+										},
+										"value": {
+											"raw": ", ",
+											"cooked": ", "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 388,
+										"end": 390,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 99
+											},
+											"end": {
+												"line": 6,
+												"column": 101
+											}
+										},
+										"value": {
+											"raw": ", ",
+											"cooked": ", "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 402,
+										"end": 402,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 113
+											},
+											"end": {
+												"line": 6,
+												"column": 113
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An interpolation whose SOURCE spans lines is not atomized: `${` hugs (a CallExpression is",
+							"start": 20,
+							"end": 112
+						},
+						{
+							"type": "Line",
+							"value": " non-qualifying) and the call breaks its own arguments, exactly as prettier does.",
+							"start": 114,
+							"end": 197
+						},
+						{
+							"type": "Line",
+							"value": " Compact source: every interpolation is atomized, so the line stays inline past width.",
+							"start": 200,
+							"end": 288
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 541,
+					"end": 660,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 547,
+							"end": 659,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 547,
+								"end": 548,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 551,
+								"end": 659,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 12,
+										"column": 18
+									}
+								},
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 615,
+										"end": 624,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 75
+											},
+											"end": {
+												"line": 10,
+												"column": 84
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 615,
+											"end": 617,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 75
+												},
+												"end": {
+													"line": 10,
+													"column": 77
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 618,
+												"end": 623,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 78
+													},
+													"end": {
+														"line": 10,
+														"column": 83
+													}
+												},
+												"value": "aaa",
+												"raw": "'aaa'"
+											}
+										],
+										"optional": false
+									},
+									{
+										"type": "CallExpression",
+										"start": 629,
+										"end": 643,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 89
+											},
+											"end": {
+												"line": 12,
+												"column": 2
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 629,
+											"end": 631,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 89
+												},
+												"end": {
+													"line": 10,
+													"column": 91
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 635,
+												"end": 640,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 2
+													},
+													"end": {
+														"line": 11,
+														"column": 7
+													}
+												},
+												"value": "bbb",
+												"raw": "'bbb'"
+											}
+										],
+										"optional": false
+									},
+									{
+										"type": "CallExpression",
+										"start": 648,
+										"end": 657,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 7
+											},
+											"end": {
+												"line": 12,
+												"column": 16
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 648,
+											"end": 650,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 7
+												},
+												"end": {
+													"line": 12,
+													"column": 9
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 651,
+												"end": 656,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 10
+													},
+													"end": {
+														"line": 12,
+														"column": 15
+													}
+												},
+												"value": "ccc",
+												"raw": "'ccc'"
+											}
+										],
+										"optional": false
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 552,
+										"end": 613,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 12
+											},
+											"end": {
+												"line": 10,
+												"column": 73
+											}
+										},
+										"value": {
+											"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 ",
+											"cooked": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 625,
+										"end": 627,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 85
+											},
+											"end": {
+												"line": 10,
+												"column": 87
+											}
+										},
+										"value": {
+											"raw": ", ",
+											"cooked": ", "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 644,
+										"end": 646,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 3
+											},
+											"end": {
+												"line": 12,
+												"column": 5
+											}
+										},
+										"value": {
+											"raw": ", ",
+											"cooked": ", "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 658,
+										"end": 658,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 17
+											},
+											"end": {
+												"line": 12,
+												"column": 17
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Source newline in the middle interpolation: that call breaks its lone short argument",
+							"start": 407,
+							"end": 494
+						},
+						{
+							"type": "Line",
+							"value": " while its compact neighbors stay inline.",
+							"start": 496,
+							"end": 539
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 741,
+					"end": 839,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 99
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 747,
+							"end": 838,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 98
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 747,
+								"end": 748,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 751,
+								"end": 838,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 98
+									}
+								},
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 827,
+										"end": 836,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 87
+											},
+											"end": {
+												"line": 15,
+												"column": 96
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 827,
+											"end": 829,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 87
+												},
+												"end": {
+													"line": 15,
+													"column": 89
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 830,
+												"end": 835,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 90
+													},
+													"end": {
+														"line": 15,
+														"column": 95
+													}
+												},
+												"value": "aaa",
+												"raw": "'aaa'"
+											}
+										],
+										"optional": false
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 752,
+										"end": 825,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 12
+											},
+											"end": {
+												"line": 15,
+												"column": 85
+											}
+										},
+										"value": {
+											"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 te12 ",
+											"cooked": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 te12 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 837,
+										"end": 837,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 97
+											},
+											"end": {
+												"line": 15,
+												"column": 97
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Boundary: exactly 100 chars flat - fits, so the source newline collapses.",
+							"start": 663,
+							"end": 739
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 913,
+					"end": 1017,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 919,
+							"end": 1016,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 919,
+								"end": 920,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 923,
+								"end": 1016,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 20,
+										"column": 4
+									}
+								},
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 1000,
+										"end": 1014,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 88
+											},
+											"end": {
+												"line": 20,
+												"column": 2
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 1000,
+											"end": 1002,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 88
+												},
+												"end": {
+													"line": 18,
+													"column": 90
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Literal",
+												"start": 1006,
+												"end": 1011,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 2
+													},
+													"end": {
+														"line": 19,
+														"column": 7
+													}
+												},
+												"value": "aaa",
+												"raw": "'aaa'"
+											}
+										],
+										"optional": false
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 924,
+										"end": 998,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 12
+											},
+											"end": {
+												"line": 18,
+												"column": 86
+											}
+										},
+										"value": {
+											"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 tex12 ",
+											"cooked": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 tex12 "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 1015,
+										"end": 1015,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 3
+											},
+											"end": {
+												"line": 20,
+												"column": 3
+											}
+										},
+										"value": {
+											"raw": "",
+											"cooked": ""
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Boundary: exactly 101 chars flat - over width, so the call breaks.",
+							"start": 842,
+							"end": 911
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
