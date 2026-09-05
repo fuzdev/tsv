@@ -1095,7 +1095,7 @@ impl<'a> Printer<'a> {
     /// the two declarator value builders, which build their value without it.
     ///
     /// Keyed by span and not consumed, like `mark_ternary_extra_indent`.
-    pub(in crate::printer) fn mark_assignment_value(&self, value: &Expression<'_>) {
+    pub(crate) fn mark_assignment_value(&self, value: &Expression<'_>) {
         self.assignment_value_target.set(Some(value.span()));
     }
 

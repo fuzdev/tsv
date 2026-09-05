@@ -272,7 +272,9 @@ impl<'a> Printer<'a> {
             let test_doc = self.wrap_statement_test_parens(
                 test,
                 frozen.map_or_else(
-                    || self.build_expression_doc(test),
+                    // A continuation-indent position; the frozen arm below emits the
+                    // author's bytes, where no layout rule applies.
+                    || self.build_continuation_indent_expression_doc(test),
                     |frozen| self.build_frozen_expression_doc(test, frozen),
                 ),
             );

@@ -1,0 +1,827 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 814,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A default parameter value's chain takes a continuation indent: prettier's",
+			"start": 10,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " shouldIndentIfInlining does NOT list AssignmentPattern, so the chain arm fires",
+			"start": 88,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The inlining spelling takes the same shape - the position is not an assignment value",
+			"start": 306,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars - stays inline",
+			"start": 527,
+			"end": 554,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - the parameter list breaks",
+			"start": 657,
+			"end": 697,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 41
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 813,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 804,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 171,
+					"end": 303,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 180,
+						"end": 182,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 4,
+								"column": 12
+							}
+						},
+						"name": "dp"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 186,
+							"end": 297,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 6
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 186,
+								"end": 187,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"name": "p"
+							},
+							"right": {
+								"type": "LogicalExpression",
+								"start": 190,
+								"end": 297,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 6
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 190,
+									"end": 287,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 6
+										},
+										"end": {
+											"line": 6,
+											"column": 43
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 190,
+										"end": 240,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 6
+											},
+											"end": {
+												"line": 5,
+												"column": 56
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 247,
+										"end": 287,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 3
+											},
+											"end": {
+												"line": 6,
+												"column": 43
+											}
+										},
+										"name": "cccccccccccccccccccccccccccccccccccccccc"
+									}
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 294,
+									"end": 297,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 6
+										}
+									},
+									"name": "ddd"
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 301,
+						"end": 303,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 3
+							},
+							"end": {
+								"line": 8,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A default parameter value's chain takes a continuation indent: prettier's",
+							"start": 10,
+							"end": 86
+						},
+						{
+							"type": "Line",
+							"value": " shouldIndentIfInlining does NOT list AssignmentPattern, so the chain arm fires",
+							"start": 88,
+							"end": 169
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 395,
+					"end": 524,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 404,
+						"end": 406,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 12
+							}
+						},
+						"name": "dq"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 410,
+							"end": 518,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 50
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 410,
+								"end": 411,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 3
+									}
+								},
+								"name": "p"
+							},
+							"right": {
+								"type": "LogicalExpression",
+								"start": 414,
+								"end": 518,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 6
+									},
+									"end": {
+										"line": 13,
+										"column": 50
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 414,
+									"end": 511,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 6
+										},
+										"end": {
+											"line": 13,
+											"column": 43
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 414,
+										"end": 464,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 6
+											},
+											"end": {
+												"line": 12,
+												"column": 56
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 471,
+										"end": 511,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 3
+											},
+											"end": {
+												"line": 13,
+												"column": 43
+											}
+										},
+										"name": "cccccccccccccccccccccccccccccccccccccccc"
+									}
+								},
+								"operator": "??",
+								"right": {
+									"type": "ArrayExpression",
+									"start": 515,
+									"end": 518,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 47
+										},
+										"end": {
+											"line": 13,
+											"column": 50
+										}
+									},
+									"elements": [
+										{
+											"type": "Literal",
+											"start": 516,
+											"end": 517,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 48
+												},
+												"end": {
+													"line": 13,
+													"column": 49
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									]
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 522,
+						"end": 524,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 3
+							},
+							"end": {
+								"line": 14,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The inlining spelling takes the same shape - the position is not an assignment value",
+							"start": 306,
+							"end": 393
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 556,
+					"end": 654,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 565,
+						"end": 567,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 10
+							},
+							"end": {
+								"line": 17,
+								"column": 12
+							}
+						},
+						"name": "dr"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 568,
+							"end": 650,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 13
+								},
+								"end": {
+									"line": 17,
+									"column": 95
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 568,
+								"end": 569,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 13
+									},
+									"end": {
+										"line": 17,
+										"column": 14
+									}
+								},
+								"name": "p"
+							},
+							"right": {
+								"type": "LogicalExpression",
+								"start": 572,
+								"end": 650,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 17
+									},
+									"end": {
+										"line": 17,
+										"column": 95
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 572,
+									"end": 643,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 17
+										},
+										"end": {
+											"line": 17,
+											"column": 88
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 572,
+										"end": 612,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 17
+											},
+											"end": {
+												"line": 17,
+												"column": 57
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 616,
+										"end": 643,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 61
+											},
+											"end": {
+												"line": 17,
+												"column": 88
+											}
+										},
+										"name": "ccccccccccccccccccccccccccc"
+									}
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 647,
+									"end": 650,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 92
+										},
+										"end": {
+											"line": 17,
+											"column": 95
+										}
+									},
+									"name": "ddd"
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 652,
+						"end": 654,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 97
+							},
+							"end": {
+								"line": 17,
+								"column": 99
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 100 chars - stays inline",
+							"start": 527,
+							"end": 554
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 699,
+					"end": 803,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 708,
+						"end": 710,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 10
+							},
+							"end": {
+								"line": 20,
+								"column": 12
+							}
+						},
+						"name": "ds"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 714,
+							"end": 797,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 2
+								},
+								"end": {
+									"line": 21,
+									"column": 85
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 714,
+								"end": 715,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 3
+									}
+								},
+								"name": "p"
+							},
+							"right": {
+								"type": "LogicalExpression",
+								"start": 718,
+								"end": 797,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 6
+									},
+									"end": {
+										"line": 21,
+										"column": 85
+									}
+								},
+								"left": {
+									"type": "LogicalExpression",
+									"start": 718,
+									"end": 790,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 6
+										},
+										"end": {
+											"line": 21,
+											"column": 78
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 718,
+										"end": 758,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 6
+											},
+											"end": {
+												"line": 21,
+												"column": 46
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 762,
+										"end": 790,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 50
+											},
+											"end": {
+												"line": 21,
+												"column": 78
+											}
+										},
+										"name": "cccccccccccccccccccccccccccc"
+									}
+								},
+								"operator": "??",
+								"right": {
+									"type": "Identifier",
+									"start": 794,
+									"end": 797,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 82
+										},
+										"end": {
+											"line": 21,
+											"column": 85
+										}
+									},
+									"name": "ddd"
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 801,
+						"end": 803,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 3
+							},
+							"end": {
+								"line": 22,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - the parameter list breaks",
+							"start": 657,
+							"end": 697
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
