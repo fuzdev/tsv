@@ -1,0 +1,140 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 614,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 605,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 97,
+							"end": 114,
+							"property": "color",
+							"value": "\\66 n(0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 118,
+							"end": 148,
+							"property": "border-color",
+							"value": "v\\61 r(--a, 0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 234,
+							"end": 261,
+							"property": "background",
+							"value": "u\\72 l('a.png')"
+						},
+						{
+							"type": "Declaration",
+							"start": 307,
+							"end": 332,
+							"property": "mask-image",
+							"value": "u\\72 l(a.png)"
+						},
+						{
+							"type": "Declaration",
+							"start": 402,
+							"end": 428,
+							"property": "outline-color",
+							"value": "a\\28 b(0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 574,
+							"end": 601,
+							"property": "background-color",
+							"value": "a\\(b(.10)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 605
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escape is ident content, so an escape-spelled name is still a function ",
+				"start": 15,
+				"end": 94
+			},
+			{
+				"type": "CSSComment",
+				"value": " the url recognizer decodes the name: quoted content takes the string path ",
+				"start": 152,
+				"end": 231
+			},
+			{
+				"type": "CSSComment",
+				"value": " unquoted url content stays opaque ",
+				"start": 265,
+				"end": 304
+			},
+			{
+				"type": "CSSComment",
+				"value": " a hex escape spelling `(` is ident content like any other ",
+				"start": 336,
+				"end": 399
+			},
+			{
+				"type": "CSSComment",
+				"value": " a raw escaped `(` leaves a dangling `\\` at the name's end — not an ident\n\t\tsequence, so this is no function at all and stays verbatim ",
+				"start": 432,
+				"end": 571
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 606,
+			"styles": "\n\ta {\n\t\t/* an escape is ident content, so an escape-spelled name is still a function */\n\t\tcolor: \\66 n(0.1);\n\t\tborder-color: v\\61 r(--a, 0.1);\n\t\t/* the url recognizer decodes the name: quoted content takes the string path */\n\t\tbackground: u\\72 l('a.png');\n\t\t/* unquoted url content stays opaque */\n\t\tmask-image: u\\72 l(a.png);\n\t\t/* a hex escape spelling `(` is ident content like any other */\n\t\toutline-color: a\\28 b(0.1);\n\t\t/* a raw escaped `(` leaves a dangling `\\` at the name's end — not an ident\n\t\tsequence, so this is no function at all and stays verbatim */\n\t\tbackground-color: a\\(b(.10);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 615,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

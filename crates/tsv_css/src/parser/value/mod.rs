@@ -261,16 +261,19 @@ pub(crate) fn parse_single_value<'arena>(
 /// what lets its unsigned depth start at zero. A violated precondition trips that walk's
 /// `debug_assert`, rather than quietly returning a wrong span.
 ///
-/// ⚠️ **That leading search is itself quote- and escape-blind, and is safe only because the
-/// name validation below refuses everything it could mis-locate.** A `(` can be *content* in
-/// the name region too — inside a glued string (`'x'fn(a)`) or an escape (`a\(b(c)`) — and the
-/// search would stop on it; but `name_part` then carries a `'` or a `\`, which is not
-/// `alphanumeric | - | _`, so the value refuses to be a function at all and prints verbatim.
-/// The refusal is lossless and matches prettier on the glued-string form. It also means the
-/// two halves move together: **widening the name validation to admit an escape without making
-/// this search escape-aware mints an over-acceptance.** An escaped name is a real
-/// function-token (CSS Syntax 3 §"Consume an ident sequence"), so the refusal is a known
-/// conformance gap — prettier normalizes `\66 n(.10)` and tsv does not.
+/// ⚠️ **That leading search is quote- and escape-blind, and [`is_function_name`] is what keeps
+/// it sound.** A `(` can be *content* in the name region — inside a glued string (`'x'fn(a)`)
+/// or an escape (`a\(b(c)`) — and the search stops on it either way. The name validation
+/// refuses both, for two different reasons, and neither is a special case:
+///
+/// - a `'` is not an ident code point, so `'x'fn` is not an ident sequence;
+/// - the byte before an escaped `(` is the escape's own `\`, so `name_part` ends in a
+///   **dangling** `\` — not a valid escape (§4.3.7 needs a code point after it), and so not
+///   an ident sequence either.
+///
+/// So a mis-located `(` always yields a name the validation rejects, and the value falls back
+/// to an opaque identifier printed verbatim. That is lossless, and on both shapes it is what
+/// prettier emits too (it unbalances on the escaped paren and splits the glued string).
 fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
     // CSS whitespace only (CSS Syntax 3 §4.2), like every other value-boundary trim: a
     // Unicode `str::trim` would cut a non-ASCII space (an NBSP) out of the name's span, and
@@ -278,12 +281,7 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
     // `name_part`, it fails the validation below and the value stays an opaque identifier.
     let name_part = trim_css(&s[..paren_pos]);
 
-    // Validate function name: alphanumeric, hyphens, underscores only
-    if name_part.is_empty()
-        || !name_part
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-    {
+    if name_part.is_empty() || !is_function_name(name_part) {
         return None;
     }
 
@@ -301,6 +299,128 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
 
     let args = &s[paren_pos + 1..close_pos];
     Some((name_part, args))
+}
+
+/// Whether `name` is a CSS **ident sequence** — the production a `<function-token>`'s name is
+/// (CSS Syntax 3 §"Consume an ident-like token": an ident sequence immediately followed by a
+/// `(`).
+///
+/// Ident content is an ident code point *or an escape* (§"Consume an ident sequence"), so
+/// `\66 n`, `v\61 r` and `a\28 b` are the names `fn`, `var` and `a(b` and each is a real
+/// function — the printer then reads the name from its span, so the author's spelling
+/// survives. The ident code points are taken as the ASCII set plus `is_alphanumeric`'s
+/// non-ASCII letters and digits, which is what this position has always accepted (`fé(…)`).
+///
+/// An escape is what makes this more than a character-class test, and it is also what keeps
+/// [`extract_function_parts`]'s escape-blind search for the opening `(` sound — see the ⚠️
+/// there. A `\` that starts no valid escape (a dangling one at the end of the name, or one
+/// before a newline) is not ident content and refuses.
+fn is_function_name(name: &str) -> bool {
+    // The escape-free name, which is every name a stylesheet really holds: `\` is not an
+    // ident code point, so this pass already stops on the first one and the walk below is
+    // entered only for a name that has one (or is genuinely not a name at all).
+    if name.chars().all(is_ident_code_point) {
+        return true;
+    }
+    escaped_name_is_ident_sequence(name)
+}
+
+/// An ident code point as this position reads it: the ASCII ident set plus
+/// `is_alphanumeric`'s non-ASCII letters and digits. Named once so the fast pass above and
+/// the escape walk below cannot drift — a name accepted by one and refused by the other
+/// would be a function whose recognition depended on whether it carried an escape.
+fn is_ident_code_point(c: char) -> bool {
+    c.is_alphanumeric() || c == '-' || c == '_'
+}
+
+/// The escaped tail of [`is_function_name`] — outlined and cold, so the escape walk stays off
+/// every function value's path, the same split the printer's own escape-spelled-name question
+/// takes (`printer::values::function_name_is`).
+#[cold]
+#[inline(never)]
+fn escaped_name_is_ident_sequence(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' {
+            // Steps the escape whole, terminator included, so `a\29 b` is one ident and not
+            // an ident, a space and another ident. The single definition every value scanner
+            // shares (`crate::escapes::escape_len`).
+            let Some(len) = crate::escapes::escape_len(name, i) else {
+                return false;
+            };
+            i += len;
+            continue;
+        }
+        // `i` is a char boundary: the loop only ever advances by a whole escape or a whole
+        // char, and both lengths are measured in code points.
+        let Some(ch) = name[i..].chars().next() else {
+            return false;
+        };
+        if !is_ident_code_point(ch) {
+            return false;
+        }
+        i += ch.len_utf8();
+    }
+    true
+}
+
+#[cfg(test)]
+mod function_name_tests {
+    use super::{extract_function_parts, is_function_name};
+
+    /// A `<function-token>`'s name is an ident sequence, and an escape is ident content
+    /// (CSS Syntax 3 §"Consume an ident sequence"), whatever it spells.
+    #[test]
+    fn an_escape_is_ident_content() {
+        // Escape-free, then the hex spellings, then the literal ones — including the four
+        // whose payload byte is what prettier's own tokenizer reads as structure.
+        for name in [
+            "fn", "a-b_1", "fé", r"\66 n", r"v\61 r", r"a\28 b", r"a\29 b", r"\31 fn", r"a\)b",
+            r#"a\"b"#, r"a\'b", r"a\\b", r"a\ b", r"\-fn",
+        ] {
+            assert!(is_function_name(name), "{name:?} is an ident sequence");
+        }
+    }
+
+    /// A `\` that starts no valid escape is not ident content — and that is what keeps
+    /// [`extract_function_parts`]'s escape-blind search for the opening `(` sound, since a
+    /// `(` found *inside* an escape always leaves the name ending in one.
+    #[test]
+    fn a_dangling_backslash_is_not_ident_content() {
+        assert!(!is_function_name("a\\"), "a trailing backslash");
+        assert!(!is_function_name("\\"), "a lone backslash");
+        assert!(!is_function_name("a\\\nb"), "a backslash before a newline");
+        // Not ident code points at all.
+        assert!(!is_function_name("'x'fn"), "a glued string");
+        assert!(!is_function_name("a b"), "a space");
+        assert!(!is_function_name("a.b"), "a dot");
+    }
+
+    /// The whole seam: which values read as a function, and where the name and arguments
+    /// are cut. The sole caller enters on the value's first `(` byte, so the tests do too.
+    #[test]
+    fn the_first_paren_byte_locates_the_function_or_refuses_it() {
+        fn parts(s: &str) -> Option<(&str, &str)> {
+            let open = s.bytes().position(|b| b == b'(')?;
+            extract_function_parts(s, open)
+        }
+        // An escape-spelled name is a function like any other.
+        assert_eq!(parts(r"\66 n(.10)"), Some((r"\66 n", ".10")));
+        assert_eq!(parts(r"a\29 b(.10)"), Some((r"a\29 b", ".10")));
+        assert_eq!(parts(r"a\)b(.10)"), Some((r"a\)b", ".10")));
+        // ⚠️ An escaped `(` is the one payload the blind search stops on. The name then
+        // ends in a dangling `\` and refuses, so the value stays a verbatim identifier —
+        // which is also what prettier emits, by unbalancing.
+        assert_eq!(parts(r"a\(b(.10)"), None);
+        assert_eq!(parts(r"a\(b(c))"), None);
+        // A quote is not ident content either, so a glued string refuses the same way.
+        assert_eq!(parts("'x'fn(.10)"), None);
+        // The close paren must be the value's last byte (the printer bounds the argument
+        // list at `span.end - 1` on the strength of it).
+        assert_eq!(parts("fn(a)b"), None);
+        assert_eq!(parts("fn(a"), None);
+    }
 }
 
 #[cfg(test)]
