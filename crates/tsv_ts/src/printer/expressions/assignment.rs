@@ -228,7 +228,6 @@ pub fn choose_layout(
     right_expr: &Expression<'_>,
     left: AssignmentLeft,
     can_break_left: bool,
-    print_width: usize,
     printer: &Printer<'_>,
 ) -> AssignmentLayout {
     // A COMPLEX destructuring target decides the layout on its own, ahead of every arm
@@ -307,7 +306,7 @@ pub fn choose_layout(
     }
 
     // Check if RHS is a poorly breakable chain (should break after operator)
-    if should_break_after_operator(right_expr, print_width, printer) {
+    if should_break_after_operator(right_expr, printer) {
         return AssignmentLayout::BreakAfterOperator;
     }
 
@@ -500,11 +499,7 @@ pub fn is_simple_self_expanding(expr: &Expression<'_>) -> bool {
 ///
 /// Note: Prettier does NOT include RegexLiteral here. Regex falls through to
 /// Fluid layout, which produces the same output since regex can't break internally.
-fn should_break_after_operator(
-    expr: &Expression<'_>,
-    print_width: usize,
-    printer: &Printer<'_>,
-) -> bool {
+fn should_break_after_operator(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
     // Unwrap wrapper expressions to get to the core
     let core_expr = unwrap_expression(expr);
 
@@ -514,7 +509,7 @@ fn should_break_after_operator(
     }
 
     // Check if it's a poorly breakable chain
-    is_poorly_breakable_chain(core_expr, print_width, printer)
+    is_poorly_breakable_chain(core_expr, printer)
 }
 
 /// Unwrap wrapper expressions (TSNonNullExpression, await, unary, yield, parenthesized)
@@ -630,24 +625,37 @@ fn is_call_with_complex_type_arguments(
 /// comments via `call_arg_has_comments`, complex type args).
 ///
 /// We have `DocArena::will_break()` infrastructure if a real gap ever surfaces.
-pub fn is_poorly_breakable_chain(
-    expr: &Expression<'_>,
-    print_width: usize,
-    printer: &Printer<'_>,
-) -> bool {
-    is_poorly_breakable_chain_recursive(expr, false, print_width, printer)
+pub fn is_poorly_breakable_chain(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
+    let walk = PoorlyBreakableWalk {
+        printer,
+        // A member-gap comment only withholds the operator break on a chain prettier
+        // prints through `printMemberChain`, and that needs a CALL — see the
+        // `MemberExpression` arm.
+        chain_has_calls: chain_has_calls(expr),
+    };
+    is_poorly_breakable_chain_recursive(expr, false, &walk)
+}
+
+/// Everything one [`is_poorly_breakable_chain`] walk holds fixed while it descends, so the
+/// six recursive call sites carry one reference instead of a widening argument list.
+struct PoorlyBreakableWalk<'a, 'src> {
+    printer: &'a Printer<'src>,
+    /// Whether the chain holds a call anywhere. Scopes the member-gap comment gate, whose
+    /// prettier counterpart (`printCallExpression`'s `doc.label?.memberChain`) is reachable
+    /// only through a call.
+    chain_has_calls: bool,
 }
 
 fn is_poorly_breakable_chain_recursive(
     expr: &Expression<'_>,
     deep: bool,
-    print_width: usize,
-    printer: &Printer<'_>,
+    walk: &PoorlyBreakableWalk<'_, '_>,
 ) -> bool {
+    let printer = walk.printer;
     match expr {
         // TSNonNullExpression is transparent - continue checking
         Expression::TSNonNullExpression(non_null) => {
-            is_poorly_breakable_chain_recursive(non_null.expression, deep, print_width, printer)
+            is_poorly_breakable_chain_recursive(non_null.expression, deep, walk)
         }
         // Note: TSAsExpression and TSSatisfiesExpression are NOT included here.
         // They have breakable type annotations, so they're not "poorly breakable".
@@ -672,7 +680,7 @@ fn is_poorly_breakable_chain_recursive(
             // allowed to expand args instead of breaking at the assignment operator.
             let is_trivial_call = call.arguments.is_empty()
                 || (call.arguments.len() == 1
-                    && is_short_arg(&call.arguments[0], printer.source, print_width)
+                    && is_short_arg(&call.arguments[0], printer.source)
                     && !call_arg_has_comments(call, printer));
 
             if !is_trivial_call {
@@ -693,12 +701,7 @@ fn is_poorly_breakable_chain_recursive(
                 Expression::MemberExpression(_) | Expression::TSNonNullExpression(_)
             ) {
                 // Non-memberish callee (e.g., `fn()()`), continue down
-                return is_poorly_breakable_chain_recursive(
-                    call.callee,
-                    true,
-                    print_width,
-                    printer,
-                );
+                return is_poorly_breakable_chain_recursive(call.callee, true, walk);
             }
 
             // Count calls in the chain
@@ -707,12 +710,7 @@ fn is_poorly_breakable_chain_recursive(
             // Single call with member access: obj.fn(arg) → poorly breakable
             // Continue checking to ensure it's a valid chain structure
             if call_count == 1 {
-                return is_poorly_breakable_chain_recursive(
-                    call.callee,
-                    true,
-                    print_width,
-                    printer,
-                );
+                return is_poorly_breakable_chain_recursive(call.callee, true, walk);
             }
 
             // 2 calls: check if factory pattern AND all calls have trivial args
@@ -722,12 +720,7 @@ fn is_poorly_breakable_chain_recursive(
             // the inner call has a non-trivial arg that provides a good break point.
             if call_count == 2 {
                 if is_factory_chain(call.callee, printer.source) {
-                    return is_poorly_breakable_chain_recursive(
-                        call.callee,
-                        true,
-                        print_width,
-                        printer,
-                    );
+                    return is_poorly_breakable_chain_recursive(call.callee, true, walk);
                 }
                 // Non-factory with 2 calls → let chain formatter handle it
                 return false;
@@ -751,33 +744,59 @@ fn is_poorly_breakable_chain_recursive(
         // token, and there prettier's operator break stands
         // (`member/prettier_ignore_base_comment` pins that side). **On page**, because
         // this is a layout gate. Otherwise continue down.
+        //
+        // ⚠️ Scoped to a chain that HOLDS A CALL, because that is the only chain the
+        // modelled prettier path can reach: the `memberChain` label lives on a CALL's
+        // doc, so a call-free `a /* c */.b` never opts out and stays poorly breakable
+        // (`member/computed_pre_bracket_block_comment_prettier_divergence`). The scope
+        // belongs HERE, not in a caller: a second predicate that answers `true` for the
+        // call-free chain and is OR-ed in from outside cancels this gate only where it is
+        // spelled — and carries a second copy of the chain-root test, which then drifts.
         Expression::MemberExpression(member) => {
-            let object_end = member.object.span().end;
-            let gap_end = if member.computed {
-                crate::printer::chain::find_bracket_position(
-                    printer.source,
-                    object_end,
-                    member.property.span().start,
-                )
-            } else {
-                member.property.span().start
-            };
-            if printer
-                .comments_on_page_between(object_end, gap_end)
-                .any(|c| {
-                    !tsv_lang::source_scan::has_newline_before_position(
+            if walk.chain_has_calls {
+                let object_end = member.object.span().end;
+                let gap_end = if member.computed {
+                    crate::printer::chain::find_bracket_position(
                         printer.source,
-                        c.span.start,
+                        object_end,
+                        member.property.span().start,
                     )
-                })
-            {
-                return false;
+                } else {
+                    member.property.span().start
+                };
+                if printer
+                    .comments_on_page_between(object_end, gap_end)
+                    .any(|c| {
+                        !tsv_lang::source_scan::has_newline_before_position(
+                            printer.source,
+                            c.span.start,
+                        )
+                    })
+                {
+                    return false;
+                }
             }
-            is_poorly_breakable_chain_recursive(member.object, true, print_width, printer)
+            is_poorly_breakable_chain_recursive(member.object, true, walk)
         }
 
-        // Base cases: identifiers, `this`, and `super` are valid chain roots
-        Expression::Identifier(_) | Expression::ThisExpression(_) | Expression::Super(_) => deep,
+        // Base case: prettier's own last line, `deep && (node.type === "Identifier" ||
+        // node.type === "ThisExpression")`.
+        //
+        // ⚠️ **`super` is not on that list**, and the omission is load-bearing rather than
+        // an oversight of prettier's: a `super.p` initializer past width takes the FLUID
+        // layout, so the `=` holds its line and the lookup takes the break
+        // (`assignment/poorly_breakable_chain_root`). Do not widen it to match the
+        // neighbouring root tests in this file — their `Super` arms are NOT precedent.
+        // `is_short_arg` and `is_factory_chain` name prettier functions that stop at
+        // `Identifier` / `ThisExpression` exactly as this one does (`isLoneShortArgument`;
+        // `printMemberChain`'s `shouldNotWrap`), so their `Super` is tsv's own widening —
+        // inert in both, since a bare `super` argument is only reachable on tsv's
+        // over-accept surface and a `Super`-rooted 2-call chain bottoms out false here
+        // whether or not `is_factory_chain` let it recurse. `is_member_only_chain` mirrors
+        // no prettier function at all: it is the structural "this chain holds no call"
+        // test, the same axis as [`chain_has_calls`] above, and `super` genuinely is a
+        // chain root there.
+        Expression::Identifier(_) | Expression::ThisExpression(_) => deep,
 
         // Everything else breaks the chain
         _ => false,
@@ -845,7 +864,7 @@ pub fn is_single_call_on_member_chain(expr: &Expression<'_>) -> bool {
 /// Check if a call expression on a member chain has a regex literal as its root.
 ///
 /// Matches patterns like `/regex/.exec(b)` where the chain root is a `RegexLiteral`.
-/// These chains are NOT poorly-breakable (only Identifier/Super are valid roots in
+/// These chains are NOT poorly-breakable (only an identifier or `this` is a valid root in
 /// `is_poorly_breakable_chain`) but should use fluid layout matching Prettier's default.
 pub fn is_regex_root_chain(expr: &Expression<'_>) -> bool {
     if let Expression::CallExpression(call) = expr {
@@ -870,9 +889,9 @@ pub fn is_regex_root_chain(expr: &Expression<'_>) -> bool {
 ///
 /// Note: Prettier uses JS `.length` (UTF-16 code units) for all measurements,
 /// we use `.len()` (UTF-8 bytes). These match for ASCII (the common case).
-fn is_short_arg(expr: &Expression<'_>, source: &str, print_width: usize) -> bool {
+fn is_short_arg(expr: &Expression<'_>, source: &str) -> bool {
     // Prettier: LONE_SHORT_ARGUMENT_THRESHOLD_RATE = 0.25 (utils/index.js:433)
-    let threshold = print_width / 4;
+    let threshold = PRINT_WIDTH / 4;
 
     match expr {
         // Prettier: node.type === "Identifier" && node.name.length <= threshold
@@ -881,7 +900,7 @@ fn is_short_arg(expr: &Expression<'_>, source: &str, print_width: usize) -> bool
         // Prettier: isSignedNumericLiteral(node) && !hasComment(node.argument)
         // + general UnaryExpression recursion (line 471-472)
         // We combine both: recurse into all unary arguments.
-        Expression::UnaryExpression(unary) => is_short_arg(unary.argument, source, print_width),
+        Expression::UnaryExpression(unary) => is_short_arg(unary.argument, source),
 
         // Prettier: regexpPattern.length <= threshold (line 456)
         Expression::RegexLiteral(regex) => regex.pattern(source).len() <= threshold,
@@ -989,7 +1008,7 @@ fn call_arg_has_comments(call: &internal::CallExpression<'_>, printer: &Printer<
 /// Used for break-after-operator layout decisions: when a type assertion call has long args,
 /// we break after `=` instead of inside the call. If the call has short/trivial args, the
 /// type annotation can break instead.
-pub fn is_type_assertion_call(expr: &Expression<'_>, source: &str, print_width: usize) -> bool {
+pub fn is_type_assertion_call(expr: &Expression<'_>, source: &str) -> bool {
     let call = match expr {
         Expression::TSAsExpression(as_expr) => match as_expr.expression {
             Expression::CallExpression(call) => call,
@@ -1005,7 +1024,7 @@ pub fn is_type_assertion_call(expr: &Expression<'_>, source: &str, print_width: 
     // Non-trivial = multiple args OR single long arg
     // (Trivial = empty args OR single short arg)
     !(call.arguments.is_empty()
-        || call.arguments.len() == 1 && is_short_arg(&call.arguments[0], source, print_width))
+        || call.arguments.len() == 1 && is_short_arg(&call.arguments[0], source))
 }
 
 /// Check if an expression is a member-only chain (no calls).
@@ -1202,7 +1221,7 @@ impl<'a> Printer<'a> {
         // extra words cost ~1% of the nesting depth the formatter survives.
         let can_break_left = (left == AssignmentLeft::ShortKey || is_simple_value(right_expr))
             && d.can_break(left_doc);
-        let mut layout = choose_layout(right_expr, left, can_break_left, PRINT_WIDTH, self);
+        let mut layout = choose_layout(right_expr, left, can_break_left, self);
 
         // Override layout based on comments:
         //
@@ -1334,7 +1353,7 @@ impl<'a> Printer<'a> {
                 owned_comment_effect.is_some()
                     || self.has_comments_on_page_between(rhs_span.start, rhs_span.end)
                     || chain_has_multiline_string_arg(core_expr, self.source)
-                    || !is_poorly_breakable_chain(core_expr, PRINT_WIDTH, self)
+                    || !is_poorly_breakable_chain(core_expr, self)
                     || !d.will_break(right_doc)
             },
             "is_poorly_breakable_chain classified expression as poorly breakable but the \
