@@ -416,17 +416,13 @@ impl<'a> Printer<'a> {
             if let Expression::BinaryExpression(binary) = unary.argument {
                 // Wrap any binaryish arg (logical or not) in a single paren group.
                 // Matches Prettier's `parent.type === "UnaryExpression"` path
-                // (binaryish.js:88-91): `group([indent([softline, ...parts]), softline])`.
+                // (binaryish.js:88-91): `group([indent([softline, ...parts]), softline])`,
+                // the same early return the call and `new` callees take — one seam for all
+                // three ([`Printer::build_expanding_parens_doc`]).
                 // The chain's shouldGroup is computed normally: 2-operand chains
                 // get a sub-group (can stay flat at inner indent when paren group
                 // breaks), 3+ chained operands break together with the paren group.
-                let inner = self.build_binary_chain_doc_ungrouped(binary);
-                d.group(d.concat(&[
-                    d.text("("),
-                    d.indent_softline(inner),
-                    d.softline(),
-                    d.text(")"),
-                ]))
+                self.build_expanding_parens_doc(self.build_binary_chain_doc_ungrouped(binary))
             } else {
                 // Non-binary that needs parens (e.g., ternary or assignment in unary/assertion)
                 d.concat(&[
@@ -477,7 +473,12 @@ impl<'a> Printer<'a> {
     /// Positions that take the expanding-paren shape prettier returns *before*
     /// `shouldNotIndent` is even computed — a call/`new` callee, a non-computed member
     /// object, an uncommented unary argument — build their own parens and reach the
-    /// ungrouped builders, not this one.
+    /// ungrouped builders, not this one. Both callee spellings say so through one seam
+    /// (`super::super::calls::CalleeParens::Binary`), which shares
+    /// [`Printer::build_expanding_parens_doc`] with the unary argument; the member object
+    /// takes the same layout from the other side — its parens stay bare outside the group
+    /// ([`Printer::build_expanding_parens_body_doc`]) so the chain's `conditional_group`
+    /// drives the break.
     ///
     /// ⚠️ One position reaches the same *layout* through a different builder: a call/`new`
     /// argument and an array element take `Printer::build_binary_chain_doc_indented`,

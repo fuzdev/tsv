@@ -116,27 +116,13 @@ impl<'a> Printer<'a> {
             self.build_frozen_value_doc(new_expr.callee, frozen, ParenContext::NewCallee)
         } else if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
             sealed
-        } else if self.needs_parens(new_expr.callee, ParenContext::NewCallee) {
-            // For binary expressions (including logical), use a group with softlines
-            // so the parens can break independently when the content is too long:
-            // new (
-            //     a || b || c
-            // )()
-            //
-            // Use ungrouped binary doc so the inner expression doesn't have its own
-            // group - the outer group controls whether to break after `(`.
-            if let internal::Expression::BinaryExpression(binary) = new_expr.callee {
-                let inner_doc = self.build_binary_chain_doc_ungrouped(binary);
-                d.group(d.concat(&[
-                    d.text("("),
-                    d.indent_softline(inner_doc),
-                    d.softline(),
-                    d.text(")"),
-                ]))
-            } else {
-                let callee_doc = self.build_expression_doc(new_expr.callee);
-                super::build_callee_parens_doc(self, new_expr.callee, callee_doc)
-            }
+        } else if let Some(parens) =
+            super::CalleeParens::of(self, new_expr.callee, ParenContext::NewCallee)
+        {
+            // The pair's shape and the operand's builder off ONE derivation of the callee's
+            // kind — a `new` callee and a call callee are the same position to prettier, so
+            // both read it from [`super::CalleeParens`].
+            parens.build_doc(self, parens.build_body_doc(self))
         } else {
             self.build_expression_doc(new_expr.callee)
         };

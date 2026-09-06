@@ -41,8 +41,8 @@ pub(crate) use arg_comments::{
 };
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
-use super::Printer;
 use super::chain::{self, ChainCall, call_callee_paren_leading_start};
+use super::{ParenContext, Printer};
 use crate::ast::internal;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
@@ -260,35 +260,83 @@ pub(in crate::printer) fn chain_has_calls(expr: &internal::Expression<'_>) -> bo
     }
 }
 
-/// The required paren pair around a CALLEE — `(x as T)()`, `new (x as T)()`.
+/// The required paren pair around a CALLEE — `(x as T)()`, `(a && b)()`, `new (x ? y : z)()`.
 ///
-/// Prettier's `printBinaryCastExpression` (print/binary-cast-expression.js) gives an
-/// `as` / `satisfies` cast its own hanging group in exactly two positions: the callee of a
-/// call or `new`, and the OBJECT of a member access. tsv already spells the object half
-/// (the chain base's `build_expanding_parens_body_doc`), and this is the callee half — so
-/// the pair breaks around the operand (`new (⏎\tx as T⏎)()`) instead of welding `new (` to
-/// it and breaking inside the operand, which is the shape the same cast takes one position
-/// over.
+/// **Ask the callee's kind BEFORE building its body.** Two of the three shapes want an
+/// operand doc that is not the one `build_expression_doc` gives every other position, so a
+/// caller that built the body first and asked afterwards would have to throw it away. That
+/// is the whole reason this is a kind rather than a doc wrapper: [`Self::build_body_doc`]
+/// and [`Self::build_doc`] are two consumers of ONE derivation, and the shape and the
+/// builder can never disagree about which callee they are looking at.
 ///
-/// Every other callee kind takes the plain pair, and that is prettier's answer too: a
-/// ternary, an `await`, an optional chain and a sequence callee all weld. A BINARY callee
-/// hangs as well, through the `new` printer's own arm — it needs the ungrouped operand doc,
-/// which this seam does not build.
-pub(super) fn build_callee_parens_doc(
-    printer: &Printer<'_>,
-    callee: &internal::Expression<'_>,
-    callee_doc: DocId,
-) -> DocId {
-    let d = printer.arena();
-    let body = if matches!(
-        callee,
-        internal::Expression::TSAsExpression(_) | internal::Expression::TSSatisfiesExpression(_)
-    ) {
-        printer.build_expanding_parens_body_doc(callee_doc)
-    } else {
-        callee_doc
-    };
-    d.parens(body)
+/// Shared by both callee positions prettier treats alike — a call's and a `new`'s.
+pub(super) enum CalleeParens<'a> {
+    /// `(x ? y : z)()` — the pair welds to the argument list and the operand takes its
+    /// ordinary doc. Prettier's answer for every callee kind but the two below: a ternary,
+    /// an `await`, an optional chain and a sequence callee all weld.
+    Welded(&'a internal::Expression<'a>),
+    /// `(⏎\tx as T⏎)()` — prettier's `printBinaryCastExpression`
+    /// (print/binary-cast-expression.js) gives an `as` / `satisfies` cast its own hanging
+    /// group in exactly two positions: the callee of a call or `new`, and the OBJECT of a
+    /// member access. tsv already spells the object half (the chain base's
+    /// [`Printer::build_expanding_parens_body_doc`]), and this is the callee half — so the
+    /// pair breaks around the operand instead of welding `new (` to it and breaking inside
+    /// the operand, which is the shape the same cast takes one position over.
+    ///
+    /// Takes the same PAIR as [`Self::Binary`] and differs only in its body: it spelled the
+    /// group *outside* the parens until that was measured against the shared inside-the-parens
+    /// shape and found byte-identical over the whole fixture suite and the whole gates corpus.
+    /// The outside-the-parens helper stays for the callers that have no choice — the ones
+    /// whose `(` / `)` a different seam emits, so only a body is theirs to wrap.
+    Cast(&'a internal::Expression<'a>),
+    /// `(⏎\ta &&⏎\tb⏎)()` — prettier's binaryish EARLY RETURN, `key === "callee" &&
+    /// isCallOrNewExpression(parent)` (binaryish.js:84-89), taken ahead of `shouldNotIndent`
+    /// and so ahead of every indent question: `group([indent([softline, ...parts]),
+    /// softline])` over FLAT parts. The operand is therefore the ungrouped chain — the
+    /// paren group alone decides whether to break after `(` — and not the
+    /// continuation-indented default a binaryish value takes everywhere else.
+    Binary(&'a internal::BinaryExpression<'a>),
+}
+
+impl<'a> CalleeParens<'a> {
+    /// The pair `callee` prints in `context`, or `None` where it needs no pair. Ask before
+    /// building the body.
+    ///
+    /// The `needs_parens` gate lives INSIDE the constructor so the type cannot exist for a
+    /// callee that prints no pair — every one of its shapes is a claim about a pair, and a
+    /// caller holding one for a bare callee would emit parens the grammar never asked for.
+    pub(super) fn of(
+        printer: &Printer<'_>,
+        callee: &'a internal::Expression<'a>,
+        context: ParenContext,
+    ) -> Option<Self> {
+        if !printer.needs_parens(callee, context) {
+            return None;
+        }
+        Some(match callee {
+            internal::Expression::TSAsExpression(_)
+            | internal::Expression::TSSatisfiesExpression(_) => Self::Cast(callee),
+            internal::Expression::BinaryExpression(binary) => Self::Binary(binary),
+            _ => Self::Welded(callee),
+        })
+    }
+
+    /// The operand doc this pair wants, which is the ordinary expression doc for every
+    /// shape but [`Self::Binary`].
+    pub(super) fn build_body_doc(&self, printer: &Printer<'_>) -> DocId {
+        match self {
+            Self::Binary(binary) => printer.build_binary_chain_doc_ungrouped(binary),
+            Self::Welded(callee) | Self::Cast(callee) => printer.build_expression_doc(callee),
+        }
+    }
+
+    /// The pair itself, around a body from [`Self::build_body_doc`].
+    pub(super) fn build_doc(&self, printer: &Printer<'_>, body: DocId) -> DocId {
+        match self {
+            Self::Welded(_) => printer.arena().parens(body),
+            Self::Cast(_) | Self::Binary(_) => printer.build_expanding_parens_doc(body),
+        }
+    }
 }
 
 /// Check if callee is a member expression (used for chain detection)
