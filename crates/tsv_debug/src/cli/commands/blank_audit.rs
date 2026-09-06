@@ -691,8 +691,10 @@ fn gap_holds_blank(source: &str, offset: usize) -> bool {
     newlines >= 2
 }
 
-/// Walk `node` collecting the verbatim-blank regions — template-literal quasis (verbatim text)
-/// and Svelte `<pre>` / `<textarea>` (whitespace-preserving elements), in byte space via `map`.
+/// Walk `node` collecting the verbatim-blank regions — template-literal quasis (verbatim text),
+/// Svelte `<pre>` / `<textarea>` (whitespace-preserving elements) and the **text parts of an
+/// attribute or `style:` value** (which both formatters copy byte for byte), in byte space via
+/// `map`.
 /// A format-ignore region is NOT found here (locating its range from the output is fragile) — a
 /// format-ignore-bearing file is exempted whole (see
 /// [`source_has_ignore_directive`]).
@@ -730,6 +732,25 @@ fn collect_blank_skip(node: &Value, map: &Utf16ToByte, out: &mut Vec<(usize, usi
                 Some("TitleElement") => {
                     if let Some(span) = map.node_byte_span(node) {
                         out.push(span);
+                    }
+                }
+                // An attribute value's TEXT parts are the author's bytes — both formatters copy
+                // them verbatim (prettier's own `isPreTagContent` names the `Attribute` type for
+                // exactly this), so a blank run inside one is content, not a bug. Only the `Text`
+                // members of the value are skipped, never the whole attribute: an `ExpressionTag`
+                // sibling is ordinary formatted code and a blank run there is still a finding.
+                // The one part of such a value tsv does respell — a whitespace-only part in a
+                // `style:` value — can emit at most ONE blank by construction, so the exemption
+                // suppresses nothing this scan could have seen.
+                Some("Attribute" | "StyleDirective") => {
+                    if let Some(Value::Array(items)) = obj.get("value") {
+                        for item in items {
+                            if item.get("type").and_then(Value::as_str) == Some("Text")
+                                && let Some(span) = map.node_byte_span(item)
+                            {
+                                out.push(span);
+                            }
+                        }
                     }
                 }
                 _ => {}

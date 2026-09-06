@@ -275,7 +275,16 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 2704 → 2705: `flowbite-svelte/.../button-toggle/ButtonToggle.svelte` arrives from
 	// `unknown` — a container initializer under a breakable binding takes the fluid layout.
 	// Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`.
-	svelte: 2705,
+	//
+	// 2705 → 2706: `layerchart/…/components/Text/Text.html.svelte` arrives from `unknown` —
+	// a whitespace-only part of a `style:` value re-indents with the printer's own break.
+	// Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`. ONE mover in the whole view, measured both
+	// ways: two staged trees over the 9,117 `find`-enumerated gates-view files formatted by a
+	// pre-change and a tip `--profile corpus` CLI (per-file error output identical line for
+	// line, 995/995, rewritten 5316/5316), and the `--all --json` bucket lists set-diffed
+	// across the two corpus-profile FFI builds — nothing arrives anywhere, `partial` /
+	// `safety` / `errors` / `expected_errors` identical file-for-file.
+	svelte: 2706,
 	// 4169 → 5124 and (css) 125 → 133: the `third_party` tier — see svelte. 955 of its 966
 	// typescript files match (flowbite-svelte 338 of 338, layerchart 188 of 190, layercake 65 of
 	// 66, svelte-ux 100 of 100, svelte-maplibre 57 of 57, language-tools 207 of 215), none
@@ -394,11 +403,8 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * `CORPUS_FORMAT_MATCH_MIN`.
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
-	// The one open item, given no detector on purpose (a detector would assert a sanction
-	// nothing has decided):
-	//   `layerchart/packages/layerchart/src/lib/components/Text/Text.html.svelte` — whitespace
-	//     only: a multi-line class value's `{expr}` continuation line keeps the author's SPACE
-	//     indentation where prettier re-indents it with tabs.
+	// Empty, and the fixture suite is what holds it there: every svelte divergence the gates
+	// view still shows is cataloged, so a new file here is a new question.
 	//
 	// 0 → 5: the `third_party` tier arrives with five backlog items: the one above,
 	// `ButtonToggle.svelte`, `BottomNavItem.svelte`, `Dialog.svelte` and `TimelineStepper.svelte`.
@@ -439,7 +445,19 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// is identical line for line, and the `--all --json` bucket lists set-diffed across the
 	// same two builds show nothing arriving anywhere — `partial` / `safety` / `errors` /
 	// `expected_errors` identical file-for-file.
-	svelte: 1,
+	//
+	// 1 → 0: `Text.html.svelte` LEAVES for `match` (`match` 2705 → 2706), the last one. A
+	// `style:` directive's value is a CSS property value, and a value PART that is nothing
+	// but whitespace can only be a token separator — a raw newline can sit in no CSS string
+	// (Syntax 3 §4.3.5) and no escape can reach across a part boundary — so tsv re-emits such
+	// a part as its own break and the continuation lands at the attribute's column, where it
+	// had copied the author's space indentation into tab-indented output. Prettier reaches
+	// further, into the parts that carry content, and collapses every whitespace run there
+	// (`'Font   Name'` is a different font-family name; in a broken attribute list the
+	// collapsed run becomes a line break inside a CSS string, which is a `<bad-string-token>`)
+	// — the held half, cataloged and fixtured rather than matched. Measurement on
+	// `CORPUS_FORMAT_MATCH_MIN`.
+	svelte: 0,
 	// No `third_party` arrival is open any more: the member-chain / assignment break-priority
 	// cluster the tier brought in is closed (the `95 → 89` step below names each file).
 	//
