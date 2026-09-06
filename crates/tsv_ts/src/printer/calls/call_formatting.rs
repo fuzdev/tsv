@@ -72,16 +72,6 @@ pub(super) fn build_call_doc_with_wrapping(
     // halves of one decision, and a second `test_call_flat_layout_applies` call is a
     // second question that can answer differently.
     let test_call_flat = test_call_flat_layout_applies(call, printer);
-    // The flat callee is a break-free doc built straight from the chain parts, so a long
-    // `it.skip` never breaks at its `.`. It replaces ONLY the callee's own doc, which is why
-    // it is built HERE rather than in the layout branch: everything the general path wraps
-    // around a callee — the removed-paren comments (`(/* c */ it)(…)`), the type arguments
-    // and the gap before them (`it/* c */ <T>(…)`) — applies to it below. A branch that
-    // returns a doc assembled from its own callee skips every one of those, `<T>` included.
-    let callee_doc = test_call_flat
-        .then(|| build_test_callee_flat_doc(call.callee, printer))
-        .flatten()
-        .unwrap_or_else(|| printer.build_expression_doc(call.callee));
 
     // Two callee positions print a required pair that keeps BOTH its gaps inside it: an
     // IIFE (`paren_pair_keeps_leading_run` — prettier's `printCommentsForFunction` prints
@@ -93,7 +83,12 @@ pub(super) fn build_call_doc_with_wrapping(
     // own for a trailing gap to exist at all: `(fn /* t */)()` writes it around the
     // callee, `(/* t */ fn())` around the whole call, where the comment belongs to the
     // call and not to any pair printed here.
-    let needs_parens = printer.needs_parens(call.callee, ParenContext::Callee);
+    //
+    // The REQUIRED pair a callee prints when it takes one, as a shape — and with it the
+    // builder its operand takes. Asked BEFORE the body is built, because a cast and a
+    // binaryish callee each want an operand doc `build_expression_doc` does not give
+    // ([`super::CalleeParens`]); `None` is the callee that needs no pair at all.
+    let callee_parens = super::CalleeParens::of(printer, call.callee, ParenContext::Callee);
     // The pair's facts and every window that opens past its `)`, off ONE derivation
     // ([`super::CalleeGap`]).
     let gap = super::callee_gap(printer, call);
@@ -103,6 +98,22 @@ pub(super) fn build_call_doc_with_wrapping(
         start: callee_gap_start,
         optional,
     } = gap;
+
+    // The flat callee is a break-free doc built straight from the chain parts, so a long
+    // `it.skip` never breaks at its `.`. It replaces ONLY the callee's own doc, which is why
+    // it is built HERE rather than in the layout branch: everything the general path wraps
+    // around a callee — the removed-paren comments (`(/* c */ it)(…)`), the type arguments
+    // and the gap before them (`it/* c */ <T>(…)`) — applies to it below. A branch that
+    // returns a doc assembled from its own callee skips every one of those, `<T>` included.
+    let callee_doc = test_call_flat
+        .then(|| build_test_callee_flat_doc(call.callee, printer))
+        .flatten()
+        .unwrap_or_else(|| {
+            callee_parens.as_ref().map_or_else(
+                || printer.build_expression_doc(call.callee),
+                |parens| parens.build_body_doc(printer),
+            )
+        });
 
     let callee = if owned_pair {
         printer.build_owned_required_pair_doc(
@@ -115,11 +126,9 @@ pub(super) fn build_call_doc_with_wrapping(
     } else {
         // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
         // This must happen BEFORE adding removed-paren comments so comments stay outside
-        let callee_doc = if needs_parens {
-            super::build_callee_parens_doc(printer, call.callee, callee_doc)
-        } else {
-            callee_doc
-        };
+        let callee_doc = callee_parens
+            .as_ref()
+            .map_or(callee_doc, |parens| parens.build_doc(printer, callee_doc));
         // Check for comments between removed parentheses and callee
         // e.g., (/* comment */ foo)() has call.span.start at '(' and callee.span.start at 'foo'
         // The comment is in the range [call.span.start, callee.span.start) and needs to be preserved

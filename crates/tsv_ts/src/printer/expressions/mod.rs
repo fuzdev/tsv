@@ -168,6 +168,38 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[d.indent(d.concat(&[d.softline(), content])), d.softline()]))
     }
 
+    /// A pair of **expanding** parens whose own `(` / `)` are INSIDE the group —
+    /// `group(["(", indent([softline, content]), softline, ")"])`, prettier's answer at the
+    /// binaryish early return (binaryish.js:84-89, `group([indent([softline, ...parts]),
+    /// softline])` with the parens supplied by `needs-parens`).
+    ///
+    /// The sibling of [`Self::build_expanding_parens_body_doc`], which spells the same layout
+    /// with the parens *outside* the group. The two are not the same doc, but neither are
+    /// they freely different: swapping the callee pair between them was measured
+    /// byte-identical over the whole fixture suite and the whole gates corpus.
+    ///
+    /// **Which to reach for is a question about who emits the `(` / `)`, not about layout.**
+    /// Use this one where the pair is the doc's own. Every caller of the other has its parens
+    /// emitted by a *different* seam and so has only a body to wrap — a chain base's
+    /// `build_owned_required_pair_doc` (whose bare outside parens also let the chain's
+    /// `conditional_group` drive the break), a non-null's `)!` closer, a ternary operand's
+    /// own pair, a sequence's own pair.
+    ///
+    /// The three positions prettier reaches through that early return build their operand
+    /// with [`Printer::build_binary_chain_doc_ungrouped`] and wrap it here — a call callee,
+    /// a `new` callee, and an uncommented unary argument. Each spelled the concat by hand
+    /// before the call callee joined them, which is exactly the drift this seam exists to
+    /// stop.
+    pub(in crate::printer) fn build_expanding_parens_doc(&self, content: DocId) -> DocId {
+        let d = self.d();
+        d.group(d.concat(&[
+            d.text("("),
+            d.indent_softline(content),
+            d.softline(),
+            d.text(")"),
+        ]))
+    }
+
     /// `build_expression_doc` for a position whose binary chain takes **no continuation
     /// indent** — prettier's `shouldNotIndent` (binaryish.js:96-115), so the chain renders
     /// as `group(parts)` and its continuation lines sit at the first operand's own column.
