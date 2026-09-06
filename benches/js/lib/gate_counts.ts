@@ -210,6 +210,12 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
  * reject-parity axis exists there. Pinned separately from the single-file counts because the
  * population is a different thing: `units_scanned` moves when the harness split or the
  * unit-language rule moves, which the single-file `scanned` cannot see.
+ *
+ * 7853 → 7858 `units_accept_parity`: the five `parserArrowFunctionExpression{8..12}.ts`
+ * `fileTs.ts` units left `BEYOND_ACORN_KNOWN_GAPS` when tsv adopted tsc's rule for a
+ * parenthesized arrow's return type in a conditional's consequent (`a ? (b) : c => d`
+ * is `a ? b : (c => d)`; the annotation is kept only when a second `:` follows the
+ * arrow) — conformance_svelte.md §TypeScript Corrections.
  */
 export const TS_REPO_PINS = {
 	scanned: 13708,
@@ -217,7 +223,7 @@ export const TS_REPO_PINS = {
 	over_acceptance_parser: 20,
 	over_acceptance_checker: 467,
 	units_scanned: 7874,
-	units_accept_parity: 7853
+	units_accept_parity: 7858
 };
 
 /**

@@ -2,7 +2,7 @@
 
 use crate::Goal;
 use crate::ast::internal::*;
-use crate::lexer::{KeywordKind, Lexer, Token, TokenKind, is_es_line_terminator};
+use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{ParseError, Span};
@@ -101,6 +101,27 @@ fn comment_from_token(
     };
     comment.debug_assert_span_len();
     (comment, has_line_terminator)
+}
+
+/// The parser state [`Parser::rewind`] restores after the grammar's one
+/// speculative parse ([`Parser::parse_arrow_or_rewind`]): the lexer cursor, the
+/// one-token window with its decoded values and line-terminator flags, `prev_end`,
+/// a peek's stored lexer error, the comment ledger's length and the grouping depth.
+/// Context flags (`allow_in`, `in_await`, …) are not carried — their combinators
+/// restore them on every path — and neither are arena nodes, which an abandoned
+/// parse simply leaves unreachable.
+pub(super) struct Checkpoint<'arena> {
+    lexer: LexerCheckpoint,
+    current: Token,
+    current_decoded: Option<&'arena str>,
+    peek: Option<Token>,
+    peek_decoded: Option<&'arena str>,
+    had_line_terminator: bool,
+    peek_had_line_terminator: bool,
+    prev_end: usize,
+    lexer_error: Option<ParseError>,
+    comments_len: usize,
+    grouping_depth: u32,
 }
 
 #[expect(clippy::struct_excessive_bools)]
@@ -202,6 +223,24 @@ pub struct Parser<'a, 'arena> {
     /// parses its header at depth 1 — and take the for-in separator for a
     /// relational `in`.
     no_in_depth: u32,
+    /// The [`Parser::grouping_depth`] at which the innermost open conditional
+    /// **consequent** began, or `None` outside one — tsc's
+    /// `allowReturnTypeInArrowFunction` flag, `Some` where tsc passes `false`.
+    ///
+    /// In a consequent a `:` after a parenthesized arrow head may be the
+    /// conditional's own (`a ? (b) : c => d` is `a ? b : (c => d)`), so a
+    /// parenthesized arrow there may keep a return-type annotation only when a
+    /// second `:` follows the whole arrow; [`Parser::parse_arrow_or_rewind`]
+    /// asks. Set by [`Parser::with_arrow_return_type_barred`] at the `?`, read
+    /// through [`Parser::arrow_return_type_barred`] against the same baseline
+    /// rule as `no_in_depth` — a grouping opened *since* the `?` is a fresh
+    /// expression frame where tsc passes `true` again, so only the consequent's
+    /// own depth is barred — and lifted by every `[+In]` body production
+    /// (`with_allow_in`) and a `yield` argument, the two places tsc resets the
+    /// flag without opening a delimiter. It survives into an arrow's concise body,
+    /// the conditional's alternate and an assignment's right side, which inherit
+    /// it exactly as tsc threads the parameter through those three.
+    arrow_return_type_barred_at: Option<u32>,
     /// The syntactic goal symbol (`Script` vs `Module`) this parse runs against.
     /// Fixed for the whole parse — embedders (Svelte) and the standalone
     /// `parse`/`format` default to `Module`; `parse_with_goal` overrides it.
@@ -392,6 +431,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             peek_had_line_terminator: false, // No peek cached yet
             allow_in: true,                  // Allow `in` binary operator by default
             no_in_depth: 0,                  // Only read while `allow_in` is false
+            arrow_return_type_barred_at: None, // Not inside a conditional consequent
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
@@ -956,10 +996,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ([`Parser::no_in_depth`] vs the parse root's literal 0). Nine pairs across
     /// `expression.rs` / `expression_literals.rs` / `expression_template.rs` are
     /// hand-balanced across early returns and are deliberately NOT unwound on the
-    /// error path — inert while the parser never backtracks, since a rejected
-    /// parse propagates straight out. Wrapping them in a combinator (so the pair
-    /// is balanced by construction) wants body extraction at several sites and is
-    /// its own change.
+    /// error path — a rejected parse propagates straight out, and the one place
+    /// that abandons a parse and continues, [`Parser::rewind`], restores the depth
+    /// itself. Wrapping them in a combinator (so the pair is balanced by
+    /// construction) wants body extraction at several sites and is its own change.
     #[inline]
     pub(super) fn enter_grouping(&mut self) {
         self.grouping_depth += 1;
@@ -989,6 +1029,110 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let result = f(self);
         *flag(self) = saved;
         result
+    }
+
+    /// Run `f` as a conditional's **consequent**: a parenthesized arrow at this
+    /// grouping depth may keep a return-type annotation only when a second `:`
+    /// follows it (see [`Parser::arrow_return_type_barred_at`]). Restored
+    /// afterward, on success and error alike, so the alternate parses under the
+    /// enclosing rule — inheriting an outer consequent's bar, as tsc's alternate
+    /// inherits the outer flag.
+    pub(super) fn with_arrow_return_type_barred<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let saved = self
+            .arrow_return_type_barred_at
+            .replace(self.grouping_depth);
+        let result = f(self);
+        self.arrow_return_type_barred_at = saved;
+        result
+    }
+
+    /// Run `f` as a fresh expression frame where a parenthesized arrow's return
+    /// type is always allowed — where tsc passes `allowReturnTypeInArrowFunction =
+    /// true` without opening a delimiter: a `[+In]` body (`with_allow_in`) and a
+    /// `yield` argument. Restored afterward, on success and error alike.
+    pub(super) fn with_arrow_return_type_allowed<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let saved = self.arrow_return_type_barred_at.take();
+        let result = f(self);
+        self.arrow_return_type_barred_at = saved;
+        result
+    }
+
+    /// Whether a parenthesized arrow parsed at the current token must be followed
+    /// by `:` to keep a return-type annotation — the current token sits directly in
+    /// a conditional's consequent, with no grouping opened since its `?`. The
+    /// baseline compare is the `no_in_depth` rule: the consequent may itself sit
+    /// at any depth, and only a delimiter opened *inside* it lifts the bar.
+    #[inline]
+    pub(super) fn arrow_return_type_barred(&self) -> bool {
+        self.arrow_return_type_barred_at == Some(self.grouping_depth)
+    }
+
+    /// Take the state [`Parser::rewind`] returns to. The grammar's one speculative
+    /// parse — [`Parser::parse_arrow_or_rewind`], the arrow head in a conditional's
+    /// consequent — takes it at the head and hands it back if the arrow it read
+    /// turns out not to be one.
+    #[must_use]
+    pub(super) fn checkpoint(&self) -> Checkpoint<'arena> {
+        // An expression head is never between the constrained-infer handoff's set
+        // and its take (both sit inside one `parse_type` call), so the handoff is
+        // not carried — `rewind` clears it instead.
+        debug_assert!(self.pending_conditional_extends.is_none());
+        Checkpoint {
+            lexer: self.lexer.checkpoint(),
+            current: self.current.clone(),
+            current_decoded: self.current_decoded,
+            peek: self.peek.clone(),
+            peek_decoded: self.peek_decoded,
+            had_line_terminator: self.had_line_terminator,
+            peek_had_line_terminator: self.peek_had_line_terminator,
+            prev_end: self.prev_end,
+            lexer_error: self.lexer_error.clone(),
+            comments_len: self.comments.len(),
+            grouping_depth: self.grouping_depth,
+        }
+    }
+
+    /// Return to `checkpoint`, abandoning everything parsed since: the token window
+    /// and lexer cursor go back, the comments drained since are dropped (the
+    /// re-parse drains them again), and the grouping depth is reset — the one
+    /// place the hand-balanced `enter_grouping` / `exit_grouping` pairs are
+    /// unwound, since the abandoned parse may have failed inside one. Arena nodes
+    /// the abandoned parse built are unreachable garbage; every context flag was
+    /// restored by its own combinator on the way out.
+    pub(super) fn rewind(&mut self, checkpoint: Checkpoint<'arena>) {
+        let Checkpoint {
+            lexer,
+            current,
+            current_decoded,
+            peek,
+            peek_decoded,
+            had_line_terminator,
+            peek_had_line_terminator,
+            prev_end,
+            lexer_error,
+            comments_len,
+            grouping_depth,
+        } = checkpoint;
+        self.lexer.rewind(lexer);
+        self.current = current;
+        self.current_decoded = current_decoded;
+        self.peek = peek;
+        self.peek_decoded = peek_decoded;
+        self.had_line_terminator = had_line_terminator;
+        self.peek_had_line_terminator = peek_had_line_terminator;
+        self.prev_end = prev_end;
+        self.lexer_error = lexer_error;
+        self.comments.truncate(comments_len);
+        self.grouping_depth = grouping_depth;
+        // Whatever the abandoned parse's type grammar was handing to itself is not
+        // for the re-parse to receive (`checkpoint` asserts it was empty).
+        self.pending_conditional_extends = None;
     }
 
     /// Run `f` with the function-like scope's `[Await]` and `[Yield]` contexts

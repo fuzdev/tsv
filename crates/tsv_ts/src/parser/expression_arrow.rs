@@ -9,7 +9,8 @@ use tsv_lang::{ParseError, Span};
 use super::Parser;
 use super::expression::ParsedExpr;
 use super::expression_lookahead::{
-    scan_angle_brackets, scan_arrow_after_identifier, scan_parens_then_arrow,
+    paren_head_return_colon, scan_angle_brackets, scan_arrow_after_identifier,
+    scan_parens_then_arrow,
 };
 use super::scan::skip_whitespace_and_comments;
 
@@ -39,11 +40,89 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(arrow_token)
     }
 
+    /// Parse the arrow function whose head a byte-scan predicate just matched, under
+    /// tsc's one context rule about its return type — the
+    /// `allowReturnTypeInArrowFunction` check in
+    /// `parseParenthesizedArrowFunctionExpression`.
+    ///
+    /// In a conditional's consequent the `:` after a parenthesized head may be the
+    /// conditional's own: `a ? (b) : c => d` is `a ? b : (c => d)`, not an arrow
+    /// `(b): c => d` with nothing left to end the conditional. tsc parses the arrow
+    /// anyway and keeps it only when **another `:` follows** it (`a ? (b): c => d : e`
+    /// — a syntax error read any other way, since JavaScript has no second colon
+    /// there); otherwise it rewinds and reads the head as a parenthesized expression.
+    /// The same here: while the return type is barred
+    /// ([`Parser::arrow_return_type_barred`]) the parse runs from a
+    /// [`Parser::checkpoint`], and an annotated arrow not followed by `:` is rewound
+    /// — `None` hands the head back for the caller to read as what it otherwise is
+    /// (a grouped expression, a type assertion, a call to `async`). Outside a
+    /// consequent, and for an arrow without an annotation, `parse` is the whole
+    /// story. The bar reaches only heads at the consequent's own grouping depth;
+    /// inside any delimiter opened since the `?`, and in a `[+In]` body or a
+    /// `yield` argument, the annotation is always allowed, as tsc passes `true`
+    /// there.
+    ///
+    /// Only an **annotated** head is ever in question (tsc's `hasReturnColon` gate),
+    /// and the annotation is read off the bytes (`paren_head_return_colon`, from the
+    /// head's `(` at `paren`) before the parse rather than off the node after it,
+    /// because an annotated head that fails to parse as an arrow is rewound too —
+    /// `a ? (b + c) : d => e` is a head tsc never reads as a signature, and its
+    /// `tryParse` rewinds where tsv's parameter parse errors. A body error rewinds
+    /// the same way, to a verdict tsc shares: the parenthesized reading hands the
+    /// same body to the alternate's arrow, which fails on it again. A head without
+    /// an annotation parses straight, so a body error there keeps its message.
+    ///
+    /// tsc additionally commits an *unambiguous* head (`(a: T)`, `()`, `(...a)`,
+    /// `(a?: T)`) to the annotation without asking — a distinction this need not
+    /// draw: such a head has no parenthesized-expression reading, so its rewound
+    /// parse fails and the failure flows outward exactly as tsc's committed arrow
+    /// leaves the enclosing conditional without its `:` — an enclosing speculation
+    /// rewinds on it and its alternate re-reads the head under the lifted rule
+    /// (`a ? (b) : c => (d: D): E => e`), and at the top the error stands.
+    ///
+    /// `parse` is a plain `fn` pointer rather than a generic closure so the cold
+    /// speculation below has ONE body across the three head sites; the fast path
+    /// inlines here, where the pointer is a constant and the call stays direct.
+    #[inline]
+    pub(super) fn parse_arrow_or_rewind(
+        &mut self,
+        paren: usize,
+        parse: fn(&mut Self) -> Result<ParsedExpr<'arena>, ParseError>,
+    ) -> Result<Option<ParsedExpr<'arena>>, ParseError> {
+        if !self.arrow_return_type_barred()
+            || !paren_head_return_colon(self.source.as_bytes(), paren)
+        {
+            return parse(self).map(Some);
+        }
+        self.parse_arrow_speculatively(parse)
+    }
+
+    /// The speculative half of [`Parser::parse_arrow_or_rewind`]: an annotated head
+    /// in a barred context, parsed from a checkpoint and kept only when `:` follows.
+    #[cold]
+    #[inline(never)]
+    fn parse_arrow_speculatively(
+        &mut self,
+        parse: fn(&mut Self) -> Result<ParsedExpr<'arena>, ParseError>,
+    ) -> Result<Option<ParsedExpr<'arena>>, ParseError> {
+        let checkpoint = self.checkpoint();
+        match parse(self) {
+            Ok(arrow) if self.check(&TokenKind::Colon) => Ok(Some(arrow)),
+            Ok(_) | Err(_) => {
+                self.rewind(checkpoint);
+                Ok(None)
+            }
+        }
+    }
+
     /// Check if current position starts an arrow function
     ///
-    /// Scans ahead looking for pattern: `(` ... `)` `=>`
-    pub(super) fn is_arrow_function_start(&self) -> bool {
-        scan_parens_then_arrow(self.source.as_bytes(), self.current.start as usize)
+    /// Scans ahead looking for pattern: `(` ... `)` `=>`. Returns the head's `(`
+    /// (slice-relative, `self.current.start`) when it is one — what
+    /// `parse_arrow_or_rewind` reads the annotation off, as for the generic head.
+    pub(super) fn paren_arrow_function_start(&self) -> Option<usize> {
+        let paren = self.current.start as usize;
+        scan_parens_then_arrow(self.source.as_bytes(), paren).then_some(paren)
     }
 
     /// Check if current position starts a single-param arrow function: `x =>`
@@ -59,24 +138,27 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Check if current position starts a generic arrow function: `<T>() =>`
     ///
     /// Scans ahead looking for pattern: `<` ... `>` `(` ... `)` `=>`
-    pub(super) fn is_generic_arrow_function_start(&self) -> bool {
+    ///
+    /// Returns the head's `(` (slice-relative, like `self.current.start`) when it
+    /// is one — what `parse_arrow_or_rewind` reads the annotation off.
+    pub(super) fn generic_arrow_function_start(&self) -> Option<usize> {
         let bytes = self.source.as_bytes();
         let start = self.current.start as usize;
 
         // Must start with '<'
         if start >= bytes.len() || bytes[start] != b'<' {
-            return false;
+            return None;
         }
 
         // Scan through type parameters: <T, U extends V, ...>
         let pos = scan_angle_brackets(bytes, start);
         if pos == 0 {
-            return false;
+            return None;
         }
 
         // After '>', check for `(...) =>` (allow comments: `<T> /* comment */ () =>`)
-        let pos = skip_whitespace_and_comments(bytes, pos);
-        scan_parens_then_arrow(bytes, pos)
+        let paren = skip_whitespace_and_comments(bytes, pos);
+        scan_parens_then_arrow(bytes, paren).then_some(paren)
     }
 
     /// Parse generic arrow function: `<T>() => ...`, `<T, U extends V>() => ...`

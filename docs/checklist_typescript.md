@@ -262,6 +262,7 @@ written in the flags position) is not a flags production at all and is rejected,
 - Default parameters (`(x = 1) => x`)
 - Destructured parameters
 - Async arrows (`async () => {}`)
+- Return-type annotation in a conditional's consequent — kept only when a second `:` follows the arrow (`a ? (b): c => d : e`); otherwise the `:` is the conditional's and the head is a parenthesized expression (`a ? (b) : c => d`), tsc's rule (acorn rejects the latter — see `tests/fixtures/typescript/expressions/arrow/return_type_ternary_consequent/`)
 
 ### Function Expressions
 

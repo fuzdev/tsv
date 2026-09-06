@@ -52,9 +52,29 @@ fn is_greater_equal_op(bytes: &[u8], pos: usize) -> bool {
 /// - Optional type annotation after `)`: `)` or `): type`
 ///
 /// Returns `true` if the pattern `(...) =>` or `(...): type =>` is found.
+#[inline]
 pub(super) fn scan_parens_then_arrow(bytes: &[u8], start: usize) -> bool {
+    scan_arrow_head_close(bytes, start).is_some()
+}
+
+/// Whether the arrow head opening at the `(` at `paren` carries a return-type
+/// annotation — a `:` right after its matching `)`. Asked only of a head
+/// [`scan_parens_then_arrow`] already matched, by the consequent-context rule
+/// (`Parser::parse_arrow_or_rewind`), which needs the fact AHEAD of the parse: a
+/// head that then fails to parse as an arrow is rewound only when annotated, so
+/// the parser's own record of a return type (written after the parameters) comes
+/// too late for the head whose parameters were the failure.
+pub(super) fn paren_head_return_colon(bytes: &[u8], paren: usize) -> bool {
+    scan_arrow_head_close(bytes, paren).is_some_and(|close| {
+        bytes.get(skip_whitespace_and_comments(bytes, close + 1)) == Some(&b':')
+    })
+}
+
+/// [`scan_parens_then_arrow`]'s walk, returning the `)` it matched the arrow head
+/// at — `None` where the pattern does not hold.
+fn scan_arrow_head_close(bytes: &[u8], start: usize) -> Option<usize> {
     if start >= bytes.len() || bytes[start] != b'(' {
-        return false;
+        return None;
     }
 
     let end = bytes.len();
@@ -108,14 +128,14 @@ pub(super) fn scan_parens_then_arrow(bytes: &[u8], start: usize) -> bool {
             b')' => {
                 depth -= 1;
                 if depth == 0 {
-                    return check_arrow_after_paren(bytes, pos + 1);
+                    return check_arrow_after_paren(bytes, pos + 1).then_some(pos);
                 }
             }
             _ => {}
         }
         pos += 1;
     }
-    false
+    None
 }
 
 /// Whether the parenthesized content at `(` (a `(` immediately followed by a
@@ -200,8 +220,12 @@ fn check_arrow_after_paren(bytes: &[u8], pos: usize) -> bool {
 /// ONE type, then require `=>` right after it. Hunting for any `=>` at bracket
 /// depth 0 is not enough, and tsc's own source names the counterexample —
 /// "`a ? (b): c` will have `(b):` parsed as a signature with a return type
-/// annotation". Two shapes put a stray `=>` within reach of such a scan, and in
-/// neither is the `:` a return-type colon:
+/// annotation". That counterexample's other half — `a ? (b) : c => d`, where the
+/// one type IS followed by `=>` and the `:` is still the conditional's — is not
+/// this scan's to settle: it needs the arrow's whole extent, so the parser asks it
+/// by speculation (`Parser::parse_arrow_or_rewind`), as tsc does. Two shapes put a
+/// stray `=>` within reach of such a scan, and in neither is the `:` a return-type
+/// colon:
 ///
 /// - a depth-0 `?`, which in a type is only a conditional type's `?` and so
 ///   requires an `extends` before it (`a ? (b, c) : d ? (p) => 1 : e`)

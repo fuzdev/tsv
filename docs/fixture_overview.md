@@ -872,6 +872,18 @@ parser still accepts and matches `expected_svelte.json` (F7/S20). This self-heal
 a canonical-parser bump that starts rejecting the input surfaces the dead
 divergence.
 
+**When no fixed point carries the divergence.** `input.*` must be a prettier fixed point
+(F1) and the two ASTs must differ on it (S17). A parse divergence reachable only from a
+spelling prettier rewrites — every acorn-rejected form of `a ? (b) : c => d` prints as
+`b ? c : (d) => e`, which acorn accepts — has no `input.*` to live in. Pin it as a
+**formatting claim** instead: a plain fixture whose `unformatted_<what moved>` variant
+holds the divergent spellings (both formatters must normalize them to the fixed point,
+and the formatted form discriminates the reading), plus a node-type test under
+`tests/` that asserts the tree directly. Check for this before designing the fixture:
+run prettier on the spelling, then `canonical_parse` its output. Precedents in
+./conformance_svelte.md §TypeScript Corrections: the `export default abstract⏎class`
+entry and the return-type-in-a-consequent entry.
+
 Never use for in-progress features or temporary gaps — let the test fail normally. See ./conformance_svelte.md.
 
 ---
