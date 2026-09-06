@@ -72,6 +72,10 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char, text_edge_ws};
 
+use crate::audit::excerpt::line_context;
+use crate::audit::properties::{BaseFixedPoint, base_fixed_point};
+use crate::audit::repro::{ReproCase, write_repro_case};
+use crate::audit::tally::CappedPaths;
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 use crate::deno::{PrettierParser, run_prettier};
@@ -101,9 +105,12 @@ pub struct AuthoringAuditCommand {
     #[argh(switch)]
     verbose: bool,
 
-    /// max boundary sites probed per file (0 = unlimited)
+    /// max boundary sites probed PER FILE (0 = unlimited). Named apart from the sibling
+    /// audits' `--limit`, which caps FILES: the two narrow a run differently and a reader
+    /// typing the familiar one here would silently grade every file at a fraction of its
+    /// sites.
     #[argh(option, default = "0")]
-    limit: usize,
+    site_limit: usize,
 
     /// cap the number of examples retained per bucket (default 40)
     #[argh(option, default = "40")]
@@ -118,6 +125,9 @@ pub struct AuthoringAuditCommand {
     #[argh(positional)]
     paths: Vec<String>,
 }
+
+/// What this audit's mutation does, for a repro note's one-line summary.
+const MUTATION: &str = "flip one boundary's whitespace";
 
 /// The kind of boundary the toggle site sits on.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -495,7 +505,12 @@ impl Outcome {
 struct Report {
     files_scanned: usize,
     files_parse_error: usize,
-    files_base_non_idempotent: usize,
+    /// Seeds whose own format is not a fixed point: excluded from the authoring analysis
+    /// (there is nothing for the variants to converge ON) and a failure of the run. A
+    /// [`CappedPaths`] rather than a count beside a `Vec`, so the number the report prints
+    /// cannot drift from the list under it and the list stays bounded on a corpus that has
+    /// many.
+    base_non_idempotent: CappedPaths,
     sites: usize,
     variant_parse_errors: usize,
     counts: BTreeMap<Bucket, usize>,
@@ -503,7 +518,6 @@ struct Report {
     /// divergence lives in.
     kind_counts: BTreeMap<(SiteKind, Bucket), usize>,
     examples: BTreeMap<Bucket, Vec<Outcome>>,
-    base_non_idempotent_paths: Vec<String>,
     dump_seq: usize,
 }
 
@@ -515,33 +529,6 @@ impl Report {
     fn kind_count(&self, k: SiteKind, b: Bucket) -> usize {
         self.kind_counts.get(&(k, b)).copied().unwrap_or(0)
     }
-}
-
-/// Write a byte-exact repro of a hard finding: the base `F`, the flipped
-/// `variant`, tsv's `ftry`, and `ftry2` (= format(ftry), to expose a 2-cycle).
-fn dump_case(dir: &str, seq: usize, tag: &str, src_path: &str, f: &str, variant: &str, ftry: &str) {
-    let slug: String = Path::new(src_path)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("case")
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '_' })
-        .collect();
-    let case_dir = Path::new(dir).join(format!("{seq:03}_{tag}_{slug}"));
-    if std::fs::create_dir_all(&case_dir).is_err() {
-        return;
-    }
-    let ftry2 = format_source(ftry, ParserType::Svelte).unwrap_or_default();
-    let note = format!(
-        "source: {src_path}\nbucket: {tag}\nbase F (a fixed point) -> flip one boundary -> variant -> format = ftry\nftry == F?      {}\nftry idempotent? {}\n",
-        ftry == f,
-        ftry == ftry2,
-    );
-    let _ = std::fs::write(case_dir.join("base.svelte"), f);
-    let _ = std::fs::write(case_dir.join("variant.svelte"), variant);
-    let _ = std::fs::write(case_dir.join("ftry.svelte"), ftry);
-    let _ = std::fs::write(case_dir.join("ftry2.svelte"), ftry2);
-    let _ = std::fs::write(case_dir.join("note.txt"), note);
 }
 
 /// Stable display / JSON key for a bucket (the map is keyed by the `Bucket` enum;
@@ -602,7 +589,7 @@ impl AuthoringAuditCommand {
         // reported-but-green.
         let hard = report.count(Bucket::BugA)
             + report.count(Bucket::NonIdempotent)
-            + report.files_base_non_idempotent;
+            + report.base_non_idempotent.count();
         if hard > 0 {
             return Err(CliError::Failed);
         }
@@ -659,14 +646,18 @@ impl AuthoringAuditCommand {
                 {
                     report.dump_seq += 1;
                     let ftry = format_source(&variant, ParserType::Svelte).unwrap_or_default();
-                    dump_case(
+                    write_repro_case(
                         dir,
-                        report.dump_seq,
-                        "bug_a",
-                        &outcome.path,
-                        &f,
-                        &variant,
-                        &ftry,
+                        &ReproCase {
+                            seq: report.dump_seq,
+                            tag: "bug_a",
+                            mutation: MUTATION,
+                            src_path: path,
+                            base: &f,
+                            variant: &variant,
+                            ftry: &ftry,
+                            parser: ParserType::Svelte,
+                        },
                     );
                 }
                 self.record(&mut report, outcome);
@@ -683,25 +674,20 @@ impl AuthoringAuditCommand {
         }
         let source = std::fs::read_to_string(path).ok()?;
         report.files_scanned += 1;
-        let Ok(f) = format_source(&source, ParserType::Svelte) else {
-            report.files_parse_error += 1;
-            return None;
-        };
-        // Base idempotency: a file whose own format isn't a fixed point has a more
-        // fundamental bug; exclude it from authoring analysis (and flag it).
-        match format_source(&f, ParserType::Svelte) {
-            Ok(f2) if f2 == f => {}
-            _ => {
-                report.files_base_non_idempotent += 1;
-                report
-                    .base_non_idempotent_paths
-                    .push(path.display().to_string());
+        let f = match base_fixed_point(&source, ParserType::Svelte) {
+            BaseFixedPoint::Ok(f) => f,
+            BaseFixedPoint::ParseError => {
+                report.files_parse_error += 1;
                 return None;
             }
-        }
+            BaseFixedPoint::NonIdempotent => {
+                report.base_non_idempotent.push(path.display().to_string());
+                return None;
+            }
+        };
         let mut sites = svelte_sites(&f)?;
-        if self.limit > 0 && sites.len() > self.limit {
-            sites.truncate(self.limit);
+        if self.site_limit > 0 && sites.len() > self.site_limit {
+            sites.truncate(self.site_limit);
         }
         report.sites += sites.len();
         Some((f, sites))
@@ -732,14 +718,18 @@ impl AuthoringAuditCommand {
             && !tsv_self_stable
         {
             report.dump_seq += 1;
-            dump_case(
+            write_repro_case(
                 dir,
-                report.dump_seq,
-                "nonidem",
-                &path.display().to_string(),
-                f,
-                &variant,
-                &ftry,
+                &ReproCase {
+                    seq: report.dump_seq,
+                    tag: "nonidem",
+                    mutation: MUTATION,
+                    src_path: path,
+                    base: f,
+                    variant: &variant,
+                    ftry: &ftry,
+                    parser: ParserType::Svelte,
+                },
             );
         }
         Some(Outcome {
@@ -780,20 +770,13 @@ fn splice(f: &str, site: &Site) -> String {
     out
 }
 
-/// The (trimmed) source line containing byte `offset`, for human context.
-fn line_context(f: &str, offset: usize) -> String {
-    let start = f[..offset].rfind('\n').map_or(0, |i| i + 1);
-    let end = f[offset..].find('\n').map_or(f.len(), |i| offset + i);
-    let line = f[start..end].trim();
-    let truncated: String = line.chars().take(80).collect();
-    truncated
-}
-
 fn print_human(report: &Report, verbose: bool, triaged: bool) {
     println!("Authoring-independence audit (Svelte boundary whitespace)");
     println!(
         "  files: {} scanned, {} parse-error, {} base-non-idempotent",
-        report.files_scanned, report.files_parse_error, report.files_base_non_idempotent,
+        report.files_scanned,
+        report.files_parse_error,
+        report.base_non_idempotent.count(),
     );
     println!(
         "  sites probed: {} ({} variant parse-errors)",
@@ -877,12 +860,12 @@ fn print_human(report: &Report, verbose: bool, triaged: bool) {
         println!();
     }
 
-    if !report.base_non_idempotent_paths.is_empty() {
+    if !report.base_non_idempotent.is_empty() {
         println!();
         println!("  ✗ base-non-idempotent files (F1 broken — excluded from the authoring");
         println!("    analysis, but a failure in their own right):");
-        for p in report.base_non_idempotent_paths.iter().take(20) {
-            println!("    {p}");
+        for line in report.base_non_idempotent.sample_lines("    ") {
+            println!("{line}");
         }
     }
 
@@ -957,13 +940,13 @@ fn print_json(report: &Report) {
     let out = serde_json::json!({
         "files_scanned": report.files_scanned,
         "files_parse_error": report.files_parse_error,
-        "files_base_non_idempotent": report.files_base_non_idempotent,
+        "files_base_non_idempotent": report.base_non_idempotent.count(),
         "sites": report.sites,
         "variant_parse_errors": report.variant_parse_errors,
         "counts": counts,
         "kind_counts": kind_counts,
         "examples": examples,
-        "base_non_idempotent_paths": report.base_non_idempotent_paths,
+        "base_non_idempotent_sample": report.base_non_idempotent.sample(),
     });
     println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
 }

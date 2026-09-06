@@ -33,6 +33,14 @@
  *   in place where prettier relocates), run report-only below so they don't fail the gate.
  * - `authoring_audit` — every render-equivalent authoring of a Svelte document reaches ONE tsv
  *   fixed point (boundary-whitespace idempotency). Real code only (Svelte).
+ * - `paren_audit` — the same question on a different equivalence: a same-operator logical chain
+ *   must format identically to the redundantly-parenthesized twin prettier rebalances it from.
+ *   Real code only, and for the SAME reason `authoring_audit` is: the prettier suites hold six
+ *   files that are not tsv F1 fixed points (`js/comments/binary-expressions-parens.js` among
+ *   them), which this audit reports as a failure of its own — that question belongs to the F1
+ *   sweep below. Real code carries twice the fixture corpus's chains, and the class it gates is
+ *   one a corpus of formatted code cannot otherwise show: the paren-nested authoring is exactly
+ *   what tsv's own output normalizes away (docs/audits.md §Paren-Authoring Independence).
  * - `census_audit` — every comment interior the author wrote survives formatting, compared as raw
  *   input-vs-output trivia multisets by the audit's own scanners. All dirs. This is the leg whose
  *   yield is external corpora *by its own design* — over `tests/fixtures` it is a tripwire, and its
@@ -155,6 +163,7 @@ const legs: Leg[] = [
 		note: 'report-only: a few known adversarial philosophy HARDs (plain comments tsv preserves in place)'
 	},
 	{ name: 'authoring_audit', args: ['authoring_audit'], seeds: real_seeds, gating: true },
+	{ name: 'paren_audit', args: ['paren_audit'], seeds: real_seeds, gating: true },
 	// The two as-authored ratchets that CAN hold a zero off their default corpus: with explicit
 	// paths the snapshot is not consulted and every finding fails, pinned or not.
 	{ name: 'census_audit', args: ['census_audit'], seeds: all_seeds, gating: true },

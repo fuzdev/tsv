@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::{ByteToCharMap, estimated_ast_arena_capacity};
 
-use super::profile::{format_duration, format_size, lang_label, median_us, resolve_profile_files};
+use super::profile::{format_duration, format_size, lang_token, median_us, resolve_profile_files};
 use crate::cli::CliError;
 
 /// Bench-corpus exclusions, mirrored from `benches/js/lib/corpus.ts`:
@@ -227,7 +227,7 @@ fn print_report(
     for (parser_type, a) in aggregates {
         eprintln!(
             "{} — {} files, {} source, {} wire JSON, {} multibyte",
-            lang_label(*parser_type),
+            lang_token(*parser_type),
             a.files,
             format_size(a.size),
             format_size(a.wire_bytes),
@@ -271,7 +271,7 @@ fn print_json(
                 "parse_us": a.parse_us,
                 "write_us": a.write_us,
             });
-            (lang_label(*parser_type).to_string(), lang)
+            (lang_token(*parser_type).to_string(), lang)
         })
         .collect();
 
@@ -280,7 +280,7 @@ fn print_json(
         .map(|r| {
             serde_json::json!({
                 "path": r.path.to_string_lossy(),
-                "lang": lang_label(r.parser_type),
+                "lang": lang_token(r.parser_type),
                 "size_bytes": r.size,
                 "wire_bytes": r.wire_bytes,
                 "multibyte": r.multibyte,

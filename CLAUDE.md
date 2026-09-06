@@ -212,6 +212,11 @@ deno task roundtrip:audit:prettier   # the same audit over the pinned prettier s
 deno task discovery:audit            # `tsv format --list ../corpora/collections` must name EXACTLY the snapshot's committed files in tsv's extensions — the corpus is defined by the snapshot's tree, not by tsv's discovery, and this is what keeps a discovery prune from silently shrinking every consumer's corpus. Refuses a dirty checkout. ~0.1 s; warn-skips when `../corpora` is absent
 deno task binding:audit              # comment↔token re-binding (HARD fails the gate, SOFT informational)
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: one fixed point per document
+deno task paren:audit                # authoring-independence over redundant PARENS: a same-operator logical chain
+#                          (`a ?? b ?? c`) must format identically to the twin prettier rebalances it from
+#                          (`a ?? (b ?? c)`). Zero-tolerance, no ratchet — a redundant paren carries no authoring
+#                          signal, so every divergence is a bug. The class is invisible on every paren-free
+#                          authoring, which is every authoring a formatted corpus holds (bug539)
 deno task fuzz:audit                 # seeded mutational fuzzer (fixed seed/iterations): no-panic + idempotency + structural reparse
 deno task swallow:audit              # `//` line comment swallowing following output-line content (also over real code via audit:corpus)
 deno task comments:audit             # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments

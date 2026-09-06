@@ -14,9 +14,9 @@
 //!   over the committed fixtures tree can be held to.
 //!
 //! Its own module rather than [`super::sweep`]'s (where it was born) because the
-//! floor is a question about an audit's DENOMINATOR, not about that loop: seven
+//! floor is a question about an audit's DENOMINATOR, not about that loop: eight
 //! of its callers — `canonicalize`, `binding`, `neutrality`, `roundtrip`,
-//! `authoring`, `render`, `fuzz` — drive no sweep at all. The pin above it is
+//! `authoring`, `paren`, `render`, `fuzz` — drive no sweep at all. The pin above it is
 //! sweep-shaped by coincidence of subject (its consumers all count formatted
 //! files); the two belong together because they are two answers to one question.
 

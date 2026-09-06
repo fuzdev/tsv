@@ -37,7 +37,7 @@
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace --all-features --all-targets -- -D warnings",
 		"format:audit": "cargo run --profile corpus -p tsv_cli --quiet -- format --check .",
-		"check": "cargo fmt --check && deno task format:audit && deno task pins:audit && deno task docs:audit && deno task typecheck && deno task typecheck:features && deno task typecheck:scripts && deno task typecheck:bench-core && deno task conformance:audit && deno task conformance:audit:compiler && deno task variants:audit && deno task scan:audit && deno task fanout:audit && deno task roundtrip:audit && deno task roundtrip:audit:prettier && deno task discovery:audit && deno task canonicalize:audit && deno task binding:audit && deno task authoring:audit && deno task razor:audit && deno task fuzz:audit && deno task test:deno && deno task test && deno task test:audits && deno task swallow:audit && deno task comments:audit && deno task gaps:audit && deno task blanks:audit && deno task fabrication:audit && deno task census:audit && deno task width:audit && deno task ignore:audit && deno task check:ast-types && deno task lint",
+		"check": "cargo fmt --check && deno task format:audit && deno task pins:audit && deno task docs:audit && deno task typecheck && deno task typecheck:features && deno task typecheck:scripts && deno task typecheck:bench-core && deno task conformance:audit && deno task conformance:audit:compiler && deno task variants:audit && deno task scan:audit && deno task fanout:audit && deno task roundtrip:audit && deno task roundtrip:audit:prettier && deno task discovery:audit && deno task canonicalize:audit && deno task binding:audit && deno task authoring:audit && deno task paren:audit && deno task razor:audit && deno task fuzz:audit && deno task test:deno && deno task test && deno task test:audits && deno task swallow:audit && deno task comments:audit && deno task gaps:audit && deno task blanks:audit && deno task fabrication:audit && deno task census:audit && deno task width:audit && deno task ignore:audit && deno task check:ast-types && deno task lint",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 		"doctor": "deno run --allow-read --allow-sys --allow-run=deno,node,bun,cargo,wasm-pack,npm,git --config benches/js/deno.json scripts/doctor.ts",
 
@@ -88,6 +88,7 @@
 		"discovery:audit": "deno run --allow-read --allow-env --allow-run=cargo,git scripts/discovery_audit.ts",
 		"binding:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet binding_audit --gate",
 		"authoring:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet authoring_audit",
+		"paren:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet paren_audit",
 		"render:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet render_audit --gate",
 		"fuzz:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet fuzz --seed 0 --iterations 5000",
 		"idempotency:sweep": "deno run --allow-read --allow-env --allow-sys --allow-run=cargo,git --config benches/js/deno.json benches/js/idempotency_sweep.ts",

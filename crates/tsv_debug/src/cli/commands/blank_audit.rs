@@ -125,7 +125,7 @@ use crate::audit::node_edge::node_edge_key_with_map;
 use crate::audit::parallel::{ArmedRun, run_pool};
 use crate::audit::properties::{
     F1Outcome, Formatted, Pristine, Utf16ToByte, f1_check, leaf_conservation_diff, ledger_format,
-    pristine_format, structurally_equivalent, tsv_parse_to_value,
+    pristine_format, source_has_ignore_directive, structurally_equivalent, tsv_parse_to_value,
 };
 use crate::audit::ratchet::{
     GateDiff, Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update,
@@ -135,8 +135,7 @@ use crate::audit::report::{
     self, BlankDetail, Detail, Finding, ReportExample, RunSummary, Severity,
 };
 use crate::audit::sites::{
-    code_regions, injection_sites, site_shape, snippet, source_has_ignore_directive,
-    string_and_template_spans,
+    code_regions, injection_sites, site_shape, snippet, string_and_template_spans,
 };
 use crate::audit::tally::CappedPaths;
 use crate::cli::CliError;
