@@ -1,0 +1,9 @@
+Prettier never reaches a fixed point on this input. The comment on the default's `=`
+line with the member value below it (`x = // c⏎(a as any).b`) oscillates forever with
+the cast operand re-wrapped in an expanded shell that holds the comment
+(`x = ( // c⏎a as any⏎).b`), flipping on every pass; the conditional case settles
+with the comment floated past the value (`x = (a as any) ? b : c // c`) but never
+frees the file. No prettier-anchored claim file (output_prettier.*, audit_signature.txt,
+variants) is expressible. The validator live-verifies this claim (rule F5). tsv keeps
+the comment on the `=` line and hangs the value one level under it, its one fixed
+point. See README.md and docs/conformance_prettier_ts_comments.md §Comment relocation.

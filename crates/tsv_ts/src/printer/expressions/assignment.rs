@@ -1068,6 +1068,24 @@ impl<'a> Printer<'a> {
         if rhs_info.has_line_comment && layout != AssignmentLayout::BreakAfterOperator {
             layout = AssignmentLayout::BreakAfterOperator;
         }
+        // The same comment one shell deeper: an own-line run inside the grouping parens of
+        // the value's LEFTMOST node (`= (⏎// c⏎a as any) ? b : c`, `= (⏎// c⏎a).b`). The
+        // value's printer strips that shell and hoists the run ahead of its whole doc, so
+        // the doc opens with the run and a hardline — exactly what the operator→RHS gap's
+        // own line comment produces, and it wants the same layout: `BreakAfterOperator`
+        // is what puts the run and the value under the operator at the value's indent.
+        // Left to the value's own arm (`Fluid` for a conditional, the chain's for a
+        // member), the run rendered FLUSH on the operator's line and the reparse — reading
+        // the comment as the operator→RHS gap's — indented it, a second fixed point one
+        // pass away. Prettier reaches the operator→RHS reading on its own second pass; a
+        // binary value already lands here through its own arm, so this is the shape the
+        // seam gives every left-side kind. Asked ahead of the chain overrides below, which
+        // keep the value on the operator's line only for a run its own pair RETAINS.
+        if layout != AssignmentLayout::BreakAfterOperator
+            && self.left_spine_shell_has_own_line_comment(right_expr)
+        {
+            layout = AssignmentLayout::BreakAfterOperator;
+        }
         if layout != AssignmentLayout::BreakAfterOperator
             && let Some(comments_doc) = rhs_info.comments
             && d.will_break(comments_doc)

@@ -1,0 +1,594 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 443,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A sequence body whose first operand's grouping parens hold an own-line comment: the",
+			"start": 20,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " sequence floats the comment out ahead of its own `(`, so the body no longer hugs the",
+			"start": 108,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `=>` — it breaks below it, the run and the sequence at the body's indent.",
+			"start": 197,
+			"end": 273,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 294,
+			"end": 298,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 330,
+			"end": 334,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " contrast: a comment-free sequence body hugs the arrow",
+			"start": 350,
+			"end": 406,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 57
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 442,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 433,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 275,
+					"end": 308,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 281,
+							"end": 307,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 281,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"name": "f1"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 286,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 12
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "SequenceExpression",
+									"start": 302,
+									"end": 306,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 7
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 302,
+											"end": 303,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 3
+												},
+												"end": {
+													"line": 7,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 305,
+											"end": 306,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 6
+												},
+												"end": {
+													"line": 7,
+													"column": 7
+												}
+											},
+											"name": "b"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 294,
+											"end": 298
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A sequence body whose first operand's grouping parens hold an own-line comment: the",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " sequence floats the comment out ahead of its own `(`, so the body no longer hugs the",
+							"start": 108,
+							"end": 195
+						},
+						{
+							"type": "Line",
+							"value": " `=>` — it breaks below it, the run and the sequence at the body's indent.",
+							"start": 197,
+							"end": 273
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 310,
+					"end": 347,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 12
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 316,
+							"end": 346,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 11
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 316,
+								"end": 318,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 9
+									}
+								},
+								"name": "f2"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 321,
+								"end": 346,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 12
+									},
+									"end": {
+										"line": 10,
+										"column": 11
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 322,
+										"end": 323,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 13
+											},
+											"end": {
+												"line": 8,
+												"column": 14
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "SequenceExpression",
+									"start": 338,
+									"end": 345,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 3
+										},
+										"end": {
+											"line": 10,
+											"column": 10
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 338,
+											"end": 339,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 3
+												},
+												"end": {
+													"line": 10,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 341,
+											"end": 342,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 6
+												},
+												"end": {
+													"line": 10,
+													"column": 7
+												}
+											},
+											"name": "b"
+										},
+										{
+											"type": "Identifier",
+											"start": 344,
+											"end": 345,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 9
+												},
+												"end": {
+													"line": 10,
+													"column": 10
+												}
+											},
+											"name": "c"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 330,
+											"end": 334
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 408,
+					"end": 432,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 414,
+							"end": 431,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 414,
+								"end": 416,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 9
+									}
+								},
+								"name": "f3"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 419,
+								"end": 431,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 12
+									},
+									"end": {
+										"line": 13,
+										"column": 24
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "SequenceExpression",
+									"start": 426,
+									"end": 430,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 19
+										},
+										"end": {
+											"line": 13,
+											"column": 23
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 426,
+											"end": 427,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 19
+												},
+												"end": {
+													"line": 13,
+													"column": 20
+												}
+											},
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 429,
+											"end": 430,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 22
+												},
+												"end": {
+													"line": 13,
+													"column": 23
+												}
+											},
+											"name": "b"
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " contrast: a comment-free sequence body hugs the arrow",
+							"start": 350,
+							"end": 406
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

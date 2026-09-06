@@ -44,6 +44,9 @@ use tsv_lang::source_scan::has_newline_before_position;
 /// the sequence disjunct, so a chain broken by `arrow_chain_should_break` hung `(a, b)` on
 /// the next line while its twin hugged it. Add a body kind here, not at a call site.
 ///
+/// Read through [`Printer::arrow_body_hugs`], which subtracts the one body whose doc opens
+/// with a hoisted run — a kind belongs here, the run exclusion there.
+///
 /// The third disjunct is deliberately NOT here: `shouldAddParensIfNotBreak` (a ternary body)
 /// is the one prettier gates on `!shouldBreakChain`, and it renders differently besides —
 /// parens in the flat form only ([`ternary_body_parens_group`]) — so each printer states it
@@ -673,7 +676,7 @@ impl<'a> Printer<'a> {
         // for a body that is not an arrow, so a sequence / object / array / template body
         // reaches the same answer both printers give.
         let should_hug = !has_own_line_comment
-            && arrow_body_always_hugs(expr, self.source)
+            && self.arrow_body_hugs(expr)
             && !chain_should_break
             && !body_arrow_param_comment_forces_break;
 
@@ -1357,7 +1360,7 @@ impl<'a> Printer<'a> {
         let body_part = match terminal {
             internal::ArrowFunctionBody::Expression(b) => {
                 let expr = b;
-                if arrow_body_always_hugs(expr, self.source) {
+                if self.arrow_body_hugs(expr) {
                     // Object/array/template/sequence body: hugs the last head, supplies its
                     // own internal indent, and does so however the chain broke.
                     d.concat(&[d.text(" "), self.build_arrow_body_doc(expr)])
@@ -1847,6 +1850,20 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for arrow function body expression.
+    /// Whether this body hugs the `=>` — [`arrow_body_always_hugs`]'s kinds, minus a body
+    /// whose doc OPENS with a hoisted own-line run: a sequence whose leading edge holds an
+    /// own-line comment floats it out ahead of its own `(`
+    /// (`append_floated_leading_comments`), so the doc is `// c⏎(a, b)` and a hug prints
+    /// `=> // c⏎(a, b)` flush — which the reparse reads as the `=>`→body gap's comment and
+    /// indents, a second fixed point one pass away. Such a body takes the own-line-comment
+    /// arm's break instead (`=>⏎↹// c⏎↹(a, b)`), the same answer every other value seam
+    /// gives a hoisted left-spine run (`Printer::left_spine_shell_has_own_line_comment`).
+    /// The one predicate all three hug sites read, so they cannot part on it.
+    fn arrow_body_hugs(&self, expr: &internal::Expression<'_>) -> bool {
+        arrow_body_always_hugs(expr, self.source)
+            && !self.left_spine_shell_has_own_line_comment(expr)
+    }
+
     fn build_arrow_body_doc(&self, expr: &internal::Expression<'_>) -> DocId {
         self.build_arrow_body_doc_with_leading(expr, None)
     }
@@ -2047,7 +2064,7 @@ impl<'a> Printer<'a> {
         let internal::ArrowFunctionBody::Expression(body) = &arrow.body else {
             return None;
         };
-        if !arrow_body_always_hugs(body, self.source)
+        if !self.arrow_body_hugs(body)
             || self.has_trailing_paren_comments(body.span().end, arrow.span.end)
         {
             return None;

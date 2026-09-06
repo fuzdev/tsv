@@ -9,13 +9,16 @@
 use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank};
 use crate::ast::internal;
 use crate::printer::ParenContext;
+use crate::printer::chain::chain_paren_leading_gap;
 use crate::printer::expressions::operators::SeqLayout;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::range_too_narrow_for_a_comment;
-use tsv_lang::source_scan::{TriviaProfile, find_char_skipping_comments, skip_trivia};
+use tsv_lang::source_scan::{
+    TriviaProfile, find_char_skipping_comments, has_newline_after_position, skip_trivia,
+};
 
 /// What follows a stripped grouping shell, and so whether a trailing block comment has a
 /// statement terminator to defer past.
@@ -61,6 +64,40 @@ pub(crate) struct ParenLeadingValue {
 /// expression, a `new` callee (whose parent is not a call at all) — takes the run
 /// out in front, and tsv matches. Read by the three positions that print such a
 /// pair: the bare callee, the tag, and the chain's IIFE base.
+/// The expression's left-side child — prettier's `getLeftSide` over the node kinds its
+/// `hasNakedLeftSide` names: the one node whose first token is also this node's first token
+/// (`a.b`'s `a`, `a ? b : c`'s `a`, `a + b`'s `a`, `(a, b)`'s `a`, `f()`'s `f`, `` t`x` ``'s
+/// `t`, `a = b`'s `a`, `a!`'s `a`). `None` for a leaf, and for every node whose left side
+/// is not naked.
+///
+/// The gap between a node's own start and its left child's holds only the grouping `(`s
+/// the parser stripped from that child — and any comment inside them
+/// (`(⏎// c⏎a as any).b` opens the member at the `(`, the `as` at `a`). The structural
+/// half of [`Printer::hoisted_left_side_child`], which is what every walk asks: whether
+/// the printer HOISTS such a run ahead of the node is a fact about the pair, not the
+/// kind, and lives there.
+///
+/// Prettier's walk also descends a cast's and a postfix update's operand
+/// (`isBinaryCastExpression`, `UpdateExpression && !prefix`); this one does not, on
+/// purpose. Those two positions RETAIN a shell whose leading gap holds a comment
+/// ([`Printer::build_asi_operand_shell_doc`] — the cataloged "a leading comment alone
+/// still keeps the shell that holds it"), unconditionally, so they have no hoisted left
+/// side at all and are excluded here rather than at the pair gate.
+fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e internal::Expression<'e>> {
+    use internal::Expression;
+    Some(match expr {
+        Expression::CallExpression(call) => call.callee,
+        Expression::MemberExpression(member) => member.object,
+        Expression::TSNonNullExpression(non_null) => non_null.expression,
+        Expression::TaggedTemplateExpression(tagged) => tagged.tag,
+        Expression::ConditionalExpression(cond) => cond.test,
+        Expression::BinaryExpression(binary) => binary.left,
+        Expression::AssignmentExpression(assign) => assign.left,
+        Expression::SequenceExpression(seq) => seq.expressions.first()?,
+        _ => return None,
+    })
+}
+
 pub(crate) fn paren_pair_keeps_leading_run(expr: &internal::Expression<'_>) -> bool {
     matches!(
         expr,
@@ -139,6 +176,88 @@ impl<'a> Printer<'a> {
     /// comment, collapses the whole call. Own-line-ness is per comment and anchored on
     /// its own neighbours ([`Printer::is_own_line_comment`]), and the author blank the
     /// old loop's bare `hardline` deleted is likewise the emitter's to preserve.
+    /// The expression's left-side child whose stripped shell's run the printer HOISTS
+    /// ahead of the expression's whole doc — prettier's `getLeftSide` ([`left_side_child`])
+    /// minus the nodes whose pair RETAINS its leading run, where nothing is hoisted:
+    ///
+    /// - a member, call or non-null whose base pair keeps the run
+    ///   ([`chain_paren_leading_gap`] — the sealed optional chain, the IIFE callee, the
+    ///   non-null operand that needs its parens or carries a trailing `//`);
+    /// - a tagged template whose tag pair keeps it ([`paren_pair_keeps_leading_run`]);
+    /// - an assignment whose target needs its parens (a type-assertion target — the
+    ///   cataloged "Assignment-target shell, leading comment").
+    ///
+    /// Two askers, one definition: a restricted production must hold a hoisted run inside a
+    /// hanging pair ([`Printer::build_restricted_production_paren_doc`]) — and must NOT wrap
+    /// a second pair around one that survives — and an assignment must lay its value out
+    /// under the operator so the hoisted run's hardline lands at the value's indent
+    /// ([`Printer::build_assignment_layout`] and the declarator's twin). A walk that
+    /// descended a retained pair told the declarator to hang a value whose run never left
+    /// its shell (`const a = ( // c⏎x + y⏎)!` hung under `=`, then hugged it again on the
+    /// reparse).
+    pub(crate) fn hoisted_left_side_child<'e>(
+        &self,
+        expr: &'e internal::Expression<'e>,
+    ) -> Option<&'e internal::Expression<'e>> {
+        use internal::Expression;
+        let child = left_side_child(expr)?;
+        let retains = match expr {
+            Expression::MemberExpression(_) | Expression::CallExpression(_) => {
+                chain_paren_leading_gap(expr, self.comments).is_some()
+            }
+            // The chain's base-pair answer covers the sealed optional chain and the
+            // shell a trailing `//` retains; the non-null's own builder ALSO keeps the
+            // pair — as the family's expanded shell, run inside — whenever the operand
+            // needs its parens (`( // c⏎x + y⏎)!`), and that pair the linearizer never
+            // sees.
+            Expression::TSNonNullExpression(non_null) => {
+                chain_paren_leading_gap(expr, self.comments).is_some()
+                    || self.needs_parens(non_null.expression, ParenContext::NonNull)
+            }
+            Expression::TaggedTemplateExpression(tagged) => {
+                tagged.span.start < tagged.tag.span().start
+                    && paren_pair_keeps_leading_run(tagged.tag)
+            }
+            Expression::AssignmentExpression(assign) => {
+                self.needs_parens(assign.left, ParenContext::AssignmentTarget)
+            }
+            _ => false,
+        };
+        (!retains).then_some(child)
+    }
+
+    /// Whether a stripped shell on the expression's left spine holds a comment the hoist
+    /// gives a line of its own — a `//`, or a block followed by a newline — so the
+    /// expression's doc opens with that run and a hardline
+    /// (`(⏎// c⏎a as any) ? b : c` prints as `// c⏎(a as any) ? b : c`).
+    ///
+    /// Walks [`Self::hoisted_left_side_child`] to the leaf, reading each node→child gap in
+    /// source. A comment in such a gap always LEADS the child (the gap holds nothing that
+    /// could own a trailing comment), so the one question is whether a newline follows it —
+    /// prettier's `hasLeadingOwnLineComment`, asked of every node on the way down exactly as
+    /// `returnArgumentHasLeadingComment` asks it. The member object→property gap is not
+    /// this walk's: a comment there is the chain's own business
+    /// (`Printer::has_line_comments_in_member_chain`).
+    pub(crate) fn left_spine_shell_has_own_line_comment(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> bool {
+        let mut node = expr;
+        while let Some(child) = self.hoisted_left_side_child(node) {
+            let shell_start = node.span().start;
+            let child_start = child.span().start;
+            if shell_start < child_start
+                && self
+                    .comments_in_source_between(shell_start, child_start)
+                    .any(|c| has_newline_after_position(self.source, c.span.end))
+            {
+                return true;
+            }
+            node = child;
+        }
+        false
+    }
+
     pub(crate) fn build_paren_leading_value_doc(
         &self,
         open_paren_end: u32,
@@ -1137,7 +1256,7 @@ impl<'a> Printer<'a> {
     /// one seam, which is a property of the position — `(() => 1 /* c */).p` prints the
     /// same pair as an IIFE callee but its trailing gap is the member seam's, and
     /// claiming it here double-printed the comment. The position-shaped predicates are
-    /// [`chain_paren_leading_gap`](crate::printer::chain::chain_paren_leading_gap)'s
+    /// [`chain_paren_leading_gap`]'s
     /// family, and the leading half reads the same ones.
     /// The second half is the author's pair, since `(fn /* t */)()` writes it around the
     /// callee while `(/* t */ fn())` writes it around the whole call, where the comment
@@ -1891,16 +2010,25 @@ impl<'a> Printer<'a> {
         inner_start: u32,
         doc: DocId,
     ) -> DocId {
-        if outer_start < inner_start {
-            if let Some(comments) = self.build_rhs_comments_opt(outer_start, inner_start) {
-                let d = self.d();
-                d.concat(&[comments, doc])
-            } else {
-                doc
-            }
-        } else {
-            doc
-        }
+        self.prepend_opt(
+            self.removed_paren_comments_opt(outer_start, inner_start),
+            doc,
+        )
+    }
+
+    /// The run [`Self::prepend_removed_paren_comments`] prepends, on its own — for a
+    /// caller that must place it around a doc it has not finished building (the root
+    /// conditional, whose run goes OUTSIDE the group it wraps its test in: `docs/comments.md`
+    /// §The left-spine shell run). `None` when the gap is empty or inverted, so the two
+    /// spellings of the guard cannot drift.
+    pub(crate) fn removed_paren_comments_opt(
+        &self,
+        outer_start: u32,
+        inner_start: u32,
+    ) -> Option<DocId> {
+        (outer_start < inner_start)
+            .then(|| self.build_rhs_comments_opt(outer_start, inner_start))
+            .flatten()
     }
 
     /// The retained-shell form for a **statement value** whose authored grouping parens

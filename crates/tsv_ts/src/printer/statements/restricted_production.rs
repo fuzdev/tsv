@@ -34,13 +34,18 @@ enum GapStart {
     Keyword(u32),
     /// A node ends here. A comment sharing its line trails *it*, not the node at the far end.
     Node(u32),
+    /// A node's own span start, ahead of its left-side child — the gap holds only the
+    /// grouping `(`s the parser stripped from that child (`(⏎// c⏎a as any).b` opens the
+    /// member at the `(`, the `as` at `a`). Like [`Self::Keyword`], nothing here can own a
+    /// trailing comment: a comment sharing the `(`'s line still leads the child.
+    Shell(u32),
 }
 
 impl GapStart {
     /// Where the gap begins — the same position either way; only the reading differs.
     const fn position(self) -> u32 {
         match self {
-            Self::Keyword(p) | Self::Node(p) => p,
+            Self::Keyword(p) | Self::Node(p) | Self::Shell(p) => p,
         }
     }
 }
@@ -273,32 +278,48 @@ impl<'a> Printer<'a> {
         self.chain_has_own_line_comment(arg)
     }
 
-    /// Walk the left side of a chain looking for leading own-line comments.
+    /// Walk the left side of the argument looking for leading own-line comments.
     ///
     /// Mirrors Prettier's `hasNakedLeftSide` + `getLeftSide` walk with
-    /// `hasLeadingOwnLineComment` check at each node. Only counts comments
-    /// that are on their own line (not trailing comments on the same line
-    /// as the preceding expression).
+    /// `hasLeadingOwnLineComment` asked of each node on the way down. Two gaps are read
+    /// per step. The gap between a node's own start and its left child's — the grouping
+    /// `(`s the parser stripped from that child, so a comment there LEADS the child
+    /// (`(⏎// c⏎a as any) ? b : c` opens the conditional at the `(`, and the comment is
+    /// the test's leading comment, exactly where prettier attaches it). And, for a
+    /// member, the object→property gap, where an own-line comment leads the property.
+    /// Only comments on their own line count (not trailing comments on the same line as
+    /// the preceding expression).
+    ///
+    /// The walk is what keeps a comment glued to the argument's leftmost leaf from
+    /// escaping the keyword's line: every printer below strips that leaf's redundant
+    /// shell and hoists the run in front of the whole argument, which is a break after
+    /// `return` / `throw` / `yield` — ASI — unless the hanging parens hold it. Which
+    /// nodes have a hoisted left side — and which pairs RETAIN the run instead, where a
+    /// hanging pair would only double the one that survives — is
+    /// [`Printer::hoisted_left_side_child`]'s, stated once for this walk and the assignment
+    /// layout's.
     fn chain_has_own_line_comment(&self, expr: &Expression<'_>) -> bool {
-        match expr {
-            Expression::CallExpression(call) => self.chain_has_own_line_comment(call.callee),
-            Expression::MemberExpression(member) => {
-                // Leading own-line comment between object and property.
-                let obj_end = member.object.span().end;
-                let prop_start = member.property.span().start;
-                if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
-                    return true;
-                }
-                self.chain_has_own_line_comment(member.object)
+        if let Expression::MemberExpression(member) = expr {
+            // Leading own-line comment between object and property.
+            let obj_end = member.object.span().end;
+            let prop_start = member.property.span().start;
+            if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
+                return true;
             }
-            Expression::TSNonNullExpression(non_null) => {
-                self.chain_has_own_line_comment(non_null.expression)
-            }
-            Expression::TaggedTemplateExpression(tagged) => {
-                self.chain_has_own_line_comment(tagged.tag)
-            }
-            _ => false,
         }
+        let Some(left) = self.hoisted_left_side_child(expr) else {
+            return false;
+        };
+        // The stripped-shell gap ahead of the left child: empty when the child was
+        // written bare (the two starts coincide).
+        let shell_start = expr.span().start;
+        let left_start = left.span().start;
+        if shell_start < left_start
+            && self.has_leading_own_line_comment_in_range(GapStart::Shell(shell_start), left_start)
+        {
+            return true;
+        }
+        self.chain_has_own_line_comment(left)
     }
 
     /// Whether a comment in the gap *leads* the node at `end` and is followed by a newline —
@@ -322,7 +343,7 @@ impl<'a> Printer<'a> {
         self.comments_in_source_between(gap_start.position(), end)
             .any(|c| {
                 let leads = match gap_start {
-                    GapStart::Keyword(_) => true,
+                    GapStart::Keyword(_) | GapStart::Shell(_) => true,
                     GapStart::Node(prev_end) => !self.is_same_line(prev_end, c.span.start),
                 };
                 leads && has_newline_after_position(self.source, c.span.end)
@@ -357,7 +378,16 @@ impl<'a> Printer<'a> {
         span_end: u32,
     ) -> (DocId, u32) {
         let d = self.d();
-        let arg_start = arg.span().start;
+        // Where the argument's own docs begin — the far end of the leading gap this layout
+        // emits. A sequence renders BARE below (the hanging parens ARE its grouping pair),
+        // and the bare builder emits nothing ahead of its first operand, so the sequence's
+        // leading edge — the `(` the parser stripped from that operand, and any comment
+        // inside it (`return (⏎// c⏎a), b`) — is this gap's to print too; the sequence's
+        // own span opens at that `(`, where the bare builder's scans do not reach.
+        let arg_start = match arg {
+            Expression::SequenceExpression(seq) => seq.expressions[0].span().start,
+            _ => arg.span().start,
+        };
 
         // The opening-delimiter rule at the hang's `(`: a `//` the author glued to it keeps
         // that line ([`Printer::split_located_paren_glued_run`]), as at every other opening

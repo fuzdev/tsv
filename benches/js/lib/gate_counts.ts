@@ -529,14 +529,22 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// property are BOTH plain identifiers (member.js); tsv also inlined a `this` / `super`
 	// base and a private-name property, so `this.mappings[i]` had no break point and the
 	// for-of head shed width by breaking its destructuring pattern instead. Nothing arrived.
-	//
 	// 97 → 96: prettier's `js/function-single-destructuring/array.js` LEAVES for `match`. Its
 	// sole array-pattern parameter carries a NON-EMPTY default (`[…] = [1, 2, 3, 4, 5]`), and
 	// prettier's `shouldHugTheOnlyFunctionParameter` hugs a defaulted pattern only when the
 	// default is an identifier or an empty object / array; tsv hugged any default, so the
 	// pattern broke inside `([` where prettier expands the parameter list and keeps the
 	// pattern flat. Nothing arrived; the two-mover byte-diff is described on the svelte pin.
-	typescript: 96,
+	//
+	// 96 → 95: `prettier/tests/format/typescript/type-alias/conditional.ts` leaves for `known`.
+	// Its `Equals<X, Y> = (<T>() => …) extends (<T>() => …) ? true : false` authors a redundant
+	// paren shell around a generic extends-type; `is_generic_type` matched the shell node
+	// (prettier's AST has none — its postprocess drops every `TSParenthesizedType`), so the
+	// alias took `fluid` instead of break-after-`=` and the file carried an unexplained
+	// layout beside its detector-known chained-conditional one. Measured by set-diffing the
+	// suite's `--json` unknown lists between the tree and the same tree with the change
+	// reverse-applied: that file is the only mover in any bucket.
+	typescript: 95,
 	css: 23
 };
 

@@ -397,7 +397,18 @@ impl<'a> Printer<'a> {
         // which also hangs a single-line block, would make `export default` the lone
         // value gap preserving an unforced break, disagreeing with its own twin
         // `export =`. Prettier keeps the break at both; tsv reflows at both.
-        if self.comments_force_own_line_between(keyword_end, decl_start) {
+        //
+        // The same comment one shell deeper — an own-line run inside the grouping parens
+        // of the value's LEFTMOST node (`export default (⏎// c⏎a as any).b`) — takes the
+        // same hang: the value's printer hoists that run to the head of its doc, so the
+        // doc opens with the run and a hardline, and this seam's continuation indent is
+        // what lands both under the keyword. Left on the keyword line, the run rendered
+        // flush and the reparse — reading it as the keyword→value gap's — indented it,
+        // a second fixed point one pass away.
+        let left_spine_run = matches!(&decl.declaration,
+            internal::ExportDefaultValue::Expression(expr)
+                if self.left_spine_shell_has_own_line_comment(expr));
+        if left_spine_run || self.comments_force_own_line_between(keyword_end, decl_start) {
             let mut parts: DocBuf = smallvec![keyword_doc];
             self.append_keyword_value_line_comments(&mut parts, keyword_end, decl_start, value_doc);
             return d.concat(&parts);
