@@ -175,35 +175,50 @@ export const SVELTE_FIXTURES_PINS: GatePins = {
 export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over_acceptance: 8 };
 
 /**
- * conformance:ts-repo — `scanned` corpus files + `accept_parity` (tsv/tsc-baseline agreement);
- * provenance in `GATE_CHECKOUT_IDS` (../typescript). A rise on the pinned corpus is a parity
- * gain, not a suite refresh; a drop is USUALLY a regression — but read the other buckets before
- * treating it as one, because `accept_parity` counts only the agreeing-ACCEPT half. A file leaving
- * for `parity reject` — tsv learning to refuse something tsc's baseline refuses too — drops this
- * number with agreement unchanged; only which side of it moved. `GAPS UNEXPECTED` staying 0 is the
- * reading that settles it, since that is the bucket a real over-rejection lands in.
+ * conformance:ts-repo — provenance in `GATE_CHECKOUT_IDS` (../typescript); the buckets and what
+ * each pin guards: docs/conformance_tsc.md.
  *
- * `scanned` includes 61 `.d.ts` cases, which this gate grades (`DECLARATIONS` in
- * `diagnostics/ts_repo_compare.ts` argues why, and why the bench harvest does not). They are also
- * where 29 of the over-acceptances come from — statements in an ambient context, tsc's TS1036: an
- * early error tsv defers by policy, not a gap.
+ * `scanned` single-file cases + `accept_parity` (tsv accepts, tsc's baselines call the file
+ * valid). A rise in `accept_parity` on the pinned corpus is a parity gain, not a suite refresh; a
+ * drop is USUALLY a regression — but read the other buckets before treating it as one, because it
+ * counts only the agreeing-ACCEPT half. A file leaving for `parity reject` — tsv learning to refuse
+ * something tsc's baseline refuses too — drops this number with agreement unchanged; only which
+ * side of it moved. The two `unexpected` buckets staying 0 is the reading that settles it, since
+ * those are where a real over-rejection lands.
  *
- * `over_acceptance` (tsv accepts, tsc's baseline says invalid) is pinned for the axis the other two
- * cannot see. `scanned` and `accept_parity` together fix how many files tsv accepts *among the
- * tsc-valid ones*; the reject / over-accept / beyond-acorn split of the remainder is free. So a
- * parser WIDENING — a fix that also starts accepting something tsc rejects — moves only this
- * number, and without a pin nothing anywhere reports it. That is the standing hazard of every
- * over-rejection fix: the new acceptance arrives unguarded. A rise here is not automatically wrong
- * (tsv defers early errors by policy), but it must be a decision, not a side effect.
+ * `scanned` includes the `.d.ts` cases, which this gate grades (`DECLARATIONS` in
+ * `diagnostics/ts_repo_compare.ts` argues why, and why the bench harvest does not).
  *
- * Two of them are `asyncDeclare_es{5,6}.ts` — `declare async function foo(): Promise<void>;`,
- * tsc's TS1040. Like the TS1036 group above it is an ambient-context early error tsv defers: tsc's
- * PARSER builds the signature with `[DeclareKeyword, AsyncKeyword]` and reports an empty
- * `parseDiagnostics`, so the TS1xxx code in the baseline is a CHECKER grammar error and this gate's
- * code-range heuristic reads it as a parser rejection it is not. `accept_parity` is unmoved by
- * design — a file tsc's baseline calls invalid was never in that bucket.
+ * The two `over_acceptance_*` pins (tsv accepts, tsc's baseline says invalid) guard the axis the
+ * first two cannot see. `scanned` and `accept_parity` together fix how many files tsv accepts
+ * *among the tsc-valid ones*; the reject / over-accept / beyond-acorn split of the remainder is
+ * free. So a parser WIDENING — a fix that also starts accepting something tsc rejects — moves only
+ * these numbers, and without a pin nothing anywhere reports it. That is the standing hazard of
+ * every over-rejection fix: the new acceptance arrives unguarded. The split is by tsc's OWN
+ * PARSER, run live over the file: `_parser` is what tsc's parser refuses and tsv takes (each one
+ * a question for the grammar line — a production tsv should also refuse, or a recovery-only reject
+ * tsv is right to defer); `_checker` is what tsc's parser accepts and its checker-side grammar
+ * checks refuse (the deferred early-error posture by design — a rise there is policy, not a bug,
+ * but still a decision). A `TS1xxx` code in a baseline is NOT proof of a parser rejection: the
+ * range spans parser and checker (TS1036 ambient statements, TS1040 ambient `async`, TS1206
+ * decorator placement are all checker-raised), which is why the live parser is asked rather than
+ * the code range.
+ *
+ * `units_scanned` + `units_accept_parity`: the multi-file tests' `@filename` units, graded only
+ * where the test's baselines carry no grammar error at all (a `TS1xxx` cannot be attributed to
+ * one unit), so a unit is either accept-parity or an over-rejection — no over-acceptance or
+ * reject-parity axis exists there. Pinned separately from the single-file counts because the
+ * population is a different thing: `units_scanned` moves when the harness split or the
+ * unit-language rule moves, which the single-file `scanned` cannot see.
  */
-export const TS_REPO_PINS = { scanned: 13708, accept_parity: 12284, over_acceptance: 487 };
+export const TS_REPO_PINS = {
+	scanned: 13708,
+	accept_parity: 12284,
+	over_acceptance_parser: 20,
+	over_acceptance_checker: 467,
+	units_scanned: 7874,
+	units_accept_parity: 7853
+};
 
 /**
  * corpus:compare:parse --all — EXACT per-language `compared` (both sides parsed and

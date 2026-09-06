@@ -12,10 +12,14 @@ real move in a number is a deliberate, visible edit.
 
 - **`benches/js/lib/gate_counts.ts`** — every Deno-side count, one per consumer:
   the fixtures gates (`scanned` + `both_accept` + `over_acceptance`), ts-repo
-  (`scanned` + `accept_parity` + `over_acceptance` — the last one pins the WIDENING
-  axis the other two structurally cannot see, since they fix only how many
-  tsc-VALID files tsv accepts and leave the split of the rest free; the fixtures
-  gates carry it for the same reason, a new over-acceptance there coming out of
+  (`scanned` + `accept_parity` + `over_acceptance_parser` + `over_acceptance_checker`
+  — the two over-acceptance halves pin the WIDENING axis the first two structurally
+  cannot see, since they fix only how many tsc-VALID files tsv accepts and leave the
+  split of the rest free, and the halves are split by tsc's LIVE parser rather than
+  by the `TS1xxx` code range; plus `units_scanned` + `units_accept_parity` for the
+  `@filename` multi-file units, a population the single-file counts cannot see —
+  [conformance_tsc.md](conformance_tsc.md); the fixtures gates carry an
+  over-acceptance pin for the same reason, a new over-acceptance there coming out of
   `parity` and moving neither of their other two),
   `corpus:compare:parse --all` (EXACT per-language `compared`
   + EXACT per-language tsv-side parse-failure counts), `corpus:compare:format

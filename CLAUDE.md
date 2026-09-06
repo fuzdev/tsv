@@ -329,10 +329,13 @@ deno task conformance:svelte-fixtures  # tsv's Svelte parser vs Svelte's own tes
 deno task conformance:ts-fixtures      # tsv's TS parser vs acorn-typescript's test suite (the adversarial TS edge-case corpus).
 # Strict: a missing ../acorn-typescript (0 scanned) FAILS — publish Step 3b's preflight is the tolerance point. Both fixtures
 # gates freshness-check their ledgers on full runs (a stale sanction/known-gap entry fails) and warn on checkout↔npm version skew.
-deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (ALL of ../typescript/tests/cases, ~13.7k
-# single-file .ts — not the conformance/parser subtree); oracle = tsc's
-# .errors.txt baselines (a TS1xxx code = tsc's parser rejects). Buckets accept/reject parity, over-acceptances, tracked gaps.
-# A missing/PARTIAL ../typescript checkout, or an empty scan, FAILS. See ./benches/js/CLAUDE.md.
+deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (ALL of ../typescript/tests/cases — every
+# single-file .ts plus every TS unit of the @filename multi-file tests); oracle = tsc's .errors.txt baselines
+# (a TS1xxx code = tsc's grammar rejects), with tsc's LIVE parser splitting over-acceptance into parser-level vs
+# checker-side and attributing goal / encoding artifacts before an over-rejection can gate. Four ledgers
+# (sanctioned = kept, known = to fix; acorn-shared or not), freshness-checked; only an UNTRACKED over-rejection
+# fails. A missing/PARTIAL ../typescript checkout, or an empty scan, FAILS. Model + triage loop:
+# ./docs/conformance_tsc.md; operator card: ./benches/js/CLAUDE.md.
 # The three gates above accept: -v, --json, <subtree>.
 
 deno task conformance                  # pre-release aggregate: preflights pins:audit:checkouts +

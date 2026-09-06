@@ -818,6 +818,11 @@ The unenforced leaks only matter for standalone JS — Svelte/TS module context 
 strict, so the real compiler would still flag them. When the diagnostics layer
 lands, each early-error row gets an `input_invalid_*` fixture.
 
+The list above is the ECMAScript side by hand; the TypeScript side is measured.
+The `conformance:ts-repo` gate histograms every deferred `TS1xxx` grammar code over
+the compiler's own corpus, and its ledgers record each construct tsv keeps rejecting
+or still owes — [conformance_tsc.md](./conformance_tsc.md).
+
 ---
 
 # Compatibility

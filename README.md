@@ -226,6 +226,7 @@ Hard non-goals:
 - [docs/conformance_prettier.md](docs/conformance_prettier.md) - where formatting diverges from Prettier (and why); its §Catalogs table indexes the per-language catalogs
 - [docs/conformance_svelte.md](docs/conformance_svelte.md) - where the parser diverges from Svelte (and why)
 - [docs/conformance_test262.md](docs/conformance_test262.md) - ECMAScript parser conformance
+- [docs/conformance_tsc.md](docs/conformance_tsc.md) - TypeScript parser conformance against the compiler's own corpus
 - [docs/fixture_overview.md](docs/fixture_overview.md) - fixture system design
 - [docs/fixture_workflow.md](docs/fixture_workflow.md) - step-by-step fixture creation
 - [docs/fixture_naming.md](docs/fixture_naming.md) - fixture naming conventions and patterns
