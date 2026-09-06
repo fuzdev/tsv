@@ -45,7 +45,7 @@ fn assert_quasi(
 ) {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_ts::convert_ast_json(&program, source);
+    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
     let quasi = json.pointer(quasi_pointer).expect("template element");
 
     assert_eq!(
@@ -236,7 +236,7 @@ fn every_quasi_normalizes() {
     let source = "fn`a\r\n${x}b\r\n${y}c\r\n`;\n";
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_ts::convert_ast_json(&program, source);
+    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
 
     for (i, expected) in ["a\n", "b\n", "c\n"].iter().enumerate() {
         let quasi = json

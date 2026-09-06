@@ -110,15 +110,21 @@ pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Val
     match parser {
         ParserType::TypeScript => {
             let ast = tsv_ts::parse(source, &arena).ok()?;
-            Some(tsv_ts::convert_ast_json(&ast, source))
+            Some(crate::json::wire_value(&tsv_ts::convert_ast_json_bytes(
+                &ast, source,
+            )))
         }
         ParserType::Svelte => {
             let ast = tsv_svelte::parse(source, &arena).ok()?;
-            Some(tsv_svelte::convert_ast_json(&ast, source))
+            Some(crate::json::wire_value(
+                &tsv_svelte::convert_ast_json_bytes(&ast, source),
+            ))
         }
         ParserType::Css => {
             let ast = tsv_css::parse(source, &arena).ok()?;
-            Some(tsv_css::convert_ast_json(&ast, source))
+            Some(crate::json::wire_value(&tsv_css::convert_ast_json_bytes(
+                &ast, source,
+            )))
         }
     }
 }

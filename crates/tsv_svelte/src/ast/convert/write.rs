@@ -2205,7 +2205,7 @@ mod tests {
         let arena = bumpalo::Bump::new();
         // Test inputs are hardcoded valid sources; a parse failure should panic
         let root = crate::parse(source, &arena).expect("parse");
-        crate::convert_ast_json(&root, source)
+        serde_json::from_slice(&crate::convert_ast_json_bytes(&root, source)).expect("wire")
     }
 
     // Svelte hard-codes a `{@const}` declaration's `end` to `parser.index - 1`

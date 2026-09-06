@@ -156,12 +156,12 @@ pub fn parse<'a>(source: &str, arena: &'a Bump) -> Result<InternalAst<'a>, Parse
 pub fn format(ast: &InternalAst, source: &str) -> String;
 pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
-pub fn convert_ast_json(ast: &InternalAst, source: &str) -> serde_json::Value;
 ```
 
 `convert_ast_json_bytes` is the **sole emission path** — the hot path for
-compact wire output (FFI, CLI non-pretty) and the source every other JSON
-form derives from. In every language it is a **writer-mode conversion**
+compact wire output (FFI, the CLI) and the source every other JSON form
+derives from, the CLI's `--pretty` included (a linear re-indent of these
+bytes, never a read). In every language it is a **writer-mode conversion**
 (`ast/convert/write*`) that emits the wire JSON directly during a single
 walk of the *internal* AST — no typed public tree is ever materialized —
 with byte→UTF-16 offset translation fused into the walk via `LocationMapper`
@@ -170,10 +170,11 @@ passthrough). The output is valid UTF-8 by construction, and returning bytes
 lets byte-oriented boundaries skip the O(output) UTF-8 validation a `String`
 requires (the wire is ~20× the source); `convert_ast_json_string` is the
 same bytes plus that one validation, for `&str` boundaries (the WASM
-binding's `JSON.parse`, N-API strings), and `convert_ast_json` parses the
-bytes back into a `serde_json::Value` for the `Value` consumers (the CLI's
-`--pretty` tab-serialization, the fixture gate) — a thin wrapper, not an
-independent conversion. Each of the three has a `_no_locations` sibling
+binding's `JSON.parse`, N-API strings). No language crate reads the wire
+back: the one `Value` consumer is `tsv_debug` (the fixture gate, the audits),
+whose `json` module reads these bytes with serde_json's recursion limit off —
+the default of 128 levels refused ~60 nested arrays or ~40 nested objects the
+writer emits without trouble. Each of the two has a `_no_locations` sibling
 (`convert_ast_json_bytes_no_locations` / `_string_no_locations`) emitting the
 same wire minus every line/column object — the per-node `loc`, plus Svelte's
 `name_loc` — so only `start`/`end` offsets remain. Line/column is a pure function

@@ -2,7 +2,7 @@
 
 use crate::deno::{parse_css, parse_svelte, parse_typescript_with_goal};
 use crate::fixtures::{self, Fixture, FixtureFiles, InputType, read_file};
-use tsv_cli::json_utils::to_json_with_tabs;
+use crate::json::to_json_with_tabs;
 
 use super::super::FixtureValidation;
 use super::super::errors::{ValidationError, ValidationSuccess};
@@ -74,7 +74,7 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
         return;
     }
 
-    let expected_json: serde_json::Value = match serde_json::from_str(&expected_str) {
+    let expected_json: serde_json::Value = match crate::json::from_str(&expected_str) {
         Ok(v) => v,
         Err(e) => {
             result.add_error(ValidationError::ParserError(format!(
@@ -84,7 +84,7 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
         }
     };
 
-    if paths.ast_json == expected_json {
+    if paths.wire_value() == expected_json {
         result.add_error(ValidationError::ParserOursFieldOrderDiffers);
     } else {
         result.add_error(ValidationError::ParserOursDiffersFromExpected);

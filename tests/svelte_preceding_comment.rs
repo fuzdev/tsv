@@ -30,7 +30,7 @@ use serde_json::Value;
 fn attached_comment(src: &str) -> Option<String> {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     for key in ["instance", "module"] {
         if let Some(v) = json
             .get(key)
@@ -154,7 +154,7 @@ fn a_lifted_tag_between_stops_the_walk_the_sanctioned_stance() {
     ] {
         let arena = bumpalo::Bump::new();
         let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
-        let json = tsv_svelte::convert_ast_json(&ast, src);
+        let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
         let comment_of = |key: &str| -> Option<String> {
             let node = json.get(key)?.get("content")?;
             let from_script = node

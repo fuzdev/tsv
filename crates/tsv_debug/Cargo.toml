@@ -64,7 +64,11 @@ tsv_ignore = { workspace = true }
 tsv_discover = { workspace = true }
 argh.workspace = true
 serde.workspace = true
-serde_json.workspace = true
+# `unbounded_depth`: the wire / oracle / expected.json reads in `src/json.rs` disable
+# serde_json's 128-level recursion limit (a nested object literal costs three levels, so the
+# default refused ~40 of them while `tsv parse` reaches thousands). Every tsv_debug thread
+# runs on the sized stack, which is what makes that sound — see the module docs there.
+serde_json = { workspace = true, features = ["unbounded_depth"] }
 bumpalo.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "process", "io-util", "sync", "macros", "time"] }
 thiserror.workspace = true

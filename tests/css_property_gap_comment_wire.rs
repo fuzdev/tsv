@@ -37,7 +37,7 @@ const SPACED: &str = "a {\n\tcolor /* c */ : blue;\n}\n";
 fn wire(source: &str) -> serde_json::Value {
     let arena = bumpalo::Bump::new();
     let stylesheet = tsv_css::parse(source, &arena).expect("parse failed");
-    tsv_css::convert_ast_json(&stylesheet, source)
+    tsv_debug::json::wire_value(&tsv_css::convert_ast_json_bytes(&stylesheet, source))
 }
 
 /// `(property, value)` of the stylesheet's single declaration.

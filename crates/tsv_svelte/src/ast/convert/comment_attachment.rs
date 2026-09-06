@@ -333,7 +333,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         #[expect(clippy::expect_used)]
         let root = crate::parse(&source, &arena).expect("parse");
-        crate::convert_ast_json(&root, &source)
+        #[expect(clippy::expect_used)]
+        serde_json::from_slice(&crate::convert_ast_json_bytes(&root, &source)).expect("wire")
     }
 
     /// The first statement's expression in the instance `<script>`.
@@ -355,7 +356,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         #[expect(clippy::expect_used)]
         let root = crate::parse(source, &arena).expect("parse");
-        crate::convert_ast_json(&root, source)
+        #[expect(clippy::expect_used)]
+        serde_json::from_slice(&crate::convert_ast_json_bytes(&root, source)).expect("wire")
     }
 
     /// `scan_past_trailing_comments` mimics acorn's post-expression token scan, so its

@@ -1,7 +1,7 @@
 use crate::cli::CliError;
+use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use std::path::Path;
-use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{CanonicalizeError, canonicalize_js};
 
 use crate::audit::vacuity::check_graded_nonzero;

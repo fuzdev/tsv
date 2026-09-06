@@ -179,6 +179,36 @@ fn test_parse_no_locations_omits_loc() {
 }
 
 #[test]
+fn test_parse_pretty_has_no_depth_ceiling_of_its_own() {
+    // `--pretty` re-indents the compact bytes rather than reading them back through
+    // a `serde_json::Value`, whose default recursion limit refused ~60 nested arrays
+    // the compact route had just emitted. 300 levels is well past that limit and well
+    // inside the parser's own ceiling (~25,000 arrays on the sized stack).
+    let n = 300;
+    let source = format!("const x = {}{};", "[".repeat(n), "]".repeat(n));
+    let output = tsv(&[
+        "parse",
+        "--content",
+        &source,
+        "--parser",
+        "typescript",
+        "--pretty",
+    ]);
+    assert!(
+        output.status.success(),
+        "deep pretty parse should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\n\t"), "pretty output is tab-indented");
+    assert_eq!(
+        stdout.matches("\"type\": \"ArrayExpression\"").count(),
+        n,
+        "every nesting level reaches the output"
+    );
+}
+
+#[test]
 fn test_parse_no_locations_pretty_reparses() {
     // `--pretty --no-locations` rides the reparse-the-bytes pretty path — assert
     // it's tab-indented AND loc-free (the only place the two branches combine).

@@ -25,7 +25,7 @@ use serde_json::Value;
 fn first_attribute(src: &str) -> Value {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the component");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     find_attribute(&json).expect("an Attribute node")
 }
 

@@ -247,24 +247,20 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
 
     // Phases 2-4: Our parser/formatter validation (skip in prettier_only mode)
     if !prettier_only {
-        // Phases 2/2b share one parse of the input (and one convert_ast_json
-        // materialization). The arena owns the internal AST and must outlive
-        // `parsed` (caller-owns-`Bump`).
+        // Phases 2/2b share one parse of the input (and one wire emission).
+        // The arena owns the internal AST and must outlive `parsed`
+        // (caller-owns-`Bump`).
         let arena = bumpalo::Bump::new();
         match parse_input(&input, input_type, fixture.goal(), &arena) {
             Ok(parsed) => {
-                match input_ast_paths(&parsed, &input) {
-                    Ok(paths) => {
-                        // Phase 2: Our Parser validation - P2 (pure Rust)
-                        validate_parser_ours(&mut result, fixture, &paths);
+                let paths = input_ast_paths(&parsed, &input);
+                // Phase 2: Our Parser validation - P2 (pure Rust)
+                validate_parser_ours(&mut result, fixture, &paths);
 
-                        // Phase 2b: Our parser (the writer's wire JSON, via
-                        // `convert_ast_json`) matches expected.json — the gate
-                        // on the emission path. (non-divergence only, pure Rust)
-                        validate_parser_ours_matches_expected(&mut result, fixture, &paths);
-                    }
-                    Err(e) => result.add_error(ValidationError::ParserError(e)),
-                }
+                // Phase 2b: Our parser (the writer's wire JSON, read back
+                // unbounded) matches expected.json — the gate on the emission
+                // path. (non-divergence only, pure Rust)
+                validate_parser_ours_matches_expected(&mut result, fixture, &paths);
             }
             Err(e) => {
                 // One parse failure, one error — svelte_divergence fixtures

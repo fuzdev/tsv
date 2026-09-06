@@ -24,7 +24,7 @@ use serde_json::Value;
 fn nth_args(src: &str) -> Value {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the CSS");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     find_pseudo_args(&json).expect("a PseudoClassSelector with args")
 }
 

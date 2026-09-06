@@ -376,25 +376,11 @@ fn format_program_in(
     output
 }
 
-/// Convert internal AST to JSON with character-based positions
-///
-/// Returns a `serde_json::Value` parsed from the wire bytes
-/// `convert_ast_json_bytes` emits — a thin wrapper over the sole emission
-/// path, not an independent conversion. Used where a `Value` is needed (the
-/// CLI's `--pretty`); byte-oriented consumers should call
-/// `convert_ast_json_bytes` directly.
-#[cfg(feature = "convert")]
-#[expect(clippy::expect_used)]
-pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Value {
-    serde_json::from_slice(&convert_ast_json_bytes(program, source))
-        .expect("writer emits valid JSON")
-}
-
 /// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
-/// Byte-identical to `serde_json::to_string(&convert_ast_json(...))`, but emits
-/// the wire JSON directly during a single walk of the internal AST (the writer
-/// in `ast/convert/write/`), never materializing the typed public tree, and
+/// The **sole emission path**: emits the wire JSON directly during a single
+/// walk of the internal AST (the writer in `ast/convert/write/`), never
+/// materializing a typed public tree or an intermediate `Value`, and
 /// fuses the byte→UTF-16 offset translation into that walk: the writer receives
 /// the `ByteToCharMap` via `LocationMapper` and emits final char-space
 /// positions directly, so no post-conversion translation walk runs. For ASCII

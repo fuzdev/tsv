@@ -1,9 +1,9 @@
 use crate::cli::CliError;
 use crate::deno;
 use crate::error;
+use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
-use tsv_cli::json_utils::to_json_with_tabs;
 
 /// Parse using canonical external parsers (Svelte, acorn+typescript, parseCss).
 #[derive(FromArgs, Debug)]
