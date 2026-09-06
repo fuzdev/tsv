@@ -1546,10 +1546,20 @@ impl ArgOpener {
     /// The hug wraps `last_arg_doc` in `group_break` (prettier's
     /// `group(lastArg, { shouldBreak: true })`), which is what lets `fits()` answer on the
     /// last argument's *first* line and so select the hug whenever the head plus the opening
-    /// bracket fit. A last argument carrying its own forced break — a hardline from an
-    /// interior comment, a source-multiline `group_break` — simply falls out of state 0 onto
-    /// the hug, so no pre-check screens for one; the *same*-type path, which has no hug state,
-    /// needs that check and does it at its own call site.
+    /// bracket fit.
+    ///
+    /// A last argument that WILL break — a block body with a statement in it, a hardline
+    /// from an interior comment, a source-multiline `group_break` — gets prettier's other
+    /// ladder, `[breakParent, conditionalGroup([hug, allArgsBrokenOut()])]`: the hug is state
+    /// 0 and there is no inline state. Rendered directly the two ladders agree, because such
+    /// an argument falls out of the inline state onto the hug anyway. They part where the
+    /// call is MEASURED from outside: a member chain's `oneLine` walks a nested conditional
+    /// group's first state only, so with the inline state first it read the whole hugged
+    /// signature flat and every chain state failed — where prettier's walk enters the hug's
+    /// broken group, stops at the parameter list's own softline, and keeps the chain flat
+    /// with the parameters breaking inside the hug
+    /// (`calls/chained/function_arg_params_break_long`). The *same*-type path, which has no
+    /// hug state, screens for the forced break at its own call site.
     #[inline]
     pub(super) fn inline_hug_or_expand_all(
         self,
@@ -1558,6 +1568,12 @@ impl ArgOpener {
         last_arg_doc: DocId,
         all_args_broken: DocId,
     ) -> DocId {
+        if d.will_break(last_arg_doc) {
+            return d.conditional_group(&[
+                self.hug(d, head_parts, last_arg_doc),
+                self.expand_all(d, all_args_broken),
+            ]);
+        }
         d.conditional_group(&[
             self.inline(d, head_parts, last_arg_doc),
             self.hug(d, head_parts, last_arg_doc),
@@ -1588,9 +1604,12 @@ impl ArgOpener {
     /// ladder replaced.
     ///
     /// A first argument that already carries a forced break (the usual block body) simply
-    /// falls out of state 0 onto state 1, so no pre-check screens for one — the same
-    /// reason [`Self::inline_hug_or_expand_all`] needs none, and prettier's own
-    /// `willBreak(firstArg)` two-state branch reduces to exactly that.
+    /// falls out of state 0 onto state 1, so no pre-check screens for one, and prettier's
+    /// own `willBreak(firstArg)` two-state branch reduces to exactly that. The expand-LAST
+    /// twin does screen ([`Self::inline_hug_or_expand_all`]) — not because the render
+    /// differs, but because a chain measuring the call from outside walks only a nested
+    /// ladder's FIRST state, and there the two orderings part. Nothing measures an
+    /// expand-first call that way.
     #[inline]
     pub(super) fn inline_hug_first_or_expand_all(
         self,

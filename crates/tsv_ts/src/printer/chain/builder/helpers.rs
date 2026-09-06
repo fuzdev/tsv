@@ -4,7 +4,7 @@
 // - ChainPartsBuilder: Builder for constructing chain parts with comments
 
 use super::super::printing::{
-    group_comment_gap, print_group, print_group_expanded, print_group_expanded_skip_first_comments,
+    group_comment_gap, print_group, print_group_expanded_skip_first_comments,
     print_group_skip_first_comments, push_gap_comments_and_break,
 };
 use super::super::types::ChainGroup;
@@ -212,17 +212,4 @@ pub(super) fn build_first_groups_doc<'a>(
 ) -> DocId {
     let d = printer.arena();
     d.concat_iter(first_groups.iter().map(|g| print_group(g, printer)))
-}
-
-/// Build first groups doc with expanded calls
-pub(super) fn build_first_groups_expanded_doc<'a>(
-    first_groups: &[ChainGroup<'a>],
-    printer: &Printer<'_>,
-) -> DocId {
-    let d = printer.arena();
-    d.concat_iter(
-        first_groups
-            .iter()
-            .map(|g| print_group_expanded(g, printer)),
-    )
 }

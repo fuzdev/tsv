@@ -587,6 +587,39 @@ impl<'a> Printer<'a> {
                     // preserved-comment form.
                     parts.push(d.group(d.concat(&[d.line(), make_rhs(type_doc)])));
                 }
+            } else if let TSType::Conditional(cond) = value_type
+                && should_break_before_conditional_type(cond)
+            {
+                // A conditional whose check or extends half is generic breaks after `=`
+                // (prettier's `shouldBreakBeforeConditionalType`, a `shouldBreakAfterOperator`
+                // arm) — asked here, ahead of the complex-params arm, exactly where
+                // `chooseLayout` asks it; the plain-halves conditional is the `fluid` arm below.
+                parts.push(hang_after_operator(d, make_rhs(build_value())));
+            } else if has_complex_params {
+                // Complex type parameters — two or more, one constrained or defaulted —
+                // take prettier's `break-lhs`, asked right after the break-after-operator
+                // arms (the union and generic-conditional arms above) and AHEAD of every
+                // value-shaped layout below: `group([group(left), " =", " ", group(right)])`.
+                // The `<…>` list is what breaks, and only once the head plus the value's
+                // first line — up to the value's own first break point — overflows; the `=`
+                // stays on the closing `>` line with the value beside it:
+                //   type Foo<
+                //     T extends string,
+                //     U = number
+                //   > = SomeLongType;
+                // Behind the intersection / conditional / internal-breaking arms this arm
+                // never reached those values, and a wide head broke after `=` instead of
+                // breaking the list (`type_param_complex_break_lhs_long`).
+                //
+                // An intersection keeps the hanging-indent doc its own arm hugs with, so a
+                // continuation member sits one level in under `type`, where prettier's
+                // `printIntersectionType` indent puts it.
+                let type_doc = match value_type {
+                    TSType::Intersection(i) => self.intersection_hanging_with_indent(i),
+                    _ => build_value(),
+                };
+                parts.push(d.text(" "));
+                parts.push(make_rhs(type_doc));
             } else if let TSType::Intersection(i) = value_type {
                 // Intersection types (prettier's `fluid`): the first member hugs the
                 // `=` line when it fits and the intersection breaks after `=` when it
@@ -609,19 +642,13 @@ impl<'a> Printer<'a> {
                 } else {
                     parts.push(fluid(make_rhs(inter_doc)));
                 }
-            } else if let TSType::Conditional(cond) = value_type {
-                // Conditional types: break after `=` only if check/extends has type
-                // parameters (prettier's `shouldBreakBeforeConditionalType` →
-                // break-after-operator); otherwise `fluid`, which keeps the ternary on the
+            } else if matches!(value_type, TSType::Conditional(_)) {
+                // A conditional with plain halves: `fluid`, which keeps the ternary on the
                 // `=` line while its head fits and breaks after `=` once the head
                 // overflows. The `fluid` marker keeps the LHS `<…>` inline (see the
-                // intersection arm) rather than breaking the type-param list.
-                let type_doc = build_value();
-                if should_break_before_conditional_type(cond) {
-                    parts.push(hang_after_operator(d, make_rhs(type_doc)));
-                } else {
-                    parts.push(fluid(make_rhs(type_doc)));
-                }
+                // intersection arm) rather than breaking the type-param list. (Generic
+                // halves took the break-after-operator arm above.)
+                parts.push(fluid(make_rhs(build_value())));
             } else if type_has_internal_breaking(self, value_type) {
                 // Types with internal breaking (braces, brackets, parens, angle brackets):
                 // prettier's `fluid`. The marker hugs the `=` line when the value's first
@@ -632,18 +659,6 @@ impl<'a> Printer<'a> {
                 // type-param list.
                 let type_doc = build_value();
                 parts.push(fluid(make_rhs(type_doc)));
-            } else if has_complex_params {
-                // Complex type parameters: use break-lhs layout
-                // Type params break, `=` stays on same line, RHS stays inline
-                // Example: type Foo<T extends string, U = number> = SomeLongType;
-                // Breaks as:
-                //   type Foo<
-                //     T extends string,
-                //     U = number,
-                //   > = SomeLongType;
-                let type_doc = build_value();
-                parts.push(d.text(" "));
-                parts.push(make_rhs(type_doc));
             } else {
                 // Remaining types break after `=` with a hanging indent when too
                 // long — unless a comment keeps the value on the `=` line, in which

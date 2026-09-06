@@ -203,7 +203,7 @@ pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> boo
 /// ⚠️ **The declarator has a hand-rolled TWIN of this dispatch** — `variable.rs`'s
 /// `should_break_after_op_rhs` / `needs_break_after_op_layout` / `needs_fluid_for_breakable_lhs`
 /// chain, which answers the same prettier function for `const x = …` and reaches arms this one
-/// does not (a module-path call, a regex-rooted or literal-based chain). The two are
+/// does not (a module-path call, a regex literal, a multiline string). The two are
 /// not interchangeable, and they DRIFT: the sequence arm below was here from the start and
 /// missing there, so `const a = (a, b)` hung its operands off the `=` column while `x = (a, b)`
 /// broke correctly. Add a `chooseLayout` fact to one and check the other — same standing hazard
@@ -428,17 +428,24 @@ pub fn arrow_chain_should_break(arrow: &internal::ArrowFunctionExpression<'_>) -
     false
 }
 
-/// Check if we should break after the operator for this expression
+/// The **tail** of prettier's `shouldBreakAfterOperator` — not the whole function: the
+/// value UNDER its wrappers (a unary operator, `await`, `yield`, a `!`) is a string
+/// literal or a poorly breakable chain, both of which don't break well internally.
 ///
-/// Returns true for expressions that don't break well internally:
-/// - Poorly breakable chains (member-only chains, trivial call chains)
-/// - String literals (can't break internally)
+/// The arms prettier answers AHEAD of that tail — its `switch` (a sequence, a decorated
+/// class expression, a binaryish that won't inline) — stay with each caller, since the two
+/// callers interleave them with their own arms differently. Both `chooseLayout` twins share
+/// this one, so a wrapped chain answers the same in each: `choose_layout` here and the
+/// declarator cascade in `statements/variable.rs`
+/// (`declarations/variable/poorly_breakable_chain_unwrap_long`).
 ///
-/// Precondition: Only called when the left is not a short key (checked in choose_layout)
+/// Precondition: only called when the left is not a short key (prettier's `hasShortKey`
+/// returns before the tail; checked in `choose_layout`).
 ///
-/// Note: Prettier does NOT include RegexLiteral here. Regex falls through to
-/// Fluid layout, which produces the same output since regex can't break internally.
-fn should_break_after_operator(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
+/// Note: prettier does NOT include RegexLiteral here. Regex falls through to Fluid layout,
+/// which produces the same output since regex can't break internally — the declarator twin
+/// names it outright to reach the same place.
+pub fn should_break_after_operator(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
     // Unwrap wrapper expressions to get to the core
     let core_expr = unwrap_expression(expr);
 
@@ -553,13 +560,12 @@ fn is_call_with_complex_type_arguments(
 ///   The same subtree is printed again for real output — effectively 2x print cost.
 ///
 /// We use static AST analysis instead:
-/// - `call_count > 2` → chain formatter handles it (matches prettier's memberChain label)
-/// - `call_count == 2` + factory check → factory patterns with trivial args
+/// - the `memberChain` label is the chain's own grouping against the short-chain cutoff
+///   (`call_prints_as_member_chain` — linearize + group, no doc)
 /// - `is_trivial_call` + `is_short_arg` → checks arg complexity directly
 ///
-/// This is faster (single O(chain_length) walk, no doc allocation) and keeps layout
-/// selection cleanly separated from doc building. Validated against 35+ targeted edge
-/// cases and 3442 corpus files with zero divergences. Every path where prettier's
+/// This is faster (O(chain_length) walks, no doc allocation) and keeps layout
+/// selection cleanly separated from doc building. Every path where prettier's
 /// `willBreak()` returns true maps to a condition we check statically (non-trivial args,
 /// comments via `call_arg_has_comments`, complex type args).
 ///
@@ -599,14 +605,10 @@ fn is_poorly_breakable_chain_recursive(
         // Note: TSAsExpression and TSSatisfiesExpression are NOT included here.
         // They have breakable type annotations, so they're not "poorly breakable".
 
-        // CallExpression: check if it's a factory pattern with trivial args
-        //
-        // Factory patterns (Object.keys, React.createElement, etc.) with 2 calls
-        // and trivial args should use break-after-operator layout. This keeps the
-        // chain flat on the indented line instead of expanding call args.
-        //
-        // For non-factory chains or chains with more calls, the chain formatter
-        // handles breaking internally.
+        // CallExpression: prettier's arm is three refusals and a descent — a chain the
+        // member-chain printer LABELS (it prints past the cutoff and breaks itself), a
+        // non-trivial argument list, complex type arguments — then `goDeeper` on the
+        // callee. The label is asked last here because it is the one that walks the chain.
         Expression::CallExpression(call) => {
             // Check if this call has trivial args (empty or single short arg without comments)
             // Matches Prettier: args.length === 0 || (args.length === 1 && isLoneShortArgument)
@@ -634,39 +636,25 @@ fn is_poorly_breakable_chain_recursive(
                 return false;
             }
 
-            // Check if callee is a member chain that might be a factory pattern
-            if !matches!(
+            // `doc.label?.memberChain`: a memberish callee prints through
+            // `printMemberChain`, and the label is on every result but the short chain's.
+            // The count is the chain's own grouping (`call_prints_as_member_chain`), not a
+            // call count — `this.x.y()?.a.b('s')` is three groups with no merge and so
+            // labelled, while `fn(a).b.then('s')` is two (the base's call joins the first
+            // group) and so poorly breakable. A `TSNonNullExpression` callee is grouped
+            // the way tsv's chain printer groups it; prettier's `isMemberish` does not
+            // name it and prints such a call as an opaque base instead.
+            // TODO: mirror that opaque-base grouping for a `!`-wrapped callee (`a.b!().c()`).
+            if matches!(
                 call.callee,
                 Expression::MemberExpression(_) | Expression::TSNonNullExpression(_)
-            ) {
-                // Non-memberish callee (e.g., `fn()()`), continue down
-                return is_poorly_breakable_chain_recursive(call.callee, true, walk);
-            }
-
-            // Count calls in the chain
-            let call_count = count_calls_in_chain(call.callee) + 1; // +1 for this call
-
-            // Single call with member access: obj.fn(arg) → poorly breakable
-            // Continue checking to ensure it's a valid chain structure
-            if call_count == 1 {
-                return is_poorly_breakable_chain_recursive(call.callee, true, walk);
-            }
-
-            // 2 calls: check if factory pattern AND all calls have trivial args
-            // Prettier's isPoorlyBreakableMemberOrCallChain recurses through the
-            // entire chain checking each call's args. A factory chain like
-            // `A.fn("long string").optional()` is NOT poorly breakable because
-            // the inner call has a non-trivial arg that provides a good break point.
-            if call_count == 2 {
-                if is_factory_chain(call.callee, printer.source) {
-                    return is_poorly_breakable_chain_recursive(call.callee, true, walk);
-                }
-                // Non-factory with 2 calls → let chain formatter handle it
+            ) && crate::printer::chain::call_prints_as_member_chain(call, printer)
+            {
                 return false;
             }
 
-            // More than 2 calls → let chain formatter handle it
-            false
+            // `goDeeper` on the callee: every call above the root must be trivial too.
+            is_poorly_breakable_chain_recursive(call.callee, true, walk)
         }
 
         // MemberExpression: a TRAILING comment in the member's own gap — glued to the
@@ -726,15 +714,15 @@ fn is_poorly_breakable_chain_recursive(
         // layout, so the `=` holds its line and the lookup takes the break
         // (`assignment/poorly_breakable_chain_root`). Do not widen it to match the
         // neighbouring root tests in this file — their `Super` arms are NOT precedent.
-        // `is_short_arg` and `is_factory_chain` name prettier functions that stop at
-        // `Identifier` / `ThisExpression` exactly as this one does (`isLoneShortArgument`;
-        // `printMemberChain`'s `shouldNotWrap`), so their `Super` is tsv's own widening —
-        // inert in both, since a bare `super` argument is only reachable on tsv's
-        // over-accept surface and a `Super`-rooted 2-call chain bottoms out false here
-        // whether or not `is_factory_chain` let it recurse. `is_member_only_chain` mirrors
-        // no prettier function at all: it is the structural "this chain holds no call"
-        // test, the same axis as [`chain_has_calls`] above, and `super` genuinely is a
-        // chain root there.
+        // `is_short_arg` names a prettier function that stops at `Identifier` /
+        // `ThisExpression` exactly as this one does (`isLoneShortArgument`), so its `Super`
+        // is tsv's own widening — inert, since a bare `super` argument is only reachable
+        // on tsv's over-accept surface. `is_member_only_chain` mirrors no prettier
+        // function at all: it is the structural "this chain holds no call" test, the same
+        // axis as [`chain_has_calls`] above, and `super` genuinely is a chain root there.
+        // (The chain grouping's `should_not_wrap` merges on a lone `super` head as it does
+        // on `this` — that is prettier's `printMemberChain`, a different function, and a
+        // `Super`-rooted chain bottoms out false here regardless.)
         Expression::Identifier(_) | Expression::ThisExpression(_) => deep,
 
         // Everything else breaks the chain
@@ -893,37 +881,6 @@ fn is_member_only_chain(expr: &Expression<'_>) -> bool {
         Expression::MemberExpression(member) => is_member_only_chain(member.object),
         Expression::TSNonNullExpression(non_null) => is_member_only_chain(non_null.expression),
         Expression::Identifier(_) | Expression::ThisExpression(_) | Expression::Super(_) => true,
-        _ => false,
-    }
-}
-
-/// Count calls in a chain expression.
-fn count_calls_in_chain(expr: &Expression<'_>) -> usize {
-    match expr {
-        Expression::CallExpression(call) => 1 + count_calls_in_chain(call.callee),
-        Expression::MemberExpression(member) => count_calls_in_chain(member.object),
-        Expression::TSNonNullExpression(non_null) => count_calls_in_chain(non_null.expression),
-        _ => 0,
-    }
-}
-
-/// Check if a chain starts with a factory pattern (capital letter or special prefixes).
-///
-/// Factory patterns include:
-/// - Capital letter start: Object.keys, React.createElement, etc.
-/// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
-///
-/// Matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u` (member-chain.js:273)
-/// Note: `$util`, `_helper` etc. are NOT factories — only pure `$`/`_` names.
-fn is_factory_chain(expr: &Expression<'_>, source: &str) -> bool {
-    match expr {
-        Expression::CallExpression(call) => is_factory_chain(call.callee, source),
-        Expression::MemberExpression(member) => is_factory_chain(member.object, source),
-        Expression::TSNonNullExpression(non_null) => is_factory_chain(non_null.expression, source),
-        Expression::Identifier(id) => {
-            super::literals::is_factory_identifier_name(id.span.extract(source))
-        }
-        Expression::ThisExpression(_) | Expression::Super(_) => true,
         _ => false,
     }
 }

@@ -553,17 +553,6 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         chain_args::build_call_args_doc_for_chain_expanded(self, call, facts)
     }
-
-    /// Build a Doc for call arguments with standard forced expansion
-    ///
-    /// Always uses `(\n  args,\n)` form, never arrow-hugging `(sig =>\n  body,\n)`.
-    pub(super) fn build_call_args_doc_for_chain_standard_expanded(
-        &self,
-        call: &internal::CallExpression<'_>,
-        facts: ChainCall,
-    ) -> DocId {
-        chain_args::build_call_args_doc_for_chain_standard_expanded(self, call, facts)
-    }
 }
 
 /// The window `prepend_removed_paren_comments` claims at a chain's head: the leading

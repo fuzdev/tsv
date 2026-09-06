@@ -23,9 +23,10 @@
 		);
 
 		// the delegate form is restricted too
-		const b = yield* (
-			// c
-			gen()
-		);
+		const b =
+			yield* (
+				// c
+				gen()
+			);
 	}
 </script>
