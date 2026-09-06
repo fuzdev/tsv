@@ -1,0 +1,95 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 210,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 148,
+				"end": 201,
+				"name": "supports",
+				"prelude": "(a: x\\\"y 'z')",
+				"block": {
+					"type": "Block",
+					"start": 172,
+					"end": 201,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 176,
+								"end": 177,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 176,
+										"end": 177,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "b",
+														"start": 176,
+														"end": 177
+													}
+												],
+												"start": 176,
+												"end": 177
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 178,
+								"end": 198,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 183,
+										"end": 193,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 176,
+							"end": 198
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escaped quote is ident content, not a string delimiter, so the real string\n\tbeside it still takes prettier's quote normalization ",
+				"start": 9,
+				"end": 146
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 202,
+			"styles": "\n\t/* an escaped quote is ident content, not a string delimiter, so the real string\n\tbeside it still takes prettier's quote normalization */\n\t@supports (a: x\\\"y 'z') {\n\t\tb {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 211,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

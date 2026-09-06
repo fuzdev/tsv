@@ -1,0 +1,229 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 466,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 158,
+				"end": 223,
+				"name": "supports",
+				"prelude": "(a: x\\#FFF) and (b: #fff)",
+				"block": {
+					"type": "Block",
+					"start": 194,
+					"end": 223,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 198,
+								"end": 199,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 198,
+										"end": 199,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 198,
+														"end": 199
+													}
+												],
+												"start": 198,
+												"end": 199
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 200,
+								"end": 220,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 205,
+										"end": 215,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 198,
+							"end": 220
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 264,
+				"end": 325,
+				"name": "supports",
+				"prelude": "(a: \\#FFF) and (b: c)",
+				"block": {
+					"type": "Block",
+					"start": 296,
+					"end": 325,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 300,
+								"end": 301,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 300,
+										"end": 301,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "d",
+														"start": 300,
+														"end": 301
+													}
+												],
+												"start": 300,
+												"end": 301
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 302,
+								"end": 322,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 307,
+										"end": 317,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 300,
+							"end": 322
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 395,
+				"end": 457,
+				"name": "media",
+				"prelude": "(a: x\\#FFF) and (b: #FFF)",
+				"block": {
+					"type": "Block",
+					"start": 428,
+					"end": 457,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 432,
+								"end": 433,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 432,
+										"end": 433,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "e",
+														"start": 432,
+														"end": 433
+													}
+												],
+												"start": 432,
+												"end": 433
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 434,
+								"end": 454,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 439,
+										"end": 449,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 432,
+							"end": 454
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escaped `#` is ident content, so the run after it belongs to the ident and is\n\tnever lowercased as a hex colour — the unescaped sibling is ",
+				"start": 9,
+				"end": 156
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same at the head of a value ",
+				"start": 225,
+				"end": 262
+			},
+			{
+				"type": "CSSComment",
+				"value": " control: `@media` preserves every hash token, escaped or not ",
+				"start": 327,
+				"end": 393
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 458,
+			"styles": "\n\t/* an escaped `#` is ident content, so the run after it belongs to the ident and is\n\tnever lowercased as a hex colour — the unescaped sibling is */\n\t@supports (a: x\\#FFF) and (b: #fff) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* the same at the head of a value */\n\t@supports (a: \\#FFF) and (b: c) {\n\t\td {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* control: `@media` preserves every hash token, escaped or not */\n\t@media (a: x\\#FFF) and (b: #FFF) {\n\t\te {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 467,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

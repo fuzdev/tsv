@@ -257,6 +257,7 @@ Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
 - `expected.json` — Default - our parser matches Svelte
 - `expected_ours.json` + `expected_svelte.json` — **Intentional, permanent** parser differences (NOT implementation gaps)
 - `output_prettier.svelte` — **Intentional, permanent** formatter differences (**NEVER** "not implemented" - that's a bug to fix!)
+  - ⚠️ **It must also be a tsv fixed point** — not an F/S rule of this validator (which grades it by F2 alone: it IS prettier's output of `input`), but `deno task authoring:audit` scans every fixture `.svelte` and fails a **base-non-idempotent** file, so a `_prettier_divergence` whose prettier form tsv rewrites passes `fixtures:validate` and fails `deno task check` several gates later. It bites when prettier's form is *mangled* rather than merely different — tsv often re-mangles it. Choose the case so prettier's own output is stable on both sides; see [audits.md §Authoring-Independence Audit](./audits.md#authoring-independence-audit-authoringaudit)
 - `prettier_variant_*.svelte` — Prettier-stable, our formatter normalizes to input
 - `variant_*.svelte` — Both formatters keep stable, NOT normalized to input
 - `divergent_variant_*.svelte` — Prettier-stable, our formatter rewrites to a distinct third stable form (NOT input, NOT the form)

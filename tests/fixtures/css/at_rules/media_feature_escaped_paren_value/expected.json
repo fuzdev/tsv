@@ -1,0 +1,229 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 498,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 136,
+				"end": 193,
+				"name": "media",
+				"prelude": "(min-width: a\\(b\\)c)",
+				"block": {
+					"type": "Block",
+					"start": 164,
+					"end": 193,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 168,
+								"end": 169,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 168,
+										"end": 169,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 168,
+														"end": 169
+													}
+												],
+												"start": 168,
+												"end": 169
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 170,
+								"end": 190,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 175,
+										"end": 185,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 168,
+							"end": 190
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 265,
+				"end": 332,
+				"name": "media",
+				"prelude": "screen and (max-width: a\\29 b)",
+				"block": {
+					"type": "Block",
+					"start": 303,
+					"end": 332,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 307,
+								"end": 308,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 307,
+										"end": 308,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 307,
+														"end": 308
+													}
+												],
+												"start": 307,
+												"end": 308
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 309,
+								"end": 329,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 314,
+										"end": 324,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 307,
+							"end": 329
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 405,
+				"end": 489,
+				"name": "media",
+				"prelude": "(min-width: calc(1px)) and (max-width: a\\(b\\)c)",
+				"block": {
+					"type": "Block",
+					"start": 460,
+					"end": 489,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 464,
+								"end": 465,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 464,
+										"end": 465,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 464,
+														"end": 465
+													}
+												],
+												"start": 464,
+												"end": 465
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 466,
+								"end": 486,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 471,
+										"end": 481,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 464,
+							"end": 486
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escaped paren in a feature value is ident content, not a nested\n\tsub-condition, so the feature name still lowercases ",
+				"start": 9,
+				"end": 134
+			},
+			{
+				"type": "CSSComment",
+				"value": " the hex spelling of the same paren carries no raw paren at all ",
+				"start": 195,
+				"end": 263
+			},
+			{
+				"type": "CSSComment",
+				"value": " a real function call in a sibling feature keeps its own nesting ",
+				"start": 334,
+				"end": 403
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 490,
+			"styles": "\n\t/* an escaped paren in a feature value is ident content, not a nested\n\tsub-condition, so the feature name still lowercases */\n\t@media (min-width: a\\(b\\)c) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* the hex spelling of the same paren carries no raw paren at all */\n\t@media screen and (max-width: a\\29 b) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* a real function call in a sibling feature keeps its own nesting */\n\t@media (min-width: calc(1px)) and (max-width: a\\(b\\)c) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 499,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

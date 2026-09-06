@@ -413,16 +413,16 @@ impl<'a> Printer<'a> {
     ///
     /// - **An escape spends at least two bytes on the one character it spells**, so a
     ///   decoded spelling of `kw` is always LONGER than `kw` — an exact-length name is
-    ///   answered by the bytes alone. That is every name a declaration value can hold
-    ///   (the value classifier admits only `alphanumeric | - | _`, so its names never
-    ///   carry a `\`), and 82% of them are three bytes.
+    ///   answered by the bytes alone, and 82% of names are three bytes.
     /// - **A longer name's first decoded character is either its first byte verbatim or
     ///   an escape's `\`**, so a first byte that is neither `\` nor `kw`'s own opening
     ///   character cannot spell `kw` however it decodes — `calc(` refuses `url` on one
     ///   compare.
     ///
-    /// What survives both is an `@import` prelude's escaped name and nothing else, which
-    /// is where the escape walk lives.
+    /// What survives both is an escape-spelled name, from an `@import` prelude or from the
+    /// value classifier (`parser::value::is_function_name`, which reads an escape as the
+    /// ident content it is), and nothing else — which is where the escape walk lives. No
+    /// corpus holds one.
     #[inline]
     fn function_name_is(&self, name_span: Span, kw: &str) -> bool {
         let name = &self.source.as_bytes()[name_span.range()];

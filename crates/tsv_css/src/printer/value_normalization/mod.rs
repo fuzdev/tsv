@@ -63,27 +63,47 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
         let after_preserve_ident = prev_ident_preserve_fn;
         prev_ident_preserve_fn = false;
 
+        // An escape is opaque — its payload is content, never structure (§4.3.7, and
+        // `crate::escapes::escape_len` for the extent, terminator included). Copied whole
+        // and ahead of every arm below, because each of them would otherwise read the
+        // payload byte as the thing it is looking for:
+        //
+        // - a `\"` / `\'` opened the string arm, which then ran to the *next* real quote
+        //   and re-quoted everything between (`(a: x\"y "z")` → `(a: x\'y 'z")`) — the
+        //   escape's payload rewritten and the string delimiters moved, output tsv's own
+        //   parser then rejects (`Unterminated string`);
+        // - a `\#` opened the `#`-token arm, so an escaped hash *inside an ident* was
+        //   lowercased as a hex colour (`x\#FFF` → `x\#fff`, a different ident);
+        // - a `\/` opened the comment arm, and a hex escape's digits were read as a
+        //   number.
+        //
+        // ⚠️ It does NOT widen the identifier run below, which deliberately stops at an
+        // escape: an ident sequence's real extent would pull the digits after a hex escape
+        // into the ident (`\41 2.50px` is the ident `A2` then `.50px`), and the number arm
+        // then glues its leading zero onto the ident (`\41 20.5px` — the ident `A20`).
+        // The one thing that costs is url-token recognition through an escaped name; see
+        // the `url` arm below.
+        if b == b'\\'
+            && let Some(len) = crate::escapes::escape_len(input, i)
+        {
+            out.push_str(&input[i..i + len]);
+            i += len;
+            continue;
+        }
+
         // Normalize quoted-string quotes (handling backslash escapes). A properly
         // closed string runs through prettier's quote chooser; an unterminated run
         // (malformed input) is copied verbatim.
         if b == b'"' || b == b'\'' {
             let start = i;
-            i += 1;
-            let mut closed = false;
-            while i < bytes.len() {
-                if bytes[i] == b'\\' {
-                    // Skip the backslash and the escaped byte (if any).
-                    i += if i + 1 < bytes.len() { 2 } else { 1 };
-                    continue;
-                }
-                closed = bytes[i] == b;
-                i += 1;
-                if closed {
-                    break;
-                }
-            }
+            // The extent is `crate::lexer::string_end`'s, not a loop of this scanner's own
+            // — see `skip_string` below, which asks the same question for `trivia_span_at`.
+            // Either failure arm means the run never closed, and a malformed run is copied
+            // verbatim rather than re-quoted.
+            let closed = crate::lexer::string_end(bytes, start).ok();
+            i = closed.unwrap_or(input.len());
             let literal = &input[start..i];
-            if closed {
+            if closed.is_some() {
                 let content = &literal[1..literal.len() - 1];
                 out.push_str(&format_string_literal(content, b as char));
             } else {
@@ -126,6 +146,12 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
             // `sprite1.50.png`) is copied verbatim, never number/unit-normalized. A
             // quoted `url("…")` is instead a function with a `<string>` arg; it flows
             // through the normal string branch (quote normalization), so leave it.
+            //
+            // ⚠️ The name is matched on the run's own bytes, so an **escape-spelled** one
+            // (`u\72 l(`, the same `<url-token>`) is missed and its content normalizes —
+            // `u\72 l(x1.50)` comes back as `u\72 l(x10.5)`, a different path. Closing it
+            // wants the ident SEQUENCE's extent (escapes included) at this position, which
+            // is not the run this branch emits; tracked in the CSS checklist §Escapes.
             if ident.eq_ignore_ascii_case("url")
                 && bytes.get(i) == Some(&b'(')
                 && !url_arg_is_quoted(input, i)
@@ -240,12 +266,30 @@ fn url_arg_is_quoted(s: &str, open: usize) -> bool {
 /// Consume the balanced parenthesized group starting at the `(` at `*i`, advancing
 /// `*i` past the matching `)` (or to end of input if unbalanced), and return the
 /// consumed slice — used to copy an opaque `url(<url-token>)` verbatim.
+///
+/// **Escapes step whole.** §4.3.6 "Consume a url token" consumes an escape as url content, so
+/// the token ends at the first *unescaped* `)` — a `\)` closes nothing. Counting it does not
+/// merely end the copy early: everything past it rejoins the normalizing path and the URL's
+/// own bytes are rewritten (`url(x\)1.50)` → `url(x\)1.5)`, `url(x\)y#FFF)` → `url(x\)y#fff)`),
+/// which is the §4.3.6 opacity this arm exists to enforce, inverted.
+///
+/// ⚠️ A block comment is deliberately **not** stepped over, for the reason the value
+/// scanners' own `matching_close_paren` gives at length (`parser/value/scan.rs`): this is a
+/// *bounding* scan over url content, where `/*` opens nothing (§4.3.6), so reading one as a
+/// comment would lose the closing paren of `url(foo/*bar)`. Escapes are the opposite case —
+/// §4.3.6 names them explicitly.
 fn consume_paren_group<'s>(s: &'s str, i: &mut usize) -> &'s str {
     let bytes = s.as_bytes();
     let start = *i;
     let mut depth = 0usize;
     while *i < s.len() {
         let b = bytes[*i];
+        if b == b'\\'
+            && let Some(len) = crate::escapes::escape_len(s, *i)
+        {
+            *i += len;
+            continue;
+        }
         *i += 1;
         if b == b'(' {
             depth += 1;
@@ -309,6 +353,17 @@ pub(crate) fn lowercase_media_feature_names(query: &str) -> Cow<'_, str> {
             i = end;
             continue;
         }
+        // So does an escape, whose payload is ident content: a `\(` at depth 0 is part of a
+        // media *type*, not the `(` that opens a feature expression, and reading it as one
+        // handed the rest of the query to `scan_paren_group` as a single opaque group —
+        // `@media a\(b and (MIN-WIDTH: 1px)` kept its uppercase feature name.
+        if bytes[i] == b'\\'
+            && let Some(len) = crate::escapes::escape_len(query, i)
+        {
+            out.push_str(&query[i..i + len]);
+            i += len;
+            continue;
+        }
         match bytes[i] {
             b'(' => {
                 // A top-level `(` opens a media-feature-expression. A group that
@@ -334,26 +389,16 @@ pub(crate) fn lowercase_media_feature_names(query: &str) -> Cow<'_, str> {
     Cow::Owned(out)
 }
 
-/// Index just past a `'…'`/`"…"` string starting at `start` (backslash-aware; or end
-/// of input for an unterminated one).
+/// Index just past a `'…'`/`"…"` string starting at `start`, or the end of input for an
+/// unterminated one (either failure arm — a missing close quote or a trailing `\`).
 ///
 /// The string twin of [`crate::comments::comment_end`]; the two are what
-/// [`trivia_span_at`] is built from.
+/// [`trivia_span_at`] is built from. Defers to [`crate::lexer::string_end`], the crate's
+/// single statement of the string token's extent — a *printer* asking where a string ends
+/// must get the same answer the lexer did, or a scanner reading a prelude disagrees with
+/// the parse it is printing.
 fn skip_string(s: &str, start: usize) -> usize {
-    let bytes = s.as_bytes();
-    let quote = bytes[start];
-    let mut i = start + 1;
-    while i < s.len() {
-        if bytes[i] == b'\\' {
-            i += 2;
-            continue;
-        }
-        if bytes[i] == quote {
-            return i + 1;
-        }
-        i += 1;
-    }
-    s.len()
+    crate::lexer::string_end(s.as_bytes(), start).unwrap_or(s.len())
 }
 
 /// If a `/* … */` comment or a `'…'`/`"…"` string starts at byte `i`, return the index
@@ -361,6 +406,12 @@ fn skip_string(s: &str, start: usize) -> usize {
 /// single source of truth for "what is skippable trivia" shared by the media-feature
 /// scanners below — each copies it through or skips it, but they must all agree on its
 /// extent and on what opens it.
+///
+/// ⚠️ An **escape** is not trivia and is deliberately not here: it is content the scanner
+/// must copy, and the two media-feature scanners disagree about it on purpose —
+/// [`lowercase_media_feature_names`] steps one whole, [`lowercase_simple_feature_expr`] does
+/// not (the test beside them says why). Folding an escape arm in here would apply it to
+/// both.
 fn trivia_span_at(s: &str, i: usize) -> Option<usize> {
     let bytes = s.as_bytes();
     match bytes[i] {
@@ -399,6 +450,15 @@ fn scan_paren_group(s: &str, open: usize) -> (usize, bool) {
         // A `(`/`)` inside a comment or string doesn't change paren depth.
         if let Some(end) = trivia_span_at(s, i) {
             i = end;
+            continue;
+        }
+        // Nor does one inside an escape: `a\(b` is the single ident `a(b` (§"Consume an ident
+        // sequence"), not a nested sub-condition, so the group stays a *simple* feature
+        // expression and its name still lowercases.
+        if bytes[i] == b'\\'
+            && let Some(len) = crate::escapes::escape_len(s, i)
+        {
+            i += len;
             continue;
         }
         match bytes[i] {
@@ -1031,6 +1091,135 @@ mod tests {
         assert_eq!(
             normalize_value_text("(margin: .5px)", false),
             "(margin: 0.5px)"
+        );
+    }
+
+    /// A `\)` inside an unquoted `url()` is url content (§4.3.6), not the token's close,
+    /// so the whole token is copied verbatim and the bytes past the escape are neither
+    /// number- nor hex-normalized.
+    ///
+    /// Prettier throws `Unbalanced parenthesis` on the single-condition spelling of every
+    /// input below, so the fixture that grades this end to end
+    /// (`css/at_rules/supports_url_escaped_paren`) has to reach for a two-condition prelude
+    /// that happens to balance postcss's own count. These pin the scan directly, including
+    /// the **unbalanced** shapes no prettier oracle exists for at all.
+    #[test]
+    fn an_escaped_paren_does_not_close_a_url_token() {
+        // The two normalizations the tail would otherwise take.
+        assert_eq!(
+            normalize_value_text(r"(a: url(x\)1.50))", true),
+            r"(a: url(x\)1.50))"
+        );
+        assert_eq!(
+            normalize_value_text(r"(a: url(x\)y#FFF))", true),
+            r"(a: url(x\)y#FFF))"
+        );
+        // An escaped OPEN paren nests nothing either — the token still ends at the first
+        // unescaped `)`, so `1.50` stays inside it.
+        assert_eq!(
+            normalize_value_text(r"(a: url(x\(1.50))", true),
+            r"(a: url(x\(1.50))"
+        );
+        // A hex escape carries its whitespace terminator, so the `)` here is the escape's
+        // payload and not a close.
+        assert_eq!(
+            normalize_value_text(r"(a: url(x\29 1.50))", true),
+            r"(a: url(x\29 1.50))"
+        );
+        // Unbalanced: the group runs to end of input rather than stopping at the escape.
+        assert_eq!(
+            normalize_value_text(r"(a: url(x\)1.50)", true),
+            r"(a: url(x\)1.50)"
+        );
+        // A trailing `\` starts no escape, so the `)` before it still closes.
+        assert_eq!(
+            normalize_value_text(r"(a: url(x1.50)\)", true),
+            r"(a: url(x1.50)\)"
+        );
+        // Control: no escape, so the token is opaque for the ordinary reason.
+        assert_eq!(
+            normalize_value_text("(a: url(x1.50))", true),
+            "(a: url(x1.50))"
+        );
+    }
+
+    /// A `(` or `)` inside an escape is ident content (§"Consume an ident sequence"), so it
+    /// neither opens a sub-condition nor moves the group's depth: the feature expression
+    /// stays *simple* and its name lowercases.
+    ///
+    /// Prettier drops the whole prelude on the unbalanced spelling (`@media (a: b\(c)` →
+    /// `@media  {`), so only the balanced one is gradable by fixture
+    /// (`css/at_rules/media_feature_escaped_paren_value`); both are pinned here.
+    #[test]
+    fn an_escaped_paren_is_not_a_media_sub_condition() {
+        // Balanced raw parens inside escapes — the fixture's shape.
+        assert_eq!(
+            lowercase_media_feature_names(r"(MIN-WIDTH: a\(b\)c)"),
+            r"(min-width: a\(b\)c)"
+        );
+        // Unbalanced: without the escape arm the group swallowed the rest of the query.
+        assert_eq!(
+            lowercase_media_feature_names(r"(MIN-WIDTH: a\(b)"),
+            r"(min-width: a\(b)"
+        );
+        assert_eq!(
+            lowercase_media_feature_names(r"(MIN-WIDTH: a\)b)"),
+            r"(min-width: a\)b)"
+        );
+        assert_eq!(
+            lowercase_media_feature_names(r"(MIN-WIDTH: a\(b) and (MAX-WIDTH: 1px)"),
+            r"(min-width: a\(b) and (max-width: 1px)"
+        );
+        // A real function call in the value still isn't a sub-condition, and a real
+        // sub-condition still is — the escape arm moves neither.
+        assert_eq!(
+            lowercase_media_feature_names("(MIN-WIDTH: calc(1px))"),
+            "(min-width: calc(1px))"
+        );
+        assert_eq!(
+            lowercase_media_feature_names("((MIN-WIDTH: 1px))"),
+            "((MIN-WIDTH: 1px))"
+        );
+        // At depth 0 an escaped `(` is part of a media TYPE, not the `(` that opens a
+        // feature expression — reading it as one handed the rest of the query to
+        // `scan_paren_group` as one opaque group and the feature name never lowercased.
+        assert_eq!(
+            lowercase_media_feature_names(r"a\(b and (MIN-WIDTH: 1px)"),
+            r"a\(b and (min-width: 1px)"
+        );
+    }
+
+    /// ⚠️ **A trap, pinned rather than fixed.** `lowercase_simple_feature_expr` is the one
+    /// scanner in this module that does **not** step escapes whole, so an escaped `:` in a
+    /// feature name reads as the name→value separator and the fragment after it is treated
+    /// as a value: `(A\:B: 1px)` comes back half-lowercased.
+    ///
+    /// That is cosmetic — a media feature name is ASCII case-insensitive, so `a:B` and
+    /// `A:B` are the same feature, and prettier's own answer splits the ident instead
+    /// (`(a\: B: 1px)`), so there is no oracle to grade a fix against.
+    ///
+    /// The trap is that adding the escape arm here **alone** is a silent regression: the
+    /// ident run stops at an escape, so `--A\:B` would arrive at
+    /// `maybe_lowercase_feature_name` as the two fragments `--A` and `B`, and only the
+    /// first carries the `--` prefix that makes a custom-media name case-sensitive — the
+    /// second would lowercase. An escape arm here owes an escape-aware ident RUN beside it.
+    /// The second assertion is what fails if that ever happens.
+    #[test]
+    fn an_escaped_colon_in_a_feature_name_is_read_as_the_separator() {
+        assert_eq!(
+            lowercase_media_feature_names(r"(A\:B: 1px)"),
+            r"(a\:B: 1px)"
+        );
+        // Case-sensitive per CSS Variables 1 — must survive whole.
+        assert_eq!(
+            lowercase_media_feature_names(r"(--A\:B: 1px)"),
+            r"(--A\:B: 1px)"
+        );
+        // An escape elsewhere in the name is ordinary content and both formatters
+        // lowercase around it.
+        assert_eq!(
+            lowercase_media_feature_names(r"(MIN\-WIDTH: 1px)"),
+            r"(min\-width: 1px)"
         );
     }
 }
