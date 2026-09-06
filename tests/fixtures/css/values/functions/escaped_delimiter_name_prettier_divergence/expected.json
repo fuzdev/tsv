@@ -1,0 +1,95 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 212,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 203,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 125,
+							"end": 141,
+							"property": "color",
+							"value": "a\\)b(0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 145,
+							"end": 168,
+							"property": "border-color",
+							"value": "a\\\"b(0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 172,
+							"end": 199,
+							"property": "background-color",
+							"value": "a\\'b(0.1)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 203
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escape is ident content whatever it spells, so these are functions and\n\t\ttheir arguments normalize ",
+				"start": 15,
+				"end": 122
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 204,
+			"styles": "\n\ta {\n\t\t/* an escape is ident content whatever it spells, so these are functions and\n\t\ttheir arguments normalize */\n\t\tcolor: a\\)b(0.1);\n\t\tborder-color: a\\\"b(0.1);\n\t\tbackground-color: a\\'b(0.1);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 213,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

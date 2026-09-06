@@ -1,0 +1,95 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 173,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 91,
+				"end": 164,
+				"name": "supports",
+				"prelude": "(a: x\\#FFF 5px) and (b: x\\#FFF y)",
+				"block": {
+					"type": "Block",
+					"start": 135,
+					"end": 164,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 139,
+								"end": 140,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 139,
+										"end": 140,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 139,
+														"end": 140
+													}
+												],
+												"start": 139,
+												"end": 140
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 141,
+								"end": 161,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 146,
+										"end": 156,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 139,
+							"end": 161
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the escaped `#` ends no token, so the separator after the ident is content ",
+				"start": 9,
+				"end": 89
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 165,
+			"styles": "\n\t/* the escaped `#` ends no token, so the separator after the ident is content */\n\t@supports (a: x\\#FFF 5px) and (b: x\\#FFF y) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 174,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

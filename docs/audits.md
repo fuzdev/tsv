@@ -1126,6 +1126,18 @@ cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src    # audit
 # converge/diverge verdict would be meaningless), but the exclusion is not a reason
 # to pass the run — that is how a whole-file reflow could sit here reported-but-green.
 #
+# ⚠️ That file-level rule is a constraint on FIXTURE DESIGN, and it is the only gate
+# that states it: the walk takes every `.svelte` under tests/fixtures whose own format
+# is claimed stable — `output_prettier.*` included — so a `_prettier_divergence` whose
+# prettier form tsv does NOT hold stable fails `deno task check` HERE, several gates
+# after `fixtures:validate` reported the fixture green (`fixtures:validate` grades
+# `output_prettier` by F2 alone: it is prettier's output of `input`, and carries no tsv
+# claim). It bites when prettier's form is *mangled* rather than merely different, since
+# tsv often re-mangles it: prettier deletes the separator in `@supports (a: x\#FFF 0.5px)`
+# → `x\#FFF0.5px`, and tsv formats THAT to `x\#FFF00.5px`. Pick the divergence's case so
+# prettier's own output is a tsv fixed point — the same divergence with an integer
+# (`x\#FFF 5px` → `x\#FFF5px`) is stable on both sides and pins the identical claim.
+#
 # --prettier adds sidecar triage:
 # (a) tsv diverges where prettier converges (bug); (b) tsv converges where prettier
 # diverges (a _prettier_divergence to pin, the space_after_block class); (c) both
