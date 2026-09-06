@@ -10,6 +10,7 @@ use tsv_lang::{
 };
 use tsv_svelte::ast::internal::{Element, Fragment, FragmentNode, TextDecoding};
 
+use crate::audit::excerpt::first_line_diff;
 use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
 
@@ -494,15 +495,15 @@ fn first_line(source: &str) -> (usize, String) {
     (1, source.lines().next().unwrap_or_default().to_string())
 }
 
-/// The first line at which two formats disagree — the F1 break's location.
+/// The first line at which two formats disagree — the F1 break's location, reported from the
+/// FIRST format's side (the finding is "this line reflowed", and the report shows what it was).
 fn first_diff_line(a: &str, b: &str) -> (usize, String) {
-    for (i, (la, lb)) in a.lines().zip(b.lines()).enumerate() {
-        if la != lb {
-            return (i + 1, la.to_string());
-        }
-    }
-    let n = a.lines().count().min(b.lines().count());
-    (n + 1, a.lines().nth(n).unwrap_or_default().to_string())
+    first_line_diff(a, b).map_or_else(
+        // Line-for-line equal yet not byte-equal: the two differ only in a trailing newline, so
+        // there is no line to show. Report it past the last one rather than at line 0.
+        || (a.lines().count() + 1, String::new()),
+        |(line, la, _)| (line, la.unwrap_or_default().to_string()),
+    )
 }
 
 fn print_report(sweep: &Sweep, width: usize) {

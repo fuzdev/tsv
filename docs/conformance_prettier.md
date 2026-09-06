@@ -513,6 +513,16 @@ rather than an `output_prettier.*`: the divergence is one of **normalization**, 
 Where prettier's per-authoring form is additionally non-idempotent, the entry is `◆prettier_bug`
 instead and the [Prettier bug index](#prettier-bug-index) carries it.
 
+**The doctrine is not whitespace-only, though this document's instances are.** It has exactly one
+non-whitespace instance, and it produces no catalog entry because both formatters converge:
+`a ?? b ?? c` and `a ?? (b ?? c)` are one document — prettier says so by *rebalancing* the tree at
+parse time (`rebalanceLogicalTree`), tsv by reading a rebalanced view per rule
+(`BinaryExpression::rebalanced_right`). There is no held spelling and so no dual-stable
+remainder: a redundant paren carries no authoring signal either formatter honors. What there is
+instead is a standing gate, since a rule left on the raw `binary.right` is invisible on every
+paren-free authoring — [audits.md §Paren-Authoring
+Independence](./audits.md#paren-authoring-independence-audit-parenaudit).
+
 **The tag for this stance is `◆stable_quirk`**, and it is distinct from `◆design_choice` on an
 axis worth naming: `◆stable_quirk` is a **convergence-count** disagreement (prettier holds a form
 per authoring, tsv holds one), `◆design_choice` a **representative** disagreement (both hold one

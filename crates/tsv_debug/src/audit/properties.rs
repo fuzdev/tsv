@@ -10,6 +10,11 @@
 //!   decode-invariant leaf-value check that the skeleton, erasing every scalar,
 //!   is blind to) — the round-trip primitives the `roundtrip_audit` / `fuzz`
 //!   commands share.
+//! - **directive pre-scan** — [`source_has_ignore_directive`], the coarse "does this
+//!   source freeze a region" question every audit whose property does not survive a
+//!   verbatim region asks of its seed.
+//! - **base fixed point** — [`base_fixed_point`], the precondition the two mutation audits
+//!   rest on: a document with no fixed point has nothing for its authorings to converge ON.
 //! - **ledger** (behind the `comment_check` feature) — [`ledger_format`] /
 //!   [`ledger_format_with_comments`] / [`pristine_format`] drive `format_source`
 //!   with the print-once comment ledger armed, and the [`Verdict`] /
@@ -40,6 +45,58 @@ use tsv_cli::cli::input::ParserType;
 
 use crate::diff::{DiffOptions, diff_to_string};
 use crate::render_normalize::{normalize_pair, structural_skeleton};
+
+/// The seed's own fixed point, or why it has none — the precondition every **mutation** audit
+/// rests on and neither can state for itself.
+///
+/// An authoring-independence audit asks "does every spelling of this document reach ONE
+/// output?". That question is only meaningful against a base that IS an output: if
+/// `format(format(x)) != format(x)`, the document has no fixed point to converge on and a
+/// converge/diverge verdict per site would be noise. So both `authoring_audit` and
+/// `paren_audit` open the same way — format, then format again — and both treat a
+/// [`Self::NonIdempotent`](BaseFixedPoint::NonIdempotent) seed as excluded-from-the-analysis
+/// but still a **failure of the run**: excluding it is not a reason to pass, or a whole-file
+/// reflow could sit reported-but-green.
+///
+/// Returned as a verdict rather than an `Option` because the two failure reasons are counted
+/// separately in every consumer's report, and collapsing them loses which one fired.
+pub(crate) enum BaseFixedPoint {
+    /// `format(source)`, verified to be a fixed point of itself.
+    Ok(String),
+    /// The parser rejected the seed — ordinary over a fixture tree (a `tsv_rejects` fixture, a
+    /// prettier-rejects input) and not this audit's business.
+    ParseError,
+    /// The seed formats, but its output reformats to something else: F1 broken as authored.
+    NonIdempotent,
+}
+
+/// Format `source` and verify the result is a fixed point. See [`BaseFixedPoint`].
+pub(crate) fn base_fixed_point(source: &str, parser: ParserType) -> BaseFixedPoint {
+    let Ok(f) = format_source(source, parser) else {
+        return BaseFixedPoint::ParseError;
+    };
+    match format_source(&f, parser) {
+        Ok(f2) if f2 == f => BaseFixedPoint::Ok(f),
+        _ => BaseFixedPoint::NonIdempotent,
+    }
+}
+
+/// Whether `source` bears an ignore directive anywhere — a coarse substring pre-scan for the
+/// `format-ignore` / `prettier-ignore` families (the exact recognizer is
+/// `tsv_lang::is_format_ignore_directive`, on a comment's trimmed text). Shared by every audit
+/// whose property does not hold across a frozen region: `blank_audit` exempts such a file from
+/// its blank-run invariant (locating the verbatim ignore range from the output alone is
+/// fragile), `ignore_audit` skips it as a seed (an injected directive interacting with a
+/// pre-existing one is fragile), and `paren_audit` skips it because a frozen region reproduces
+/// the parens it injects verbatim.
+///
+/// Ungated, and here rather than in [`sites`](crate::audit::sites) (where it was born, beside
+/// the injection audits that were its only callers) because it is pure text over an input with
+/// no dependency on the ledger those audits arm — and `sites` is compiled out of a default
+/// build.
+pub(crate) fn source_has_ignore_directive(source: &str) -> bool {
+    source.contains("format-ignore") || source.contains("prettier-ignore")
+}
 
 /// Parse `source` with tsv's own parser and convert to the wire-JSON `Value`
 /// (the same shape the canonical ASTs use). `None` on a tsv parse error.

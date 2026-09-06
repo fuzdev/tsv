@@ -124,7 +124,9 @@ use tsv_lang::comment_ledger;
 use crate::audit::examples::{ExampleOrd, ExampleSet};
 use crate::audit::node_edge::is_non_structural_key;
 use crate::audit::parallel::{ArmedRun, run_pool};
-use crate::audit::properties::{Pristine, Utf16ToByte, pristine_format, tsv_parse_to_value};
+use crate::audit::properties::{
+    Pristine, Utf16ToByte, pristine_format, source_has_ignore_directive, tsv_parse_to_value,
+};
 use crate::audit::ratchet::{
     GateDiff, Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update,
     report_unpinned_panics,
@@ -132,10 +134,7 @@ use crate::audit::ratchet::{
 use crate::audit::report::{
     self, Detail, Finding, IgnoreDetail, ReportExample, RunSummary, Severity,
 };
-use crate::audit::sites::{
-    code_regions, regex_literal_spans, snippet, source_has_ignore_directive,
-    string_and_template_spans,
-};
+use crate::audit::sites::{code_regions, regex_literal_spans, snippet, string_and_template_spans};
 use crate::audit::tally::CappedPaths;
 use crate::cli::CliError;
 

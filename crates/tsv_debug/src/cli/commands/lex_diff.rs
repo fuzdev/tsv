@@ -1,3 +1,4 @@
+use crate::audit::excerpt::first_line_diff;
 use crate::cli::CliError;
 use crate::cli::commands::profile::{is_pruned_dir, is_ts_family};
 use argh::FromArgs;
@@ -154,19 +155,11 @@ impl LexDiffCommand {
     }
 }
 
-/// First line (1-indexed) where two streams differ, with both versions.
+/// First line (1-indexed) where two streams differ, with both versions — `<eof>` for the side
+/// that ran out.
 fn first_diff_line<'a>(golden: &'a str, current: &'a str) -> Option<(usize, &'a str, &'a str)> {
-    for (i, (g, c)) in golden.lines().zip(current.lines()).enumerate() {
-        if g != c {
-            return Some((i + 1, g, c));
-        }
-    }
-    // Same prefix but different length.
-    let (gc, cc) = (golden.lines().count(), current.lines().count());
-    if gc != cc {
-        return Some((gc.min(cc) + 1, "<eof>", "<eof>"));
-    }
-    None
+    first_line_diff(golden, current)
+        .map(|(line, g, c)| (line, g.unwrap_or("<eof>"), c.unwrap_or("<eof>")))
 }
 
 fn serialize_golden(streams: &BTreeMap<String, String>) -> String {
