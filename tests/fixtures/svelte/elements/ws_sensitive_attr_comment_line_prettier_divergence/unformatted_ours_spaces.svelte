@@ -2,8 +2,9 @@
 	takes its own line instead of hugging the last attribute. The break lands inside the tag,
 	where no character is content, so the literal text is untouched. -->
 
-<!-- With content, the attributes keep the tag-name line and the `>` hugs the content one
-	level in, the layout an over-width `<textarea>` already takes -->
+<!-- With content, the `>` takes the next line one level in and hugs the content there, the
+	layout an over-width `<textarea>` already takes. The list wraps around the `//` like any
+	other list holding one, so only a comment the author put on the tag-name line stays -->
 <pre    // c
       >text</pre
    >

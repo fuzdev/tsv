@@ -1,0 +1,227 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 400,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 269,
+				"data": " A `<title>` in `<svelte:head>` preserves its content, so its head answers the `>` the way\n\t`<pre>` / `<textarea>` do. Attributes on a `<title>` are a compile error, so an empty\n\tattribute list is the only list it has, and prettier deletes every comment in one. "
+			},
+			{
+				"type": "Text",
+				"start": 269,
+				"end": 270,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 270,
+				"end": 399,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 271
+					},
+					"end": {
+						"line": 4,
+						"column": 12,
+						"character": 282
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 283,
+							"end": 285,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "TitleElement",
+							"start": 285,
+							"end": 314,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 286
+								},
+								"end": {
+									"line": 5,
+									"column": 7,
+									"character": 291
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 301,
+										"end": 306,
+										"raw": "text1",
+										"data": "text1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 314,
+							"end": 317,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "TitleElement",
+							"start": 317,
+							"end": 350,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 318
+								},
+								"end": {
+									"line": 7,
+									"column": 7,
+									"character": 323
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 335,
+										"end": 340,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 350,
+							"end": 353,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "TitleElement",
+							"start": 353,
+							"end": 384,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 2,
+									"character": 354
+								},
+								"end": {
+									"line": 11,
+									"column": 7,
+									"character": 359
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 369,
+										"end": 374,
+										"raw": "text3",
+										"data": "text3"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 384,
+							"end": 385,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"start": 292,
+			"end": 300,
+			"value": " c1 ",
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 8,
+					"character": 292
+				},
+				"end": {
+					"line": 5,
+					"column": 16,
+					"character": 300
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 326,
+			"end": 334,
+			"value": " c2 ",
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2,
+					"character": 326
+				},
+				"end": {
+					"line": 8,
+					"column": 10,
+					"character": 334
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 360,
+			"end": 365,
+			"value": " c3",
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 8,
+					"character": 360
+				},
+				"end": {
+					"line": 11,
+					"column": 13,
+					"character": 365
+				}
+			}
+		}
+	]
+}
