@@ -17,6 +17,12 @@ forces the chain to break, on the right-hand side of an **assignment expression*
   (`x =⏎\t\tfoo // c⏎\t\t.bar!`). (For the object-property value prettier keeps it on the
   `:` line, matching tsv — only the assignment-expression form diverges.)
 
+An indentable block comment the **value owns** (`z = /**⏎ * c⏎ */ foo // c⏎.bar!`) hangs
+the value under the `=` in **both** formatters — the owned comment's rule comes ahead of the
+chain's — and the divergence reduces to the chain's indent: tsv's chain still breaks at its
+own comment, one level under the hung value (`.bar!` two levels under `z`), where prettier
+keeps the member one level under the target (last case).
+
 This is the same comment-preservation choice as the `const`-declaration seed, in the layout
 path that keeps the chain glued to the operator (`NeverBreakAfterOperator`); a `const`
 declaration prints through a different path (never reaching this one), so the two are

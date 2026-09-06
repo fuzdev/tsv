@@ -6,9 +6,8 @@ use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ContinuationValue, LeadingGlue, OwnedCommentEffect,
     ParenContext, analysis, class_expr_has_decorators, conditional_should_break_after_op,
-    is_call_on_member_chain, is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
-    is_literal_member_chain, is_module_path_fluid_call, is_multiline_string_literal,
-    is_poorly_breakable_chain, is_regex_root_chain, is_simple_value, is_string_literal,
+    is_curried_arrow_chain, is_curried_arrow_chain_that_breaks, is_module_path_fluid_call,
+    is_multiline_string_literal, is_poorly_breakable_chain, is_simple_value, is_string_literal,
     is_type_assertion_call, needs_parens, should_inline_logical_expression,
 };
 use smallvec::smallvec;
@@ -87,9 +86,14 @@ impl<'a> Printer<'a> {
     ///
     /// ⚠️ The layout cascade below is a hand-rolled twin of `assignment.rs::choose_layout`
     /// — one prettier function answered twice, once for a declarator and once for every
-    /// other assignment. It reaches arms `choose_layout` does not (the three chain shapes),
-    /// so the two cannot simply be merged — but they DRIFT, and a `chooseLayout` fact added
-    /// to one belongs in both.
+    /// other assignment. It interleaves prettier's arms with arms only a declarator has
+    /// (the multiline string, the type-assertion binding's non-wrapping rebuild, the
+    /// break-lhs rebuilds), so the two cannot simply be merged — but they DRIFT, and a
+    /// `chooseLayout` fact added to one belongs in both. A value-SHAPE arm that
+    /// `chooseLayout` does not have belongs in neither: a shape prettier answers `fluid`
+    /// by default reaches the default fluid arm here on its own, and a flag for it placed
+    /// ahead of the hang arm shadows the owned-comment rules (`Hangs` / `Pins`) for exactly
+    /// that shape.
     pub(in crate::printer) fn build_declarator_init_doc(
         &self,
         inputs: &DeclaratorInitInputs<'_, '_>,
@@ -266,8 +270,8 @@ impl<'a> Printer<'a> {
         //
         // ⚠️ **This chain is a hand-rolled twin of `assignment.rs::choose_layout`** —
         // one prettier function answered twice, once for `const x = …` and once for
-        // every other assignment. It reaches arms `choose_layout` does not (the three
-        // chain shapes below), so the two cannot simply be merged — but they DRIFT, and
+        // every other assignment. It interleaves prettier's arms with the declarator's
+        // own (see the fn doc), so the two cannot simply be merged — but they DRIFT, and
         // the sequence arm is the proof: `choose_layout` has had it from the start while
         // this list did not, so `const a = (a, b)` hung its operands off the `=` column.
         // A `chooseLayout` fact added to one belongs in both — and a fact added to THIS
@@ -275,7 +279,7 @@ impl<'a> Printer<'a> {
         // `is_poorly_breakable_chain`'s own question (its gate is scoped to a chain that
         // holds a CALL, where prettier's `memberChain` label lives), so it takes no
         // cancelling term here that `choose_layout` would lack.
-        let should_break_after_op_rhs = (is_module_path_fluid_call(init, self.source)
+        let should_break_after_op_rhs = is_module_path_fluid_call(init, self.source)
             || is_poorly_breakable_chain(init, self)
             || is_string_literal(init)
             // A SEQUENCE init breaks after the `=` and lays its operands out under
@@ -284,30 +288,12 @@ impl<'a> Printer<'a> {
             // Without it the sequence's internal break satisfies the fluid layout's
             // fits() and the operands hang off the `=` column instead.
             || matches!(init, Expression::SequenceExpression(_))
-            || matches!(init, Expression::RegexLiteral(_)))
-            && is_layout_eligible;
+            || matches!(init, Expression::RegexLiteral(_));
 
         // Decorated class expression → break after operator, each decorator
         // on its own line (`const C =\n\t@dec\n\tclass {}`).
-        let is_decorated_class_expr = is_layout_eligible
-            && matches!(init, Expression::ClassExpression(c) if class_expr_has_decorators(c));
-
-        // Single-call member chains with complex args (arrows, objects, arrays):
-        // Use TRUE fluid layout to break at `=` only when necessary.
-        // E.g., `const x = a.b.c.filter((x) => ...)` breaks at `=` if > print_width
-        let is_single_call_member_chain = is_call_on_member_chain(init) && is_layout_eligible;
-
-        // Regex-rooted member chain calls: /regex/.exec(b)
-        // Prettier returns "fluid" layout (its default) because regex roots are NOT
-        // accepted by isPoorlyBreakableMemberOrCallChain (only Identifier/ThisExpression).
-        // Our is_poorly_breakable_chain similarly rejects regex roots. Route to fluid
-        // so fits() can decide whether to break at `=` or let the call expand args.
-        let is_regex_chain_call = is_regex_root_chain(init) && is_layout_eligible;
-
-        // Member-only chains on literal bases: 'string'.length, `template`.length
-        // These need Fluid layout so the assignment can break at `=` when the
-        // literal base exceeds print_width on the assignment line.
-        let is_literal_member = is_literal_member_chain(init) && is_layout_eligible;
+        let is_decorated_class_expr =
+            matches!(init, Expression::ClassExpression(c) if class_expr_has_decorators(c));
 
         // Expressions that need break-after-operator layout:
         // group([left, " =", indent([line, right])])
@@ -324,7 +310,7 @@ impl<'a> Printer<'a> {
             false
         };
         let needs_break_after_op_layout =
-            (is_non_inline_binary || conditional_should_break_after_op(init)) && is_layout_eligible;
+            is_non_inline_binary || conditional_should_break_after_op(init);
 
         // A comment the initializer *owns* (a JSDoc cast, a bundler annotation) is
         // glued to its first token and travels inside its doc, so the gap probes
@@ -334,11 +320,22 @@ impl<'a> Printer<'a> {
         // halves come off one lookup; see `owned_leading_comment_effect`.
         let owned_comment_effect = self.owned_leading_comment_effect(init);
 
-        let is_break_after_op_rhs = should_break_after_op_rhs
-            || needs_break_after_op_layout
-            || is_decorated_class_expr
-            // An indentable owned comment hangs the value.
-            || owned_comment_effect == Some(OwnedCommentEffect::Hangs);
+        // Every value-keyed hang, gated ONCE on layout eligibility: a value whose own line
+        // comments expand it takes the never-break arm instead.
+        let is_break_after_op_rhs = is_layout_eligible
+            && (should_break_after_op_rhs
+                || needs_break_after_op_layout
+                || is_decorated_class_expr);
+
+        // An indentable owned comment hangs the value, and its arm sits AHEAD of every arm
+        // the binding or the value's own shape would choose — the break-lhs rebuilds, the
+        // type-assertion and breakable-binding fluid arms, the curried chain's fluid arm.
+        // Prettier hangs such a comment under a short key, a never-break value, a complex
+        // pattern and a curried chain alike, and the twin (`build_assignment_layout`)
+        // overrides `BreakLhs` and `Fluid` for it; an arm placed after any of those
+        // shadows the rule for exactly that shape (`chain_value_glued_multiline_block_comment`,
+        // `binding_layout_glued_multiline_block_comment`).
+        let owned_comment_hangs = owned_comment_effect == Some(OwnedCommentEffect::Hangs);
 
         // The other half: a *preserved* multi-line comment the initializer owns
         // ends the `=` line inside itself, so no width-decided break at `=` is
@@ -371,13 +368,8 @@ impl<'a> Printer<'a> {
         // column — the list is a doc-tree `indent` now
         // (`build_variable_declaration_doc`), so the hang sits one level past the
         // declarator, where prettier puts it (`multiple/init_long`). The owned-comment
-        // hang (`OwnedCommentEffect::Hangs`) is part of `is_break_after_op_rhs` and rides
-        // the same arm.
-        let needs_break_after_operator = is_break_after_op_rhs
-            && !d.will_break(id_doc)
-            && !has_complex_type_annotation
-            && !has_complex_destructuring
-            && !is_arrow_with_breakable_left;
+        // hang has its own arm above this one (`owned_comment_hangs`).
+        let needs_break_after_operator = is_break_after_op_rhs && !d.will_break(id_doc);
 
         // A curried chain whose heads trigger `arrow_chain_should_break` breaks
         // after `=` unconditionally; every other curried chain goes fluid below.
@@ -416,6 +408,22 @@ impl<'a> Printer<'a> {
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" ="));
             parts.push(d.indent_hardline(value()));
+        } else if owned_comment_hangs {
+            // The owned comment's hang (see `owned_comment_hangs`). The binding prints as
+            // built — a pattern or a type annotation stays flat while it fits, prettier's
+            // `group(leftDoc)` — and a curried chain takes the assignment-RHS chain layout,
+            // as it does under every hang the twin builds.
+            parts.push(lhs_doc_with_comments(id_doc));
+            parts.push(d.text(" ="));
+            let init_doc = if is_curried_arrow_chain(init) {
+                self.build_with_arrow_chain_context(
+                    crate::printer::ArrowChainContext::AssignmentRhs,
+                    || make_init_doc(value()),
+                )
+            } else {
+                make_init_doc(value())
+            };
+            parts.push(hang_after_operator(d, init_doc));
         } else if is_curried_arrow_chain(init) {
             // Every other curried chain: fluid break after `=`. The chain's
             // signature heads break only when they don't fit on the operator
@@ -459,15 +467,11 @@ impl<'a> Printer<'a> {
             parts.push(d.text(" = "));
             let init_doc = make_init_doc(value());
             parts.push(d.group(init_doc));
-        } else if is_type_assertion_with_lhs_type
-            || is_single_call_member_chain
-            || needs_fluid_for_breakable_lhs
-            || is_regex_chain_call
-            || is_literal_member
-        {
-            // Fluid layout for specific RHS patterns: break after `=` only
-            // when the full line exceeds print_width. Type assertion case
-            // rebuilds LHS with non-wrapping type annotation.
+        } else if is_type_assertion_with_lhs_type || needs_fluid_for_breakable_lhs {
+            // Fluid layout ahead of the hang arm for the two LEFT-keyed cases: a breakable
+            // binding (prettier's `canBreak(leftDoc) → "fluid"`), and a type assertion
+            // call under a typed binding, which rebuilds the LHS with a non-wrapping type
+            // annotation. Every value-keyed fluid case is the default arm below.
             let fluid_id_doc = if is_type_assertion_with_lhs_type
                 && let Expression::Identifier(ident) = &declarator.id
             {

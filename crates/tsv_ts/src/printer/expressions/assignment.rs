@@ -742,70 +742,6 @@ fn is_poorly_breakable_chain_recursive(
     }
 }
 
-/// Check if an expression is a call on a member chain with complex args.
-///
-/// Returns true for patterns like `a.b.c.filter((x) => x.s)` where a single call
-/// is at the end of a member expression chain AND the call has complex args
-/// (arrow functions, objects, arrays). These expressions benefit from fluid layout
-/// because breaking at `=` is preferable to expanding call args.
-///
-/// The key insight is that for single-call chains with non-trivial args, there are
-/// no good internal break points. Breaking at `=` keeps the chain flat on an indented
-/// line, while expanding args would create deeper nesting.
-///
-/// Does NOT match:
-/// - Bare calls: `foo()` (no member chain)
-/// - Multiple calls: `a.b().c()` (handled by chain formatter)
-/// - Trivial args: `obj.fn(arg)` (chain formatter handles these well)
-pub fn is_call_on_member_chain(expr: &Expression<'_>) -> bool {
-    if let Expression::CallExpression(call) = expr {
-        // The callee must be a member expression chain (possibly with non-null assertions)
-        let is_member_chain = matches!(
-            call.callee,
-            Expression::MemberExpression(_) | Expression::TSNonNullExpression(_)
-        ) && count_calls_in_chain(call.callee) == 0;
-
-        if !is_member_chain {
-            return false;
-        }
-
-        // Only match when args are "complex" (arrow, object, array) - these are the cases
-        // where Prettier breaks at `=` instead of expanding args
-        call.arguments.iter().any(|arg| {
-            matches!(
-                arg,
-                Expression::ArrowFunctionExpression(_)
-                    | Expression::ObjectExpression(_)
-                    | Expression::ArrayExpression(_)
-                    | Expression::FunctionExpression(_)
-            )
-        })
-    } else {
-        false
-    }
-}
-
-/// Check if a call expression on a member chain has a regex literal as its root.
-///
-/// Matches patterns like `/regex/.exec(b)` where the chain root is a `RegexLiteral`.
-/// These chains are NOT poorly-breakable (only an identifier or `this` is a valid root in
-/// `is_poorly_breakable_chain`) but should use fluid layout matching Prettier's default.
-pub fn is_regex_root_chain(expr: &Expression<'_>) -> bool {
-    if let Expression::CallExpression(call) = expr {
-        let mut node = call.callee;
-        loop {
-            match node {
-                Expression::MemberExpression(member) => node = member.object,
-                Expression::TSNonNullExpression(non_null) => node = non_null.expression,
-                _ => break,
-            }
-        }
-        matches!(node, Expression::RegexLiteral(_))
-    } else {
-        false
-    }
-}
-
 /// Check if an argument is "short" (won't expand when formatted)
 ///
 /// Prettier ref: `isLoneShortArgument` in utils/index.js:434
@@ -958,37 +894,6 @@ fn is_member_only_chain(expr: &Expression<'_>) -> bool {
         Expression::TSNonNullExpression(non_null) => is_member_only_chain(non_null.expression),
         Expression::Identifier(_) | Expression::ThisExpression(_) | Expression::Super(_) => true,
         _ => false,
-    }
-}
-
-/// Check if an expression is a member-only chain with a literal base
-/// (e.g., `'string'.length`, `` `template`.length ``).
-///
-/// These chains need Fluid assignment layout because the literal base can't break
-/// internally but may exceed print_width on the assignment line. Without Fluid,
-/// the member access breaks to the next line but the assignment stays flat,
-/// potentially exceeding print_width.
-///
-/// Prettier handles this via `printMemberExpression` which produces
-/// `[objectDoc, group(indent([softline, ".prop"]))]` — the assignment's
-/// `chooseLayout` returns Fluid (default) for these expressions.
-pub fn is_literal_member_chain(expr: &Expression<'_>) -> bool {
-    if !matches!(expr, Expression::MemberExpression(_)) {
-        return false;
-    }
-    let root = member_chain_root(expr);
-    matches!(
-        root,
-        Expression::Literal(_) | Expression::TemplateLiteral(_)
-    )
-}
-
-/// Walk a member chain to find the root expression.
-fn member_chain_root<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    match expr {
-        Expression::MemberExpression(member) => member_chain_root(member.object),
-        Expression::TSNonNullExpression(non_null) => member_chain_root(non_null.expression),
-        _ => expr,
     }
 }
 
@@ -1181,6 +1086,22 @@ impl<'a> Printer<'a> {
                 layout = AssignmentLayout::BreakAfterOperator;
             }
         }
+        // Member-only AND call chains with line comments break internally at the
+        // comment location (the chain formatter does this — see
+        // build_member_only_chain_with_comments_doc and the call-chain breaking path).
+        // Keep the chain with `=` (NeverBreakAfterOperator) so it doesn't also break
+        // after the operator, which would double-indent the broken chain.
+        //
+        // Asked BEFORE the owned-comment rules below: an indentable comment the value
+        // owns hangs it whatever its chain holds — prettier hangs it too, and the chain
+        // then breaks at its own comment one level further in — and the declarator's
+        // twin answers the same way (`chain_value_glued_multiline_block_comment`).
+        if self.has_line_comments_in_member_chain(right_expr)
+            || (layout == AssignmentLayout::BreakAfterOperator
+                && self.has_line_comments_in_call_chain(right_expr))
+        {
+            layout = AssignmentLayout::NeverBreakAfterOperator;
+        }
         // A comment the RHS *owns* (a JSDoc cast, a bundler annotation) is glued to its
         // first token and travels inside its doc, so it is never in `rhs_comments` — the
         // gap emits nothing for it. It is still on the page and still decides the layout,
@@ -1200,17 +1121,6 @@ impl<'a> Printer<'a> {
         // not override a `BreakAfterOperator` the value itself earned.
         if layout == AssignmentLayout::Fluid
             && owned_comment_effect == Some(OwnedCommentEffect::Pins)
-        {
-            layout = AssignmentLayout::NeverBreakAfterOperator;
-        }
-        // Member-only AND call chains with line comments break internally at the
-        // comment location (the chain formatter does this — see
-        // build_member_only_chain_with_comments_doc and the call-chain breaking path).
-        // Keep the chain with `=` (NeverBreakAfterOperator) so it doesn't also break
-        // after the operator, which would double-indent the broken chain.
-        if self.has_line_comments_in_member_chain(right_expr)
-            || (layout == AssignmentLayout::BreakAfterOperator
-                && self.has_line_comments_in_call_chain(right_expr))
         {
             layout = AssignmentLayout::NeverBreakAfterOperator;
         }

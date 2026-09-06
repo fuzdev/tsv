@@ -176,13 +176,18 @@ impl<'a> Printer<'a> {
 /// asking twice. See [`Printer::owned_leading_comment_effect`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OwnedCommentEffect {
-    /// The comment **hangs** the value onto its own line after the operator
-    /// (prettier's `hasLeadingOwnLineComment` → break-after-operator).
+    /// The comment **hangs** the value onto its own line after the operator — the
+    /// break-after-operator layout, ahead of every layout the value or the binding would
+    /// otherwise take (a never-break value, a short key, a break-lhs pattern, a fluid
+    /// chain, a curried arrow chain), which is where prettier lands for it too.
     ///
     /// The **indentable** multi-line block (`/**⏎ * c⏎ */`), whose reprint is hard lines
-    /// the enclosing group must honor ([`Printer::block_comment_is_indentable`]) —
-    /// prettier reaches the same place through `printIndentableBlockComment`'s
-    /// `breakParent`.
+    /// the enclosing group must honor ([`Printer::block_comment_is_indentable`]). ⚠️ The
+    /// glued shape is NOT prettier's `hasLeadingOwnLineComment` (no newline follows the
+    /// comment), and prettier's hang for it is layout-independent — it hangs a `1` under
+    /// a short key as readily as a call under a pattern — so no layout arm may sit ahead
+    /// of this rule (`chain_value_glued_multiline_block_comment`,
+    /// `binding_layout_glued_multiline_block_comment`, `pure_annotation_value_hang`).
     ///
     /// TODO: the hang is right, but the comment's hard break also propagates into the
     /// VALUE's own group, so a value that would fit flat explodes with it
