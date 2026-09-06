@@ -1,0 +1,349 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 611,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 237,
+				"data": " A whitespace-sensitive head whose attribute list must break wraps one attribute per line\n\tand the `>` hugs the last one, so no character is added to the literal content. Here a\n\tnewline inside the value is what forces the break. "
+			},
+			{
+				"type": "Text",
+				"start": 237,
+				"end": 238,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 238,
+				"end": 315,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 239
+					},
+					"end": {
+						"line": 4,
+						"column": 9,
+						"character": 247
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 249,
+						"end": 277,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 1,
+								"character": 249
+							},
+							"end": {
+								"line": 5,
+								"column": 11,
+								"character": 259
+							}
+						},
+						"value": [
+							{
+								"start": 261,
+								"end": 276,
+								"type": "Text",
+								"raw": "value1,\n\tvalue2",
+								"data": "value1,\n\tvalue2"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 279,
+						"end": 298,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 1,
+								"character": 279
+							},
+							"end": {
+								"line": 7,
+								"column": 11,
+								"character": 289
+							}
+						},
+						"value": [
+							{
+								"start": 291,
+								"end": 297,
+								"type": "Text",
+								"raw": "value2",
+								"data": "value2"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 299,
+							"end": 303,
+							"type": "Text",
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 315,
+				"end": 317,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 317,
+				"end": 375,
+				"data": " The same head on an inline element inside `<pre>` "
+			},
+			{
+				"type": "Text",
+				"start": 375,
+				"end": 376,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 376,
+				"end": 462,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 377
+					},
+					"end": {
+						"line": 11,
+						"column": 4,
+						"character": 380
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 381,
+							"end": 456,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 6,
+									"character": 382
+								},
+								"end": {
+									"line": 11,
+									"column": 10,
+									"character": 386
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 389,
+									"end": 417,
+									"name": "data-attr1",
+									"name_loc": {
+										"start": {
+											"line": 12,
+											"column": 2,
+											"character": 389
+										},
+										"end": {
+											"line": 12,
+											"column": 12,
+											"character": 399
+										}
+									},
+									"value": [
+										{
+											"start": 401,
+											"end": 416,
+											"type": "Text",
+											"raw": "value1,\n\tvalue2",
+											"data": "value1,\n\tvalue2"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 420,
+									"end": 439,
+									"name": "data-attr2",
+									"name_loc": {
+										"start": {
+											"line": 14,
+											"column": 2,
+											"character": 420
+										},
+										"end": {
+											"line": 14,
+											"column": 12,
+											"character": 430
+										}
+									},
+									"value": [
+										{
+											"start": 432,
+											"end": 438,
+											"type": "Text",
+											"raw": "value2",
+											"data": "value2"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 440,
+										"end": 447,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 462,
+				"end": 464,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 464,
+				"end": 543,
+				"data": " A block element answers the same way, and keeps its closing tag intact "
+			},
+			{
+				"type": "Text",
+				"start": 543,
+				"end": 544,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 544,
+				"end": 610,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 545
+					},
+					"end": {
+						"line": 18,
+						"column": 4,
+						"character": 548
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 550,
+						"end": 578,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 19,
+								"column": 1,
+								"character": 550
+							},
+							"end": {
+								"line": 19,
+								"column": 11,
+								"character": 560
+							}
+						},
+						"value": [
+							{
+								"start": 562,
+								"end": 577,
+								"type": "Text",
+								"raw": "value1,\n\tvalue2",
+								"data": "value1,\n\tvalue2"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 580,
+						"end": 599,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 21,
+								"column": 1,
+								"character": 580
+							},
+							"end": {
+								"line": 21,
+								"column": 11,
+								"character": 590
+							}
+						},
+						"value": [
+							{
+								"start": 592,
+								"end": 598,
+								"type": "Text",
+								"raw": "value2",
+								"data": "value2"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 600,
+							"end": 604,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -12,4 +12,4 @@
 
 <!-- an ANCESTOR is enough: the run re-indents on a nested element too -->
 <pre><span style:transform-origin="{expr1}
-	{expr2}">text</span></pre>
+		{expr2}">text</span></pre>

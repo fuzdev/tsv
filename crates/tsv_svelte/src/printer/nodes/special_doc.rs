@@ -11,7 +11,8 @@ use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 use super::element_doc::{
-    AttrGaps, ElementContext, ElementKind, ElementLayout, ElementParts, ThisClaim,
+    AttrGaps, AttrListEmission, ElementAttrsDoc, ElementContext, ElementKind, ElementLayout,
+    ElementParts, ThisClaim,
 };
 
 impl<'a> Printer<'a> {
@@ -29,12 +30,31 @@ impl<'a> Printer<'a> {
         element: &internal::SpecialElement<'_>,
     ) -> DocId {
         let tag_name = element.kind.tag_name();
+        let name = self.d().text(tag_name);
 
         // Attribute docs (including the synthesized `this={…}` for component/element)
-        let attr_docs = self.build_special_element_attrs_doc(element, self.d().line());
+        let ElementAttrsDoc {
+            docs: attr_docs,
+            emission,
+        } = self.build_special_element_attrs_doc(element, self.d().line());
+
+        // `<title>` as a head child is whitespace-SENSITIVE, so it leaves the shared pipeline
+        // here — the same place `build_element_doc` dispatches `<pre>`/`<textarea>` out of it,
+        // and for the same reason: `compute_element_layout` trims the content boundaries,
+        // which for this one kind deletes rendered bytes. It leaves **before**
+        // `analyze_element` because it reads nothing that stage produces — its head comes from
+        // the whitespace-sensitive family and its content from the source.
+        if element.kind.preserves_content_whitespace() && !element.fragment.nodes.is_empty() {
+            return self.build_title_content_doc(
+                name,
+                element.fragment.nodes,
+                &attr_docs,
+                emission,
+            );
+        }
 
         let parts = ElementParts {
-            name: self.d().text(tag_name),
+            name,
             // Every special element is block-kind. `ElementKind::Inline` means *HTML inline flow
             // content*, whose content-boundary whitespace is preserved as a space
             // (`<span> text </span>`) — and a `svelte:*` element (or `<slot>` / `<title>`) is never
@@ -57,19 +77,6 @@ impl<'a> Printer<'a> {
             span: element.span,
         };
         let ctx = self.analyze_element(&parts, &attr_docs);
-
-        // `<title>` as a head child is whitespace-SENSITIVE, so it leaves the shared pipeline
-        // here — the same place `build_element_doc` dispatches `<pre>`/`<textarea>` out of it,
-        // and for the same reason. `compute_element_layout` is the only stage skipped: it is
-        // what trims the content boundaries, which for this one kind deletes rendered bytes.
-        if element.kind.preserves_content_whitespace() && !element.fragment.nodes.is_empty() {
-            return self.build_title_content_doc(
-                tag_name,
-                element.fragment.nodes,
-                &attr_docs,
-                &ctx,
-            );
-        }
 
         match self.compute_element_layout(&parts, &ctx) {
             // Identical shape to a regular element's `<tag … />` — `is_declaration: false`
@@ -109,26 +116,37 @@ impl<'a> Printer<'a> {
     /// **empty** title has no content bytes to preserve, so it keeps the shared pipeline's
     /// self-closing / empty layouts (the caller gates on that).
     ///
+    /// The **head** is the ws-sensitive family's, not the block-style one: this hands the
+    /// whole of it to [`Printer::build_ws_sensitive_head_with_content_doc`], off the same
+    /// [`Printer::ws_sensitive_content_edges`] read `<pre>` / `<textarea>` use. So the `>`
+    /// hugs the last list member and the closing tag dangles on the same terms they do —
+    /// `<title>` is inline by [`internal::SpecialElementKind::is_block`], which is what
+    /// decides the dangle for the other two.
+    ///
+    /// Reaching for `build_opening_tag` here instead (whose `dedent(softline)` is the
+    /// block-style `>` placement) gave this one kind a third answer to a question the family
+    /// answers once: an own-line comment left the `>` at base indent where a `<textarea>` hugs
+    /// it. Attributes are a compile error on a `<title>`, so the list is empty in anything
+    /// Svelte accepts and a comment is the only member it can have — but the formatter still
+    /// has to print what it was handed, and an attribute-bearing head takes the family's shape
+    /// too.
+    ///
     /// Pinned by
-    /// [`title_content_verbatim`](../../../../../tests/fixtures/svelte/special_elements/title_content_verbatim_prettier_divergence/);
+    /// [`title_content_verbatim`](../../../../../tests/fixtures/svelte/special_elements/title_content_verbatim_prettier_divergence/)
+    /// (the content) and
+    /// [`title_head_comment`](../../../../../tests/fixtures/svelte/special_elements/title_head_comment_prettier_divergence/)
+    /// (the head);
     /// see [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).
     fn build_title_content_doc(
         &self,
-        tag_name: &'static str,
+        name: DocId,
         nodes: &[internal::FragmentNode<'_>],
         attr_docs: &[DocId],
-        ctx: &ElementContext,
+        emission: AttrListEmission,
     ) -> DocId {
-        let d = self.d();
-        let name_doc = d.text(tag_name);
-        // Attributes are a compile error on a `<title>`, so this list is empty in anything
-        // Svelte accepts — but the formatter still has to print what it was handed, and
-        // `build_opening_tag` is the one emitter that keeps a `//`-terminated list off the
-        // `>`'s line. Its trailing break sits inside the attr group, so the `>` appended here
-        // hugs a flat list and takes its own line when the list wraps.
-        let opening = self.build_opening_tag(name_doc, attr_docs, ctx.has_multiline_attr);
         let content = self.build_whitespace_sensitive_content_doc(nodes);
-        d.concat(&[opening, d.text(">"), content, self.end_tag(name_doc)])
+        let edges = self.ws_sensitive_content_edges(nodes);
+        self.build_ws_sensitive_head_with_content_doc(name, attr_docs, emission, content, edges)
     }
 
     /// Build `<tag></tag>` for a special element with no content, wrapping the attributes in the
@@ -186,7 +204,9 @@ impl<'a> Printer<'a> {
         ]);
 
         // State 2: Hug mode - attrs inline (space-separated), > on new line
-        let hug_attrs = self.build_special_element_attrs_doc(element, self.d().text(" "));
+        let hug_attrs = self
+            .build_special_element_attrs_doc(element, self.d().text(" "))
+            .docs;
         let hug_attrs_concat = d.concat(&hug_attrs);
         let hug_state = d.concat(&[
             d.text("<"),
@@ -217,7 +237,7 @@ impl<'a> Printer<'a> {
         &self,
         element: &internal::SpecialElement<'_>,
         separator: DocId,
-    ) -> DocBuf {
+    ) -> ElementAttrsDoc {
         // `<svelte:element>` / `<svelte:component>` carry their `this` binding in the kind
         // rather than in `attributes` — every other special element has none. The two build
         // apart because their types differ: the component's `this` is always braced, the
@@ -273,7 +293,7 @@ impl<'a> Printer<'a> {
 
         // svelte:element renders as HTML, so normalize class attribute whitespace
         let normalize_class = matches!(element.kind, SpecialElementKind::SvelteElement { .. });
-        self.push_attrs_with_comments(
+        let emission = self.push_attrs_with_comments(
             &mut docs,
             element.attributes,
             separator,
@@ -285,7 +305,7 @@ impl<'a> Printer<'a> {
             normalize_class,
         );
 
-        docs
+        ElementAttrsDoc { docs, emission }
     }
 
     /// Build `this={…}` — the braced form, shared by `<svelte:element>` and the
