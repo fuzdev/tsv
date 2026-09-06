@@ -203,7 +203,7 @@ pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> boo
 /// ⚠️ **The declarator has a hand-rolled TWIN of this dispatch** — `variable.rs`'s
 /// `should_break_after_op_rhs` / `needs_break_after_op_layout` / `needs_fluid_for_breakable_lhs`
 /// chain, which answers the same prettier function for `const x = …` and reaches arms this one
-/// does not (a module-path call, a pure property chain, an expandable member call). The two are
+/// does not (a module-path call, a regex-rooted or literal-based chain). The two are
 /// not interchangeable, and they DRIFT: the sequence arm below was here from the start and
 /// missing there, so `const a = (a, b)` hung its operands off the `=` column while `x = (a, b)`
 /// broke correctly. Add a `chooseLayout` fact to one and check the other — same standing hazard
@@ -253,18 +253,8 @@ pub fn choose_layout(
         return AssignmentLayout::Fluid;
     }
 
-    // Objects, arrays, functions, classes, and calls handle their own expansion
-    // The value expands internally: `key: { ... }` not `key:\n{ ... }`
-    //
-    // Call expressions use conditional_group to try multiple states during fits().
-    // With the fits logic, calls can "fit" even when they break internally,
-    // allowing the call to handle breaking before the assignment does.
-    if is_self_expanding_value(right_expr) {
-        return AssignmentLayout::NeverBreakAfterOperator;
-    }
-
     // Binary expressions → break after operator, UNLESS it's a logical expression
-    // with a self-expanding RHS (non-empty object/array). In that case, the RHS
+    // with an inlinable RHS (non-empty object/array). In that case, the RHS
     // handles its own expansion: `x = foo || { a: 1 }` not `x =\n  foo || {a: 1}`
     //
     // Prettier ref: shouldBreakAfterOperator (assignment.js:199)
@@ -328,8 +318,8 @@ pub fn choose_layout(
 /// Whether a class expression carries decorators (`@dec class {}`).
 ///
 /// A decorated class expression breaks after the assignment operator (each
-/// decorator on its own line) rather than self-expanding; an undecorated one
-/// expands its body in place. Prettier ref: shouldBreakAfterOperator
+/// decorator on its own line); an undecorated one stays on the operator's line
+/// and expands its body in place. Prettier ref: shouldBreakAfterOperator
 /// (assignment.js:228) `case "ClassExpression": isNonEmptyArray(decorators)`;
 /// the never-break ClassExpression case (assignment.js:189) only applies once
 /// that has ruled out a decorated class.
@@ -337,38 +327,7 @@ pub fn class_expr_has_decorators(c: &internal::ClassExpression<'_>) -> bool {
     c.decorators.is_some_and(|d| !d.is_empty())
 }
 
-/// Check if an expression handles its own expansion (objects, arrays, functions, classes)
-///
-/// These values should never have a break between key: and value because they
-/// expand internally. `key: { ... }` NOT `key:\n{ ... }`
-///
-/// Note: Call expressions and NewExpressions are NOT included here.
-/// They use Fluid layout (from choose_layout default) which allows breaking
-/// after the operator when the total line exceeds printWidth.
-///
-/// Note: a curried arrow chain whose heads trigger `arrow_chain_should_break` is NOT
-/// self-expanding. It needs BreakAfterOperator to produce:
-///   const f =
-///       (x: T): H =>
-///       (y) => ...
-pub fn is_self_expanding_value(expr: &Expression<'_>) -> bool {
-    match expr {
-        Expression::ObjectExpression(_)
-        | Expression::ArrayExpression(_)
-        | Expression::FunctionExpression(_) => true,
-
-        // An undecorated class expression expands its body in place (`= class {…}`);
-        // a *decorated* one breaks after the operator instead (`choose_layout`).
-        Expression::ClassExpression(c) => !class_expr_has_decorators(c),
-
-        // Arrow functions are self-expanding UNLESS the chain's heads force the break
-        Expression::ArrowFunctionExpression(_) => !is_curried_arrow_chain_that_breaks(expr),
-
-        _ => false,
-    }
-}
-
-/// Check if a binary expression is a logical expression with a self-expanding RHS.
+/// Check if a binary expression is a logical expression with an inlinable RHS.
 ///
 /// Returns true when a LogicalExpression (`&&`, `||`, `??`) has a non-empty object,
 /// non-empty array, or JSX element on the right side. These cases should NOT use
@@ -467,26 +426,6 @@ pub fn arrow_chain_should_break(arrow: &internal::ArrowFunctionExpression<'_>) -
     }
 
     false
-}
-
-/// Check if an expression is self-expanding but won't actually expand because
-/// it's empty or trivially short. Used when LHS has a breakable type annotation -
-/// we need a break point after `=` so the type doesn't expand prematurely.
-///
-/// Returns true only if the value truly won't expand:
-/// - Empty arrays/objects
-/// - Single-element arrays/objects where the element itself won't expand
-pub fn is_simple_self_expanding(expr: &Expression<'_>) -> bool {
-    match expr {
-        // Only empty arrays/objects are "simple" — they truly won't expand.
-        // Non-empty arrays/objects have group softlines that can break internally
-        // when the line exceeds print_width, so they handle their own expansion.
-        // Treating non-empty ones as "simple" would force break-after-operator,
-        // preventing the array/object from expanding naturally (e.g., `= [\n  elem,\n]`).
-        Expression::ArrayExpression(arr) => arr.elements.is_empty(),
-        Expression::ObjectExpression(obj) => obj.properties.is_empty(),
-        _ => false,
-    }
 }
 
 /// Check if we should break after the operator for this expression
@@ -846,21 +785,6 @@ pub fn is_call_on_member_chain(expr: &Expression<'_>) -> bool {
     }
 }
 
-/// Check if an expression is a single call on a member chain (without complex-arg requirement).
-///
-/// Like `is_call_on_member_chain` but without the complex-args check. Used to detect
-/// `a.fn(anyArg)` patterns for width-based layout decisions in variable declarations.
-pub fn is_single_call_on_member_chain(expr: &Expression<'_>) -> bool {
-    if let Expression::CallExpression(call) = expr {
-        matches!(
-            call.callee,
-            Expression::MemberExpression(_) | Expression::TSNonNullExpression(_)
-        ) && count_calls_in_chain(call.callee) == 0
-    } else {
-        false
-    }
-}
-
 /// Check if a call expression on a member chain has a regex literal as its root.
 ///
 /// Matches patterns like `/regex/.exec(b)` where the chain root is a `RegexLiteral`.
@@ -1099,11 +1023,15 @@ fn is_factory_chain(expr: &Expression<'_>, source: &str) -> bool {
     }
 }
 
-/// Check if an expression is a simple value that shouldn't break
-/// Values that should never break after operator: booleans, numbers, template literals.
+/// Check if an expression is a simple value that shouldn't break.
 ///
-/// Prettier ref: chooseLayout (assignment.js:181-191) — when !canBreakLeftDoc.
-/// Note: ClassExpression is handled separately by is_self_expanding_value.
+/// Prettier's `never-break-after-operator` value list (`chooseLayout`, assignment.js
+/// 181-191), read when the LEFT cannot break: a boolean, a number, a template literal, a
+/// tagged template, and a class expression — `const x = class {}` stays welded to its `=`
+/// past the print width where an empty `{}` drops (`empty_value_long`). Only an
+/// UNDECORATED class is on the list because a decorated one never reaches it: prettier's
+/// `shouldBreakAfterOperator` answers it first, as both of tsv's layout twins do
+/// (`class_expr_has_decorators`).
 pub fn is_simple_value(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
@@ -1115,7 +1043,7 @@ pub fn is_simple_value(expr: &Expression<'_>) -> bool {
     ) || matches!(
         expr,
         Expression::TemplateLiteral(_) | Expression::TaggedTemplateExpression(_)
-    )
+    ) || matches!(expr, Expression::ClassExpression(c) if !class_expr_has_decorators(c))
 }
 
 /// The RHS comment / freeze / stripped-paren-boundary controls for
@@ -1267,8 +1195,8 @@ impl<'a> Printer<'a> {
         }
         // The other half: a *preserved* multi-line owned comment ends the operator's line
         // inside itself, so a width-decided break at the operator decides nothing — take
-        // the never-break form, as for a self-expanding value. Only `Fluid` is affected in
-        // practice (it is the one width-decided layout here), and this deliberately does
+        // the never-break form. Only `Fluid` is affected in practice (it is the one
+        // width-decided layout here), and this deliberately does
         // not override a `BreakAfterOperator` the value itself earned.
         if layout == AssignmentLayout::Fluid
             && owned_comment_effect == Some(OwnedCommentEffect::Pins)

@@ -62,9 +62,8 @@ pub use expressions::assignment::should_inline_logical_expression;
 use expressions::assignment::{
     arrow_chain_should_break, class_expr_has_decorators, is_call_on_member_chain,
     is_curried_arrow_chain, is_curried_arrow_chain_that_breaks, is_literal_member_chain,
-    is_poorly_breakable_chain, is_regex_root_chain, is_self_expanding_value,
-    is_simple_self_expanding, is_simple_value, is_single_call_on_member_chain,
-    is_type_assertion_call, jsdoc_cast_comment_is_own_line,
+    is_poorly_breakable_chain, is_regex_root_chain, is_simple_value, is_type_assertion_call,
+    jsdoc_cast_comment_is_own_line,
 };
 use needs_parens::{ParenContext, is_in_binary, needs_parens};
 use types::unwrap_parenthesized;
@@ -771,16 +770,6 @@ impl<'a> Printer<'a> {
     /// Get the current column position (for doc-builder width calculations)
     pub(crate) fn current_column(&self) -> usize {
         self.buffer.current_column(TAB_WIDTH)
-    }
-
-    /// Compute the visual indent width at a source position.
-    ///
-    /// Finds the start of the line containing `pos` and measures the leading
-    /// whitespace visual width (tabs count as `tab_width` chars).
-    pub(crate) fn source_indent_visual(&self, pos: u32) -> usize {
-        let pos = pos as usize;
-        let line_start = self.source[..pos].rfind('\n').map_or(0, |i| i + 1);
-        printing::visual_width(&self.source[line_start..pos], TAB_WIDTH)
     }
 
     /// Check if two positions are on the same line.

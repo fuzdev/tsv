@@ -169,11 +169,6 @@ const ALLOW: &[Allow] = &[
         "if let Some(last_nl) = text.rfind('\\n') {",
         "newline",
     ),
-    (
-        "tsv_ts/src/printer/mod.rs",
-        "let line_start = self.source[..pos].rfind('\\n').map_or(0, |i| i + 1);",
-        "newline",
-    ),
 ];
 
 /// A detected `find`/`rfind` call site.

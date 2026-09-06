@@ -204,7 +204,7 @@ pub(crate) enum OwnedCommentEffect {
     /// only pushes the same unbreakable run one indent over, and prettier — whose
     /// non-indentable comment is one opaque string — leaves the value on the operator's
     /// line (`const a = /* line1⏎line2 */ x;`, `const { a, b } = /* line1⏎line2 */ x;`).
-    /// So the layout must be the never-break form, exactly as for a self-expanding value.
+    /// So the layout must be the never-break form.
     ///
     /// This half is a tsv-side rule with no prettier counterpart because the *mechanism*
     /// differs: tsv emits that interior through `literalline`s (see

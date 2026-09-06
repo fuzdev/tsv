@@ -8,15 +8,14 @@ use crate::printer::{
     ParenContext, analysis, class_expr_has_decorators, conditional_should_break_after_op,
     is_call_on_member_chain, is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
     is_literal_member_chain, is_module_path_fluid_call, is_multiline_string_literal,
-    is_poorly_breakable_chain, is_regex_root_chain, is_self_expanding_value,
-    is_simple_self_expanding, is_simple_value, is_single_call_on_member_chain, is_string_literal,
+    is_poorly_breakable_chain, is_regex_root_chain, is_simple_value, is_string_literal,
     is_type_assertion_call, needs_parens, should_inline_logical_expression,
 };
 use smallvec::smallvec;
 use std::cell::LazyCell;
+use tsv_lang::Span;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
-use tsv_lang::{PRINT_WIDTH, Span};
 
 /// Build the fluid assignment layout: break after `=` only when the full line
 /// exceeds print_width. Uses indentIfBreak so the RHS is evaluated independently.
@@ -60,10 +59,6 @@ pub(in crate::printer) struct DeclaratorInitInputs<'e, 'a> {
     /// Its initializer. Passed rather than read back off `declarator.init`, since the caller
     /// has already matched on it to get here.
     pub init: &'e Expression<'a>,
-    /// Start of the enclosing DECLARATION — the anchor for the expandable-member-call
-    /// width check's source indent, which measures the call head from the statement's
-    /// own column.
-    pub decl_start: u32,
     /// The printed binding.
     pub id_doc: DocId,
     /// The `=` and what the gaps on either side of it hold.
@@ -104,7 +99,6 @@ impl<'a> Printer<'a> {
         let &DeclaratorInitInputs {
             declarator,
             init,
-            decl_start,
             id_doc,
             gap:
                 DeclaratorEqGap {
@@ -225,9 +219,6 @@ impl<'a> Printer<'a> {
         let is_arrow_with_breakable_left =
             matches!(init, Expression::ArrowFunctionExpression(_)) && *can_break_left;
 
-        // Break-after-operator layout: group([left, " =", group(indent([line, right]))])
-        // Used for fluid RHS or simple RHS when LHS can break.
-
         // Calls and imports with trailing comments expand internally and should not use fluid layout
         let is_call_with_trailing_comments = if let Expression::CallExpression(call) = init {
             call.arguments.last().is_some_and(|last_arg| {
@@ -253,12 +244,20 @@ impl<'a> Printer<'a> {
         let has_trailing_comment_expansion =
             is_call_with_trailing_comments || is_import_with_trailing_comments;
 
-        // Common exclusion: layout strategies don't apply when the init
-        // self-expands (object/array), has trailing comment expansion, or
-        // has line comments in a chain — those need special handling.
-        let is_layout_eligible = !is_self_expanding_value(init)
-            && !has_trailing_comment_expansion
-            && !has_line_comments_in_chain;
+        // Common exclusion: layout strategies don't apply when the init has trailing
+        // comment expansion or line comments in a chain — those need special handling.
+        //
+        // An object, array, function or class initializer is as eligible as any other
+        // value: prettier's `chooseLayout` has no notion of a value that "expands on its
+        // own", so those fall through to `fluid`, whose marker measures only the value's
+        // OPENING (` {`, ` [`, ` function () {`) and drops the value after the `=` when
+        // that opening is what passes the print width. That is what keeps a long pattern
+        // or typed binding flat while the value takes the break
+        // (`destructuring_fluid_value_long`, `typed_fluid_value_long`), and what gives an
+        // over-width `= {}` / `= () => {}` its one break point (`empty_value_long`).
+        // Withholding the layout from them left the binding as the only thing that could
+        // shed width.
+        let is_layout_eligible = !has_trailing_comment_expansion && !has_line_comments_in_chain;
 
         // RHS expressions that should use break-after-operator layout.
         // Matches Prettier's shouldBreakAfterOperator: poorly breakable chains,
@@ -327,26 +326,6 @@ impl<'a> Printer<'a> {
         let needs_break_after_op_layout =
             (is_non_inline_binary || conditional_should_break_after_op(init)) && is_layout_eligible;
 
-        // Member-chain call (a.fn(...)) where the call head fits within print_width:
-        // Use default layout and let the call expand its own args rather than breaking
-        // at `=`. E.g., `const {a, b} = vi.mocked(longArg)` with short LHS keeps
-        // `= vi.mocked(` on line 1 and expands the arg — matching Prettier's behavior.
-        // Only fires when call head (decl_start to callee_end + "(") fits in print_width.
-        // is_single_call_on_member_chain guarantees CallExpression
-        let is_expandable_member_call = if let Expression::CallExpression(call) = init
-            && is_single_call_on_member_chain(init)
-        {
-            // Include actual source indentation (JS nesting) in the width check.
-            // Without this, deeply-nested declarations would incorrectly use
-            // default layout even when the call head exceeds print_width.
-            let indent_visual = self.source_indent_visual(decl_start);
-            let call_head_width =
-                indent_visual + (call.callee.span().end as usize - decl_start as usize) + 1; // +1 for "(" after callee
-            call_head_width < PRINT_WIDTH
-        } else {
-            false
-        };
-
         // A comment the initializer *owns* (a JSDoc cast, a bundler annotation) is
         // glued to its first token and travels inside its doc, so the gap probes
         // above cannot see it. It is still on the page and still decides the `=`
@@ -368,29 +347,22 @@ impl<'a> Printer<'a> {
         // at `=` on the comment's own `literalline`s.
         let init_pinned_to_eq = owned_comment_effect == Some(OwnedCommentEffect::Pins);
 
-        // Breakable LHS (destructuring patterns) with non-self-expanding RHS:
-        // Use fluid layout so the printer breaks at `=` before expanding the
-        // destructuring pattern. Matches Prettier's `canBreak(leftDoc) → "fluid"`.
-        // E.g., `const {a, b, c} = resolve(x, y, z)` breaks after `=`, not inside `{}`
+        // Breakable LHS (a destructuring pattern, a typed binding whose type arguments can
+        // break): use fluid layout so the printer breaks at `=` before expanding the
+        // binding. Matches Prettier's `canBreak(leftDoc) → "fluid"`.
+        // E.g., `const {a, b, c} = resolve(x, y, z)` breaks after `=`, not inside `{}`,
+        // and so does `const {a, b, c} = { … }` once `= {` no longer fits.
         //
         // Excludes break-after-operator RHS (binary, conditional, strings, chains) —
         // those go through needs_break_after_operator with their own layout.
         // In Prettier, shouldBreakAfterOperator() handles those before the canBreak fallback.
-        //
-        // Excludes is_expandable_member_call: when the call head fits, the call's own
-        // arg-expansion handles line breaking via default layout.
-        let needs_fluid_for_breakable_lhs = is_layout_eligible
-            && !is_break_after_op_rhs
-            && !is_expandable_member_call
-            && !init_pinned_to_eq
-            && *can_break_left;
+        let needs_fluid_for_breakable_lhs =
+            is_layout_eligible && !is_break_after_op_rhs && !init_pinned_to_eq && *can_break_left;
 
         // Type assertion calls with LHS type annotation need special fluid handling
         // (handled separately below because they need non-wrapping LHS type)
         let is_type_assertion_with_lhs_type = is_type_assertion_call(init, self.source)
             && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation().is_some());
-
-        let is_simple_rhs_with_breakable_lhs = is_simple_self_expanding(init) && *can_break_left;
 
         // Answered per declarator, exactly as prettier's `printAssignment` is: a
         // multi-declarator list does NOT withhold the width-decided break at `=` from its
@@ -401,8 +373,7 @@ impl<'a> Printer<'a> {
         // declarator, where prettier puts it (`multiple/init_long`). The owned-comment
         // hang (`OwnedCommentEffect::Hangs`) is part of `is_break_after_op_rhs` and rides
         // the same arm.
-        let needs_break_after_operator = (is_break_after_op_rhs
-            || is_simple_rhs_with_breakable_lhs)
+        let needs_break_after_operator = is_break_after_op_rhs
             && !d.will_break(id_doc)
             && !has_complex_type_annotation
             && !has_complex_destructuring
@@ -538,6 +509,11 @@ impl<'a> Printer<'a> {
                 init_doc,
             ));
         } else {
+            // Prettier's `never-break-after-operator`: a simple value (`is_simple_value`)
+            // under a binding that cannot break — a breakable one took the fluid arm above
+            // — plus a value pinned to the `=` by the multi-line comment it owns, and the
+            // comment-expanding calls and chains `is_layout_eligible` excludes. The value
+            // rides the operator's line and breaks inside itself or not at all.
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" = "));
             let init_doc = make_init_doc(value());
@@ -936,7 +912,6 @@ impl<'a> Printer<'a> {
                     &DeclaratorInitInputs {
                         declarator,
                         init,
-                        decl_start: decl.span.start,
                         id_doc,
                         gap: DeclaratorEqGap {
                             id_end,
