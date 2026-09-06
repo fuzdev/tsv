@@ -65,6 +65,24 @@ export const TS_FIXTURE_SANCTIONS: Sanction[] = [
 	}
 ];
 
+/**
+ * The tsc corpus (`conformance:ts-repo`): over-rejections that BOTH tsc's baselines
+ * and acorn call valid, which tsv keeps deliberately. Same bar as the acorn suite's
+ * list above — the corpus is a different tree, so the entries are kept apart, but
+ * a shape sanctioned on one side is sanctioned on the other for the same reason.
+ * The gate's OTHER ledgers (over-rejections acorn ALSO rejects) live in
+ * `diagnostics/ts_repo_compare.ts`, since that bucket is graded against tsc alone.
+ */
+export const TS_REPO_SANCTIONS: Sanction[] = [
+	// The multi-file `importAssertionsDeprecated*` tests: `import x from 'y' assert
+	// { type: 'json' }` — the same deprecated syntax as the acorn-suite entry above.
+	{
+		pattern: 'importAssertionsDeprecated',
+		reason:
+			'deprecated import assertions (`assert {…}`) — tsv supports the successor `with {…}` only'
+	}
+];
+
 /** First matching sanction reason for `path`, or null. */
 export function sanction_for(sanctions: Sanction[], path: string): string | null {
 	return sanctions.find((s) => path.includes(s.pattern))?.reason ?? null;
