@@ -1,0 +1,840 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1028,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Prettier's `isPoorlyBreakableMemberOrCallChain` bottoms out at an `Identifier` or a",
+			"start": 20,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `ThisExpression` — and at nothing else, `super` included. A chain that qualifies breaks",
+			"start": 108,
+			"end": 198,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after the `=` and stays whole; one that does not falls through to the fluid layout,",
+			"start": 200,
+			"end": 286,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " where the `=` holds its line and the lookup takes the break instead.",
+			"start": 288,
+			"end": 359,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an identifier root qualifies",
+			"start": 400,
+			"end": 431,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 3
+				},
+				"end": {
+					"line": 9,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " so does `this`",
+			"start": 539,
+			"end": 556,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `super` does not - at exactly 100 the whole thing still fits",
+			"start": 664,
+			"end": 727,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 3
+				},
+				"end": {
+					"line": 17,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " one char more, and the fluid layout breaks the lookup rather than the `=`",
+			"start": 830,
+			"end": 906,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 3
+				},
+				"end": {
+					"line": 20,
+					"column": 79
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1027,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1018,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 362,
+					"end": 1017,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 368,
+						"end": 369,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 7
+							},
+							"end": {
+								"line": 7,
+								"column": 8
+							}
+						},
+						"name": "Q"
+					},
+					"superClass": {
+						"type": "Identifier",
+						"start": 378,
+						"end": 379,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 17
+							},
+							"end": {
+								"line": 7,
+								"column": 18
+							}
+						},
+						"name": "R"
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 380,
+						"end": 1017,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 19
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 384,
+								"end": 1014,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 384,
+									"end": 385,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 3
+										}
+									},
+									"name": "m"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 385,
+									"end": 1014,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 3
+										},
+										"end": {
+											"line": 23,
+											"column": 3
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 386,
+											"end": 393,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 4
+												},
+												"end": {
+													"line": 8,
+													"column": 11
+												}
+											},
+											"name": "objx",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 390,
+												"end": 393,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 8
+													},
+													"end": {
+														"line": 8,
+														"column": 11
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 392,
+													"end": 393,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 10
+														},
+														"end": {
+															"line": 8,
+															"column": 11
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 392,
+														"end": 393,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 10
+															},
+															"end": {
+																"line": 8,
+																"column": 11
+															}
+														},
+														"name": "Q"
+													}
+												}
+											}
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 395,
+										"end": 1014,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 13
+											},
+											"end": {
+												"line": 23,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "VariableDeclaration",
+												"start": 435,
+												"end": 534,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 3
+													},
+													"end": {
+														"line": 11,
+														"column": 88
+													}
+												},
+												"declarations": [
+													{
+														"type": "VariableDeclarator",
+														"start": 441,
+														"end": 533,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 9
+															},
+															"end": {
+																"line": 11,
+																"column": 87
+															}
+														},
+														"id": {
+															"type": "Identifier",
+															"start": 441,
+															"end": 443,
+															"loc": {
+																"start": {
+																	"line": 10,
+																	"column": 9
+																},
+																"end": {
+																	"line": 10,
+																	"column": 11
+																}
+															},
+															"name": "aa"
+														},
+														"init": {
+															"type": "MemberExpression",
+															"start": 450,
+															"end": 533,
+															"loc": {
+																"start": {
+																	"line": 11,
+																	"column": 4
+																},
+																"end": {
+																	"line": 11,
+																	"column": 87
+																}
+															},
+															"object": {
+																"type": "Identifier",
+																"start": 450,
+																"end": 454,
+																"loc": {
+																	"start": {
+																		"line": 11,
+																		"column": 4
+																	},
+																	"end": {
+																		"line": 11,
+																		"column": 8
+																	}
+																},
+																"name": "objx"
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 455,
+																"end": 533,
+																"loc": {
+																	"start": {
+																		"line": 11,
+																		"column": 9
+																	},
+																	"end": {
+																		"line": 11,
+																		"column": 87
+																	}
+																},
+																"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+															},
+															"computed": false,
+															"optional": false
+														}
+													}
+												],
+												"kind": "const",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " an identifier root qualifies",
+														"start": 400,
+														"end": 431
+													}
+												]
+											},
+											{
+												"type": "VariableDeclaration",
+												"start": 560,
+												"end": 659,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 3
+													},
+													"end": {
+														"line": 15,
+														"column": 88
+													}
+												},
+												"declarations": [
+													{
+														"type": "VariableDeclarator",
+														"start": 566,
+														"end": 658,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 9
+															},
+															"end": {
+																"line": 15,
+																"column": 87
+															}
+														},
+														"id": {
+															"type": "Identifier",
+															"start": 566,
+															"end": 568,
+															"loc": {
+																"start": {
+																	"line": 14,
+																	"column": 9
+																},
+																"end": {
+																	"line": 14,
+																	"column": 11
+																}
+															},
+															"name": "bb"
+														},
+														"init": {
+															"type": "MemberExpression",
+															"start": 575,
+															"end": 658,
+															"loc": {
+																"start": {
+																	"line": 15,
+																	"column": 4
+																},
+																"end": {
+																	"line": 15,
+																	"column": 87
+																}
+															},
+															"object": {
+																"type": "ThisExpression",
+																"start": 575,
+																"end": 579,
+																"loc": {
+																	"start": {
+																		"line": 15,
+																		"column": 4
+																	},
+																	"end": {
+																		"line": 15,
+																		"column": 8
+																	}
+																}
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 580,
+																"end": 658,
+																"loc": {
+																	"start": {
+																		"line": 15,
+																		"column": 9
+																	},
+																	"end": {
+																		"line": 15,
+																		"column": 87
+																	}
+																},
+																"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+															},
+															"computed": false,
+															"optional": false
+														}
+													}
+												],
+												"kind": "const",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " so does `this`",
+														"start": 539,
+														"end": 556
+													}
+												]
+											},
+											{
+												"type": "VariableDeclaration",
+												"start": 731,
+												"end": 825,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 3
+													},
+													"end": {
+														"line": 18,
+														"column": 97
+													}
+												},
+												"declarations": [
+													{
+														"type": "VariableDeclarator",
+														"start": 737,
+														"end": 824,
+														"loc": {
+															"start": {
+																"line": 18,
+																"column": 9
+															},
+															"end": {
+																"line": 18,
+																"column": 96
+															}
+														},
+														"id": {
+															"type": "Identifier",
+															"start": 737,
+															"end": 739,
+															"loc": {
+																"start": {
+																	"line": 18,
+																	"column": 9
+																},
+																"end": {
+																	"line": 18,
+																	"column": 11
+																}
+															},
+															"name": "cc"
+														},
+														"init": {
+															"type": "MemberExpression",
+															"start": 742,
+															"end": 824,
+															"loc": {
+																"start": {
+																	"line": 18,
+																	"column": 14
+																},
+																"end": {
+																	"line": 18,
+																	"column": 96
+																}
+															},
+															"object": {
+																"type": "Super",
+																"start": 742,
+																"end": 747,
+																"loc": {
+																	"start": {
+																		"line": 18,
+																		"column": 14
+																	},
+																	"end": {
+																		"line": 18,
+																		"column": 19
+																	}
+																}
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 748,
+																"end": 824,
+																"loc": {
+																	"start": {
+																		"line": 18,
+																		"column": 20
+																	},
+																	"end": {
+																		"line": 18,
+																		"column": 96
+																	}
+																},
+																"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+															},
+															"computed": false,
+															"optional": false
+														}
+													}
+												],
+												"kind": "const",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " `super` does not - at exactly 100 the whole thing still fits",
+														"start": 664,
+														"end": 727
+													}
+												]
+											},
+											{
+												"type": "VariableDeclaration",
+												"start": 910,
+												"end": 1010,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 3
+													},
+													"end": {
+														"line": 22,
+														"column": 83
+													}
+												},
+												"declarations": [
+													{
+														"type": "VariableDeclarator",
+														"start": 916,
+														"end": 1009,
+														"loc": {
+															"start": {
+																"line": 21,
+																"column": 9
+															},
+															"end": {
+																"line": 22,
+																"column": 82
+															}
+														},
+														"id": {
+															"type": "Identifier",
+															"start": 916,
+															"end": 918,
+															"loc": {
+																"start": {
+																	"line": 21,
+																	"column": 9
+																},
+																"end": {
+																	"line": 21,
+																	"column": 11
+																}
+															},
+															"name": "dd"
+														},
+														"init": {
+															"type": "MemberExpression",
+															"start": 921,
+															"end": 1009,
+															"loc": {
+																"start": {
+																	"line": 21,
+																	"column": 14
+																},
+																"end": {
+																	"line": 22,
+																	"column": 82
+																}
+															},
+															"object": {
+																"type": "Super",
+																"start": 921,
+																"end": 926,
+																"loc": {
+																	"start": {
+																		"line": 21,
+																		"column": 14
+																	},
+																	"end": {
+																		"line": 21,
+																		"column": 19
+																	}
+																}
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 932,
+																"end": 1009,
+																"loc": {
+																	"start": {
+																		"line": 22,
+																		"column": 5
+																	},
+																	"end": {
+																		"line": 22,
+																		"column": 82
+																	}
+																},
+																"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+															},
+															"computed": false,
+															"optional": false
+														}
+													}
+												],
+												"kind": "const",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " one char more, and the fluid layout breaks the lookup rather than the `=`",
+														"start": 830,
+														"end": 906
+													}
+												]
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Prettier's `isPoorlyBreakableMemberOrCallChain` bottoms out at an `Identifier` or a",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " `ThisExpression` — and at nothing else, `super` included. A chain that qualifies breaks",
+							"start": 108,
+							"end": 198
+						},
+						{
+							"type": "Line",
+							"value": " after the `=` and stays whole; one that does not falls through to the fluid layout,",
+							"start": 200,
+							"end": 286
+						},
+						{
+							"type": "Line",
+							"value": " where the `=` holds its line and the lookup takes the break instead.",
+							"start": 288,
+							"end": 359
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

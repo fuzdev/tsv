@@ -26,7 +26,9 @@ const a =                  const a =
 ```
 
 Both formatters break after the `=` (the RHS carries a broken comment run), so the
-divergence is the comment's position alone. The `//` sibling keeps `arr // c1` on the
+divergence is the comment's position alone — and an **assignment expression** (case `zz`)
+answers exactly as the declarator does on both sides, the RHS hanging under the `=` rather
+than sitting at the statement's own column. The `//` sibling keeps `arr // c1` on the
 `=` line instead — a trailing `//` defers via `line_suffix`, which the `=` layout
 never sees as a break, while a block run with an own-line member breaks for real.
 

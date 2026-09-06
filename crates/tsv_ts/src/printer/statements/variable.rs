@@ -8,10 +8,9 @@ use crate::printer::{
     ParenContext, analysis, class_expr_has_decorators, conditional_should_break_after_op,
     is_call_on_member_chain, is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
     is_literal_member_chain, is_module_path_fluid_call, is_multiline_string_literal,
-    is_poorly_breakable_chain, is_pure_property_chain, is_regex_root_chain,
-    is_self_expanding_value, is_simple_self_expanding, is_simple_value,
-    is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
-    should_inline_logical_expression,
+    is_poorly_breakable_chain, is_regex_root_chain, is_self_expanding_value,
+    is_simple_self_expanding, is_simple_value, is_single_call_on_member_chain, is_string_literal,
+    is_type_assertion_call, needs_parens, should_inline_logical_expression,
 };
 use smallvec::smallvec;
 use std::cell::LazyCell;
@@ -272,10 +271,13 @@ impl<'a> Printer<'a> {
         // chain shapes below), so the two cannot simply be merged — but they DRIFT, and
         // the sequence arm is the proof: `choose_layout` has had it from the start while
         // this list did not, so `const a = (a, b)` hung its operands off the `=` column.
-        // A `chooseLayout` fact added to one belongs in both.
+        // A `chooseLayout` fact added to one belongs in both — and a fact added to THIS
+        // list alone drifts the same way: a call-free chain's member-gap comment is
+        // `is_poorly_breakable_chain`'s own question (its gate is scoped to a chain that
+        // holds a CALL, where prettier's `memberChain` label lives), so it takes no
+        // cancelling term here that `choose_layout` would lack.
         let should_break_after_op_rhs = (is_module_path_fluid_call(init, self.source)
-            || is_pure_property_chain(init)
-            || is_poorly_breakable_chain(init, PRINT_WIDTH, self)
+            || is_poorly_breakable_chain(init, self)
             || is_string_literal(init)
             // A SEQUENCE init breaks after the `=` and lays its operands out under
             // one indent, prettier's own `shouldBreakAfterOperator` switch arm —
@@ -385,11 +387,8 @@ impl<'a> Printer<'a> {
 
         // Type assertion calls with LHS type annotation need special fluid handling
         // (handled separately below because they need non-wrapping LHS type)
-        let is_type_assertion_with_lhs_type = is_type_assertion_call(
-            init,
-            self.source,
-            PRINT_WIDTH,
-        ) && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation().is_some());
+        let is_type_assertion_with_lhs_type = is_type_assertion_call(init, self.source)
+            && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation().is_some());
 
         let is_simple_rhs_with_breakable_lhs = is_simple_self_expanding(init) && *can_break_left;
 

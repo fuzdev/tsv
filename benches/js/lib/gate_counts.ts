@@ -341,14 +341,27 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// for them) are corpus-NEUTRAL: `fn(function () {})` and `obj.m({})` past the print width
 	// are shapes no gates-view file holds, so the +1 is the literal fix alone.
 	//
-	// 5140 → 5141: the parenthesized binary CALL callee takes prettier's expanding parens.
-	// `prettier/tests/format/js/binary-expressions/call.js` — the whole file is that one
-	// construct — arrives from `unknown`. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`. TWO files
-	// in the whole gates view change bytes at all, and the second moves no count:
-	// `js/call/boolean/boolean.js` improves by the same rule (its `(a || a || a)(Boolean)`
-	// callee, sitting right beside the `new (` sibling that already expanded) and stays
-	// `unknown` on the unrelated `isBooleanTypeCoercion` gap its other hunks are.
-	typescript: 5141,
+	// 5140 → 5142: the two `Boolean(…)` / paren-callee fixes, which land as ONE step because
+	// each was the other's last residual in `js/call/boolean/boolean.js`.
+	//   `prettier/tests/format/js/binary-expressions/call.js` → **match** on the parenthesized
+	//     binary CALL callee alone — the whole file is that one construct.
+	//   `prettier/tests/format/js/call/boolean/boolean.js` → **match**, and it needs BOTH: its
+	//     `(a || a || a)(Boolean)` callee is the paren shape and every other hunk is
+	//     `isBooleanTypeCoercion`. Each fix alone leaves the file `unknown` on the other's gap,
+	//     which is why neither measured it as a mover.
+	// Measured on the merged tree, not derived: `--all --json` bucket lists set-diffed against
+	// a build with the callee-paren hunks reverse-applied (`git diff … -- crates/ | git apply
+	// -R`), 9,305 files. Those two are the only moves in any bucket — `known` is unmoved at
+	// 120 so both land in `match`, and `partial` / `safety` / `errors` / `expected_errors`
+	// come back identical file-for-file. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`.
+	//
+	// 5142 → 5143: `language-tools/…/typescript-plugin/src/source-mapper.ts` arrives from
+	// `unknown` — the lone-lookup inline clause. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`.
+	// ONE file in the whole snapshot + prettier suites changes bytes at all: two staged trees
+	// over 11,749 `find`-enumerated files (so the ~800 `tsv format --list` prunes are in),
+	// formatted by a HEAD and a tip `--profile corpus` binary, with the per-file error output
+	// identical line for line.
+	typescript: 5143,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -372,9 +385,17 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// sanction nothing has decided):
 	//   `flowbite-svelte/src/lib/forms/button-toggle/ButtonToggle.svelte` — a seven-key
 	//     shorthand object pattern assigned an object literal: prettier keeps the pattern flat
-	//     (it fits) and breaks after `=`; tsv breaks the pattern and hugs the literal — the
-	//     pattern group's fits walk measures what follows flat, where prettier's stops at the
-	//     first line of the rest in break mode.
+	//     (it fits at 99) and breaks after `=`; tsv breaks the pattern and hugs the literal.
+	//     ⚠️ NOT a fits-walk difference — that reading was probed and refuted: tsv's
+	//     `arena_fits_with_lookahead` carries each rest command's own mode and returns at the
+	//     first `Line` it reaches in `Break` mode, exactly as prettier's `fits` does. The cause
+	//     is upstream of any measuring: a self-expanding RHS (`is_self_expanding_value` —
+	//     object / array / function / class / plain arrow) makes the declarator
+	//     `is_layout_eligible = false`, so it takes the hand-rolled `[id, " = ", init]` arm
+	//     with no break point after the operator at all, and the pattern is the only thing left
+	//     that can break. Prettier has no such concept: an `ObjectExpression` RHS falls through
+	//     `chooseLayout` to `fluid`, whose `group(indent(line))` breaks precisely when
+	//     `lhs = {` would not fit.
 	//   `layerchart/packages/layerchart/src/lib/components/Text/Text.html.svelte` — whitespace
 	//     only: a multi-line class value's `{expr}` continuation line keeps the author's SPACE
 	//     indentation where prettier re-indents it with tabs.
@@ -404,7 +425,7 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// function-expression arms). ONE mover in any bucket, by the same `--all --json`
 	// bucket-list diff described on `CORPUS_FORMAT_MATCH_MIN`.
 	svelte: 2,
-	// Six of the `third_party` arrivals are still open, all of them the member-chain /
+	// Five of the `third_party` arrivals are still open, all of them the member-chain /
 	// assignment / binaryish break-priority cluster, pinned here as the gate's backlog rather
 	// than sanctioned:
 	//   `language-tools/…/typescript/features/CompletionProvider.ts` — a declarator whose init
@@ -416,10 +437,6 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//   `language-tools/…/typescript/features/RenameProvider.ts` — `lang.call(a, b)
 	//     ?.definitions?.[0]`: prettier keeps the call flat and breaks before `?.definitions`;
 	//     tsv breaks the call's arguments.
-	//   `language-tools/…/typescript-plugin/src/source-mapper.ts` — a for-of head
-	//     destructuring `{0: a, 2: b, 3: c}` of `this.mappings[i]`: prettier keeps the pattern
-	//     flat and breaks the member; tsv breaks the pattern (the ButtonToggle.svelte fits-walk
-	//     difference again, see the svelte pin).
 	//   `layerchart/…/components/Chart/Chart.shared.svelte.ts` — a type alias with three
 	//     constrained or defaulted params: prettier's `isComplexTypeAliasParams` takes
 	//     `break-lhs` (the params break, `=` stays on the closing line); tsv keeps them flat
@@ -429,7 +446,8 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//     params (its expanded-state fits measures nested groups in break mode); tsv breaks
 	//     every argument.
 	//
-	// 103 → 114: eleven arrive with the `third_party` tier — the six above plus
+	// 103 → 114: eleven arrive with the `third_party` tier — the five above, plus
+	// `source-mapper.ts` (which has since left, at `98 → 97` below), plus
 	// `addComponentExport.ts`, `ExportedNames.ts`, `incremental.ts`, `options.ts` and
 	// `layercake/src/_data/unemployment.js`, the one OVER-WIDTH output of the group.
 	//
@@ -484,16 +502,23 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// argument ends at `printCallArguments`' soft-break group. Nothing arrived in `unknown`,
 	// and the same one-mover byte-diff is described on `CORPUS_FORMAT_MATCH_MIN`.
 	//
-	// 100 → 99: `js/binary-expressions/call.js` LEAVES for `match` — the parenthesized binary
-	// CALL callee. Prettier's binaryish EARLY RETURN (`key === "callee" &&
-	// isCallOrNewExpression(parent)`, taken ahead of `shouldNotIndent`) expands the pair,
-	// `(⏎\ta &&⏎\tb⏎)()`, where tsv welded it to the argument list; the `new` callee already
-	// took that shape and both now read it off one seam. Nothing arrived. Measured by
-	// formatting two staged copies of the whole snapshot + prettier suites (11,749 files,
-	// `find`-enumerated so the ~800 that `tsv format --list` prunes are included) with a HEAD
-	// and a tip `--profile corpus` binary and diffing the trees: two files move, named on
-	// `CORPUS_FORMAT_MATCH_MIN`, and the per-file error output is identical line for line.
-	typescript: 99,
+	// 100 → 98: two files LEAVE for `match`, on the pair of `Boolean(…)` / paren-callee fixes.
+	// `js/binary-expressions/call.js` goes on the parenthesized binary CALL callee: prettier's
+	// binaryish EARLY RETURN (`key === "callee" && isCallOrNewExpression(parent)`, taken ahead
+	// of `shouldNotIndent`) expands the pair, `(⏎\ta &&⏎\tb⏎)()`, where tsv welded it to the
+	// argument list; the `new` callee already took that shape and both now read it off one
+	// seam. `js/call/boolean/boolean.js` needs that fix AND `isBooleanTypeCoercion` — its
+	// `(a || a || a)(Boolean)` callee is the paren shape, its other hunks are the coercion
+	// predicate — so each half alone left the file here on the other's gap. Nothing arrived.
+	// Reasoning on `CORPUS_FORMAT_MATCH_MIN`, which carries the merged-tree measurement.
+	//
+	// 98 → 97: `source-mapper.ts` LEAVES for `match` — a member-chain backlog item of the
+	// group above, and the ONLY one whose cause was the lone-lookup inline clause. Prettier's
+	// `shouldInline` takes a lone `.prop`'s break point back only when the object and the
+	// property are BOTH plain identifiers (member.js); tsv also inlined a `this` / `super`
+	// base and a private-name property, so `this.mappings[i]` had no break point and the
+	// for-of head shed width by breaking its destructuring pattern instead. Nothing arrived.
+	typescript: 97,
 	css: 23
 };
 
@@ -537,8 +562,10 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// `safety`, `errors` and `expected_errors` identical file-for-file, `match` unmoved at
 	// 5140. The same change also fixes the chain-headed spelling (`Boolean(a || b).c()`, flat
 	// where the member-chain printer never asked) and the two-argument one, neither of which
-	// any gates file spells at breaking width; `js/call/boolean/boolean.js` holds all three
-	// and stays `unknown` on its separately filed callee-paren shape.
+	// any gates file spells at breaking width. `js/call/boolean/boolean.js` holds all three and
+	// needed one more thing to close: the callee-paren fix landing beside this one, which is
+	// what carries it to `match` (see `CORPUS_FORMAT_UNKNOWN_PIN`); `partial` is unmoved by
+	// that second half, and 22 is re-measured on the merged tree.
 	typescript: 22,
 	css: 9
 };

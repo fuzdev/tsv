@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 659,
+	"end": 851,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -204,9 +204,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " The optional form's `?.[` answers the same way.",
+			"value": " An ASSIGNMENT EXPRESSION answers exactly as the declarator does: the RHS hangs under",
 			"start": 561,
-			"end": 611,
+			"end": 648,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -214,6 +214,70 @@
 				},
 				"end": {
 					"line": 23,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `=` rather than sitting at the statement's own column.",
+			"start": 650,
+			"end": 711,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 724,
+			"end": 732,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 6
+				},
+				"end": {
+					"line": 26,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c9 ",
+			"start": 735,
+			"end": 743,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The optional form's `?.[` answers the same way.",
+			"start": 753,
+			"end": 803,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
 					"column": 51
 				}
 			}
@@ -221,15 +285,15 @@
 		{
 			"type": "Block",
 			"value": " c7 ",
-			"start": 631,
-			"end": 639,
+			"start": 823,
+			"end": 831,
 			"loc": {
 				"start": {
-					"line": 26,
+					"line": 33,
 					"column": 2
 				},
 				"end": {
-					"line": 26,
+					"line": 33,
 					"column": 10
 				}
 			}
@@ -238,19 +302,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 658,
+		"end": 850,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 649,
+			"end": 841,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 28,
+					"line": 35,
 					"column": 9
 				}
 			},
@@ -742,45 +806,171 @@
 					]
 				},
 				{
-					"type": "VariableDeclaration",
-					"start": 613,
-					"end": 648,
+					"type": "ExpressionStatement",
+					"start": 713,
+					"end": 750,
 					"loc": {
 						"start": {
-							"line": 24,
+							"line": 25,
 							"column": 1
 						},
 						"end": {
-							"line": 27,
+							"line": 28,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 713,
+						"end": 749,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 5
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 713,
+							"end": 715,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 1
+								},
+								"end": {
+									"line": 25,
+									"column": 3
+								}
+							},
+							"name": "zz"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 720,
+							"end": 749,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 5
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 720,
+								"end": 723,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 5
+									}
+								},
+								"name": "arr",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c8 ",
+										"start": 724,
+										"end": 732
+									}
+								]
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 747,
+								"end": 748,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 3
+									},
+									"end": {
+										"line": 28,
+										"column": 4
+									}
+								},
+								"name": "i",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c9 ",
+										"start": 735,
+										"end": 743
+									}
+								]
+							},
+							"computed": true,
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An ASSIGNMENT EXPRESSION answers exactly as the declarator does: the RHS hangs under",
+							"start": 561,
+							"end": 648
+						},
+						{
+							"type": "Line",
+							"value": " the `=` rather than sitting at the statement's own column.",
+							"start": 650,
+							"end": 711
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 805,
+					"end": 840,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
 							"column": 8
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 619,
-							"end": 647,
+							"start": 811,
+							"end": 839,
 							"loc": {
 								"start": {
-									"line": 24,
+									"line": 31,
 									"column": 7
 								},
 								"end": {
-									"line": 27,
+									"line": 34,
 									"column": 7
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 619,
-								"end": 620,
+								"start": 811,
+								"end": 812,
 								"loc": {
 									"start": {
-										"line": 24,
+										"line": 31,
 										"column": 7
 									},
 									"end": {
-										"line": 24,
+										"line": 31,
 										"column": 8
 									}
 								},
@@ -788,43 +978,43 @@
 							},
 							"init": {
 								"type": "ChainExpression",
-								"start": 625,
-								"end": 647,
+								"start": 817,
+								"end": 839,
 								"loc": {
 									"start": {
-										"line": 25,
+										"line": 32,
 										"column": 2
 									},
 									"end": {
-										"line": 27,
+										"line": 34,
 										"column": 7
 									}
 								},
 								"expression": {
 									"type": "MemberExpression",
-									"start": 625,
-									"end": 647,
+									"start": 817,
+									"end": 839,
 									"loc": {
 										"start": {
-											"line": 25,
+											"line": 32,
 											"column": 2
 										},
 										"end": {
-											"line": 27,
+											"line": 34,
 											"column": 7
 										}
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 625,
-										"end": 628,
+										"start": 817,
+										"end": 820,
 										"loc": {
 											"start": {
-												"line": 25,
+												"line": 32,
 												"column": 2
 											},
 											"end": {
-												"line": 25,
+												"line": 32,
 												"column": 5
 											}
 										},
@@ -832,15 +1022,15 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 645,
-										"end": 646,
+										"start": 837,
+										"end": 838,
 										"loc": {
 											"start": {
-												"line": 27,
+												"line": 34,
 												"column": 5
 											},
 											"end": {
-												"line": 27,
+												"line": 34,
 												"column": 6
 											}
 										},
@@ -849,8 +1039,8 @@
 											{
 												"type": "Block",
 												"value": " c7 ",
-												"start": 631,
-												"end": 639
+												"start": 823,
+												"end": 831
 											}
 										]
 									},
@@ -865,8 +1055,8 @@
 						{
 							"type": "Line",
 							"value": " The optional form's `?.[` answers the same way.",
-							"start": 561,
-							"end": 611
+							"start": 753,
+							"end": 803
 						}
 					]
 				}
