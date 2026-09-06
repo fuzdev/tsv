@@ -30,6 +30,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `deno task conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check`; `audit:corpus` (real code) |
+| [Paren authoring](#paren-authoring-independence-audit-parenaudit) | `paren:audit` | a same-operator logical chain formatting differently from its redundantly-parenthesized twin — the class a rule left on the raw `binary.right` falls into, invisible on every paren-free authoring | `deno task check`; `audit:corpus` (real code) |
 | [Razor sweep](#print-width-razor-sweep-razoraudit) | `razor:audit` | width-keyed layout bugs — an F1 break at some column, and the stray line-head boundary space that is its OWN fixed point | `deno task check` |
 | [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present); `audit:corpus` (real code) |
 | [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check`; `audit:corpus` (real code) |
@@ -557,7 +558,7 @@ Why it needs its own gate: **every other gate is blind to an over-width line, by
 - **comment ledger / census** — nothing is dropped, merged, or rewritten.
 - **gaps / blanks / fabrication / swallow / ignore injection** — these perturb comment gaps, blank lines and directives; none measures a column.
 - **`corpus:compare:format`** — grades *against prettier*, and on the widest shape prettier emits the over-width line **itself**, so the oracle vouches for the bug.
-- **`authoring:audit`** — asks for one fixed point per document, not a good one.
+- **`authoring:audit` / `paren:audit`** — ask for one fixed point per document, not a good one.
 
 Two real bugs (the mid-run comment weld and its leading twin) shipped an over-width line — one of them also non-idempotent — with `deno task check` green throughout.
 
@@ -1134,6 +1135,109 @@ cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src    # audit
 cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src --prettier --dump-dir /tmp/audit
 ```
 
+## Paren-Authoring Independence Audit (`paren:audit`)
+
+The sibling of the whitespace audit above, on a different equivalence: `a ?? b ?? c` and
+`a ?? (b ?? c)` are **one document**, so tsv must format them to one output. Prettier says so
+structurally — its parse postprocess (`../prettier/src/language-js/parse/postprocess/index.js`,
+`onLeave(LogicalExpression)` → `rebalanceLogicalTree`) rewrites `a op (b op c)` into
+`(a op b) op c` whenever `node.operator === node.right.operator`, recursively, for both the
+`babel` and `typescript` parsers, so by the time its printer runs the two authorings ARE the
+same tree. The doctrine is [§Authoring Convergence
+Philosophy](./conformance_prettier.md#authoring-convergence-philosophy); this is its one
+non-whitespace instance, and unlike the whitespace one it has **no dual-stable remainder** — a
+redundant paren carries no authoring signal either formatter honors.
+
+**Why it exists.** tsv cannot rebalance: acorn keeps the right-nested shape and tsv's wire must
+match it (the drop-in AST contract, priority #1). So every rule prettier asks of the rebalanced
+tree, tsv asks through a rebalanced *view* — `BinaryExpression::rebalanced_right`, named for
+prettier's `isUnbalancedLogicalTree`. That is a per-rule obligation across six callers, and **a
+rule left on the raw `binary.right` is invisible on every paren-free authoring** — which is
+every authoring a formatted corpus contains, since tsv's own output normalizes the parens away.
+bug539 was exactly that (one half of `should_inline_logical_expression`): it passed all ~4,300
+fixtures *and* the whole 9,305-file `corpus:compare:format` gate, and only a hand-written
+paren-nested twin exposed it. Nothing else enumerates that twin.
+
+```bash
+# paren_audit - for every same-operator logical chain in the formatted base, insert the
+# redundant parens that re-associate it one level (`a op b op c` -> `a op (b op c)`) and
+# require the twin to format back to the base, byte for byte. Pure Rust, no sidecar —
+# one format per site. Defaults to tests/fixtures; pass dirs/files to audit real code.
+# Exits 1 on any finding. ~1.4 s over tests/fixtures.
+cargo run --profile corpus -p tsv_debug --features audits paren_audit
+cargo run --profile corpus -p tsv_debug --features audits paren_audit ../corpora/collections
+# Also: --json, --limit N (files), --examples N (findings shown, default 20), and
+# --dump-dir DIR — a byte-exact repro per finding (base / variant / ftry / ftry2 + note.txt,
+# the same four files `authoring_audit --dump-dir` writes), which is the seed a fixture is
+# made from without re-deriving the splice by hand.
+#
+# The mutation is a pure two-character insertion, and each of its three soundness facts is a
+# property of the acorn wire rather than an assumption about the text: both offsets are token
+# boundaries; the close offset is the OUTER node's end (`lastTokEnd`), so it lands past every
+# closing paren the node holds, and a group opened inside the spliced range also closes inside
+# it; and `&&` / `||` / `??` re-associate (all three short-circuit left to right). `LogicalExpression`
+# carries exactly those three operators, which is why the walk keys on the node TYPE and not on an
+# operator list — a `BinaryExpression` (`+`, `&`) is not re-associable and prettier does not
+# rebalance it. The walk is over the WIRE, so one enumerator covers a `.ts` module and a Svelte
+# component's <script>, template expression, block head, attribute and `{@const}` alike.
+#
+# Verdicts: converge / DIVERGE (dual-stable) / DIVERGE (non-idempotent) / variant parse error.
+# Everything but converge FAILS — there is no sanctioned remainder here. A variant parse error
+# would falsify the splice's own soundness argument, so it is a finding about the instrument,
+# never a pass. A base-non-idempotent FILE also fails: it is excluded from the re-association
+# analysis (its fixed point is undefined, so "formats back to the base" is meaningless), but
+# excluding it is not a reason to pass the run.
+```
+
+**Graded as a hard gate, not a ratchet — measured before deciding.** Zero findings over
+`tests/fixtures` (1,260 sites), the `../corpora` snapshot (2,530), `../prettier/tests/format`
+(225), `../svelte/packages/svelte/src` (684) and `../acorn-typescript` (116), with all three
+operators exercised in each. The per-operator table is printed for exactly that reason: a zero
+row is a corpus gap, not a pass.
+
+It gates twice, on `tests/fixtures` in `deno task check` and over **real code** as a leg of
+[`audit:corpus`](#the-corpus-bundle-auditcorpus) — the real-code corpus carries twice the
+fixture tree's chains (2,532 sites), and the class it grades is one no corpus of formatted code
+can show on its own. The prettier suites are deliberately not a seed there: six of their files
+are not tsv F1 fixed points, which this audit reports as a failure of its own, and that question
+belongs to the bundle's F1 sweep.
+
+**Positive control.** Reverting bug539's one-line fix (`binary.rebalanced_right()` →
+`binary.right`) turns the fixtures run red with **30 findings across 11 files**, ten of which
+are ordinary fixtures that predate the bug — so this audit would have caught it automatically,
+from the corpus as it already stood. The `../corpora` snapshot also goes red (2 findings), on
+the same corpus that `corpus:compare:format --all` passed clean at the time.
+
+**Blind spots.**
+
+- **Only the paren-INSERTING direction.** Sites are enumerated from tsv's own fixed point, which
+  normalizes the parens away, so a chain reaches this audit paren-free. Were tsv's fixed point
+  ever to *retain* a redundant paren, that shape's paren-free twin would go unprobed — that is
+  also a prettier divergence, which `corpus:compare:format` grades.
+- **One re-association step per node.** A four-operand chain contributes one site per
+  same-operator node, each re-associating one level; the fully right-nested composition is not
+  enumerated. One step is what turns `binary.right` from a leaf into a `LogicalExpression`,
+  which is the whole signal.
+- **A site whose `(` would land after a forward-binding block comment is excluded** — the splice
+  would re-bind a JSDoc cast or a bundler annotation (`err && /** @type {any} */ (err).name && …`
+  becomes `err && /** @type {any} */ ((err).name && …)`, where the cast now annotates the whole
+  chain), making the twin a different document. Both of the corpus's only two divergences were
+  exactly this. The count is printed rather than dropped silently — an audit that quietly stops
+  probing a class reads like one that finds nothing in it. Paren-vs-comment binding is
+  [`binding:audit`](#commenttoken-binding-audit-bindingaudit)'s subject, where a migrating paren
+  IS the finding. A **line** comment stays in scope: it runs to end of line, so it binds backward
+  and cannot be a cast or an annotation.
+- **A seed bearing a format-ignore directive is skipped**, like the injection audits: a frozen
+  region reproduces the inserted parens verbatim, which is correct behavior and would read as a
+  divergence.
+- **Same-operator only**, because that is precisely what prettier rebalances. `a || (b && c)` is
+  a different tree in both formatters and its parens are load-bearing.
+- **The general redundant-paren class is larger than this slice.** Wrapping *any* expression in
+  parens and requiring one fixed point is a strictly stronger instrument; it needs a
+  `preserve_parens` reparse for the removal direction, and its findings would mix the deliberate
+  paren retentions (a cast's shell, a required operand pair) with real bugs, so it wants its own
+  triage rather than this gate's zero tolerance.
+
 ## Print-Width Razor Sweep (`razor:audit`)
 
 ```bash
@@ -1147,8 +1251,9 @@ cargo run --profile corpus -p tsv_debug razor_audit ../corpora/collections/zzz/s
 ```
 
 **The dimension no other gate varies.** `authoring:audit` mutates the *spelling* of a
-document's whitespace, `fuzz:audit` its *structure*, `gaps`/`blanks` inject at *sites* — every
-one of them formats each document at the single width its content happens to have. The Svelte
+document's whitespace and `paren:audit` its parenthesization, `fuzz:audit` mutates its
+*structure*, `gaps`/`blanks` inject at *sites* — every one of them formats each document at the
+single width its content happens to have. The Svelte
 inline-layout family's bugs are **width-keyed**: a rule fires only once a construct crosses
 column 100, so a document one character short of the razor exercises none of it. This audit
 supplies that variation by padding a text word, which shifts everything downstream by `k`
@@ -1430,13 +1535,20 @@ deno task idempotency:sweep
 
 ## The Corpus Bundle (`audit:corpus`)
 
-The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `deno task check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `swallow_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `census_audit` + `fabrication_audit` + `fuzz --iterations 0`, over the `robustness` corpus view (the whole `../corpora` snapshot + the `svelte_styles` cache + the live working trees' diff against the snapshot) + the pinned prettier suites. Pure Rust; absent working trees warn-skip (floor = the whole snapshot). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
+The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `deno task check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `swallow_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `paren_audit` + `census_audit` + `fabrication_audit` + `fuzz --iterations 0`, over the `robustness` corpus view (the whole `../corpora` snapshot + the `svelte_styles` cache + the live working trees' diff against the snapshot) + the pinned prettier suites. Pure Rust; absent working trees warn-skip (floor = the whole snapshot). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
 
 ```bash
 deno task audit:corpus
 ```
 
 **Two of the three as-authored ratchets are legs here; the third cannot be.** `census_audit` and `fabrication_audit` both assert a **zero** — off their default corpus the snapshot is not consulted and `grade_narrowed_strictly` fails every finding, pinned or not — and the corpus currently holds that zero over all ~6,700 files, at about the cost of a leg already in the bundle. The census in particular is the leg whose own module doc names external corpora as its discovery arm, so its absence was a hole rather than a policy.
+
+**The two authoring-independence legs are real-code-only, and for one shared reason.** Both
+`authoring_audit` and `paren_audit` fail a run on a base-non-idempotent seed — a file whose own
+format is not a fixed point is excluded from the authoring analysis (its fixed point is
+undefined) but is not a reason to pass — so the pinned prettier suites, which hold six such
+files, are not among their seeds. That F1 question is the bundle's `fuzz --iterations 0` leg,
+over the same real seeds.
 
 `width_audit` stays out **structurally**, not by omission: it has no zero to grade against (the sanctioned overruns are everywhere, which is why a narrowed run reports and exits 0 by design). Gating it here would need a second snapshot pinned over this corpus — and the `robustness` view includes the LIVE working trees, so that snapshot would churn with ordinary work: over the svelte + zzz sources alone, 83 of 91 shapes are absent from the committed fixtures snapshot and 25 pinned shapes never fire. That is the re-pin treadmill the format count pins escaped by gating on the pinned `../corpora` snapshot ([gate_counts.md](gate_counts.md)). A real-code width run stays a **triage** command.
 

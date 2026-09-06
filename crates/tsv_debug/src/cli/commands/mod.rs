@@ -44,6 +44,7 @@ pub mod lex_diff;
 pub mod line_width;
 pub mod metrics;
 pub mod neutrality_audit;
+pub mod paren_audit;
 pub mod profile;
 pub mod razor_audit;
 pub mod render_audit;

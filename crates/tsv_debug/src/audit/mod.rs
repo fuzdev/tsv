@@ -22,6 +22,9 @@
 //! - [`shape`] — the markup arm of the line-shape alphabet those snapshots key
 //!   on, shared so two ratchets cannot drift into meaning different things by
 //!   the same key.
+//! - [`excerpt`] — the report side of the same coin: which source line an offset
+//!   sits on, and where two outputs first disagree. Not a key — see its docs on
+//!   why an excerpt and a snapshot key pull in opposite directions.
 //! - [`examples`] — the bounded, `--jobs`-deterministic example set every audit's
 //!   per-shape aggregate keeps its reproducers in.
 //! - [`tally`] — run-level tally primitives (the capped path-sample bucket the
@@ -62,9 +65,9 @@ pub(crate) mod ratchet;
 // `census_audit`, `width_audit`) drive no instrumentation seam.
 pub(crate) mod sweep;
 
-// The vacuity guard is NOT gated, and reaches further than the sweep: seven of
+// The vacuity guard is NOT gated, and reaches further than the sweep: eight of
 // its callers (`canonicalize`, `binding`, `neutrality`, `roundtrip`, `authoring`,
-// `render`, `fuzz`) drive no sweep, and several exist in a default build.
+// `paren`, `render`, `fuzz`) drive no sweep, and several exist in a default build.
 pub(crate) mod vacuity;
 
 // The panic-hook bracket is NOT gated: `sweep` installs one in a default build.
@@ -79,6 +82,11 @@ pub(crate) mod tally;
 // The line-shape alphabet is NOT gated, for the same reason and the same
 // consumers — it is pure text keying with no seam of its own.
 pub(crate) mod shape;
+
+// The report-side excerpting is NOT gated either, and its consumers are wider than the
+// ratchets': `authoring_audit`, `paren_audit`, `razor_audit` and `lex_diff` all exist in a
+// default build.
+pub(crate) mod excerpt;
 
 // The injection machinery is only reachable through `gap_audit` / `blank_audit`,
 // both themselves behind the `comment_check` feature (they arm

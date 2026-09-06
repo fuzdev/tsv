@@ -72,6 +72,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char, text_edge_ws};
 
+use crate::audit::excerpt::line_context;
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 use crate::deno::{PrettierParser, run_prettier};
@@ -778,15 +779,6 @@ fn splice(f: &str, site: &Site) -> String {
     out.push_str(site.flipped);
     out.push_str(&f[site.end..]);
     out
-}
-
-/// The (trimmed) source line containing byte `offset`, for human context.
-fn line_context(f: &str, offset: usize) -> String {
-    let start = f[..offset].rfind('\n').map_or(0, |i| i + 1);
-    let end = f[offset..].find('\n').map_or(f.len(), |i| offset + i);
-    let line = f[start..end].trim();
-    let truncated: String = line.chars().take(80).collect();
-    truncated
 }
 
 fn print_human(report: &Report, verbose: bool, triaged: bool) {

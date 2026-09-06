@@ -10,6 +10,9 @@
 //!   decode-invariant leaf-value check that the skeleton, erasing every scalar,
 //!   is blind to) — the round-trip primitives the `roundtrip_audit` / `fuzz`
 //!   commands share.
+//! - **directive pre-scan** — [`source_has_ignore_directive`], the coarse "does this
+//!   source freeze a region" question every audit whose property does not survive a
+//!   verbatim region asks of its seed.
 //! - **ledger** (behind the `comment_check` feature) — [`ledger_format`] /
 //!   [`ledger_format_with_comments`] / [`pristine_format`] drive `format_source`
 //!   with the print-once comment ledger armed, and the [`Verdict`] /
@@ -40,6 +43,23 @@ use tsv_cli::cli::input::ParserType;
 
 use crate::diff::{DiffOptions, diff_to_string};
 use crate::render_normalize::{normalize_pair, structural_skeleton};
+
+/// Whether `source` bears an ignore directive anywhere — a coarse substring pre-scan for the
+/// `format-ignore` / `prettier-ignore` families (the exact recognizer is
+/// `tsv_lang::is_format_ignore_directive`, on a comment's trimmed text). Shared by every audit
+/// whose property does not hold across a frozen region: `blank_audit` exempts such a file from
+/// its blank-run invariant (locating the verbatim ignore range from the output alone is
+/// fragile), `ignore_audit` skips it as a seed (an injected directive interacting with a
+/// pre-existing one is fragile), and `paren_audit` skips it because a frozen region reproduces
+/// the parens it injects verbatim.
+///
+/// Ungated, and here rather than in [`sites`](crate::audit::sites) (where it was born, beside
+/// the injection audits that were its only callers) because it is pure text over an input with
+/// no dependency on the ledger those audits arm — and `sites` is compiled out of a default
+/// build.
+pub(crate) fn source_has_ignore_directive(source: &str) -> bool {
+    source.contains("format-ignore") || source.contains("prettier-ignore")
+}
 
 /// Parse `source` with tsv's own parser and convert to the wire-JSON `Value`
 /// (the same shape the canonical ASTs use). `None` on a tsv parse error.
