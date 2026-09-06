@@ -96,7 +96,10 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::audit::excerpt::{first_line_diff, line_context};
-use crate::audit::properties::{Utf16ToByte, source_has_ignore_directive, tsv_parse_to_value};
+use crate::audit::properties::{
+    BaseFixedPoint, Utf16ToByte, base_fixed_point, source_has_ignore_directive, tsv_parse_to_value,
+};
+use crate::audit::repro::{ReproCase, write_repro_case};
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 
@@ -172,6 +175,15 @@ struct Site {
     op: LogicalOp,
 }
 
+/// A file's enumeration: the sites to probe, and a count of the ones excluded as unsound.
+/// The exclusion is counted rather than dropped silently — an audit that quietly stops
+/// probing a class reads exactly like one that finds nothing in it.
+#[derive(Default)]
+struct Sites {
+    probed: Vec<Site>,
+    comment_bound: usize,
+}
+
 /// Collect every same-operator re-association site in a wire AST.
 ///
 /// The walk is over the wire `Value` rather than any language's internal AST because the
@@ -206,15 +218,6 @@ fn collect_sites(node: &Value, f: &str, map: &Utf16ToByte, out: &mut Sites) {
         }
         _ => {}
     }
-}
-
-/// A file's enumeration: the sites to probe, and a count of the ones excluded as unsound.
-/// The exclusion is counted rather than dropped silently — an audit that quietly stops
-/// probing a class reads exactly like one that finds nothing in it.
-#[derive(Default)]
-struct Sites {
-    probed: Vec<Site>,
-    comment_bound: usize,
 }
 
 /// Whether a `(` inserted at `at` would land between a **forward-binding block comment** and
@@ -407,20 +410,20 @@ impl ParenAuditCommand {
         }
         let parser = ParserType::from_extension(&path.to_string_lossy());
         report.files_scanned += 1;
-        let Ok(f) = format_source(&source, parser) else {
-            report.files_parse_error += 1;
-            return;
-        };
-        match format_source(&f, parser) {
-            Ok(f2) if f2 == f => {}
-            _ => {
+        let f = match base_fixed_point(&source, parser) {
+            BaseFixedPoint::Ok(f) => f,
+            BaseFixedPoint::ParseError => {
+                report.files_parse_error += 1;
+                return;
+            }
+            BaseFixedPoint::NonIdempotent => {
                 report.files_base_non_idempotent += 1;
                 report
                     .base_non_idempotent_paths
                     .push(path.display().to_string());
                 return;
             }
-        }
+        };
         let Some(wire) = tsv_parse_to_value(&f, parser) else {
             // The base formatted but its own output does not reparse — `roundtrip_audit`'s
             // property, gated there. Counted apart from a seed the parser rejects: those are
@@ -460,11 +463,12 @@ impl ParenAuditCommand {
         if verdict.is_finding() {
             if let Some(dir) = &self.dump_dir {
                 report.dump_seq += 1;
-                dump_case(
+                write_repro_case(
                     dir,
-                    &DumpCase {
+                    &ReproCase {
                         seq: report.dump_seq,
-                        verdict,
+                        tag: verdict.key(),
+                        mutation: "splice one site's redundant parens",
                         src_path: path,
                         base: f,
                         variant: &variant,
@@ -483,71 +487,6 @@ impl ParenAuditCommand {
             });
         }
     }
-}
-
-/// One finding's repro material — the four texts and what to name the case directory by.
-/// A struct rather than eight positional parameters, all of them `&str`-ish and easy to swap.
-#[derive(Clone, Copy)]
-struct DumpCase<'a> {
-    seq: usize,
-    verdict: Verdict,
-    src_path: &'a Path,
-    /// The formatted seed: a fixed point, and what the twin must format back to.
-    base: &'a str,
-    /// `base` with one site's redundant parens spliced in.
-    variant: &'a str,
-    /// `format(variant)`; empty when the variant failed to parse.
-    ftry: &'a str,
-    parser: ParserType,
-}
-
-/// Write a byte-exact repro of one finding: the base `F` (a fixed point), the spliced
-/// `variant`, tsv's `ftry` = `format(variant)`, and `ftry2` = `format(ftry)` — the pair that
-/// separates a second fixed point from a non-idempotency. The same four files
-/// `authoring_audit --dump-dir` writes, so one habit reads both audits' output.
-///
-/// A finding's `path` + `offset` already locate it; what this adds is a seed that can become a
-/// fixture without re-deriving the splice by hand — which is precisely the step that made
-/// bug539 expensive.
-fn dump_case(dir: &str, case: &DumpCase<'_>) {
-    let DumpCase {
-        seq,
-        verdict,
-        src_path,
-        base,
-        variant,
-        ftry,
-        parser,
-    } = *case;
-    let slug: String = src_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("case")
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '_' })
-        .collect();
-    let case_dir = Path::new(dir).join(format!("{seq:03}_{}_{slug}", verdict.key()));
-    if std::fs::create_dir_all(&case_dir).is_err() {
-        return;
-    }
-    let ftry2 = format_source(ftry, parser).unwrap_or_default();
-    let note = format!(
-        "source:  {}\nverdict: {}\nbase F (a fixed point) -> splice redundant parens -> variant -> format = ftry\nftry == F?       {}\nftry idempotent? {}\n",
-        src_path.display(),
-        verdict.key(),
-        ftry == base,
-        ftry == ftry2,
-    );
-    let ext = match parser {
-        ParserType::Svelte => "svelte",
-        ParserType::Css => "css",
-        ParserType::TypeScript => "ts",
-    };
-    let _ = std::fs::write(case_dir.join(format!("base.{ext}")), base);
-    let _ = std::fs::write(case_dir.join(format!("variant.{ext}")), variant);
-    let _ = std::fs::write(case_dir.join(format!("ftry.{ext}")), ftry);
-    let _ = std::fs::write(case_dir.join(format!("ftry2.{ext}")), ftry2);
-    let _ = std::fs::write(case_dir.join("note.txt"), note);
 }
 
 /// [`first_line_diff`] in this report's own terms: owned lines, with the run-out side named.

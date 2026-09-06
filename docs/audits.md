@@ -1131,7 +1131,8 @@ cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src    # audit
 # diverges (a _prettier_divergence to pin, the space_after_block class); (c) both
 # diverge (sanctioned, e.g. Tier-2 element expansion). --dump-dir writes byte-exact
 # repro artifacts per hard finding — the basis for a fixtures-first fix.
-# Also: --json, --verbose, --limit N (sites/file), --examples N.
+# Also: --json, --verbose, --site-limit N (sites per FILE — named apart from the sibling
+# audits' --limit, which caps files), --examples N.
 cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src --prettier --dump-dir /tmp/audit
 ```
 

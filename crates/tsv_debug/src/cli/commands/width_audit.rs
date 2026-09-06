@@ -2,7 +2,6 @@ use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use tsv_cli::cli::input::ParserType;
 use tsv_lang::printing::visual_width;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
@@ -12,7 +11,7 @@ use crate::audit::sweep::{PristineSweep, sweep_pristine};
 use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
 
-use super::profile::resolve_seed_files;
+use super::profile::{lang_token, resolve_seed_files};
 
 /// Audit for output lines that exceed the print width.
 ///
@@ -297,7 +296,7 @@ fn sweep_files(files: &[PathBuf]) -> Sweep {
             // one that decides a *shape*. Do not hoist it above the width test.
             let trimmed = line.trim();
             let shape = WidthShape {
-                lang: lang_bucket(parser),
+                lang: lang_token(parser),
                 head: head_shape(trimmed),
                 inner: inner_shape(trimmed),
                 tail: tail_shape(trimmed),
@@ -320,16 +319,13 @@ fn sweep_files(files: &[PathBuf]) -> Sweep {
     }
 }
 
-/// The language bucket a seed's parser stands for — the key's first field.
-fn lang_bucket(parser: ParserType) -> &'static str {
-    match parser {
-        ParserType::TypeScript => "ts",
-        ParserType::Css => "css",
-        ParserType::Svelte => "svelte",
-    }
-}
-
-/// The inverse of [`lang_bucket`], for reading a snapshot line back.
+/// The inverse of [`lang_token`], for reading a snapshot line back.
+///
+/// Deliberately NOT derived from `lang_token` — the two are a matched pair over a COMMITTED
+/// snapshot, and writing the inverse out by hand is what makes the round-trip test below a
+/// real check rather than a tautology. That test is now the pin on the shared alphabet: four
+/// other consumers spell their labels, extensions and keys with `lang_token`, and this is the
+/// only place a change to those three strings has to answer for itself.
 ///
 /// Returns `None` on anything else, so a drifted snapshot line fails to parse rather than
 /// grading as a live shape — a bucket that silently became valid would mask a real one.
@@ -593,10 +589,10 @@ fn print_json(sweep: &Sweep) {
 #[cfg(test)]
 mod tests {
     use super::{
-        NO_INNER, WidthShape, excerpt, head_shape, inner_shape, lang_bucket, lang_from_bucket,
-        tail_shape,
+        NO_INNER, WidthShape, excerpt, head_shape, inner_shape, lang_from_bucket, tail_shape,
     };
     use crate::audit::ratchet::SnapshotKey;
+    use crate::cli::commands::profile::lang_token;
     use tsv_cli::cli::input::ParserType;
 
     fn shape(lang: &'static str, head: &str, tail: &str) -> WidthShape {
@@ -697,21 +693,21 @@ mod tests {
         assert!(WidthShape::from_line("svelte\tIDENT\t-\t-->\textra").is_none());
     }
 
-    /// Every bucket `lang_bucket` can emit must parse back, or a new language would write
+    /// Every bucket `lang_token` can emit must parse back, or a new language would write
     /// snapshot lines that `from_line` drops — every pin for it reading STALE forever.
     #[test]
     fn buckets_cover_every_parser_and_round_trip() {
         for parser in [ParserType::TypeScript, ParserType::Css, ParserType::Svelte] {
-            let bucket = lang_bucket(parser);
+            let bucket = lang_token(parser);
             assert_eq!(
                 lang_from_bucket(bucket),
                 Some(bucket),
                 "{bucket} does not parse back"
             );
         }
-        assert_eq!(lang_bucket(ParserType::TypeScript), "ts");
-        assert_eq!(lang_bucket(ParserType::Css), "css");
-        assert_eq!(lang_bucket(ParserType::Svelte), "svelte");
+        assert_eq!(lang_token(ParserType::TypeScript), "ts");
+        assert_eq!(lang_token(ParserType::Css), "css");
+        assert_eq!(lang_token(ParserType::Svelte), "svelte");
         assert_eq!(lang_from_bucket("rust"), None);
     }
 

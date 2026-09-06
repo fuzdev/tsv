@@ -234,7 +234,7 @@ fn lang_groups(results: &[FileResult]) -> Vec<(&'static str, Aggregate)> {
         .into_iter()
         .filter_map(|pt| {
             let agg = Aggregate::from_results(results.iter().filter(|r| r.parser_type == pt));
-            (agg.files > 0).then(|| (lang_label(pt), agg))
+            (agg.files > 0).then(|| (lang_token(pt), agg))
         })
         .collect()
 }
@@ -417,7 +417,23 @@ pub(crate) fn format_size(bytes: usize) -> String {
     }
 }
 
-pub(crate) fn lang_label(parser_type: ParserType) -> &'static str {
+/// The SHORT lowercase token for a parser — `ts` / `svelte` / `css`.
+///
+/// ⚠️ **These three strings are not a display choice.** One definition rather than one per
+/// consumer, because they play three roles at once and only one of them is cosmetic:
+///
+/// - a **report label** (`profile`, `json_profile`, `build_fanout_audit`),
+/// - a **file extension** for a repro artifact (`fuzz --dump-dir`, `paren_audit --dump-dir` —
+///   the whole TypeScript family dumps as `.ts`, which is what tsv parses it as),
+/// - and the language field of a **committed ratchet key** (`width_audit_known.txt`, read back
+///   by that audit's own `lang_from_bucket`).
+///
+/// So changing one of these strings silently rewrites what a committed snapshot's lines mean.
+/// It had drifted into five identical copies — `parser_ext`, `lang_bucket`, `parser_label`, an
+/// inline match, and this — each free to be "improved" alone; same reason [`is_ts_family`] is
+/// shared. Distinct from `ParserType::name`, which is the long `--parser` CLI value
+/// (`typescript`), deliberately not this.
+pub(crate) fn lang_token(parser_type: ParserType) -> &'static str {
     match parser_type {
         ParserType::TypeScript => "ts",
         ParserType::Svelte => "svelte",
@@ -476,7 +492,7 @@ fn print_table(results: &[FileResult], iterations: usize, skipped: usize) {
         };
         row(
             &display_path(&r.path),
-            lang_label(r.parser_type),
+            lang_token(r.parser_type),
             &format_size(r.size),
             &format_duration(r.parse_us),
             &format_duration(r.format_us),
@@ -559,7 +575,7 @@ fn print_json(results: &[FileResult], iterations: usize, skipped: usize) {
         .map(|r| {
             serde_json::json!({
                 "path": r.path.to_string_lossy(),
-                "lang": lang_label(r.parser_type),
+                "lang": lang_token(r.parser_type),
                 "size_bytes": r.size,
                 "parse_us": r.parse_us,
                 "format_us": r.format_us,

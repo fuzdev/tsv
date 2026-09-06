@@ -1,6 +1,7 @@
 use argh::FromArgs;
 
 use crate::cli::CliError;
+use crate::cli::commands::profile::lang_token;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::arena::DocArena;
 use tsv_lang::estimated_ast_arena_capacity;
@@ -503,14 +504,6 @@ fn measure(c: &Construct) -> ConstructResult {
     }
 }
 
-fn parser_label(p: ParserType) -> &'static str {
-    match p {
-        ParserType::Svelte => "svelte",
-        ParserType::TypeScript => "ts",
-        ParserType::Css => "css",
-    }
-}
-
 impl BuildFanoutAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let constructs = [
@@ -772,7 +765,7 @@ fn print_human(results: &[ConstructResult], failed: usize) {
         println!(
             "  {:<17} ({:<6}) depth:nodes {:<28} exponent {:<5} {}",
             r.name,
-            parser_label(r.parser),
+            lang_token(r.parser),
             trail,
             exp,
             verdict(r),
@@ -801,7 +794,7 @@ fn print_json(results: &[ConstructResult]) {
         .map(|r| {
             serde_json::json!({
                 "name": r.name,
-                "parser": parser_label(r.parser),
+                "parser": lang_token(r.parser),
                 "points": r.points.iter().map(|p| serde_json::json!({"depth": p.depth, "nodes": p.nodes})).collect::<Vec<_>>(),
                 "exceeded_cap": r.exceeded_cap,
                 "error": r.error,

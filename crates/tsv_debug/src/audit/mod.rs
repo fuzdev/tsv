@@ -25,6 +25,10 @@
 //! - [`excerpt`] — the report side of the same coin: which source line an offset
 //!   sits on, and where two outputs first disagree. Not a key — see its docs on
 //!   why an excerpt and a snapshot key pull in opposite directions.
+//! - [`repro`] — the byte-exact repro directory a mutation audit writes for a
+//!   finding (`base` / `variant` / `ftry` / `ftry2` + a note), so the two
+//!   authoring-independence audits' `--dump-dir` output is one shape by
+//!   construction rather than by having been copied.
 //! - [`examples`] — the bounded, `--jobs`-deterministic example set every audit's
 //!   per-shape aggregate keeps its reproducers in.
 //! - [`tally`] — run-level tally primitives (the capped path-sample bucket the
@@ -87,6 +91,10 @@ pub(crate) mod shape;
 // ratchets': `authoring_audit`, `paren_audit`, `razor_audit` and `lex_diff` all exist in a
 // default build.
 pub(crate) mod excerpt;
+
+// The repro writer is NOT gated, for the same reason: `authoring_audit` and `paren_audit`
+// both exist in a default build.
+pub(crate) mod repro;
 
 // The injection machinery is only reachable through `gap_audit` / `blank_audit`,
 // both themselves behind the `comment_check` feature (they arm

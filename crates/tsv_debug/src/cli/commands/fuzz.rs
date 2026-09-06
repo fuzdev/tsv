@@ -63,7 +63,7 @@ use std::time::{Duration, Instant};
 
 use tsv_cli::cli::input::ParserType;
 
-use super::profile::resolve_seed_files;
+use super::profile::{lang_token, resolve_seed_files};
 use crate::audit::properties::{F1Outcome, f1_check};
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
@@ -428,14 +428,6 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
 }
 
 /// File extension for a parser — dump + last-input repro file names.
-fn parser_ext(parser: ParserType) -> &'static str {
-    match parser {
-        ParserType::TypeScript => "ts",
-        ParserType::Svelte => "svelte",
-        ParserType::Css => "css",
-    }
-}
-
 /// Best-effort pre-attempt repro file: written **before** every parse/format
 /// attempt and removed on an orderly exit, so an input that HANGS the formatter
 /// (the exponential-rebuild class — `catch_unwind` can't see an infinite loop)
@@ -463,7 +455,7 @@ impl LastInput {
         let path = std::env::temp_dir().join(format!(
             "tsv_fuzz_last_input_{}.{}",
             std::process::id(),
-            parser_ext(parser)
+            lang_token(parser)
         ));
         match std::fs::write(&path, src) {
             Ok(()) => {
@@ -849,7 +841,7 @@ impl FuzzCommand {
             let name = format!(
                 "finding_{n:03}_{}.{}",
                 f.outcome.label(),
-                parser_ext(f.parser)
+                lang_token(f.parser)
             );
             let path = PathBuf::from(dir).join(name);
             if let Err(e) = std::fs::write(&path, &f.input) {
