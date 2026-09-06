@@ -8,6 +8,10 @@ f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,1).g((x
 // Ternary body - the arguments break out the same way
 f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,1).g((x)=>(a?b:c)/* c */);
 
+// Ternary body off a head call with one argument, and off a bare member: the same
+f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa).g((x)=>(a?b:c)/* c */);
+ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.g((x)=>(a?b:c)/* c */);
+
 // Array body - the arguments break out instead of hugging the brackets
 f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,1).g((x)=>[x]/* c */);
 

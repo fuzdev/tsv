@@ -111,7 +111,7 @@ pub(super) fn try_expand_last_arg(
     // Prettier excludes "concise" arrays (all numeric literals) — those use fill layout, whose
     // break characteristics the hug states can't express.
     let last_is_collection = last_arg.is_some_and(|arg| {
-        is_array_or_object_unwrapped(arg) && !printer.arg_is_concisely_printed_array(arg)
+        is_array_or_object_unwrapped(arg, printer) && !printer.arg_is_concisely_printed_array(arg)
     });
     if !(last_is_function || last_is_collection) {
         return None;
@@ -308,6 +308,9 @@ pub(super) fn try_expand_last_arg(
 
     // Different types: the 3-state ladder (inline → hug → expand all). For a breaking last
     // argument prettier keeps the hug — `[breakParent, conditionalGroup([hug,
-    // allArgsBrokenOut])]` — there is no forced-break → inline-or-expand-all form.
+    // allArgsBrokenOut])]` — there is no forced-break → inline-or-expand-all form. That
+    // screen lives inside the ladder rather than here, because every caller of it owes the
+    // same one; the same-type arm above keeps its own, since its answer (expand everything)
+    // is not a ladder at all.
     Some(opener.inline_hug_or_expand_all(d, &head_parts, last_arg_doc, all_args_broken))
 }

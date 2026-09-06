@@ -3,9 +3,9 @@
 	// stays hugged to `.g(` and the retained parens keep the comment on that line
 f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,1).g((x)=>({ k: x }/* c */));
 
-	// 101 chars: the argument expands onto its own line, the layout that reassembles
-	// the arrow around the object body
-   f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,1).g( (x)=>({ k: x }/* c */) );
+	// 101 chars: the object expands behind the signature, the argument's own
+	// expand-last printing, and the comment stays inside the parens
+f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,1).g((x)=>({ k: x }/* c */));
 
 	// last argument of a multi-argument call — 100 chars, everything inline
 f(1,(x)=>(g(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)/* c */));

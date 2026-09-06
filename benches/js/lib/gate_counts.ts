@@ -379,7 +379,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// `unknown` — the sole-parameter hug declines a non-empty default. Reasoning on
 	// `CORPUS_FORMAT_UNKNOWN_PIN`, whose svelte note carries the two-mover byte-diff this
 	// step shares.
-	typescript: 5144,
+	//
+	// 5144 → 5150: six files arrive from `unknown` — the member-chain / assignment
+	// break-priority cluster, named with their causes and the seven-mover byte-diff on
+	// `CORPUS_FORMAT_UNKNOWN_PIN`'s `95 → 89` step.
+	typescript: 5150,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -454,28 +458,11 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// — the held half, cataloged and fixtured rather than matched. Measurement on
 	// `CORPUS_FORMAT_MATCH_MIN`.
 	svelte: 0,
-	// Five of the `third_party` arrivals are still open, all of them the member-chain /
-	// assignment / binaryish break-priority cluster, pinned here as the gate's backlog rather
-	// than sanctioned:
-	//   `language-tools/…/typescript/features/CompletionProvider.ts` — a declarator whose init
-	//     is a `this.x.call()?.a?.b…` chain: prettier keeps the head on the `=` line and breaks
-	//     the chain; tsv breaks after `=` and indents the whole chain.
-	//   `language-tools/…/typescript/features/FoldingRangeProvider.ts` — `!!this.x.call()?.a
-	//     ?.b?.c` in a declarator: a one-call chain is poorly breakable, so prettier breaks
-	//     after `=` and keeps it whole; tsv breaks before the last `?.prop`.
-	//   `language-tools/…/typescript/features/RenameProvider.ts` — `lang.call(a, b)
-	//     ?.definitions?.[0]`: prettier keeps the call flat and breaks before `?.definitions`;
-	//     tsv breaks the call's arguments.
-	//   `layerchart/…/components/Chart/Chart.shared.svelte.ts` — a type alias with three
-	//     constrained or defaulted params: prettier's `isComplexTypeAliasParams` takes
-	//     `break-lhs` (the params break, `=` stays on the closing line); tsv keeps them flat
-	//     and breaks after `=`.
-	//   `layerchart/…/utils/canvas.svelte.test.ts` — a hugged last-argument `function (this:
-	//     T, ...args: any) {…}` whose params do not fit: prettier keeps the hug and breaks the
-	//     params (its expanded-state fits measures nested groups in break mode); tsv breaks
-	//     every argument.
+	// No `third_party` arrival is open any more: the member-chain / assignment break-priority
+	// cluster the tier brought in is closed (the `95 → 89` step below names each file).
 	//
-	// 103 → 114: eleven arrive with the `third_party` tier — the five above, plus
+	// 103 → 114: eleven arrive with the `third_party` tier — the five the `95 → 89` step
+	// names, plus
 	// `source-mapper.ts` (which has since left, at `98 → 97` below), plus
 	// `addComponentExport.ts`, `ExportedNames.ts`, `incremental.ts`, `options.ts` and
 	// `layercake/src/_data/unemployment.js`, the one OVER-WIDTH output of the group.
@@ -562,7 +549,41 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// layout beside its detector-known chained-conditional one. Measured by set-diffing the
 	// suite's `--json` unknown lists between the tree and the same tree with the change
 	// reverse-applied: that file is the only mover in any bucket.
-	typescript: 95,
+	//
+	// 95 → 89: six files LEAVE for `match` — the member-chain / assignment break-priority
+	// cluster. One cause each:
+	//   `language-tools/…/typescript/features/RenameProvider.ts` — the trailing tail a chain
+	//     peels off its last call now holds computed lookups and `!` too (`?.definitions?.[0]`),
+	//     each printed outside the chain as prettier's `printMemberExpression` does, so the
+	//     call stays flat and the lookup takes the break.
+	//   `language-tools/…/typescript/features/CompletionProvider.ts` — prettier's `memberChain`
+	//     label is answered off the chain's own grouping against the short-chain cutoff
+	//     (`this.x.y()?.…includes('s')` is three groups with no merge), where a call count
+	//     had read every `this`-rooted chain as a merged factory head.
+	//   `language-tools/…/typescript/features/FoldingRangeProvider.ts` — the declarator asks
+	//     `shouldBreakAfterOperator` of the value UNDER its wrappers (`!!chain`, `await chain`),
+	//     as the assignment twin already did.
+	//   `prettier/tests/format/js/assignment/discussion-15196.js` — the same unwrap, reached
+	//     through `void !!(await chain)`.
+	//   `layerchart/…/components/Chart/Chart.shared.svelte.ts` — the alias's break-lhs arm
+	//     (`isComplexTypeAliasParams`) is asked ahead of the intersection / conditional /
+	//     internal-breaking layouts, so the `<…>` list breaks and the `=` keeps the `>` line.
+	//   `layerchart/…/utils/canvas.svelte.test.ts` — a last argument that will break offers
+	//     prettier's two-state ladder (hug, then all broken out), so a chain measuring the
+	//     call reads the hug and stops at the parameter list's own softline; and a short
+	//     chain is a plain group whatever its first call's arity, its renderer walking that
+	//     ladder to the hug.
+	// Measured as two staged trees over 9,117 `find`-enumerated snapshot + suite files
+	// formatted by a pre-change and a tip `--profile corpus` CLI: these six are the ONLY files
+	// whose bytes change, with the per-file error output identical line for line; the
+	// `--all --json` bucket lists set-diffed across the same two FFI builds show nothing
+	// arriving anywhere — `partial` / `safety` / `errors` / `expected_errors` identical
+	// file-for-file. One more rule rides in corpus-NEUTRAL by construction: the container
+	// predicate refuses an EMPTY literal under a cast the way `couldExpandArg` does, which is
+	// what keeps `language-tools/…/typescript-plugin/src/language-service/find-references.ts`
+	// (`fn(cb, <ts.ReferenceEntry[]>[])`) byte-identical once the short-chain ladder that had
+	// been holding it broken out is gone.
+	typescript: 89,
 	css: 23
 };
 

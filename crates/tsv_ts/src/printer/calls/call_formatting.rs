@@ -780,7 +780,7 @@ fn try_single_arg_hug(
         // Object/array literals, and type assertions wrapping them — the shared arm, so the
         // `new` twin cannot answer either half differently
         // ([`build_single_container_arg_doc`]).
-        _ if is_array_or_object_unwrapped(arg) => {
+        _ if is_array_or_object_unwrapped(arg, printer) => {
             return Some(build_single_container_arg_doc(printer, callee, arg));
         }
 

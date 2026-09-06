@@ -121,19 +121,6 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a>(
     d.concat(&[first_doc, d.indent(d.concat(&rest))])
 }
 
-/// Whether a node opens a new segment — i.e. whether a break point may precede it.
-///
-/// A `.prop` lookup may break onto its own line; a computed `[i]` / `?.[i]` lookup may
-/// NOT. Prettier's `printMemberExpression` (member.js) inlines every computed lookup
-/// (`shouldInline` includes `node.computed`), so a computed access stays glued to the
-/// object and sheds width by breaking its own brackets instead (`computed_lookup_doc`).
-/// Giving it a segment of its own would put a softline before the `[`, which prettier
-/// never emits — and the breakable brackets make it unnecessary for fitting an overlong
-/// computed access.
-fn starts_segment(node: &ChainNode<'_>) -> bool {
-    node.is_member() && !node.is_computed()
-}
-
 /// Prettier's `shouldInline` clause for a lone `a.prop` (member.js): the lookup's OBJECT
 /// is an `Identifier`, its PROPERTY is an `Identifier`, and its first non-chain-element-
 /// wrapper parent is not itself a member. Every one of the three is literal, and after
@@ -177,7 +164,7 @@ fn lone_lookup_off_bare_base(nodes: &[&ChainNode<'_>]) -> bool {
 /// `printMemberExpression`.
 ///
 /// Break points are ONLY at member access (`.foo`), not at non-null (`!`) and not at a
-/// computed lookup (`[i]` — see `starts_segment`). This ensures `.foo!` stays together as
+/// computed lookup (`[i]` — see [`ChainNode::is_dot_lookup`]). This ensures `.foo!` stays together as
 /// a unit.
 ///
 /// Example: `a!.b!.c!` breaks as:
@@ -231,7 +218,7 @@ pub(super) fn build_member_only_chain_doc<'a>(
     // - a lone `a.prop` off a bare base ([`lone_lookup_off_bare_base`]).
     //
     // A fourth clause reaches this builder without deciding anything here —
-    // `node.computed` is answered by `starts_segment`, which opens no segment for a
+    // `node.computed` is answered by [`ChainNode::is_dot_lookup`], which opens no segment for a
     // computed lookup, so its own bracket group survives untouched on either path —
     // which is what keeps `chooseLayout`'s `canBreakLeftDoc` true for `params['key'] = …`.
     //
@@ -285,14 +272,14 @@ pub(super) fn build_member_only_chain_doc<'a>(
     //
     // Nodes print in source order, and `print_node` handles each member node's own block
     // comments.
-    let base_run_end = all_nodes.iter().take_while(|n| !starts_segment(n)).count();
+    let base_run_end = all_nodes.iter().take_while(|n| !n.is_dot_lookup()).count();
     let mut parts = DocBuf::new();
     parts.extend(
         all_nodes[..base_run_end]
             .iter()
             .map(|n| print_node(n, printer)),
     );
-    for segment in all_nodes[base_run_end..].chunk_by(|_, next| !starts_segment(next)) {
+    for segment in all_nodes[base_run_end..].chunk_by(|_, next| !next.is_dot_lookup()) {
         // A run opens with a segment-starter — the one node its break point belongs to —
         // and everything after it is glued: concatenated AFTER the group, never inside it.
         for (i, node) in segment.iter().enumerate() {

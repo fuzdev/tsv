@@ -29,8 +29,9 @@
 			Foo();
 
 		// In value position the continuation sits one level under the statement.
-		const c = await // c8
-			fn2();
+		const c =
+			await // c8
+				fn2();
 
 		// Control: a single-line block forces nothing, so it collapses inline and there is
 		// no continuation to indent.

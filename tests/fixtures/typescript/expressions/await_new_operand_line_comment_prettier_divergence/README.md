@@ -32,9 +32,9 @@ What the cases pin, beyond the plain `new`/`await` continuation (c1, c2, c3):
 - **c7** — an own-line **multiline** block hangs for its own reason (inlining it
   would reflow the author's break) and takes the same indent, matching the
   `keyof`/`extends`/`=` siblings that share this shape.
-- **c8** — in value position the continuation is one level under the statement.
-  Prettier additionally breaks the `=` there; tsv keeps the `await` on the `=`
-  line, so this case diverges in two ways at once.
+- **c8** — in value position the `=` breaks in both formatters (`await fn2()` is a
+  poorly breakable chain, so `chooseLayout` hangs it) and the continuation sits one
+  level under the hung `await`; only that indent diverges.
 - **c9** — the control: a single-line block forces nothing, collapses inline, and
   has no continuation to indent (the block sibling's rule).
 

@@ -7,8 +7,8 @@ use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ContinuationValue, LeadingGlue, OwnedCommentEffect,
     ParenContext, analysis, class_expr_has_decorators, conditional_should_break_after_op,
     is_curried_arrow_chain, is_curried_arrow_chain_that_breaks, is_module_path_fluid_call,
-    is_multiline_string_literal, is_poorly_breakable_chain, is_simple_value, is_string_literal,
-    is_type_assertion_call, needs_parens, should_inline_logical_expression,
+    is_multiline_string_literal, is_simple_value, is_type_assertion_call, needs_parens,
+    should_break_after_operator, should_inline_logical_expression,
 };
 use smallvec::smallvec;
 use std::cell::LazyCell;
@@ -278,10 +278,11 @@ impl<'a> Printer<'a> {
         // list alone drifts the same way: a call-free chain's member-gap comment is
         // `is_poorly_breakable_chain`'s own question (its gate is scoped to a chain that
         // holds a CALL, where prettier's `memberChain` label lives), so it takes no
-        // cancelling term here that `choose_layout` would lack.
+        // cancelling term here that `choose_layout` would lack. The string / poorly-
+        // breakable pair is the twin's own `should_break_after_operator`, which asks it
+        // of the value UNDER its wrappers (`!!chain`, `await chain`) as prettier does.
         let should_break_after_op_rhs = is_module_path_fluid_call(init, self.source)
-            || is_poorly_breakable_chain(init, self)
-            || is_string_literal(init)
+            || should_break_after_operator(init, self)
             // A SEQUENCE init breaks after the `=` and lays its operands out under
             // one indent, prettier's own `shouldBreakAfterOperator` switch arm —
             // the same fact `choose_layout` states for the assignment-RHS twin.

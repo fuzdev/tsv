@@ -163,7 +163,7 @@ pub(super) fn build_call_args_doc_for_chain(
     call: &internal::CallExpression<'_>,
     facts: ChainCall,
 ) -> DocId {
-    build_call_args_doc_for_chain_impl(printer, call, facts, false, false)
+    build_call_args_doc_for_chain_impl(printer, call, facts, false)
 }
 
 /// A lone arrow argument with an EXPRESSION body — the shape every hug arm in
@@ -222,22 +222,7 @@ pub(super) fn build_call_args_doc_for_chain_expanded(
     call: &internal::CallExpression<'_>,
     facts: ChainCall,
 ) -> DocId {
-    build_call_args_doc_for_chain_impl(printer, call, facts, true, false)
-}
-
-/// Build a Doc for call arguments with standard forced expansion
-///
-/// Like `build_call_args_doc_for_chain_expanded`, but always uses the standard
-/// `(\n  args,\n)` form — never the arrow-hugging `(sig =>\n  body,\n)` form.
-/// Used for the "first call inline, rest expanded" state in short chains where
-/// the chain doesn't break between groups, so the arrow signature would add
-/// too much to the first line.
-pub(super) fn build_call_args_doc_for_chain_standard_expanded(
-    printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
-    facts: ChainCall,
-) -> DocId {
-    build_call_args_doc_for_chain_impl(printer, call, facts, true, true)
+    build_call_args_doc_for_chain_impl(printer, call, facts, true)
 }
 
 /// Shared per-call state computed once in `build_call_args_doc_for_chain_impl`'s
@@ -281,7 +266,6 @@ struct ChainArgsContext {
     last_arg_commented: bool,
     has_trailing_block_comments: bool,
     comments_force_expansion: bool,
-    standard_expansion: bool,
     leading_comment_doc: Option<DocId>,
 }
 
@@ -291,7 +275,6 @@ fn build_call_args_doc_for_chain_impl(
     call: &internal::CallExpression<'_>,
     facts: ChainCall,
     force_expand: bool,
-    standard_expansion: bool,
 ) -> DocId {
     let ChainCall { own_call_layout } = facts;
     // Build type arguments if present: `<T, U>`
@@ -424,7 +407,6 @@ fn build_call_args_doc_for_chain_impl(
         last_arg_commented,
         has_trailing_block_comments,
         comments_force_expansion,
-        standard_expansion,
         leading_comment_doc,
     };
 
@@ -507,7 +489,6 @@ fn build_chain_args_force_expand(
         last_arg_commented,
         has_trailing_block_comments,
         comments_force_expansion,
-        standard_expansion,
         leading_comment_doc,
         ..
     } = ctx;
@@ -564,12 +545,10 @@ fn build_chain_args_force_expand(
         //
         // TODO: this is the one reassembling arm that asks half the refusal pair — the
         // body-tail question alone, where its OBJECT twin below asks
-        // `arrow_hug_refused_by_comments` (and `!standard_expansion`). Instrumenting the arm's
-        // entry over ~23k files (`tests/fixtures` + the prettier / svelte / kit / zzz / gro
-        // trees) reaches it 6 times, all of them inside `tests/fixtures`: the signature
-        // question is false at EVERY hit, so adding it cannot fire, and two of the hits DO
-        // carry `standard_expansion` yet adding that half moves zero bytes (the state it
-        // would change is not the one selected there). So no input separates either half —
+        // `arrow_hug_refused_by_comments`. Instrumenting the arm's entry over ~23k files
+        // (`tests/fixtures` + the prettier / svelte / kit / zzz / gro trees) reaches it 6
+        // times, all of them inside `tests/fixtures`, and the signature question is false
+        // at EVERY hit, so adding it cannot fire. No input separates the two halves —
         // hence no fixture, hence no change. Close it the moment one turns up.
         if matches!(body_expr, Expression::ArrayExpression(_))
             && !arrow_body_tail_has_comments(printer, arrow, body_expr)
@@ -579,12 +558,9 @@ fn build_chain_args_force_expand(
         }
 
         // OBJECT body: `(sig => ({\n  props\n}))` — the object expands behind its
-        // grammar-required parens, synthesized here. Skipped under standard expansion —
-        // prettier's all-broken fallback prints the argument normally (`(\n  sig => ({ … })
-        // \n)`), the object breaking by width alone — and when a break forced inside the
-        // signature invalidates the hug (`arrow_signature_has_breaking_comments`).
+        // grammar-required parens, synthesized here. Skipped when a break forced inside
+        // the signature invalidates the hug (`arrow_signature_has_breaking_comments`).
         if matches!(body_expr, Expression::ObjectExpression(_))
-            && !standard_expansion
             && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
         {
             let body_doc = d.parens(printer.build_arg_expression_doc_expanded(body_expr));
@@ -594,15 +570,10 @@ fn build_chain_args_force_expand(
         // BREAKABLE body (call, ternary): the arrow-hugging break state directly,
         // `(sig =>\n  body,\n)` — prettier keeps the signature hugged even when forcing
         // expansion. couldExpandArg keys on the body type (looking through the return-type
-        // annotation and a trailing `!`), so typed-return arrows hug too.
-        // Skipped under standard expansion — short chains where the chain doesn't break
-        // between groups need the standard `(\n  args,\n)` form to keep the first line short
-        // enough for fits(); the standard form routes the argument→`)` gap through
-        // `emit_last_arg_trailing_comments`, which is also prettier's layout for a commented
-        // argument. Skipped on a signature break and on a body-tail comment for the same
-        // reasons as the object arm above.
-        if !standard_expansion
-            && (arrow_body_is_call_through_non_null(body_expr) || is_ternary_arrow_body(body_expr))
+        // annotation and a trailing `!`), so typed-return arrows hug too. Skipped on a
+        // signature break and on a body-tail comment for the same reasons as the object
+        // arm above.
+        if (arrow_body_is_call_through_non_null(body_expr) || is_ternary_arrow_body(body_expr))
             && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
         {
             let body_doc = printer.build_expression_doc(body_expr);
@@ -1154,6 +1125,14 @@ fn build_chain_args_single(
             // Needs soft-break wrapping - e.g., long strings
             opener.wrap_soft(d, arg_with_comments)
         }
+        ChainArgKind::NeedsWrapper if last_arg_commented => {
+            // A comment TRAILING the argument defeats this hug exactly as it defeats the
+            // natural one below: prettier's `shouldExpandLastArg` refuses on
+            // `hasComment(lastArg, Trailing)`, so the call takes the default broken-out
+            // layout — `.g(⏎\t(x) => (a ? b : c) /* c */⏎)`, the ternary parenthesized as
+            // an unbroken arrow body is (`calls/chained/trailing_arg_comment_long`).
+            opener.wrap_soft(d, arg_with_comments)
+        }
         ChainArgKind::NeedsWrapper => {
             // Huggable with internal break points (ternary, etc.)
             // Hugs opening paren; breaks the closing paren onto its own line
@@ -1447,7 +1426,7 @@ fn build_chain_args_multi(
     //
     // Skip when last two args have the same outer type - use expand-all instead.
     if call.arguments.len() >= 2
-        && last_arg_is_array_or_object(call.arguments)
+        && last_arg_is_array_or_object(call.arguments, printer)
         && !call
             .arguments
             .last()

@@ -787,7 +787,18 @@ pub fn group_chain_nodes<'a>(
 /// Corresponds to prettier's `shouldMerge` logic:
 /// - `Object.keys(items).filter()` → merge "Object" + ".keys()" on first line
 /// - `_.values(obj).map()` → merge "_" + ".values()" on first line
-pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> bool {
+///
+/// `in_expression_statement` is prettier's `isExpressionStatement` — whether the chain's
+/// outermost call is an expression statement's own expression, which is what admits the
+/// short-name merge (`d3.scaleLinear()`). The caller states it: the chain builder reads the
+/// statement printer's flag, and the assignment layout's label question
+/// ([`super::builder::call_prints_as_member_chain`]) passes `false`, since prettier asks
+/// the CALL's parent there and that parent is the assignment.
+pub(super) fn should_merge_first_groups<'a>(
+    groups: &[ChainGroup<'a>],
+    in_expression_statement: bool,
+    printer: &Printer<'_>,
+) -> bool {
     if groups.len() < 2 {
         return false;
     }
@@ -801,7 +812,7 @@ pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printe
         return false;
     }
 
-    should_not_wrap(groups, printer)
+    should_not_wrap(groups, in_expression_statement, printer)
 }
 
 /// Whether a chain node's comment gap (see [`ChainNode::comment_range`]) holds a
@@ -845,7 +856,11 @@ fn gap_has_line_comment(node: &ChainNode<'_>, printer: &Printer<'_>) -> bool {
 /// Corresponds to prettier's `shouldNotWrap` logic:
 /// - Single base that's `this`, factory identifier, or short name (in expression statement)
 /// - Multiple nodes where last is member with factory property
-pub fn should_not_wrap<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> bool {
+fn should_not_wrap<'a>(
+    groups: &[ChainGroup<'a>],
+    in_expression_statement: bool,
+    printer: &Printer<'_>,
+) -> bool {
     if groups.len() < 2 {
         return false;
     }
@@ -871,7 +886,7 @@ pub fn should_not_wrap<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> 
             Expression::Identifier(id) => {
                 is_factory_name(id.ident_name(), id.span.start, printer)
                     || has_computed
-                    || (printer.is_expression_statement()
+                    || (in_expression_statement
                         && is_short_name(id.ident_name(), id.span.start, printer))
             }
 

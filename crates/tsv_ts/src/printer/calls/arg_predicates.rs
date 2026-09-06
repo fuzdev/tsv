@@ -277,10 +277,7 @@ where
         }
         Expression::TSAsExpression(_)
         | Expression::TSSatisfiesExpression(_)
-        | Expression::TSTypeAssertion(_) => {
-            let inner = unwrap_ts_type_wrappers(arg);
-            (inner, inner.span().start)
-        }
+        | Expression::TSTypeAssertion(_) => unwrap_ts_type_wrappers(arg),
         _ => return false,
     };
 
@@ -328,32 +325,78 @@ pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
 
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
 #[inline]
-pub(super) fn last_arg_is_array_or_object(arguments: &[Expression<'_>]) -> bool {
-    arguments.last().is_some_and(is_array_or_object_unwrapped)
+pub(super) fn last_arg_is_array_or_object(
+    arguments: &[Expression<'_>],
+    printer: &Printer<'_>,
+) -> bool {
+    arguments
+        .last()
+        .is_some_and(|arg| is_array_or_object_unwrapped(arg, printer))
 }
 
-/// Check if an expression is an array or object, unwrapping TS type wrappers
-pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>) -> bool {
-    matches!(
-        unwrap_ts_type_wrappers(expr),
-        Expression::ArrayExpression(_) | Expression::ObjectExpression(_)
-    )
+/// The container half of prettier's `couldExpandArg`: an object or array literal — read
+/// through the TS casts — that is NON-EMPTY, or empty but carrying a comment
+/// (`arg.properties.length > 0 || hasComment(arg)`, and the array twin).
+///
+/// The emptiness clause is load-bearing under a cast: an empty `{}` / `[]` has nothing to
+/// expand, so a hug state of it renders as its flat state and falls through — but
+/// `<T[]>[]` puts the cast's own `<…>` group inside the hug, and a walk that reaches it
+/// selects the hug and breaks the TYPE (`fn(cb, <⏎\tT[]⏎>[])`) where prettier, refusing the
+/// expansion, breaks every argument out (`calls/empty_container_cast_last_arg_long`). The
+/// comment clause reads **on page** from where a leading comment starts attaching to the
+/// container ([`unwrap_ts_type_wrappers`]) through its end: a dangling comment makes an
+/// empty literal print multi-line, and a comment after a `<T>` assertion's `>` is the
+/// literal's own leading one — which is why `<T[]>/* c */ []` expands where `<T[]>[]` does
+/// not.
+///
+/// What leads the whole ARGUMENT is deliberately not read here, the one axis on which this
+/// stops short of `hasComment`. It can only matter for an EMPTY bare container, and an empty
+/// one has nothing to break: its hug state renders as its flat state, so every ladder this
+/// feeds lands on the same bytes whether the clause admits it or not. The expand-FIRST twin,
+/// where the same comment does decide, takes that gap as a parameter
+/// ([`could_expand_collection_arg`]).
+pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
+    let (inner, leading_from) = unwrap_ts_type_wrappers(expr);
+    let non_empty = match inner {
+        Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
+        Expression::ObjectExpression(obj) => !obj.properties.is_empty(),
+        _ => return false,
+    };
+    non_empty || printer.has_comments_on_page_between(leading_from, inner.span().end)
 }
 
-/// Unwrap the TypeScript cast wrappers (`as`, `satisfies`, `<T>`) to get the inner expression.
-/// Returns the innermost non-cast expression.
+/// Unwrap the TypeScript cast wrappers (`as`, `satisfies`, `<T>`) to get the inner
+/// expression, together with the position from which a LEADING comment attaches to that
+/// inner expression rather than to something around it.
 ///
 /// Mirrors Prettier's `couldExpandArg`, which looks through `isBinaryCastExpression`
 /// (`as`/`satisfies`) and `TSTypeAssertion` (`<T>x`) but NOT `TSNonNullExpression`: a
 /// `{...}!` / `[...]!` argument is not treated as an expandable object/array, so it does
 /// not hug the call parens.
-fn unwrap_ts_type_wrappers<'a>(mut expr: &'a Expression<'a>) -> &'a Expression<'a> {
+///
+/// **The window is the half `hasComment` reads and a span cannot give.** `couldExpandArg`
+/// recurses and only then asks `hasComment` of whatever it landed on, so the question is
+/// which comments attach THERE. A `<T>` assertion is the one wrapper that puts source AHEAD
+/// of what it wraps, so a comment written after its `>` is the inner node's own leading
+/// comment: `<T[]>/* c */ []` satisfies the clause where `<T[]>[]` does not. Every other
+/// spelling starts where the inner node does — under `as` / `satisfies` the inner comes
+/// FIRST, so a comment ahead of it precedes the whole CAST and attaches there
+/// (`/* c */ [] as T` does not expand). Nested assertions take the innermost `>`.
+///
+/// What leads the whole ARGUMENT is the caller's question, since only the caller knows where
+/// that gap opens — see [`could_expand_collection_arg`] and
+/// [`is_array_or_object_unwrapped`], which answer it differently and say why.
+fn unwrap_ts_type_wrappers<'a>(mut expr: &'a Expression<'a>) -> (&'a Expression<'a>, u32) {
+    let mut leading_from = expr.span().start;
     loop {
         expr = match expr {
             Expression::TSAsExpression(cast) => cast.expression,
             Expression::TSSatisfiesExpression(cast) => cast.expression,
-            Expression::TSTypeAssertion(cast) => cast.expression,
-            _ => return expr,
+            Expression::TSTypeAssertion(cast) => {
+                leading_from = cast.type_annotation.span().end;
+                cast.expression
+            }
+            _ => return (expr, leading_from),
         };
     }
 }
