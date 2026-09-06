@@ -1,0 +1,95 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 156,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 88,
+				"end": 147,
+				"name": "supports",
+				"prelude": "s\\65 lector(#ABC)",
+				"block": {
+					"type": "Block",
+					"start": 116,
+					"end": 147,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 120,
+								"end": 123,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 120,
+										"end": 123,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 120,
+														"end": 123
+													}
+												],
+												"start": 120,
+												"end": 123
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 124,
+								"end": 144,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 129,
+										"end": 139,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 120,
+							"end": 144
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a CSS function name is ASCII case-insensitive and may be escape-spelled ",
+				"start": 9,
+				"end": 86
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 148,
+			"styles": "\n\t/* a CSS function name is ASCII case-insensitive and may be escape-spelled */\n\t@supports s\\65 lector(#ABC) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 157,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

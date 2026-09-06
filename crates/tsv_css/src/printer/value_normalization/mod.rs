@@ -44,6 +44,12 @@ use tsv_lang::printing::format_string_literal;
 /// its whole content is copied verbatim regardless of `lowercase_hex` (a path like
 /// `url(sprite1.50.png)` is never number/unit-normalized). A quoted `url("…")` is a
 /// function with a `<string>` arg and takes normal quote normalization.
+///
+/// A number **abutting the identifier before it** is that identifier's own tail, not a
+/// value: `x1.50` is the ident `x1` then `.50`, and giving the number its canonical leading
+/// zero would hand the `0` to the ident (`x10` then `.5`). Such a pair is copied verbatim,
+/// unit included — the same rule prettier states as `(WORD_PART)?(NUMBER)(UNIT)?` returned
+/// unchanged when the word part matched.
 pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
     let bytes = input.as_bytes();
     let mut out = String::with_capacity(input.len());
@@ -57,11 +63,17 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
     // immediately follows opens a preserve group (a CSS function token requires the
     // `(` to abut the name — any char between, incl. whitespace, breaks it).
     let mut prev_ident_preserve_fn = false;
+    // Whether the run just emitted ends in a character that would absorb a digit appended
+    // to it, so a number abutting it here is that run's own tail rather than a value of
+    // its own — see the number arm.
+    let mut prev_run_absorbs_digit = false;
 
     while i < bytes.len() {
         let b = bytes[i];
         let after_preserve_ident = prev_ident_preserve_fn;
         prev_ident_preserve_fn = false;
+        let after_absorbing_run = prev_run_absorbs_digit;
+        prev_run_absorbs_digit = false;
 
         // An escape is opaque — its payload is content, never structure (§4.3.7, and
         // `crate::escapes::escape_len` for the extent, terminator included). Copied whole
@@ -78,16 +90,15 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
         //   number.
         //
         // ⚠️ It does NOT widen the identifier run below, which deliberately stops at an
-        // escape: an ident sequence's real extent would pull the digits after a hex escape
-        // into the ident (`\41 2.50px` is the ident `A2` then `.50px`), and the number arm
-        // then glues its leading zero onto the ident (`\41 20.5px` — the ident `A20`).
-        // The one thing that costs is url-token recognition through an escaped name; see
-        // the `url` arm below.
-        if b == b'\\'
-            && let Some(len) = crate::escapes::escape_len(input, i)
-        {
-            out.push_str(&input[i..i + len]);
-            i += len;
+        // escape. Prettier's prelude passes read an escape's payload as ordinary text too,
+        // so stopping here is what keeps the two agreeing: `\41 2.50px` is emitted as
+        // `\41 2.5px` by both, where reading the ident sequence's real extent (`A2`, then
+        // `.50px`) would hand the number arm a word part to glue against and produce
+        // `\41 20.5px` — the ident `A20`. The escape-spelled function name that costs is
+        // the `url` arm below, where prettier is blind in the same direction.
+        if let Some(end) = escape_span_at(input, i) {
+            out.push_str(&input[i..end]);
+            i = end;
             continue;
         }
 
@@ -148,10 +159,13 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
             // through the normal string branch (quote normalization), so leave it.
             //
             // ⚠️ The name is matched on the run's own bytes, so an **escape-spelled** one
-            // (`u\72 l(`, the same `<url-token>`) is missed and its content normalizes —
-            // `u\72 l(x1.50)` comes back as `u\72 l(x10.5)`, a different path. Closing it
-            // wants the ident SEQUENCE's extent (escapes included) at this position, which
-            // is not the run this branch emits; tracked in the CSS checklist §Escapes.
+            // (`u\72 l(`, the same `<url-token>`) is missed and its content normalizes.
+            // That is **parity, not a gap**: prettier's prelude passes match the name
+            // literally too, so `u\72 l(1.50)` is `1.5` and `u\72 l(#FFF)` is `#fff` on
+            // both sides. Teaching this arm the ident sequence's real extent would make
+            // tsv the only one preserving them. The parser's own recognition, which does
+            // decode the escape (`printer::values::function_name_is`), answers a different
+            // question — an `@import` prelude the lexer tokenized, not this raw text.
             if ident.eq_ignore_ascii_case("url")
                 && bytes.get(i) == Some(&b'(')
                 && !url_arg_is_quoted(input, i)
@@ -164,6 +178,12 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
             // an ID selector's `#` is case-sensitive (numbers inside stay on the normal
             // path — the documented `selector()` over-normalization).
             prev_ident_preserve_fn = ident.eq_ignore_ascii_case("selector");
+            // A digit appended to this run joins it only when the run's last code point is
+            // a CSS *ident* code point (§"ident code point": letter, digit, `-`, `_`,
+            // non-ASCII). `$` and `@`, which this module's deliberately permissive ident
+            // class also admits so preprocessor-flavoured preludes stay readable, are
+            // delim tokens that absorb nothing — `$` + `.50` may safely become `$0.5`.
+            prev_run_absorbs_digit = ident.ends_with(is_css_ident_code_point);
             continue;
         }
 
@@ -210,11 +230,28 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
             let unit = &input[unit_start..i];
             // Inside a `selector(...)` group the digits are selector syntax — an
             // `<an+b>` term, an attribute value — not a `<number>` with a canonical
-            // serialization, so they are copied like the `#`-token above.
-            if preserve_from.is_none()
-                && (unit.is_empty() || unit.eq_ignore_ascii_case("n") || is_known_css_unit(unit))
-            {
-                out.push_str(&normalize_css_number(num));
+            // serialization, so they are copied verbatim like the `#`-token above; so is
+            // a number carrying a unit CSS doesn't define (`1abc`).
+            let normalized = (preserve_from.is_none()
+                && (unit.is_empty() || unit.eq_ignore_ascii_case("n") || is_known_css_unit(unit)))
+            .then(|| normalize_css_number(num))
+            // A number abutting the identifier run just emitted must not begin with a
+            // character that identifier would absorb: the canonical form of a `.`-leading
+            // number carries a leading `0`, so `x1` + `.50` came back as `x10` + `.5` —
+            // two different tokens. The pair is copied through instead, which is what
+            // prettier's own scan does (`print/misc.js`: a `(WORD_PART)?(NUMBER)(UNIT)?`
+            // match is returned verbatim when the word part matched). A signed number is
+            // never at risk, since the sign it keeps merges with nothing — `x+1.50` still
+            // normalizes.
+            //
+            // Only the ident arm sets `after_absorbing_run`. A number after a *number*
+            // (`1a` + `.50`) or a `#`-token (`#1` + `.50`) merges the same way, but
+            // prettier's two prelude paths disagree about those — `@supports` prints value
+            // nodes, `@media` runs the regex — so each is its own oracle question, tracked
+            // in the CSS checklist §Escapes.
+            .filter(|n| !(after_absorbing_run && n.starts_with(is_css_ident_code_point)));
+            if let Some(normalized) = normalized {
+                out.push_str(&normalized);
                 // `canonical_unit` lowercases a known unit (`PX`→`px`) and leaves the
                 // `n`/empty cases untouched (neither is a known unit).
                 out.push_str(&canonical_unit(unit));
@@ -284,10 +321,8 @@ fn consume_paren_group<'s>(s: &'s str, i: &mut usize) -> &'s str {
     let mut depth = 0usize;
     while *i < s.len() {
         let b = bytes[*i];
-        if b == b'\\'
-            && let Some(len) = crate::escapes::escape_len(s, *i)
-        {
-            *i += len;
+        if let Some(end) = escape_span_at(s, *i) {
+            *i = end;
             continue;
         }
         *i += 1;
@@ -313,6 +348,61 @@ fn is_ident_continue(ch: char) -> bool {
     is_ident_start(ch) || ch.is_ascii_digit() || ch == '-'
 }
 
+/// Is `ch` an **ident code point** as CSS Syntax 3 defines one — a letter, a digit, `-`,
+/// `_`, or a non-ASCII code point at the **lexer's** threshold?
+///
+/// The strict counterpart of [`is_ident_continue`], which additionally admits `$` and `@`
+/// so a preprocessor-flavoured prelude reads as one run rather than shattering. Those two
+/// are `<delim-token>`s to CSS proper, so they end a token where a real ident code point
+/// would extend one — the difference that decides whether appending a digit merges.
+///
+/// The non-ASCII half is `lexer::is_non_ascii_identifier_codepoint`, the crate's single
+/// source for that threshold, rather than a bare `!ch.is_ascii()`: this predicate answers
+/// what the *lexer* would join, and the lexer stops at the C1 controls (U+0080–U+009F).
+fn is_css_ident_code_point(ch: char) -> bool {
+    ch.is_ascii_alphanumeric()
+        || ch == '-'
+        || ch == '_'
+        || crate::lexer::is_non_ascii_identifier_codepoint(ch)
+}
+
+/// How far does the ident **sequence** starting at `start` reach — [`is_ident_continue`]'s
+/// class with escapes stepped whole?
+///
+/// CSS Syntax 3 §"Consume an ident sequence" appends an escape's code point to the name and
+/// keeps going, so an escape both begins and continues a sequence: `a\:b` is the single
+/// ident `a:b`, `--A\42 C` the single ident `--AB`. A scanner that stops at the `\` reads
+/// one name as two fragments, and any rule keyed on the *name* — the `--` prefix that makes
+/// a custom-media name case-sensitive, the name→value `:` — then reads the wrong one.
+///
+/// Returns `start` when nothing there can extend a sequence (a lone `\` that starts no
+/// escape — trailing, or before a newline, §4.3.4), so a caller that advances by the result
+/// must handle that case itself. Whether the first code point may *start* an ident is the
+/// caller's question; this only measures the reach.
+fn ident_sequence_end(s: &str, start: usize) -> usize {
+    let bytes = s.as_bytes();
+    let mut i = start;
+    while i < s.len() {
+        if bytes[i] == b'\\' {
+            // A `\` that starts no escape extends nothing, so the run ends at it.
+            let Some(end) = escape_span_at(s, i) else {
+                break;
+            };
+            i = end;
+            continue;
+        }
+        // `i` is a char boundary: the loop advances only by a whole escape or a whole char.
+        let Some(ch) = s[i..].chars().next() else {
+            break;
+        };
+        if !is_ident_continue(ch) {
+            break;
+        }
+        i += ch.len_utf8();
+    }
+    i
+}
+
 /// Lowercase the **feature name** in an `@media`/`@import` media-query string,
 /// matching prettier — which lowercases the `media-feature` name (`MIN-WIDTH` →
 /// `min-width`) but preserves media types (`SCREEN`), the `and`/`or`/`not`/`only`
@@ -332,11 +422,12 @@ fn is_ident_continue(ch: char) -> bool {
 /// preserves the whole grouped condition for consistency — see
 /// `media_grouped_feature_case_prettier_divergence`.)
 ///
-/// Within a simple expression the feature name is the identifier in **name
-/// position** — before the `:` (plain feature), or anywhere there's no `:` at all
-/// (boolean `(hover)` and range `(width >= 600px)` / `(600px <= width)`, whose values
-/// are numeric). The value after a `:` is preserved. A case-sensitive custom-media
-/// name (`--*`) is preserved (see [`maybe_lowercase_feature_name`]).
+/// Within a simple expression the feature name is everything in **name position** — before
+/// the `:` (plain feature), or the whole interior where there's no `:` at all (boolean
+/// `(hover)` and range `(width >= 600px)` / `(600px <= width)`, whose values are numeric);
+/// [`feature_name_end`] draws that line. The value after a `:` is preserved, and so is a
+/// name that is case-*sensitive* rather than a keyword — a custom media `--*` above all
+/// (see [`feature_name_preserves_case`]).
 pub(crate) fn lowercase_media_feature_names(query: &str) -> Cow<'_, str> {
     let bytes = query.as_bytes();
     // Cheap bail: nothing to lowercase without an uppercase ASCII letter.
@@ -357,11 +448,9 @@ pub(crate) fn lowercase_media_feature_names(query: &str) -> Cow<'_, str> {
         // media *type*, not the `(` that opens a feature expression, and reading it as one
         // handed the rest of the query to `scan_paren_group` as a single opaque group —
         // `@media a\(b and (MIN-WIDTH: 1px)` kept its uppercase feature name.
-        if bytes[i] == b'\\'
-            && let Some(len) = crate::escapes::escape_len(query, i)
-        {
-            out.push_str(&query[i..i + len]);
-            i += len;
+        if let Some(end) = escape_span_at(query, i) {
+            out.push_str(&query[i..end]);
+            i = end;
             continue;
         }
         match bytes[i] {
@@ -407,11 +496,12 @@ fn skip_string(s: &str, start: usize) -> usize {
 /// scanners below — each copies it through or skips it, but they must all agree on its
 /// extent and on what opens it.
 ///
-/// ⚠️ An **escape** is not trivia and is deliberately not here: it is content the scanner
-/// must copy, and the two media-feature scanners disagree about it on purpose —
-/// [`lowercase_media_feature_names`] steps one whole, [`lowercase_simple_feature_expr`] does
-/// not (the test beside them says why). Folding an escape arm in here would apply it to
-/// both.
+/// ⚠️ An **escape** is not trivia and is deliberately not here: it is *content*, and the two
+/// media-feature scanners want it for opposite reasons — [`lowercase_media_feature_names`]
+/// steps one whole to keep it out of the structure it scans for, while
+/// [`lowercase_simple_feature_expr`] runs the ident sequence *through* it
+/// ([`ident_sequence_end`]). A shared "skip this span" arm would give the second one the
+/// first one's answer and split the name at the escape again.
 fn trivia_span_at(s: &str, i: usize) -> Option<usize> {
     let bytes = s.as_bytes();
     match bytes[i] {
@@ -421,6 +511,24 @@ fn trivia_span_at(s: &str, i: usize) -> Option<usize> {
         b'"' | b'\'' => Some(skip_string(s, i)),
         _ => None,
     }
+}
+
+/// If a CSS escape starts at byte `i`, the index just past it (so `s[i..end]` is the whole
+/// escape, its optional whitespace terminator included); otherwise `None`.
+///
+/// The escape twin of [`trivia_span_at`], and the one spelling of the `\`-then-
+/// [`crate::escapes::escape_len`] pair every scanner in this module walks. `None` covers
+/// both "not an escape here" and "a `\` that starts none" (trailing, or before a newline —
+/// §4.3.4); a caller that must tell those apart tests the byte itself first.
+///
+/// ⚠️ Deliberately **not** folded into [`trivia_span_at`]: an escape is content, so a caller
+/// copies it where it skips trivia, and the two media-feature scanners want opposite things
+/// from it — see that function's note.
+fn escape_span_at(s: &str, i: usize) -> Option<usize> {
+    if s.as_bytes().get(i) != Some(&b'\\') {
+        return None;
+    }
+    Some(i + crate::escapes::escape_len(s, i)?)
 }
 
 /// Whether `b` is a byte that can end a CSS identifier (a function name, right before
@@ -455,10 +563,8 @@ fn scan_paren_group(s: &str, open: usize) -> (usize, bool) {
         // Nor does one inside an escape: `a\(b` is the single ident `a(b` (§"Consume an ident
         // sequence"), not a nested sub-condition, so the group stays a *simple* feature
         // expression and its name still lowercases.
-        if bytes[i] == b'\\'
-            && let Some(len) = crate::escapes::escape_len(s, i)
-        {
-            i += len;
+        if let Some(end) = escape_span_at(s, i) {
+            i = end;
             continue;
         }
         match bytes[i] {
@@ -490,67 +596,119 @@ fn scan_paren_group(s: &str, open: usize) -> (usize, bool) {
     (s.len(), has_nested)
 }
 
-/// Emit a simple media-feature expression `(…)` (no nested parens), lowercasing the
-/// feature name. See [`lowercase_media_feature_names`] for the name-position rule.
-fn lowercase_simple_feature_expr(group: &str, out: &mut String) {
+/// Where the feature **name** ends inside `group` (a whole `(…)` slice): the byte index of
+/// the name→value `:`, or `group.len()` for a boolean or range feature, which has none.
+///
+/// Trivia, escapes and a value function call's own parens are all stepped, so the `:` found
+/// is one that really separates a name from a value — not one inside a comment or string,
+/// not an escaped one (`(A\:B: 1px)` is a name carrying a `:`, per
+/// [`ident_sequence_end`]), and not one nested in a call (`(a: url(x:y))`).
+fn feature_name_end(group: &str) -> usize {
+    debug_assert!(
+        group.starts_with('('),
+        "a feature expression is its whole parenthesized group"
+    );
     let bytes = group.as_bytes();
     let mut i = 0;
-    let mut seen_colon = false;
+    // `group` opens with its own `(`, so the name sits at depth 1.
+    let mut depth = 0usize;
     while i < group.len() {
-        // Comments/strings copy through verbatim (a `:` inside one isn't the
-        // name/value separator).
+        if let Some(end) = trivia_span_at(group, i) {
+            i = end;
+            continue;
+        }
+        if let Some(end) = escape_span_at(group, i) {
+            i = end;
+            continue;
+        }
+        match bytes[i] {
+            b'(' => depth += 1,
+            b')' => depth = depth.saturating_sub(1),
+            b':' if depth == 1 => return i,
+            _ => {}
+        }
+        i += 1;
+    }
+    group.len()
+}
+
+/// Does the feature name spelled by `name` keep its case?
+///
+/// Prettier asks this of the **whole** media-feature node (`maybeToLowerCase` in
+/// `src/language-css/utilities/index.js`), and asking it of anything smaller is what let a
+/// case-sensitive name half-fold: tsv used to test each identifier run for the `--` prefix,
+/// so `(--A B: 1px)` preserved `--A` and lowercased `B`.
+///
+/// - `--` opens an `<extension-name>` (css-extensions-1), an author-defined name with no
+///   canonical casing to fold to — unlike a plain feature name, which is a pre-defined
+///   keyword and so ASCII case-insensitive (css-values-4 §"Pre-defined Keywords").
+/// - `$`, `@`, `#` and a leading `%` are prettier's preprocessor accommodations (`$var`,
+///   `@var`, `#{…}`, `%placeholder`). tsv's parser is permissive enough to reach them, and
+///   folding the case of a name it does not understand can only lose information.
+/// - A name holding a balanced call is likewise not a keyword.
+///
+/// Prettier's remaining `:--` arm is unreachable here: the name region ends at the first
+/// separator `:`, so a name cannot begin with one.
+fn feature_name_preserves_case(name: &str) -> bool {
+    name.starts_with("--")
+        || name.starts_with('%')
+        || name.contains(['$', '@', '#'])
+        || (name.contains('(') && name.contains(')'))
+}
+
+/// Emit a simple media-feature expression `(…)` (no nested sub-condition), lowercasing the
+/// feature name. See [`lowercase_media_feature_names`] for the name-position rule.
+fn lowercase_simple_feature_expr(group: &str, out: &mut String) {
+    let name_end = feature_name_end(group);
+    // Everything after `group`'s own `(`, up to the separator, is the name prettier tests.
+    if feature_name_preserves_case(crate::escapes::trim_css(&group[1..name_end])) {
+        out.push_str(group);
+        return;
+    }
+
+    // The name lowercases; the value after the separator is preserved, so only the region
+    // below `name_end` is walked for identifiers and the rest is copied through.
+    let mut i = 0;
+    while i < name_end {
+        // Comments/strings copy through verbatim (their contents are never lowercased).
+        // Neither can straddle `name_end`: `feature_name_end` steps trivia whole, so the
+        // separator it found is never inside one.
         if let Some(end) = trivia_span_at(group, i) {
             out.push_str(&group[i..end]);
             i = end;
             continue;
         }
-        match bytes[i] {
-            b':' => {
-                seen_colon = true;
-                out.push(':');
-                i += 1;
-            }
-            _ => {
-                let ch = group[i..].chars().next().unwrap_or('\0');
-                // An identifier (incl. a leading `-` for custom media / vendor).
-                if is_ident_start(ch) || ch == '-' {
-                    let start = i;
-                    i += ch.len_utf8();
-                    while let Some(c) = group[i..].chars().next() {
-                        if is_ident_continue(c) {
-                            i += c.len_utf8();
-                        } else {
-                            break;
-                        }
-                    }
-                    let ident = &group[start..i];
-                    // Before the `:` (or no `:` at all — boolean/range, numeric
-                    // values) the identifier is the feature name; after it, a value.
-                    if seen_colon {
-                        out.push_str(ident);
-                    } else {
-                        out.push_str(&maybe_lowercase_feature_name(ident));
-                    }
-                } else {
-                    out.push(ch);
-                    i += ch.len_utf8();
-                }
-            }
+        let ch = group[i..].chars().next().unwrap_or('\0');
+        // An identifier: the ident class, a leading `-` (custom media, vendor prefixes),
+        // or a leading escape — an escape begins an ident sequence exactly as an ident
+        // code point does, and `ident_sequence_end` runs through the ones inside it too.
+        let end = if is_ident_start(ch) || ch == '-' || ch == '\\' {
+            ident_sequence_end(group, i)
+        } else {
+            i
+        };
+        if end > i {
+            out.push_str(&lowercase_feature_name(&group[i..end]));
+            i = end;
+        } else {
+            // Not an ident start, or a lone `\` that starts no escape.
+            out.push(ch);
+            i += ch.len_utf8();
         }
     }
+    debug_assert_eq!(i, name_end, "the name walk overshot the separator");
+    out.push_str(&group[name_end..]);
 }
 
-/// Lowercase a media-feature name unless it's case-sensitive: preserve a custom media
-/// (`--*` / `:--*`), which is case-sensitive per CSS Variables 1. An already-lowercase
-/// name borrows unchanged.
-fn maybe_lowercase_feature_name(name: &str) -> Cow<'_, str> {
-    if name.starts_with("--")
-        || name.starts_with(":--")
-        || !name.bytes().any(|b| b.is_ascii_uppercase())
-    {
-        return Cow::Borrowed(name);
+/// Lowercase one identifier of a media-feature name. Whether the name is case-*sensitive*
+/// is [`feature_name_preserves_case`]'s question, asked once of the whole name before any
+/// of this runs; an already-lowercase identifier borrows unchanged.
+fn lowercase_feature_name(name: &str) -> Cow<'_, str> {
+    if name.bytes().any(|b| b.is_ascii_uppercase()) {
+        Cow::Owned(name.to_ascii_lowercase())
+    } else {
+        Cow::Borrowed(name)
     }
-    Cow::Owned(name.to_ascii_lowercase())
 }
 
 /// Extract and normalize property name from declaration source
@@ -788,8 +946,8 @@ pub(crate) fn lowercase_at_rule_name(name: &str) -> Cow<'_, str> {
 /// reach the caller today (it passes a trimmed name), but the predicate answers it
 /// correctly rather than relying on the caller — hence the final hex-digit check.
 ///
-/// Walks forward through `crate::escapes::escape_len` rather than scanning backward for
-/// hex digits: that is the crate's single definition of how far an escape reaches, so an
+/// Walks forward through [`escape_span_at`] rather than scanning backward for hex digits:
+/// that is the crate's single definition of how far an escape reaches, so an
 /// escaped backslash (`\\41` — a literal `\` followed by the ordinary text `41`) falls out
 /// of the walk instead of needing its own parity/lookback rule here.
 fn ends_with_hex_escape(name: &str) -> bool {
@@ -797,10 +955,7 @@ fn ends_with_hex_escape(name: &str) -> bool {
     let mut i = 0;
     let mut ends_with_escape = false;
     while i < bytes.len() {
-        if bytes[i] == b'\\'
-            && let Some(len) = crate::escapes::escape_len(name, i)
-        {
-            let end = i + len;
+        if let Some(end) = escape_span_at(name, i) {
             // A hex escape is the one whose first payload byte is a hex digit — and it is
             // still *live* only if it ends ON a hex digit, i.e. `escape_len` found no
             // whitespace terminator to swallow.
@@ -1189,37 +1344,160 @@ mod tests {
         );
     }
 
-    /// ⚠️ **A trap, pinned rather than fixed.** `lowercase_simple_feature_expr` is the one
-    /// scanner in this module that does **not** step escapes whole, so an escaped `:` in a
-    /// feature name reads as the name→value separator and the fragment after it is treated
-    /// as a value: `(A\:B: 1px)` comes back half-lowercased.
+    /// A media-feature name is one **ident sequence**, and an escape is ident content
+    /// (CSS Syntax 3 §"Consume an ident sequence"), so the name runs *through* every escape
+    /// it carries — including one spelling the `:` that would otherwise look like the
+    /// name→value separator.
     ///
-    /// That is cosmetic — a media feature name is ASCII case-insensitive, so `a:B` and
-    /// `A:B` are the same feature, and prettier's own answer splits the ident instead
-    /// (`(a\: B: 1px)`), so there is no oracle to grade a fix against.
+    /// Two rules key on the whole name, and a scanner that stopped at the `\` got both
+    /// wrong on the fragment after it: a plain name is a pre-defined keyword and so ASCII
+    /// case-insensitive (css-values-4 §"Pre-defined Keywords"), while a custom-media name
+    /// is an `<extension-name>` (css-extensions-1) with no canonical casing to fold to, so
+    /// only the fragment carrying the `--` was preserved.
     ///
-    /// The trap is that adding the escape arm here **alone** is a silent regression: the
-    /// ident run stops at an escape, so `--A\:B` would arrive at
-    /// `maybe_lowercase_feature_name` as the two fragments `--A` and `B`, and only the
-    /// first carries the `--` prefix that makes a custom-media name case-sensitive — the
-    /// second would lowercase. An escape arm here owes an escape-aware ident RUN beside it.
-    /// The second assertion is what fails if that ever happens.
+    /// The `\:` spelling has no prettier oracle — prettier reads the escape's payload as
+    /// the separator and splits the ident (`(a\: B: 1px)`), a cataloged divergence
+    /// (`media_feature_escaped_colon_prettier_divergence`).
     #[test]
-    fn an_escaped_colon_in_a_feature_name_is_read_as_the_separator() {
+    fn an_escaped_colon_does_not_end_a_feature_name() {
+        // The whole run is the name, so the whole run lowercases.
         assert_eq!(
             lowercase_media_feature_names(r"(A\:B: 1px)"),
-            r"(a\:B: 1px)"
+            r"(a\:b: 1px)"
         );
-        // Case-sensitive per CSS Variables 1 — must survive whole.
+        // Case-sensitive per css-extensions-1 — must survive whole, past the escape.
         assert_eq!(
             lowercase_media_feature_names(r"(--A\:B: 1px)"),
             r"(--A\:B: 1px)"
         );
-        // An escape elsewhere in the name is ordinary content and both formatters
-        // lowercase around it.
+        assert_eq!(
+            lowercase_media_feature_names(r"(--A\42 C: 1px)"),
+            r"(--A\42 C: 1px)"
+        );
+        assert_eq!(
+            lowercase_media_feature_names(r"(--MIN\-WIDTH: 1px)"),
+            r"(--MIN\-WIDTH: 1px)"
+        );
+        // A boolean feature — no `:` at all, so the whole group is name position.
+        assert_eq!(lowercase_media_feature_names(r"(--A\42 C)"), r"(--A\42 C)");
+        // An escape elsewhere in a plain name is ordinary content and the run lowercases
+        // across it, hex digits included (a hex escape is itself case-insensitive).
         assert_eq!(
             lowercase_media_feature_names(r"(MIN\-WIDTH: 1px)"),
             r"(min\-width: 1px)"
+        );
+        assert_eq!(
+            lowercase_media_feature_names(r"(A\4B C: 1px)"),
+            r"(a\4b c: 1px)"
+        );
+        // A lone `\` starts no escape (§4.3.4) and so extends nothing: the run ends at it
+        // and the scanner still advances.
+        assert_eq!(
+            lowercase_media_feature_names("(A\\\nB: 1px)"),
+            "(a\\\nb: 1px)"
+        );
+        assert_eq!(lowercase_media_feature_names(r"(A: 1px)\"), r"(a: 1px)\");
+        // The value side is preserved whether or not it carries an escape.
+        assert_eq!(
+            lowercase_media_feature_names(r"(A: LAND\53 CAPE)"),
+            r"(a: LAND\53 CAPE)"
+        );
+    }
+
+    /// Case-sensitivity is a property of the **whole** feature name, which is why
+    /// [`feature_name_preserves_case`] is asked once rather than per identifier: a name
+    /// spelled as several runs kept only the run that carried the marker, so `(--A B: 1px)`
+    /// preserved `--A` and lowercased `B`. Prettier asks the same question of the same
+    /// region (`maybeToLowerCase`), so every case here matches it.
+    #[test]
+    fn case_sensitivity_is_a_property_of_the_whole_feature_name() {
+        // An `<extension-name>` marks the whole name, however many runs it spans.
+        assert_eq!(
+            lowercase_media_feature_names(r"(--A B: 1px)"),
+            r"(--A B: 1px)"
+        );
+        assert_eq!(
+            lowercase_media_feature_names(r"(--A\Z B: 1px)"),
+            r"(--A\Z B: 1px)"
+        );
+        assert_eq!(
+            lowercase_media_feature_names("(--A 1PX: 1px)"),
+            "(--A 1PX: 1px)"
+        );
+        // Leading whitespace does not hide the marker.
+        assert_eq!(
+            lowercase_media_feature_names("( --A B : 1px)"),
+            "( --A B : 1px)"
+        );
+        // Preprocessor spellings tsv's permissive parser reaches: folding a name it does
+        // not understand can only lose information, and prettier preserves them too.
+        assert_eq!(lowercase_media_feature_names("(A$B: 1px)"), "(A$B: 1px)");
+        assert_eq!(lowercase_media_feature_names("($A: 1px)"), "($A: 1px)");
+        assert_eq!(lowercase_media_feature_names("(A@B: 1px)"), "(A@B: 1px)");
+        assert_eq!(lowercase_media_feature_names("(A#B: 1px)"), "(A#B: 1px)");
+        assert_eq!(lowercase_media_feature_names("(%A: 1px)"), "(%A: 1px)");
+        // A `%` that is not leading is not a marker, so the name still folds.
+        assert_eq!(lowercase_media_feature_names("(A%B: 1px)"), "(a%b: 1px)");
+        // A `:` in the VALUE does not end the name, so a call there cannot mark it.
+        assert_eq!(
+            lowercase_media_feature_names("(MIN-WIDTH: calc(1px))"),
+            "(min-width: calc(1px))"
+        );
+        assert_eq!(
+            lowercase_media_feature_names("(MIN-WIDTH: url(x:y))"),
+            "(min-width: url(x:y))"
+        );
+        // A `:` inside trivia is not the separator either.
+        assert_eq!(
+            lowercase_media_feature_names("(/* : */ MIN-WIDTH: 1px)"),
+            "(/* : */ min-width: 1px)"
+        );
+        assert_eq!(
+            lowercase_media_feature_names(r"(MIN-WIDTH: ':')"),
+            r"(min-width: ':')"
+        );
+    }
+
+    /// A number abutting the identifier before it is that identifier's own tail: the ident
+    /// run stops at the first non-ident code point, so what follows can only be a
+    /// `.`-leading number, and its canonical leading zero would be swallowed by the ident.
+    /// Prettier states the same rule textually and both formatters copy the pair through.
+    #[test]
+    fn a_number_abutting_an_identifier_is_copied_verbatim() {
+        // `x1` + `.50`, not `x10` + `.5`.
+        assert_eq!(normalize_value_text("(a: x1.50)", true), "(a: x1.50)");
+        // The unit rides along verbatim too — no `canonical_unit` lowercasing.
+        assert_eq!(normalize_value_text("(a: x.50PX)", true), "(a: x.50PX)");
+        // A leading `--` reaches the ident arm at the first letter, so it is covered.
+        assert_eq!(normalize_value_text("(a: --x.50)", true), "(a: --x.50)");
+        // Separated by whitespace, the number is a value of its own and normalizes.
+        assert_eq!(normalize_value_text("(a: x .50)", true), "(a: x 0.5)");
+        // So does one that starts the value.
+        assert_eq!(normalize_value_text("(a: .50px)", true), "(a: 0.5px)");
+        // A signed number keeps its sign, which merges with nothing, so it normalizes even
+        // against an identifier. (`x-1` is one ident run, so `x-1.50` is the glued case.)
+        assert_eq!(normalize_value_text("(a: x+1.50)", true), "(a: x+1.5)");
+        assert_eq!(normalize_value_text("(a: x-1.50)", true), "(a: x-1.50)");
+        // `$` and `@` are `<delim-token>`s, not ident code points, so nothing merges into
+        // them even though this module's ident class reads them as run starts.
+        assert_eq!(normalize_value_text("(a: $.50)", false), "(a: $0.5)");
+        assert_eq!(normalize_value_text("(a: @.50)", false), "(a: @0.5)");
+        assert_eq!(normalize_value_text("(a: $x.50)", false), "(a: $x.50)");
+        // An escape does not make a word part (prettier's own scan reads no `\` either),
+        // so the number after one still normalizes — matching prettier.
+        assert_eq!(
+            normalize_value_text(r"(a: \41 2.50px)", true),
+            r"(a: \41 2.5px)"
+        );
+        assert_eq!(
+            normalize_value_text(r"(a: x\41 .50)", true),
+            r"(a: x\41 0.5)"
+        );
+        // The ident arm's own `url(` exit clears the word part: what follows the group is
+        // not the ident's tail.
+        assert_eq!(
+            normalize_value_text("(a: url(x).50)", true),
+            "(a: url(x)0.5)"
         );
     }
 }

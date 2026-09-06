@@ -325,12 +325,22 @@ fn is_function_name(name: &str) -> bool {
     escaped_name_is_ident_sequence(name)
 }
 
-/// An ident code point as this position reads it: the ASCII ident set plus
-/// `is_alphanumeric`'s non-ASCII letters and digits. Named once so the fast pass above and
-/// the escape walk below cannot drift — a name accepted by one and refused by the other
-/// would be a function whose recognition depended on whether it carried an escape.
+/// An ident code point: the ASCII ident set plus the crate's non-ASCII threshold. Named
+/// once so the fast pass above and the escape walk below cannot drift — a name accepted by
+/// one and refused by the other would be a function whose recognition depended on whether
+/// it carried an escape.
+///
+/// ⚠️ The non-ASCII half is the **lexer's** (`is_non_ascii_identifier_codepoint`, every code
+/// point at or above U+00A0), not `char::is_alphanumeric`. This position re-reads a token
+/// the lexer already read, so a narrower class here refuses a name the lexer accepted: `a°`
+/// is one identifier to the lexer, and reading it as a non-name dropped the whole value
+/// onto the verbatim `Identifier` path, silently switching off every value normalization
+/// for that declaration (`a°(1.50)` kept its `1.50` where `aé(1.50)` normalized).
 fn is_ident_code_point(c: char) -> bool {
-    c.is_alphanumeric() || c == '-' || c == '_'
+    c.is_ascii_alphanumeric()
+        || c == '-'
+        || c == '_'
+        || crate::lexer::is_non_ascii_identifier_codepoint(c)
 }
 
 /// The escaped tail of [`is_function_name`] — outlined and cold, so the escape walk stays off
