@@ -23,8 +23,14 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
+///
+/// Asked of the type *inside* any redundant paren shell: prettier's AST holds no
+/// `TSParenthesizedType` (its postprocess unwraps every one), so its predicate sees the
+/// function type / reference directly. Matching the shell node instead answered "not
+/// generic" for `(<T>() => …)`, which flipped the alias from break-after-`=` to `fluid` on
+/// the authored form alone — the stripped output then took the other layout (F1).
 fn is_generic_type(ts_type: &TSType<'_>) -> bool {
-    match ts_type {
+    match unwrap_parenthesized(ts_type) {
         TSType::Function(f) => f.type_parameters.is_some(),
         TSType::TypeReference(r) => r.type_arguments.is_some(),
         _ => false,
@@ -421,6 +427,15 @@ impl<'a> Printer<'a> {
                         && self.trailing_run_hugs_previous(Some(comment), next)
                     {
                         // The author glued the pair onto one line — keep it.
+                        indent_comment_parts.push(d.text(" "));
+                    } else if next_comment.is_none() && self.comment_hugs_next(comment) {
+                        // The run's LAST comment, glued to the value (`/* c1 */⏎/* c2 */ Ref`):
+                        // it leads the value on the value's line — prettier's
+                        // `printLeadingComment` keys the separator on what follows the
+                        // comment, and only a newline after it ends the line. An
+                        // unconditional hardline here re-broke the glued pair on every
+                        // pass (`/* c2 */⏎Ref`), so the run's own-line-ness leaked onto a
+                        // comment the author never gave its own line (F1).
                         indent_comment_parts.push(d.text(" "));
                     } else {
                         self.push_blank_preserving_hardline(

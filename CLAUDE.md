@@ -1005,6 +1005,13 @@ full in docs/comments.md; here is the seam to reach for:
   `Printer::delimiter_line_comment_prefix`), with the author blank below it kept everywhere
   (`Printer::push_delimiter_glued_blank`).
   [§The delimiter-line question](docs/comments.md#the-delimiter-line-question-one-rule-read-at-three-points).
+- **The left-spine shell run** — an own-line run inside the stripped shell of a node's
+  LEFTMOST child is hoisted ahead of the node and prints OUTSIDE the node's group (a hardline
+  inside it broke a conditional / sequence prettier's second pass prints flat); which nodes
+  have a hoisted left side, and which pairs retain the run instead, is stated once
+  (`Printer::hoisted_left_side_child`) for its askers — the restricted productions' hanging
+  pair and the assignment / declarator / `export default` / parameter-default seams.
+  [§The left-spine shell run](docs/comments.md#the-left-spine-shell-run-hoisted-outside-the-enclosing-group-and-one-definition-of-left-side).
 
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see

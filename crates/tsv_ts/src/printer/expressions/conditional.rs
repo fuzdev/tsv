@@ -474,8 +474,22 @@ impl<'a> Printer<'a> {
         // without this the comment is silently dropped. Outside the re-added parens,
         // matching every other operand position. A no-op when the test wasn't
         // parenthesized (the two starts coincide).
-        let test =
-            self.prepend_removed_paren_comments(cond.span.start, cond.test.span().start, test);
+        //
+        // A ROOT conditional prepends the run OUTSIDE its group (below), not onto the
+        // test: an own-line `//` there carries a hardline, and inside the group that
+        // hardline broke the `?` / `:` lines open for a comment that sits ahead of the
+        // whole conditional (`(⏎// c⏎a as any) ? b : c` → `// c⏎(a as any)⏎\t? b⏎\t: c`),
+        // which is not a fixed point — the reparse reads the comment as leading the
+        // conditional and prints the group flat. Prettier's own second pass lands there
+        // for the same reason; tsv gets there in one. A chained conditional keeps the run
+        // on its test: the parent's group breaks either way, and
+        // `place_nested_ternary_test` owns the test's indent.
+        let shell_run = self.removed_paren_comments_opt(cond.span.start, cond.test.span().start);
+        let (test, root_run) = if is_chained {
+            (self.prepend_opt(shell_run, test), None)
+        } else {
+            (test, shell_run)
+        };
         let test = self.place_nested_ternary_test(nesting, test);
         // Prettier's shouldNotIndent (binaryish.js:109-113) also applies to binaries
         // in consequent/alternate positions: when parent is ConditionalExpression and
@@ -636,7 +650,11 @@ impl<'a> Printer<'a> {
 
         // If chained (nested in another conditional), don't wrap in group
         // This allows the parent's break decision to cascade
-        if is_chained { inner } else { d.group(inner) }
+        if is_chained {
+            inner
+        } else {
+            self.prepend_opt(root_run, d.group(inner))
+        }
     }
 
     /// Build a conditional expression doc when there are line comments

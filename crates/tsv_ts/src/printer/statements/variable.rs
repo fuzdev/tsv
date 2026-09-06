@@ -359,7 +359,19 @@ impl<'a> Printer<'a> {
             || needs_break_after_op_layout
             || is_decorated_class_expr
             // An indentable owned comment hangs the value.
-            || owned_comment_effect == Some(OwnedCommentEffect::Hangs);
+            || owned_comment_effect == Some(OwnedCommentEffect::Hangs)
+            // An own-line run inside the grouping parens of the initializer's LEFTMOST
+            // node (`= (⏎// c⏎a as any) ? b : c`, `= (⏎// c⏎a).b`): the initializer's
+            // printer hoists it to the head of its doc, so the doc opens with the run and
+            // a hardline — the shape the `=`→init gap's own line comment produces, and it
+            // wants the same hang, so the run and the value sit under `=` at the value's
+            // indent (a binary initializer already lands there through its own arm).
+            // Left to the fluid / chain arms the run rendered FLUSH on the `=` line and
+            // the reparse — reading the comment as the gap's — indented it, a second
+            // fixed point one pass away. The `build_assignment_layout` twin states the
+            // same term (its left-spine override); eligibility keeps a chain whose own
+            // pair RETAINS the run hugging the `=`, as there.
+            || (is_layout_eligible && self.left_spine_shell_has_own_line_comment(init));
 
         // The other half: a *preserved* multi-line comment the initializer owns
         // ends the `=` line inside itself, so no width-decided break at `=` is

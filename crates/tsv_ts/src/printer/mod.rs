@@ -957,8 +957,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if a type has complex nested type parameters
+    ///
+    /// Both arms ask the type *inside* any redundant paren shell (`unwrap_parenthesized`):
+    /// prettier's AST holds no `TSParenthesizedType`, so its predicate sees the reference /
+    /// conditional directly, and a shell the output strips must not flip the layout
+    /// (`(A extends B ? C : D)` as an argument, `(Map<…>)` around the annotation).
     fn type_has_complex_annotation(&self, ts_type: &internal::TSType<'_>) -> bool {
-        match ts_type {
+        match unwrap_parenthesized(ts_type) {
             internal::TSType::TypeReference(type_ref) => {
                 // Must have >1 type argument
                 let type_args = match &type_ref.type_arguments {
@@ -981,7 +986,7 @@ impl<'a> Printer<'a> {
 
     /// Check if a type has nested type parameters or is a conditional type
     fn type_has_nested_generics(&self, ts_type: &internal::TSType<'_>) -> bool {
-        match ts_type {
+        match unwrap_parenthesized(ts_type) {
             internal::TSType::TypeReference(type_ref) => {
                 // Has type arguments means nested generics
                 type_ref.type_arguments.is_some()
