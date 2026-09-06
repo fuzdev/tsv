@@ -13,9 +13,9 @@ mod token;
 use tsv_lang::lex_err;
 
 // Re-export public API
-pub use core::Lexer;
 pub(crate) use core::{
     ES_LINE_TERMINATOR_LEADS, is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace,
     unicode_escape_len_at,
 };
+pub use core::{Lexer, LexerCheckpoint};
 pub use token::{KeywordKind, Token, TokenKind};

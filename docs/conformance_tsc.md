@@ -161,8 +161,12 @@ nothing fails the gate, so a fixed gap must leave its ledger the day it is fixed
   - `beyond_acorn_gap` — a genuine gap acorn shares: the grammar has the production,
     tsc and prettier's `typescript` parser accept, and tsv should diverge from acorn
     toward it. The fix is a `_svelte_divergence` fixture (canonical rejects, tsv
-    parses). A typed arrow inside a conditional's consequent (`a ? (b) : c => d : e`),
-    `for (using x = …;;)`, a string-named import specifier behind `type`.
+    parses) — or, where prettier normalizes every acorn-rejected spelling into one
+    acorn accepts, `unformatted_*` variants that pin the reading as a formatting
+    claim (the arrow-in-a-consequent family took that route; see
+    [conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)).
+    `for (using x = …;;)`, a string-named import specifier behind `type`, a type-only
+    default import whose binding is named `from`.
 
 ## Reading the numbers
 
@@ -260,8 +264,12 @@ The burn-down loop, one family per pull request, fixtures first.
    the code. The reason is the record — the gate reads it back on every run.
 5. **Fix** a known gap fixture-first ([fixture_workflow.md](./fixture_workflow.md)):
    a `_svelte_divergence` fixture where acorn rejects and tsv should parse, an
-   `input_invalid_*` file where tsv should keep rejecting. Delete the ledger entry in
-   the same change; the freshness check refuses a stale one.
+   `input_invalid_*` file where tsv should keep rejecting. Check first that a fixed
+   point carries the divergence at all — run prettier on the corpus spelling and parse
+   its output with acorn; where every fixed point is one acorn accepts, the divergence
+   is pinned as `unformatted_*` variants plus a node-type test under `tests/` instead
+   ([fixture_overview.md §Svelte Parser Divergence](./fixture_overview.md#svelte-parser-divergence)).
+   Delete the ledger entry in the same change; the freshness check refuses a stale one.
 6. **Re-pin** the counts that moved, each with its reason on the constant.
 
 ## What this gate does not do

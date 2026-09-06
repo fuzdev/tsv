@@ -428,18 +428,6 @@ const BEYOND_ACORN_KNOWN_GAPS: BeyondAcornKnownGap[] = [
 		reason: 'an accessor `this` parameter — TS2784 checker-raised'
 	},
 	// --- beyond_acorn_gap ------------------------------------------------------
-	...[
-		'parserArrowFunctionExpression8.ts',
-		'parserArrowFunctionExpression9.ts',
-		'parserArrowFunctionExpression10.ts',
-		'parserArrowFunctionExpression11.ts',
-		'parserArrowFunctionExpression12.ts'
-	].map((pattern) => ({
-		pattern,
-		category: 'beyond_acorn_gap' as const,
-		reason:
-			'a parenthesized arrow with a return-type annotation in a conditional’s consequent (`a ? (b) : c => d : e`) — tsc backs the annotation off when the `:` belongs to the conditional; tsv (and acorn-ts) commit to it and run out of `:`'
-	})),
 	{
 		pattern: 'importDefaultNamedType2.ts',
 		category: 'beyond_acorn_gap',

@@ -162,6 +162,21 @@ enum TemplateStop {
     Eof,
 }
 
+/// A [`Lexer`] cursor position with the state that travels with it, taken by
+/// [`Lexer::checkpoint`] and restored by [`Lexer::rewind`]. Opaque: only the lexer
+/// reads it, and only to put itself back.
+#[derive(Clone, Copy)]
+pub struct LexerCheckpoint {
+    position: usize,
+    template_depth: u32,
+    had_line_terminator: bool,
+    /// Restored rather than left: a slot the abandoned tokens filled names a real
+    /// non-plain start and would never be *wrong*, but the two-slot window's
+    /// "at most one token ahead of the parser" reading is simplest when the
+    /// window is exactly what it was.
+    nonplain_ident_starts: [u32; 2],
+}
+
 pub struct Lexer<'a> {
     source: &'a str,
     /// The source as raw bytes (`source.as_bytes()`), cached so the hot dispatch
@@ -428,6 +443,39 @@ impl<'a> Lexer<'a> {
     /// Used for ASI (Automatic Semicolon Insertion).
     pub fn had_line_terminator(&self) -> bool {
         self.had_line_terminator
+    }
+
+    /// The cursor state a later [`Lexer::rewind`] returns to — the parser's one
+    /// speculative parse (`Parser::parse_arrow_or_rewind`) takes it before the arrow
+    /// head it may have to un-read. Everything a token advances except the decode
+    /// scratch, which the rewind marks stale instead (see `rewind`).
+    #[must_use]
+    pub fn checkpoint(&self) -> LexerCheckpoint {
+        LexerCheckpoint {
+            position: self.position,
+            template_depth: self.template_depth,
+            had_line_terminator: self.had_line_terminator,
+            nonplain_ident_starts: self.nonplain_ident_starts,
+        }
+    }
+
+    /// Return the cursor to `checkpoint`, un-reading every token lexed since. The
+    /// decode scratch is left as the abandoned tokens overwrote it and flagged
+    /// absent: the parser drains a decoded value into its arena at the lex that
+    /// produced it, so nothing reads the scratch for a token it did not just lex,
+    /// and the next token-producing call resets the flag either way.
+    pub fn rewind(&mut self, checkpoint: LexerCheckpoint) {
+        let LexerCheckpoint {
+            position,
+            template_depth,
+            had_line_terminator,
+            nonplain_ident_starts,
+        } = checkpoint;
+        self.position = position;
+        self.template_depth = template_depth;
+        self.had_line_terminator = had_line_terminator;
+        self.nonplain_ident_starts = nonplain_ident_starts;
+        self.has_decoded = false;
     }
 
     /// Seek to a specific position and re-lex from there.
