@@ -1,0 +1,223 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 333,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 90,
+				"end": 140,
+				"name": "media",
+				"prelude": "(a\\42 c: 1px)",
+				"block": {
+					"type": "Block",
+					"start": 111,
+					"end": 140,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 115,
+								"end": 116,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 115,
+										"end": 116,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "d",
+														"start": 115,
+														"end": 116
+													}
+												],
+												"start": 115,
+												"end": 116
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 117,
+								"end": 137,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 122,
+										"end": 132,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 115,
+							"end": 137
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 214,
+				"end": 266,
+				"name": "media",
+				"prelude": "(--A\\42 C: 1px)",
+				"block": {
+					"type": "Block",
+					"start": 237,
+					"end": 266,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 241,
+								"end": 242,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 241,
+										"end": 242,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "d",
+														"start": 241,
+														"end": 242
+													}
+												],
+												"start": 241,
+												"end": 242
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 243,
+								"end": 263,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 248,
+										"end": 258,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 241,
+							"end": 263
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 268,
+				"end": 324,
+				"name": "media",
+				"prelude": "(--MIN\\-WIDTH: 1px)",
+				"block": {
+					"type": "Block",
+					"start": 295,
+					"end": 324,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 299,
+								"end": 300,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 299,
+										"end": 300,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "d",
+														"start": 299,
+														"end": 300
+													}
+												],
+												"start": 299,
+												"end": 300
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 301,
+								"end": 321,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 306,
+										"end": 316,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 299,
+							"end": 321
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escape does not end an ident, so the feature name lowercases across it ",
+				"start": 9,
+				"end": 88
+			},
+			{
+				"type": "CSSComment",
+				"value": " a custom-media name is case-sensitive, so the whole run survives ",
+				"start": 142,
+				"end": 212
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 325,
+			"styles": "\n\t/* an escape does not end an ident, so the feature name lowercases across it */\n\t@media (a\\42 c: 1px) {\n\t\td {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* a custom-media name is case-sensitive, so the whole run survives */\n\t@media (--A\\42 C: 1px) {\n\t\td {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (--MIN\\-WIDTH: 1px) {\n\t\td {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 334,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

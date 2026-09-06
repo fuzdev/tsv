@@ -1,0 +1,95 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 215,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 206,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 156,
+							"end": 166,
+							"property": "b",
+							"value": "c°(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 170,
+							"end": 180,
+							"property": "d",
+							"value": "e♥(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 184,
+							"end": 202,
+							"property": "f",
+							"value": "g·(#fff, 1.5px)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 206
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " every code point at or above U+00A0 is an identifier code point, so a\n\t\tfunction name may hold one and its arguments still normalize ",
+				"start": 15,
+				"end": 153
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 207,
+			"styles": "\n\ta {\n\t\t/* every code point at or above U+00A0 is an identifier code point, so a\n\t\tfunction name may hold one and its arguments still normalize */\n\t\tb: c°(1.5);\n\t\td: e♥(1.5);\n\t\tf: g·(#fff, 1.5px);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 216,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
