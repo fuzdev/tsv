@@ -1936,7 +1936,6 @@ impl<'a> Printer<'a> {
                                 &DeclaratorInitInputs {
                                     declarator,
                                     init,
-                                    decl_start: decl.span.start,
                                     id_doc,
                                     gap: DeclaratorEqGap {
                                         id_end,

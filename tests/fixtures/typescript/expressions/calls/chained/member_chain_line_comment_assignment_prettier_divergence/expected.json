@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 496,
+	"end": 710,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -169,24 +169,88 @@
 					"column": 13
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " An indentable block comment the value owns hangs the value under the `=` (as",
+			"start": 488,
+			"end": 567,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier does too); the chain still breaks at its own comment, one level further in.",
+			"start": 569,
+			"end": 656,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 664,
+			"end": 680,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 685,
+			"end": 689,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 10
+				},
+				"end": {
+					"line": 26,
+					"column": 14
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 495,
+		"end": 709,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 486,
+			"end": 700,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 20,
+					"line": 28,
 					"column": 9
 				}
 			},
@@ -662,6 +726,147 @@
 							"value": " Object property value.",
 							"start": 420,
 							"end": 445
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 658,
+					"end": 699,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 9
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 658,
+						"end": 698,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 8
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 658,
+							"end": 659,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 1
+								},
+								"end": {
+									"line": 23,
+									"column": 2
+								}
+							},
+							"name": "z"
+						},
+						"right": {
+							"type": "TSNonNullExpression",
+							"start": 681,
+							"end": 698,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 6
+								},
+								"end": {
+									"line": 27,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "MemberExpression",
+								"start": 681,
+								"end": 697,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 6
+									},
+									"end": {
+										"line": 27,
+										"column": 7
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 681,
+									"end": 684,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 6
+										},
+										"end": {
+											"line": 26,
+											"column": 9
+										}
+									},
+									"name": "foo",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 685,
+											"end": 689
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 694,
+									"end": 697,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 4
+										},
+										"end": {
+											"line": 27,
+											"column": 7
+										}
+									},
+									"name": "bar"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "*\n * c\n ",
+									"start": 664,
+									"end": 680
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An indentable block comment the value owns hangs the value under the `=` (as",
+							"start": 488,
+							"end": 567
+						},
+						{
+							"type": "Line",
+							"value": " prettier does too); the chain still breaks at its own comment, one level further in.",
+							"start": 569,
+							"end": 656
 						}
 					]
 				}
