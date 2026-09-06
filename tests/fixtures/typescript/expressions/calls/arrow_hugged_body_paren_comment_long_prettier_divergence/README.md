@@ -3,11 +3,11 @@
 The sibling
 [arrow_hugged_body_paren_comment](../arrow_hugged_body_paren_comment_prettier_divergence/)
 pins the hug states a short line already selects. Several more are reachable **only once a
-line crosses the print width**, so they get their own boundary fixture: the chain's
-forced-expansion argument builder — which a head call carrying its own arguments selects,
-not the `obj.a().b().m(…)` shape — the expand-last state of a multi-argument call, and the
-**object/array-terminal** state of that same expand-last layout, in both the plain-call and
-the member-chain spelling.
+line crosses the print width**, so they get their own boundary fixture: a short chain whose
+head call carries its own arguments — a plain group in both formatters, so the last call's
+own hug ladder is what the width reaches, unlike the `obj.a().b().m(…)` shape — the
+expand-last state of a multi-argument call, and the **object/array-terminal** state of that
+same expand-last layout, in both the plain-call and the member-chain spelling.
 
 Each case is a 100/101 pair. At **100** the arguments stay inline and the whole arrow is
 printed, so the authored parens and their comment ride along for free. At **101** the
@@ -30,7 +30,8 @@ for a call body, and for the **object** body — where the parens are grammar-**
 rather than authored — keeps the parens but moves the comment outside them
 (`(x) => ({ k: x }) /* c */`), re-associating it from the object to the whole body. So the
 object rows differ in the comment's position alone; the layout agrees.
-Prettier is also non-idempotent on its own output for the 101 chain-builder object row: a
+Prettier is also non-idempotent on its own output for the 101 short-chain object row: its
+first pass hugs the argument with the object expanded — the layout tsv keeps — and its
 second pass expands the argument onto its own line, so `audit_signature.txt` pins the chain.
 
 Reason: comment preservation. See

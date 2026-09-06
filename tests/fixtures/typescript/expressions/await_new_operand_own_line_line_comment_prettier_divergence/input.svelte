@@ -37,9 +37,10 @@
 			Foo();
 
 		// In value position the run sits one level under the statement.
-		const c = await
-			// c9
-			fn2();
+		const c =
+			await
+				// c9
+				fn2();
 
 		// Control: a comment the author put ON the keyword's line trails it, as before.
 		new // c10

@@ -254,7 +254,9 @@ impl<'a> Printer<'a> {
                 // owns the truly-empty softline case ([`build_single_container_arg_doc`]). An
                 // on-page leading comment declines it (see the guard's comment above);
                 // prettier expands the same way.
-                arg if is_array_or_object_unwrapped(arg) && !single_arg_leading_on_page_comment => {
+                arg if is_array_or_object_unwrapped(arg, self)
+                    && !single_arg_leading_on_page_comment =>
+                {
                     return build_single_container_arg_doc(self, callee_with_types, arg);
                 }
                 // Function-expression argument: the shared lone-argument ladder

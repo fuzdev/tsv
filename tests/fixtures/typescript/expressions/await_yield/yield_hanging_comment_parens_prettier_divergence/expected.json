@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 582,
+	"end": 588,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -173,16 +173,16 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 550,
-			"end": 554,
+			"start": 554,
+			"end": 558,
 			"loc": {
 				"start": {
-					"line": 27,
-					"column": 3
+					"line": 28,
+					"column": 4
 				},
 				"end": {
-					"line": 27,
-					"column": 7
+					"line": 28,
+					"column": 8
 				}
 			}
 		}
@@ -190,19 +190,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 581,
+		"end": 587,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 572,
+			"end": 578,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 31,
+					"line": 32,
 					"column": 9
 				}
 			},
@@ -210,14 +210,14 @@
 				{
 					"type": "FunctionDeclaration",
 					"start": 10,
-					"end": 571,
+					"end": 577,
 					"loc": {
 						"start": {
 							"line": 2,
 							"column": 1
 						},
 						"end": {
-							"line": 30,
+							"line": 31,
 							"column": 2
 						}
 					},
@@ -244,14 +244,14 @@
 					"body": {
 						"type": "BlockStatement",
 						"start": 24,
-						"end": 571,
+						"end": 577,
 						"loc": {
 							"start": {
 								"line": 2,
 								"column": 15
 							},
 							"end": {
-								"line": 30,
+								"line": 31,
 								"column": 2
 							}
 						},
@@ -679,30 +679,30 @@
 							{
 								"type": "VariableDeclaration",
 								"start": 528,
-								"end": 568,
+								"end": 574,
 								"loc": {
 									"start": {
 										"line": 26,
 										"column": 2
 									},
 									"end": {
-										"line": 29,
-										"column": 4
+										"line": 30,
+										"column": 5
 									}
 								},
 								"declarations": [
 									{
 										"type": "VariableDeclarator",
 										"start": 534,
-										"end": 567,
+										"end": 573,
 										"loc": {
 											"start": {
 												"line": 26,
 												"column": 8
 											},
 											"end": {
-												"line": 29,
-												"column": 3
+												"line": 30,
+												"column": 4
 											}
 										},
 										"id": {
@@ -723,45 +723,45 @@
 										},
 										"init": {
 											"type": "YieldExpression",
-											"start": 538,
-											"end": 567,
+											"start": 541,
+											"end": 573,
 											"loc": {
 												"start": {
-													"line": 26,
-													"column": 12
+													"line": 27,
+													"column": 3
 												},
 												"end": {
-													"line": 29,
-													"column": 3
+													"line": 30,
+													"column": 4
 												}
 											},
 											"delegate": true,
 											"argument": {
 												"type": "CallExpression",
-												"start": 558,
-												"end": 563,
+												"start": 563,
+												"end": 568,
 												"loc": {
 													"start": {
-														"line": 28,
-														"column": 3
+														"line": 29,
+														"column": 4
 													},
 													"end": {
-														"line": 28,
-														"column": 8
+														"line": 29,
+														"column": 9
 													}
 												},
 												"callee": {
 													"type": "Identifier",
-													"start": 558,
-													"end": 561,
+													"start": 563,
+													"end": 566,
 													"loc": {
 														"start": {
-															"line": 28,
-															"column": 3
+															"line": 29,
+															"column": 4
 														},
 														"end": {
-															"line": 28,
-															"column": 6
+															"line": 29,
+															"column": 7
 														}
 													},
 													"name": "gen"
@@ -772,8 +772,8 @@
 													{
 														"type": "Line",
 														"value": " c",
-														"start": 550,
-														"end": 554
+														"start": 554,
+														"end": 558
 													}
 												]
 											}

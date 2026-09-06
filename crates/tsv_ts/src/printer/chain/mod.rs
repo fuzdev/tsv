@@ -50,7 +50,7 @@ pub use analysis::{
     linearize_chain_from_member_into, linearize_chain_from_non_null_into,
 };
 pub(crate) use analysis::{call_callee_paren_leading_start, tag_paren_leading_start};
-pub use builder::build_chain_doc;
+pub use builder::{build_chain_doc, call_prints_as_member_chain};
 pub(crate) use printing::find_bracket_position;
 #[cfg(feature = "buffer_stats")]
 pub use types::ChainGroupVec;

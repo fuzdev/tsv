@@ -4,7 +4,7 @@
 //
 // `shouldInline` is one disjunction over six clauses. Two are answerable from the chain's
 // own linearized shape and are settled where the lookup is built — `node.computed`
-// (`starts_segment` in `member_only.rs`, the paren-base arm in `builder/mod.rs`) and the
+// (the segment split in `member_only.rs`, the paren-base arm in `builder/mod.rs`) and the
 // lone `a.prop` off a bare base (`lone_lookup_off_bare_base`). A third, `BindExpression`,
 // is a stage-0 proposal tsv does not parse, so it can never fire.
 //

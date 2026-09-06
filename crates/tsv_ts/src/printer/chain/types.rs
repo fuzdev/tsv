@@ -319,6 +319,14 @@ impl<'a> ChainNode<'a> {
         )
     }
 
+    /// A `.prop` / `.#prop` lookup — the member kinds that carry a break point of their
+    /// own (prettier's `printMemberExpression` gives each a `group(indent([softline,
+    /// lookup]))`), as opposed to a computed `[i]`, which its `shouldInline` glues
+    /// (`node.computed`) and which sheds width inside its own brackets.
+    pub const fn is_dot_lookup(&self) -> bool {
+        matches!(self, Self::Member { .. } | Self::PrivateMember { .. })
+    }
+
     /// Get the **chain-level** comment range for this node (object_end, property_start)
     /// — the region whose comments the chain builder emits ahead of the line break it
     /// puts in front of the node.

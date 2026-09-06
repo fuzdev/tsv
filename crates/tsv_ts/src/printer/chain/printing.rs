@@ -399,22 +399,6 @@ pub(crate) fn print_group_expanded<'a>(group: &ChainGroup<'a>, printer: &Printer
     print_group_inner(group, printer, true, false)
 }
 
-/// Print a chain group with standard forced call expansion (no arrow hugging)
-///
-/// Like `print_group_expanded`, but uses `(\n  args,\n)` instead of `(sig =>\n  body,\n)`
-/// for single-arg arrows with breakable bodies. Used in short chain states where the
-/// chain doesn't break between groups.
-pub(crate) fn print_group_standard_expanded<'a>(
-    group: &ChainGroup<'a>,
-    printer: &Printer<'_>,
-) -> DocId {
-    let d = printer.arena();
-    d.concat_iter(group.nodes.iter().map(|n| match n {
-        ChainNode::Call { call, facts } => printer.print_call_args_standard_expanded(call, *facts),
-        _ => print_node_inner(n, printer, false, false),
-    }))
-}
-
 /// Print a chain group, skipping block comments for the first member node
 ///
 /// Used by ChainPartsBuilder in expanded path where `add_comments_and_break`
@@ -471,7 +455,7 @@ pub(crate) fn member_lookup_group(d: &DocArena, lookup: DocId) -> DocId {
 /// The brackets are where a computed access sheds width. Prettier never places a break
 /// point *before* the `[` (`printMemberExpression`'s `shouldInline` includes
 /// `node.computed`), so callers must keep the lookup glued to the object — see
-/// `starts_segment` in the member-only builder. A non-breakable lookup (`breakable ==
+/// [`ChainNode::is_dot_lookup`] in the member-only builder. A non-breakable lookup (`breakable ==
 /// false`, the numeric-index carve-out) has no break point at all, and so overflows the
 /// print width rather than splitting.
 fn computed_lookup_doc(

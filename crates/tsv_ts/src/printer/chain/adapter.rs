@@ -43,14 +43,6 @@ impl<'a> Printer<'a> {
         self.build_call_args_doc_for_chain_expanded(call, facts)
     }
 
-    pub(crate) fn print_call_args_standard_expanded(
-        &self,
-        call: &internal::CallExpression<'_>,
-        facts: ChainCall,
-    ) -> DocId {
-        self.build_call_args_doc_for_chain_standard_expanded(call, facts)
-    }
-
     pub(crate) fn build_chain_block_comments_doc(
         &self,
         start: u32,
