@@ -3,8 +3,7 @@
 // The writer (`write/`) emits the compact wire JSON directly from the internal
 // AST in one walk, fusing byte→UTF-16 offset translation into the walk (final
 // char-space positions emitted directly via `LocationMapper`). It is the sole
-// emission path; `convert_ast_json_bytes`/`_string` in `lib.rs` call it, and
-// `convert_ast_json` parses its bytes back into a `Value`.
+// emission path; `convert_ast_json_bytes`/`_string` in `lib.rs` call it.
 
 use tsv_lang::{ByteToCharMap, LocationTracker};
 

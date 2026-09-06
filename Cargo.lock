@@ -658,8 +658,6 @@ version = "0.2.0"
 dependencies = [
  "argh",
  "bumpalo",
- "serde",
- "serde_json",
  "tsv_css",
  "tsv_discover",
  "tsv_ignore",
@@ -674,7 +672,6 @@ version = "0.2.0"
 dependencies = [
  "bumpalo",
  "phf",
- "serde_json",
  "tsv_lang",
 ]
 
@@ -794,7 +791,6 @@ name = "tsv_ts"
 version = "0.2.0"
 dependencies = [
  "bumpalo",
- "serde_json",
  "smallvec",
  "tsv_lang",
  "unicode-ident",

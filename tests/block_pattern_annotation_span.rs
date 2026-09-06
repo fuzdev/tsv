@@ -33,7 +33,7 @@ use serde_json::Value;
 fn annotation_span(src: &str) -> (u64, u64) {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the component");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let mut found = Vec::new();
     collect(&json, &mut found);
     match found.as_slice() {

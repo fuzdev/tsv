@@ -2,9 +2,9 @@ use crate::cli::CliError;
 use crate::deno::{parse_css, parse_svelte, parse_typescript_with_goal};
 use crate::fixtures;
 use crate::fixtures::InputType;
+use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use futures_util::StreamExt;
-use tsv_cli::json_utils::to_json_with_tabs;
 
 /// Regenerate expected.json (or expected_ours.json + expected_svelte.json) files.
 #[derive(FromArgs, Debug)]
@@ -290,9 +290,9 @@ async fn generate_tsv_rejects_fixture(fixture: &fixtures::Fixture, source: &str)
 }
 
 async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) -> FixtureResult {
-    // Generate expected_ours.json from our parser.
-    // Parse directly and serialize the struct (not via serde_json::Value) to
-    // preserve field order. Dispatch on input type (mirrors generate_expected_fixture).
+    // Generate expected_ours.json from our parser: the writer's wire, read back
+    // unbounded (`preserve_order` keeps the writer's field order through the
+    // `Value`), then tab-indented. Dispatch on input type (mirrors generate_expected_fixture).
     let our_json = match fixture.input_type() {
         InputType::SvelteTs | InputType::TypeScript => {
             let arena = bumpalo::Bump::new();
@@ -300,7 +300,7 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
             };
-            let json_value = tsv_ts::convert_ast_json(&ast, source);
+            let json_value = crate::json::wire_value(&tsv_ts::convert_ast_json_bytes(&ast, source));
             match to_json_with_tabs(&json_value) {
                 Ok(json) => format!("{json}\n"),
                 Err(e) => {
@@ -314,7 +314,8 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
             };
-            let json_value = tsv_css::convert_ast_json(&ast, source);
+            let json_value =
+                crate::json::wire_value(&tsv_css::convert_ast_json_bytes(&ast, source));
             match to_json_with_tabs(&json_value) {
                 Ok(json) => format!("{json}\n"),
                 Err(e) => {
@@ -328,7 +329,8 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
             };
-            let json_value = tsv_svelte::convert_ast_json(&ast, source);
+            let json_value =
+                crate::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, source));
             match to_json_with_tabs(&json_value) {
                 Ok(json) => format!("{json}\n"),
                 Err(e) => {

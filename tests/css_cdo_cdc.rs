@@ -24,7 +24,7 @@ use serde_json::Value;
 fn parse_json(src: &str) -> Value {
     let arena = bumpalo::Bump::new();
     let ast = tsv_css::parse(src, &arena).expect("parser should accept the CSS");
-    tsv_css::convert_ast_json(&ast, src)
+    tsv_debug::json::wire_value(&tsv_css::convert_ast_json_bytes(&ast, src))
 }
 
 fn accepts(src: &str) -> bool {

@@ -16,7 +16,7 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 
 - Input handling (file, `--content`, `--stdin`) — `cli/input.rs`
 - File/directory discovery with extension filter, gitignore-aware ignore evaluation (hierarchical `.gitignore`/`.formatignore`/`.prettierignore`), and the non-git heuristic fallback — `cli/discover.rs`
-- JSON utilities (tab-indented serialization) — `json_utils.rs`
+- The `--pretty` re-indenter (tab-indented form of the compact wire, no deserializer) — `json_utils.rs`
 
 ## Binary Structure
 
@@ -242,6 +242,28 @@ the enum's width, so they are arena-boxed too — not for rarity but because the
 ceiling, and a boxed head copies the same bytes into the arena that it would have moved
 into the enum. Together those take `Statement` to **72 B rather than 544**; the
 next-widest inline variant is `TryStatement` at 64 B, which is where the ladder stops.
+
+**The wire has no reader ceiling of its own.** `tsv parse --pretty` re-indents the
+compact wire bytes in one linear pass (`json_utils::indent_json_with_tabs`) rather than
+reading them back into a tree, so it stops exactly where the parser stops. It did not
+always: the pretty route used to round-trip through a `serde_json::Value`, and
+serde_json's default recursion limit of 128 JSON levels — two per nested array (the node
+and its `elements`), three per nested object literal — refused a wire past ~60 nested
+arrays or ~40 nested objects that the compact route had just emitted, a clean exit 1 on
+input the parser handles at 400× the depth. No tool tsv stands in for bounds depth by
+choice: `JSON.parse` is iterative in V8 and JSC and takes a million levels, and acorn,
+Svelte's parser and prettier each stop only at V8's stack (1,023 nested arrays for acorn
++ `@sveltejs/acorn-typescript`, 767 for prettier's `typescript` parser). The one reader
+of the wire left is `tsv_debug`'s `json` module (the fixture gate, the sidecar
+transport, every audit's `Value` walk), which reads with the limit disabled on the same
+`STACK_SIZE` reservation: a `Value` read costs ~0.6 KiB of stack per JSON level
+(measured, and the same for the drop, `==` and pretty-print walks), so ~1.2 KiB per
+nested array against the parser's ~1.14 — the read reaches ~27,500 arrays where the
+parse reaches ~28,000, a 2% band on adversarial input where a *dev tool* would overflow
+instead of erroring, and ~1.8 KiB per nested object against the parser's ~2.4, where
+the parser binds. Fixture
+[`typescript/expressions/objects/nested_deep`](../tests/fixtures/typescript/expressions/objects/nested_deep/)
+(45 nested object literals, 145 wire levels) pins the pipeline past the old ceiling.
 
 **The other surfaces have their own ceilings, set by their hosts, and the CLI's
 reservation does not reach them:**

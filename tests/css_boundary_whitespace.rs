@@ -172,7 +172,7 @@ use serde_json::Value;
 fn named_nodes(src: &str) -> Vec<(String, String)> {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();
     collect(json.get("css").unwrap_or(&Value::Null), &mut out);
     out
@@ -664,7 +664,7 @@ fn a_run_moves_neither_an_argument_lists_start_nor_a_combinators_end() {
 fn pseudo_args_starts(src: &str) -> Vec<u64> {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();
     fn walk(node: &Value, out: &mut Vec<u64>) {
         match node {
@@ -686,7 +686,7 @@ fn pseudo_args_starts(src: &str) -> Vec<u64> {
 fn combinator_ends(src: &str) -> Vec<u64> {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();
     fn walk(node: &Value, out: &mut Vec<u64>) {
         match node {
@@ -1310,7 +1310,7 @@ fn declaration_values(src: &str) -> Vec<String> {
 fn wire_field_values(src: &str, ty: &str, field: &str) -> Vec<String> {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();
     fn walk(node: &Value, ty: &str, field: &str, out: &mut Vec<String>) {
         match node {
@@ -1343,7 +1343,7 @@ fn utf16_offset_of(src: &str, needle: &str) -> u64 {
 fn selector_list_starts(src: &str) -> Vec<u64> {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let mut found = Vec::new();
     fn walk(node: &Value, out: &mut Vec<u64>) {
         match node {
@@ -1374,7 +1374,7 @@ fn selector_list_start(src: &str) -> u64 {
 fn css_comment_values(src: &str) -> Vec<String> {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("component should parse");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();
     fn walk(node: &Value, out: &mut Vec<String>) {
         match node {

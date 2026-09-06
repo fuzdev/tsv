@@ -20,8 +20,7 @@
 // in one walk and **reuses the raw-source reconstruction helpers below**
 // (`strip_css_comments_collecting`, `split_declaration_svelte_compat`,
 // `raw_selector_name`, …), so the Svelte scan semantics live in one place. It
-// is the sole emission path; `convert_ast_json_bytes` calls it and
-// `convert_ast_json` parses its bytes back into a `Value`. That one walk also
+// is the sole emission path; `convert_ast_json_bytes` calls it. That one walk also
 // GATHERS the wire's flat `CSSComment[]`: a declaration's comments exist only
 // in the strip its `value` comes from, so collecting them there rather than in
 // a second pass is what keeps their offsets indexing the string they describe.

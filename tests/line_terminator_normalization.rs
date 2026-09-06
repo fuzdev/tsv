@@ -117,7 +117,7 @@ fn parse_leaves_the_authors_line_terminators_alone() {
     let cr = "const a = 1;\rconst b = 2;\r";
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(cr, &arena).expect("parse");
-    let json = tsv_ts::convert_ast_json(&program, cr);
+    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, cr));
     let second = json
         .pointer("/body/1")
         .and_then(|n| n.get("start"))

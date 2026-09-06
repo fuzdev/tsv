@@ -6,9 +6,9 @@ use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
 use argh::FromArgs;
 use futures_util::StreamExt;
 
+use crate::json::to_json_with_tabs;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{
     CompileError, CompileOptions, Parity, Refusal, canonicalize_js, compare_canonical, compile,
     refusal_census, refusal_census_buckets,

@@ -378,7 +378,7 @@ prettier-svelte for formatting; variants use `.svelte.ts`).
 
 - **P1**: `expected.json` matches Svelte parser output
 - **P2**: `expected_ours.json` matches our parser output (divergence fixtures)
-- **P2b**: our parser output (the writer's wire JSON, via `convert_ast_json`) matches `expected.json` — the gate on the emission path (non-divergence fixtures)
+- **P2b**: our parser output (the writer's wire JSON, tab-indented by the CLI's `--pretty` re-indenter and read back unbounded for the field-order triage) matches `expected.json` — the gate on the emission path (non-divergence fixtures)
 - **P3**: `expected_svelte.json` matches Svelte parser output
 
 The writer (`convert_ast_json_bytes`) is the sole emission path, so P2/P2b

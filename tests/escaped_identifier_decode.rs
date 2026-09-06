@@ -32,7 +32,7 @@ fn assert_name_decodes(
 ) {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_ts::convert_ast_json(&program, source);
+    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
 
     assert_eq!(
         json.pointer(name_pointer).and_then(Value::as_str),
@@ -54,7 +54,7 @@ fn assert_name_decodes(
         output,
         "output should be stable"
     );
-    let json_out = tsv_ts::convert_ast_json(&reparsed, &output);
+    let json_out = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&reparsed, &output));
     assert_eq!(
         json_out.pointer(name_pointer).and_then(Value::as_str),
         Some(expected_name),
@@ -115,7 +115,7 @@ fn escaped_constructor_is_constructor() {
     let source = r"class C { \u0063onstructor() {} }";
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_ts::convert_ast_json(&program, source);
+    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
     let member = json.pointer("/body/0/body/body/0").expect("class member");
     assert_eq!(
         member.pointer("/kind").and_then(Value::as_str),

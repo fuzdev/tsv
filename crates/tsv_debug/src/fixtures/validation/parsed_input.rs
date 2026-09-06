@@ -2,7 +2,8 @@
 //! validation phases (2/2b).
 
 use crate::fixtures::InputType;
-use tsv_cli::json_utils::to_json_with_tabs;
+use crate::json::wire_value;
+use tsv_cli::json_utils::indent_json_with_tabs;
 
 /// A fixture input parsed once with our parser.
 ///
@@ -40,36 +41,47 @@ pub(super) fn parse_input<'arena>(
     }
 }
 
-/// Both JSON-AST outputs derived from one `convert_ast_json` call.
+/// The parser phases' view of one input: the writer's wire and its tabbed form.
 pub(super) struct InputAstPaths {
-    /// `convert_ast_json`'s `Value` — used to classify a byte mismatch against
-    /// `expected.json` as field-order-only (key-order-insensitive `Value`
-    /// equality) vs semantic.
-    pub ast_json: serde_json::Value,
-    /// The same `Value` serialized with tabs + trailing newline — the exact
-    /// bytes `expected*.json` files store (matches `fixtures_update_parsed`);
-    /// the byte-strict comparison the parser phases gate on.
+    /// The compact wire `convert_ast_json_bytes` emitted (the sole emission
+    /// path). Read back into a `Value` only on a byte mismatch, to classify it
+    /// as field-order-only vs semantic ([`Self::wire_value`]) — so the happy
+    /// path deserializes nothing, like the CLI.
+    pub wire: Vec<u8>,
+    /// The same wire tab-indented + trailing newline — the exact bytes
+    /// `expected*.json` files store (matches `fixtures_update_parsed`); the
+    /// byte-strict comparison the parser phases gate on.
     pub ast_json_tabs: String,
 }
 
+impl InputAstPaths {
+    /// The wire as a key-order-insensitive `Value`, through the unbounded reader.
+    pub fn wire_value(&self) -> serde_json::Value {
+        wire_value(&self.wire)
+    }
+}
+
 /// Compute the JSON-AST for the parser-side phases from an already-parsed
-/// input. `convert_ast_json` parses the wire bytes the writer emits (the sole
-/// emission path); `expected.json` — pinned to the canonical parser by the P1/P3
-/// freshness checks — is the oracle these phases compare against.
-pub(super) fn input_ast_paths(
-    parsed: &ParsedInput<'_>,
-    content: &str,
-) -> Result<InputAstPaths, String> {
-    let ast_json = match parsed {
-        ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json(ast, content),
-        ParsedInput::Ts(ast) => tsv_ts::convert_ast_json(ast, content),
-        ParsedInput::Css(ast) => tsv_css::convert_ast_json(ast, content),
+/// input. The tabbed text derives from the wire through the CLI's
+/// recursion-free re-indenter — the `--pretty` route, so the gate exercises it
+/// on every fixture. `expected.json` — pinned to the canonical parser by the
+/// P1/P3 freshness checks — is the oracle these phases compare against.
+pub(super) fn input_ast_paths(parsed: &ParsedInput<'_>, content: &str) -> InputAstPaths {
+    let wire = match parsed {
+        ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json_bytes(ast, content),
+        ParsedInput::Ts(ast) => tsv_ts::convert_ast_json_bytes(ast, content),
+        ParsedInput::Css(ast) => tsv_css::convert_ast_json_bytes(ast, content),
     };
-    let tabs = to_json_with_tabs(&ast_json)
-        .map_err(|e| format!("Failed to serialize AST to JSON: {e}"))?;
-    Ok(InputAstPaths {
-        ast_json,
-        // Trailing newline matches the fixtures_update_parsed format
-        ast_json_tabs: format!("{tabs}\n"),
-    })
+    let mut tabs = indent_json_with_tabs(&wire);
+    // Trailing newline matches the fixtures_update_parsed format
+    tabs.push(b'\n');
+    #[expect(
+        clippy::expect_used,
+        reason = "the wire is UTF-8 by construction and re-indenting adds only ASCII"
+    )]
+    let ast_json_tabs = String::from_utf8(tabs).expect("re-indented wire is UTF-8");
+    InputAstPaths {
+        wire,
+        ast_json_tabs,
+    }
 }
