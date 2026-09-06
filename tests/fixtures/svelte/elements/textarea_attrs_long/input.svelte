@@ -7,9 +7,15 @@
 	id="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	data-attr="ccccccccccccccccccccccccccc"></textarea>
 
-<!-- With content - whitespace-sensitive, hug behavior -->
-<textarea class="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" id="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	>content</textarea
+<!-- With content, head exactly 100 - attrs stay flat, `>` takes the next line one level in -->
+<textarea data-attr1="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" data-attr2="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	>text</textarea
+>
+
+<!-- One char more - the attrs wrap one per line and the `>` hugs the last -->
+<textarea
+	data-attr1="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	data-attr2="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb">text</textarea
 >
 
 <!-- With expression value - empty, attrs wrap; > hugs the last attr -->

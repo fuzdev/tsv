@@ -163,31 +163,28 @@ pub(in crate::printer) struct AttrGaps {
 ///
 /// Most callers read only `docs`: their `>` / `/>` already sits behind a `line` in the
 /// list's own group, so the `break_parent` a line comment pushes moves it off the comment's
-/// line unaided, and their attributes already wrap behind those same `line` separators. The
-/// whitespace-sensitive builder is the one that must consult the emission — it hugs the `>`
-/// onto the last attribute and holds its attributes flat, with no line to break for either
-/// question (see [`Printer::push_attrs_with_comments`]).
+/// line unaided. The whitespace-sensitive builder is the one that must consult the emission —
+/// it **hugs** the `>` onto whatever the list ends on, so there is no `line` in front of it
+/// for that `break_parent` to spend, and only the flag says the hug is off
+/// (see [`Printer::push_attrs_with_comments`]). Its attributes wrap behind the same `line`
+/// separators as everyone else's.
 pub(super) struct ElementAttrsDoc {
     pub(super) docs: DocBuf,
     pub(super) emission: AttrListEmission,
 }
 
-/// What emitting an attribute list did that a layout keeping the list **flat** must know —
+/// What emitting an attribute list did that whoever prints the tag's closer must know —
 /// [`Printer::push_attrs_with_comments`]'s summary of its comment runs.
 ///
-/// Both fields are read off the emission as it happens rather than re-derived from source
-/// or probed off the docs, so they cannot disagree with what was printed —
-/// [`DocArena::will_break`](tsv_lang::doc::arena::DocArena::will_break) is *not* the
-/// `has_hardline` question: it counts the `break_parent` a trailing `//` pushes, which
-/// forces only the `>` off the comment's line while the list itself stays flat.
+/// Read off the emission as it happens rather than re-derived from source or probed off the
+/// docs, so it cannot disagree with what was printed. It is deliberately *not*
+/// [`DocArena::will_break`](tsv_lang::doc::arena::DocArena::will_break): that answers whether
+/// the list breaks, which every head already reads through its own attrs group, where this
+/// answers whether the `>` may share the list's last line at all.
 #[derive(Clone, Copy, Default)]
 pub(in crate::printer) struct AttrListEmission {
     /// Whether the emitted list ends on a `//`, so nothing may share its line.
     pub(in crate::printer) ends_with_line_comment: bool,
-    /// Whether a comment forced a hardline *into* the list — an own-line comment keeping
-    /// its own line, or a same-line `//` pushing the following attribute to a fresh one.
-    /// The list can no longer render flat at any width.
-    pub(in crate::printer) has_hardline: bool,
 }
 
 /// What an emitted attribute-comment run leaves behind for whoever prints next.
@@ -205,10 +202,6 @@ struct AttrCommentRun {
     next_on_new_line: bool,
     /// Whether the run's **last** comment is a `//`, so nothing may share its line.
     ends_with_line_comment: bool,
-    /// Whether **any** comment in the run kept a line of its own (accumulated, unlike the
-    /// two tail facts above): the run pushed a hardline, so the list holding it can never
-    /// render flat — [`AttrListEmission::has_hardline`]'s per-run input.
-    has_own_line_comment: bool,
 }
 
 /// Which comments the synthesized `this={…}` prints — [`AttrGaps::claimed`]'s payload, and
@@ -1227,9 +1220,8 @@ impl<'a> Printer<'a> {
             return AttrListEmission::default();
         }
 
-        let mut has_hardline = false;
         for (i, attr) in attrs.iter().enumerate() {
-            has_hardline |= self.push_attr_item_with_leading_comments(
+            self.push_attr_item_with_leading_comments(
                 docs,
                 separator,
                 gap_comments(gap_start(i), attr.span().start),
@@ -1244,7 +1236,6 @@ impl<'a> Printer<'a> {
             self.push_attr_comment_docs(docs, gap_comments(gap_start(attrs.len()), open_tag_end));
         AttrListEmission {
             ends_with_line_comment: trailing.ends_with_line_comment,
-            has_hardline: has_hardline || trailing.has_own_line_comment,
         }
     }
 
@@ -1269,21 +1260,17 @@ impl<'a> Printer<'a> {
     /// beside the `this` binding is how the two drifted in the first place — that one printed
     /// no leading comments at all, so every comment before the binding was dropped.
     ///
-    /// Returns whether the emission put a hardline into the list — a comment in the run kept
-    /// its own line, or the run's tail forced the item onto a fresh one
-    /// ([`AttrListEmission::has_hardline`]'s per-item input).
     pub(super) fn push_attr_item_with_leading_comments<'c>(
         &self,
         docs: &mut DocBuf,
         separator: DocId,
         comments: impl IntoIterator<Item = &'c tsv_lang::Comment>,
         item: DocId,
-    ) -> bool {
+    ) {
         let d = self.d();
         let mut comments = comments.into_iter().peekable();
-        let pushed_hardline = if comments.peek().is_none() {
+        if comments.peek().is_none() {
             docs.push(separator);
-            false
         } else {
             let tail = self.push_attr_comment_docs(docs, comments);
             docs.push(if tail.next_on_new_line {
@@ -1291,10 +1278,8 @@ impl<'a> Printer<'a> {
             } else {
                 separator
             });
-            tail.has_own_line_comment || tail.next_on_new_line
-        };
+        }
         docs.push(item);
-        pushed_hardline
     }
 
     /// Whether the author put `comment` on a line of its own — the question every
@@ -1355,7 +1340,6 @@ impl<'a> Printer<'a> {
             tail = AttrCommentRun {
                 next_on_new_line: is_own_line || !comment.is_block,
                 ends_with_line_comment: !comment.is_block,
-                has_own_line_comment: tail.has_own_line_comment || is_own_line,
             };
         }
         tail

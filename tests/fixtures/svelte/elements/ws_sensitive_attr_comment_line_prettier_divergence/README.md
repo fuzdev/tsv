@@ -9,7 +9,8 @@ untouched.
 tsv:
 
 ```svelte
-<pre data-attr="value" // c
+<pre
+	data-attr="value" // c
 	>text</pre
 >
 
@@ -22,8 +23,13 @@ over-width `<textarea>` already takes, pinned by
 [elements/textarea_attrs_long](../textarea_attrs_long/). With no content there is nothing for the
 `>` to protect, so it sits at base indent, the shape every other element takes
 ([attributes/comment_trailing_same_line](../../attributes/comment_trailing_same_line/)).
-An **own-line** `//` before the `>` carries its line break with it — the attributes wrap one per
-line ([ws_sensitive_attr_comment_own_line](../ws_sensitive_attr_comment_own_line/)'s rule) and the
+
+The **list** wraps around the `//` in both, because a list holding one wraps at every head —
+`<div⏎	data-attr="value" // c⏎></div>` is what a regular element already prints
+([attributes/comment_trailing_same_line](../../attributes/comment_trailing_same_line/) again).
+Only a comment the author put on the **tag-name** line has nothing before it to wrap and stays
+there. An **own-line** `//` before the `>` carries its line break with it the same way
+([ws_sensitive_attr_comment_own_line](../ws_sensitive_attr_comment_own_line/)'s rule), and the
 `>` keeps the next line, one level in.
 
 Prettier **ejects the comment out of the element**:
@@ -53,7 +59,8 @@ and the catalog entry in
 
 ## Related
 
-- [elements/textarea_attrs_long](../textarea_attrs_long/) — the same broken-`>` layout, forced by width
+- [elements/textarea_attrs_long](../textarea_attrs_long/) — the same broken-`>` layout, forced by width, at its exact 100/101 boundary
+- [elements/ws_sensitive_head_attrs_wrap](../ws_sensitive_head_attrs_wrap/) — the head shape a breaking list takes with no comment in it (matches prettier)
 - [elements/pre_closing_tag](../pre_closing_tag/) — the dangling close tag in `<pre>` content
 - [elements/ws_sensitive_self_closing_kinds](../ws_sensitive_self_closing_kinds_prettier_divergence/) — the other question this printing path answers on its own
 - [attributes/comment_no_attributes](../../attributes/comment_no_attributes_prettier_divergence/) — the empty-list deletion, here as the no-attribute arm

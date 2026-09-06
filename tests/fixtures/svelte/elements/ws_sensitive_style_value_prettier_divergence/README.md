@@ -20,7 +20,12 @@ Prettier keeps the head on one line and the value exactly as authored — the sp
 authoring is a second fixed point for it, pinned by `prettier_variant_spaces.svelte`.
 
 An **ancestor** is enough for prettier's guard, so the last case sits the directive on a
-nested `<span>` and both formatters answer it exactly as they answer the cases above.
+nested `<span>` and both formatters answer it exactly as they answer the cases above — tsv
+wraps the head and hugs the `>`, prettier keeps the head on one line. That parity is the
+nested case's whole point, and it is the head shape
+[ws_sensitive_head_attrs_wrap](../ws_sensitive_head_attrs_wrap/) pins directly: a
+whitespace-sensitive head answers a breaking list one way whether the element is the `<pre>`
+itself or an inline element inside it.
 
 The break lands **inside the tag**, where no character is element content, so the render is
 unchanged — the same licence
