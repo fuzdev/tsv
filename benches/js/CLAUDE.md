@@ -440,29 +440,35 @@ AST-shape to a gate once the undocumented-group count hits 0 is a natural follow
 
 ### `conformance:ts-repo`
 
-tsv's TS parser over `../typescript/tests/cases` — the WHOLE corpus, ~13.7k
-single-file `.ts` — using **tsc's OWN baselines as the validity oracle** — a
-`tests/baselines/reference/<name>.errors.txt` with a `TS1xxx` code = tsc's parser
-rejects (→ tsv correctly stricter), no `TS1xxx` = tsc accepts (→ a tsv reject is a
-real gap). Entry: `diagnostics/ts_repo_compare.ts`.
+tsv's TS parser over `../typescript/tests/cases` — the WHOLE corpus, every
+single-file `.ts` plus every TypeScript unit of the `@filename` multi-file tests —
+using **tsc's OWN baselines as the validity oracle**: a
+`tests/baselines/reference/<name>.errors.txt` with a `TS1xxx` code = tsc's grammar
+rejects, no `TS1xxx` = tsc accepts. Entry: `diagnostics/ts_repo_compare.ts`. **The
+full model — the oracle, the bucket ladder, the four ledgers and their categories,
+the reading rules, and the triage loop — is
+[docs/conformance_tsc.md](../../docs/conformance_tsc.md).** What follows is what an
+operator of the aggregate needs.
 
-tsc is authoritative because acorn-ts (tsv's *target*) is itself over-lenient; using
-tsc's baselines auto-resolves those leniency cases to reject-parity (no sanction
-needed), and acorn's verdict sub-labels each gap (`gap` = acorn-confirmed → gates;
-`gap_beyond_acorn` = acorn also rejects, a mixed acorn-gap / early-error-timing
-surface → reported, not gated). In the blocking `conformance` aggregate (promoted
-once its baseline hit 0 untracked gaps), tracked separately from the acorn-suite
-gate (own `KNOWN_GAPS`, freshness-checked on full-corpus runs). `.tsx` and
-`@filename` multi-file tests are skipped (5,158 of them — a filed coverage hole; the
-directive rule mirrors tsc's own harness, which `is_multi_file_test` argues in full);
-`.d.ts` cases ARE graded (61 of them — a declaration file is ordinary TS to tsv, and
-the bench harvest skips them for a reason of its own, argued at each `DECLARATIONS`).
-Baseline: 13,708 scanned, 12,284 accept-parity, a 487-entry over-acceptance pin, 0 untracked gaps. ⚠️ The root is the
-whole corpus deliberately: the old `conformance/parser` default was green at 768 files
-while 32 over-rejections sat untracked in the checker/emitter trees, whose ordinary TS is
-likelier reachable in real code than the parser torture suite. A
-missing checkout, a partial one (baselines or corpus subtree missing), or an empty
-scan all FAIL rather than green-skipping.
+tsc is authoritative because acorn-ts (tsv's *shape* target) is itself over-lenient;
+grading against tsc auto-resolves those leniency cases to reject-parity (no
+sanction needed), and acorn's verdict only sub-labels tsv's over-rejections. Every
+over-rejection is attributed before it can gate: a goal artifact (parses at
+`Goal::Script`, and tsc reads the file as a script), a file tsc's own live parser
+refuses (UTF-16 bytes, a shebang under a directive), then a ledger — sanctioned
+(kept deliberately, with a category naming the production or tsc's recovery
+leniency) or known (to fix). Only an **untracked** over-rejection fails the gate,
+whether acorn shares it or not; every ledger is freshness-checked on a full-corpus
+run, so a fixed gap must leave its ledger. Over-acceptance (tsv accepts what tsc's
+baseline refuses) is split by tsc's live parser into a `parser` half (a question
+for the grammar line) and a `checker` half (the deferred early-error posture), both
+pinned, neither gating, with a per-`TS1xxx` histogram under `-v` / `--json`. `.tsx`
+is skipped; `.d.ts` cases are graded (the bench harvest skips them for a reason of
+its own, argued at each `DECLARATIONS`); a multi-file test with a grammar error
+anywhere is skipped whole, since the baseline cannot say which unit. In the blocking
+`conformance` aggregate, tracked separately from the acorn-suite gate. A missing
+checkout, a partial one (baselines or corpus subtree missing), or an empty scan all
+FAIL rather than green-skipping. Pins: `TS_REPO_PINS` in `lib/gate_counts.ts`.
 
 ### Pre-release aggregate — `conformance` / `conformance:all`
 
@@ -1262,10 +1268,11 @@ benches/js/
     │                      # artifact-naming pair every loader AND guard shares — native_library_filename
     │                      # and wasm_target (the pkg/<variant>/<target>/ segment)
     ├── swc.ts             # swc wrapper (parse-only, TS/JS; both surfaces — goal axis is `isModule`)
-    ├── ts_repo.ts         # Shared `../typescript`-corpus vocabulary: discovery + the baseline
-    │                      # key/grammar-error rules (the ts-repo GATE and the harvest both read it,
-    │                      # so they can't drift on what a parse unit is or what tsc's baselines say;
-    │                      # they scope themselves along two DECLARED axes — root + DeclarationPolicy)
+    ├── ts_repo.ts         # Shared `../typescript`-corpus vocabulary: discovery, the `@filename`
+    │                      # unit split (tsc's own harness rule), and the baseline key/grammar-code
+    │                      # rules (the ts-repo GATE and the harvest both read it, so they can't
+    │                      # drift on what a parse unit is or what tsc's baselines say; they scope
+    │                      # themselves along two DECLARED axes — root + DeclarationPolicy)
     ├── tsc.ts             # tsc wrapper (parse-only, conformance surface only) + the shared
     │                      # `typescript` loader and parse call the harvest reuses
     ├── tsv_artifacts.ts   # The measured tsv artifacts: crate lists + per-build path/label/rebuild, read by
