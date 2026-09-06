@@ -340,7 +340,15 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// siblings (plain call, `new`, the member-chain spelling, and prettier's flat-parameter rule
 	// for them) are corpus-NEUTRAL: `fn(function () {})` and `obj.m({})` past the print width
 	// are shapes no gates-view file holds, so the +1 is the literal fix alone.
-	typescript: 5140,
+	//
+	// 5140 → 5141: the parenthesized binary CALL callee takes prettier's expanding parens.
+	// `prettier/tests/format/js/binary-expressions/call.js` — the whole file is that one
+	// construct — arrives from `unknown`. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`. TWO files
+	// in the whole gates view change bytes at all, and the second moves no count:
+	// `js/call/boolean/boolean.js` improves by the same rule (its `(a || a || a)(Boolean)`
+	// callee, sitting right beside the `new (` sibling that already expanded) and stays
+	// `unknown` on the unrelated `isBooleanTypeCoercion` gap its other hunks are.
+	typescript: 5141,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -475,7 +483,17 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// could not break once nothing above it could. Prettier has no such arm: every non-hug
 	// argument ends at `printCallArguments`' soft-break group. Nothing arrived in `unknown`,
 	// and the same one-mover byte-diff is described on `CORPUS_FORMAT_MATCH_MIN`.
-	typescript: 100,
+	//
+	// 100 → 99: `js/binary-expressions/call.js` LEAVES for `match` — the parenthesized binary
+	// CALL callee. Prettier's binaryish EARLY RETURN (`key === "callee" &&
+	// isCallOrNewExpression(parent)`, taken ahead of `shouldNotIndent`) expands the pair,
+	// `(⏎\ta &&⏎\tb⏎)()`, where tsv welded it to the argument list; the `new` callee already
+	// took that shape and both now read it off one seam. Nothing arrived. Measured by
+	// formatting two staged copies of the whole snapshot + prettier suites (11,749 files,
+	// `find`-enumerated so the ~800 that `tsv format --list` prunes are included) with a HEAD
+	// and a tip `--profile corpus` binary and diffing the trees: two files move, named on
+	// `CORPUS_FORMAT_MATCH_MIN`, and the per-file error output is identical line for line.
+	typescript: 99,
 	css: 23
 };
 
