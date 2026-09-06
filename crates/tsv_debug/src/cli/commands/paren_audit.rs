@@ -234,11 +234,13 @@ fn collect_sites(node: &Value, f: &str, map: &Utf16ToByte, out: &mut Sites) {
 ///
 /// A **line** comment is deliberately still in scope: it runs to the end of its line, so
 /// anything it precedes sits on the next line and it is that line's trailing comment — it binds
-/// backward and cannot be a cast or an annotation.
+/// backward and cannot be a cast or an annotation. The one line comment this coarse test cannot
+/// tell from a block close is one whose own text ends in `*/` (`// see /* … */`); that site is
+/// over-excluded, which is the safe direction and is why the count is reported.
 ///
 /// The trim is Rust's `char::is_whitespace`, wider than JS's `WhiteSpace` production. Wrong in
-/// the safe direction: a wider class only skips more sites, where a narrower one would probe a
-/// splice this is meant to exclude.
+/// the safe direction too: a wider class only skips more sites, where a narrower one would probe
+/// a splice this is meant to exclude.
 fn splits_forward_binding_comment(f: &str, at: usize) -> bool {
     f[..at].trim_end().ends_with("*/")
 }
@@ -321,7 +323,9 @@ struct Finding {
     verdict: Verdict,
     context: String,
     /// The first line at which `format(variant)` departs from the base, as
-    /// `(line number, base line, variant line)`. `None` when the twin failed to parse.
+    /// `(line number, base line, variant line)`. `None` when the twin failed to parse, and
+    /// when the two are line-for-line equal yet not byte-equal (they differ only in a
+    /// trailing newline) — there is no line to show either way.
     first_diff: Option<(usize, String, String)>,
 }
 
@@ -359,6 +363,14 @@ impl Report {
             .map(|v| self.count(*v))
             .sum()
     }
+
+    /// Whether this run FAILS — the one question the exit code and the report's ✓ are two
+    /// readings of, so the two cannot disagree. A base-non-idempotent file fails the run
+    /// while producing no site finding at all, and that is exactly the case a ✓ keyed on the
+    /// findings alone prints a pass over (`../prettier/tests/format` holds six such files).
+    fn failed(&self) -> bool {
+        self.findings_total() + self.files_base_non_idempotent > 0
+    }
 }
 
 impl ParenAuditCommand {
@@ -386,7 +398,7 @@ impl ParenAuditCommand {
         // A base-non-idempotent file is excluded from the re-association analysis (its fixed
         // point is undefined, so "formats back to the base" is meaningless) — but excluding
         // it is not a reason to pass the run, or a whole-file reflow could sit here green.
-        if report.findings_total() + report.files_base_non_idempotent > 0 {
+        if report.failed() {
             return Err(CliError::Failed);
         }
         // The floor UNDER the non-empty resolution: this audit's product is per-SITE, so a
@@ -555,10 +567,11 @@ fn print_human(report: &Report, examples: usize) {
     }
 
     if report.findings.is_empty() {
-        // Only claim the property when something actually carried it — a run that graded no
-        // site is about to fail the vacuity floor, and a ✓ printed above that error reads as
-        // a pass the run is not entitled to.
-        if report.sites > 0 {
+        // Only claim the property when something actually carried it AND nothing else failed
+        // the run: a run that graded no site is about to fail the vacuity floor, and one
+        // holding a base-non-idempotent file has already printed the ✗ list above and exits
+        // 1. A ✓ over either reads as a pass the run is not entitled to.
+        if report.sites > 0 && !report.failed() {
             println!();
             println!("  ✓ every same-operator chain formats identically to its parenthesized twin");
         }
@@ -745,6 +758,22 @@ mod tests {
     #[test]
     fn line_comment_before_operand_stays_in_scope() {
         assert_eq!(sites_of("const x =\n\ta && // c\n\tb && c;").len(), 1);
+    }
+
+    /// A base-non-idempotent file fails the run while producing no site finding — the case
+    /// the report's ✓ has to read from the same question the exit code does, or it prints a
+    /// pass over a run that exits 1. `../prettier/tests/format` is a real corpus that lands
+    /// here (six such files, zero site findings).
+    #[test]
+    fn a_base_non_idempotent_file_fails_the_run_with_no_findings() {
+        let report = Report {
+            sites: 12,
+            files_base_non_idempotent: 1,
+            ..Report::default()
+        };
+        assert!(report.findings.is_empty());
+        assert_eq!(report.findings_total(), 0);
+        assert!(report.failed());
     }
 
     /// The walk is over the wire, so a Svelte component's script, template expression and

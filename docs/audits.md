@@ -1191,7 +1191,7 @@ cargo run --profile corpus -p tsv_debug --features audits paren_audit ../corpora
 ```
 
 **Graded as a hard gate, not a ratchet — measured before deciding.** Zero findings over
-`tests/fixtures` (1,260 sites), the `../corpora` snapshot (2,530), `../prettier/tests/format`
+`tests/fixtures` (1,269 sites), the `../corpora` snapshot (2,530), `../prettier/tests/format`
 (225), `../svelte/packages/svelte/src` (684) and `../acorn-typescript` (116), with all three
 operators exercised in each. The per-operator table is printed for exactly that reason: a zero
 row is a corpus gap, not a pass.
@@ -1227,7 +1227,8 @@ the same corpus that `corpus:compare:format --all` passed clean at the time.
   probing a class reads like one that finds nothing in it. Paren-vs-comment binding is
   [`binding:audit`](#commenttoken-binding-audit-bindingaudit)'s subject, where a migrating paren
   IS the finding. A **line** comment stays in scope: it runs to end of line, so it binds backward
-  and cannot be a cast or an annotation.
+  and cannot be a cast or an annotation — save one the coarse `*/` test cannot tell from a block
+  close, a `//` whose own text ends in `*/`, which is over-excluded.
 - **A seed bearing a format-ignore directive is skipped**, like the injection audits: a frozen
   region reproduces the inserted parens verbatim, which is correct behavior and would read as a
   divergence.

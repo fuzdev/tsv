@@ -75,7 +75,7 @@ pub(crate) fn write_repro_case(dir: &str, case: &ReproCase<'_>) {
     let _ = std::fs::write(case_dir.join(format!("base.{ext}")), case.base);
     let _ = std::fs::write(case_dir.join(format!("variant.{ext}")), case.variant);
     let _ = std::fs::write(case_dir.join(format!("ftry.{ext}")), case.ftry);
-    let _ = std::fs::write(case_dir.join("ftry2.".to_string() + ext), ftry2);
+    let _ = std::fs::write(case_dir.join(format!("ftry2.{ext}")), ftry2);
     let _ = std::fs::write(case_dir.join("note.txt"), note);
 }
 

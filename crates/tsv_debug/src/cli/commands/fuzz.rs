@@ -427,7 +427,6 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
     }
 }
 
-/// File extension for a parser — dump + last-input repro file names.
 /// Best-effort pre-attempt repro file: written **before** every parse/format
 /// attempt and removed on an orderly exit, so an input that HANGS the formatter
 /// (the exponential-rebuild class — `catch_unwind` can't see an infinite loop)

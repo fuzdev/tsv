@@ -513,7 +513,7 @@ rather than an `output_prettier.*`: the divergence is one of **normalization**, 
 Where prettier's per-authoring form is additionally non-idempotent, the entry is `◆prettier_bug`
 instead and the [Prettier bug index](#prettier-bug-index) carries it.
 
-**The doctrine is not whitespace-only, though this document’s instances are.** It has exactly one
+**The doctrine is not whitespace-only, though this document's instances are.** It has exactly one
 non-whitespace instance, and it produces no catalog entry because both formatters converge:
 `a ?? b ?? c` and `a ?? (b ?? c)` are one document — prettier says so by *rebalancing* the tree at
 parse time (`rebalanceLogicalTree`), tsv by reading a rebalanced view per rule
