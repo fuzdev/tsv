@@ -333,7 +333,11 @@ pub(super) struct ElementContext {
     pub(super) is_empty: bool,
     /// Whether children need multiline formatting, and why — see [`MultilineCause`]
     pub(super) multiline: MultilineCause,
-    /// Whether any attribute source contains embedded newlines (forces attr group break)
+    /// Whether any attribute's DOC carries a forced break, so the attribute group wraps. Read
+    /// off the built docs (`DocArena::will_break`), not off the source: a value's embedded
+    /// newline is the common cause but not the only one — a comment in the list or in a `{…}`
+    /// value forces the same break, and a `style:` value's whitespace-only part is a break the
+    /// printer emits where the source holds only a newline.
     pub(super) has_multiline_attr: bool,
 }
 

@@ -469,7 +469,15 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a Doc for an attribute value part
+    //
+    // The three per-part value policies. [`Printer::build_attribute_value_doc`] is the rule —
+    // an attribute value is opaque text — and the two below are narrow deviations that fall
+    // back to it for everything they do not claim: a `class` attribute's token list, which
+    // prettier normalizes, and a `style:` directive's CSS separators.
+    //
+
+    /// Build a Doc for an attribute value part — the VERBATIM rule every quoted value takes
+    /// unless its host has a narrower one.
     fn build_attribute_value_doc(&self, value: &internal::AttributeValue<'_>) -> DocId {
         match value {
             internal::AttributeValue::Text(text) => {
@@ -507,7 +515,58 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Push the docs for one part of a quoted `style:` value.
+    ///
+    /// A `style:` value is a **CSS property value**, so a whitespace run the CSS grammar can
+    /// only read as a `<whitespace-token>` is a separator whose spelling carries nothing —
+    /// tsv re-emits it as its own break, re-indenting the continuation to the attribute's
+    /// column (a blank line survives as one blank, the printer's rule everywhere else). Every
+    /// other whitespace in the value is copied verbatim by
+    /// [`Printer::build_attribute_value_doc`], the plain-attribute rule.
+    ///
+    /// ⚠️ The separator claim is made at **part granularity**, and that is what makes it
+    /// provable. A part that is *nothing but* whitespace and holds a newline can neither sit
+    /// inside a CSS string (a raw newline there is a parse error — Syntax 3 §4.3.5 returns a
+    /// `<bad-string-token>`, so the declaration is already dead) nor be an escape's payload
+    /// (the `\` would be content in this same part). Reaching *inside* a part that carries
+    /// content has neither guarantee, which is exactly where prettier — one `isPreTagContent`
+    /// type test away from treating a `StyleDirective` value as element text — collapses
+    /// `'Font   Name'` to a different font name and breaks a string across lines. See
+    /// [`directives/style/value_whitespace_prettier_divergence`](../../../../tests/fixtures/svelte/directives/style/value_whitespace_prettier_divergence/).
+    ///
+    /// ⚠️ The class is the host's render class,
+    /// [`is_collapsible_ws`](internal::is_collapsible_ws) — `[ \t\n\r]` — and **not** CSS's
+    /// own (`is_css_whitespace`, which adds the form feed because §3.3 folds one to a newline
+    /// before §4.2 ever sees it). Two authorities bear on "may this be respelled", and where
+    /// they disagree tsv takes the narrower: a form feed is *content* to every instrument in
+    /// this workspace — `clean_nodes`, the render-key oracle, `fabrication_audit`'s blank-line
+    /// class — each narrowed on the argument that a class one character too wide vouches for
+    /// the very rewrite it exists to catch. Respelling one buys prettier parity on a
+    /// character no source holds and costs a zero-tolerance gate its emptiness, so a
+    /// form-feed-bearing run joins the held half above. The *newline* test is `\n`-keyed, as
+    /// prettier's `printWhitespace` is; the format path has already folded every `<CR>`.
+    fn push_style_value_part(&self, parts: &mut DocBuf, value: &internal::AttributeValue<'_>) {
+        if let internal::AttributeValue::Text(text) = value
+            && text.is_collapsible_ws_only
+            && text.has_newline()
+        {
+            let d = self.d();
+            if text.newline_count >= 2 {
+                parts.push(d.hardline());
+            }
+            parts.push(d.hardline());
+            return;
+        }
+        parts.push(self.build_attribute_value_doc(value));
+    }
+
     /// Build a Doc for attribute text content, handling newlines as literallines.
+    ///
+    /// An attribute value is opaque text: its lines keep the columns the author gave them, so
+    /// they are emitted as `literalline`s rather than re-indented. The one value whose
+    /// whitespace tsv reads rather than copies is a `style:` directive's — see
+    /// [`Printer::push_style_value_part`], which routes only the parts it can prove separators
+    /// and hands everything else back here.
     fn build_attribute_text_doc(&self, raw: &str, raw_span: Option<Span>) -> DocId {
         let d = self.d();
         if raw.contains('\n') {
@@ -682,10 +741,12 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::StyleDirectiveValue::Parts(value_parts) => {
+                // The same quoted-value assembly `build_attribute_doc`'s general path takes —
+                // shared delimiter choice, one doc per part — with the CSS policy for the parts.
                 let (open, close) = self.attribute_value_delims(value_parts);
                 parts.push(open);
                 for part in value_parts.iter() {
-                    parts.push(self.build_attribute_value_doc(part));
+                    self.push_style_value_part(&mut parts, part);
                 }
                 parts.push(close);
             }

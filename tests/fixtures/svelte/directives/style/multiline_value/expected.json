@@ -1,0 +1,610 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 637,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 87,
+				"data": " a whitespace-only run between value parts re-indents to the attribute's column "
+			},
+			{
+				"type": "Text",
+				"start": 87,
+				"end": 88,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 88,
+				"end": 179,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 89
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 92
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 93,
+							"end": 95,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 95,
+							"end": 172,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 96
+								},
+								"end": {
+									"line": 3,
+									"column": 5,
+									"character": 99
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 100,
+										"end": 103,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 103,
+										"end": 164,
+										"name": "div",
+										"name_loc": {
+											"start": {
+												"line": 4,
+												"column": 3,
+												"character": 104
+											},
+											"end": {
+												"line": 4,
+												"column": 6,
+												"character": 107
+											}
+										},
+										"attributes": [
+											{
+												"start": 111,
+												"end": 154,
+												"type": "StyleDirective",
+												"name": "transform-origin",
+												"name_loc": {
+													"start": {
+														"line": 5,
+														"column": 3,
+														"character": 111
+													},
+													"end": {
+														"line": 5,
+														"column": 25,
+														"character": 133
+													}
+												},
+												"modifiers": [],
+												"value": [
+													{
+														"type": "ExpressionTag",
+														"start": 135,
+														"end": 142,
+														"expression": {
+															"type": "Identifier",
+															"start": 136,
+															"end": 141,
+															"loc": {
+																"start": {
+																	"line": 5,
+																	"column": 28
+																},
+																"end": {
+																	"line": 5,
+																	"column": 33
+																}
+															},
+															"name": "expr1"
+														}
+													},
+													{
+														"start": 142,
+														"end": 146,
+														"type": "Text",
+														"raw": "\n\t\t\t",
+														"data": "\n\t\t\t"
+													},
+													{
+														"type": "ExpressionTag",
+														"start": 146,
+														"end": 153,
+														"expression": {
+															"type": "Identifier",
+															"start": 147,
+															"end": 152,
+															"loc": {
+																"start": {
+																	"line": 6,
+																	"column": 4
+																},
+																"end": {
+																	"line": 6,
+																	"column": 9
+																}
+															},
+															"name": "expr2"
+														}
+													}
+												]
+											}
+										],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": []
+										}
+									},
+									{
+										"type": "Text",
+										"start": 164,
+										"end": 166,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 172,
+							"end": 173,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 179,
+				"end": 181,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 181,
+				"end": 239,
+				"data": " a blank line in the run is preserved as one blank "
+			},
+			{
+				"type": "Text",
+				"start": 239,
+				"end": 240,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 240,
+				"end": 296,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 241
+					},
+					"end": {
+						"line": 12,
+						"column": 4,
+						"character": 244
+					}
+				},
+				"attributes": [
+					{
+						"start": 246,
+						"end": 288,
+						"type": "StyleDirective",
+						"name": "transform-origin",
+						"name_loc": {
+							"start": {
+								"line": 13,
+								"column": 1,
+								"character": 246
+							},
+							"end": {
+								"line": 13,
+								"column": 23,
+								"character": 268
+							}
+						},
+						"modifiers": [],
+						"value": [
+							{
+								"type": "ExpressionTag",
+								"start": 270,
+								"end": 277,
+								"expression": {
+									"type": "Identifier",
+									"start": 271,
+									"end": 276,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 26
+										},
+										"end": {
+											"line": 13,
+											"column": 31
+										}
+									},
+									"name": "expr1"
+								}
+							},
+							{
+								"start": 277,
+								"end": 280,
+								"type": "Text",
+								"raw": "\n\n\t",
+								"data": "\n\n\t"
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 280,
+								"end": 287,
+								"expression": {
+									"type": "Identifier",
+									"start": 281,
+									"end": 286,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 7
+										}
+									},
+									"name": "expr2"
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 296,
+				"end": 298,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 298,
+				"end": 342,
+				"data": " the run at the value's leading edge "
+			},
+			{
+				"type": "Text",
+				"start": 342,
+				"end": 343,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 343,
+				"end": 391,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 344
+					},
+					"end": {
+						"line": 19,
+						"column": 4,
+						"character": 347
+					}
+				},
+				"attributes": [
+					{
+						"start": 349,
+						"end": 383,
+						"type": "StyleDirective",
+						"name": "transform-origin",
+						"name_loc": {
+							"start": {
+								"line": 20,
+								"column": 1,
+								"character": 349
+							},
+							"end": {
+								"line": 20,
+								"column": 23,
+								"character": 371
+							}
+						},
+						"modifiers": [],
+						"value": [
+							{
+								"start": 373,
+								"end": 375,
+								"type": "Text",
+								"raw": "\n\t",
+								"data": "\n\t"
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 375,
+								"end": 382,
+								"expression": {
+									"type": "Identifier",
+									"start": 376,
+									"end": 381,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 2
+										},
+										"end": {
+											"line": 21,
+											"column": 7
+										}
+									},
+									"name": "expr1"
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 391,
+				"end": 393,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 393,
+				"end": 438,
+				"data": " the run at the value's trailing edge "
+			},
+			{
+				"type": "Text",
+				"start": 438,
+				"end": 439,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 439,
+				"end": 487,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 25,
+						"column": 1,
+						"character": 440
+					},
+					"end": {
+						"line": 25,
+						"column": 4,
+						"character": 443
+					}
+				},
+				"attributes": [
+					{
+						"start": 445,
+						"end": 479,
+						"type": "StyleDirective",
+						"name": "transform-origin",
+						"name_loc": {
+							"start": {
+								"line": 26,
+								"column": 1,
+								"character": 445
+							},
+							"end": {
+								"line": 26,
+								"column": 23,
+								"character": 467
+							}
+						},
+						"modifiers": [],
+						"value": [
+							{
+								"type": "ExpressionTag",
+								"start": 469,
+								"end": 476,
+								"expression": {
+									"type": "Identifier",
+									"start": 470,
+									"end": 475,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 26
+										},
+										"end": {
+											"line": 26,
+											"column": 31
+										}
+									},
+									"name": "expr1"
+								}
+							},
+							{
+								"start": 476,
+								"end": 478,
+								"type": "Text",
+								"raw": "\n\t",
+								"data": "\n\t"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 487,
+				"end": 489,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 489,
+				"end": 588,
+				"data": " contrast: a plain attribute value is opaque, so its continuation keeps the authored indent "
+			},
+			{
+				"type": "Text",
+				"start": 588,
+				"end": 589,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 589,
+				"end": 636,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 31,
+						"column": 1,
+						"character": 590
+					},
+					"end": {
+						"line": 31,
+						"column": 4,
+						"character": 593
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 595,
+						"end": 628,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 32,
+								"column": 1,
+								"character": 595
+							},
+							"end": {
+								"line": 32,
+								"column": 10,
+								"character": 604
+							}
+						},
+						"value": [
+							{
+								"type": "ExpressionTag",
+								"start": 606,
+								"end": 613,
+								"expression": {
+									"type": "Identifier",
+									"start": 607,
+									"end": 612,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 13
+										},
+										"end": {
+											"line": 32,
+											"column": 18
+										}
+									},
+									"name": "expr1"
+								}
+							},
+							{
+								"start": 613,
+								"end": 620,
+								"type": "Text",
+								"raw": "\n      ",
+								"data": "\n      "
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 620,
+								"end": 627,
+								"expression": {
+									"type": "Identifier",
+									"start": 621,
+									"end": 626,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 7
+										},
+										"end": {
+											"line": 33,
+											"column": 12
+										}
+									},
+									"name": "expr2"
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
