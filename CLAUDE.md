@@ -946,7 +946,8 @@ comment nothing prints is a DROPPED comment — a builder that *reassembles* a n
 routing through `build_expression_doc`, or *replaces* its doc with a frozen slice, must claim
 on its own seam (`prepend_owned_leading_comment_at`, `build_frozen_node_doc`); (2) an owned
 comment travels *inside* its node's doc, so the gap around it can't see it — ask the node
-(`owned_leading_comment_effect`); (3) a region the parser *lifts out* of its container is still
+(`owned_leading_comment_effect`), and ask it AHEAD of every shape-keyed layout arm, since an arm
+placed before it shadows the rule for its shape; (3) a region the parser *lifts out* of its container is still
 inside the container's gap, so two emitters print it (`AttrGaps::claimed`) — ownership masks
 this one, only a line comment exposes the double-print; (4) an **alternate-layout container
 builder** that emits only its children's docs runs no gap lookup, so every gap comment is

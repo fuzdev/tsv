@@ -168,8 +168,8 @@ impl<'a> Printer<'a> {
     /// `=` loses the line the author gave it — which for an honored directive makes the
     /// placement inert, so the freeze would die on the second pass. `tsv_ts`'s assignment
     /// printer states the same rule for `<script>` code; this is the `{@const}` tag's copy
-    /// of it, and without it a self-expanding value (object, array) took the fluid layout
-    /// and glued the run to `=`, diverging from prettier for a plain comment too.
+    /// of it, and without it an object or array value took the fluid layout and glued the
+    /// run to `=`, diverging from prettier for a plain comment too.
     ///
     /// **on page**, not to-emit: hanging the value is a LAYOUT decision, and a block glued
     /// to the value is *owned* by it — emitted from inside the value's own doc, so an
@@ -199,7 +199,7 @@ impl<'a> Printer<'a> {
     fn const_should_break_after_op(expr: &Expression<'_>) -> bool {
         match expr {
             // Binary expressions break after `=`, UNLESS it's a logical expression
-            // with a self-expanding RHS (non-empty object/array). In that case, the
+            // with an inlinable RHS (non-empty object/array). In that case, the
             // RHS handles its own expansion: `= item || { ... }` not `=\n  item || {}`
             // Prettier ref: assignment.js:199 `isBinaryish && !shouldInlineLogicalExpression`
             Expression::BinaryExpression(bin) => !tsv_ts::should_inline_logical_expression(bin),

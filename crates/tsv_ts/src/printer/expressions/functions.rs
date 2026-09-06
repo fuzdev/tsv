@@ -198,8 +198,13 @@ pub(in crate::printer) fn has_leftmost_object_expression(expr: &internal::Expres
 
 /// Check if an expression is a huggable pattern for function parameters.
 ///
-/// Prettier's `shouldHugFunctionParameters` hugs single object/array patterns,
+/// Prettier's `shouldHugTheOnlyFunctionParameter` hugs a single object/array pattern,
 /// keeping `({` and `}: Type)` together while letting the pattern's content break.
+///
+/// A pattern with a default hugs only when the default is an identifier or an EMPTY
+/// object/array — the three spellings whose default cannot itself take the width. A
+/// non-empty literal or a call default makes the parameter list expand instead, the
+/// pattern staying flat inside it (`destructuring_param_default_long`).
 ///
 /// Shared with the signature-param path (`build_signature_params_doc`) so bodyless
 /// declarations (declare / overload) and type-member signatures (method / call /
@@ -207,12 +212,16 @@ pub(in crate::printer) fn has_leftmost_object_expression(expr: &internal::Expres
 pub(in crate::printer) fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => true,
-        // Assignment pattern with object/array on left: `{a, b} = default`
         internal::Expression::AssignmentPattern(ap) => {
             matches!(
                 ap.left,
                 internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
-            )
+            ) && match ap.right {
+                internal::Expression::Identifier(_) => true,
+                internal::Expression::ObjectExpression(obj) => obj.properties.is_empty(),
+                internal::Expression::ArrayExpression(arr) => arr.elements.is_empty(),
+                _ => false,
+            }
         }
         _ => false,
     }

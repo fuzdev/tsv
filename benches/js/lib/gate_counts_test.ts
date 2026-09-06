@@ -18,12 +18,11 @@ import { GATE_CHECKOUT_IDS } from './gate_counts.ts';
  * Pins measured over inputs that have no checkout commit to record — each with the
  * reason, so an addition here is an argument rather than an exemption.
  */
-const UNTRACKED_PINS: Record<string, string> =
-	{
-		// Empty since the real-code corpus became the pinned `../corpora` snapshot: the
-		// one former entry (the svelte-styles block count, a minimum over live working
-		// trees) is now an exact pin measured at that checkout's commit.
-	};
+const UNTRACKED_PINS: Record<string, string> = {
+	// Empty since the real-code corpus became the pinned `../corpora` snapshot: the
+	// one former entry (the svelte-styles block count, a minimum over live working
+	// trees) is now an exact pin measured at that checkout's commit.
+};
 
 /**
  * Exported constants that are NOT pinned counts — each with the reason, same posture
