@@ -405,7 +405,7 @@ The precompute itself (`pooled_text_width`) is a **search, not a sum**: a plain 
 
 ## Parser Architecture
 
-All three parsers are **recursive descent** with **fail-fast error handling** (return `Result`, stop at the first error). Each parser owns a lexer and maintains a single-entry peek cache (`peek: Option<Token>`, the lexer's own token POD) to avoid re-lexing during lookahead. (Fail-fast is current, not final — spec-style error recovery is a tracked goal; see [Open Concerns](#open-concerns).)
+All three parsers are **recursive descent** with **fail-fast error handling** (return `Result`, stop at the first error). Each parser owns a lexer and maintains a single-entry peek cache (`peek: Option<Token>`, the lexer's own token POD) to avoid re-lexing during lookahead. Disambiguation is by **byte-scan lookahead** over the source, never by backtracking — with one exception in the TS parser: a parenthesized, generic or async arrow head whose return-type `:` may be an enclosing conditional's (`a ? (b) : c => d`) is parsed from a `Parser::checkpoint` and rewound when no second `:` follows it (`parse_arrow_or_rewind`, tsc's `allowReturnTypeInArrowFunction`). Even that head is speculated on only where tsc is unsure of it: a head tsc reads as a signature outright (`()`, `(...a)`, `(a: T)`, …) is parsed committed, with the rule lifted for its body. The checkpoint carries the lexer cursor, the one-token window, the comment ledger's length and the grouping depth; context flags are restored by their own combinators, and the abandoned parse's arena nodes are left unreachable. (Fail-fast is current, not final — spec-style error recovery is a tracked goal; see [Open Concerns](#open-concerns).)
 
 ### TypeScript (`tsv_ts/src/parser/`)
 

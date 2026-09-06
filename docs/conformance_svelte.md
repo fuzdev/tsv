@@ -934,6 +934,52 @@ legacy import-assertions and reserved-keyword-qualified-head entries above.
 **Upstream candidate**: acorn-typescript — `parseMaybeConditional` folds a
 ternary onto an unparenthesized arrow above the `parseExprOps` arrow guard.
 
+**Return type of a parenthesized arrow in a conditional's consequent**
+([return_type_ternary_consequent](../tests/fixtures/typescript/expressions/arrow/return_type_ternary_consequent/)):
+inside a ternary's consequent the `:` after a parenthesized head may be the
+ternary's own — `a ? (b) : c => d` is `a ? b : (c => d)`, and
+`x ? y => ({ y }) : z => ({ z })` is two arrows around the ternary's `:`. tsc
+(`parseParenthesizedArrowFunctionExpression`, its `allowReturnTypeInArrowFunction`
+flag) parses the arrow speculatively and keeps the annotation only when **another
+`:` follows it** — `a ? (b): c => d : e`, a syntax error read any other way —
+rewinding to the parenthesized-expression reading otherwise. The flag is `false`
+for the consequent, inherited by an arrow's concise body, the alternate and an
+assignment's right side, and `true` again inside any bracket, in a function or
+class body and in a `yield` argument. acorn-typescript (and Babel) commit to the
+annotation as soon as one type followed by `=>` parses and then fail to find the
+ternary's `:` — all five of tsc's own `parserArrowFunctionExpression8–12` corpus
+files reject. tsv follows tsc by the same mechanism: the one speculative parse in
+its grammar (`Parser::parse_arrow_or_rewind`, from a `Parser::checkpoint`), taken
+for an annotated parenthesized, generic or async head parsed directly in a
+consequent — and rewound on a failed parse as well as on a refused annotation, which
+is what reads `a ? (b + c) : d => e` (a head tsc never takes for a signature) as the
+consequent `b + c`.
+
+tsc's other half is followed too: a head it reads as a signature **without asking**
+(`isParenthesizedArrowFunctionExpressionWorker`'s `Tristate.True` — `()`, `(...a)`,
+`(a: T)`, `(a?: T)`, `(public a)`, and each of those behind `async`; never a
+`<T>(…)`, which it always leaves `Unknown`) is parsed **committed**, with the flag
+lifted, and the lift reaches the arrow's BODY: an annotated head inside a committed
+arrow's body keeps its own annotation, so `a ? (b: B): c => (d): e => f;` runs the
+conditional out of `:` and is a syntax error. Speculating there instead would parse
+the body under the bar, truncate it, take the `:` the inner annotation wanted and
+keep the outer arrow — a reading neither tsc nor acorn has. The head classifier is
+`paren_head_commits_to_signature`, arm for arm tsc's; the fixture's two
+`input_invalid_*` files pin that class, where acorn rejects with tsv.
+
+The accepting half has no such file, because **every spelling of it is
+prettier-normalized into an unambiguous one** (the alternate's parameter always
+gets its parens: `b ? c : (d) => e`) and acorn accepts each of those fixed points.
+The divergence is reachable only from an input that is nobody's fixed point and —
+like the `export default abstract⏎class` entry above — is pinned as a formatting
+claim: the fixture's `unformatted_paren_placement` variant holds the five corpus
+spellings, which both formatters normalize to the fixed point (the arrow reading of
+`(c) : d => e` could not print as `c : (d) => e`);
+[arrow_consequent_return_type.rs](../tests/arrow_consequent_return_type.rs)
+asserts the trees directly. **Upstream candidate**: acorn-typescript —
+`shouldParseArrow`'s return-type `tryParse` commits on `: type =>` alone, never
+asking whether the `:` is an enclosing conditional's.
+
 #### Import-phase proposals
 
 The **source-phase imports** and **import defer** proposals — not yet standard — add a
@@ -1107,6 +1153,7 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 - Anonymous class-expression `id` — omitted for implements-first heritage
 - `export default class implements I {}` — anonymous default class with implements-first heritage rejected (`implements` read as a reserved-word name)
 - Type assertion vs. generic arrow — `<T>` before any arrow (even a parenthesized one) reads as type parameters; the parenthesized-arrow abort check is dead code
+- Arrow return type in a conditional's consequent — `shouldParseArrow`'s return-type `tryParse` keeps `(b): c => d` in `a ? (b) : c => d`, then fails on the missing ternary `:`
 
 (No **acorn core** candidates. The `v`-flag regex is not one: acorn supports the `v` flag and its
 set operations, and correctly rejects the one construct

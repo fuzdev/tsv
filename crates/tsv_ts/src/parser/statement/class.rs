@@ -547,7 +547,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (`[+In]`), field initializers (`[+In]`), method/getter/setter bodies,
         // and static blocks all permit `in` even when the class expression sits
         // in a for-header init. A nested for-header inside re-disables it.
-        let body = self.with_allow_in(|p| {
+        let body = self.with_body_frame(|p| {
             let mut body = p.bvec();
             while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
                 // Stray semicolons are empty class members — acorn skips them,

@@ -330,7 +330,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // context, so `in` is the binary operator even when this function
         // expression sits in a for-header init.
         let (params, return_type, body) = self.with_fn_context(is_async, is_generator, |p| {
-            p.with_allow_in(|p| {
+            p.with_body_frame(|p| {
                 let params: &'arena [Expression<'arena>] =
                     p.parse_parameter_list()?.into_bump_slice();
                 let return_type = p.parse_optional_return_type()?;
