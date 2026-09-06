@@ -1733,6 +1733,18 @@ impl<'a> Printer<'a> {
         layout: SeqLayout,
     ) -> DocId {
         let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
+        // Where this builder's comment scans open: the FIRST OPERAND, never `seq.span.start`.
+        // The leading edge between the two — the grouping `(` the parser stripped from that
+        // operand, and any comment inside it — is emitted by someone else in every mode:
+        // the envelope floats it out ahead of the pair it prints
+        // (`append_floated_leading_comments`, the self-parenthesizing modes), and in `Bare`
+        // mode the enclosing construct supplies the pair and emits the edge ahead of the
+        // operand run (`Printer::build_restricted_production_paren_doc`). So a `//` on that
+        // edge must not force the operands apart for a comment this builder never prints:
+        // `(⏎// c⏎a), b;` floated the comment out and still broke the operands, which the
+        // reparse — the comment now ahead of the statement — printed flat (F1);
+        // `return (⏎// c⏎a), b` settles on `a, b` the same way.
+        let interior_start = seq.expressions[0].span().start;
         // Line comments anywhere up to `trailing_end` (incl. the last operand's
         // trailing comment, which lives outside `seq.span` in value positions) need
         // break handling so the comment isn't swallowed by the following comma/operand
@@ -1744,7 +1756,7 @@ impl<'a> Printer<'a> {
         // own-line block directive onto the operand's line — an inert placement, so the
         // freeze would be lost on the second pass.
         if self
-            .comments_to_emit_between(seq.span.start, trailing_end)
+            .comments_to_emit_between(interior_start, trailing_end)
             .any(|c| !c.is_block || self.is_honored_directive(c))
         {
             return self.build_sequence_doc_with_line_comments(seq, trailing_end, parens, layout);
@@ -1761,7 +1773,7 @@ impl<'a> Printer<'a> {
         // empty. Skip the per-operand comma scans + the `empty()` comment children on the
         // comment-free common path. Byte-identical (the line-comment path already branched
         // off above, so a present comment here is a block, handled by the full path).
-        let seq_has_comments = self.has_comments_to_emit_between(seq.span.start, seq.span.end);
+        let seq_has_comments = self.has_comments_to_emit_between(interior_start, seq.span.end);
 
         // Where the first operand's docs end — the continuation indent starts here, never
         // at the run's own start (see `build_sequence_layout_doc`).

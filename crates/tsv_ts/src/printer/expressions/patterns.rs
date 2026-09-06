@@ -1536,6 +1536,16 @@ impl<'a> Printer<'a> {
             let value_doc =
                 if gap_has_comments && self.has_comments_to_emit_between(eq_pos + 1, rhs_start) {
                     self.build_pattern_value_gap_doc(eq_pos + 1, rhs_start, rhs_doc)
+                } else if self.left_spine_shell_has_own_line_comment(pattern.right) {
+                    // The same line comment one shell deeper — inside the grouping parens
+                    // of the value's LEFTMOST node (`x = (⏎// c⏎a as any).b`): the value's
+                    // printer hoists that run to the head of its doc, so the doc opens
+                    // with the run and a hardline, and the gap emitter's continuation
+                    // indent is what this seam owes it (`x = // c⏎↹↹value`, the form the
+                    // gap's own `//` takes). Without it the value rendered at the
+                    // parameter's level and the reparse — reading the comment as the
+                    // `=`→value gap's — indented it, a second fixed point one pass away.
+                    d.indent(rhs_doc)
                 } else {
                     rhs_doc
                 };

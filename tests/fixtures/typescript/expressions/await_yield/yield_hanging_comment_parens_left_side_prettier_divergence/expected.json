@@ -1,0 +1,782 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 578,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " the comment sits inside the paren shell of the operand's LEFTMOST node — a member's",
+			"start": 38,
+			"end": 124,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " object, a binary's left operand, a conditional's test — rather than ahead of the",
+			"start": 127,
+			"end": 210,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " whole operand: the walk down the left side finds it, and the parens are retained",
+			"start": 213,
+			"end": 296,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (`yield` is a restricted production: a newline after it triggers ASI)",
+			"start": 299,
+			"end": 371,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 385,
+			"end": 389,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 3
+				},
+				"end": {
+					"line": 8,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 424,
+			"end": 428,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 3
+				},
+				"end": {
+					"line": 12,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 465,
+			"end": 469,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 3
+				},
+				"end": {
+					"line": 16,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the delegate form too",
+			"start": 500,
+			"end": 524,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 539,
+			"end": 543,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 3
+				},
+				"end": {
+					"line": 22,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 577,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 568,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 26,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 20,
+					"end": 567,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 30,
+						"end": 31,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 11
+							},
+							"end": {
+								"line": 2,
+								"column": 12
+							}
+						},
+						"name": "g"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 34,
+						"end": 567,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 25,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 374,
+								"end": 410,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 374,
+									"end": 409,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 3
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "MemberExpression",
+										"start": 393,
+										"end": 405,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 3
+											},
+											"end": {
+												"line": 9,
+												"column": 15
+											}
+										},
+										"object": {
+											"type": "TSAsExpression",
+											"start": 394,
+											"end": 402,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 4
+												},
+												"end": {
+													"line": 9,
+													"column": 12
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 394,
+												"end": 395,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 4
+													},
+													"end": {
+														"line": 9,
+														"column": 5
+													}
+												},
+												"name": "a"
+											},
+											"typeAnnotation": {
+												"type": "TSAnyKeyword",
+												"start": 399,
+												"end": 402,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 9
+													},
+													"end": {
+														"line": 9,
+														"column": 12
+													}
+												}
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 404,
+											"end": 405,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 14
+												},
+												"end": {
+													"line": 9,
+													"column": 15
+												}
+											},
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 385,
+												"end": 389
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " the comment sits inside the paren shell of the operand's LEFTMOST node — a member's",
+										"start": 38,
+										"end": 124
+									},
+									{
+										"type": "Line",
+										"value": " object, a binary's left operand, a conditional's test — rather than ahead of the",
+										"start": 127,
+										"end": 210
+									},
+									{
+										"type": "Line",
+										"value": " whole operand: the walk down the left side finds it, and the parens are retained",
+										"start": 213,
+										"end": 296
+									},
+									{
+										"type": "Line",
+										"value": " (`yield` is a restricted production: a newline after it triggers ASI)",
+										"start": 299,
+										"end": 371
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 413,
+								"end": 451,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 413,
+									"end": 450,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 3
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 432,
+										"end": 446,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 3
+											},
+											"end": {
+												"line": 13,
+												"column": 17
+											}
+										},
+										"left": {
+											"type": "TSAsExpression",
+											"start": 433,
+											"end": 441,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 4
+												},
+												"end": {
+													"line": 13,
+													"column": 12
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 433,
+												"end": 434,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 4
+													},
+													"end": {
+														"line": 13,
+														"column": 5
+													}
+												},
+												"name": "a"
+											},
+											"typeAnnotation": {
+												"type": "TSAnyKeyword",
+												"start": 438,
+												"end": 441,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 9
+													},
+													"end": {
+														"line": 13,
+														"column": 12
+													}
+												}
+											}
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 445,
+											"end": 446,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 16
+												},
+												"end": {
+													"line": 13,
+													"column": 17
+												}
+											},
+											"name": "b"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 424,
+												"end": 428
+											}
+										]
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 454,
+								"end": 496,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 454,
+									"end": 495,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 3
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "ConditionalExpression",
+										"start": 473,
+										"end": 491,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 3
+											},
+											"end": {
+												"line": 17,
+												"column": 21
+											}
+										},
+										"test": {
+											"type": "TSAsExpression",
+											"start": 474,
+											"end": 482,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 4
+												},
+												"end": {
+													"line": 17,
+													"column": 12
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 474,
+												"end": 475,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 4
+													},
+													"end": {
+														"line": 17,
+														"column": 5
+													}
+												},
+												"name": "a"
+											},
+											"typeAnnotation": {
+												"type": "TSAnyKeyword",
+												"start": 479,
+												"end": 482,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 9
+													},
+													"end": {
+														"line": 17,
+														"column": 12
+													}
+												}
+											}
+										},
+										"consequent": {
+											"type": "Identifier",
+											"start": 486,
+											"end": 487,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 16
+												},
+												"end": {
+													"line": 17,
+													"column": 17
+												}
+											},
+											"name": "b"
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 490,
+											"end": 491,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 20
+												},
+												"end": {
+													"line": 17,
+													"column": 21
+												}
+											},
+											"name": "c"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 465,
+												"end": 469
+											}
+										]
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 527,
+								"end": 564,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 527,
+									"end": 563,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 3
+										}
+									},
+									"delegate": true,
+									"argument": {
+										"type": "MemberExpression",
+										"start": 547,
+										"end": 559,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 3
+											},
+											"end": {
+												"line": 23,
+												"column": 15
+											}
+										},
+										"object": {
+											"type": "TSAsExpression",
+											"start": 548,
+											"end": 556,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 4
+												},
+												"end": {
+													"line": 23,
+													"column": 12
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 548,
+												"end": 549,
+												"loc": {
+													"start": {
+														"line": 23,
+														"column": 4
+													},
+													"end": {
+														"line": 23,
+														"column": 5
+													}
+												},
+												"name": "a"
+											},
+											"typeAnnotation": {
+												"type": "TSAnyKeyword",
+												"start": 553,
+												"end": 556,
+												"loc": {
+													"start": {
+														"line": 23,
+														"column": 9
+													},
+													"end": {
+														"line": 23,
+														"column": 12
+													}
+												}
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 558,
+											"end": 559,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 14
+												},
+												"end": {
+													"line": 23,
+													"column": 15
+												}
+											},
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 539,
+												"end": 543
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " the delegate form too",
+										"start": 500,
+										"end": 524
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,634 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 402,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The declarator's rule (`init_left_side_shell_comment`) at the other seams that share",
+			"start": 20,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `build_assignment_layout`: an assignment expression's RHS and a class field's",
+			"start": 109,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " initializer. The run inside the value's leftmost shell hangs the value under the operator.",
+			"start": 191,
+			"end": 284,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 94
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 292,
+			"end": 296,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 326,
+			"end": 330,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 367,
+			"end": 371,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 401,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 392,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 286,
+					"end": 318,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 21
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 286,
+						"end": 317,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 20
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 286,
+							"end": 287,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 2
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "ConditionalExpression",
+							"start": 299,
+							"end": 317,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 20
+								}
+							},
+							"test": {
+								"type": "TSAsExpression",
+								"start": 300,
+								"end": 308,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 3
+									},
+									"end": {
+										"line": 7,
+										"column": 11
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 300,
+									"end": 301,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 4
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSAnyKeyword",
+									"start": 305,
+									"end": 308,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 8
+										},
+										"end": {
+											"line": 7,
+											"column": 11
+										}
+									}
+								}
+							},
+							"consequent": {
+								"type": "Identifier",
+								"start": 312,
+								"end": 313,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 15
+									},
+									"end": {
+										"line": 7,
+										"column": 16
+									}
+								},
+								"name": "b"
+							},
+							"alternate": {
+								"type": "Identifier",
+								"start": 316,
+								"end": 317,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 19
+									},
+									"end": {
+										"line": 7,
+										"column": 20
+									}
+								},
+								"name": "c"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 292,
+									"end": 296
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The declarator's rule (`init_left_side_shell_comment`) at the other seams that share",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " `build_assignment_layout`: an assignment expression's RHS and a class field's",
+							"start": 109,
+							"end": 189
+						},
+						{
+							"type": "Line",
+							"value": " initializer. The run inside the value's leftmost shell hangs the value under the operator.",
+							"start": 191,
+							"end": 284
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 320,
+					"end": 346,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 320,
+						"end": 345,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 14
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 320,
+							"end": 321,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"name": "y"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 333,
+							"end": 345,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 14
+								}
+							},
+							"object": {
+								"type": "TSAsExpression",
+								"start": 334,
+								"end": 342,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 3
+									},
+									"end": {
+										"line": 10,
+										"column": 11
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 334,
+									"end": 335,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 3
+										},
+										"end": {
+											"line": 10,
+											"column": 4
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSAnyKeyword",
+									"start": 339,
+									"end": 342,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 8
+										},
+										"end": {
+											"line": 10,
+											"column": 11
+										}
+									}
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 344,
+								"end": 345,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 13
+									},
+									"end": {
+										"line": 10,
+										"column": 14
+									}
+								},
+								"name": "p"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 326,
+									"end": 330
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 348,
+					"end": 391,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 354,
+						"end": 355,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 7
+							},
+							"end": {
+								"line": 11,
+								"column": 8
+							}
+						},
+						"name": "K"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 356,
+						"end": 391,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 9
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 360,
+								"end": 388,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 16
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 360,
+									"end": 361,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 3
+										}
+									},
+									"name": "p"
+								},
+								"value": {
+									"type": "MemberExpression",
+									"start": 375,
+									"end": 387,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 15
+										}
+									},
+									"object": {
+										"type": "TSAsExpression",
+										"start": 376,
+										"end": 384,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 4
+											},
+											"end": {
+												"line": 14,
+												"column": 12
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 376,
+											"end": 377,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 4
+												},
+												"end": {
+													"line": 14,
+													"column": 5
+												}
+											},
+											"name": "a"
+										},
+										"typeAnnotation": {
+											"type": "TSAnyKeyword",
+											"start": 381,
+											"end": 384,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 9
+												},
+												"end": {
+													"line": 14,
+													"column": 12
+												}
+											}
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 386,
+										"end": 387,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 14
+											},
+											"end": {
+												"line": 14,
+												"column": 15
+											}
+										},
+										"name": "q"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 367,
+											"end": 371
+										}
+									]
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
