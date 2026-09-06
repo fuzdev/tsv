@@ -20,6 +20,13 @@
 		arr /* m1
 	m2 */ /* c6 */[i];
 
+	// An ASSIGNMENT EXPRESSION answers exactly as the declarator does: the RHS hangs under
+	// the `=` rather than sitting at the statement's own column.
+	zz =
+		arr /* c8 */
+		/* c9 */
+		[i];
+
 	// The optional form's `?.[` answers the same way.
 	const e =
 		arr
