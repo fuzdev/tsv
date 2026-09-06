@@ -1,0 +1,1012 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 987,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a short chain fits, so the parens stay welded to the argument list",
+			"start": 10,
+			"end": 79,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 100 chars - the callee still fits, the parens stay welded",
+			"start": 108,
+			"end": 168,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars - the parens expand onto their own lines and the operands break with them",
+			"start": 271,
+			"end": 357,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an arithmetic chain takes the same shape",
+			"start": 470,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a two-operand chain keeps a group of its own, so it stays flat on the indented line",
+			"start": 626,
+			"end": 712,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a curried call is the same callee position",
+			"start": 821,
+			"end": 866,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 46
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 986,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 977,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 33,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 81,
+					"end": 105,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 87,
+							"end": 104,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 87,
+								"end": 89,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "r1"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 92,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 3,
+										"column": 24
+									}
+								},
+								"callee": {
+									"type": "LogicalExpression",
+									"start": 93,
+									"end": 101,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 13
+										},
+										"end": {
+											"line": 3,
+											"column": 21
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 93,
+										"end": 95,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 13
+											},
+											"end": {
+												"line": 3,
+												"column": 15
+											}
+										},
+										"name": "aa"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 99,
+										"end": 101,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 19
+											},
+											"end": {
+												"line": 3,
+												"column": 21
+											}
+										},
+										"name": "bb"
+									}
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a short chain fits, so the parens stay welded to the argument list",
+							"start": 10,
+							"end": 79
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 170,
+					"end": 268,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 99
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 176,
+							"end": 267,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 98
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 176,
+								"end": 178,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "r2"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 181,
+								"end": 267,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 98
+									}
+								},
+								"callee": {
+									"type": "LogicalExpression",
+									"start": 182,
+									"end": 264,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 13
+										},
+										"end": {
+											"line": 6,
+											"column": 95
+										}
+									},
+									"left": {
+										"type": "LogicalExpression",
+										"start": 182,
+										"end": 236,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 13
+											},
+											"end": {
+												"line": 6,
+												"column": 67
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 182,
+											"end": 207,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 13
+												},
+												"end": {
+													"line": 6,
+													"column": 38
+												}
+											},
+											"name": "aaaaaaaaaaaaaaaaaaaaaaaaa"
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 211,
+											"end": 236,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 42
+												},
+												"end": {
+													"line": 6,
+													"column": 67
+												}
+											},
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 240,
+										"end": 264,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 71
+											},
+											"end": {
+												"line": 6,
+												"column": 95
+											}
+										},
+										"name": "cccccccccccccccccccccccc"
+									}
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 100 chars - the callee still fits, the parens stay welded",
+							"start": 108,
+							"end": 168
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 359,
+					"end": 467,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 365,
+							"end": 466,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 365,
+								"end": 367,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 9
+									}
+								},
+								"name": "r3"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 370,
+								"end": 466,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 12
+									},
+									"end": {
+										"line": 13,
+										"column": 4
+									}
+								},
+								"callee": {
+									"type": "LogicalExpression",
+									"start": 374,
+									"end": 461,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 27
+										}
+									},
+									"left": {
+										"type": "LogicalExpression",
+										"start": 374,
+										"end": 430,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 27
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 374,
+											"end": 399,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 2
+												},
+												"end": {
+													"line": 10,
+													"column": 27
+												}
+											},
+											"name": "aaaaaaaaaaaaaaaaaaaaaaaaa"
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 405,
+											"end": 430,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 2
+												},
+												"end": {
+													"line": 11,
+													"column": 27
+												}
+											},
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 436,
+										"end": 461,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 27
+											}
+										},
+										"name": "ccccccccccccccccccccccccc"
+									}
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars - the parens expand onto their own lines and the operands break with them",
+							"start": 271,
+							"end": 357
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 515,
+					"end": 623,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 521,
+							"end": 622,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 521,
+								"end": 523,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 9
+									}
+								},
+								"name": "r4"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 526,
+								"end": 622,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 12
+									},
+									"end": {
+										"line": 20,
+										"column": 4
+									}
+								},
+								"callee": {
+									"type": "BinaryExpression",
+									"start": 530,
+									"end": 617,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 27
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 530,
+										"end": 587,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 28
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 530,
+											"end": 556,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 2
+												},
+												"end": {
+													"line": 17,
+													"column": 28
+												}
+											},
+											"name": "aaaaaaaaaaaaaaaaaaaaaaaaaa"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 561,
+											"end": 587,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 28
+												}
+											},
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 592,
+										"end": 617,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 27
+											}
+										},
+										"name": "ccccccccccccccccccccccccc"
+									}
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an arithmetic chain takes the same shape",
+							"start": 470,
+							"end": 513
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 714,
+					"end": 818,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 720,
+							"end": 817,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 720,
+								"end": 722,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 9
+									}
+								},
+								"name": "r5"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 725,
+								"end": 817,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 12
+									},
+									"end": {
+										"line": 25,
+										"column": 4
+									}
+								},
+								"callee": {
+									"type": "LogicalExpression",
+									"start": 729,
+									"end": 812,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 85
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 729,
+										"end": 769,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 42
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 773,
+										"end": 812,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 46
+											},
+											"end": {
+												"line": 24,
+												"column": 85
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a two-operand chain keeps a group of its own, so it stays flat on the indented line",
+							"start": 626,
+							"end": 712
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 868,
+					"end": 976,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 874,
+							"end": 975,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 874,
+								"end": 876,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 7
+									},
+									"end": {
+										"line": 28,
+										"column": 9
+									}
+								},
+								"name": "r6"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 879,
+								"end": 975,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 12
+									},
+									"end": {
+										"line": 32,
+										"column": 6
+									}
+								},
+								"callee": {
+									"type": "CallExpression",
+									"start": 879,
+									"end": 973,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 12
+										},
+										"end": {
+											"line": 32,
+											"column": 4
+										}
+									},
+									"callee": {
+										"type": "LogicalExpression",
+										"start": 883,
+										"end": 968,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 26
+											}
+										},
+										"left": {
+											"type": "LogicalExpression",
+											"start": 883,
+											"end": 938,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 2
+												},
+												"end": {
+													"line": 30,
+													"column": 26
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 883,
+												"end": 908,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 2
+													},
+													"end": {
+														"line": 29,
+														"column": 27
+													}
+												},
+												"name": "aaaaaaaaaaaaaaaaaaaaaaaaa"
+											},
+											"operator": "&&",
+											"right": {
+												"type": "Identifier",
+												"start": 914,
+												"end": 938,
+												"loc": {
+													"start": {
+														"line": 30,
+														"column": 2
+													},
+													"end": {
+														"line": 30,
+														"column": 26
+													}
+												},
+												"name": "bbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 944,
+											"end": 968,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 2
+												},
+												"end": {
+													"line": 31,
+													"column": 26
+												}
+											},
+											"name": "cccccccccccccccccccccccc"
+										}
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a curried call is the same callee position",
+							"start": 821,
+							"end": 866
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
