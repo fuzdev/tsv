@@ -246,8 +246,9 @@ pub(crate) fn parse_single_value<'arena>(
 }
 
 /// Extract function name and arguments, validating balanced parentheses.
-/// Both returned strings borrow from `s` (the caller copies `name` into the
-/// arena when storing; `args` is re-parsed, not stored).
+/// Both returned strings borrow from `s`, and neither is kept: the caller reads the name's
+/// **offset** off the two heads and stores a `name_span` (span-for-verbatim, so an escaped
+/// spelling survives), and `args` is re-parsed.
 ///
 /// `Some` means the whole of `s` is the function — the matching close paren is its last
 /// byte — which is what lets the printer bound the argument list at `span.end - 1`
@@ -255,12 +256,21 @@ pub(crate) fn parse_single_value<'arena>(
 /// refuse on `s`'s last byte alone: the close paren this returns on *is* that byte, so a
 /// value ending in anything else is never a function.
 ///
-/// ⚠️ **`paren_pos` must address a `(`** — both callers derive it from `position(|&b| b ==
-/// b'(')`, so the first byte the depth walk reads always opens the run. The walk below
-/// visits nothing but parens and leans on that: it reads a non-`(` as a close without
-/// re-testing, and its unsigned depth is never decremented below zero. A violated
-/// precondition trips the walk's `debug_assert` or its underflow, rather than quietly
-/// returning a wrong span.
+/// ⚠️ **`paren_pos` must address a `(`** — both call sites derive it from `position(|&b| b ==
+/// b'(')`, so the first byte [`scan::matching_close_paren`] reads always opens the run, which is
+/// what lets its unsigned depth start at zero. A violated precondition trips that walk's
+/// `debug_assert`, rather than quietly returning a wrong span.
+///
+/// ⚠️ **That leading search is itself quote- and escape-blind, and is safe only because the
+/// name validation below refuses everything it could mis-locate.** A `(` can be *content* in
+/// the name region too — inside a glued string (`'x'fn(a)`) or an escape (`a\(b(c)`) — and the
+/// search would stop on it; but `name_part` then carries a `'` or a `\`, which is not
+/// `alphanumeric | - | _`, so the value refuses to be a function at all and prints verbatim.
+/// The refusal is lossless and matches prettier on the glued-string form. It also means the
+/// two halves move together: **widening the name validation to admit an escape without making
+/// this search escape-aware mints an over-acceptance.** An escaped name is a real
+/// function-token (CSS Syntax 3 §"Consume an ident sequence"), so the refusal is a known
+/// conformance gap — prettier normalizes `\66 n(.10)` and tsv does not.
 fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
     // CSS whitespace only (CSS Syntax 3 §4.2), like every other value-boundary trim: a
     // Unicode `str::trim` would cut a non-ASCII space (an NBSP) out of the name's span, and
@@ -277,44 +287,14 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
         return None;
     }
 
-    // Find the matching close paren by HOPPING between parens rather than reading every
-    // byte: only `(` and `)` move this scan, and a function's interior runs long between
-    // them — a mean of 18.7 bytes across 638 stylesheets, with 83% of the hops past the
-    // word loop's 3-4-byte break-even. `next_byte_of` answers "where is the next `(` or
-    // `)`" eight bytes per load where the per-byte match arm cost about ten instructions
-    // a byte, and it is the same rung the string scan next door already sits on.
-    //
-    // Both targets are ASCII, so no UTF-8 lead or continuation byte can collide with
-    // them: the matching-paren offset is the same one a char scan finds, without
-    // decoding. `i` therefore only ever addresses a paren, which is what lets the `else`
-    // arm below take `)` without re-testing for it.
-    //
-    // ⚠️ A one-byte pre-test in front of the hop — `string_end`'s shape, for the
-    // adjacent-paren case — is deliberately NOT here. That pre-test pays in proportion to
-    // how often the run is empty, and `()` / `))` is only 8.6% of the hops on this
-    // surface against roughly half of `string_end`'s; built and measured, it removed
-    // marginally fewer instructions and did not separate from this spelling on cycles.
-    // Rung by the run length the site actually sees.
-    let bytes = s.as_bytes();
-    let mut closing_paren_pos = None;
-    let mut depth = 0u32;
-    let mut i = paren_pos;
-    while i < bytes.len() {
-        debug_assert!(bytes[i] == b'(' || bytes[i] == b')');
-        if bytes[i] == b'(' {
-            depth += 1;
-        } else {
-            depth -= 1;
-            if depth == 0 {
-                closing_paren_pos = Some(i);
-                break;
-            }
-        }
-        i = tsv_lang::swar::next_byte_of(bytes, i + 1, [b'(', b')']);
-    }
+    // Where the run closes is the value scanners' shared question, not this one's: a paren
+    // inside a quoted string or inside an escape closes nothing, and a walk that counted
+    // them would balance the function somewhere other than its real end. See
+    // [`scan::matching_close_paren`], which also carries the hop's rung note, the refused
+    // pre-test, and why a block comment is deliberately NOT stepped over.
+    let close_pos = scan::matching_close_paren(s, paren_pos)?;
 
     // Closing paren must be at end of string
-    let close_pos = closing_paren_pos?;
     if close_pos != s.len() - 1 {
         return None;
     }

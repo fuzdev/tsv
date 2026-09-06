@@ -1,0 +1,81 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 129,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 120,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 96,
+							"end": 116,
+							"property": "color",
+							"value": "fn(a\\)b, 0.1)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 120
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escaped paren is ident content, so the argument list still normalizes ",
+				"start": 15,
+				"end": 93
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 121,
+			"styles": "\n\ta {\n\t\t/* an escaped paren is ident content, so the argument list still normalizes */\n\t\tcolor: fn(a\\)b, 0.1);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 130,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
