@@ -4,13 +4,15 @@
 //!
 //! Two consumer shapes, which is why `CappedPaths::merge` is feature-gated
 //! while the rest is not: the injection audits fold one bucket per worker (a
-//! `comment_check` build), and the single-threaded pristine
-//! [`sweep`](crate::audit::sweep) keeps its panicking inputs in one (every
-//! build).
+//! `comment_check` build), while the single-threaded walks keep theirs in one
+//! (every build) — the pristine [`sweep`](crate::audit::sweep)'s panicking
+//! inputs, and the two mutation audits' base-non-idempotent seeds.
 
 /// An exact count plus a bounded path sample — the "recorded, wants triage" bucket
-/// (`blank_audit`'s and `ignore_audit`'s not-a-clean-fixed-point files, and the
-/// pristine sweep's panicking inputs).
+/// (`blank_audit`'s and `ignore_audit`'s not-a-clean-fixed-point files, the pristine
+/// sweep's panicking inputs, and `authoring_audit`'s and `paren_audit`'s
+/// base-non-idempotent seeds: a file whose own format is not a fixed point, excluded from
+/// the mutation analysis and a failure of the run).
 ///
 /// The COUNT is exact and always reported (a file the audit couldn't grade is a coverage
 /// fact a graded gate must never silently drop); the PATH sample is bounded at
@@ -69,10 +71,13 @@ impl CappedPaths {
     ///
     /// Every consumer that shows the sample owes the reader that tail — the
     /// count is exact and the list is not, so printing the list alone reads as
-    /// the whole set. All three had hand-rolled the same two steps; the tail's
+    /// the whole set. Each had hand-rolled the same two steps; the tail's
     /// subtraction is the part that goes quietly wrong (forget the cap and it
     /// prints "and 0 more", or underflows), so it lives here once, beside the
-    /// cap that makes it necessary.
+    /// cap that makes it necessary. The two mutation audits are the standing
+    /// proof: both had hand-rolled the cap (`.iter().take(20)`, the same 20)
+    /// and neither the tail, so a corpus with more would have read as exactly
+    /// twenty.
     pub(crate) fn sample_lines(&self, indent: &str) -> Vec<String> {
         let mut lines: Vec<String> = self
             .sample

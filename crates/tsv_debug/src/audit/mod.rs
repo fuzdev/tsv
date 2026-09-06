@@ -32,7 +32,8 @@
 //! - [`examples`] — the bounded, `--jobs`-deterministic example set every audit's
 //!   per-shape aggregate keeps its reproducers in.
 //! - [`tally`] — run-level tally primitives (the capped path-sample bucket the
-//!   injection audits' skipped files and the sweep's panicking inputs share).
+//!   injection audits' skipped files, the sweep's panicking inputs and the two
+//!   mutation audits' base-non-idempotent seeds share).
 //! - [`node_edge`] — the wire-tree walker keying an injection offset to its
 //!   enclosing AST node + child-role edge, the coarse companion to `sites`'
 //!   file-independent shape keying.

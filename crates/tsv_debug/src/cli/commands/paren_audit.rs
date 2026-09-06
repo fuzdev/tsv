@@ -100,6 +100,7 @@ use crate::audit::properties::{
     BaseFixedPoint, Utf16ToByte, base_fixed_point, source_has_ignore_directive, tsv_parse_to_value,
 };
 use crate::audit::repro::{ReproCase, write_repro_case};
+use crate::audit::tally::CappedPaths;
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 
@@ -335,13 +336,17 @@ struct Report {
     files_parse_error: usize,
     files_output_reparse_error: usize,
     files_ignore_directive: usize,
-    files_base_non_idempotent: usize,
+    /// Seeds whose own format is not a fixed point: excluded from the re-association
+    /// analysis (there is nothing for the twin to converge ON) and a failure of the run.
+    /// A [`CappedPaths`] rather than a count beside a `Vec`, so the number the report
+    /// prints cannot drift from the list under it and the list stays bounded on a corpus
+    /// that has many.
+    base_non_idempotent: CappedPaths,
     sites: usize,
     sites_comment_bound: usize,
     counts: BTreeMap<Verdict, usize>,
     op_counts: BTreeMap<(LogicalOp, Verdict), usize>,
     findings: Vec<Finding>,
-    base_non_idempotent_paths: Vec<String>,
     /// Sequence number for `--dump-dir` case directories, so two findings in one file do not
     /// collide on a name.
     dump_seq: usize,
@@ -369,7 +374,7 @@ impl Report {
     /// while producing no site finding at all, and that is exactly the case a ✓ keyed on the
     /// findings alone prints a pass over (`../prettier/tests/format` holds six such files).
     fn failed(&self) -> bool {
-        self.findings_total() + self.files_base_non_idempotent > 0
+        self.findings_total() + self.base_non_idempotent.count() > 0
     }
 }
 
@@ -429,10 +434,7 @@ impl ParenAuditCommand {
                 return;
             }
             BaseFixedPoint::NonIdempotent => {
-                report.files_base_non_idempotent += 1;
-                report
-                    .base_non_idempotent_paths
-                    .push(path.display().to_string());
+                report.base_non_idempotent.push(path.display().to_string());
                 return;
             }
         };
@@ -517,7 +519,7 @@ fn print_human(report: &Report, examples: usize) {
         report.files_parse_error,
         report.files_output_reparse_error,
         report.files_ignore_directive,
-        report.files_base_non_idempotent,
+        report.base_non_idempotent.count(),
     );
     println!(
         "  sites probed: {} ({} excluded — a `(` there would re-bind a forward-binding comment)",
@@ -557,12 +559,12 @@ fn print_human(report: &Report, examples: usize) {
         println!();
     }
 
-    if !report.base_non_idempotent_paths.is_empty() {
+    if !report.base_non_idempotent.is_empty() {
         println!();
         println!("  ✗ base-non-idempotent files (F1 broken — excluded from the re-association");
         println!("    analysis, but a failure in their own right):");
-        for p in report.base_non_idempotent_paths.iter().take(20) {
-            println!("    {p}");
+        for line in report.base_non_idempotent.sample_lines("    ") {
+            println!("{line}");
         }
     }
 
@@ -649,13 +651,13 @@ fn print_json(report: &Report) {
         "files_parse_error": report.files_parse_error,
         "files_output_reparse_error": report.files_output_reparse_error,
         "files_ignore_directive": report.files_ignore_directive,
-        "files_base_non_idempotent": report.files_base_non_idempotent,
+        "files_base_non_idempotent": report.base_non_idempotent.count(),
         "sites": report.sites,
         "sites_comment_bound": report.sites_comment_bound,
         "counts": counts,
         "op_counts": op_counts,
         "findings": findings,
-        "base_non_idempotent_paths": report.base_non_idempotent_paths,
+        "base_non_idempotent_sample": report.base_non_idempotent.sample(),
     });
     println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
 }
@@ -766,11 +768,11 @@ mod tests {
     /// here (six such files, zero site findings).
     #[test]
     fn a_base_non_idempotent_file_fails_the_run_with_no_findings() {
-        let report = Report {
+        let mut report = Report {
             sites: 12,
-            files_base_non_idempotent: 1,
             ..Report::default()
         };
+        report.base_non_idempotent.push("seed.svelte".to_string());
         assert!(report.findings.is_empty());
         assert_eq!(report.findings_total(), 0);
         assert!(report.failed());

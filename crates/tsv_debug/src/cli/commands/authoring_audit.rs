@@ -75,6 +75,7 @@ use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char, text_edge_
 use crate::audit::excerpt::line_context;
 use crate::audit::properties::{BaseFixedPoint, base_fixed_point};
 use crate::audit::repro::{ReproCase, write_repro_case};
+use crate::audit::tally::CappedPaths;
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 use crate::deno::{PrettierParser, run_prettier};
@@ -504,7 +505,12 @@ impl Outcome {
 struct Report {
     files_scanned: usize,
     files_parse_error: usize,
-    files_base_non_idempotent: usize,
+    /// Seeds whose own format is not a fixed point: excluded from the authoring analysis
+    /// (there is nothing for the variants to converge ON) and a failure of the run. A
+    /// [`CappedPaths`] rather than a count beside a `Vec`, so the number the report prints
+    /// cannot drift from the list under it and the list stays bounded on a corpus that has
+    /// many.
+    base_non_idempotent: CappedPaths,
     sites: usize,
     variant_parse_errors: usize,
     counts: BTreeMap<Bucket, usize>,
@@ -512,7 +518,6 @@ struct Report {
     /// divergence lives in.
     kind_counts: BTreeMap<(SiteKind, Bucket), usize>,
     examples: BTreeMap<Bucket, Vec<Outcome>>,
-    base_non_idempotent_paths: Vec<String>,
     dump_seq: usize,
 }
 
@@ -584,7 +589,7 @@ impl AuthoringAuditCommand {
         // reported-but-green.
         let hard = report.count(Bucket::BugA)
             + report.count(Bucket::NonIdempotent)
-            + report.files_base_non_idempotent;
+            + report.base_non_idempotent.count();
         if hard > 0 {
             return Err(CliError::Failed);
         }
@@ -676,10 +681,7 @@ impl AuthoringAuditCommand {
                 return None;
             }
             BaseFixedPoint::NonIdempotent => {
-                report.files_base_non_idempotent += 1;
-                report
-                    .base_non_idempotent_paths
-                    .push(path.display().to_string());
+                report.base_non_idempotent.push(path.display().to_string());
                 return None;
             }
         };
@@ -772,7 +774,9 @@ fn print_human(report: &Report, verbose: bool, triaged: bool) {
     println!("Authoring-independence audit (Svelte boundary whitespace)");
     println!(
         "  files: {} scanned, {} parse-error, {} base-non-idempotent",
-        report.files_scanned, report.files_parse_error, report.files_base_non_idempotent,
+        report.files_scanned,
+        report.files_parse_error,
+        report.base_non_idempotent.count(),
     );
     println!(
         "  sites probed: {} ({} variant parse-errors)",
@@ -856,12 +860,12 @@ fn print_human(report: &Report, verbose: bool, triaged: bool) {
         println!();
     }
 
-    if !report.base_non_idempotent_paths.is_empty() {
+    if !report.base_non_idempotent.is_empty() {
         println!();
         println!("  ✗ base-non-idempotent files (F1 broken — excluded from the authoring");
         println!("    analysis, but a failure in their own right):");
-        for p in report.base_non_idempotent_paths.iter().take(20) {
-            println!("    {p}");
+        for line in report.base_non_idempotent.sample_lines("    ") {
+            println!("{line}");
         }
     }
 
@@ -936,13 +940,13 @@ fn print_json(report: &Report) {
     let out = serde_json::json!({
         "files_scanned": report.files_scanned,
         "files_parse_error": report.files_parse_error,
-        "files_base_non_idempotent": report.files_base_non_idempotent,
+        "files_base_non_idempotent": report.base_non_idempotent.count(),
         "sites": report.sites,
         "variant_parse_errors": report.variant_parse_errors,
         "counts": counts,
         "kind_counts": kind_counts,
         "examples": examples,
-        "base_non_idempotent_paths": report.base_non_idempotent_paths,
+        "base_non_idempotent_sample": report.base_non_idempotent.sample(),
     });
     println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
 }
