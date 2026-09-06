@@ -977,23 +977,27 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (block_start, _) = self.current_pos();
         self.advance()?; // consume '{'
 
-        // Set ambient context for declare namespace
-        let saved_ambient = self.in_ambient_context;
-        if is_ambient {
-            self.in_ambient_context = true;
-        }
-
-        // Parse module items until '}'. A namespace/module body is a module-item
-        // context, so `import`/`export` declarations are valid here (unlike an
-        // ordinary block).
-        let mut body = self.bvec();
-        while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            let stmt = self.parse_module_item()?;
-            body.push(stmt);
-        }
-
-        // Restore ambient context
-        self.in_ambient_context = saved_ambient;
+        // Parse module items until '}' with the ambient context a `declare`
+        // namespace establishes (a non-ambient block inherits, never clears). The
+        // save/restore goes through the combinator so it holds on the ERROR path
+        // too: an item that fails mid-body must not leave the relaxed grammar
+        // behind for whatever reads next — `Parser::rewind` is a caller that
+        // abandons a failed parse and keeps going. A namespace/module body is a
+        // module-item context, so `import`/`export` declarations are valid here
+        // (unlike an ordinary block).
+        let ambient = is_ambient || self.in_ambient_context;
+        let body = self.with_context_flag(
+            |p| &mut p.in_ambient_context,
+            ambient,
+            |p| {
+                let mut body = p.bvec();
+                while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
+                    let stmt = p.parse_module_item()?;
+                    body.push(stmt);
+                }
+                Ok(body)
+            },
+        )?;
 
         // Expect closing brace
         if !matches!(self.current_kind(), TokenKind::BraceClose) {

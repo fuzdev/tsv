@@ -17,7 +17,7 @@ use tsv_lang::source_scan;
 use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
 use super::Parser;
-use super::expression_lookahead::{matching_angle_close, scan_parens_then_arrow};
+use super::expression_lookahead::{ArrowHead, matching_angle_close};
 use super::scan::{parse_number_literal, skip_whitespace_and_comments};
 
 //
@@ -411,28 +411,41 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         result
     }
 
-    /// Run `f` as a fresh `[+In]` expression frame: the `[In]` grammar parameter
-    /// forced to `[+In]` (`allow_in = true`) and a conditional consequent's
-    /// return-type bar lifted (`with_arrow_return_type_allowed`), both restored
-    /// afterward (even on error). Used at the grammar productions that reset
-    /// `[+In]` — the ternary consequent, function/class bodies, param defaults —
-    /// where a bare `in` is the binary operator, not the for-in separator. The two
-    /// flags share the boundary because a body is where tsc's
-    /// `allowReturnTypeInArrowFunction` goes back to `true` without a delimiter
-    /// opening; the ternary consequent is the one `[+In]` production that instead
-    /// BARS the return type, and it wraps `with_arrow_return_type_barred` inside
-    /// this. The `[In]` half is a no-op outside a for-header init (where `allow_in`
-    /// is already `true`); a nested for-header re-disables it via
-    /// `parse_expression_no_in`'s own save/restore.
+    /// Run `f` with the `[In]` grammar parameter forced to `[+In]` (`allow_in =
+    /// true`), restoring the prior value afterward (even on error). Used at the
+    /// grammar productions that reset `[+In]` within a for-header init — the
+    /// ternary consequent, function/class bodies, param defaults — where a bare
+    /// `in` is the binary operator, not the for-in separator. A no-op outside a
+    /// for-header init (where `allow_in` is already `true`); a nested for-header
+    /// re-disables it via `parse_expression_no_in`'s own save/restore.
+    ///
+    /// The `[In]` parameter ALONE — a body also lifts the conditional consequent's
+    /// return-type bar, and takes [`Parser::with_body_frame`] for both.
     pub(super) fn with_allow_in<T>(
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
-        self.with_context_flag(
-            |p| &mut p.allow_in,
-            true,
-            |p| p.with_arrow_return_type_allowed(f),
-        )
+        self.with_context_flag(|p| &mut p.allow_in, true, f)
+    }
+
+    /// Run `f` as a **body** — an arrow's block body, a function's params + body,
+    /// or a class body: `[+In]` ([`Parser::with_allow_in`]) and a conditional
+    /// consequent's return-type bar lifted
+    /// ([`Parser::with_arrow_return_type_allowed`]), both restored afterward (even
+    /// on error). The two flags share this boundary — a body is where tsc's
+    /// `allowReturnTypeInArrowFunction` goes back to `true` without a delimiter
+    /// opening, and it is `[+In]` for the same reason — so the three sites take one
+    /// call rather than nesting two.
+    ///
+    /// The ternary consequent is the one `[+In]` production that instead BARS the
+    /// return type, so it takes `with_allow_in` and
+    /// [`Parser::with_arrow_return_type_barred`] directly: routing it through here
+    /// would lift the bar only to re-set it.
+    pub(super) fn with_body_frame<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        self.with_allow_in(|p| p.with_arrow_return_type_allowed(f))
     }
 
     /// Fold a trailing TypeScript `as` / `satisfies` type assertion at the current
@@ -837,8 +850,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // `async(...)` — could be async arrow or call to function named `async`
                     // Scan ahead: if `(...)` is followed by `=>`, it's an async arrow function
                     let paren_start = self.peek_start();
-                    if scan_parens_then_arrow(self.source.as_bytes(), paren_start)
-                        && let Some(arrow) = self.parse_arrow_or_rewind(paren_start, |p| {
+                    if let Some(head) = ArrowHead::at_paren(self.source.as_bytes(), paren_start)
+                        && let Some(arrow) = self.parse_arrow_or_rewind(head, |p| {
                             let (start, _) = p.current_pos();
                             p.advance()?; // consume 'async'
                             p.parse_async_arrow_function_after_async(start)
@@ -881,9 +894,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `<`), so a shift here can only open a type assertion whose
                 // type is a generic function type: `<<T>() => R>x`.
                 if self.current.kind == TokenKind::LessThan
-                    && let Some(paren) = self.generic_arrow_function_start()
+                    && let Some(head) = self.generic_arrow_function_start()
                     && let Some(arrow) =
-                        self.parse_arrow_or_rewind(paren, Self::parse_generic_arrow_function)?
+                        self.parse_arrow_or_rewind(head, Self::parse_generic_arrow_function)?
                 {
                     arrow
                 } else {
@@ -1828,8 +1841,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // conditional's consequent the arrow may be handed back (`None`): its
         // return-type `:` was the conditional's, and the head is the grouped
         // expression below (`a ? (b) : c => d`).
-        if let Some(paren) = self.paren_arrow_function_start()
-            && let Some(arrow) = self.parse_arrow_or_rewind(paren, Self::parse_arrow_function)?
+        if let Some(head) = self.paren_arrow_function_start()
+            && let Some(arrow) = self.parse_arrow_or_rewind(head, Self::parse_arrow_function)?
         {
             return Ok(arrow);
         }

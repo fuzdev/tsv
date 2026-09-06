@@ -43,36 +43,162 @@ fn is_greater_equal_op(bytes: &[u8], pos: usize) -> bool {
         && !(pos + 2 < bytes.len() && matches!(bytes[pos + 2], b'>' | b'='))
 }
 
-/// Scan through parentheses and check if followed by `=>`
-///
-/// Assumes `pos` is at the opening `(`. Handles:
-/// - Nested parentheses
-/// - String literals inside parens
-/// - Comments (line and block)
-/// - Optional type annotation after `)`: `)` or `): type`
-///
-/// Returns `true` if the pattern `(...) =>` or `(...): type =>` is found.
+/// Whether an arrow head opens at `start` — [`scan_arrow_head_close`] for a caller
+/// that wants only the verdict, not the `)`.
 #[inline]
 pub(super) fn scan_parens_then_arrow(bytes: &[u8], start: usize) -> bool {
     scan_arrow_head_close(bytes, start).is_some()
 }
 
-/// Whether the arrow head opening at the `(` at `paren` carries a return-type
-/// annotation — a `:` right after its matching `)`. Asked only of a head
-/// [`scan_parens_then_arrow`] already matched, by the consequent-context rule
-/// (`Parser::parse_arrow_or_rewind`), which needs the fact AHEAD of the parse: a
-/// head that then fails to parse as an arrow is rewound only when annotated, so
-/// the parser's own record of a return type (written after the parameters) comes
-/// too late for the head whose parameters were the failure.
-pub(super) fn paren_head_return_colon(bytes: &[u8], paren: usize) -> bool {
-    scan_arrow_head_close(bytes, paren).is_some_and(|close| {
-        bytes.get(skip_whitespace_and_comments(bytes, close + 1)) == Some(&b':')
-    })
+/// A matched arrow head's byte extents, built by the parser's three head
+/// predicates and read by the consequent-context rule
+/// ([`super::Parser::parse_arrow_or_rewind`]) — which asks two questions of it,
+/// both keyed on what the match already found so neither re-walks the head.
+#[derive(Clone, Copy)]
+pub(super) struct ArrowHead {
+    /// The `(` opening the parameter list — `None` for a `<T>(…)` head. tsc's
+    /// `isParenthesizedArrowFunctionExpressionWorker` answers `Tristate.Unknown`
+    /// for every `<` outside JSX, so a generic head never commits; keeping the
+    /// fact HERE rather than at the site that must not ask means a fourth head
+    /// site cannot forget it.
+    paren: Option<usize>,
+    /// The `)` closing the parameter list.
+    close: usize,
 }
 
-/// [`scan_parens_then_arrow`]'s walk, returning the `)` it matched the arrow head
-/// at — `None` where the pattern does not hold.
-fn scan_arrow_head_close(bytes: &[u8], start: usize) -> Option<usize> {
+impl ArrowHead {
+    /// The head opening at the `(` at `paren` — a plain `(a) =>` head, or the
+    /// `(` an `async` precedes, which tsc classifies by the same rules.
+    pub(super) fn at_paren(bytes: &[u8], paren: usize) -> Option<Self> {
+        scan_arrow_head_close(bytes, paren).map(|close| Self {
+            paren: Some(paren),
+            close,
+        })
+    }
+
+    /// The head whose parameter list opens at `paren`, behind type parameters
+    /// (`<T>(a) =>`). Never commits — see [`ArrowHead::paren`].
+    pub(super) fn behind_type_parameters(bytes: &[u8], paren: usize) -> Option<Self> {
+        scan_arrow_head_close(bytes, paren).map(|close| Self { paren: None, close })
+    }
+
+    /// Whether the head carries a return-type annotation — a `:` right after its
+    /// `)`. The consequent-context rule needs this AHEAD of the parse: a head that
+    /// then fails to parse as an arrow is rewound only when annotated, so the
+    /// parser's own record of a return type (written after the parameters) comes
+    /// too late for the head whose parameters were the failure.
+    pub(super) fn has_return_type(self, bytes: &[u8]) -> bool {
+        bytes.get(skip_whitespace_and_comments(bytes, self.close + 1)) == Some(&b':')
+    }
+
+    /// Whether tsc reads this head as a signature without asking — its
+    /// `Tristate.True` (see [`paren_head_commits_to_signature`]).
+    pub(super) fn commits_to_signature(self, bytes: &[u8]) -> bool {
+        self.paren
+            .is_some_and(|paren| paren_head_commits_to_signature(bytes, paren))
+    }
+}
+
+/// tsc's `isModifierKind` set, minus `async` — the words that may open a
+/// parameter-property parameter (`(public a)`). `async` is excluded because it is
+/// the arrow's own modifier, and because `(async a)` reads as two names.
+///
+/// Order is alphabetical for reading only; the lookup is a linear compare over fourteen
+/// short words on a cold path.
+const PARAM_MODIFIERS: &[&[u8]] = &[
+    b"abstract",
+    b"accessor",
+    b"const",
+    b"declare",
+    b"default",
+    b"export",
+    b"in",
+    b"out",
+    b"override",
+    b"private",
+    b"protected",
+    b"public",
+    b"readonly",
+    b"static",
+];
+
+/// Whether the parameter list opening at the `(` at `paren` is one tsc reads as a
+/// signature **without asking** — `Tristate.True` from
+/// `isParenthesizedArrowFunctionExpressionWorker`, where
+/// `tryParseParenthesizedArrowFunctionExpression` parses committed and passes
+/// `allowReturnTypeInArrowFunction: true`.
+///
+/// The distinction is load-bearing for the consequent-context rule, and in BOTH
+/// directions. tsc's `true` reaches the arrow's **body**, so an annotated head
+/// inside a committed arrow's body keeps its own annotation and the conditional
+/// runs out of `:`; speculating on such a head instead truncates the body, finds
+/// the `:` the inner annotation would have taken, and keeps the outer arrow — a
+/// reading neither tsc nor acorn has. And the converse: a head tsc leaves
+/// `Unknown` (`(a)`, `(a, b)`, `(a = 1)`, `([a])`, `({a})`, every `<T>(…)`) has a
+/// parenthesized-expression reading, so committing it would reject a program tsc
+/// accepts.
+///
+/// Each arm below is one of tsc's, in its order — a `)`, a binding-pattern open, a
+/// rest `...`, a parameter property, then the first name's follower. One
+/// deliberate deviation: this reads any identifier-shaped word where tsc asks
+/// `isIdentifier()`, so a **reserved** word (`(if: T)`, `(true?: T)`) commits here
+/// and does not there. That cannot move a verdict — `(<reserved> :` and
+/// `(<reserved> ?` spell no parenthesized expression either, so both readings
+/// reject — and it keeps a keyword table out of a byte scan. `this` needs no such
+/// argument: tsc admits it explicitly.
+fn paren_head_commits_to_signature(bytes: &[u8], paren: usize) -> bool {
+    debug_assert_eq!(bytes.get(paren), Some(&b'('));
+    let second = skip_whitespace_and_comments(bytes, paren + 1);
+    match bytes.get(second) {
+        // `()` — a signature when a return type, the `=>` or an error-recovery
+        // body brace follows.
+        Some(b')') => {
+            let third = skip_whitespace_and_comments(bytes, second + 1);
+            matches!(bytes.get(third), Some(b':' | b'{')) || bytes[third..].starts_with(b"=>")
+        }
+        // `([` / `({` — a binding pattern, or a parenthesized array/object.
+        Some(b'[' | b'{') => false,
+        // `(...` — a rest parameter, which no expression spells.
+        Some(b'.') => bytes[second..].starts_with(b"..."),
+        Some(_) if identifier_starts_at(bytes, second) => {
+            let name = &bytes[second..skip_identifier(bytes, second)];
+            let after_name = skip_whitespace_and_comments(bytes, second + name.len());
+            // `(public a` — a parameter property. A modifier NOT followed by a
+            // name is just a name (`(readonly)`), and an `as` after it makes the
+            // pair an assertion on one (`(public as B)`).
+            if PARAM_MODIFIERS.contains(&name) && identifier_starts_at(bytes, after_name) {
+                return !is_word_at(bytes, after_name, b"as");
+            }
+            match bytes.get(after_name) {
+                // `(a:` — an annotated parameter.
+                Some(b':') => true,
+                // `(a?` — optional only when `:`, `,`, `=` or `)` follows; any
+                // other follower makes the `?` a conditional's own (`(a ? b : c)`,
+                // `(a ?? b)`). The `=` must be the assignment token, not the head
+                // of `==` or `=>`.
+                Some(b'?') => {
+                    let past = skip_whitespace_and_comments(bytes, after_name + 1);
+                    match bytes.get(past) {
+                        Some(b':' | b',' | b')') => true,
+                        Some(b'=') => !matches!(bytes.get(past + 1), Some(b'=' | b'>')),
+                        _ => false,
+                    }
+                }
+                // `(a,` / `(a=` / `(a)` — could be either; ask by parsing.
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+/// Scan an arrow head's parameter list from the `(` at `start`, returning the `)`
+/// that closes it when `=>` follows — `None` where the pattern does not hold.
+///
+/// Handles nested parentheses, the strings / templates / comments / regexes a
+/// `(` or `)` can hide inside, and an optional return-type annotation after the
+/// `)` (so both `(...) =>` and `(...): type =>` match).
+pub(super) fn scan_arrow_head_close(bytes: &[u8], start: usize) -> Option<usize> {
     if start >= bytes.len() || bytes[start] != b'(' {
         return None;
     }

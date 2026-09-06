@@ -280,11 +280,13 @@ fn a_rewound_parse_re_drains_its_comments_once() {
     );
 }
 
-/// An unambiguous head (`(d: D)`) has no parenthesized reading, so when its own
-/// speculation is refused the failure rewinds the *enclosing* speculation, whose
-/// alternate then re-reads it under the lifted rule — tsc's outer rewind.
+/// A committed inner head consumes the `:` the enclosing speculation was waiting
+/// for, so that speculation rewinds: `(d: D)` is unambiguous, keeps its annotation
+/// and swallows `(d: D): E => e` whole, leaving nothing after the outer arrow. The
+/// alternate then re-reads the same bytes under the lifted rule — tsc's outer
+/// rewind, and the reason the two halves of the rule compose.
 #[test]
-fn an_unambiguous_inner_head_rewinds_the_enclosing_speculation() {
+fn a_committed_inner_head_rewinds_the_enclosing_speculation() {
     let json = parse_json("a ? (b) : c => (d: D): E => e;");
     assert_eq!(node_type(&json, CONSEQUENT), "Identifier");
     assert!(annotated(&json, &format!("{ALTERNATE}/body")));
@@ -292,6 +294,78 @@ fn an_unambiguous_inner_head_rewinds_the_enclosing_speculation() {
     assert_eq!(node_type(&json, CONSEQUENT), "Identifier");
     assert!(annotated(&json, &format!("{ALTERNATE}/body")));
     assert!(annotated(&json, &format!("{ALTERNATE}/body/body")));
+}
+
+/// tsc COMMITS an *unambiguous* head to the annotation without asking — `(a: T)`,
+/// `()`, `(...a)`, `(a?: T)`, and the same after `async`
+/// (`isParenthesizedArrowFunctionExpressionWorker`'s `Tristate.True`, which reaches
+/// `parseParenthesizedArrowFunctionExpression` with `allowReturnTypeInArrowFunction:
+/// true`). That `true` reaches the arrow's BODY as well, so an annotated head inside
+/// it keeps its own annotation and the conditional runs out of `:` — a syntax error
+/// tsc raises and tsv must raise with it. Speculating on such a head instead reads a
+/// truncated body, finds the `:` that the inner annotation would have taken, and
+/// keeps the outer arrow: an over-acceptance no valid program can reach, but a
+/// reading neither tsc nor acorn has.
+///
+/// The distinction is only about WHICH heads commit: an ambiguous head, a generic
+/// head (`Tristate.Unknown` for tsc — a `<` never commits outside JSX) and an
+/// unannotated head all stay speculative, and their bodies keep the bar.
+#[test]
+fn an_unambiguous_head_commits_and_lifts_the_bar_in_its_body() {
+    // One per `Tristate.True` arm: `(a: T)`, `this`, `()`, `(...a)`, `(a?` with each
+    // of its four followers, a parameter property — and the set behind `async`.
+    for source in [
+        "a ? (b: B): c => (d): e => f;",
+        "a ? (this: T): c => (d): e => f;",
+        "a ? (): c => (d): e => f;",
+        "a ? (...b): c => (d): e => f;",
+        "a ? ( /* c */ ...b): c => (d): e => f;",
+        "a ? (b?: B): c => (d): e => f;",
+        "a ? (b?): c => (d): e => f;",
+        "a ? (b?, c): d => (e): f => g;",
+        "a ? (b? = 1): c => (d): e => f;",
+        "a ? (public b): c => (d): e => f;",
+        "a ? (readonly b): c => (d): e => f;",
+        "a ? async (b: B): c => (d): e => f;",
+    ] {
+        assert!(!accepts(source), "should reject: {source}");
+    }
+    // And one per arm tsc leaves `Unknown` or `False`, each of which HAS a
+    // parenthesized reading, so committing would reject what tsc accepts. The `?`
+    // followers are the near misses: `(a ? b : c)` and `(a ?? b)` are a conditional
+    // and a coalesce, not an optional parameter; `(public as B)` is an assertion on
+    // a name and `(readonly)` is just one.
+    for source in [
+        "a ? (b, c): d => (e): f => g;",
+        "a ? (b = 1): c => (d): e => f;",
+        "a ? ([b]): c => (d): e => f;",
+        "a ? ({ b }): c => (d): e => f;",
+        "a ? (b ? c : d): e => (f): g => h;",
+        "a ? (b ?? c): d => (e): f => g;",
+        "a ? (public as B): c => (d): e => f;",
+        "a ? (readonly): c => (d): e => f;",
+    ] {
+        assert!(accepts(source), "should accept: {source}");
+    }
+    // The heads tsc leaves ambiguous keep the speculation, so the inner annotation
+    // is refused and the outer one survives on the `:` it frees up.
+    for source in [
+        "a ? (b): c => (d): e => f;",
+        "a ? <T>(b): c => (d): e => f;",
+    ] {
+        let json = parse_json(source);
+        assert!(annotated(&json, CONSEQUENT), "{source}");
+        assert_eq!(
+            node_type(&json, &format!("{CONSEQUENT}/body")),
+            "Identifier",
+            "{source}"
+        );
+    }
+    // A committed head is committed for its whole reading: the same shape with the
+    // conditional's `:` present parses, and the body keeps ITS annotation.
+    let json = parse_json("a ? (b: B): c => (d): e => f : g;");
+    assert!(annotated(&json, CONSEQUENT));
+    assert!(annotated(&json, &format!("{CONSEQUENT}/body")));
 }
 
 /// The rewound reading ends the statement where the body ends: a token on the

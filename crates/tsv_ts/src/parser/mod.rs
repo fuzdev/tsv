@@ -110,6 +110,15 @@ fn comment_from_token(
 /// Context flags (`allow_in`, `in_await`, …) are not carried — their combinators
 /// restore them on every path — and neither are arena nodes, which an abandoned
 /// parse simply leaves unreachable.
+///
+/// ⚠️ That first exemption is a **standing obligation**, not an observation: a
+/// context flag whose save/restore is hand-rolled around a `?` leaks its value
+/// out of an abandoned parse, and nothing here can see that it did. Every one
+/// goes through [`Parser::with_context_flag`] (or a combinator built on it) for
+/// exactly this reason. Nothing likewise forces a NEW `Parser` field into this
+/// struct — the destructuring in [`Parser::rewind`] guards only the other
+/// direction — so a field added below `grouping_depth` must be classified here
+/// by hand: carried, combinator-restored, or provably immutable for the parse.
 pub(super) struct Checkpoint<'arena> {
     lexer: LexerCheckpoint,
     current: Token,
@@ -235,11 +244,12 @@ pub struct Parser<'a, 'arena> {
     /// through [`Parser::arrow_return_type_barred`] against the same baseline
     /// rule as `no_in_depth` — a grouping opened *since* the `?` is a fresh
     /// expression frame where tsc passes `true` again, so only the consequent's
-    /// own depth is barred — and lifted by every `[+In]` body production
-    /// (`with_allow_in`) and a `yield` argument, the two places tsc resets the
-    /// flag without opening a delimiter. It survives into an arrow's concise body,
-    /// the conditional's alternate and an assignment's right side, which inherit
-    /// it exactly as tsc threads the parameter through those three.
+    /// own depth is barred — and lifted by every body ([`Parser::with_body_frame`])
+    /// and every `yield` argument, the two places tsc resets the flag without
+    /// opening a delimiter, plus the head it commits to a signature outright
+    /// (`Parser::parse_arrow_or_rewind`). It survives into an arrow's concise
+    /// body, the conditional's alternate and an assignment's right side, which
+    /// inherit it exactly as tsc threads the parameter through those three.
     arrow_return_type_barred_at: Option<u32>,
     /// The syntactic goal symbol (`Script` vs `Module`) this parse runs against.
     /// Fixed for the whole parse — embedders (Svelte) and the standalone
@@ -1051,8 +1061,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Run `f` as a fresh expression frame where a parenthesized arrow's return
     /// type is always allowed — where tsc passes `allowReturnTypeInArrowFunction =
-    /// true` without opening a delimiter: a `[+In]` body (`with_allow_in`) and a
-    /// `yield` argument. Restored afterward, on success and error alike.
+    /// true`: a body ([`Parser::with_body_frame`], which pairs this with `[+In]`),
+    /// a `yield` argument, and the arrow head tsc commits to a signature outright
+    /// (`Parser::parse_arrow_or_rewind`, whose commit exists FOR this lift —
+    /// tsc's `true` reaches the arrow's body). Restored afterward, on success and
+    /// error alike.
     pub(super) fn with_arrow_return_type_allowed<T>(
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,

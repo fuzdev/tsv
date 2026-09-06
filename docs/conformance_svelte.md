@@ -953,16 +953,29 @@ its grammar (`Parser::parse_arrow_or_rewind`, from a `Parser::checkpoint`), take
 for an annotated parenthesized, generic or async head parsed directly in a
 consequent — and rewound on a failed parse as well as on a refused annotation, which
 is what reads `a ? (b + c) : d => e` (a head tsc never takes for a signature) as the
-consequent `b + c`, and lets an unambiguous inner head's failure rewind the
-speculation enclosing it (`a ? (b) : c => (d: D): E => e`). **Every
-such spelling is prettier-normalized into an unambiguous one** (the alternate's
-parameter always gets its parens: `b ? c : (d) => e`) and acorn accepts each of
-those fixed points, so the divergence is reachable only from an input that is
-nobody's fixed point and — like the `export default abstract⏎class` entry above —
-is pinned as a formatting claim: the fixture's `unformatted_paren_placement`
-variant holds the five corpus spellings, which both formatters normalize to the
-fixed point (the arrow reading of `(c) : d => e` could not print as
-`c : (d) => e`); [arrow_consequent_return_type.rs](../tests/arrow_consequent_return_type.rs)
+consequent `b + c`.
+
+tsc's other half is followed too: a head it reads as a signature **without asking**
+(`isParenthesizedArrowFunctionExpressionWorker`'s `Tristate.True` — `()`, `(...a)`,
+`(a: T)`, `(a?: T)`, `(public a)`, and each of those behind `async`; never a
+`<T>(…)`, which it always leaves `Unknown`) is parsed **committed**, with the flag
+lifted, and the lift reaches the arrow's BODY: an annotated head inside a committed
+arrow's body keeps its own annotation, so `a ? (b: B): c => (d): e => f;` runs the
+conditional out of `:` and is a syntax error. Speculating there instead would parse
+the body under the bar, truncate it, take the `:` the inner annotation wanted and
+keep the outer arrow — a reading neither tsc nor acorn has. The head classifier is
+`paren_head_commits_to_signature`, arm for arm tsc's; the fixture's two
+`input_invalid_*` files pin that class, where acorn rejects with tsv.
+
+The accepting half has no such file, because **every spelling of it is
+prettier-normalized into an unambiguous one** (the alternate's parameter always
+gets its parens: `b ? c : (d) => e`) and acorn accepts each of those fixed points.
+The divergence is reachable only from an input that is nobody's fixed point and —
+like the `export default abstract⏎class` entry above — is pinned as a formatting
+claim: the fixture's `unformatted_paren_placement` variant holds the five corpus
+spellings, which both formatters normalize to the fixed point (the arrow reading of
+`(c) : d => e` could not print as `c : (d) => e`);
+[arrow_consequent_return_type.rs](../tests/arrow_consequent_return_type.rs)
 asserts the trees directly. **Upstream candidate**: acorn-typescript —
 `shouldParseArrow`'s return-type `tryParse` commits on `: type =>` alone, never
 asking whether the `:` is an enclosing conditional's.

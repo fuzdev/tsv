@@ -8,10 +8,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::Parser;
 use super::expression::ParsedExpr;
-use super::expression_lookahead::{
-    paren_head_return_colon, scan_angle_brackets, scan_arrow_after_identifier,
-    scan_parens_then_arrow,
-};
+use super::expression_lookahead::{ArrowHead, scan_angle_brackets, scan_arrow_after_identifier};
 use super::scan::skip_whitespace_and_comments;
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -63,48 +60,55 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// there.
     ///
     /// Only an **annotated** head is ever in question (tsc's `hasReturnColon` gate),
-    /// and the annotation is read off the bytes (`paren_head_return_colon`, from the
-    /// head's `(` at `paren`) before the parse rather than off the node after it,
-    /// because an annotated head that fails to parse as an arrow is rewound too —
-    /// `a ? (b + c) : d => e` is a head tsc never reads as a signature, and its
-    /// `tryParse` rewinds where tsv's parameter parse errors. A body error rewinds
-    /// the same way, to a verdict tsc shares: the parenthesized reading hands the
-    /// same body to the alternate's arrow, which fails on it again. A head without
-    /// an annotation parses straight, so a body error there keeps its message.
+    /// and the annotation is read off the bytes ([`ArrowHead::has_return_type`])
+    /// before the parse rather than off the node after it, because an annotated head
+    /// that fails to parse as an arrow is rewound too — `a ? (b + c) : d => e` is a
+    /// head tsc never reads as a signature, and its `tryParse` rewinds where tsv's
+    /// parameter parse errors. A body error rewinds the same way, to a verdict tsc
+    /// shares: the parenthesized reading hands the same body to the alternate's
+    /// arrow, which fails on it again. A head without an annotation parses straight,
+    /// so a body error there keeps its message.
     ///
-    /// tsc additionally commits an *unambiguous* head (`(a: T)`, `()`, `(...a)`,
-    /// `(a?: T)`) to the annotation without asking — a distinction this need not
-    /// draw: such a head has no parenthesized-expression reading, so its rewound
-    /// parse fails and the failure flows outward exactly as tsc's committed arrow
-    /// leaves the enclosing conditional without its `:` — an enclosing speculation
-    /// rewinds on it and its alternate re-reads the head under the lifted rule
-    /// (`a ? (b) : c => (d: D): E => e`), and at the top the error stands.
+    /// An **unambiguous** head — one tsc reads as a signature without asking
+    /// ([`ArrowHead::commits_to_signature`], its `Tristate.True`) — is not
+    /// speculated on at all: tsc parses it committed and with
+    /// `allowReturnTypeInArrowFunction: true`, and that `true` reaches the arrow's
+    /// BODY, so an annotated head inside the body keeps its own annotation and the
+    /// conditional runs out of `:`. Speculating instead would parse the body under
+    /// the bar, truncate it, find the `:` the inner annotation would have taken and
+    /// keep the outer arrow — accepting `a ? (b: B): c => (d): e => f;`, which
+    /// neither tsc nor acorn reads any way at all. So the commit is not an
+    /// optimization: it is the rule for those heads, and the lifted flag is the
+    /// point of it.
     ///
     /// `parse` is a plain `fn` pointer rather than a generic closure so the cold
-    /// speculation below has ONE body across the three head sites; the fast path
-    /// inlines here, where the pointer is a constant and the call stays direct.
+    /// half below has ONE body across the three head sites; the fast path inlines
+    /// here, where the pointer is a constant and the call stays direct.
     #[inline]
     pub(super) fn parse_arrow_or_rewind(
         &mut self,
-        paren: usize,
+        head: ArrowHead,
         parse: fn(&mut Self) -> Result<ParsedExpr<'arena>, ParseError>,
     ) -> Result<Option<ParsedExpr<'arena>>, ParseError> {
-        if !self.arrow_return_type_barred()
-            || !paren_head_return_colon(self.source.as_bytes(), paren)
-        {
+        if !self.arrow_return_type_barred() || !head.has_return_type(self.source.as_bytes()) {
             return parse(self).map(Some);
         }
-        self.parse_arrow_speculatively(parse)
+        self.parse_annotated_arrow_in_consequent(head, parse)
     }
 
-    /// The speculative half of [`Parser::parse_arrow_or_rewind`]: an annotated head
-    /// in a barred context, parsed from a checkpoint and kept only when `:` follows.
+    /// The cold half of [`Parser::parse_arrow_or_rewind`]: an annotated head in a
+    /// barred context, either committed with the bar lifted (an unambiguous head)
+    /// or parsed from a checkpoint and kept only when `:` follows.
     #[cold]
     #[inline(never)]
-    fn parse_arrow_speculatively(
+    fn parse_annotated_arrow_in_consequent(
         &mut self,
+        head: ArrowHead,
         parse: fn(&mut Self) -> Result<ParsedExpr<'arena>, ParseError>,
     ) -> Result<Option<ParsedExpr<'arena>>, ParseError> {
+        if head.commits_to_signature(self.source.as_bytes()) {
+            return self.with_arrow_return_type_allowed(parse).map(Some);
+        }
         let checkpoint = self.checkpoint();
         match parse(self) {
             Ok(arrow) if self.check(&TokenKind::Colon) => Ok(Some(arrow)),
@@ -117,12 +121,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Check if current position starts an arrow function
     ///
-    /// Scans ahead looking for pattern: `(` ... `)` `=>`. Returns the head's `(`
-    /// (slice-relative, `self.current.start`) when it is one — what
-    /// `parse_arrow_or_rewind` reads the annotation off, as for the generic head.
-    pub(super) fn paren_arrow_function_start(&self) -> Option<usize> {
-        let paren = self.current.start as usize;
-        scan_parens_then_arrow(self.source.as_bytes(), paren).then_some(paren)
+    /// Scans ahead looking for pattern: `(` ... `)` `=>`. Returns the head
+    /// (slice-relative, like `self.current.start`) when it is one — what
+    /// `parse_arrow_or_rewind` asks its two byte questions of.
+    pub(super) fn paren_arrow_function_start(&self) -> Option<ArrowHead> {
+        ArrowHead::at_paren(self.source.as_bytes(), self.current.start as usize)
     }
 
     /// Check if current position starts a single-param arrow function: `x =>`
@@ -139,9 +142,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Scans ahead looking for pattern: `<` ... `>` `(` ... `)` `=>`
     ///
-    /// Returns the head's `(` (slice-relative, like `self.current.start`) when it
-    /// is one — what `parse_arrow_or_rewind` reads the annotation off.
-    pub(super) fn generic_arrow_function_start(&self) -> Option<usize> {
+    /// Returns the head (slice-relative, like `self.current.start`) when it is one
+    /// — what `parse_arrow_or_rewind` asks its two byte questions of.
+    pub(super) fn generic_arrow_function_start(&self) -> Option<ArrowHead> {
         let bytes = self.source.as_bytes();
         let start = self.current.start as usize;
 
@@ -157,8 +160,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // After '>', check for `(...) =>` (allow comments: `<T> /* comment */ () =>`)
-        let paren = skip_whitespace_and_comments(bytes, pos);
-        scan_parens_then_arrow(bytes, paren).then_some(paren)
+        ArrowHead::behind_type_parameters(bytes, skip_whitespace_and_comments(bytes, pos))
     }
 
     /// Parse generic arrow function: `<T>() => ...`, `<T, U extends V>() => ...`
@@ -205,8 +207,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody<'arena>, ParseError> {
         if self.check(&TokenKind::BraceOpen) {
             // A block body is a `FunctionBody` (`[+In]`) — `in` is the binary
-            // operator even when this arrow sits in a for-header init.
-            let block = self.with_allow_in(Self::parse_function_body)?;
+            // operator even when this arrow sits in a for-header init — and a fresh
+            // frame for a parenthesized arrow's return type.
+            let block = self.with_body_frame(Self::parse_function_body)?;
             Ok(ArrowFunctionBody::BlockStatement(block))
         } else {
             // A concise body is `AssignmentExpression[?In]` — it inherits the
