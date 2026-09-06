@@ -271,7 +271,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 2703 → 2704: `flowbite-svelte/.../stepper/TimelineStepper.svelte` arrives from
 	// `unknown` — the lone-container hug reaching its last state. Reasoning on
 	// `CORPUS_FORMAT_UNKNOWN_PIN`.
-	svelte: 2704,
+	//
+	// 2704 → 2705: `flowbite-svelte/.../button-toggle/ButtonToggle.svelte` arrives from
+	// `unknown` — a container initializer under a breakable binding takes the fluid layout.
+	// Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`.
+	svelte: 2705,
 	// 4169 → 5124 and (css) 125 → 133: the `third_party` tier — see svelte. 955 of its 966
 	// typescript files match (flowbite-svelte 338 of 338, layerchart 188 of 190, layercake 65 of
 	// 66, svelte-ux 100 of 100, svelte-maplibre 57 of 57, language-tools 207 of 215), none
@@ -361,7 +365,12 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// over 11,749 `find`-enumerated files (so the ~800 `tsv format --list` prunes are in),
 	// formatted by a HEAD and a tip `--profile corpus` binary, with the per-file error output
 	// identical line for line.
-	typescript: 5143,
+	//
+	// 5143 → 5144: prettier's `js/function-single-destructuring/array.js` arrives from
+	// `unknown` — the sole-parameter hug declines a non-empty default. Reasoning on
+	// `CORPUS_FORMAT_UNKNOWN_PIN`, whose svelte note carries the two-mover byte-diff this
+	// step shares.
+	typescript: 5144,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -381,27 +390,14 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * `CORPUS_FORMAT_MATCH_MIN`.
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
-	// The two open items, neither given a detector on purpose (a detector would assert a
-	// sanction nothing has decided):
-	//   `flowbite-svelte/src/lib/forms/button-toggle/ButtonToggle.svelte` — a seven-key
-	//     shorthand object pattern assigned an object literal: prettier keeps the pattern flat
-	//     (it fits at 99) and breaks after `=`; tsv breaks the pattern and hugs the literal.
-	//     ⚠️ NOT a fits-walk difference — that reading was probed and refuted: tsv's
-	//     `arena_fits_with_lookahead` carries each rest command's own mode and returns at the
-	//     first `Line` it reaches in `Break` mode, exactly as prettier's `fits` does. The cause
-	//     is upstream of any measuring: a self-expanding RHS (`is_self_expanding_value` —
-	//     object / array / function / class / plain arrow) makes the declarator
-	//     `is_layout_eligible = false`, so it takes the hand-rolled `[id, " = ", init]` arm
-	//     with no break point after the operator at all, and the pattern is the only thing left
-	//     that can break. Prettier has no such concept: an `ObjectExpression` RHS falls through
-	//     `chooseLayout` to `fluid`, whose `group(indent(line))` breaks precisely when
-	//     `lhs = {` would not fit.
+	// The one open item, given no detector on purpose (a detector would assert a sanction
+	// nothing has decided):
 	//   `layerchart/packages/layerchart/src/lib/components/Text/Text.html.svelte` — whitespace
 	//     only: a multi-line class value's `{expr}` continuation line keeps the author's SPACE
 	//     indentation where prettier re-indents it with tabs.
 	//
-	// 0 → 5: the `third_party` tier arrives with five backlog items, the two above plus
-	// `BottomNavItem.svelte`, `Dialog.svelte` and `TimelineStepper.svelte`.
+	// 0 → 5: the `third_party` tier arrives with five backlog items: the one above,
+	// `ButtonToggle.svelte`, `BottomNavItem.svelte`, `Dialog.svelte` and `TimelineStepper.svelte`.
 	//
 	// 5 → 3: `Dialog.svelte` and `BottomNavItem.svelte` LEAVE the bucket by MATCHING (`match`
 	// 2701 → 2703). The multi-declarator list is a doc-tree `indent` now rather than literal
@@ -424,7 +420,22 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// (`ArgOpener::lone_hug_ladder`, shared with the plain-call / `new` / member-chain
 	// function-expression arms). ONE mover in any bucket, by the same `--all --json`
 	// bucket-list diff described on `CORPUS_FORMAT_MATCH_MIN`.
-	svelte: 2,
+	//
+	// 2 → 1: `ButtonToggle.svelte` LEAVES for `match` (`match` 2704 → 2705). Its seven-key
+	// shorthand pattern is assigned an object literal, and prettier's `chooseLayout` has no
+	// notion of a value that "expands on its own": the initializer takes `fluid`, whose marker
+	// measures only ` {` and drops the literal after the `=` when `pattern = {` is what passes
+	// the width, the pattern staying flat at 99. tsv withheld every layout from an object /
+	// array / function / class initializer, leaving the pattern as the only thing that could
+	// shed width; both layout twins (the declarator's cascade and `choose_layout`) now let
+	// those values through to `fluid`, and an undecorated class joins prettier's never-break
+	// list instead. Measured as two staged trees over 9,117 `find`-enumerated snapshot + suite
+	// files formatted by a pre-change and a tip `--profile corpus` binary: this file and the
+	// typescript mover below are the ONLY two whose bytes change, the per-file error output
+	// is identical line for line, and the `--all --json` bucket lists set-diffed across the
+	// same two builds show nothing arriving anywhere — `partial` / `safety` / `errors` /
+	// `expected_errors` identical file-for-file.
+	svelte: 1,
 	// Five of the `third_party` arrivals are still open, all of them the member-chain /
 	// assignment / binaryish break-priority cluster, pinned here as the gate's backlog rather
 	// than sanctioned:
@@ -518,7 +529,14 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// property are BOTH plain identifiers (member.js); tsv also inlined a `this` / `super`
 	// base and a private-name property, so `this.mappings[i]` had no break point and the
 	// for-of head shed width by breaking its destructuring pattern instead. Nothing arrived.
-	// 97 → 96: `prettier/tests/format/typescript/type-alias/conditional.ts` leaves for `known`.
+	// 97 → 96: prettier's `js/function-single-destructuring/array.js` LEAVES for `match`. Its
+	// sole array-pattern parameter carries a NON-EMPTY default (`[…] = [1, 2, 3, 4, 5]`), and
+	// prettier's `shouldHugTheOnlyFunctionParameter` hugs a defaulted pattern only when the
+	// default is an identifier or an empty object / array; tsv hugged any default, so the
+	// pattern broke inside `([` where prettier expands the parameter list and keeps the
+	// pattern flat. Nothing arrived; the two-mover byte-diff is described on the svelte pin.
+	//
+	// 96 → 95: `prettier/tests/format/typescript/type-alias/conditional.ts` leaves for `known`.
 	// Its `Equals<X, Y> = (<T>() => …) extends (<T>() => …) ? true : false` authors a redundant
 	// paren shell around a generic extends-type; `is_generic_type` matched the shell node
 	// (prettier's AST has none — its postprocess drops every `TSParenthesizedType`), so the
@@ -526,7 +544,7 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// layout beside its detector-known chained-conditional one. Measured by set-diffing the
 	// suite's `--json` unknown lists between the tree and the same tree with the change
 	// reverse-applied: that file is the only mover in any bucket.
-	typescript: 96,
+	typescript: 95,
 	css: 23
 };
 

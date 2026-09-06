@@ -17,4 +17,12 @@
 		k: foo // c
 			.bar!
 	};
+
+	// An indentable block comment the value owns hangs the value under the `=` (as
+	// prettier does too); the chain still breaks at its own comment, one level further in.
+	z =
+		/**
+		 * c
+		 */ foo // c
+			.bar!;
 </script>
