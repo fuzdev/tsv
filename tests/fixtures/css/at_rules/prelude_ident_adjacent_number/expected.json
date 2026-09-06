@@ -1,0 +1,217 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 286,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 86,
+				"end": 151,
+				"name": "supports",
+				"prelude": "(a: x1.50) and (b: 0.5px)",
+				"block": {
+					"type": "Block",
+					"start": 122,
+					"end": 151,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 126,
+								"end": 127,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 126,
+										"end": 127,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 126,
+														"end": 127
+													}
+												],
+												"start": 126,
+												"end": 127
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 128,
+								"end": 148,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 133,
+										"end": 143,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 126,
+							"end": 148
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 153,
+				"end": 224,
+				"name": "media",
+				"prelude": "(min-width: 0.5px) and (a: x.50px)",
+				"block": {
+					"type": "Block",
+					"start": 195,
+					"end": 224,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 199,
+								"end": 200,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 199,
+										"end": 200,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 199,
+														"end": 200
+													}
+												],
+												"start": 199,
+												"end": 200
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 201,
+								"end": 221,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 206,
+										"end": 216,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 199,
+							"end": 221
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 226,
+				"end": 277,
+				"name": "supports",
+				"prelude": "(a: --x.50)",
+				"block": {
+					"type": "Block",
+					"start": 248,
+					"end": 277,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 252,
+								"end": 253,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 252,
+										"end": 253,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 252,
+														"end": 253
+													}
+												],
+												"start": 252,
+												"end": 253
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 254,
+								"end": 274,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 259,
+										"end": 269,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 252,
+							"end": 274
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a number glued to the ident before it is not a value token of its own ",
+				"start": 9,
+				"end": 84
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 278,
+			"styles": "\n\t/* a number glued to the ident before it is not a value token of its own */\n\t@supports (a: x1.50) and (b: 0.5px) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (min-width: 0.5px) and (a: x.50px) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@supports (a: --x.50) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 287,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

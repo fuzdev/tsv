@@ -1,13 +1,14 @@
 <style>
 	a {
-		/* A no-break space (U+00A0) is not CSS whitespace, so one glued ahead of a function
-		   name is value content: the run stays one opaque token, kept verbatim */
-		width: calc(1px);
-		color: var(--x);
-		/* ...and between the name and its `(`: the same opaque token, not a function call */
-		height:calc (1px);
-		/* A keyword and a color led by one keep it the same way */
+		/* A no-break space (U+00A0) is not CSS whitespace, so one glued to a function name
+		   is ident content: the name keeps it verbatim, and the `(` abutting it still opens
+		   a real function whose arguments normalize */
+		width: calc(1.5px);
+		color: var(--x,red);
+		/* ...and between the name and its `(`, where the space is the name's last code point */
+		height:calc (1.5px);
+		color:rgb (1,2,3);
+		/* A keyword led by one is no keyword, so that run stays opaque */
 		color: red;
-		color: rgb(1, 2, 3);
 	}
 </style>

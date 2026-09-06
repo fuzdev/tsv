@@ -1,0 +1,162 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 263,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 82,
+				"end": 130,
+				"name": "media",
+				"prelude": "(a\\:b: 1px)",
+				"block": {
+					"type": "Block",
+					"start": 101,
+					"end": 130,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 105,
+								"end": 106,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 105,
+										"end": 106,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 105,
+														"end": 106
+													}
+												],
+												"start": 105,
+												"end": 106
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 107,
+								"end": 127,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 112,
+										"end": 122,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 105,
+							"end": 127
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 204,
+				"end": 254,
+				"name": "media",
+				"prelude": "(--A\\:B: 1px)",
+				"block": {
+					"type": "Block",
+					"start": 225,
+					"end": 254,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 229,
+								"end": 230,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 229,
+										"end": 230,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 229,
+														"end": 230
+													}
+												],
+												"start": 229,
+												"end": 230
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 231,
+								"end": 251,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 236,
+										"end": 246,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 229,
+							"end": 251
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an escaped `:` is ident content, so the feature name runs past it ",
+				"start": 9,
+				"end": 80
+			},
+			{
+				"type": "CSSComment",
+				"value": " a custom-media name is case-sensitive, so the whole run survives ",
+				"start": 132,
+				"end": 202
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 255,
+			"styles": "\n\t/* an escaped `:` is ident content, so the feature name runs past it */\n\t@media (a\\:b: 1px) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* a custom-media name is case-sensitive, so the whole run survives */\n\t@media (--A\\:B: 1px) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 264,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

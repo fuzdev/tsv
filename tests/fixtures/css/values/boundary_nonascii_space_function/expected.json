@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 440,
+		"end": 518,
 		"attributes": [],
 		"children": [
 			{
@@ -38,79 +38,79 @@
 				"block": {
 					"type": "Block",
 					"start": 11,
-					"end": 431,
+					"end": 509,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 179,
-							"end": 196,
+							"start": 238,
+							"end": 257,
 							"property": "width",
-							"value": "calc(1px)"
+							"value": "calc(1.5px)"
 						},
 						{
 							"type": "Declaration",
-							"start": 200,
-							"end": 216,
+							"start": 261,
+							"end": 282,
 							"property": "color",
-							"value": "var(--x)"
+							"value": "var(--x, red)"
 						},
 						{
 							"type": "Declaration",
-							"start": 308,
-							"end": 326,
+							"start": 377,
+							"end": 397,
 							"property": "height",
-							"value": "calc (1px)"
+							"value": "calc (1.5px)"
 						},
 						{
 							"type": "Declaration",
-							"start": 392,
-							"end": 403,
+							"start": 401,
+							"end": 421,
+							"property": "color",
+							"value": "rgb (1, 2, 3)"
+						},
+						{
+							"type": "Declaration",
+							"start": 494,
+							"end": 505,
 							"property": "color",
 							"value": "red"
-						},
-						{
-							"type": "Declaration",
-							"start": 407,
-							"end": 427,
-							"property": "color",
-							"value": "rgb(1, 2, 3)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 431
+				"end": 509
 			}
 		],
 		"comments": [
 			{
 				"type": "CSSComment",
-				"value": " A no-break space (U+00A0) is not CSS whitespace, so one glued ahead of a function\n\t\t   name is value content: the run stays one opaque token, kept verbatim ",
+				"value": " A no-break space (U+00A0) is not CSS whitespace, so one glued to a function name\n\t\t   is ident content: the name keeps it verbatim, and the `(` abutting it still opens\n\t\t   a real function whose arguments normalize ",
 				"start": 15,
-				"end": 176
+				"end": 235
 			},
 			{
 				"type": "CSSComment",
-				"value": " ...and between the name and its `(`: the same opaque token, not a function call ",
-				"start": 220,
-				"end": 305
+				"value": " ...and between the name and its `(`, where the space is the name's last code point ",
+				"start": 286,
+				"end": 374
 			},
 			{
 				"type": "CSSComment",
-				"value": " A keyword and a color led by one keep it the same way ",
-				"start": 330,
-				"end": 389
+				"value": " A keyword led by one is no keyword, so that run stays opaque ",
+				"start": 425,
+				"end": 491
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 432,
-			"styles": "\n\ta {\n\t\t/* A no-break space (U+00A0) is not CSS whitespace, so one glued ahead of a function\n\t\t   name is value content: the run stays one opaque token, kept verbatim */\n\t\twidth:  calc(1px);\n\t\tcolor:  var(--x);\n\t\t/* ...and between the name and its `(`: the same opaque token, not a function call */\n\t\theight: calc (1px);\n\t\t/* A keyword and a color led by one keep it the same way */\n\t\tcolor:  red;\n\t\tcolor:  rgb(1, 2, 3);\n\t}\n",
+			"end": 510,
+			"styles": "\n\ta {\n\t\t/* A no-break space (U+00A0) is not CSS whitespace, so one glued to a function name\n\t\t   is ident content: the name keeps it verbatim, and the `(` abutting it still opens\n\t\t   a real function whose arguments normalize */\n\t\twidth:  calc(1.5px);\n\t\tcolor:  var(--x, red);\n\t\t/* ...and between the name and its `(`, where the space is the name's last code point */\n\t\theight: calc (1.5px);\n\t\tcolor: rgb (1, 2, 3);\n\t\t/* A keyword led by one is no keyword, so that run stays opaque */\n\t\tcolor:  red;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 441,
+	"end": 519,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
