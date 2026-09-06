@@ -1,0 +1,455 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 493,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 81,
+				"data": " the value's whitespace-only run re-indents, and its break wraps the head "
+			},
+			{
+				"type": "Text",
+				"start": 81,
+				"end": 82,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 82,
+				"end": 140,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 83
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 86
+					}
+				},
+				"attributes": [
+					{
+						"start": 88,
+						"end": 129,
+						"type": "StyleDirective",
+						"name": "transform-origin",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 1,
+								"character": 88
+							},
+							"end": {
+								"line": 3,
+								"column": 23,
+								"character": 110
+							}
+						},
+						"modifiers": [],
+						"value": [
+							{
+								"type": "ExpressionTag",
+								"start": 112,
+								"end": 119,
+								"expression": {
+									"type": "Identifier",
+									"start": 113,
+									"end": 118,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 26
+										},
+										"end": {
+											"line": 3,
+											"column": 31
+										}
+									},
+									"name": "expr1"
+								}
+							},
+							{
+								"start": 119,
+								"end": 121,
+								"type": "Text",
+								"raw": "\n\t",
+								"data": "\n\t"
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 121,
+								"end": 128,
+								"expression": {
+									"type": "Identifier",
+									"start": 122,
+									"end": 127,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 7
+										}
+									},
+									"name": "expr2"
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 130,
+							"end": 134,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 140,
+				"end": 142,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 142,
+				"end": 206,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 143
+					},
+					"end": {
+						"line": 6,
+						"column": 9,
+						"character": 151
+					}
+				},
+				"attributes": [
+					{
+						"start": 153,
+						"end": 194,
+						"type": "StyleDirective",
+						"name": "transform-origin",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 1,
+								"character": 153
+							},
+							"end": {
+								"line": 7,
+								"column": 23,
+								"character": 175
+							}
+						},
+						"modifiers": [],
+						"value": [
+							{
+								"type": "ExpressionTag",
+								"start": 177,
+								"end": 184,
+								"expression": {
+									"type": "Identifier",
+									"start": 178,
+									"end": 183,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 26
+										},
+										"end": {
+											"line": 7,
+											"column": 31
+										}
+									},
+									"name": "expr1"
+								}
+							},
+							{
+								"start": 184,
+								"end": 186,
+								"type": "Text",
+								"raw": "\n\t",
+								"data": "\n\t"
+							},
+							{
+								"type": "ExpressionTag",
+								"start": 186,
+								"end": 193,
+								"expression": {
+									"type": "Identifier",
+									"start": 187,
+									"end": 192,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 7
+										}
+									},
+									"name": "expr2"
+								}
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 206,
+				"end": 208,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 208,
+				"end": 300,
+				"data": " contrast: a plain attribute value is opaque here too, and both wrap the head for it "
+			},
+			{
+				"type": "Text",
+				"start": 300,
+				"end": 301,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 301,
+				"end": 340,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 302
+					},
+					"end": {
+						"line": 11,
+						"column": 4,
+						"character": 305
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 307,
+						"end": 329,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 12,
+								"column": 1,
+								"character": 307
+							},
+							"end": {
+								"line": 12,
+								"column": 10,
+								"character": 316
+							}
+						},
+						"value": [
+							{
+								"start": 318,
+								"end": 328,
+								"type": "Text",
+								"raw": "a,\n      b",
+								"data": "a,\n      b"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 330,
+							"end": 334,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 340,
+				"end": 342,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 342,
+				"end": 416,
+				"data": " an ANCESTOR is enough: the run re-indents on a nested element too "
+			},
+			{
+				"type": "Text",
+				"start": 416,
+				"end": 417,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 417,
+				"end": 492,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 418
+					},
+					"end": {
+						"line": 16,
+						"column": 4,
+						"character": 421
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 422,
+							"end": 486,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 6,
+									"character": 423
+								},
+								"end": {
+									"line": 16,
+									"column": 10,
+									"character": 427
+								}
+							},
+							"attributes": [
+								{
+									"start": 428,
+									"end": 469,
+									"type": "StyleDirective",
+									"name": "transform-origin",
+									"name_loc": {
+										"start": {
+											"line": 16,
+											"column": 11,
+											"character": 428
+										},
+										"end": {
+											"line": 16,
+											"column": 33,
+											"character": 450
+										}
+									},
+									"modifiers": [],
+									"value": [
+										{
+											"type": "ExpressionTag",
+											"start": 452,
+											"end": 459,
+											"expression": {
+												"type": "Identifier",
+												"start": 453,
+												"end": 458,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 36
+													},
+													"end": {
+														"line": 16,
+														"column": 41
+													}
+												},
+												"name": "expr1"
+											}
+										},
+										{
+											"start": 459,
+											"end": 461,
+											"type": "Text",
+											"raw": "\n\t",
+											"data": "\n\t"
+										},
+										{
+											"type": "ExpressionTag",
+											"start": 461,
+											"end": 468,
+											"expression": {
+												"type": "Identifier",
+												"start": 462,
+												"end": 467,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 2
+													},
+													"end": {
+														"line": 17,
+														"column": 7
+													}
+												},
+												"name": "expr2"
+											}
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 473,
+										"end": 477,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
