@@ -80,6 +80,18 @@
 //! - **CSS has no expression grammar**, so `.css` seeds hold no sites; the audit's subject
 //!   filter is the Svelte + TypeScript families.
 //!
+//! ## Containment
+//!
+//! Each file's work runs under `catch_unwind` with the default panic hook suppressed
+//! (`audit::panic_hook`), the same bracket the pristine sweep and the injection audits
+//! use: a panic anywhere in a file — the base format, the wire walk, a variant format — is
+//! recorded as a PANICKED entry (path + message, an exact count with a bounded sample) and
+//! the walk continues, rather than one adversarial file killing a corpus run with its
+//! findings unprinted. A panic FAILS the run: a crash on a seed is never a pass, and a
+//! gate that reported it green would launder the loudest possible finding. Catching needs
+//! the corpus profile's `panic = "unwind"`; a stack overflow is not a panic and still
+//! aborts (the sized-stack contract in `tsv_cli::cli::stack` is what bounds that).
+//!
 // TODO: the general redundant-paren class — wrap ANY expression in parens and require one
 // fixed point — is a strictly larger instrument this one is the first slice of. It needs a
 // `preserve_parens` reparse to enumerate the removal direction, and its findings would mix
@@ -88,6 +100,7 @@
 
 use argh::FromArgs;
 use std::collections::BTreeMap;
+use std::panic::AssertUnwindSafe;
 use std::path::Path;
 
 use serde_json::Value;
@@ -96,6 +109,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::audit::excerpt::{first_line_diff, line_context};
+use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
 use crate::audit::properties::{
     BaseFixedPoint, Utf16ToByte, base_fixed_point, source_has_ignore_directive, tsv_parse_to_value,
 };
@@ -342,6 +356,11 @@ struct Report {
     /// prints cannot drift from the list under it and the list stays bounded on a corpus
     /// that has many.
     base_non_idempotent: CappedPaths,
+    /// Files whose work PANICKED (`path: message`) — caught per file so the walk finishes,
+    /// counted exactly with a bounded sample, and a failure of the run. See the module
+    /// docs' §Containment. Counts recorded before the panic (sites, verdicts) stay in the
+    /// report; each was complete when it was taken.
+    panics: CappedPaths,
     sites: usize,
     sites_comment_bound: usize,
     counts: BTreeMap<Verdict, usize>,
@@ -373,8 +392,9 @@ impl Report {
     /// readings of, so the two cannot disagree. A base-non-idempotent file fails the run
     /// while producing no site finding at all, and that is exactly the case a ✓ keyed on the
     /// findings alone prints a pass over (`../prettier/tests/format` holds six such files).
+    /// A panicking file is the same shape one step louder.
     fn failed(&self) -> bool {
-        self.findings_total() + self.base_non_idempotent.count() > 0
+        self.findings_total() + self.base_non_idempotent.count() + self.panics.count() > 0
     }
 }
 
@@ -390,8 +410,22 @@ impl ParenAuditCommand {
         )?;
 
         let mut report = Report::default();
-        for path in &files {
-            self.scan_file(path, &mut report);
+        {
+            // Suppressed for the walk only: a caught panic is recorded below, and the
+            // default hook's per-file backtrace would bury the report. Restored on drop.
+            let _hook = SuppressedPanicHook::install();
+            for path in &files {
+                let scanned = std::panic::catch_unwind(AssertUnwindSafe(|| {
+                    self.scan_file(path, &mut report);
+                }));
+                if let Err(payload) = scanned {
+                    report.panics.push(format!(
+                        "{}: {}",
+                        path.display(),
+                        panic_message(payload.as_ref())
+                    ));
+                }
+            }
         }
 
         if self.json {
@@ -568,6 +602,17 @@ fn print_human(report: &Report, examples: usize) {
         }
     }
 
+    if !report.panics.is_empty() {
+        println!();
+        println!(
+            "  ⚠ {} file(s) PANICKED (caught per file so the walk finished; a failure of the run):",
+            report.panics.count()
+        );
+        for line in report.panics.sample_lines("    ") {
+            println!("{line}");
+        }
+    }
+
     if report.findings.is_empty() {
         // Only claim the property when something actually carried it AND nothing else failed
         // the run: a run that graded no site is about to fail the vacuity floor, and one
@@ -652,12 +697,14 @@ fn print_json(report: &Report) {
         "files_output_reparse_error": report.files_output_reparse_error,
         "files_ignore_directive": report.files_ignore_directive,
         "files_base_non_idempotent": report.base_non_idempotent.count(),
+        "files_panicked": report.panics.count(),
         "sites": report.sites,
         "sites_comment_bound": report.sites_comment_bound,
         "counts": counts,
         "op_counts": op_counts,
         "findings": findings,
         "base_non_idempotent_sample": report.base_non_idempotent.sample(),
+        "panicked_sample": report.panics.sample(),
     });
     println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
 }
@@ -665,6 +712,19 @@ fn print_json(report: &Report) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A caught panic is a failure of the run even with zero site findings — the same
+    /// shape as a base-non-idempotent file, one step louder.
+    #[test]
+    fn a_panicking_file_fails_the_run() {
+        let mut report = Report {
+            sites: 1,
+            ..Report::default()
+        };
+        assert!(!report.failed());
+        report.panics.push("seed.ts: boom".to_string());
+        assert!(report.failed());
+    }
 
     /// Enumerate the sites of a TypeScript snippet, as the audit does.
     fn sites_of(source: &str) -> Vec<Site> {

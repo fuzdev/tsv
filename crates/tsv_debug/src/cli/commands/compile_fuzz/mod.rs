@@ -69,13 +69,13 @@
 mod anchors;
 mod operators;
 
+use crate::json::to_json_with_tabs;
 use anchors::Anchors;
 use argh::FromArgs;
 use futures_util::StreamExt;
 use operators::{Donor, Operator};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{
     CompileError, CompileOptions, Parity, canonicalize_js, compare_canonical, compile,
 };

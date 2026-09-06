@@ -2,9 +2,9 @@ use crate::cli::CliError;
 use crate::deno;
 use crate::diff::LINE_WIDTH_THRESHOLD;
 use crate::fixtures::{self, InputType, find_input_file};
+use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use std::path::Path;
-use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_lang::printing::visual_width;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 

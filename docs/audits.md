@@ -1134,6 +1134,11 @@ cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src    # audit
 # Also: --json, --verbose, --site-limit N (sites per FILE — named apart from the sibling
 # audits' --limit, which caps files), --examples N.
 cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src --prettier --dump-dir /tmp/audit
+# Containment: each file's tsv-side work (the prettier pass: each sync piece) runs under
+# catch_unwind with the default panic hook suppressed, like the pristine sweep and the
+# injection audits — a panic is a PANICKED entry (path + message, exact count, bounded
+# sample) and the walk continues; it FAILS the run. Needs the corpus profile's
+# panic = "unwind"; a stack overflow is not a panic and still aborts.
 ```
 
 ## Paren-Authoring Independence Audit (`paren:audit`)
@@ -1188,6 +1193,13 @@ cargo run --profile corpus -p tsv_debug --features audits paren_audit ../corpora
 # never a pass. A base-non-idempotent FILE also fails: it is excluded from the re-association
 # analysis (its fixed point is undefined, so "formats back to the base" is meaningless), but
 # excluding it is not a reason to pass the run.
+# Containment: each file runs under catch_unwind with the default panic hook suppressed, like
+# the pristine sweep and the injection audits — a panic is a PANICKED entry (path + message,
+# exact count, bounded sample) and the walk continues; it FAILS the run. Needs the corpus
+# profile's panic = "unwind"; a stack overflow is not a panic and still aborts. Found the way
+# every corpus tool wants it: one 208-wire-level tsc file (minified asm.js) killed a whole
+# ../typescript/tests/cases run at the reader's old 128-level recursion limit — the reader is
+# now unbounded (tsv_debug::json), and the walk now survives whatever the next one is.
 ```
 
 **Graded as a hard gate, not a ratchet — measured before deciding.** Zero findings over

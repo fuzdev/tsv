@@ -5,10 +5,10 @@ use crate::compile_fixtures::{
 };
 use crate::deno::{self, SvelteGenerate};
 use crate::diff::{DiffOptions, diff_to_string};
+use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use futures_util::StreamExt;
 use std::path::Path;
-use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{CompileOptions, canonicalize_js, compare_canonical, compile};
 
 /// Validate compile fixtures against the canonical Svelte compiler.

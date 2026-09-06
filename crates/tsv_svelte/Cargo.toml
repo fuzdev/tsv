@@ -8,7 +8,7 @@ description = "Svelte parsing and formatting library"
 default = ["convert"]
 # The wire-JSON conversion layer (`ast/convert/write.rs`). Forwards to
 # tsv_ts/tsv_css because the writer composes their embedded emitters.
-convert = ["dep:serde_json", "tsv_lang/json", "tsv_ts/convert", "tsv_css/convert"]
+convert = ["tsv_lang/json", "tsv_ts/convert", "tsv_css/convert"]
 # Opt-in print-once comment ledger (`tsv_lang::comment_ledger`): the format entry points
 # register `Root.comments`, the four JS-comment doc builders record each emit, and the
 # format-ignore seams (raw `<script>`/`<style>`, the template node + range forms) record
@@ -22,8 +22,12 @@ tsv_html.workspace = true
 tsv_ts.workspace = true
 tsv_css.workspace = true
 bumpalo.workspace = true
-serde_json = { workspace = true, optional = true }
 smallvec.workspace = true
+
+[dev-dependencies]
+# The convert-layer unit tests read the wire back into a `Value` (shallow inputs, the
+# default reader). The shipped crate never deserializes.
+serde_json.workspace = true
 
 [lints]
 workspace = true

@@ -339,8 +339,8 @@ pub fn render_diff_with_options(
 pub fn diff_to_string(expected: &str, actual: &str, options: &DiffOptions) -> String {
     // Try to parse as JSON and add path annotations if requested
     let (expected_formatted, actual_formatted, is_json) = match (
-        serde_json::from_str::<serde_json::Value>(expected),
-        serde_json::from_str::<serde_json::Value>(actual),
+        crate::json::from_str::<serde_json::Value>(expected),
+        crate::json::from_str::<serde_json::Value>(actual),
     ) {
         (Ok(exp_json), Ok(act_json)) => (
             serde_json::to_string_pretty(&exp_json).unwrap_or_else(|_| expected.to_string()),

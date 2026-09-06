@@ -3,8 +3,8 @@
 //! This is the **sole emission path** for the TS wire JSON: it walks the
 //! *internal* AST once and writes the final JSON bytes as it goes, never
 //! materializing a typed public tree — the hot path behind
-//! `convert_ast_json_bytes`/`_string` (FFI/WASM parse bindings, CLI compact
-//! output; `convert_ast_json` parses these bytes back into a `Value`).
+//! `convert_ast_json_bytes`/`_string` (FFI/WASM/N-API parse bindings, the CLI's
+//! compact and `--pretty` output — the latter a re-indent of these same bytes).
 //!
 //! **Byte-identity**: the wire JSON is a faithful emission of the acorn quirk
 //! catalog — each node's field order, `skip_serializing_if` behavior, `null`s

@@ -25,7 +25,7 @@ const LINE_BREAK_ERROR: &str = "Optional tuple element `?` cannot follow a line 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::convert_ast_json(&program, source)
+    tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source))
 }
 
 /// Assert tsv rejects `source` on the `[no LineTerminator here]` rule specifically — a

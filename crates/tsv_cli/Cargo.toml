@@ -16,8 +16,6 @@ tsv_lang.workspace = true
 tsv_ignore.workspace = true
 tsv_discover.workspace = true
 argh.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 bumpalo.workspace = true
 
 [lints]

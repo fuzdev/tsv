@@ -1,9 +1,9 @@
 use crate::cli::CliError;
 use crate::deno::{self, SvelteGenerate};
 use crate::diff::{DiffOptions, diff_to_string};
+use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use tsv_cli::cli::input::{InputArgs, ParserType};
-use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{
     CompileError, CompileOptions, Generate, Parity, canonicalize_js, compare_canonical, compile,
 };

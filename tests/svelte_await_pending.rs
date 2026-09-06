@@ -24,7 +24,7 @@ use serde_json::Value;
 fn await_pending(src: &str) -> Value {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the await block");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     find_await(&json).expect("an AwaitBlock")["pending"].clone()
 }
 

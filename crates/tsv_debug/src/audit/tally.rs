@@ -11,8 +11,9 @@
 /// An exact count plus a bounded path sample — the "recorded, wants triage" bucket
 /// (`blank_audit`'s and `ignore_audit`'s not-a-clean-fixed-point files, the pristine
 /// sweep's panicking inputs, and `authoring_audit`'s and `paren_audit`'s
-/// base-non-idempotent seeds: a file whose own format is not a fixed point, excluded from
-/// the mutation analysis and a failure of the run).
+/// base-non-idempotent seeds — a file whose own format is not a fixed point, excluded from
+/// the mutation analysis and a failure of the run — and their panicking files, caught per
+/// unit of work so a corpus walk finishes).
 ///
 /// The COUNT is exact and always reported (a file the audit couldn't grade is a coverage
 /// fact a graded gate must never silently drop); the PATH sample is bounded at

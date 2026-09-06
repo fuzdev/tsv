@@ -3,10 +3,10 @@
 //! printer every subcommand shares.
 
 use crate::cli::CliError;
+use crate::json::to_json_with_tabs;
 use crate::tsc_conformance::runner::SkeletonReport;
 use crate::tsc_conformance::{MissingCause, RunFilter};
 use std::path::{Path, PathBuf};
-use tsv_cli::json_utils::to_json_with_tabs;
 
 use super::pins::RunPins;
 

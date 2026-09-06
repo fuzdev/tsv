@@ -1,5 +1,5 @@
 use crate::cli::input::{InputArgs, ParserType};
-use crate::json_utils::to_json_with_tabs;
+use crate::json_utils::indent_json_with_tabs;
 use argh::FromArgs;
 use std::process;
 
@@ -112,26 +112,23 @@ fn parse_to_json(
     goal: tsv_ts::Goal,
     locations: bool,
 ) -> Result<Vec<u8>, String> {
-    // Compact output uses the convert_ast_json_bytes hot path (skips the
-    // intermediate serde_json::Value and the output UTF-8 validation a String
-    // would require); pretty-printing needs the Value for tab-indented
-    // serialization.
+    // Both outputs ride the convert_ast_json_bytes hot path (no intermediate
+    // tree, and no output UTF-8 validation a String would require): compact
+    // returns the bytes verbatim, and `--pretty` re-indents them in one linear
+    // pass (`indent_json_with_tabs`) rather than reading them back into a
+    // `serde_json::Value` — a read that recursed per JSON level and, at
+    // serde_json's default recursion limit, refused past ~60 nested arrays
+    // what the compact form of the same input emitted fine. So the pretty
+    // route has no depth ceiling of its own; it stops where the parser stops.
     // The arena owns the internal AST; convert produces owned JSON, so nothing
     // borrowed escapes this function. Pre-sized to the source to avoid the
     // bump's chunk-doubling tail on the parse.
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
 
-    // Shared tail: `--pretty` reparses the compact wire bytes (the sole emission
-    // path) into a `Value` for tab-indented serialization; compact returns the
-    // bytes verbatim. A no-locations pretty print rides the same bytes rather
-    // than a separate `Value` writer.
+    // Shared tail; a no-locations pretty print rides the same bytes.
     let finish = |bytes: Vec<u8>| -> Result<Vec<u8>, String> {
         if pretty {
-            let value: serde_json::Value =
-                serde_json::from_slice(&bytes).map_err(|e| format!("JSON parse failed: {e}"))?;
-            Ok(to_json_with_tabs(&value)
-                .map_err(|e| format!("JSON serialization failed: {e}"))?
-                .into_bytes())
+            Ok(indent_json_with_tabs(&bytes))
         } else {
             Ok(bytes)
         }

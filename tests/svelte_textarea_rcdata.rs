@@ -31,7 +31,7 @@ use serde_json::Value;
 fn rcdata_skeleton(src: &str) -> String {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("parser should accept <textarea> RCDATA");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let nodes = json["fragment"]["nodes"]
         .as_array()
         .expect("Root.fragment.nodes array");
@@ -63,7 +63,7 @@ fn reduce(nodes: &[Value]) -> String {
 fn first_textarea_text(src: &str) -> (String, String) {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("parser should accept <textarea> RCDATA");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let text = &json["fragment"]["nodes"][0]["fragment"]["nodes"][0];
     (
         text["raw"].as_str().expect("Text.raw").to_owned(),

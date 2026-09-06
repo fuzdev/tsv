@@ -30,7 +30,7 @@ fn assert_paren_this(source: &str, pointer: &str, expected_output: &str) {
 
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_ts::convert_ast_json(&program, source);
+    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
 
     let paren = json.pointer(pointer).expect("parenthesized type");
     assert_eq!(

@@ -63,9 +63,23 @@
 //! - **(c) ---** — both diverge (sanctioned, e.g. Tier-2 element expansion); record.
 //!   Each (c) carries a latent design question: *should* tsv converge here anyway?
 //! - **clean** — both converge.
+//!
+//! ## Containment
+//!
+//! The tsv-side work of each file — the base format + site enumeration, and each site's
+//! variant format — runs under `catch_unwind` with the default panic hook suppressed
+//! (`audit::panic_hook`), the bracket the pristine sweep and the injection audits use: a
+//! panic is recorded as a PANICKED entry (path + message, an exact count with a bounded
+//! sample) and the walk continues, instead of one adversarial file killing a corpus run
+//! with its findings unprinted. A panic FAILS the run — a crash on a seed is never a pass.
+//! Catching needs the corpus profile's `panic = "unwind"`; a stack overflow is not a panic
+//! and still aborts (bounded by the sized-stack contract in `tsv_cli::cli::stack`). The
+//! prettier calls of the `--prettier` pass are async and outside the bracket; the sidecar
+//! reports its own failures as `prettier_error`.
 
 use argh::FromArgs;
 use std::collections::BTreeMap;
+use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 
 use tsv_cli::cli::format_source::format_source;
@@ -73,6 +87,7 @@ use tsv_cli::cli::input::ParserType;
 use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char, text_edge_ws};
 
 use crate::audit::excerpt::line_context;
+use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
 use crate::audit::properties::{BaseFixedPoint, base_fixed_point};
 use crate::audit::repro::{ReproCase, write_repro_case};
 use crate::audit::tally::CappedPaths;
@@ -511,6 +526,10 @@ struct Report {
     /// cannot drift from the list under it and the list stays bounded on a corpus that has
     /// many.
     base_non_idempotent: CappedPaths,
+    /// Files (or sites — the prettier pass guards per site) whose tsv-side work PANICKED,
+    /// `path: message`: caught so the walk finishes, counted exactly with a bounded sample,
+    /// and a failure of the run. See the module docs' §Containment.
+    panics: CappedPaths,
     sites: usize,
     variant_parse_errors: usize,
     counts: BTreeMap<Bucket, usize>,
@@ -566,11 +585,16 @@ impl AuthoringAuditCommand {
         // loud on one, naming the subject rather than the raw walk.
         let files = resolve_seed_files_named(&self.paths, 0, ".svelte files", is_svelte)?;
 
-        let report = if self.prettier {
-            let rt = super::create_runtime();
-            rt.block_on(self.scan_with_prettier(&files))
-        } else {
-            self.scan_pure(&files)
+        let report = {
+            // Suppressed for the walk only: a caught panic is recorded on the report, and
+            // the default hook's per-file backtrace would bury it. Restored on drop.
+            let _hook = SuppressedPanicHook::install();
+            if self.prettier {
+                let rt = super::create_runtime();
+                rt.block_on(self.scan_with_prettier(&files))
+            } else {
+                self.scan_pure(&files)
+            }
         };
 
         if self.json {
@@ -589,7 +613,8 @@ impl AuthoringAuditCommand {
         // reported-but-green.
         let hard = report.count(Bucket::BugA)
             + report.count(Bucket::NonIdempotent)
-            + report.base_non_idempotent.count();
+            + report.base_non_idempotent.count()
+            + report.panics.count();
         if hard > 0 {
             return Err(CliError::Failed);
         }
@@ -600,19 +625,22 @@ impl AuthoringAuditCommand {
         check_graded_nonzero(report.sites, "boundary sites probed")
     }
 
-    /// Pure-Rust pass: convergence + self-stability only (no prettier).
+    /// Pure-Rust pass: convergence + self-stability only (no prettier). Each file's
+    /// whole body is one guarded unit.
     fn scan_pure(&self, files: &[PathBuf]) -> Report {
         let mut report = Report::default();
         for path in files {
-            let Some((f, sites)) = self.prepare_file(path, &mut report) else {
-                continue;
-            };
-            for site in &sites {
-                let Some(outcome) = self.tsv_outcome(path, &f, site, &mut report) else {
-                    continue;
+            guarded(path, &mut report, |report| {
+                let Some((f, sites)) = self.prepare_file(path, report) else {
+                    return;
                 };
-                self.record(&mut report, outcome);
-            }
+                for site in &sites {
+                    let Some(outcome) = self.tsv_outcome(path, &f, site, report) else {
+                        continue;
+                    };
+                    self.record(report, outcome);
+                }
+            });
         }
         report
     }
@@ -621,7 +649,11 @@ impl AuthoringAuditCommand {
     async fn scan_with_prettier(&self, files: &[PathBuf]) -> Report {
         let mut report = Report::default();
         for path in files {
-            let Some((f, sites)) = self.prepare_file(path, &mut report) else {
+            // The tsv-side pieces are guarded one by one here, since the prettier calls
+            // between them are awaits a `catch_unwind` cannot span.
+            let Some((f, sites)) =
+                guarded(path, &mut report, |report| self.prepare_file(path, report)).flatten()
+            else {
                 continue;
             };
             // Prettier's take on the base form, computed once per file.
@@ -629,7 +661,10 @@ impl AuthoringAuditCommand {
                 .await
                 .ok();
             for site in &sites {
-                let Some(mut outcome) = self.tsv_outcome(path, &f, site, &mut report) else {
+                let Some(mut outcome) = guarded(path, &mut report, |report| {
+                    self.tsv_outcome(path, &f, site, report)
+                })
+                .flatten() else {
                     continue;
                 };
                 let variant = splice(&f, site);
@@ -761,6 +796,23 @@ impl AuthoringAuditCommand {
     }
 }
 
+/// Run one unit of tsv-side work under `catch_unwind`, recording a panic on the report
+/// (`path: message`) instead of letting it end the corpus walk; `None` when it panicked.
+/// Counts the unit recorded before panicking stay — each was complete when taken.
+fn guarded<T>(path: &Path, report: &mut Report, work: impl FnOnce(&mut Report) -> T) -> Option<T> {
+    match std::panic::catch_unwind(AssertUnwindSafe(|| work(report))) {
+        Ok(value) => Some(value),
+        Err(payload) => {
+            report.panics.push(format!(
+                "{}: {}",
+                path.display(),
+                panic_message(payload.as_ref())
+            ));
+            None
+        }
+    }
+}
+
 /// Build a variant of `f` with one site's whitespace run flipped.
 fn splice(f: &str, site: &Site) -> String {
     let mut out = String::with_capacity(f.len());
@@ -869,6 +921,17 @@ fn print_human(report: &Report, verbose: bool, triaged: bool) {
         }
     }
 
+    if !report.panics.is_empty() {
+        println!();
+        println!(
+            "  ⚠ {} unit(s) PANICKED (caught so the walk finished; a failure of the run):",
+            report.panics.count()
+        );
+        for line in report.panics.sample_lines("    ") {
+            println!("{line}");
+        }
+    }
+
     if verbose {
         for (bucket, list) in &report.examples {
             if list.is_empty() {
@@ -941,12 +1004,40 @@ fn print_json(report: &Report) {
         "files_scanned": report.files_scanned,
         "files_parse_error": report.files_parse_error,
         "files_base_non_idempotent": report.base_non_idempotent.count(),
+        "panicked": report.panics.count(),
         "sites": report.sites,
         "variant_parse_errors": report.variant_parse_errors,
         "counts": counts,
         "kind_counts": kind_counts,
         "examples": examples,
         "base_non_idempotent_sample": report.base_non_idempotent.sample(),
+        "panicked_sample": report.panics.sample(),
     });
     println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+}
+
+#[cfg(test)]
+mod tests {
+    /// A panicking unit is recorded (`path: message`), returns `None`, and fails the run;
+    /// a clean unit passes its value through and records nothing.
+    #[test]
+    fn guarded_records_a_panic_and_the_walk_continues() {
+        let _hook = crate::audit::panic_hook::SuppressedPanicHook::install();
+        let mut report = super::Report::default();
+        let path = std::path::Path::new("seed.svelte");
+        let clean = super::guarded(path, &mut report, |r| {
+            r.sites += 1;
+            7
+        });
+        assert_eq!(clean, Some(7));
+        assert!(report.panics.is_empty());
+        let crashed: Option<()> = super::guarded(path, &mut report, |r| {
+            r.sites += 1;
+            panic!("boom at site");
+        });
+        assert_eq!(crashed, None);
+        assert_eq!(report.sites, 2, "counts taken before the panic stay");
+        assert_eq!(report.panics.count(), 1);
+        assert_eq!(report.panics.sample(), ["seed.svelte: boom at site"]);
+    }
 }

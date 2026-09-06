@@ -818,7 +818,7 @@ cargo run -p tsv_debug metrics [--json]    # line counts by crate and phase (pur
 
 ### Closed Scope, Open Convention
 
-tsv ships a closed language set (TypeScript, CSS, Svelte) but is open by convention **at the Rust source/crate level**: each language crate (`tsv_ts`, `tsv_css`, `tsv_svelte`) is self-contained — owns its internal AST, parser, formatter, and convert layer — and exposes the same free-function API (`parse()`, `format()`, `convert_ast_json_bytes()`, `convert_ast_json_string()`, `convert_ast_json()`). **No central `Language` trait, no registry, no enum dispatch.** Two properties follow:
+tsv ships a closed language set (TypeScript, CSS, Svelte) but is open by convention **at the Rust source/crate level**: each language crate (`tsv_ts`, `tsv_css`, `tsv_svelte`) is self-contained — owns its internal AST, parser, formatter, and convert layer — and exposes the same free-function API (`parse()`, `format()`, `convert_ast_json_bytes()`, `convert_ast_json_string()`). **No central `Language` trait, no registry, no enum dispatch.** Two properties follow:
 
 - **Optimal artifacts**: concrete types end-to-end, no dyn dispatch; WASM tree-shakes by feature at the link level — `@fuzdev/tsv_format_wasm` excludes the convert layer, `@fuzdev/tsv_parse_wasm` the printers.
 - **Source-level openness**: anyone can publish a same-shaped `my_org/tsv_html_parse` crate and any downstream _Rust_ consumer can `use` it without central buy-in. Published CLI/WASM binaries still hardcode the language list (`lang_bindings!` macro), by design.
@@ -866,14 +866,14 @@ HTML element classification is split between the `tsv_html` crate — pure funct
 Drop-in replacement for the canonical parsers' **public JSON AST** (acorn / acorn-typescript / Svelte / `parseCss`), NOT their internal implementation.
 
 - **Internal AST**: Clean, semantic representation (decoded strings, normalized values) — what every tool (formatter, linter, …) builds on.
-- **Wire JSON**: the parse product. The per-language writers (`ast/convert/write*`) emit it **directly from the internal AST in a single walk** — applying each acorn/`parseCss`/Svelte quirk at emission time — never materializing a typed public-AST Rust layer. The wire shape *is* the contract, documented by the hand-maintained `crates/tsv_wasm/types/tsv_ast.d.ts`; `convert_ast_json` is a thin `serde_json::from_slice` over the writer's bytes.
+- **Wire JSON**: the parse product. The per-language writers (`ast/convert/write*`) emit it **directly from the internal AST in a single walk** — applying each acorn/`parseCss`/Svelte quirk at emission time — never materializing a typed public-AST Rust layer. The wire shape *is* the contract, documented by the hand-maintained `crates/tsv_wasm/types/tsv_ast.d.ts`; no shipped crate reads the wire back — the CLI's `--pretty` re-indents the bytes, and `tsv_debug::json` (the fixture gate, the audits) is the one reader, unbounded in depth.
 
 Worked example + full design: ./docs/architecture.md §Two-AST Design.
 
 **Key Rules**:
 
 - Raw strings NEVER duplicated in the internal AST (extract via `source[span.range()]`)
-- The internal AST is NEVER the wire output — the wire JSON is hand-emitted by the writer; `serde_json` is used only for exact string-escape / `f64` parity and to parse the bytes back into a `Value` (CLI `--pretty`, tests)
+- The internal AST is NEVER the wire output — the wire JSON is hand-emitted by the writer; `serde_json` is used only for exact string-escape / `f64` parity (the writer substrate in `tsv_lang`) and, in `tsv_debug` alone, to read bytes back into a `Value` (the fixture gate, the audits, tests) — the shipped CLI's `--pretty` re-indents the compact bytes without a reader
 
 ### Position Types: u32 vs usize
 
@@ -1014,9 +1014,9 @@ cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — 
 
 ### Rust Crates (minimal deps)
 
-The shipped language/foundation crates' external deps (the `tsv_cli` binary adds `argh` and a direct `serde` dep; dev tooling adds `tokio`, `futures-util`, and the serde `derive` macro on top; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
+The shipped language/foundation crates' external deps (the `tsv_cli` binary adds only `argh`; dev tooling adds `tokio`, `futures-util`, and `serde` with its `derive` macro on top; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
 
-- `serde_json` — wire-JSON emission (exact string-escape / `f64` formatting) + reparsing bytes to a `Value` (CLI `--pretty`, tests). Language crates depend on `serde` only transitively, without its `derive` (the `derive` macro is used only in `tsv_debug`; `tsv_cli` takes `serde` directly for its `Serialize`-bound tab-indented `--pretty` helper but derives nothing)
+- `serde_json` — wire-JSON emission (exact string-escape / `f64` formatting), reached only through `tsv_lang`'s `json` feature; no shipped crate deserializes. The one reader is `tsv_debug::json` (the fixture gate, the audits, tests), which enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`); the language crates see it only transitively
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `thiserror` — error type derivation
 - `phf` — compile-time perfect hash maps (keywords, entities)

@@ -378,7 +378,7 @@ impl ActorState {
             return Ok(true);
         }
 
-        let response: WireResponse = match serde_json::from_str(trimmed) {
+        let response: WireResponse = match crate::json::from_str(trimmed) {
             Ok(r) => r,
             Err(e) => {
                 // Log the actual content that failed to parse for debugging

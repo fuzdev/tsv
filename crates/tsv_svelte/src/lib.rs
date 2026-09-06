@@ -99,35 +99,11 @@ pub fn format_folded_in(
     printer::format_svelte_folded_in(root, folded, arena)
 }
 
-/// Convert internal AST to JSON with character-based positions
-///
-/// Returns a `serde_json::Value` parsed from the wire bytes
-/// `convert_ast_json_bytes` emits — a thin wrapper over the sole emission
-/// path, not an independent conversion. All byte-based positions (`start`,
-/// `end`, `loc.*.column`, `character`) are already translated to Unicode
-/// character offsets by the writer. Used where a `Value` is needed (the CLI's
-/// `--pretty`, the fixture gate); byte-oriented consumers should call
-/// `convert_ast_json_bytes` directly.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let source = "<div>Hello</div>";
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_svelte::parse(source, &arena)?;
-/// let json = tsv_svelte::convert_ast_json(&ast, source);
-/// ```
-#[cfg(feature = "convert")]
-#[expect(clippy::expect_used)]
-pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
-    serde_json::from_slice(&convert_ast_json_bytes(root, source)).expect("writer emits valid JSON")
-}
-
 /// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
-/// Emits the wire JSON directly during a single walk of the *internal* Svelte
-/// AST — no typed public tree, no intermediate `serde_json::Value` for the
-/// output. A **writer-mode conversion** (`ast/convert/write.rs`) fuses
+/// The **sole emission path**: emits the wire JSON directly during a single
+/// walk of the *internal* Svelte AST — no typed public tree, no intermediate
+/// `Value` for the output. A **writer-mode conversion** (`ast/convert/write.rs`) fuses
 /// byte→UTF-16 offset translation into the walk: the whole document — the
 /// Svelte spine (elements, blocks, tags, directives, attributes, `name_loc`),
 /// embedded template expressions and `<script>` content via `tsv_ts`'s
@@ -142,8 +118,18 @@ pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
 /// emitted byte is a source slice or ASCII fragment), and byte-oriented
 /// consumers skip the O(output) validation a `String` requires.
 ///
-/// The output is the Svelte parser's JSON shape; `convert_ast_json` parses these
-/// bytes back into a `Value`.
+/// The output is the Svelte parser's JSON shape, with every byte-based position
+/// (`start`, `end`, `loc.*.column`, `character`) already translated to a Unicode
+/// character offset by the writer.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let source = "<div>Hello</div>";
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_svelte::parse(source, &arena)?;
+/// let wire = tsv_svelte::convert_ast_json_bytes(&ast, source);
+/// ```
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
     ast::convert::write_root_bytes(root, source)

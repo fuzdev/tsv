@@ -1,8 +1,8 @@
 use crate::cli::CliError;
 use crate::deno::{self, SvelteCompileOutput, SvelteGenerate};
+use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use tsv_cli::cli::input::{InputArgs, ParserType};
-use tsv_cli::json_utils::to_json_with_tabs;
 
 /// Compile Svelte with the canonical Svelte compiler (the deterministic oracle).
 #[derive(FromArgs, Debug)]

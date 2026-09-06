@@ -1,8 +1,8 @@
 use crate::cli::CliError;
 use crate::compile_fixtures::{COMPILE_FIXTURES_DIR, walk_compile_fixtures};
+use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use std::path::Path;
-use tsv_cli::json_utils::to_json_with_tabs;
 
 /// Audit compile-fixture divergence integrity (the compiler analog of
 /// `conformance_audit`, deliberately minimal).

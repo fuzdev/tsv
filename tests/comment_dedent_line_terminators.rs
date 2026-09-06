@@ -41,7 +41,7 @@
 fn comment_value(src: &str) -> String {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the component");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
     let comments = json["comments"]
         .as_array()
         .expect("wire root should carry a `comments` array");
