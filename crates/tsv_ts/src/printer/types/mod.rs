@@ -135,10 +135,9 @@ impl<'t> HeadShell<'t> {
 #[derive(Clone, Copy)]
 pub(in crate::printer) enum RequiredParenRun {
     /// The operand IS a redundant shell: the required pair collapses onto it and renders
-    /// the shell's own deep interior gaps, carried here as
-    /// [`paren_shell_gaps`]' `(leading, trailing)` so the resolver and the emitter cannot
-    /// come to mean different windows.
-    Shell(Span, Span),
+    /// the shell's own deep interior gaps, carried here as [`paren_shell_gaps`]' two
+    /// windows so the resolver and the emitter cannot come to mean different shells.
+    Shell { leading: Span, trailing: Span },
     /// The shell sits at the operand's leading printed EDGE, and this is its claim: the
     /// pair opens over that region and the operand prints whole inside it.
     Edge(Span),
@@ -852,9 +851,8 @@ impl<'a> Printer<'a> {
 
     /// Collect the leading line-comment run in a stripped paren shell — the deep-window
     /// collector paired with [`Self::stripped_paren_has_leading_line_comment`]. Scans
-    /// the whole discarded shell, from the OUTERMOST `(` to the fully-unwrapped inner
-    /// type's start (`unwrap_parenthesized`), where the shallow predicate sees only one
-    /// paren's own gap.
+    /// the whole discarded shell via [`paren_shell_gaps`], where the shallow predicate
+    /// [`Self::paren_inner_comment_flags`] sees only one paren's own gap.
     ///
     /// Returns the run ONLY when stripping the shell would relocate it losslessly: the
     /// leading gap holds ≥1 comment, ALL line comments, AND there is no comment in the
@@ -873,19 +871,21 @@ impl<'a> Printer<'a> {
         &self,
         ty: &TSType<'_>,
     ) -> CommentVec<'_> {
-        if !matches!(ty, TSType::Parenthesized(_)) {
+        let Some(shell) = outermost_paren(ty) else {
             return smallvec![];
-        }
-        let inner = unwrap_parenthesized(ty);
+        };
+        // Both halves come from [`paren_shell_gaps`] — the one spelling of this window, so
+        // this collector cannot drift from the predicates that gate the same strip.
+        let (leading, trailing) = paren_shell_gaps(shell);
         let lead: CommentVec<'_> = self
-            .comments_to_emit_between(ty.span().start + 1, inner.span().start)
+            .comments_to_emit_between(leading.start, leading.end)
             .collect();
         // Non-empty + all line comments ⇒ ≥1 leading line comment and no block comment
         // in the leading gap; the trailing check rules out a comment between the inner
         // and the outermost `)`.
         if !lead.is_empty()
             && lead.iter().all(|c| !c.is_block)
-            && !self.has_comments_to_emit_between(inner.span().end, ty.span().end - 1)
+            && !self.has_comments_to_emit_between(trailing.start, trailing.end)
         {
             return lead;
         }
@@ -1747,10 +1747,7 @@ impl<'a> Printer<'a> {
     /// question — that function consults this too, so an enclosing layout and the shell's
     /// own emission cannot disagree.
     pub(in crate::printer) fn paren_retains_for_trailing_run(&self, ty: &TSType<'_>) -> bool {
-        let TSType::Parenthesized(p) = ty else {
-            return false;
-        };
-        self.paren_shell_retains_for_trailing_run(p)
+        outermost_paren(ty).is_some_and(|p| self.paren_shell_retains_for_trailing_run(p))
     }
 
     /// Build `ty`'s doc and wrap it in the parens an enclosing construct **requires**
@@ -1888,7 +1885,7 @@ impl<'a> Printer<'a> {
             && let Some(shell) = outermost_paren(ty)
         {
             let (leading, trailing) = paren_shell_gaps(shell);
-            return Some(RequiredParenRun::Shell(leading, trailing));
+            return Some(RequiredParenRun::Shell { leading, trailing });
         }
         self.leading_edge_shell_line_comment_claim(ty)
             .filter(|claim| !self.shell_leading_run_claimed(claim.start, claim.end))
@@ -1922,7 +1919,7 @@ impl<'a> Printer<'a> {
         run: RequiredParenRun,
     ) -> DocId {
         match run {
-            RequiredParenRun::Shell(leading, trailing) => self.build_open_paren_shell_doc(
+            RequiredParenRun::Shell { leading, trailing } => self.build_open_paren_shell_doc(
                 leading.start,
                 leading.end,
                 self.build_type_doc(unwrap_parenthesized(ty)),

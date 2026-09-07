@@ -125,12 +125,15 @@ impl<'a> Printer<'a> {
     /// (line-only, no block/trailing) still serves the conditional-`extends` and
     /// intersection-first-member callers.
     fn stripped_redundant_paren_member_leading_run(&self, t: &TSType<'_>) -> CommentVec<'_> {
-        if type_needs_parens_in_union_or_intersection(t) || !matches!(t, TSType::Parenthesized(_)) {
+        if type_needs_parens_in_union_or_intersection(t) {
             return smallvec![];
         }
-        let inner = unwrap_parenthesized(t);
+        let Some(shell) = outermost_paren(t) else {
+            return smallvec![];
+        };
+        let (leading_gap, _) = paren_shell_gaps(shell);
         let leading: CommentVec<'_> = self
-            .comments_to_emit_between(t.span().start, inner.span().start)
+            .comments_to_emit_between(leading_gap.start, leading_gap.end)
             .collect();
         if leading.iter().any(|c| !c.is_block) {
             leading
@@ -1285,11 +1288,16 @@ impl<'a> Printer<'a> {
     ///   be inlined regardless (a `//` runs to end-of-line and would swallow the member).
     ///   `union_has_comments_between_members` cannot answer this: the gap is *before* the
     ///   first member, not *between* two. A **block** there stays hugged and inline —
-    ///   ⚠️ an **open divergence**, not parity: the gap is non-empty only for a
-    ///   leading-operator union (`G<| /* c */ { a: 1 } | null>`), where the block sits
-    ///   inside the union's own range and prettier attaches it to the first member and
-    ///   expands. The bare `/* c */ { … } | null` spelling prettier *does* hug leaves this
-    ///   range empty and never reaches the probe, which is why the two read alike;
+    ///   ⚠️ an **open divergence**, not parity: prettier attaches such a comment to the
+    ///   first member, so `types.some((t) => hasComment(t))` bails and it expands
+    ///   one-member-per-line. Two things hide it. The probe is *line*-only, and its range is
+    ///   anchored at `union.span.start` — which for the plain `/* c */ { … } | null`
+    ///   spelling IS the first member's own start, an empty range the comment sits before.
+    ///   So neither the leading-operator spelling (`G<| /* c */ { … } | null>`, where the
+    ///   range is non-empty but the comment is a block) nor the plain one reaches it, and
+    ///   tsv hugs both at all seven positions. Widening the probe to any comment fixes only
+    ///   the first; the second needs the gap measured from the union's *enclosing* anchor
+    ///   (the `<`, `=` or `:`), not from its own span;
     /// - inside a member's own redundant **paren shell** (`({ … } /* c */) | null`) —
     ///   [`Self::union_member_shell_holds_comment`], the other half of
     ///   `types.some((t) => hasComment(t))` that the between-member scan cannot reach.
@@ -1327,14 +1335,18 @@ impl<'a> Printer<'a> {
     /// like the single layer it strips to.
     ///
     /// The detached-model half of prettier's `types.some((t) => hasComment(t))` that the
-    /// between-member scan cannot see. Prettier's TS AST drops the paren node but keeps the
-    /// UNION's range over it, so a comment written inside a member's shell falls between the
-    /// union's range and the member's own — it attaches to that member as a leading or
-    /// trailing comment, and `shouldHugUnionType` bails. The same comment written OUTSIDE
-    /// the shell (`/* c */ { … } | null`) falls outside the union's range entirely, attaches
-    /// to the parent, and prettier hugs — so this is a real difference between the two
-    /// authorings, not a paren-independence break: the paren is what puts the comment inside
-    /// the union.
+    /// between-member scan cannot see: prettier's TS AST drops the paren node, so a comment
+    /// the author wrote in a member's shell attaches to that member as an ordinary leading
+    /// or trailing comment and `shouldHugUnionType` bails.
+    ///
+    /// ⚠️ **This is a paren-INDEPENDENCE clause, not a paren-sensitivity one.** Prettier's
+    /// output for `({ … } /* c */) | null` is byte-identical to `{ … } /* c */ | null`'s, and
+    /// likewise at the other two placements (`(/* c */ { … })`, `| (/* c */ null)`) — it
+    /// expands all six. Without this clause the unwrap in `helpers::is_object_like_type`
+    /// would let the paren'd spellings hug while their bare twins expand, which is the
+    /// divergence, not the parity. The bare twins are already declined by
+    /// [`Self::union_has_comments_between_members`] — except the leading placement, which
+    /// neither reaches (see [`Self::union_prints_hugged`]'s open divergence).
     ///
     /// A comment nested deeper inside the member (`({ /* c */ a: 1 })`) sits within the
     /// unwrapped inner's own span and never counts, matching the rule
@@ -1530,9 +1542,7 @@ impl<'a> Printer<'a> {
         if !member_parens(t) {
             return None;
         }
-        let TSType::Parenthesized(p) = t else {
-            return None;
-        };
+        let p = outermost_paren(t)?;
         let TSType::Union(union) = unwrap_parenthesized(t) else {
             return None;
         };
@@ -2587,10 +2597,14 @@ impl<'a> Printer<'a> {
         let Some(first_member) = intersection.types.first() else {
             return smallvec![];
         };
-        if !matches!(first_member, TSType::Parenthesized(_)) {
+        let Some(shell) = outermost_paren(first_member) else {
             return smallvec![];
-        }
+        };
         let inner = unwrap_parenthesized(first_member);
+        // The hoist's window is [`paren_shell_gaps`]' deep leading half — the one spelling
+        // of "the author's shell", so this collector cannot drift from the predicates that
+        // decide the strip below.
+        let (leading, _) = paren_shell_gaps(shell);
         // An ENCLOSING gap may already own this run: the intersection's first member is a
         // descent link of the leading-edge seam (`Printer::head_stripped_paren_shell`), so
         // at a gap that claimed it the hoist here would be a second emitter for one comment.
@@ -2629,7 +2643,7 @@ impl<'a> Printer<'a> {
         }
         if matches!(inner, TSType::Union(_)) {
             return self
-                .comments_to_emit_between(first_member.span().start + 1, inner.span().start)
+                .comments_to_emit_between(leading.start, leading.end)
                 .filter(|c| !c.is_block)
                 .collect();
         }
@@ -2640,7 +2654,7 @@ impl<'a> Printer<'a> {
         // by `build_hang_value_doc` in `build_intersection_first_member_stripped`, so
         // nothing is dropped.
         let lead: CommentVec<'_> = self
-            .comments_to_emit_between(first_member.span().start + 1, inner.span().start)
+            .comments_to_emit_between(leading.start, leading.end)
             .collect();
         if lead.iter().any(|c| !c.is_block) {
             return lead;
@@ -2745,10 +2759,7 @@ impl<'a> Printer<'a> {
                 // block-comment-only.
                 // The outermost paren bounds the block-comment scan, so a block comment
                 // authored in the stripped shell (before the union) is still preserved.
-                let paren = match first_member {
-                    TSType::Parenthesized(p) => Some(p),
-                    _ => None,
-                };
+                let paren = outermost_paren(first_member);
                 self.build_parenthesized_union_doc(union, paren, ShellLeadingRun::Upstream)
             } else {
                 // Matches the bare intersection-member parenthesization in

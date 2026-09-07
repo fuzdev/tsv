@@ -155,7 +155,7 @@ pub(super) fn union_has_brace_member(union: &TSUnionType<'_>) -> bool {
 /// pair those builders emit, so the whole `(`…`)` region is one author gap. Bounding a
 /// gap scan by an inner layer's span stops it short and drops everything between the two
 /// closers (`((A | B) /* c */)[]`, `[((A | B) /* c */)?]`).
-pub(super) fn outermost_paren<'a>(
+pub(in crate::printer) fn outermost_paren<'a>(
     ts_type: &'a TSType<'a>,
 ) -> Option<&'a internal::TSParenthesizedType<'a>> {
     match ts_type {
@@ -176,16 +176,20 @@ pub(super) fn outermost_paren<'a>(
 /// to this window one at a time, each after a bug — the leading half at
 /// [`Printer::stripped_paren_hang_has_leading_line_comment`](super::super::Printer::stripped_paren_hang_has_leading_line_comment),
 /// the trailing half at
-/// [`Printer::paren_retains_for_trailing_run`](super::super::Printer::paren_retains_for_trailing_run),
+/// [`Printer::paren_shell_retains_for_trailing_run`](super::super::Printer::paren_shell_retains_for_trailing_run),
 /// where asking only the outer layer's own trailing gap called a shell stripped while the
 /// inner pair retained and printed the leading run itself, beside the enclosing gap's copy
-/// (a DOUBLE-PRINT). Every caller that reads a shell's own comments asks here, so the two
-/// halves cannot drift apart again.
+/// (a DOUBLE-PRINT). Every caller that reads a shell's own comments asks here — the type
+/// builders, the required-paren emitter, and `ignore.rs`'s directive-freeze scans alike — so
+/// the two halves cannot drift apart again.
 ///
 /// The paren bytes themselves are excluded, which changes no comment query — a comment can
 /// neither begin at the `(` nor end past the `)` — but keeps the spans meaning exactly "the
-/// author's gap".
-pub(super) fn paren_shell_gaps(shell: &internal::TSParenthesizedType<'_>) -> (Span, Span) {
+/// author's gap". That is why a caller whose hand-rolled window included them
+/// (`t.span().start` rather than `+ 1`) converts to this pair unchanged.
+pub(in crate::printer) fn paren_shell_gaps(
+    shell: &internal::TSParenthesizedType<'_>,
+) -> (Span, Span) {
     let inner = unwrap_parenthesized(shell.type_annotation).span();
     (
         Span::new(shell.span.start + 1, inner.start),
@@ -270,12 +274,13 @@ pub(super) fn union_hug_shape(union: &TSUnionType<'_>) -> bool {
 /// decline the hug its paren-free spelling takes.
 ///
 /// The unwrap widens what reaches the hug, and the comment gate is what makes that safe:
-/// prettier keeps the UNION's range over a member's parens even after dropping the node, so
-/// a comment written inside a member's shell attaches to that member and bails its
-/// `shouldHugUnionType`. `Printer::union_member_shell_holds_comment` is that clause — without
-/// it a one-member union whose member is a paren shell reaches the hug, where the hug's own
-/// leading-run emitter and the enclosing gap that claimed the shell's region both fill one
-/// position and an authored comment prints TWICE
+/// prettier bails `shouldHugUnionType` on `types.some((t) => hasComment(t))`, and a comment
+/// the author wrote inside a member's shell attaches to that member — so a paren'd member
+/// carrying one must decline the hug exactly as the bare spelling does.
+/// `Printer::union_member_shell_holds_comment` is that clause — without it a one-member
+/// union whose member is a paren shell reaches the hug, where the hug's own leading-run
+/// emitter and the enclosing gap that claimed the shell's region both fill one position and
+/// an authored comment prints TWICE
 /// (`single_member_intersection_leading_gap_shell_run_prettier_divergence`, the
 /// `q<| /* c */ (// d⏎ P)>` case).
 #[inline]

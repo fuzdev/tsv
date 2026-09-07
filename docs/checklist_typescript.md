@@ -544,12 +544,19 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
   grouping, both slots of the union hug), and it is why `is_huggable_type` reads through
   `unwrap_parenthesized` — prettier's TS AST carries no paren node, so matching its check means
   unwrapping, never reading the raw member
-- ⚠️ A **comment** is the one thing the paren does carry, and only at the union hug: prettier
-  drops the paren node but keeps the UNION's range over it, so a comment written inside a
-  member's shell (`({ … } /* c */) | null`) attaches to that member and bails the hug, while the
-  same comment outside the shell (`{ … } /* c */ | null`, outside the union's range) attaches to
-  the parent and leaves it alone. `Printer::union_member_shell_holds_comment` is that clause —
-  the half of `types.some((t) => hasComment(t))` the between-member scan cannot reach
+- The rule holds for a **commented** member too, and the union hug is where it takes a second
+  clause to keep: prettier drops the paren node, so a comment written inside a member's shell
+  (`({ … } /* c */) | null`) attaches to that member like the bare spelling's own
+  (`{ … } /* c */ | null`) and bails `shouldHugUnionType` the same way — prettier's output for
+  the two is byte-identical. `Printer::union_member_shell_holds_comment` is what makes tsv
+  agree: it is the half of `types.some((t) => hasComment(t))` the between-member scan cannot
+  reach, and without it the unwrap above would hug the paren'd spelling while the bare twin
+  expands
+- ⚠️ **Open divergence** at one placement: a comment immediately *before* the first member
+  (`/* c */ { … } | null`, and the leading-operator `| /* c */ { … } | null`) bails prettier's
+  hug and does not bail tsv's, at every hug position. Paren-independent — tsv hugs the bare
+  spelling and, thanks to the clause above, expands the paren'd one, so this is the one cell
+  where tsv's own answer still depends on the paren
 
 ### Function Types
 
