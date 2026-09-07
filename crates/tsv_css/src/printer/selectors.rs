@@ -105,7 +105,7 @@ impl<'a> Printer<'a> {
             return;
         }
         if self.has_comments_to_emit_between(list.span.start, list.span.end) {
-            let doc = self.build_comma_list_doc(list, false);
+            let doc = self.build_comma_list_doc(list.selectors, false);
             self.write_arena_doc_with_suffix(doc, SELECTOR_SUFFIX_WIDTH);
             return;
         }
@@ -165,7 +165,7 @@ impl<'a> Printer<'a> {
     /// complex-selector doc; the group around it (added by the caller) decides
     /// whether the `line`s flatten to `, ` or break one-per-line.
     fn build_nested_selector_list_doc(&self, list: &internal::SelectorList<'_>) -> DocId {
-        self.build_comma_list_doc(list, true)
+        self.build_comma_list_doc(list.selectors, true)
     }
 
     /// Build a comma-joined selector-list doc with comments interleaved at each comma
@@ -177,20 +177,32 @@ impl<'a> Printer<'a> {
     /// comments (inside `:is()` parens) are added by the caller — `build_pseudo_args_doc`
     /// via `comment_blocks_in_range` + `wrap_inner_with_comments` — since they sit
     /// outside the list span.
-    fn build_comma_list_doc(&self, list: &internal::SelectorList<'_>, breakable: bool) -> DocId {
+    ///
+    /// Takes the bare selector slice rather than a `SelectorList`, so it is the one spelling
+    /// of the comma seam for every list, including the one with no `SelectorList` node of
+    /// its own: a `@supports selector(.a, /* c */ .b)` argument
+    /// (`ConditionSegment::Selectors`). Joining that one with a literal `", "` dropped every
+    /// comma-adjacent comment — the alternate-layout-builder hazard (docs/comments.md
+    /// hazard 4); the seam's two runs must partition the gap wherever a comma separates two
+    /// selectors.
+    pub(super) fn build_comma_list_doc(
+        &self,
+        selectors: &[internal::ComplexSelector<'_>],
+        breakable: bool,
+    ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for (i, complex) in list.selectors.iter().enumerate() {
+        for (i, complex) in selectors.iter().enumerate() {
             if i > 0 {
                 let (before, after) = self.split_selector_comments_around_comma(
-                    list.selectors[i - 1].span.end,
+                    selectors[i - 1].span.end,
                     complex.span.start,
                 );
                 if !before.is_empty() {
                     parts.push(d.text(" "));
                     parts.push(d.text_pooled(&before));
                 }
-                let kept = self.pre_comma_boundary_ws(&list.selectors[i - 1], complex.span.start);
+                let kept = self.pre_comma_boundary_ws(&selectors[i - 1], complex.span.start);
                 if !kept.is_empty() {
                     parts.push(d.text_pooled(&kept));
                 }

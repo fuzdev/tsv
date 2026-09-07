@@ -86,8 +86,9 @@
 //! It also inherits **[`code_regions`]' reach**: a gap
 //! the region walk doesn't name is a gap never probed. Today that means a `.svelte` file's
 //! `<style>` content is unprobed, so a Svelte file containing only a `<style>` block yields
-//! **zero sites** — now a yield/cost call rather than a scope one (the ledger guards CSS
-//! in-block comments), see that function's TODO.
+//! **zero sites** — a queued follow-up rather than a scope limit (the ledger guards CSS
+//! in-block comments, and a discovery run over the region found real drops), see that
+//! function's TODO.
 //!
 //! ## Structure
 //!
@@ -763,11 +764,14 @@ fn audit_file(
                     // span is ISLAND-relative — mapping it across the splice would yield a bogus
                     // seed offset with `victim_map_fallbacks` staying 0, a SILENT mis-attribution.
                     // Safe TODAY only because `code_regions` injects host-only, so no island
-                    // finding can arise. Naming <style>/nested-element raw content in
-                    // `code_regions` (see `audit::sites::code_regions`'s TODO) opens the hole and
-                    // MUST fix this first: thread the finding's `DocumentKey` (host source
-                    // identity) through `CommentFinding` so the mapping can scope to the host key —
-                    // as `comment_ledger::parsed_comment_spans` already does — or fall back.
+                    // finding can arise. The top-level `<style>` block is NOT such an island:
+                    // its stylesheet parses against the host source and registers under the
+                    // host's key (host-absolute spans), so naming `Root::css`'s content span
+                    // (see `audit::sites::code_regions`'s TODO) keeps this mapping sound. Naming
+                    // a NESTED `<style>` element's raw content would open the hole and MUST fix
+                    // this first: thread the finding's `DocumentKey` (host source identity)
+                    // through `CommentFinding` so the mapping can scope to the host key — as
+                    // `comment_ledger::parsed_comment_spans` already does — or fall back.
                     match victim_seed_offset(&source, offset, text.len(), victim_start) {
                         Some(seed_offset) => seed_offset,
                         None => {

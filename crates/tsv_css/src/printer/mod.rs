@@ -33,8 +33,7 @@ mod values;
 use crate::ast::internal::{Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{
-    CommentFreeWindow, CommentPosition, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH,
-    classify_comment_scan, comments_to_emit_from,
+    CommentFreeWindow, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_from,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -567,9 +566,12 @@ impl<'a> Printer<'a> {
         let mut prev_end: u32 = 0;
         let mut printed_any = false;
 
-        for node in nodes {
+        for (i, node) in nodes.iter().enumerate() {
             let node_start = node.span().start;
             let node_end = node.span().end;
+            // The next sibling's start bounds this node's trailing claim (see
+            // `print_inline_comments_after_node`); the last node's runs to the end.
+            let next_start = nodes.get(i + 1).map(|next| next.span().start);
 
             // Print comments between prev_end and this node
             let idx_before = comment_idx;
@@ -612,7 +614,8 @@ impl<'a> Printer<'a> {
             }
 
             // Check for inline comments on same line as node's closing brace
-            let inline_count = self.print_inline_comments_after_node(node_end, &mut comment_idx);
+            let inline_count =
+                self.print_inline_comments_after_node(node_end, next_start, &mut comment_idx);
 
             prev_end = if inline_count > 0 {
                 self.comments
@@ -661,20 +664,11 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            let position = classify_comment_scan(
-                comment,
-                prev_end,
-                curr_start,
-                self.source.as_bytes(),
-                self.line_table,
-            );
-
-            // Skip trailing comments (same line as prev node)
-            if prev_end > 0 && matches!(position, CommentPosition::Trailing) {
-                *comment_idx += 1;
-                last_end = comment.span.end;
-                continue;
-            }
+            // A comment on the previous node's line is never here: `print_inline_comments_after_node`
+            // claimed the whole same-line run before this scan started, with the same
+            // `is_same_line` test and the same cursor, and `prev_end` is that run's end. (This
+            // scan once re-classified each comment and SKIPPED a `Trailing` one — a silent drop
+            // had the two ever disagreed; 5.3M injections never reached it.)
 
             // Print with proper spacing
             let mut starts_line = true;
@@ -715,9 +709,19 @@ impl<'a> Printer<'a> {
 
     /// Print inline comments on the same line after a node
     /// Returns the number of comments printed
+    ///
+    /// The claim runs from the node's end to the NEXT sibling's start, never past it: a
+    /// comment on this line but inside the next node — a prelude comment of an `@import` /
+    /// `@supports` / `@container` / `@scope` glued on after `;` or `}` — belongs to that
+    /// node's own emitter, which prints it again. Unbounded, this scan claimed every such
+    /// comment to the end of the line and each printed twice (the statement-gap seam's
+    /// rule: the trailing claim stops where the next statement begins). The nested block
+    /// loops need no such bound — they walk the child list, where a comment is a child
+    /// and the next rule is the stop by construction.
     fn print_inline_comments_after_node(
         &mut self,
         node_end: u32,
+        next_start: Option<u32>,
         comment_idx: &mut usize,
     ) -> usize {
         let mut printed = 0;
@@ -736,7 +740,9 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            if !self.is_same_line(last_end, comment.span.start) {
+            if next_start.is_some_and(|next| comment.span.start >= next)
+                || !self.is_same_line(last_end, comment.span.start)
+            {
                 break;
             }
 

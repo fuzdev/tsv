@@ -15,4 +15,15 @@
 			color: red;
 		}
 	}
+
+	/* A non-ASCII boundary run before the comma is the author's and stays; the list still
+	keeps the prelude's line */
+	@supports selector(
+		.class1 ,
+		.class2
+	) {
+		div {
+			color: red;
+		}
+	}
 </style>

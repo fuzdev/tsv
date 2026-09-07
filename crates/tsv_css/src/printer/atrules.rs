@@ -636,15 +636,12 @@ impl<'a> Printer<'a> {
                     d.text_pooled(text)
                 }
             }
+            // The selector printer's own comma seam, so a comment beside a list comma
+            // (`selector(.a, /* c */ .b)`) partitions the gap exactly as it does in a
+            // rule's selector list; `breakable = false` joins with a literal space, and
+            // `remove_lines` keeps the argument on the prelude's line either way.
             internal::ConditionSegment::Selectors(selectors) => {
-                let mut list = DocBuf::with_capacity(selectors.len() * 2);
-                for (i, selector) in selectors.iter().enumerate() {
-                    if i > 0 {
-                        list.push(d.text(", "));
-                    }
-                    list.push(self.build_complex_selector_doc(selector));
-                }
-                d.remove_lines(d.concat(&list))
+                d.remove_lines(self.build_comma_list_doc(selectors, false))
             }
         }
     }
