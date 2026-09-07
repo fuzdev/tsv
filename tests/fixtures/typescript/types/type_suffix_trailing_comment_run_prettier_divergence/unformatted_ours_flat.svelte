@@ -24,4 +24,16 @@
 	type B3 = (// c7
 	U // c8
 	)[];
+
+	// an author BLANK inside the run survives: the run never leaves the region it was
+	// written in, so `isPreviousLineEmpty` still has the line above the comment to read
+	type A3 = T[K // c9
+
+	// c10
+	];
+
+	type B4 = (U // c11
+
+	// c12
+	)[];
 </script>
