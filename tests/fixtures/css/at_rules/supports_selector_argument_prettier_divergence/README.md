@@ -7,6 +7,8 @@ tsv parses a `selector()` argument as the selector it is and prints it with the 
 tsv: `selector(.class1, .class2)`
 Prettier: `selector(⏎.class1,⏎.class2⏎)`
 
+The argument prints through the selector printer's comma seam, so a non-ASCII boundary run before the comma (`.class1<NBSP>, .class2`) is the author's and stays on both sides — the same rule as a rule's own list ([keyframes_selector_nonascii_space](../keyframes_selector_nonascii_space/)); only the layout differs.
+
 **An argument that is not a selector keeps its tokens.** `<supports-selector-fn> = selector( <complex-selector> )` (css-conditional-4 §"Extensions to the @supports rule") — when the argument doesn't parse as a selector, `<supports-in-parens>` falls through to its third arm, `<general-enclosed>` (css-conditional-3), whose production is `[ <function-token> <any-value>? ) ]` (mediaqueries-4 §"Syntax"). That arm is *grammatically valid* — "the result is false", not invalid — so a formatter must keep the rule and has no grammar to normalize its contents against. An attribute value must be an identifier or a string (selectors-4 §"Attribute selectors"), so `1.50` is not one, and tsv's selector parser rejects it in rule position too (`div[data-attr=1.50] {}` is a parse error). tsv therefore leaves it as authored; prettier quotes it, which is a repair rather than a normalization — and one that can flip a false condition true.
 
 tsv: `selector([data-attr=1.50])`

@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 292,
+		"end": 481,
 		"attributes": [],
 		"children": [
 			{
@@ -126,6 +126,67 @@
 						}
 					]
 				}
+			},
+			{
+				"type": "Atrule",
+				"start": 403,
+				"end": 472,
+				"name": "supports",
+				"prelude": "selector(.class1 , .class2)",
+				"block": {
+					"type": "Block",
+					"start": 441,
+					"end": 472,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 445,
+								"end": 448,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 445,
+										"end": 448,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 445,
+														"end": 448
+													}
+												],
+												"start": 445,
+												"end": 448
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 449,
+								"end": 469,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 454,
+										"end": 464,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 445,
+							"end": 469
+						}
+					]
+				}
 			}
 		],
 		"comments": [
@@ -140,18 +201,24 @@
 				"value": " An attribute value must be an identifier or a string, so this is no selector ",
 				"start": 131,
 				"end": 213
+			},
+			{
+				"type": "CSSComment",
+				"value": " A non-ASCII boundary run before the comma is the author's and stays; the list still\n\tkeeps the prelude's line ",
+				"start": 286,
+				"end": 401
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 284,
-			"styles": "\n\t/* A selector list stays on the prelude's line */\n\t@supports selector(.class1, .class2) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* An attribute value must be an identifier or a string, so this is no selector */\n\t@supports selector([data-attr=1.50]) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"end": 473,
+			"styles": "\n\t/* A selector list stays on the prelude's line */\n\t@supports selector(.class1, .class2) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* An attribute value must be an identifier or a string, so this is no selector */\n\t@supports selector([data-attr=1.50]) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A non-ASCII boundary run before the comma is the author's and stays; the list still\n\tkeeps the prelude's line */\n\t@supports selector(.class1 , .class2) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 293,
+	"end": 482,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
