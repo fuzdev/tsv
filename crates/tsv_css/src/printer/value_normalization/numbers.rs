@@ -102,7 +102,7 @@ ascii_keyword_set! {
     /// matching prettier's `adjustNumbers` (which checks `css-units-list`). The **value**
     /// path has no unit gate at all: `printUnit` passes an unknown unit straight through,
     /// so `@supports (a: 1.50abc)` is `1.5abc` where `@media` keeps `1.50abc`. See
-    /// `PreludeReader`.
+    /// `ValueReader`.
     pub(crate) fn is_known_css_unit;
 
     // Absolute length

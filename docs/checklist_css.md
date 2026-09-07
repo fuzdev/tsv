@@ -61,6 +61,11 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
 
 - CSS comments (`/* comment */`)
 - Multi-line comments
+- Comments in **declaration values** — the value cannot become a doc (CSS value comments live
+  outside the AST), so the printer re-emits its text; the comments keep their authored
+  positions and everything between them still takes the value reader's rules, so a number, a
+  hex color, a unit's case and a string's quote normalize exactly as they do without a comment
+  (`printer/declarations.rs` → `value_normalization::normalize_value_with_comments`)
 - Comments in selectors
 - Comments in `:nth-*()` args — in every position: before the An+B term, **inside** it
   (`:nth-child(2n /* c */ + 1)`, either interior gap of the `['+' | '-'] <signless-integer>`

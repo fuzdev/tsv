@@ -23,24 +23,30 @@ use crate::escapes::escape_span_at;
 use numbers::{canonical_unit, is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
 
-/// Which of prettier's two prelude readers an at-rule's prelude goes through — the axis
+/// Which of prettier's two value readers a stretch of raw CSS text goes through — the axis
 /// every rule in [`normalize_value_text`] is keyed on.
 ///
-/// `parser-postcss.js` routes a prelude by at-rule name: `@media` (and `@custom-media`) to
-/// `parseMediaQuery`, and `@supports` — plus every `isModuleRuleName` at-rule, of which
-/// `@import` is the one tsv formats — to `parseValue`. tsv's own routing
-/// (`parser/atrules/mod.rs`) tests the same pair, so a `@custom-media` prelude reaches this
-/// function on the media path like a `@media` one. The two readers tokenize the same
-/// text differently and print through different arms, so one authoring can have two
-/// canonical forms, and a rule keyed on the wrong one is wrong on three counts at once:
-/// the unit gate, the hex fold, and which runs absorb a following number.
+/// The axis is the READER, not the construct: `parser-postcss.js` hands a **declaration
+/// value** (line 195) and an `@supports` / `isModuleRuleName` **prelude** to the same
+/// `parseValue`, and only `@media` (with `@custom-media`) to `parseMediaQuery`. tsv's own
+/// at-rule routing (`parser/atrules/mod.rs`) tests the same pair, so a `@custom-media`
+/// prelude reaches this function on the media path like a `@media` one. The two readers
+/// tokenize the same text differently and print through different arms, so one authoring
+/// can have two canonical forms, and a rule keyed on the wrong one is wrong on three
+/// counts at once: the unit gate, the hex fold, and which runs absorb a following number.
 ///
 /// `@container` is on neither list — prettier keeps its params raw — so it never reaches
 /// this function and its prelude stays verbatim.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PreludeReader {
-    /// `@supports` and `@import`: `parseValue` (postcss-values-parser) → `value-*` nodes,
-    /// printed as `printCssNumber(value) + printUnit(unit)` / `value-word`.
+pub(crate) enum ValueReader {
+    /// A declaration value, plus an `@supports` / `@import` prelude: `parseValue`
+    /// (postcss-values-parser) → `value-*` nodes, printed as
+    /// `printCssNumber(value) + printUnit(unit)` / `value-word`.
+    ///
+    /// A comment-free declaration value takes these rules through the value AST instead
+    /// (each node's own printer); this arm is what a **comment-bearing** one takes, since
+    /// CSS value comments live outside the AST and that value is re-emitted from source
+    /// (`printer/declarations.rs`).
     Value,
     /// `@media` and `@custom-media`: `parseMediaQuery` → a node split (`media-type`, `media-feature`,
     /// `media-colon`, `media-value`, `media-keyword`, `media-url`, `media-unknown`), of which
@@ -57,8 +63,9 @@ pub(crate) enum PreludeReader {
     MediaQuery,
 }
 
-/// Normalize CSS numbers and string quotes within a raw at-rule prelude string, mirroring
-/// whichever of prettier's two prelude readers `path` names. `/* */` comments are copied
+/// Normalize CSS numbers, hex colors, unit case and string quotes within a raw value text —
+/// an at-rule prelude, or a declaration value the printer re-emits from source — mirroring
+/// whichever of prettier's two value readers `path` names. `/* */` comments are copied
 /// verbatim, and quoted strings get prettier's quote normalization (prefer single, swapping
 /// only to minimize escaping), which is `adjustStrings` on both paths.
 ///
@@ -70,13 +77,13 @@ pub(crate) enum PreludeReader {
 /// `(1.50: 2.5)`: the name's number kept, the value's normalized. [`feature_name_end`] draws
 /// that boundary, asked here at each top-level `(` and again by
 /// [`lowercase_media_feature_names`] for the case fold — one line, two passes. The value
-/// path has no such split: `parseValue` reads a prelude as one value.
+/// path has no such split: `parseValue` reads its whole text as one value.
 ///
 /// **Numbers.** A number that is its own token normalizes to canonical form (`.50` → `0.5`)
-/// on both paths; what follows it is where they part. [`PreludeReader::Value`] prints a
+/// on both paths; what follows it is where they part. [`ValueReader::Value`] prints a
 /// `value-number` node as `printCssNumber(value) + printUnit(unit)` with **no gate on the
 /// unit** — whatever trails the number is the unit and rides through unchanged, so `1.50abc`
-/// is `1.5abc`. [`PreludeReader::MediaQuery`] runs `adjustNumbers`' `(WORD_PART)?(NUMBER)(UNIT)?`
+/// is `1.5abc`. [`ValueReader::MediaQuery`] runs `adjustNumbers`' `(WORD_PART)?(NUMBER)(UNIT)?`
 /// regex, which returns the **whole match verbatim** unless the unit it captured is empty,
 /// the `<an+b>` `n`, or a unit CSS defines — so `1.50abc` stays. Unit *casing* parts with it:
 /// the value path asks [`canonical_unit`] (`printUnit` of the author's spelling), the media
@@ -104,11 +111,11 @@ pub(crate) enum PreludeReader {
 ///
 /// **`#`-prefixed tokens.** A `#` followed by an ident code point or a valid escape is a
 /// `<hash-token>` whose value is the ident sequence after it (CSS Syntax 3 §4.3.1); anything
-/// else — `#.50` — leaves a bare `<delim-token>`. On [`PreludeReader::Value`] a hex **color**
+/// else — `#.50` — leaves a bare `<delim-token>`. On [`ValueReader::Value`] a hex **color**
 /// (`#` + exactly 3, 4, 6, or 8 ASCII hex digits) is lowercased (`#FFF` → `#fff`), matching
 /// prettier's `value-word` arm; any other hash token — an off-length run (`#ABCDE`), a
 /// non-hex token, or one inside a `selector(...)` group (a case-sensitive ID selector) — is
-/// copied verbatim. On [`PreludeReader::MediaQuery`] the `#` is not a token head at all:
+/// copied verbatim. On [`ValueReader::MediaQuery`] the `#` is not a token head at all:
 /// `adjustNumbers` is a regex over raw text with no hash arm, so the `#` is copied as the
 /// delimiter it is and the run after it takes the ordinary ident/number arms.
 ///
@@ -123,9 +130,9 @@ pub(crate) enum PreludeReader {
 /// `media-feature`, which takes no number pass, and one at depth 0 is a `media-url` node,
 /// which `adjustNumbers` never prints either — both keep their content
 /// (`@media (url(1.50): a)`, `@custom-media --a url(1.50)`). The `#` arm below is the mirror
-/// image: it *is* restricted to [`PreludeReader::Value`], since `adjustNumbers` has no hash
+/// image: it *is* restricted to [`ValueReader::Value`], since `adjustNumbers` has no hash
 /// concept at all.
-pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
+pub(crate) fn normalize_value_text(input: &str, path: ValueReader) -> String {
     let bytes = input.as_bytes();
     let mut out = String::with_capacity(input.len());
     let mut i = 0;
@@ -258,7 +265,7 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
             // its number pass does not run — name position and depth 0 — and drops it in
             // `media-value` position, where `adjustNumbers` walks the node's raw text with
             // no url concept.
-            let media_value_text = path == PreludeReader::MediaQuery
+            let media_value_text = path == ValueReader::MediaQuery
                 && media_node_at(paren_depth, i, media_name_until) == MediaNode::Value;
             if ident.eq_ignore_ascii_case("url")
                 && bytes.get(i) == Some(&b'(')
@@ -292,7 +299,7 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
         // path this arm is what produced `#10.5`: the hash token ended at `#1`, the `.50`
         // then normalized on its own, and its canonical leading `0` joined the token before
         // it — a hash whose value changed from `1` to `10`, matching neither oracle.
-        if b == b'#' && path == PreludeReader::Value {
+        if b == b'#' && path == ValueReader::Value {
             let start = i;
             i += 1;
             let body_start = i;
@@ -348,7 +355,7 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
             // the number `50` with unit `%.5` and `.50#FFF` the number `.50` with unit `#FFF`,
             // both of which prettier prints verbatim. `split_number_and_unit` (numbers.rs) is
             // the value rule, already correct, and serves the declaration-value path.
-            // TODO: take the value rule from that sibling on `PreludeReader::Value`.
+            // TODO: take the value rule from that sibling on `ValueReader::Value`.
             let unit_start = i;
             while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
                 i += 1;
@@ -363,13 +370,13 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
                     // carries whatever trailed the number as its unit and no gate reads it,
                     // so the number normalizes and the unit rides through (`1.50abc` →
                     // `1.5abc`). `printUnit` is `canonical_unit` below.
-                    PreludeReader::Value => true,
+                    ValueReader::Value => true,
                     // `adjustNumbers` returns the whole `(WORD_PART)?(NUMBER)(UNIT)?` match
                     // verbatim unless the captured unit is empty, the `<an+b>` `n`, or one
                     // CSS defines — so `1abc` is left alone. And it runs on a `media-value`
                     // or a `media-type`, never on the `media-feature` NAME this number may
                     // sit in.
-                    PreludeReader::MediaQuery => {
+                    ValueReader::MediaQuery => {
                         media_node_at(paren_depth, num_start, media_name_until) != MediaNode::Name
                             && (unit.is_empty()
                                 || unit.eq_ignore_ascii_case("n")
@@ -400,7 +407,7 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
             // there is one. The media path's regex re-splits at the next number instead, so
             // a unit absorbs nothing there (`1a` + `.50` → `1a0.5`).
             prev_run_absorbs_digit =
-                path == PreludeReader::Value && out.ends_with(is_css_ident_code_point);
+                path == ValueReader::Value && out.ends_with(is_css_ident_code_point);
             continue;
         }
 
@@ -419,7 +426,7 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
                 // `feature_name_end` finds may sit at any depth inside one. Nor does a
                 // `<function-token>`'s own paren: `@media calc(1.50)` is a `media-type`,
                 // which `adjustNumbers` prints in full (`calc(1.5)`).
-                if path == PreludeReader::MediaQuery
+                if path == ValueReader::MediaQuery
                     && paren_depth == 0
                     && opens_feature_expression(bytes, i)
                 {
@@ -471,7 +478,7 @@ enum MediaNode {
 /// `media_name_until` — the boundary [`normalize_value_text`] took from [`feature_name_end`]
 /// at the enclosing expression's own `(`.
 ///
-/// Only meaningful on [`PreludeReader::MediaQuery`]; the value path has no split, leaves
+/// Only meaningful on [`ValueReader::MediaQuery`]; the value path has no split, leaves
 /// `media_name_until` at 0, and its callers gate on the path before asking.
 fn media_node_at(paren_depth: usize, i: usize, media_name_until: usize) -> MediaNode {
     if i < media_name_until {
@@ -492,15 +499,15 @@ fn media_node_at(paren_depth: usize, i: usize, media_name_until: usize) -> Media
 /// `printUnit` of that, so the media path folds it (`2N` → `2n`). Every *known* unit agrees
 /// either way — [`canonical_unit`] lowercases it — and an unknown one never reaches here on
 /// the media path at all, its gate having refused the whole match.
-fn prelude_unit(unit: &str, path: PreludeReader) -> Cow<'_, str> {
+fn prelude_unit(unit: &str, path: ValueReader) -> Cow<'_, str> {
     match path {
         // `canonical_unit` lowercases a known unit (`PX`→`px`) and leaves the
         // `n`/empty/unknown cases untouched (none is a known unit).
-        PreludeReader::Value => canonical_unit(unit),
-        PreludeReader::MediaQuery if unit.bytes().any(|b| b.is_ascii_uppercase()) => {
+        ValueReader::Value => canonical_unit(unit),
+        ValueReader::MediaQuery if unit.bytes().any(|b| b.is_ascii_uppercase()) => {
             Cow::Owned(unit.to_ascii_lowercase())
         }
-        PreludeReader::MediaQuery => Cow::Borrowed(unit),
+        ValueReader::MediaQuery => Cow::Borrowed(unit),
     }
 }
 
@@ -665,10 +672,10 @@ fn media_word_part_split(run: &str) -> (usize, bool) {
 ///
 /// On the media path the question is `adjustNumbers`' `WORD_PART` instead, which can end the
 /// run short of what this module read — see [`media_word_part_split`].
-fn ident_run_split(run: &str, path: PreludeReader) -> (usize, bool) {
+fn ident_run_split(run: &str, path: ValueReader) -> (usize, bool) {
     match path {
-        PreludeReader::Value => (run.len(), run.ends_with(is_css_ident_code_point)),
-        PreludeReader::MediaQuery => media_word_part_split(run),
+        ValueReader::Value => (run.len(), run.ends_with(is_css_ident_code_point)),
+        ValueReader::MediaQuery => media_word_part_split(run),
     }
 }
 
@@ -1278,9 +1285,10 @@ pub(crate) fn extract_string_value(
     None
 }
 
-/// Extract and normalize value with comments from declaration source
+/// Extract and normalize a declaration's post-colon value text, comments included.
 ///
-/// Extracts the value part of a declaration and normalizes spacing around comments.
+/// The slicing half of [`normalize_value_with_comments`], which owns the rules: this only
+/// says where a declaration's value text starts.
 ///
 /// # Arguments
 /// * `decl_source` - Full declaration source (e.g., `margin: 10px /* test */ 20px;`)
@@ -1296,8 +1304,23 @@ pub(crate) fn extract_string_value(
 /// assert_eq!(extract_value_with_comments(source, 6), "10px /* test */ 20px");
 /// ```
 pub(crate) fn extract_value_with_comments(decl_source: &str, colon_pos: usize) -> String {
-    let value_with_ws = &decl_source[colon_pos + 1..];
-    normalize_css_whitespace(value_with_ws).into_owned()
+    normalize_value_with_comments(&decl_source[colon_pos + 1..])
+}
+
+/// Normalize a stretch of declaration-value source the printer re-emits as text.
+///
+/// CSS value comments live outside the AST, so a comment-bearing value cannot become a doc
+/// and the printer copies its text instead (`printer/declarations.rs`). Copying it is not
+/// the same as printing it: prettier reads that value with `parseValue` either way
+/// (`parser-postcss.js` line 195 — the reader an `@supports` prelude also takes), so its
+/// numbers, hex colors, units and quotes normalize exactly as they do without a comment.
+///
+/// Two passes, because they answer different questions: [`normalize_css_whitespace`] for
+/// the gaps the comments sit in, then [`normalize_value_text`] for the tokens between
+/// them. This is the one name every declaration path asks both by — the width check
+/// included, so a measure and its emit can never pick different spellings.
+pub(crate) fn normalize_value_with_comments(value: &str) -> String {
+    normalize_value_text(&normalize_css_whitespace(value), ValueReader::Value)
 }
 
 #[cfg(test)]
@@ -1479,7 +1502,7 @@ mod tests {
     #[test]
     fn test_normalize_value_text_hex() {
         // The value path (`@supports`, `@import`): a hex color of a valid length lowercases.
-        let sup = |s: &str| normalize_value_text(s, PreludeReader::Value);
+        let sup = |s: &str| normalize_value_text(s, ValueReader::Value);
         assert_eq!(sup("(background: #FFF)"), "(background: #fff)"); // 3-digit
         assert_eq!(sup("(a: #ABCD)"), "(a: #abcd)"); // 4-digit RGBA
         assert_eq!(sup("(a: #AABBCC)"), "(a: #aabbcc)"); // 6-digit
@@ -1512,25 +1535,25 @@ mod tests {
         assert_eq!(sup("url()"), "url()"); // empty url-token
         // A quoted `url("…")` is a `<string>` arg: quotes normalize, content preserved.
         assert_eq!(
-            normalize_value_text("(background: url(\"v2.00.png\"))", PreludeReader::Value),
+            normalize_value_text("(background: url(\"v2.00.png\"))", ValueReader::Value),
             "(background: url('v2.00.png'))"
         );
         // The media path walks into a `media-value`'s url (see
-        // `the_two_prelude_readers_answer_a_number_differently`) — and finds nothing to do
+        // `the_two_value_readers_answer_a_number_differently`) — and finds nothing to do
         // here, the word part `x1` absorbing the number that abuts it either way.
         assert_eq!(
-            normalize_value_text("(a: url(x1.50))", PreludeReader::MediaQuery),
+            normalize_value_text("(a: url(x1.50))", ValueReader::MediaQuery),
             "(a: url(x1.50))"
         );
 
         // The media path (`@media`): the regex has no hash arm, so a `#` is copied as the
         // delimiter it is and its run keeps its case.
         assert_eq!(
-            normalize_value_text("(min-width: #FFF)", PreludeReader::MediaQuery),
+            normalize_value_text("(min-width: #FFF)", ValueReader::MediaQuery),
             "(min-width: #FFF)"
         );
         assert_eq!(
-            normalize_value_text("(margin: .5px)", PreludeReader::MediaQuery),
+            normalize_value_text("(margin: .5px)", ValueReader::MediaQuery),
             "(margin: 0.5px)"
         );
     }
@@ -1548,38 +1571,38 @@ mod tests {
     fn an_escaped_paren_does_not_close_a_url_token() {
         // The two normalizations the tail would otherwise take.
         assert_eq!(
-            normalize_value_text(r"(a: url(x\)1.50))", PreludeReader::Value),
+            normalize_value_text(r"(a: url(x\)1.50))", ValueReader::Value),
             r"(a: url(x\)1.50))"
         );
         assert_eq!(
-            normalize_value_text(r"(a: url(x\)y#FFF))", PreludeReader::Value),
+            normalize_value_text(r"(a: url(x\)y#FFF))", ValueReader::Value),
             r"(a: url(x\)y#FFF))"
         );
         // An escaped OPEN paren nests nothing either — the token still ends at the first
         // unescaped `)`, so `1.50` stays inside it.
         assert_eq!(
-            normalize_value_text(r"(a: url(x\(1.50))", PreludeReader::Value),
+            normalize_value_text(r"(a: url(x\(1.50))", ValueReader::Value),
             r"(a: url(x\(1.50))"
         );
         // A hex escape carries its whitespace terminator, so the `)` here is the escape's
         // payload and not a close.
         assert_eq!(
-            normalize_value_text(r"(a: url(x\29 1.50))", PreludeReader::Value),
+            normalize_value_text(r"(a: url(x\29 1.50))", ValueReader::Value),
             r"(a: url(x\29 1.50))"
         );
         // Unbalanced: the group runs to end of input rather than stopping at the escape.
         assert_eq!(
-            normalize_value_text(r"(a: url(x\)1.50)", PreludeReader::Value),
+            normalize_value_text(r"(a: url(x\)1.50)", ValueReader::Value),
             r"(a: url(x\)1.50)"
         );
         // A trailing `\` starts no escape, so the `)` before it still closes.
         assert_eq!(
-            normalize_value_text(r"(a: url(x1.50)\)", PreludeReader::Value),
+            normalize_value_text(r"(a: url(x1.50)\)", ValueReader::Value),
             r"(a: url(x1.50)\)"
         );
         // Control: no escape, so the token is opaque for the ordinary reason.
         assert_eq!(
-            normalize_value_text("(a: url(x1.50))", PreludeReader::Value),
+            normalize_value_text("(a: url(x1.50))", ValueReader::Value),
             "(a: url(x1.50))"
         );
     }
@@ -1752,78 +1775,78 @@ mod tests {
     fn a_number_abutting_an_identifier_is_copied_verbatim() {
         // `x1` + `.50`, not `x10` + `.5`.
         assert_eq!(
-            normalize_value_text("(a: x1.50)", PreludeReader::Value),
+            normalize_value_text("(a: x1.50)", ValueReader::Value),
             "(a: x1.50)"
         );
         // The unit rides along verbatim too — no `canonical_unit` lowercasing.
         assert_eq!(
-            normalize_value_text("(a: x.50PX)", PreludeReader::Value),
+            normalize_value_text("(a: x.50PX)", ValueReader::Value),
             "(a: x.50PX)"
         );
         // A leading `--` reaches the ident arm at the first letter, so it is covered.
         assert_eq!(
-            normalize_value_text("(a: --x.50)", PreludeReader::Value),
+            normalize_value_text("(a: --x.50)", ValueReader::Value),
             "(a: --x.50)"
         );
         // Separated by whitespace, the number is a value of its own and normalizes.
         assert_eq!(
-            normalize_value_text("(a: x .50)", PreludeReader::Value),
+            normalize_value_text("(a: x .50)", ValueReader::Value),
             "(a: x 0.5)"
         );
         // So does one that starts the value.
         assert_eq!(
-            normalize_value_text("(a: .50px)", PreludeReader::Value),
+            normalize_value_text("(a: .50px)", ValueReader::Value),
             "(a: 0.5px)"
         );
         // A signed number keeps its sign, which merges with nothing, so it normalizes even
         // against an identifier. (`x-1` is one ident run, so `x-1.50` is the glued case.)
         assert_eq!(
-            normalize_value_text("(a: x+1.50)", PreludeReader::Value),
+            normalize_value_text("(a: x+1.50)", ValueReader::Value),
             "(a: x+1.5)"
         );
         assert_eq!(
-            normalize_value_text("(a: x-1.50)", PreludeReader::Value),
+            normalize_value_text("(a: x-1.50)", ValueReader::Value),
             "(a: x-1.50)"
         );
         // `$` and `@` are `<delim-token>`s, not ident code points, so nothing merges into
         // them even though this module's ident class reads them as run starts.
         assert_eq!(
-            normalize_value_text("(a: $.50)", PreludeReader::MediaQuery),
+            normalize_value_text("(a: $.50)", ValueReader::MediaQuery),
             "(a: $0.5)"
         );
         assert_eq!(
-            normalize_value_text("(a: @.50)", PreludeReader::MediaQuery),
+            normalize_value_text("(a: @.50)", ValueReader::MediaQuery),
             "(a: @0.5)"
         );
         assert_eq!(
-            normalize_value_text("(a: $x.50)", PreludeReader::MediaQuery),
+            normalize_value_text("(a: $x.50)", ValueReader::MediaQuery),
             "(a: $x.50)"
         );
         // An escape does not make a word part (prettier's own scan reads no `\` either),
         // so the number after one still normalizes — matching prettier.
         assert_eq!(
-            normalize_value_text(r"(a: \41 2.50px)", PreludeReader::Value),
+            normalize_value_text(r"(a: \41 2.50px)", ValueReader::Value),
             r"(a: \41 2.5px)"
         );
         assert_eq!(
-            normalize_value_text(r"(a: x\41 .50)", PreludeReader::Value),
+            normalize_value_text(r"(a: x\41 .50)", ValueReader::Value),
             r"(a: x\41 0.5)"
         );
         // The ident arm's own `url(` exit clears the word part: what follows the group is
         // not the ident's tail.
         assert_eq!(
-            normalize_value_text("(a: url(x).50)", PreludeReader::Value),
+            normalize_value_text("(a: url(x).50)", ValueReader::Value),
             "(a: url(x)0.5)"
         );
     }
 
-    /// The three rules keyed on [`PreludeReader`], each measured against the reader prettier
+    /// The three rules keyed on [`ValueReader`], each measured against the reader prettier
     /// actually uses: the unit gate, the hex fold, and which runs absorb a number. One
     /// authoring, two canonical forms — so every case is asserted on both paths.
     #[test]
-    fn the_two_prelude_readers_answer_a_number_differently() {
-        let value = |s: &str| normalize_value_text(s, PreludeReader::Value);
-        let media = |s: &str| normalize_value_text(s, PreludeReader::MediaQuery);
+    fn the_two_value_readers_answer_a_number_differently() {
+        let value = |s: &str| normalize_value_text(s, ValueReader::Value);
+        let media = |s: &str| normalize_value_text(s, ValueReader::MediaQuery);
 
         // The unit gate. `printUnit` has none — whatever trails the number is the unit —
         // where `adjustNumbers` keeps the whole match on a unit CSS doesn't define.
@@ -1899,7 +1922,7 @@ mod tests {
     /// the expression's first colon, or its whole interior when it has none.
     #[test]
     fn the_media_readers_number_pass_skips_feature_name_position() {
-        let media = |s: &str| normalize_value_text(s, PreludeReader::MediaQuery);
+        let media = |s: &str| normalize_value_text(s, ValueReader::MediaQuery);
 
         // The headline: one expression, two halves, two answers.
         assert_eq!(media("(1.50: 2.50)"), "(1.50: 2.5)");
@@ -1940,9 +1963,9 @@ mod tests {
         assert_eq!(media("(1.50 /* c */: a)"), "(1.50 /* c */: a)");
         assert_eq!(media("(/* : */ 1.50: a)"), "(/* : */ 1.50: a)");
         assert_eq!(media(r"(a\:b: 1.50)"), r"(a\:b: 1.5)");
-        // The value path has no such split — `parseValue` reads a prelude as one value.
+        // The value path has no such split — `parseValue` reads its whole text as one value.
         assert_eq!(
-            normalize_value_text("(1.50: 2.50)", PreludeReader::Value),
+            normalize_value_text("(1.50: 2.50)", ValueReader::Value),
             "(1.5: 2.5)"
         );
     }
@@ -1952,7 +1975,7 @@ mod tests {
     /// token that is no colour (`#FFF.5` → `#fff.5`).
     #[test]
     fn the_hex_fold_reads_the_whole_hash_word() {
-        let value = |s: &str| normalize_value_text(s, PreludeReader::Value);
+        let value = |s: &str| normalize_value_text(s, ValueReader::Value);
 
         // The word runs on past the digits — no colour here, so nothing is recased.
         assert_eq!(value("(a: #FFF.5)"), "(a: #FFF.5)");

@@ -419,9 +419,12 @@ impl<'a> Printer<'a> {
     ) {
         self.write(":");
         // A leading comment run is `raws.between` material, so it stays on the colon's
-        // line and the value breaks beneath it. Emitted through the same whitespace
-        // normalizer every other comment-bearing value path uses, so a run of them is
-        // joined single-spaced.
+        // line and the value breaks beneath it. Whitespace normalization only, so a run of
+        // them is joined single-spaced — deliberately NOT the value seam
+        // (`normalize_value_with_comments`) the comment-bearing paths take, because this run
+        // is between-material rather than value content and holds nothing but comments and
+        // the gaps between them. The value's own members print from the AST below, where
+        // every value-level rule already runs.
         if let Some(run) = plan.hoisted {
             self.write(" ");
             let text = value_normalization::normalize_css_whitespace(run.extract(self.source));
@@ -441,7 +444,9 @@ impl<'a> Printer<'a> {
     /// `write_arena_doc_reserving` — decides flat-vs-wrapped, so the wrap decision
     /// and the emission are a single doc and cannot drift. A value with comments
     /// stays on the imperative source-extraction path, since CSS value comments
-    /// aren't stored in the AST and so can't be expressed as a doc.
+    /// aren't stored in the AST and so can't be expressed as a doc — but it takes the
+    /// same value-level rules there (`normalize_value_with_comments`), so a number, a
+    /// hex color, a unit's case and a quote answer the same with a comment as without.
     fn print_decl_function(
         &mut self,
         decl: &internal::CssDeclaration<'_>,
@@ -491,7 +496,9 @@ impl<'a> Printer<'a> {
     ///
     /// CSS value comments aren't stored in the AST, so the value is reconstructed
     /// from source text: a wrapped function splits its args from source (preserving
-    /// the comments in place), an inline one re-emits the normalized value verbatim.
+    /// the comments in place), an inline one re-emits the whole value. Both go through
+    /// `normalize_value_with_comments`, so "reconstructed from source" means the source's
+    /// comments in the source's positions — never its number, hex, unit or quote spellings.
     fn print_decl_function_with_comments(
         &mut self,
         decl: &internal::CssDeclaration<'_>,
@@ -500,17 +507,25 @@ impl<'a> Printer<'a> {
         args: &[CssValue<'_>],
         span: Span,
     ) {
-        // Width check uses the NORMALIZED source length (comments included), since the
-        // comments aren't in the doc and the value must round-trip verbatim.
+        // Width check uses the source the emit will produce, comments included, since the
+        // comments aren't in the doc and the value must round-trip verbatim. It is the
+        // NORMALIZED text and not the author's, because normalizing shortens
+        // (`1.50px` → `1.5px`): measuring the raw form wraps a value that fits, which is
+        // what prettier's own group does not do — it measures the doc it printed.
         let func_source = span.extract(self.source);
-        let normalized = value_normalization::normalize_css_whitespace(func_source);
+        // Named for its slice: this is the FUNCTION's own text, while the inline arm below
+        // emits the whole post-colon value. The two coincide here — `extract_function_parts`
+        // accepts a value as a function only when the matching `)` is its last byte, so a
+        // `CssValue::Function` value has no tail — but they are different slices of different
+        // strings, so they keep different names rather than shadowing.
+        let func_normalized = value_normalization::normalize_value_with_comments(func_source);
         // Visual width (not byte length) of `property: value !important;`. The multibyte
         // comment's byte inflation is excluded by `visual_width`; the ` !important` tail is
         // counted via `declaration_tail` (the same string the emit appends) so an important
         // value wraps rather than overrunning the print width. `: ` is 2 cols, `;` is 1.
         let inline_len = visual_width(decl.property, TAB_WIDTH)
             + 2
-            + visual_width(&normalized, TAB_WIDTH)
+            + visual_width(&func_normalized, TAB_WIDTH)
             + visual_width(&self.declaration_tail(decl), TAB_WIDTH)
             + 1;
         let needs_wrap = self.indent_width() + inline_len > PRINT_WIDTH;
@@ -527,9 +542,9 @@ impl<'a> Printer<'a> {
             self.write_indent();
             self.write(")");
         } else {
-            let normalized =
+            let value_normalized =
                 value_normalization::extract_value_with_comments(decl_source, decl.colon_pos());
-            self.write(&normalized);
+            self.write(&value_normalized);
         }
     }
 
@@ -818,7 +833,7 @@ impl<'a> Printer<'a> {
         let arg_strs = value_normalization::split_args_by_comma(args_content);
         for (i, arg_str) in arg_strs.iter().enumerate() {
             self.write_indent();
-            let normalized = value_normalization::normalize_css_whitespace(arg_str);
+            let normalized = value_normalization::normalize_value_with_comments(arg_str);
 
             // Check if this arg has space-separated values that would exceed width
             // Split by top-level spaces (not inside parens) to get individual values
