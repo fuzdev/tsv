@@ -1,0 +1,223 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 597,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 253,
+				"end": 322,
+				"name": "supports",
+				"prelude": "(a: x, 9px) and (b: #fff + 5)",
+				"block": {
+					"type": "Block",
+					"start": 293,
+					"end": 322,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 297,
+								"end": 298,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 297,
+										"end": 298,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 297,
+														"end": 298
+													}
+												],
+												"start": 297,
+												"end": 298
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 299,
+								"end": 319,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 304,
+										"end": 314,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 297,
+							"end": 319
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 324,
+				"end": 387,
+				"name": "media",
+				"prelude": "(a: x,9px) and (b: #FFF+5)",
+				"block": {
+					"type": "Block",
+					"start": 358,
+					"end": 387,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 362,
+								"end": 363,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 362,
+										"end": 363,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 362,
+														"end": 363
+													}
+												],
+												"start": 362,
+												"end": 363
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 364,
+								"end": 384,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 369,
+										"end": 379,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 362,
+							"end": 384
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 521,
+				"end": 588,
+				"name": "media",
+				"prelude": "(not ( screen and ( color ) ))",
+				"block": {
+					"type": "Block",
+					"start": 559,
+					"end": 588,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 563,
+								"end": 564,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 563,
+										"end": 564,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 563,
+														"end": 564
+													}
+												],
+												"start": 563,
+												"end": 564
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 565,
+								"end": 585,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 570,
+										"end": 580,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 563,
+							"end": 585
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the two prelude readers disagree about separator and operator spacing: the value\n\treader groups the value and prints its own, so a comma takes `, ` and an operator\n\ttakes ` + `; the media reader keeps the media-value's raw text verbatim ",
+				"start": 9,
+				"end": 251
+			},
+			{
+				"type": "CSSComment",
+				"value": " a grouped condition is name position whole, so its runs collapse to one space\n\twhile the spaces beside its inner parens stay ",
+				"start": 389,
+				"end": 519
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 589,
+			"styles": "\n\t/* the two prelude readers disagree about separator and operator spacing: the value\n\treader groups the value and prints its own, so a comma takes `, ` and an operator\n\ttakes ` + `; the media reader keeps the media-value's raw text verbatim */\n\t@supports (a: x, 9px) and (b: #fff + 5) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (a: x,9px) and (b: #FFF+5) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* a grouped condition is name position whole, so its runs collapse to one space\n\twhile the spaces beside its inner parens stay */\n\t@media (not ( screen and ( color ) )) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 598,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,217 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 397,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 162,
+					"end": 165,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 162,
+							"end": 165,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 162,
+											"end": 165
+										}
+									],
+									"start": 162,
+									"end": 165
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 166,
+					"end": 246,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 170,
+							"end": 190,
+							"property": "aspect-ratio",
+							"value": "16 / 9"
+						},
+						{
+							"type": "Declaration",
+							"start": 194,
+							"end": 213,
+							"property": "aspect-ratio",
+							"value": "1.777"
+						},
+						{
+							"type": "Declaration",
+							"start": 217,
+							"end": 242,
+							"property": "aspect-ratio",
+							"value": "auto 16 / 9"
+						}
+					]
+				},
+				"start": 162,
+				"end": 246
+			},
+			{
+				"type": "Atrule",
+				"start": 249,
+				"end": 316,
+				"name": "media",
+				"prelude": "(aspect-ratio: 16 / 9)",
+				"block": {
+					"type": "Block",
+					"start": 279,
+					"end": 316,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 283,
+								"end": 287,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 283,
+										"end": 287,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "body",
+														"start": 283,
+														"end": 287
+													}
+												],
+												"start": 283,
+												"end": 287
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 288,
+								"end": 313,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 293,
+										"end": 308,
+										"property": "background",
+										"value": "red"
+									}
+								]
+							},
+							"start": 283,
+							"end": 313
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 319,
+				"end": 388,
+				"name": "media",
+				"prelude": "(aspect-ratio: 16  /  9)",
+				"block": {
+					"type": "Block",
+					"start": 351,
+					"end": 388,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 355,
+								"end": 359,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 355,
+										"end": 359,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "body",
+														"start": 355,
+														"end": 359
+													}
+												],
+												"start": 355,
+												"end": 359
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 360,
+								"end": 385,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 365,
+										"end": 380,
+										"property": "background",
+										"value": "red"
+									}
+								]
+							},
+							"start": 355,
+							"end": 385
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a ratio's whitespace normalizes in a declaration value and is preserved in a\n\tmedia query: the media reader emits its `media-value` node verbatim ",
+				"start": 9,
+				"end": 160
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 389,
+			"styles": "\n\t/* a ratio's whitespace normalizes in a declaration value and is preserved in a\n\tmedia query: the media reader emits its `media-value` node verbatim */\n\tdiv {\n\t\taspect-ratio: 16 / 9;\n\t\taspect-ratio: 1.777;\n\t\taspect-ratio: auto 16 / 9;\n\t}\n\n\t@media (aspect-ratio: 16 / 9) {\n\t\tbody {\n\t\t\tbackground: red;\n\t\t}\n\t}\n\n\t@media (aspect-ratio: 16  /  9) {\n\t\tbody {\n\t\t\tbackground: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 398,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

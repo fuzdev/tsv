@@ -1,0 +1,82 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 252,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 177,
+				"end": 184,
+				"name": "media",
+				"prelude": "",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 186,
+				"end": 196,
+				"name": "supports",
+				"prelude": "",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 198,
+				"end": 209,
+				"name": "container",
+				"prelude": "",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 211,
+				"end": 225,
+				"name": "custom-media",
+				"prelude": "",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 227,
+				"end": 234,
+				"name": "layer",
+				"prelude": "",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 236,
+				"end": 243,
+				"name": "scope",
+				"prelude": "",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an at-rule whose prelude is empty writes no name→prelude separator, so its `;`\n\tcloses flush — the block form is already flush because `{` absorbs the separator ",
+				"start": 9,
+				"end": 175
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 244,
+			"styles": "\n\t/* an at-rule whose prelude is empty writes no name→prelude separator, so its `;`\n\tcloses flush — the block form is already flush because `{` absorbs the separator */\n\t@media;\n\t@supports;\n\t@container;\n\t@custom-media;\n\t@layer;\n\t@scope;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 253,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -410,7 +410,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
 	// (`conformance` does, late, beside the legs that read it). Re-harvest before believing a
 	// css shortfall.
-	css: 133
+	//
+	// 133 → 138: five files arrive from `unknown`, closing the at-rule prelude ROUTING
+	// TABLE and the media reader's node split. Reasoning and the bucket-list diff on
+	// `CORPUS_FORMAT_UNKNOWN_PIN`'s `23 → 18` step.
+	css: 138
 };
 
 /**
@@ -605,7 +609,38 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// (`fn(cb, <ts.ReferenceEntry[]>[])`) byte-identical once the short-chain ladder that had
 	// been holding it broken out is gone.
 	typescript: 89,
-	css: 23
+	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
+	// question — which reader prettier hands an at-rule prelude to, and what that reader
+	// does with the text inside a feature expression.
+	//
+	//   - `atrule/custom-media.css`, `case/case.css`,
+	//     `stylefmt-repo/custom-media-queries/…`, `stylefmt-repo/media-queries-ranges/…`
+	//     leave because `@custom-media` now ROUTES to the media reader. `parser-postcss.js`
+	//     sends `["media", "custom-media"]` to `parseMediaQuery`; tsv's table tested `media`
+	//     alone, so a `@custom-media` prelude fell to the verbatim raw branch and took no
+	//     whitespace collapse, feature-name lowercase, unit fold or number normalization.
+	//     Printer-only: the wire prelude is `strip_css_comments(span.extract(source))` for
+	//     the media arm and the raw arm alike.
+	//   - `stylefmt-repo/at-media/at-media.css` leaves because the media reader now has the
+	//     NODE SPLIT it was missing. `parseMediaQuery` cuts a prelude into nodes joined by
+	//     one space, and `parseMediaFeature` cuts a feature expression at its first colon
+	//     into a name (runs collapsed) and a value (verbatim), trimming only at the
+	//     expression's OWN parens. tsv collapsed whitespace beside every paren at every
+	//     depth, so a grouped condition lost the spaces prettier keeps —
+	//     `(not ( screen and ( color ) ))` came back `(not (screen and (color)))`.
+	//
+	// The same split makes a `media-value`'s text the author's, and a comma inside a
+	// feature expression its own byte, which is the media half of the separator/operator
+	// rule; the value half is the mirror — `@supports` and `@import`'s `supports()` go to
+	// `parseValue`, which regroups and prints its own `, `, while `@container` is on
+	// neither list and stays verbatim. Both halves are corpus-neutral on their own and
+	// ride this step's measurement.
+	//
+	// Measured by the ritual's old-binary/new-binary `--all --json` bucket-list diff over
+	// the whole gates view: these five files are the ONLY ones that change bucket in any
+	// language, and `partial` / `safety` / `errors` / `expected_errors` are identical
+	// file-for-file, `typescript` and `svelte` unmoved in every bucket.
+	css: 18
 };
 
 /**

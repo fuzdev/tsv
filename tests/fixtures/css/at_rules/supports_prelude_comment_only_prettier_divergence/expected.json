@@ -1,0 +1,96 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 245,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 194,
+				"end": 212,
+				"name": "supports",
+				"prelude": "",
+				"block": null
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 214,
+					"end": 217,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 214,
+							"end": 217,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 214,
+											"end": 217
+										}
+									],
+									"start": 214,
+									"end": 217
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 218,
+					"end": 236,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 222,
+							"end": 232,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 214,
+				"end": 236
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a condition prelude holding only comments still emits them — prettier drops the\n\tlast byte of the closing delimiter, leaving an unterminated comment its own parser\n\tthen rejects ",
+				"start": 9,
+				"end": 192
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 204,
+				"end": 211,
+				"position": 0
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 237,
+			"styles": "\n\t/* a condition prelude holding only comments still emits them — prettier drops the\n\tlast byte of the closing delimiter, leaving an unterminated comment its own parser\n\tthen rejects */\n\t@supports /* c */;\n\tdiv {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 246,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

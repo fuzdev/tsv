@@ -1925,24 +1925,6 @@ Deno.test('comment_preserved: negative - prettier RELOCATES the comment (not a d
 	assertEquals(match, null);
 });
 
-// ─── css_value_ratio ────────────────────────────────────────────────────────
-
-Deno.test('css_value_ratio: positive - ratio spacing in media query', () => {
-	const prettier = '<style>\n@media (aspect-ratio: 16  /  9) {\n\tdiv { color: red; }\n}\n</style>';
-	const ours = '<style>\n@media (aspect-ratio: 16 / 9) {\n\tdiv { color: red; }\n}\n</style>';
-	const ctx = make_context(ours, prettier, 'svelte');
-	const match = run_pattern('css_value_ratio', ctx);
-	assertNotEquals(match, null);
-});
-
-Deno.test('css_value_ratio: negative - division in TypeScript', () => {
-	const prettier = 'const x = 16  /  9;';
-	const ours = 'const x = 16 / 9;';
-	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('css_value_ratio', ctx);
-	assertEquals(match, null);
-});
-
 // ─── css_comment_stable_quirk ───────────────────────────────────────────────
 
 Deno.test('css_comment_stable_quirk: positive - comment before { in at-rule', () => {

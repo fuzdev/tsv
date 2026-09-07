@@ -1,0 +1,95 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 241,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 185,
+				"end": 232,
+				"name": "media",
+				"prelude": "(a: b c)",
+				"block": {
+					"type": "Block",
+					"start": 201,
+					"end": 232,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 205,
+								"end": 208,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 205,
+										"end": 208,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 205,
+														"end": 208
+													}
+												],
+												"start": 205,
+												"end": 208
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 209,
+								"end": 229,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 214,
+										"end": 224,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 205,
+							"end": 229
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a `media-value`'s whitespace run is the author's, with one exception: a run\n\tcarrying a newline still collapses, because tsv never emits a raw newline inside a\n\tprelude ",
+				"start": 9,
+				"end": 183
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 233,
+			"styles": "\n\t/* a `media-value`'s whitespace run is the author's, with one exception: a run\n\tcarrying a newline still collapses, because tsv never emits a raw newline inside a\n\tprelude */\n\t@media (a: b c) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 242,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,1 @@
+prettier truncates the comment terminator, and its own parser rejects the result

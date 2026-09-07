@@ -1,0 +1,66 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 433,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 252,
+				"end": 288,
+				"name": "custom-media",
+				"prelude": "--a (max-width: 30em)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 290,
+				"end": 334,
+				"name": "custom-media",
+				"prelude": "--KeepName (min-width: 100px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 336,
+				"end": 396,
+				"name": "custom-media",
+				"prelude": "--b (min-width: 100px) and (max-width: 200px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 398,
+				"end": 424,
+				"name": "custom-media",
+				"prelude": "--c not all",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " `@custom-media` is read by the media-query parser, like `@media`: its prelude's\n\twhitespace collapses, its feature names lowercase and its units fold, while the\n\t`--` name keeps its case (an author-defined name has no canonical casing) ",
+				"start": 9,
+				"end": 250
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 425,
+			"styles": "\n\t/* `@custom-media` is read by the media-query parser, like `@media`: its prelude's\n\twhitespace collapses, its feature names lowercase and its units fold, while the\n\t`--` name keeps its case (an author-defined name has no canonical casing) */\n\t@custom-media --a (max-width: 30em);\n\t@custom-media --KeepName (min-width: 100px);\n\t@custom-media --b (min-width: 100px) and (max-width: 200px);\n\t@custom-media --c not all;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 434,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

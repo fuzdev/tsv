@@ -28,10 +28,9 @@ use tsv_lang::printing::format_string_literal;
 ///
 /// `parser-postcss.js` routes a prelude by at-rule name: `@media` (and `@custom-media`) to
 /// `parseMediaQuery`, and `@supports` — plus every `isModuleRuleName` at-rule, of which
-/// `@import` is the one tsv formats — to `parseValue`. ⚠️ tsv's own routing
-/// (`parser/atrules/mod.rs`) tests `media` alone, so a `@custom-media` prelude never reaches
-/// this function at all and stays verbatim — the reader split below describes prettier
-/// faithfully and tsv only for `@media`. The two readers tokenize the same
+/// `@import` is the one tsv formats — to `parseValue`. tsv's own routing
+/// (`parser/atrules/mod.rs`) tests the same pair, so a `@custom-media` prelude reaches this
+/// function on the media path like a `@media` one. The two readers tokenize the same
 /// text differently and print through different arms, so one authoring can have two
 /// canonical forms, and a rule keyed on the wrong one is wrong on three counts at once:
 /// the unit gate, the hex fold, and which runs absorb a following number.
@@ -43,7 +42,7 @@ pub(crate) enum PreludeReader {
     /// `@supports` and `@import`: `parseValue` (postcss-values-parser) → `value-*` nodes,
     /// printed as `printCssNumber(value) + printUnit(unit)` / `value-word`.
     Value,
-    /// `@media`: `parseMediaQuery` → a node split (`media-type`, `media-feature`,
+    /// `@media` and `@custom-media`: `parseMediaQuery` → a node split (`media-type`, `media-feature`,
     /// `media-colon`, `media-value`, `media-keyword`, `media-url`, `media-unknown`), of which
     /// `media-type` and `media-value` print through `adjustNumbers` (`print/misc.js`), a regex
     /// pass over the raw text.

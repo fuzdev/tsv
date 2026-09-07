@@ -55,7 +55,9 @@ pub(in crate::fixtures::validation) fn validate_formatter_idempotent(
 /// of trusting the marker, verify the claim still holds:
 /// - `prettier(input) != input` (otherwise prettier is idempotent — divergence gone)
 /// - `prettier^2(input) != prettier(input)` (otherwise a fixed point exists one pass
-///   in — document it normally via `output_prettier.*`)
+///   in — document it normally via `output_prettier.*`), where prettier THROWING on
+///   its own pass-1 output satisfies the inequality outright: it cannot re-read where
+///   it landed, so there is no fixed point to find
 ///
 /// Two passes are a proxy for "never converges": a true proof is impossible, but
 /// every convergent prettier chain observed in this repo bottoms out within
@@ -86,15 +88,15 @@ pub(in crate::fixtures::validation) async fn validate_prettier_nonconvergent(
         return;
     }
 
-    let pass2 = match run_prettier(&pass1, parser).await {
-        Ok(f) => f,
-        Err(e) => {
-            result.add_error(ValidationError::FormatterError(format!(
-                "Prettier on {} (F5 pass 2): {e}",
-                fixture.input_file
-            )));
-            return;
-        }
+    // Prettier THROWING on its own pass-1 output is the strongest form of the claim the
+    // marker makes, not a harness failure: there is no fixed point because prettier cannot
+    // even read where it landed (`@supports /* c */;` comes back with the comment's closing
+    // delimiter truncated, which its own parser then rejects as `Unclosed comment`). A
+    // pass-1 throw is a different fixture — the input itself is refused, which is
+    // `prettier_rejects.txt`.
+    let Ok(pass2) = run_prettier(&pass1, parser).await else {
+        result.add_success(ValidationSuccess::PrettierNonconvergenceVerified);
+        return;
     };
     if pass2 == pass1 {
         result.add_error(ValidationError::NonconvergentMarkerButPrettierConverges(

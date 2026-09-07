@@ -1,0 +1,192 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 302,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 158,
+				"end": 177,
+				"name": "container",
+				"prelude": "",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 180,
+				"end": 238,
+				"name": "container",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 207,
+					"end": 238,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 211,
+								"end": 214,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 211,
+										"end": 214,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 211,
+														"end": 214
+													}
+												],
+												"start": 211,
+												"end": 214
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 215,
+								"end": 235,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 220,
+										"end": 230,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 211,
+							"end": 235
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 241,
+				"end": 293,
+				"name": "container",
+				"prelude": "b",
+				"block": {
+					"type": "Block",
+					"start": 262,
+					"end": 293,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 266,
+								"end": 269,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 266,
+										"end": 269,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 266,
+														"end": 269
+													}
+												],
+												"start": 266,
+												"end": 269
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 270,
+								"end": 290,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 275,
+										"end": 285,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 266,
+							"end": 290
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a condition prelude holding only comments still emits them: the query has no\n\tparts, and the whole prelude span is the comments' only carrier ",
+				"start": 9,
+				"end": 156
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 169,
+				"end": 176,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 191,
+				"end": 198,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " d ",
+				"start": 199,
+				"end": 206,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 254,
+				"end": 261,
+				"position": 2
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 294,
+			"styles": "\n\t/* a condition prelude holding only comments still emits them: the query has no\n\tparts, and the whole prelude span is the comments' only carrier */\n\t@container /* c */;\n\n\t@container /* c */ /* d */ {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@container b /* c */ {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 303,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,291 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 706,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 245,
+				"end": 314,
+				"name": "media",
+				"prelude": "(aspect-ratio: 16 / 9 )",
+				"block": {
+					"type": "Block",
+					"start": 283,
+					"end": 314,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 287,
+								"end": 290,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 287,
+										"end": 290,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 287,
+														"end": 290
+													}
+												],
+												"start": 287,
+												"end": 290
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 291,
+								"end": 311,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 296,
+										"end": 306,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 287,
+							"end": 311
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 317,
+				"end": 374,
+				"name": "media",
+				"prelude": "(a: url(a.png)  b)",
+				"block": {
+					"type": "Block",
+					"start": 343,
+					"end": 374,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 347,
+								"end": 350,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 347,
+										"end": 350,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 347,
+														"end": 350
+													}
+												],
+												"start": 347,
+												"end": 350
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 351,
+								"end": 371,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 356,
+										"end": 366,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 347,
+							"end": 371
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 604,
+				"end": 648,
+				"name": "media",
+				"prelude": "(a: )",
+				"block": {
+					"type": "Block",
+					"start": 617,
+					"end": 648,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 621,
+								"end": 624,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 621,
+										"end": 624,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 621,
+														"end": 624
+													}
+												],
+												"start": 621,
+												"end": 624
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 625,
+								"end": 645,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 630,
+										"end": 640,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 621,
+							"end": 645
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 651,
+				"end": 697,
+				"name": "media",
+				"prelude": "(a: b:)",
+				"block": {
+					"type": "Block",
+					"start": 666,
+					"end": 697,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 670,
+								"end": 673,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 670,
+										"end": 673,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 670,
+														"end": 673
+													}
+												],
+												"start": 670,
+												"end": 673
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 674,
+								"end": 694,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 679,
+										"end": 689,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 670,
+							"end": 694
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a `media-value` is a node prettier emits verbatim, so a whitespace run inside one\n\tis the author's: the run before a comment, and the run after an opaque `url()`, are\n\tkept rather than collapsed onto the separator's single space ",
+				"start": 9,
+				"end": 243
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 274,
+				"end": 281,
+				"position": 22
+			},
+			{
+				"type": "CSSComment",
+				"value": " only the SPLITTING colon holds a run open against the expression's own `)` — the\n\tprettier-mandated space of an empty value; a later colon is value text, so the run\n\tafter it trims like every other run beside that paren ",
+				"start": 377,
+				"end": 602
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 698,
+			"styles": "\n\t/* a `media-value` is a node prettier emits verbatim, so a whitespace run inside one\n\tis the author's: the run before a comment, and the run after an opaque `url()`, are\n\tkept rather than collapsed onto the separator's single space */\n\t@media (aspect-ratio: 16 / 9 /* c */) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@media (a: url(a.png)  b) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* only the SPLITTING colon holds a run open against the expression's own `)` — the\n\tprettier-mandated space of an empty value; a later colon is value text, so the run\n\tafter it trims like every other run beside that paren */\n\t@media (a: ) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@media (a: b:) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 707,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
