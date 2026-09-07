@@ -14,7 +14,8 @@ use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
 use self::preludes::{
-    parse_condition_query, parse_container_prelude, parse_import_prelude, parse_scope_prelude,
+    ConditionReader, parse_condition_query, parse_container_prelude, parse_import_prelude,
+    parse_scope_prelude,
 };
 use self::raw::parse_raw_prelude_content;
 
@@ -111,7 +112,7 @@ pub(crate) fn parse_atrule<'arena>(
         parse_scope_prelude(parser)?
     } else if name_lc == "supports" {
         // Parse @supports prelude as structured conditions (for line-width wrapping)
-        let (condition, span) = parse_condition_query(parser)?;
+        let (condition, span) = parse_condition_query(parser, ConditionReader::Value)?;
         PreludeValue::Supports { condition, span }
     } else if name_lc == "container" {
         // Parse @container prelude as structured conditions (for line-width wrapping)
@@ -121,11 +122,20 @@ pub(crate) fn parse_atrule<'arena>(
             condition,
             span,
         }
-    } else if name_lc == "media" {
+    } else if matches!(name_lc, "media" | "custom-media") {
         // Parse @media as raw string to preserve comments
         // Wrapping is handled in the printer by finding and/or boundaries
         // Fully structuring preludes is a deferred design option — see
         // docs/architecture.md § "Red-Green Trees (Deferred)"
+        //
+        // `@custom-media` reads through the same media-query parser as `@media` —
+        // prettier routes `["media", "custom-media"]` to `parseMediaQuery` — so its
+        // prelude takes the media reader's whitespace, feature-name case and number
+        // rules rather than falling to the verbatim raw branch below. The `--name` it
+        // leads with is an `<extension-name>` (css-extensions-1), preserved as any
+        // case-sensitive feature name is. Routing is printer-only: the wire prelude is
+        // `strip_css_comments(span.extract(source))` for both this arm and `Raw`, and
+        // `parse_raw_prelude_content`'s span is flag-independent.
         let (content, span) = parse_raw_prelude_content(parser, true, false)?;
         PreludeValue::Media { content, span }
     } else {

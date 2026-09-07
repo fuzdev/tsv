@@ -119,6 +119,31 @@ fn boolean_operator_position(prev: Option<TokenKind>, in_selector_args: bool) ->
         )
 }
 
+/// Which of prettier's two prelude readers a condition prelude is read by — the axis
+/// that decides whether its value text is regrouped or kept as the author wrote it.
+///
+/// `parser-postcss.js` hands `@supports` (and the `supports()` of an `@import`) to
+/// `parseValue`, which regroups the value into its own nodes and prints its own
+/// separators, so a comma there is a separator and takes prettier's `, `.
+/// `@container` is on **neither** of prettier's lists: its params stay raw, so a comma
+/// between its parens is the author's byte and moving it would be a rewrite.
+///
+/// The axis `value_normalization::PreludeReader` already names for the printer's
+/// number/hex rules, stated here for the parser's separator rules.
+/// ⚠️ The variants name **prettier's** reader, not tsv's output. `Raw` bounds the comma
+/// rule and nothing else: tsv still applies its own boolean-operator and value-colon
+/// spacing to a `@container` prelude, a deliberate divergence with its own catalog entry
+/// (`container_spacing_prettier_divergence` — ◆spec_violation, the grammar requires the
+/// space `and(` omits). Don't read `Raw` as "tsv emits this verbatim".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ConditionReader {
+    /// `@supports`, and `@import`'s `supports()` — read by `parseValue`.
+    Value,
+    /// `@container` — read by neither of prettier's readers, so its prelude text is
+    /// prettier's verbatim.
+    Raw,
+}
+
 /// Parse a condition query — `(prop: val)` parts connected by `and`/`or`, with
 /// an optional leading `not` and function-style `selector(...)` conditions.
 ///
@@ -136,6 +161,7 @@ fn boolean_operator_position(prev: Option<TokenKind>, in_selector_args: bool) ->
 /// - `(a) and (b) or (c)` - mixed (parsed left-to-right)
 pub(super) fn parse_condition_query<'arena>(
     parser: &mut CssParser<'_, 'arena>,
+    reader: ConditionReader,
 ) -> Result<(ConditionQuery<'arena>, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
     let mut parts = parser.bvec();
@@ -180,6 +206,7 @@ pub(super) fn parse_condition_query<'arena>(
             current_connector.take(),
             current_connector_raw.take(),
             end_pos,
+            reader,
         )? {
             ConditionPartOutcome::Parsed { part, end, .. } => {
                 end_pos = end;
@@ -232,6 +259,7 @@ fn parse_condition_part<'arena>(
     connector: Option<ConditionConnector>,
     connector_raw: Option<&'arena str>,
     mut end_pos: usize,
+    reader: ConditionReader,
 ) -> Result<ConditionPartOutcome<'arena>, ParseError> {
     let part_start = parser.span_pos(parser.current_start);
     // One growable buffer instead of a `Vec<String>` of per-token / per-space pieces
@@ -434,13 +462,27 @@ fn parse_condition_part<'arena>(
             trailing_spaces += 1;
         }
 
-        // Remove trailing whitespace before a value ':' — only the counted
-        // programmatic spaces, never a token's own escape-terminator space. (The
-        // counter is reset by the token emission just below, which always runs
-        // next.) Inside a `<general-enclosed>` `selector()` argument the colon
-        // opens a pseudo-class instead, where a preceding space is a descendant
-        // combinator: `selector(div :hover)` is not `selector(div:hover)`.
-        if matches!(parser.current_kind, TokenKind::Colon) && general_enclosed_selector.is_none() {
+        // A comma is a SEPARATOR on the value reader, which regroups the value into its
+        // own nodes and prints its own `, ` — so its left side is stripped below and its
+        // right side padded further down, the same pair the value colon takes. Bounded
+        // twice: `@container` is on neither of prettier's reader lists (its params are
+        // verbatim, comma included), and inside a `<general-enclosed>` `selector()`
+        // argument the comma separates a selector list the selector printer owns.
+        let pads_comma = matches!(parser.current_kind, TokenKind::Comma)
+            && reader == ConditionReader::Value
+            && general_enclosed_selector.is_none();
+
+        // Remove trailing whitespace before a value ':' or a separator ',' — only the
+        // counted programmatic spaces, never a token's own escape-terminator space. (The
+        // counter is reset by the token emission just below, which always runs next.)
+        // Inside a `<general-enclosed>` `selector()` argument the colon opens a
+        // pseudo-class instead, where a preceding space is a descendant combinator:
+        // `selector(div :hover)` is not `selector(div:hover)`. One statement of which
+        // tokens strip, the `raw.rs` sibling's shape.
+        let strips_leading_space = pads_comma
+            || (matches!(parser.current_kind, TokenKind::Colon)
+                && general_enclosed_selector.is_none());
+        if strips_leading_space {
             part_buf.truncate(part_buf.len() - trailing_spaces);
         }
 
@@ -473,6 +515,13 @@ fn parse_condition_part<'arena>(
             && !parser.check(TokenKind::Whitespace)
             && !parser.check(TokenKind::RightParen)
         {
+            part_buf.push(' ');
+            trailing_spaces += 1;
+        }
+
+        // Add space after a value-reader comma — `pads_comma`, whose left-side strip
+        // above is the same rule read from the other side.
+        if pads_comma && !parser.check(TokenKind::Whitespace) {
             part_buf.push(' ');
             trailing_spaces += 1;
         }
@@ -570,7 +619,7 @@ pub(super) fn parse_supports_function_condition<'arena>(
         part,
         end,
         closed: true,
-    } = parse_condition_part(parser, None, None, start)?
+    } = parse_condition_part(parser, None, None, start, ConditionReader::Value)?
     else {
         return Ok(None);
     };
@@ -624,7 +673,7 @@ pub(super) fn parse_container_prelude<'arena>(
     };
 
     // Now parse the condition (same grammar as @supports).
-    let (condition, cond_span) = parse_condition_query(parser)?;
+    let (condition, cond_span) = parse_condition_query(parser, ConditionReader::Raw)?;
 
     // The prelude span keeps the pre-name `start` and takes the condition's end,
     // so a named `@container foo (…)` covers the name while an unnamed one matches

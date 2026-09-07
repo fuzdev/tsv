@@ -227,32 +227,25 @@ impl<'a> Printer<'a> {
                 self.write(content);
             }
             internal::PreludeValue::Supports { condition, span } => {
-                self.write(" ");
                 // @supports conditions are declarations, so prettier normalizes
                 // their values (e.g. numbers); @container queries are left raw.
-                self.print_condition_query(
-                    ConditionKind::Supports,
-                    condition,
-                    atrule.block.is_some(),
-                    Some(*span),
-                );
+                self.write_condition_prelude(ConditionKind::Supports, condition, *span, atrule);
             }
             internal::PreludeValue::Container {
                 name,
                 condition,
                 span,
             } => {
-                self.write(" ");
-                self.print_condition_query(
+                self.write_condition_prelude(
                     ConditionKind::Container {
                         name: name.as_deref(),
                     },
                     condition,
-                    atrule.block.is_some(),
-                    Some(*span),
+                    *span,
+                    atrule,
                 );
             }
-            internal::PreludeValue::Media { content, .. } => {
+            internal::PreludeValue::Media { content, .. } if !content.is_empty() => {
                 self.write(" ");
                 self.print_media_prelude(content, atrule.block.is_some());
             }
@@ -365,13 +358,15 @@ impl<'a> Printer<'a> {
         self.write_arena_doc_with_suffix(doc, suffix_width);
     }
 
-    /// Build the doc tree for an `@media` prelude (see `print_media_prelude`).
+    /// Build the doc tree for a media-reader prelude — `@media` or `@custom-media` (see
+    /// `print_media_prelude`).
     fn build_media_prelude_doc(&self, content: &str, suffix_width: usize) -> DocId {
         let d = self.d();
         // Normalize numbers + string quotes in the raw prelude (`.5px` → `0.5px`,
-        // `"x"` → `'x'`). Comments preserved. `@media` is the one at-rule prettier hands
-        // to `parseMediaQuery`, so its prelude takes the `adjustNumbers` rules — the
-        // known-unit gate, no hex fold, `WORD_PART` deciding what absorbs a number.
+        // `"x"` → `'x'`). Comments preserved. `@media` and `@custom-media` are the two
+        // at-rules prettier hands to `parseMediaQuery`, so their preludes take the
+        // `adjustNumbers` rules — the known-unit gate, no hex fold, `WORD_PART` deciding
+        // what absorbs a number.
         let content = value_normalization::normalize_value_text(content, PreludeReader::MediaQuery);
         // Lowercase media-feature *names* (`(MIN-WIDTH: …)` → `(min-width: …)`),
         // matching prettier; media types, `and`/`or`/`not`/`only`, and feature values
@@ -460,6 +455,58 @@ impl<'a> Printer<'a> {
         d.indent(fill)
     }
 
+    /// Write a `@supports` / `@container` prelude — the name→prelude separator included,
+    /// because whether there *is* one is part of the same question.
+    ///
+    /// A prelude with **no condition part** (`@supports;`, `@container b /* c */ {`) is
+    /// what makes it one question, in two ways. The query carries nothing, so the prelude
+    /// REGION is the only carrier its comments have — [`Self::build_condition_query_doc`]
+    /// returns early on empty `parts`, which is what dropped them. And with nothing at all
+    /// to emit there must be no separator either, or a blockless `@supports;` closes on
+    /// `@supports ;`. The block form is already flush — [`Printer::write_block_open`]
+    /// absorbs a trailing space — but the `;` writer deliberately does **not** trim one,
+    /// because a prelude's last byte can BE a space (`@layer a\ ;`, an escape whose
+    /// payload is that space), so the decision has to be made here rather than at the tail.
+    ///
+    /// A comment can only follow the container name in this branch: one *before* it is
+    /// followed by the name token, which anchors a condition part, so the prelude is not
+    /// partless at all (`@container /* c */ b {`).
+    fn write_condition_prelude(
+        &mut self,
+        kind: ConditionKind<'_>,
+        condition: &internal::ConditionQuery<'_>,
+        span: Span,
+        atrule: &internal::CssAtrule<'_>,
+    ) {
+        if condition.parts.is_empty() {
+            // Bounds the prelude region rather than the condition: the span's end is the
+            // empty condition's own and stops short of a trailing comment, and its start
+            // can too, so the walk runs from the at-keyword (which no comment can sit
+            // inside) to the block's `{` or the rule's `;`.
+            let region_end = atrule
+                .block
+                .as_ref()
+                .map_or(atrule.span.end, |b| b.span.start);
+            let comments = self.comment_blocks_in_range(atrule.name_span.end, region_end);
+            let name = kind.name();
+            if name.is_none() && comments.is_empty() {
+                return;
+            }
+            self.write(" ");
+            if let Some(n) = name {
+                self.write(n);
+                if !comments.is_empty() {
+                    self.write(" ");
+                }
+            }
+            self.write(&comments);
+            return;
+        }
+
+        self.write(" ");
+        self.print_condition_query(kind, condition, atrule.block.is_some(), Some(span));
+    }
+
     /// Format an `@supports`/`@container` condition prelude (doc-first).
     ///
     /// The whole prelude is one doc tree rendered through the renderer, so the
@@ -480,15 +527,18 @@ impl<'a> Printer<'a> {
         has_block: bool,
         prelude_span: Option<Span>,
     ) {
+        // The partless prelude is `write_condition_prelude`'s, this function's one caller
+        // — it owns the name→prelude separator too, for the same reason. Everything below
+        // may therefore assume a part exists.
+        debug_assert!(
+            !condition.parts.is_empty(),
+            "a partless condition prelude is write_condition_prelude's to print"
+        );
         // Print optional name prefix (for @container)
         let name_end_pos = if let Some(n) = kind.name() {
             self.write(n);
-            // Separate the name from its condition with a space — but a name with no
-            // condition (`@container b {`) takes none, else the block's ` {` would
-            // stack into a double space.
-            if !condition.parts.is_empty() {
-                self.write(" ");
-            }
+            // Separate the name from its condition.
+            self.write(" ");
             // Find where the name ends in source (name length from prelude start)
             prelude_span.map(|s| s.start + n.len() as u32)
         } else {
@@ -669,6 +719,11 @@ impl<'a> Printer<'a> {
 
         if parts.len() <= 1 {
             // Single condition: no break point, emit inline (leading + content + trailing).
+            // A partless query never reaches here — `write_condition_prelude` answers it
+            // (a prelude with nothing to print also has no separator to write, and this
+            // builder cannot see the region its comments live in); the `debug_assert` at
+            // that entry point states it. This arm is the release-mode floor, never the
+            // handler.
             let Some(first) = parts.first() else {
                 return d.text("");
             };
