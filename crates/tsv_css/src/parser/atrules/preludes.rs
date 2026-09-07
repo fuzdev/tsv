@@ -128,7 +128,7 @@ fn boolean_operator_position(prev: Option<TokenKind>, in_selector_args: bool) ->
 /// `@container` is on **neither** of prettier's lists: its params stay raw, so a comma
 /// between its parens is the author's byte and moving it would be a rewrite.
 ///
-/// The axis `value_normalization::PreludeReader` already names for the printer's
+/// The axis `value_normalization::ValueReader` already names for the printer's
 /// number/hex rules, stated here for the parser's separator rules.
 /// ⚠️ The variants name **prettier's** reader, not tsv's output. `Raw` bounds the comma
 /// rule and nothing else: tsv still applies its own boolean-operator and value-colon

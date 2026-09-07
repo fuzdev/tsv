@@ -22,7 +22,7 @@ use std::borrow::Cow;
 
 use super::Printer;
 use super::value_normalization;
-use super::value_normalization::PreludeReader;
+use super::value_normalization::ValueReader;
 use crate::ast::internal;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
@@ -367,7 +367,7 @@ impl<'a> Printer<'a> {
         // at-rules prettier hands to `parseMediaQuery`, so their preludes take the
         // `adjustNumbers` rules — the known-unit gate, no hex fold, `WORD_PART` deciding
         // what absorbs a number.
-        let content = value_normalization::normalize_value_text(content, PreludeReader::MediaQuery);
+        let content = value_normalization::normalize_value_text(content, ValueReader::MediaQuery);
         // Lowercase media-feature *names* (`(MIN-WIDTH: …)` → `(min-width: …)`),
         // matching prettier; media types, `and`/`or`/`not`/`only`, and feature values
         // are preserved (see `lowercase_media_feature_names`). Keep the already-owned
@@ -630,7 +630,7 @@ impl<'a> Printer<'a> {
                 if kind.normalizes() {
                     d.text_pooled(&value_normalization::normalize_value_text(
                         text,
-                        PreludeReader::Value,
+                        ValueReader::Value,
                     ))
                 } else {
                     d.text_pooled(text)
@@ -924,7 +924,7 @@ impl<'a> Printer<'a> {
         // same reader `@supports` takes. So it normalizes on the value path — no known-unit
         // gate, hex folded, a word absorbing an abutting number — which is the same split
         // that already leaves its media-feature *names* unfolded here.
-        let normalized = value_normalization::normalize_value_text(content, PreludeReader::Value);
+        let normalized = value_normalization::normalize_value_text(content, ValueReader::Value);
         let MediaQueryList {
             text,
             entries: queries,
