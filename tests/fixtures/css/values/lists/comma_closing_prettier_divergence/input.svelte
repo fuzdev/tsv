@@ -8,6 +8,8 @@
 			b 2s ease,;
 		/* a function's argument list takes the same rule */
 		background: linear-gradient(red, blue,);
+		/* and so does a nameless parenthesized group, which is one */
+		border-image: (red, blue,);
 		/* a custom property substitutes its tokens verbatim */
 		--x: a,;
 		/* and the rule reaches a function nested in one */

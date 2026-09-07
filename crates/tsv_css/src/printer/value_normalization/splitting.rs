@@ -79,6 +79,14 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     let mut in_string = false;
     let mut string_delim = '\0';
     let mut pending_space = false;
+    // How far into `result` the last **literal whitespace escape** emitted below reaches.
+    // The `)` and `,` arms strip the spaces before their delimiter, and an escape's payload
+    // IS a space (`(1px\ )`, `(a\ ,b)`) — stripping it strands the backslash onto the
+    // delimiter the arm is about to push, which is either output that no longer parses
+    // (`(1px\)`) or a different value (`(a\, b)`, one argument where there were two).
+    // Neither strip may cross this mark. Position, not kind: only the escape's own payload
+    // is protected, so a separator space pushed after it still strips.
+    let mut escape_payload_end = 0usize;
 
     while let Some(ch) = chars.next() {
         let ch_start = byte_pos;
@@ -162,6 +170,18 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
                 &mut byte_pos,
                 &s[ch_start..ch_start + len],
             );
+            // A **literal** escape of a whitespace character — `\` plus that one code point,
+            // so exactly two bytes, CSS whitespace being ASCII. §4.3.4's "anything else"
+            // branch *returns the current input code point*, so the payload is the escaped
+            // character itself: content the strips below must not reach. A **hex** escape's
+            // trailing whitespace is the optional *terminator* of §4.3.7 ("if the next input
+            // code point is whitespace, consume it as well", the returned code point being
+            // the hex value), so it carries nothing and both formatters drop it
+            // (`a\41 ` → `a\41`) — deliberately unguarded, the same split
+            // `trim_end_preserving_escape` makes at the value's own end.
+            if len == 2 && is_css_whitespace(s.as_bytes()[ch_start + 1] as char) {
+                escape_payload_end = result.len();
+            }
             continue;
         }
 
@@ -181,9 +201,9 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
             continue;
         }
 
-        // Closing paren - remove trailing whitespace
+        // Closing paren - remove trailing whitespace (never an escape's payload)
         if ch == ')' {
-            while result.ends_with(' ') {
+            while result.len() > escape_payload_end && result.ends_with(' ') {
                 result.pop();
             }
             result.push(ch);
@@ -192,9 +212,10 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
         }
 
         // Comma - no space before, single space after (CSS never wants a space
-        // before a comma, e.g. a media-query list `projection, tv`).
+        // before a comma, e.g. a media-query list `projection, tv`) — but the space an
+        // escape spells is content, not the separator this arm is normalizing away.
         if ch == ',' {
-            while result.ends_with(' ') {
+            while result.len() > escape_payload_end && result.ends_with(' ') {
                 result.pop();
             }
             result.push(ch);
@@ -580,6 +601,28 @@ mod tests {
             "a\u{00A0}\u{00A0}b"
         ); // not collapsed
         assert_eq!(normalize_css_whitespace("émotion"), "émotion"); // non-ws non-ASCII verbatim
+    }
+
+    /// A literal escape of a whitespace character spells that character (CSS Syntax 3
+    /// §4.3.4, "anything else": *return the current input code point*), so its payload is
+    /// content and neither delimiter strip may take it. Stranded, the backslash escapes the
+    /// delimiter instead: `(1px\)` no longer parses at all, and `(a\, b)` is one argument
+    /// where the author wrote two.
+    #[test]
+    fn a_whitespace_escapes_payload_survives_the_delimiter_strips() {
+        assert_eq!(normalize_css_whitespace("(1px\\ )"), "(1px\\ )");
+        assert_eq!(normalize_css_whitespace("(a\\ ,b)"), "(a\\ , b)");
+        assert_eq!(normalize_css_whitespace("(a\\\t)"), "(a\\\t)"); // tab payload, same rule
+
+        // Only the payload is protected, not the separator run after it: the space the
+        // author wrote *outside* the escape is still the strip's business.
+        assert_eq!(normalize_css_whitespace("( 1px\\  )"), "(1px\\ )");
+
+        // A HEX escape's trailing whitespace is §4.3.7's optional terminator rather than a
+        // payload — it carries nothing, and both formatters drop it — so it is deliberately
+        // not protected. Same split `trim_end_preserving_escape` makes at a value's own end.
+        assert_eq!(normalize_css_whitespace("(a\\41 )"), "(a\\41)");
+        assert_eq!(normalize_css_whitespace("(a\\41 ,b)"), "(a\\41, b)");
     }
 
     #[test]

@@ -25,6 +25,9 @@ follows:
 | `padding: var(--b, x\,y);` | `padding: var(--b, x\, y);` | the **escaped comma** is read as an argument separator, so one ident is split and rejoined with `", "` — a space is inserted *inside* the value `x,y` |
 | `gap: a, b\,;` | `gap: a, b\;` | the same escaped comma at the value's *end*: its payload is dropped and `\;` escapes the terminator |
 | `inset: a\+b;` | `inset: a\+ b;` | the **escaped `+`** is read as an operator and gets operator spacing — one ident `a+b` becomes two values |
+| `left: (1px\ ) /* c */;` | `left: (1px\) /* c */;` | `\)` escapes the group's closer, as in the `calc` row |
+| `right: f(1px\ , 2px) /* c */;` | `right: f(1px\, 2px) /* c */;` | `\,` is no longer a separator — two arguments become one |
+| `bottom: (a b c\ )(d);` | `bottom: (a b c\) (d);` | same closer as the `left` row, in a shell the value parser leaves opaque |
 
 The `gap` row is also the boundary of a separate tsv rule: a comma **closing** a
 value is authored content tsv keeps ([comma_closing](../lists/comma_closing_prettier_divergence/)),
@@ -37,9 +40,22 @@ escaped the declaration and the block never close. (Svelte's error-recovering
 *formatter* divergence, not a parser one. tsv's parse AST matches `parseCss` on
 `input.svelte` exactly, escaped space and all.)
 
-The last two are the same root cause seen from the other side: an escape is
-**opaque**, so nothing inside it — a space, a comma, a paren — is structure. tsv
-steps over escapes whole wherever it scans a value.
+The `inset` and `padding` rows are the same root cause seen from the other side: an
+escape is **opaque**, so nothing inside it — a space, a comma, a paren — is structure.
+tsv steps over escapes whole wherever it scans a value.
+
+The last three rows say where the payload has to survive on tsv's side, and it is not
+the same question as stepping over the escape while scanning. These values reach the
+printer's whitespace normalizer as *text* rather than as a value tree — a value holding a
+comment is re-emitted from source, and a paren shell whose first `(` does not close at the
+value's end stays one opaque token — and that normalizer strips the spaces before a `)` or
+a `,` to place the delimiter. The escape's payload is such a space, so the strips are
+bounded by where the last one was emitted. Only the payload is bounded: a separator the
+author wrote *after* it still strips (`( 1px\  )` → `(1px\ )`), and a **hex** escape's
+trailing whitespace is §4.3.7's optional terminator rather than a payload, so it is dropped
+here too, matching prettier (`f(a\41 )` → `f(a\41)`). The comment-free spellings of the
+same three values already print correctly from the value tree, so this is one rule reaching
+its second emitter, not a second rule.
 
 A *hex* escape is opaque for one byte more than it looks: it takes up to six hex
 digits and then, optionally, **one whitespace terminator**, which belongs to the

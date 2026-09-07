@@ -1,11 +1,14 @@
 # comma_closing_prettier_divergence
 
 A comma **closing** a declaration's value (`transition: a,`, `--x: a,`,
-`rgb(1, 2, 3,)`) is a separator with no entry after it. tsv keeps it; prettier
-deletes it.
+`rgb(1, 2, 3,)`, `(red, blue,)`) is a separator with no entry after it. tsv keeps it;
+prettier deletes it.
 
-tsv: `transition: a,` · `linear-gradient(red, blue,)` · `--x: a,`
-Prettier: `transition: a` · `linear-gradient(red, blue)` · `--x: a`
+tsv: `transition: a,` · `linear-gradient(red, blue,)` · `(red, blue,)` · `--x: a,`
+Prettier: `transition: a` · `linear-gradient(red, blue)` · `(red, blue)` · `--x: a`
+
+A nameless parenthesized group is an argument list like any other — it parses as a
+function whose name is empty — so it takes the rule without a clause of its own.
 
 The rule is **token preservation**: a declaration value is text tsv re-spells, and a
 comma the author wrote is one of its tokens. Deleting it leaves the comma-split parse

@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 55,
+		"end": 86,
 		"attributes": [],
 		"children": [
 			{
@@ -12,19 +12,27 @@
 				"name": "import",
 				"prelude": "url('style.css') layer(base)",
 				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 48,
+				"end": 77,
+				"name": "import",
+				"prelude": "url('a.css') layer()",
+				"block": null
 			}
 		],
 		"comments": [],
 		"content": {
 			"start": 7,
-			"end": 47,
-			"styles": "\n\t@import url('style.css') layer(base);\n",
+			"end": 78,
+			"styles": "\n\t@import url('style.css') layer(base);\n\t@import url('a.css') layer();\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 56,
+	"end": 87,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

@@ -1,0 +1,189 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 826,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 817,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 256,
+							"end": 269,
+							"property": "margin",
+							"value": "(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 273,
+							"end": 284,
+							"property": "flex",
+							"value": "(0.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 288,
+							"end": 308,
+							"property": "border-color",
+							"value": "(#fff)"
+						},
+						{
+							"type": "Declaration",
+							"start": 312,
+							"end": 330,
+							"property": "font-family",
+							"value": "('a')"
+						},
+						{
+							"type": "Declaration",
+							"start": 334,
+							"end": 346,
+							"property": "width",
+							"value": "(1px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 475,
+							"end": 491,
+							"property": "padding",
+							"value": "a (1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 495,
+							"end": 520,
+							"property": "border-width",
+							"value": "(1.5) (2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 524,
+							"end": 545,
+							"property": "height",
+							"value": "calc((1.5px))"
+						},
+						{
+							"type": "Declaration",
+							"start": 620,
+							"end": 633,
+							"property": "top",
+							"value": "(a: 1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 637,
+							"end": 666,
+							"property": "left",
+							"value": "(100vw - 1.5px - 2.5px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 716,
+							"end": 726,
+							"property": "--a",
+							"value": "(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 789,
+							"end": 798,
+							"property": "right",
+							"value": "()"
+						},
+						{
+							"type": "Declaration",
+							"start": 802,
+							"end": 813,
+							"property": "bottom",
+							"value": "x()"
+						}
+					]
+				},
+				"start": 9,
+				"end": 817
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a parenthesized group is a value group like any other, so its members take\n\t\tevery value-level rule they take outside it: a number canonicalizes, a hex\n\t\tcolour lowercases, a string re-quotes and a unit folds to its canonical case ",
+				"start": 17,
+				"end": 253
+			},
+			{
+				"type": "CSSComment",
+				"value": " the group is one member of the value around it — beside a word, beside\n\t\tanother group, and nested inside a function ",
+				"start": 350,
+				"end": 472
+			},
+			{
+				"type": "CSSComment",
+				"value": " a colon-bearing interior and an operator chain are members too ",
+				"start": 549,
+				"end": 617
+			},
+			{
+				"type": "CSSComment",
+				"value": " a custom property takes the same path ",
+				"start": 670,
+				"end": 713
+			},
+			{
+				"type": "CSSComment",
+				"value": " a group holding nothing closes flush, named or not ",
+				"start": 730,
+				"end": 786
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 818,
+			"styles": "\n\tdiv {\n\t\t/* a parenthesized group is a value group like any other, so its members take\n\t\tevery value-level rule they take outside it: a number canonicalizes, a hex\n\t\tcolour lowercases, a string re-quotes and a unit folds to its canonical case */\n\t\tmargin: (1.5);\n\t\tflex: (0.5);\n\t\tborder-color: (#fff);\n\t\tfont-family: ('a');\n\t\twidth: (1px);\n\t\t/* the group is one member of the value around it — beside a word, beside\n\t\tanother group, and nested inside a function */\n\t\tpadding: a (1.5);\n\t\tborder-width: (1.5) (2.5);\n\t\theight: calc((1.5px));\n\t\t/* a colon-bearing interior and an operator chain are members too */\n\t\ttop: (a: 1.5);\n\t\tleft: (100vw - 1.5px - 2.5px);\n\t\t/* a custom property takes the same path */\n\t\t--a: (1.5);\n\t\t/* a group holding nothing closes flush, named or not */\n\t\tright: ();\n\t\tbottom: x();\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 827,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -82,10 +82,15 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for an identifier value
     ///
-    /// Uses source extraction to preserve escapes, with whitespace normalization
-    /// for parenthesized expressions (like calc sub-expressions).
-    /// Parenthesized groups like `(100vw - var(--a) - var(--b))` get fill-based
-    /// wrapping so they can break at operator boundaries when exceeding print width.
+    /// The ordinary leaf printer — everything the classifiers did not claim as a string,
+    /// dimension, colour or function (`red`, `flex`, `100%`, 98.6% of identifier values on
+    /// a real corpus). The text is source-extracted so escapes survive verbatim, with
+    /// whitespace normalization for the interior runs of a token the value parser left
+    /// opaque: a comment run, or a paren shell whose first `(` does not close at the value's
+    /// end (`(a b c)(d)`). A *balanced* parenthesized group is not one of those — it parses
+    /// as a nameless `CssValue::Function` (css-syntax-3's `()`-block) and prints through
+    /// `build_value_function_doc`, so its members reach the ordinary value printers and its
+    /// layout is the function group's.
     fn build_identifier_doc(&self, span: Span) -> DocId {
         let d = self.d();
         // The identifier text is recovered from source (escapes preserved verbatim).
@@ -105,22 +110,10 @@ impl<'a> Printer<'a> {
                 // (e.g., "(  100%  -  40px  )" → "(100% - 40px)").
                 let normalized = value_normalization::normalize_css_whitespace(raw);
 
-                // Parenthesized groups with multiple space-separated tokens get
-                // fill-based wrapping so they can break at operator boundaries.
-                // Matches prettier's group(indent(fill(parts))) for paren groups.
-                if normalized.starts_with('(') && normalized.ends_with(')') {
-                    let inner = &normalized[1..normalized.len() - 1];
-                    let tokens = value_normalization::split_by_space_preserving_parens(inner);
-                    if tokens.len() >= 3 {
-                        return self.build_paren_group_doc(&tokens);
-                    }
-                }
-
                 return match normalized {
                     // Verbatim value the host-word test refused (it holds a control byte the
                     // normalizer keeps, `<VT>` and its kin): normalized == source[span], so
-                    // the same zero-allocation `DocText::SourceSpan`. (A verbatim value can never
-                    // contain `(`, so it never reaches the paren-group branch above.)
+                    // the same zero-allocation `DocText::SourceSpan`.
                     Cow::Borrowed(_) => d.source_span(span, self.source),
                     Cow::Owned(s) => d.text_pooled(&s),
                 };
@@ -130,33 +123,6 @@ impl<'a> Printer<'a> {
         // out-of-range span (never in practice — spans index the printer's source):
         // nothing to emit.
         d.text("")
-    }
-
-    /// Build a doc for a parenthesized group with fill-based wrapping
-    ///
-    /// Structure: group("(" indent(softline group(indent(fill(tokens...)))) softline ")")
-    /// - Flat: `(a - b - c)`
-    /// - Break: `(\n  a - b -\n    c\n)`
-    fn build_paren_group_doc(&self, tokens: &[&str]) -> DocId {
-        let d = self.d();
-        let mut fill_parts = DocBuf::with_capacity(tokens.len() * 2);
-        for (i, token) in tokens.iter().enumerate() {
-            fill_parts.push(d.text_pooled(token));
-            if i < tokens.len() - 1 {
-                fill_parts.push(d.line());
-            }
-        }
-        // Inner: group(indent(fill(tokens))) — continuation indent for wrapped lines
-        let inner = d.group(d.indent(d.fill(&fill_parts)));
-        // Outer: group("(" indent(softline inner) softline ")")
-        let open = d.text("(");
-        let close = d.text(")");
-        d.group(d.concat(&[
-            open,
-            d.indent(d.concat(&[d.softline(), inner])),
-            d.softline(),
-            close,
-        ]))
     }
 
     /// Build a doc for a string value
@@ -249,6 +215,12 @@ impl<'a> Printer<'a> {
     ///   when it exceeds width
     /// - `url()` and the `var(--a,)` empty fallback: kept flat — handled before
     ///   this point
+    /// - a blank argument region: closes flush (`f(  )` → `f()`)
+    ///
+    /// A **nameless** `name_span` is the parenthesized group (css-syntax-3's `()`-block,
+    /// `value/mod.rs::extract_function_parts`), and it takes every rule above unchanged —
+    /// the name simply emits nothing. `url` / `var` recognition refuses it on length, so no
+    /// arm needs a clause for it.
     pub(super) fn build_value_function_doc(
         &self,
         name_span: Span,
@@ -311,10 +283,29 @@ impl<'a> Printer<'a> {
             return self.flat_function_doc(name_span, args_doc);
         }
 
-        // A function whose grammar tsv doesn't read parsed no args (`scope((.a) to (.b))`);
-        // it stays verbatim.
+        // No argument came out of the region between the parens, which happens two ways.
+        //
+        // The region held nothing but whitespace — `parse_function_arguments` trims it away
+        // with the same `trim_start_css` / `trim_end_preserving_escape` pair `escapes::trim_css`
+        // composes, so the parser's verdict and the test below cannot disagree — and there is
+        // then nothing to print, so the call closes flush: `f(  )` → `f()`,
+        // `layer(  )` → `layer()`, and the nameless group `(  )` → `()`. That is the same
+        // gap collapse every other value interior takes, and it is one rule for all three
+        // (before the group parsed, its collapse came from the identifier path's whitespace
+        // normalizer instead).
+        //
+        // Or the region was never parsed at all: an `@import` prelude consumes an unknown
+        // function's argument opaquely (`scope((.a) to (.b))` — `preludes::consume_function_args`),
+        // leaving real content behind no argument. That text is the only record of it, so it
+        // stays verbatim.
         if args.is_empty() && span.end_usize() <= self.source.len() {
-            return d.text_pooled(span.extract(self.source));
+            let raw = span.extract(self.source);
+            if let Some(interior) = function_paren_interior(raw, name_span, span)
+                && crate::escapes::trim_css(interior).is_empty()
+            {
+                return self.flat_function_doc(name_span, d.text(""));
+            }
+            return d.text_pooled(raw);
         }
 
         // A comma **closing** the argument list (`rgb(1, 2, 3,)`, `var(--a,)`,
@@ -457,4 +448,19 @@ impl<'a> Printer<'a> {
         self.d()
             .join(values.iter().map(|v| self.build_css_value_doc(v)), sep)
     }
+}
+
+/// The text between a function's parentheses, read off `raw` — the function's own source
+/// slice (`span`), whose last byte the value parser guarantees is the closing `)`.
+///
+/// The opening paren is found past the **name**, never from the start of `raw`: a name may
+/// carry an escaped one (`a\(b(…)` is refused as a name, but `a\28 b(…)` is the name `a(b`),
+/// and a `(` inside the name opens no argument list. `None` when the shape isn't
+/// `<name>(<interior>)` at all, which is the defensive case the sole caller keeps verbatim.
+fn function_paren_interior(raw: &str, name_span: Span, span: Span) -> Option<&str> {
+    let after_name = raw.get(name_span.end_usize().checked_sub(span.start_usize())?..)?;
+    after_name
+        .strip_suffix(')')?
+        .split_once('(')
+        .map(|(_, i)| i)
 }
