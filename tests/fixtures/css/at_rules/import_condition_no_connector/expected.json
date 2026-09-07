@@ -1,0 +1,88 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 689,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 186,
+				"end": 209,
+				"name": "import",
+				"prelude": "'a.css' screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 211,
+				"end": 233,
+				"name": "import",
+				"prelude": "'b.css' layer",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 235,
+				"end": 266,
+				"name": "import",
+				"prelude": "'c.css' not (a: 0.5px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 268,
+				"end": 319,
+				"name": "import",
+				"prelude": "'d.css' supports(display: grid) (a: 0.5px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 481,
+				"end": 579,
+				"name": "import",
+				"prelude": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css' (min-width: 768px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 581,
+				"end": 680,
+				"name": "import",
+				"prelude": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css' (min-width: 768px)",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " each of these is the prelude's last value and a bare identifier run, so each routes\n\tto the media-query printer — the single place the prelude's value normalization runs ",
+				"start": 9,
+				"end": 184
+			},
+			{
+				"type": "CSSComment",
+				"value": " none holds a top-level and/or, so none has a break point: the condition is emitted\n\tverbatim and overruns rather than wrapping, at 100 chars and at 101 ",
+				"start": 322,
+				"end": 479
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 681,
+			"styles": "\n\t/* each of these is the prelude's last value and a bare identifier run, so each routes\n\tto the media-query printer — the single place the prelude's value normalization runs */\n\t@import 'a.css' screen;\n\t@import 'b.css' layer;\n\t@import 'c.css' not (a: 0.5px);\n\t@import 'd.css' supports(display: grid) (a: 0.5px);\n\n\t/* none holds a top-level and/or, so none has a break point: the condition is emitted\n\tverbatim and overruns rather than wrapping, at 100 chars and at 101 */\n\t@import 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css' (min-width: 768px);\n\t@import 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css' (min-width: 768px);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 690,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -417,6 +417,25 @@ impl<'a> Printer<'a> {
     /// them with breakable separators that keep the keyword on the line before the
     /// break (`… and⏎\t…`). A query with no top-level `and`/`or` has no break point,
     /// so it's emitted verbatim. Shared by `@media` and `@import` single queries.
+    ///
+    /// A connector is a break point only where it **joins two segments** — one before it
+    /// and at least one atom after it — which is the grammar's own rule rather than a
+    /// heuristic about malformed input: every connector production binds its operand to
+    /// the right, in both grammars this printer serves. Media Queries 4 §"Syntax" has
+    /// `<media-and> = and <media-in-parens>` and `<media-or> = or <media-in-parens>`, and
+    /// CSS Conditional 3 §"@supports" spells the same shape (`<supports-in-parens> [ and
+    /// <supports-in-parens> ]*`). It is also why `not` is not a connector here at all: it
+    /// is `not <media-in-parens>`, a **prefix**, so it opens a segment instead of joining
+    /// two.
+    ///
+    /// A trailing `and`/`or` is therefore the query's own last word, and emitting a
+    /// separator for it strands a space where the query ends: `@import 'a.css' screen and;`
+    /// closed on `screen and ;`. `@media` hides that, because
+    /// [`Printer::write_block_open`] absorbs a trailing space while the `;` writer
+    /// deliberately does not (a prelude's last byte can *be* a space — see
+    /// [`Self::write_condition_prelude`]), so the guard belongs here at the source rather
+    /// than at either tail. The leading end is the same question read from the other side,
+    /// and `!segment.is_empty()` already answers it.
     fn build_and_or_wrap_doc(&self, query: &str, suffix_width: usize) -> DocId {
         let d = self.d();
         let atoms = value_normalization::split_by_space_preserving_parens(query);
@@ -426,10 +445,10 @@ impl<'a> Printer<'a> {
         let mut fill_parts = DocBuf::new();
         let mut segment = d.pool_writer();
         let mut has_connector = false;
-        for atom in atoms {
+        for (i, atom) in atoms.iter().copied().enumerate() {
             // A `and`/`or` connector (case-insensitive) is the wrap break point;
             // its case is preserved (emit the original `atom`).
-            if is_media_connector(atom) && !segment.is_empty() {
+            if is_media_connector(atom) && !segment.is_empty() && i + 1 < atoms.len() {
                 has_connector = true;
                 fill_parts.push(segment.finish_text());
                 segment = d.pool_writer();

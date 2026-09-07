@@ -1,0 +1,222 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 649,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 94,
+				"end": 121,
+				"name": "import",
+				"prelude": "'a.css' screen and",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 123,
+				"end": 149,
+				"name": "import",
+				"prelude": "'b.css' screen or",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 151,
+				"end": 178,
+				"name": "import",
+				"prelude": "'c.css' screen AND",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 180,
+				"end": 219,
+				"name": "import",
+				"prelude": "'d.css' screen and (color) and",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 295,
+				"end": 315,
+				"name": "import",
+				"prelude": "'e.css' and",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 392,
+				"end": 427,
+				"name": "import",
+				"prelude": "'f.css' screen and (color)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 521,
+				"end": 573,
+				"name": "media",
+				"prelude": "screen and",
+				"block": {
+					"type": "Block",
+					"start": 539,
+					"end": 573,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 543,
+								"end": 549,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 543,
+										"end": 549,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class",
+														"start": 543,
+														"end": 549
+													}
+												],
+												"start": 543,
+												"end": 549
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 550,
+								"end": 570,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 555,
+										"end": 565,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 543,
+							"end": 570
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 576,
+				"end": 640,
+				"name": "media",
+				"prelude": "screen and (color) and",
+				"block": {
+					"type": "Block",
+					"start": 606,
+					"end": 640,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 610,
+								"end": 616,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 610,
+										"end": 616,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class",
+														"start": 610,
+														"end": 616
+													}
+												],
+												"start": 610,
+												"end": 616
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 617,
+								"end": 637,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 622,
+										"end": 632,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 610,
+							"end": 637
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a connector with nothing after it is the query's last word, not a break point ",
+				"start": 9,
+				"end": 92
+			},
+			{
+				"type": "CSSComment",
+				"value": " a connector with no query before it is likewise not a break point ",
+				"start": 222,
+				"end": 293
+			},
+			{
+				"type": "CSSComment",
+				"value": " control: a connector that joins two segments keeps its break point ",
+				"start": 318,
+				"end": 390
+			},
+			{
+				"type": "CSSComment",
+				"value": " `@media` reaches the same wrap; its `{` absorbs the stray separator, the `;` cannot ",
+				"start": 430,
+				"end": 519
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 641,
+			"styles": "\n\t/* a connector with nothing after it is the query's last word, not a break point */\n\t@import 'a.css' screen and;\n\t@import 'b.css' screen or;\n\t@import 'c.css' screen AND;\n\t@import 'd.css' screen and (color) and;\n\n\t/* a connector with no query before it is likewise not a break point */\n\t@import 'e.css' and;\n\n\t/* control: a connector that joins two segments keeps its break point */\n\t@import 'f.css' screen and (color);\n\n\t/* `@media` reaches the same wrap; its `{` absorbs the stray separator, the `;` cannot */\n\t@media screen and {\n\t\t.class {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@media screen and (color) and {\n\t\t.class {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 650,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
