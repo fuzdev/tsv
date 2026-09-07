@@ -65,6 +65,7 @@
 
 use super::ParenContext;
 use super::Printer;
+use super::types::helpers::{outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
 use crate::ast::internal::{self, Comment, TSType};
 use smallvec::smallvec;
@@ -460,12 +461,12 @@ impl<'a> Printer<'a> {
         if !self.has_format_ignore {
             return None;
         }
-        if !matches!(shell, TSType::Parenthesized(_)) {
-            return None;
-        }
-        let inner = unwrap_parenthesized(shell);
-        self.member_gap_frozen(shell.span().start + 1, inner.span().start)
-            .then_some(inner)
+        let p = outermost_paren(shell)?;
+        // The window is [`paren_shell_gaps`]' deep leading half — redundant layers strip
+        // as a unit, so an in-shell directive binds from the OUTERMOST `(`.
+        let (leading, _) = paren_shell_gaps(p);
+        self.member_gap_frozen(leading.start, leading.end)
+            .then_some(unwrap_parenthesized(shell))
     }
 
     /// [`Self::member_gap_frozen`] for list item `i`, the single home of the
@@ -1190,15 +1191,17 @@ impl<'a> Printer<'a> {
     /// yet the frozen raw slice never routes it through `build_comment_doc` — it would be
     /// dropped either way, so the physical-presence question is the correct one.
     fn frozen_paren_shell_has_comment(&self, t: &TSType<'_>) -> bool {
-        if !matches!(t, TSType::Parenthesized(_)) {
+        let Some(shell) = outermost_paren(t) else {
             return false;
-        }
-        let inner = unwrap_parenthesized(t);
-        self.comments_in_source_between(t.span().start, inner.span().start)
+        };
+        // Both halves from [`paren_shell_gaps`]: a doubly-nested shell freezes as one
+        // slice, so the comment between its two `(`s belongs to it.
+        let (leading, trailing) = paren_shell_gaps(shell);
+        self.comments_in_source_between(leading.start, leading.end)
             .next()
             .is_some()
             || self
-                .comments_in_source_between(inner.span().end, t.span().end)
+                .comments_in_source_between(trailing.start, trailing.end)
                 .next()
                 .is_some()
     }
