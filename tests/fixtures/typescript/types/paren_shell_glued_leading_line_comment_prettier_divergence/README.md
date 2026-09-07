@@ -67,7 +67,15 @@ and
   closed around the result — `(// c⏎N extends O ? P : Q)[]`, the `(` glued with no space,
   the operand never indented into the shell, and the `)` welded to its tail. A fixed point
   that reparses, so only a `compare` ever saw it.
-- **c10**, **c13** — the controls: written on its own line it keeps its own line, and at
-  **c10 prettier agrees** — the two formatters part on preserving the author's choice, not
-  on one layout. `c13` is the own-line half at one of the two positions above, which had no
-  own-line form to keep.
+- **c14**, **c16** — the **aligned trailing-object intersection** shell
+  (`((b | c) & { x: X })`), whose leading run is emitted by the aligned-object rendering
+  rather than by the plain shell path above — a different builder, and the one that had no
+  emitter for the run at all until it was given one, so the comment was silently DROPPED in
+  the union-member position. `c14` is that position; `c16` is the same shell reached without
+  a union around it, where the hoist path prints the run instead. Both keep the `(` line, so
+  the two builders answer the delimiter question the same way.
+- **c10**, **c13**, **c15** — the controls: written on its own line it keeps its own line,
+  and at **c10 prettier agrees** — the two formatters part on preserving the author's choice,
+  not on one layout. `c13` is the own-line half at one of the two required-pair positions
+  above, which had no own-line form to keep; `c15` is the own-line half at the aligned-object
+  shell, where prettier collapses both authorings to one form and tsv holds each.

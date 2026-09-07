@@ -40,6 +40,18 @@
 	type B1 = // c12
 	(C1 extends D1 ? E1 : F1)[G1];
 
+	// The ALIGNED trailing-object intersection shell, whose run has its own emitter
+	// (the aligned-object rendering is a different builder from the plain shell above)
+	type M1 =
+		| (// c14
+		  (N1 | O1) & { x: X })
+		| P1;
+
+	// The same shell where the union does NOT wrap it, so the hoisting path prints the
+	// run instead — both paths keep the comment on the `(` line
+	type Q1 = // c16
+	(R1 | S1) & { x: X };
+
 	// Control: written on its own line, it keeps its own line — both authorings are
 	// fixed points, and a blank against the `(` is erased in either
 	type T = [
@@ -50,4 +62,8 @@
 	];
 	type H1 = // c13
 	(I1 extends J1 ? K1 : L1)[];
+	type T1 =
+		| (// c15
+		  (U1 | V1) & { x: X })
+		| W1;
 </script>

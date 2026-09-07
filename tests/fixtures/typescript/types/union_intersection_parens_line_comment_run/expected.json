@@ -1,0 +1,3201 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2438,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A run lifted out of a stripped UNION member's paren shell prints at the member",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " seam, flush under the `|`, not at the member's own two-column offset",
+			"start": 103,
+			"end": 174,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 191,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 6
+				},
+				"end": {
+					"line": 5,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 199,
+			"end": 204,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a later member's shell takes the same seam",
+			"start": 214,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 282,
+			"end": 287,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 6
+				},
+				"end": {
+					"line": 12,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 290,
+			"end": 295,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line comment alone in the shell, nothing on the member's own line",
+			"start": 305,
+			"end": 380,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 399,
+			"end": 404,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the INTERSECTION's answer to the same question: the run opens the continuation",
+			"start": 414,
+			"end": 495,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line the `&` breaks onto, so it takes that line's indent",
+			"start": 497,
+			"end": 556,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 571,
+			"end": 576,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 14
+				},
+				"end": {
+					"line": 24,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 579,
+			"end": 584,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " and the same with a third member past the boundary",
+			"start": 592,
+			"end": 645,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 660,
+			"end": 665,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 14
+				},
+				"end": {
+					"line": 29,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 668,
+			"end": 673,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a comment in a LATER member's gap forces the multiline intersection layout; the",
+			"start": 687,
+			"end": 769,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " first member's lifted run still lands on the continuation",
+			"start": 771,
+			"end": 831,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 846,
+			"end": 852,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 14
+				},
+				"end": {
+					"line": 36,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 855,
+			"end": 861,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c12",
+			"start": 868,
+			"end": 874,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 6
+				},
+				"end": {
+					"line": 38,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank inside the run: the UNION's run stays trailing its member, so the",
+			"start": 882,
+			"end": 966,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank survives",
+			"start": 968,
+			"end": 985,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 42,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 1002,
+			"end": 1008,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 6
+				},
+				"end": {
+					"line": 44,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c14",
+			"start": 1012,
+			"end": 1018,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 2
+				},
+				"end": {
+					"line": 46,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the INTERSECTION's does not - the comment attaches to the member below and the `&`",
+			"start": 1028,
+			"end": 1113,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 1
+				},
+				"end": {
+					"line": 49,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " has been pulled onto the line above, so the blank has nowhere to land and both",
+			"start": 1115,
+			"end": 1196,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " formatters drop it",
+			"start": 1198,
+			"end": 1219,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 1
+				},
+				"end": {
+					"line": 51,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c15",
+			"start": 1234,
+			"end": 1240,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 14
+				},
+				"end": {
+					"line": 52,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c16",
+			"start": 1243,
+			"end": 1249,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 2
+				},
+				"end": {
+					"line": 53,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " THE OTHER ARM: a member carrying LEADING comments takes its whole run INSIDE the",
+			"start": 1257,
+			"end": 1340,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 1
+				},
+				"end": {
+					"line": 56,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " per-member offset, so the same run indents two columns instead of sitting flush.",
+			"start": 1342,
+			"end": 1425,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 1
+				},
+				"end": {
+					"line": 57,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " In the shell...",
+			"start": 1427,
+			"end": 1445,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 1
+				},
+				"end": {
+					"line": 58,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c17 ",
+			"start": 1460,
+			"end": 1469,
+			"loc": {
+				"start": {
+					"line": 60,
+					"column": 4
+				},
+				"end": {
+					"line": 60,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c18",
+			"start": 1472,
+			"end": 1478,
+			"loc": {
+				"start": {
+					"line": 60,
+					"column": 16
+				},
+				"end": {
+					"line": 60,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c19",
+			"start": 1483,
+			"end": 1489,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 4
+				},
+				"end": {
+					"line": 61,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ...in the union's own gap, which is where the reparse reads both of them...",
+			"start": 1499,
+			"end": 1577,
+			"loc": {
+				"start": {
+					"line": 64,
+					"column": 1
+				},
+				"end": {
+					"line": 64,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c20 ",
+			"start": 1592,
+			"end": 1601,
+			"loc": {
+				"start": {
+					"line": 66,
+					"column": 4
+				},
+				"end": {
+					"line": 66,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c21",
+			"start": 1604,
+			"end": 1610,
+			"loc": {
+				"start": {
+					"line": 66,
+					"column": 16
+				},
+				"end": {
+					"line": 66,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c22",
+			"start": 1615,
+			"end": 1621,
+			"loc": {
+				"start": {
+					"line": 67,
+					"column": 4
+				},
+				"end": {
+					"line": 67,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ...and on a later member, whose region opens past its own `|`",
+			"start": 1631,
+			"end": 1695,
+			"loc": {
+				"start": {
+					"line": 70,
+					"column": 1
+				},
+				"end": {
+					"line": 70,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c23 ",
+			"start": 1716,
+			"end": 1725,
+			"loc": {
+				"start": {
+					"line": 73,
+					"column": 4
+				},
+				"end": {
+					"line": 73,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c24",
+			"start": 1728,
+			"end": 1734,
+			"loc": {
+				"start": {
+					"line": 73,
+					"column": 16
+				},
+				"end": {
+					"line": 73,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c25",
+			"start": 1739,
+			"end": 1745,
+			"loc": {
+				"start": {
+					"line": 74,
+					"column": 4
+				},
+				"end": {
+					"line": 74,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: a comment before the `|` trails the member ABOVE, so it decides nothing",
+			"start": 1755,
+			"end": 1838,
+			"loc": {
+				"start": {
+					"line": 77,
+					"column": 1
+				},
+				"end": {
+					"line": 77,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " about this one and the run stays flush",
+			"start": 1840,
+			"end": 1881,
+			"loc": {
+				"start": {
+					"line": 78,
+					"column": 1
+				},
+				"end": {
+					"line": 78,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c26 ",
+			"start": 1898,
+			"end": 1907,
+			"loc": {
+				"start": {
+					"line": 80,
+					"column": 6
+				},
+				"end": {
+					"line": 80,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c27",
+			"start": 1914,
+			"end": 1920,
+			"loc": {
+				"start": {
+					"line": 81,
+					"column": 6
+				},
+				"end": {
+					"line": 81,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c28",
+			"start": 1923,
+			"end": 1929,
+			"loc": {
+				"start": {
+					"line": 82,
+					"column": 2
+				},
+				"end": {
+					"line": 82,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ...and the split is asked of the OUTPUT, not of the source bytes: an own-line gap",
+			"start": 1939,
+			"end": 2023,
+			"loc": {
+				"start": {
+					"line": 85,
+					"column": 1
+				},
+				"end": {
+					"line": 85,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment is relocated ABOVE the `|`, where the reparse reads it as `z`'s trailing",
+			"start": 2025,
+			"end": 2108,
+			"loc": {
+				"start": {
+					"line": 86,
+					"column": 1
+				},
+				"end": {
+					"line": 86,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " run, so it leads nothing and the run below stays flush",
+			"start": 2110,
+			"end": 2167,
+			"loc": {
+				"start": {
+					"line": 87,
+					"column": 1
+				},
+				"end": {
+					"line": 87,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c29 ",
+			"start": 2187,
+			"end": 2196,
+			"loc": {
+				"start": {
+					"line": 91,
+					"column": 2
+				},
+				"end": {
+					"line": 91,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c30",
+			"start": 2203,
+			"end": 2209,
+			"loc": {
+				"start": {
+					"line": 92,
+					"column": 6
+				},
+				"end": {
+					"line": 92,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c31",
+			"start": 2212,
+			"end": 2218,
+			"loc": {
+				"start": {
+					"line": 93,
+					"column": 2
+				},
+				"end": {
+					"line": 93,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the FIRST member has no earlier member to be relocated onto, so its whole gap run",
+			"start": 2228,
+			"end": 2312,
+			"loc": {
+				"start": {
+					"line": 96,
+					"column": 1
+				},
+				"end": {
+					"line": 96,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leads it however it was written - and the run below indents",
+			"start": 2314,
+			"end": 2376,
+			"loc": {
+				"start": {
+					"line": 97,
+					"column": 1
+				},
+				"end": {
+					"line": 97,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c32 ",
+			"start": 2391,
+			"end": 2400,
+			"loc": {
+				"start": {
+					"line": 99,
+					"column": 4
+				},
+				"end": {
+					"line": 99,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c33",
+			"start": 2403,
+			"end": 2409,
+			"loc": {
+				"start": {
+					"line": 99,
+					"column": 16
+				},
+				"end": {
+					"line": 99,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c34",
+			"start": 2414,
+			"end": 2420,
+			"loc": {
+				"start": {
+					"line": 100,
+					"column": 4
+				},
+				"end": {
+					"line": 100,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2437,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 2428,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 102,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 176,
+					"end": 211,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 181,
+						"end": 182,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 187,
+						"end": 210,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 7,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 189,
+								"end": 190,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 4
+									},
+									"end": {
+										"line": 5,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 189,
+									"end": 190,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 4
+										},
+										"end": {
+											"line": 5,
+											"column": 5
+										}
+									},
+									"name": "a"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 191,
+										"end": 196
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 209,
+								"end": 210,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 4
+									},
+									"end": {
+										"line": 7,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 209,
+									"end": 210,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 4
+										},
+										"end": {
+											"line": 7,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 199,
+										"end": 204
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run lifted out of a stripped UNION member's paren shell prints at the member",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " seam, flush under the `|`, not at the member's own two-column offset",
+							"start": 103,
+							"end": 174
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 261,
+					"end": 302,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 266,
+						"end": 267,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 272,
+						"end": 301,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 2
+							},
+							"end": {
+								"line": 14,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 274,
+								"end": 275,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 4
+									},
+									"end": {
+										"line": 11,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 274,
+									"end": 275,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 4
+										},
+										"end": {
+											"line": 11,
+											"column": 5
+										}
+									},
+									"name": "z"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 280,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 4
+									},
+									"end": {
+										"line": 12,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 280,
+									"end": 281,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 4
+										},
+										"end": {
+											"line": 12,
+											"column": 5
+										}
+									},
+									"name": "a"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 282,
+										"end": 287
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 300,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 4
+									},
+									"end": {
+										"line": 14,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 300,
+									"end": 301,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 4
+										},
+										"end": {
+											"line": 14,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 290,
+										"end": 295
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a later member's shell takes the same seam",
+							"start": 214,
+							"end": 259
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 382,
+					"end": 411,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 387,
+						"end": 388,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 6
+							},
+							"end": {
+								"line": 17,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 393,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 2
+							},
+							"end": {
+								"line": 20,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 395,
+								"end": 396,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 4
+									},
+									"end": {
+										"line": 18,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 395,
+									"end": 396,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 4
+										},
+										"end": {
+											"line": 18,
+											"column": 5
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 409,
+								"end": 410,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 4
+									},
+									"end": {
+										"line": 20,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 409,
+									"end": 410,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 4
+										},
+										"end": {
+											"line": 20,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c5",
+										"start": 399,
+										"end": 404
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line comment alone in the shell, nothing on the member's own line",
+							"start": 305,
+							"end": 380
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 558,
+					"end": 589,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 563,
+						"end": 564,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 6
+							},
+							"end": {
+								"line": 24,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 567,
+						"end": 588,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 10
+							},
+							"end": {
+								"line": 26,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 567,
+								"end": 568,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 10
+									},
+									"end": {
+										"line": 24,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 567,
+									"end": 568,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 10
+										},
+										"end": {
+											"line": 24,
+											"column": 11
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 587,
+								"end": 588,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 587,
+									"end": 588,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 2
+										},
+										"end": {
+											"line": 26,
+											"column": 3
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c6",
+										"start": 571,
+										"end": 576
+									},
+									{
+										"type": "Line",
+										"value": " c7",
+										"start": 579,
+										"end": 584
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the INTERSECTION's answer to the same question: the run opens the continuation",
+							"start": 414,
+							"end": 495
+						},
+						{
+							"type": "Line",
+							"value": " line the `&` breaks onto, so it takes that line's indent",
+							"start": 497,
+							"end": 556
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 647,
+					"end": 684,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 652,
+						"end": 653,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 6
+							},
+							"end": {
+								"line": 29,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 656,
+						"end": 683,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 10
+							},
+							"end": {
+								"line": 32,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 656,
+								"end": 657,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 10
+									},
+									"end": {
+										"line": 29,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 656,
+									"end": 657,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 10
+										},
+										"end": {
+											"line": 29,
+											"column": 11
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 676,
+								"end": 677,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 676,
+									"end": 677,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 2
+										},
+										"end": {
+											"line": 31,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c8",
+										"start": 660,
+										"end": 665
+									},
+									{
+										"type": "Line",
+										"value": " c9",
+										"start": 668,
+										"end": 673
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 682,
+								"end": 683,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 682,
+									"end": 683,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 2
+										},
+										"end": {
+											"line": 32,
+											"column": 3
+										}
+									},
+									"name": "c"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " and the same with a third member past the boundary",
+							"start": 592,
+							"end": 645
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 833,
+					"end": 879,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 838,
+						"end": 839,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 6
+							},
+							"end": {
+								"line": 36,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 842,
+						"end": 878,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 10
+							},
+							"end": {
+								"line": 39,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 842,
+								"end": 843,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 10
+									},
+									"end": {
+										"line": 36,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 842,
+									"end": 843,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 10
+										},
+										"end": {
+											"line": 36,
+											"column": 11
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 864,
+								"end": 865,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 864,
+									"end": 865,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 38,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c10",
+										"start": 846,
+										"end": 852
+									},
+									{
+										"type": "Line",
+										"value": " c11",
+										"start": 855,
+										"end": 861
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 877,
+								"end": 878,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 2
+									},
+									"end": {
+										"line": 39,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 877,
+									"end": 878,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 2
+										},
+										"end": {
+											"line": 39,
+											"column": 3
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c12",
+										"start": 868,
+										"end": 874
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment in a LATER member's gap forces the multiline intersection layout; the",
+							"start": 687,
+							"end": 769
+						},
+						{
+							"type": "Line",
+							"value": " first member's lifted run still lands on the continuation",
+							"start": 771,
+							"end": 831
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 987,
+					"end": 1025,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 1
+						},
+						"end": {
+							"line": 47,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 992,
+						"end": 993,
+						"loc": {
+							"start": {
+								"line": 43,
+								"column": 6
+							},
+							"end": {
+								"line": 43,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 998,
+						"end": 1024,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 2
+							},
+							"end": {
+								"line": 47,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1000,
+								"end": 1001,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 4
+									},
+									"end": {
+										"line": 44,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1000,
+									"end": 1001,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 4
+										},
+										"end": {
+											"line": 44,
+											"column": 5
+										}
+									},
+									"name": "a"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c13",
+										"start": 1002,
+										"end": 1008
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1023,
+								"end": 1024,
+								"loc": {
+									"start": {
+										"line": 47,
+										"column": 4
+									},
+									"end": {
+										"line": 47,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1023,
+									"end": 1024,
+									"loc": {
+										"start": {
+											"line": 47,
+											"column": 4
+										},
+										"end": {
+											"line": 47,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c14",
+										"start": 1012,
+										"end": 1018
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank inside the run: the UNION's run stays trailing its member, so the",
+							"start": 882,
+							"end": 966
+						},
+						{
+							"type": "Line",
+							"value": " blank survives",
+							"start": 968,
+							"end": 985
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1221,
+					"end": 1254,
+					"loc": {
+						"start": {
+							"line": 52,
+							"column": 1
+						},
+						"end": {
+							"line": 54,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1226,
+						"end": 1227,
+						"loc": {
+							"start": {
+								"line": 52,
+								"column": 6
+							},
+							"end": {
+								"line": 52,
+								"column": 7
+							}
+						},
+						"name": "H"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 1230,
+						"end": 1253,
+						"loc": {
+							"start": {
+								"line": 52,
+								"column": 10
+							},
+							"end": {
+								"line": 54,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1230,
+								"end": 1231,
+								"loc": {
+									"start": {
+										"line": 52,
+										"column": 10
+									},
+									"end": {
+										"line": 52,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1230,
+									"end": 1231,
+									"loc": {
+										"start": {
+											"line": 52,
+											"column": 10
+										},
+										"end": {
+											"line": 52,
+											"column": 11
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1252,
+								"end": 1253,
+								"loc": {
+									"start": {
+										"line": 54,
+										"column": 2
+									},
+									"end": {
+										"line": 54,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1252,
+									"end": 1253,
+									"loc": {
+										"start": {
+											"line": 54,
+											"column": 2
+										},
+										"end": {
+											"line": 54,
+											"column": 3
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c15",
+										"start": 1234,
+										"end": 1240
+									},
+									{
+										"type": "Line",
+										"value": " c16",
+										"start": 1243,
+										"end": 1249
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the INTERSECTION's does not - the comment attaches to the member below and the `&`",
+							"start": 1028,
+							"end": 1113
+						},
+						{
+							"type": "Line",
+							"value": " has been pulled onto the line above, so the blank has nowhere to land and both",
+							"start": 1115,
+							"end": 1196
+						},
+						{
+							"type": "Line",
+							"value": " formatters drop it",
+							"start": 1198,
+							"end": 1219
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1447,
+					"end": 1496,
+					"loc": {
+						"start": {
+							"line": 59,
+							"column": 1
+						},
+						"end": {
+							"line": 62,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1452,
+						"end": 1453,
+						"loc": {
+							"start": {
+								"line": 59,
+								"column": 6
+							},
+							"end": {
+								"line": 59,
+								"column": 7
+							}
+						},
+						"name": "I"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1458,
+						"end": 1495,
+						"loc": {
+							"start": {
+								"line": 60,
+								"column": 2
+							},
+							"end": {
+								"line": 62,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1470,
+								"end": 1471,
+								"loc": {
+									"start": {
+										"line": 60,
+										"column": 14
+									},
+									"end": {
+										"line": 60,
+										"column": 15
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1470,
+									"end": 1471,
+									"loc": {
+										"start": {
+											"line": 60,
+											"column": 14
+										},
+										"end": {
+											"line": 60,
+											"column": 15
+										}
+									},
+									"name": "a"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c17 ",
+										"start": 1460,
+										"end": 1469
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c18",
+										"start": 1472,
+										"end": 1478
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1494,
+								"end": 1495,
+								"loc": {
+									"start": {
+										"line": 62,
+										"column": 4
+									},
+									"end": {
+										"line": 62,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1494,
+									"end": 1495,
+									"loc": {
+										"start": {
+											"line": 62,
+											"column": 4
+										},
+										"end": {
+											"line": 62,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c19",
+										"start": 1483,
+										"end": 1489
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " THE OTHER ARM: a member carrying LEADING comments takes its whole run INSIDE the",
+							"start": 1257,
+							"end": 1340
+						},
+						{
+							"type": "Line",
+							"value": " per-member offset, so the same run indents two columns instead of sitting flush.",
+							"start": 1342,
+							"end": 1425
+						},
+						{
+							"type": "Line",
+							"value": " In the shell...",
+							"start": 1427,
+							"end": 1445
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1579,
+					"end": 1628,
+					"loc": {
+						"start": {
+							"line": 65,
+							"column": 1
+						},
+						"end": {
+							"line": 68,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1584,
+						"end": 1585,
+						"loc": {
+							"start": {
+								"line": 65,
+								"column": 6
+							},
+							"end": {
+								"line": 65,
+								"column": 7
+							}
+						},
+						"name": "J"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1590,
+						"end": 1627,
+						"loc": {
+							"start": {
+								"line": 66,
+								"column": 2
+							},
+							"end": {
+								"line": 68,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1602,
+								"end": 1603,
+								"loc": {
+									"start": {
+										"line": 66,
+										"column": 14
+									},
+									"end": {
+										"line": 66,
+										"column": 15
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1602,
+									"end": 1603,
+									"loc": {
+										"start": {
+											"line": 66,
+											"column": 14
+										},
+										"end": {
+											"line": 66,
+											"column": 15
+										}
+									},
+									"name": "a"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c20 ",
+										"start": 1592,
+										"end": 1601
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c21",
+										"start": 1604,
+										"end": 1610
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1626,
+								"end": 1627,
+								"loc": {
+									"start": {
+										"line": 68,
+										"column": 4
+									},
+									"end": {
+										"line": 68,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1626,
+									"end": 1627,
+									"loc": {
+										"start": {
+											"line": 68,
+											"column": 4
+										},
+										"end": {
+											"line": 68,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c22",
+										"start": 1615,
+										"end": 1621
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " ...in the union's own gap, which is where the reparse reads both of them...",
+							"start": 1499,
+							"end": 1577
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1697,
+					"end": 1752,
+					"loc": {
+						"start": {
+							"line": 71,
+							"column": 1
+						},
+						"end": {
+							"line": 75,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1702,
+						"end": 1703,
+						"loc": {
+							"start": {
+								"line": 71,
+								"column": 6
+							},
+							"end": {
+								"line": 71,
+								"column": 7
+							}
+						},
+						"name": "K"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1708,
+						"end": 1751,
+						"loc": {
+							"start": {
+								"line": 72,
+								"column": 2
+							},
+							"end": {
+								"line": 75,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1710,
+								"end": 1711,
+								"loc": {
+									"start": {
+										"line": 72,
+										"column": 4
+									},
+									"end": {
+										"line": 72,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1710,
+									"end": 1711,
+									"loc": {
+										"start": {
+											"line": 72,
+											"column": 4
+										},
+										"end": {
+											"line": 72,
+											"column": 5
+										}
+									},
+									"name": "z"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1726,
+								"end": 1727,
+								"loc": {
+									"start": {
+										"line": 73,
+										"column": 14
+									},
+									"end": {
+										"line": 73,
+										"column": 15
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1726,
+									"end": 1727,
+									"loc": {
+										"start": {
+											"line": 73,
+											"column": 14
+										},
+										"end": {
+											"line": 73,
+											"column": 15
+										}
+									},
+									"name": "a"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c23 ",
+										"start": 1716,
+										"end": 1725
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c24",
+										"start": 1728,
+										"end": 1734
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1750,
+								"end": 1751,
+								"loc": {
+									"start": {
+										"line": 75,
+										"column": 4
+									},
+									"end": {
+										"line": 75,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1750,
+									"end": 1751,
+									"loc": {
+										"start": {
+											"line": 75,
+											"column": 4
+										},
+										"end": {
+											"line": 75,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c25",
+										"start": 1739,
+										"end": 1745
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " ...and on a later member, whose region opens past its own `|`",
+							"start": 1631,
+							"end": 1695
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1883,
+					"end": 1936,
+					"loc": {
+						"start": {
+							"line": 79,
+							"column": 1
+						},
+						"end": {
+							"line": 83,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1888,
+						"end": 1889,
+						"loc": {
+							"start": {
+								"line": 79,
+								"column": 6
+							},
+							"end": {
+								"line": 79,
+								"column": 7
+							}
+						},
+						"name": "L"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1894,
+						"end": 1935,
+						"loc": {
+							"start": {
+								"line": 80,
+								"column": 2
+							},
+							"end": {
+								"line": 83,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1896,
+								"end": 1897,
+								"loc": {
+									"start": {
+										"line": 80,
+										"column": 4
+									},
+									"end": {
+										"line": 80,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1896,
+									"end": 1897,
+									"loc": {
+										"start": {
+											"line": 80,
+											"column": 4
+										},
+										"end": {
+											"line": 80,
+											"column": 5
+										}
+									},
+									"name": "z"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c26 ",
+										"start": 1898,
+										"end": 1907
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1912,
+								"end": 1913,
+								"loc": {
+									"start": {
+										"line": 81,
+										"column": 4
+									},
+									"end": {
+										"line": 81,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1912,
+									"end": 1913,
+									"loc": {
+										"start": {
+											"line": 81,
+											"column": 4
+										},
+										"end": {
+											"line": 81,
+											"column": 5
+										}
+									},
+									"name": "a"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c27",
+										"start": 1914,
+										"end": 1920
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1934,
+								"end": 1935,
+								"loc": {
+									"start": {
+										"line": 83,
+										"column": 4
+									},
+									"end": {
+										"line": 83,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1934,
+									"end": 1935,
+									"loc": {
+										"start": {
+											"line": 83,
+											"column": 4
+										},
+										"end": {
+											"line": 83,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c28",
+										"start": 1923,
+										"end": 1929
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: a comment before the `|` trails the member ABOVE, so it decides nothing",
+							"start": 1755,
+							"end": 1838
+						},
+						{
+							"type": "Line",
+							"value": " about this one and the run stays flush",
+							"start": 1840,
+							"end": 1881
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 2169,
+					"end": 2225,
+					"loc": {
+						"start": {
+							"line": 88,
+							"column": 1
+						},
+						"end": {
+							"line": 94,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 2174,
+						"end": 2175,
+						"loc": {
+							"start": {
+								"line": 88,
+								"column": 6
+							},
+							"end": {
+								"line": 88,
+								"column": 7
+							}
+						},
+						"name": "M"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 2180,
+						"end": 2224,
+						"loc": {
+							"start": {
+								"line": 89,
+								"column": 2
+							},
+							"end": {
+								"line": 94,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 2182,
+								"end": 2183,
+								"loc": {
+									"start": {
+										"line": 89,
+										"column": 4
+									},
+									"end": {
+										"line": 89,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 2182,
+									"end": 2183,
+									"loc": {
+										"start": {
+											"line": 89,
+											"column": 4
+										},
+										"end": {
+											"line": 89,
+											"column": 5
+										}
+									},
+									"name": "z"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 2201,
+								"end": 2202,
+								"loc": {
+									"start": {
+										"line": 92,
+										"column": 4
+									},
+									"end": {
+										"line": 92,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 2201,
+									"end": 2202,
+									"loc": {
+										"start": {
+											"line": 92,
+											"column": 4
+										},
+										"end": {
+											"line": 92,
+											"column": 5
+										}
+									},
+									"name": "a"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c29 ",
+										"start": 2187,
+										"end": 2196
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c30",
+										"start": 2203,
+										"end": 2209
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 2223,
+								"end": 2224,
+								"loc": {
+									"start": {
+										"line": 94,
+										"column": 4
+									},
+									"end": {
+										"line": 94,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 2223,
+									"end": 2224,
+									"loc": {
+										"start": {
+											"line": 94,
+											"column": 4
+										},
+										"end": {
+											"line": 94,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c31",
+										"start": 2212,
+										"end": 2218
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " ...and the split is asked of the OUTPUT, not of the source bytes: an own-line gap",
+							"start": 1939,
+							"end": 2023
+						},
+						{
+							"type": "Line",
+							"value": " comment is relocated ABOVE the `|`, where the reparse reads it as `z`'s trailing",
+							"start": 2025,
+							"end": 2108
+						},
+						{
+							"type": "Line",
+							"value": " run, so it leads nothing and the run below stays flush",
+							"start": 2110,
+							"end": 2167
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 2378,
+					"end": 2427,
+					"loc": {
+						"start": {
+							"line": 98,
+							"column": 1
+						},
+						"end": {
+							"line": 101,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 2383,
+						"end": 2384,
+						"loc": {
+							"start": {
+								"line": 98,
+								"column": 6
+							},
+							"end": {
+								"line": 98,
+								"column": 7
+							}
+						},
+						"name": "N"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 2389,
+						"end": 2426,
+						"loc": {
+							"start": {
+								"line": 99,
+								"column": 2
+							},
+							"end": {
+								"line": 101,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 2401,
+								"end": 2402,
+								"loc": {
+									"start": {
+										"line": 99,
+										"column": 14
+									},
+									"end": {
+										"line": 99,
+										"column": 15
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 2401,
+									"end": 2402,
+									"loc": {
+										"start": {
+											"line": 99,
+											"column": 14
+										},
+										"end": {
+											"line": 99,
+											"column": 15
+										}
+									},
+									"name": "a"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c32 ",
+										"start": 2391,
+										"end": 2400
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c33",
+										"start": 2403,
+										"end": 2409
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 2425,
+								"end": 2426,
+								"loc": {
+									"start": {
+										"line": 101,
+										"column": 4
+									},
+									"end": {
+										"line": 101,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 2425,
+									"end": 2426,
+									"loc": {
+										"start": {
+											"line": 101,
+											"column": 4
+										},
+										"end": {
+											"line": 101,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c34",
+										"start": 2414,
+										"end": 2420
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the FIRST member has no earlier member to be relocated onto, so its whole gap run",
+							"start": 2228,
+							"end": 2312
+						},
+						{
+							"type": "Line",
+							"value": " leads it however it was written - and the run below indents",
+							"start": 2314,
+							"end": 2376
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
