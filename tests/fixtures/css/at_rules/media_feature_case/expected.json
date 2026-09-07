@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 262,
+		"end": 329,
 		"attributes": [],
 		"children": [
 			{
@@ -248,19 +248,80 @@
 						}
 					]
 				}
+			},
+			{
+				"type": "Atrule",
+				"start": 255,
+				"end": 320,
+				"name": "media",
+				"prelude": "CALC(A) and (min-width: 1px)",
+				"block": {
+					"type": "Block",
+					"start": 291,
+					"end": 320,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 295,
+								"end": 296,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 295,
+										"end": 296,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 295,
+														"end": 296
+													}
+												],
+												"start": 295,
+												"end": 296
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 297,
+								"end": 317,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 302,
+										"end": 312,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 295,
+							"end": 317
+						}
+					]
+				}
 			}
 		],
 		"comments": [],
 		"content": {
 			"start": 7,
-			"end": 254,
-			"styles": "\n\t@media (min-width: 100px) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media screen and (max-width: 200px) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (hover) and (pointer: fine) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (width >= 600px) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"end": 321,
+			"styles": "\n\t@media (min-width: 100px) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media screen and (max-width: 200px) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (hover) and (pointer: fine) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (width >= 600px) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media CALC(A) and (min-width: 1px) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 263,
+	"end": 330,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

@@ -1,0 +1,169 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 339,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 121,
+				"end": 175,
+				"name": "media",
+				"prelude": "( 1.50: a)",
+				"block": {
+					"type": "Block",
+					"start": 146,
+					"end": 175,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 150,
+								"end": 151,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 150,
+										"end": 151,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "b",
+														"start": 150,
+														"end": 151
+													}
+												],
+												"start": 150,
+												"end": 151
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 152,
+								"end": 172,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 157,
+										"end": 167,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 150,
+							"end": 172
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 261,
+				"end": 330,
+				"name": "media",
+				"prelude": "('x:y' 1.50: a) and ('x:y': 2.5)",
+				"block": {
+					"type": "Block",
+					"start": 301,
+					"end": 330,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 305,
+								"end": 306,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 305,
+										"end": 306,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "b",
+														"start": 305,
+														"end": 306
+													}
+												],
+												"start": 305,
+												"end": 306
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 307,
+								"end": 327,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 312,
+										"end": 322,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 305,
+							"end": 327
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comment is one token, so the feature name runs past the colon inside it and the\n\tname's number is kept ",
+				"start": 9,
+				"end": 119
+			},
+			{
+				"type": "CSSComment",
+				"value": " : ",
+				"start": 129,
+				"end": 136,
+				"position": 1
+			},
+			{
+				"type": "CSSComment",
+				"value": " a string is one token for the same reason, and keeps its quote normalization ",
+				"start": 177,
+				"end": 259
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 331,
+			"styles": "\n\t/* a comment is one token, so the feature name runs past the colon inside it and the\n\tname's number is kept */\n\t@media (/* : */ 1.50: a) {\n\t\tb {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* a string is one token for the same reason, and keeps its quote normalization */\n\t@media ('x:y' 1.50: a) and ('x:y': 2.5) {\n\t\tb {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 340,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

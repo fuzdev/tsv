@@ -14,7 +14,7 @@
 	}
 
 	/* Comment inside condition value */
-	@media (min-width: /* size */500px) {
+	@media (min-width: /* size */ 500px) {
 		div {
 			color: green;
 		}

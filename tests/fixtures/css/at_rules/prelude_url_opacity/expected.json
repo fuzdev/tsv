@@ -1,0 +1,223 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 469,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 159,
+				"end": 213,
+				"name": "supports",
+				"prelude": "(a: url(1.50))",
+				"block": {
+					"type": "Block",
+					"start": 184,
+					"end": 213,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 188,
+								"end": 189,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 188,
+										"end": 189,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "b",
+														"start": 188,
+														"end": 189
+													}
+												],
+												"start": 188,
+												"end": 189
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 190,
+								"end": 210,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 195,
+										"end": 205,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 188,
+							"end": 210
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 215,
+				"end": 265,
+				"name": "media",
+				"prelude": "(a: url(1.5))",
+				"block": {
+					"type": "Block",
+					"start": 236,
+					"end": 265,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 240,
+								"end": 241,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 240,
+										"end": 241,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "b",
+														"start": 240,
+														"end": 241
+													}
+												],
+												"start": 240,
+												"end": 241
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 242,
+								"end": 262,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 247,
+										"end": 257,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 240,
+							"end": 262
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 409,
+				"end": 460,
+				"name": "media",
+				"prelude": "(url(1.50): a)",
+				"block": {
+					"type": "Block",
+					"start": 431,
+					"end": 460,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 435,
+								"end": 436,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 435,
+										"end": 436,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "b",
+														"start": 435,
+														"end": 436
+													}
+												],
+												"start": 435,
+												"end": 436
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 437,
+								"end": 457,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 442,
+										"end": 452,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 435,
+							"end": 457
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an unquoted `url()` is opaque to the value reader and transparent to the media\n\treader's number pass, so one authoring has two canonical forms ",
+				"start": 9,
+				"end": 157
+			},
+			{
+				"type": "CSSComment",
+				"value": " the media reader's number pass runs in value position only, so a `url()` in name\n\tposition keeps its content whichever reader is asked ",
+				"start": 267,
+				"end": 407
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 461,
+			"styles": "\n\t/* an unquoted `url()` is opaque to the value reader and transparent to the media\n\treader's number pass, so one authoring has two canonical forms */\n\t@supports (a: url(1.50)) {\n\t\tb {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (a: url(1.5)) {\n\t\tb {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* the media reader's number pass runs in value position only, so a `url()` in name\n\tposition keeps its content whichever reader is asked */\n\t@media (url(1.50): a) {\n\t\tb {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 470,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

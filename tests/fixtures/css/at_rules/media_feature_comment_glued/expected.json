@@ -1,0 +1,278 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 672,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 189,
+				"end": 277,
+				"name": "media",
+				"prelude": "(a: b) and (c: d) and (f h: i)",
+				"block": {
+					"type": "Block",
+					"start": 248,
+					"end": 277,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 252,
+								"end": 253,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 252,
+										"end": 253,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 252,
+														"end": 253
+													}
+												],
+												"start": 252,
+												"end": 253
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 254,
+								"end": 274,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 259,
+										"end": 269,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 252,
+							"end": 274
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 402,
+				"end": 478,
+				"name": "media",
+				"prelude": "(a  b: d) and (e: f    h)",
+				"block": {
+					"type": "Block",
+					"start": 449,
+					"end": 478,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 453,
+								"end": 454,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 453,
+										"end": 454,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 453,
+														"end": 454
+													}
+												],
+												"start": 453,
+												"end": 454
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 455,
+								"end": 475,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 460,
+										"end": 470,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 453,
+							"end": 475
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 592,
+				"end": 663,
+				"name": "media",
+				"prelude": "(not ( a: b)) and ()",
+				"block": {
+					"type": "Block",
+					"start": 634,
+					"end": 663,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 638,
+								"end": 639,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 638,
+										"end": 639,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 638,
+														"end": 639
+													}
+												],
+												"start": 638,
+												"end": 639
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 640,
+								"end": 660,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 645,
+										"end": 655,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 638,
+							"end": 660
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comment inside a feature expression is the node's own text, so neither half\n\tpads it: a comment glued to the expression's own paren, to a name, or to a value\n\tstays glued ",
+				"start": 9,
+				"end": 187
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 197,
+				"end": 204,
+				"position": 1
+			},
+			{
+				"type": "CSSComment",
+				"value": " e ",
+				"start": 219,
+				"end": 226,
+				"position": 16
+			},
+			{
+				"type": "CSSComment",
+				"value": " g ",
+				"start": 234,
+				"end": 241,
+				"position": 24
+			},
+			{
+				"type": "CSSComment",
+				"value": " the name half collapses its whitespace runs to one space and the value half\n\tkeeps them, on both sides of a comment ",
+				"start": 279,
+				"end": 400
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 412,
+				"end": 419,
+				"position": 3
+			},
+			{
+				"type": "CSSComment",
+				"value": " g ",
+				"start": 437,
+				"end": 444,
+				"position": 21
+			},
+			{
+				"type": "CSSComment",
+				"value": " an inner paren is node text too, and an expression holding nothing but a comment\n\tkeeps its parens tight ",
+				"start": 480,
+				"end": 590
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 605,
+				"end": 612,
+				"position": 6
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 625,
+				"end": 632,
+				"position": 19
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 664,
+			"styles": "\n\t/* a comment inside a feature expression is the node's own text, so neither half\n\tpads it: a comment glued to the expression's own paren, to a name, or to a value\n\tstays glued */\n\t@media (/* c */a: b) and (c: d/* e */) and (f/* g */ h: i) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* the name half collapses its whitespace runs to one space and the value half\n\tkeeps them, on both sides of a comment */\n\t@media (a /* c */ b: d) and (e: f  /* g */  h) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* an inner paren is node text too, and an expression holding nothing but a comment\n\tkeeps its parens tight */\n\t@media (not (/* c */ a: b)) and (/* c */) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 673,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
