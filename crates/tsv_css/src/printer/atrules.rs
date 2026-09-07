@@ -22,6 +22,7 @@ use std::borrow::Cow;
 
 use super::Printer;
 use super::value_normalization;
+use super::value_normalization::PreludeReader;
 use crate::ast::internal;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
@@ -163,7 +164,8 @@ impl<'a> Printer<'a> {
                     let glue_next =
                         self.source.as_bytes().get(value.span().start as usize) == Some(&b',');
                     self.write_import_gap_comments(prev_end, value.span().start, i > 0, glue_next);
-                    // Check if this is the media query part of @import that needs wrapping
+                    // The media condition of an `@import` prelude — its last value, and the
+                    // only one that is a bare identifier run rather than a string/function.
                     if is_import
                         && i == values.len() - 1
                         && let internal::CssValue::Identifier {
@@ -175,31 +177,18 @@ impl<'a> Printer<'a> {
                         let normalized = value_normalization::normalize_css_whitespace(
                             value_span.extract(self.source),
                         );
-                        // Route a wrappable media condition through the line-wrapping
-                        // path: an `and`/`or`-joined query, or a comma-separated query
-                        // *list* (prettier value-parses `@import` and fills the whole
-                        // list). A comma-only list with comments stays on the
-                        // comment-aware value path below — the fill splits on whitespace
-                        // and would shatter `/* … */` comments (the `and`/`or` path keeps
-                        // its existing comment handling).
-                        // Connector detection is ASCII case-insensitive — `AND`/`Or`
-                        // are valid connectors (CSS Syntax 3) that route to the
-                        // wrapping path (which preserves their source case). Only fold
-                        // case when there's uppercase to fold; the common all-lowercase
-                        // query probes the original directly (no allocation).
-                        let lower = if normalized.bytes().any(|b| b.is_ascii_uppercase()) {
-                            Cow::Owned(normalized.to_ascii_lowercase())
-                        } else {
-                            Cow::Borrowed(&*normalized)
-                        };
-                        if lower.contains(" and ")
-                            || lower.contains(" or ")
-                            || (normalized.contains(',') && !normalized.contains("/*"))
-                        {
-                            self.print_import_media_query(&normalized);
-                            prev_end = value.span().end;
-                            continue;
-                        }
+                        // The whole media condition routes here, not only a wrappable one:
+                        // this is the single place the prelude's value normalization runs,
+                        // so a condition that skips it comes out raw (`(a: .50PX)` stayed
+                        // `.50PX` where prettier gives `0.5px`, and the identical condition
+                        // joined by an `and` normalized). `print_import_media_query` picks
+                        // the layout for every shape itself — a one-entry list and a
+                        // comment-bearing one take the `and`/`or` wrap, only a
+                        // comment-free comma list takes the fill (which splits on
+                        // whitespace and would shatter a `/* … */`).
+                        self.print_import_media_query(&normalized);
+                        prev_end = value.span().end;
+                        continue;
                     }
                     // Doc-based formatting normalizes quotes and spacing. The last
                     // value is followed by the rule's `;`, so reserve it — a value
@@ -380,10 +369,10 @@ impl<'a> Printer<'a> {
     fn build_media_prelude_doc(&self, content: &str, suffix_width: usize) -> DocId {
         let d = self.d();
         // Normalize numbers + string quotes in the raw prelude (`.5px` → `0.5px`,
-        // `"x"` → `'x'`), matching the declaration-value path. Comments preserved.
-        // Hex case is preserved (`lowercase_hex` off) — prettier only lowercases hex
-        // in `@supports` condition declarations, not `@media` feature values.
-        let content = value_normalization::normalize_value_text(content, false);
+        // `"x"` → `'x'`). Comments preserved. `@media` is the one at-rule prettier hands
+        // to `parseMediaQuery`, so its prelude takes the `adjustNumbers` rules — the
+        // known-unit gate, no hex fold, `WORD_PART` deciding what absorbs a number.
+        let content = value_normalization::normalize_value_text(content, PreludeReader::MediaQuery);
         // Lowercase media-feature *names* (`(MIN-WIDTH: …)` → `(min-width: …)`),
         // matching prettier; media types, `and`/`or`/`not`/`only`, and feature values
         // are preserved (see `lowercase_media_feature_names`). Keep the already-owned
@@ -589,7 +578,10 @@ impl<'a> Printer<'a> {
         match segment {
             internal::ConditionSegment::Text(text) => {
                 if kind.normalizes() {
-                    d.text_pooled(&value_normalization::normalize_value_text(text, true))
+                    d.text_pooled(&value_normalization::normalize_value_text(
+                        text,
+                        PreludeReader::Value,
+                    ))
                 } else {
                     d.text_pooled(text)
                 }
@@ -875,9 +867,12 @@ impl<'a> Printer<'a> {
     /// `at_line_start` divergence kept for Svelte), so nested doc fills can't
     /// reproduce prettier's layout. Confirmed: the list does **not** map to `fill()`.
     fn print_import_media_query(&mut self, content: &str) {
-        // `@import`'s prelude is a media query (feature values), so hex case is
-        // preserved like `@media` — only `@supports` conditions lowercase hex.
-        let normalized = value_normalization::normalize_value_text(content, false);
+        // ⚠️ An `@import` prelude is a media query by *grammar*, but prettier does not read
+        // it with the media-query reader: `isModuleRuleName` routes it to `parseValue`, the
+        // same reader `@supports` takes. So it normalizes on the value path — no known-unit
+        // gate, hex folded, a word absorbing an abutting number — which is the same split
+        // that already leaves its media-feature *names* unfolded here.
+        let normalized = value_normalization::normalize_value_text(content, PreludeReader::Value);
         let MediaQueryList {
             text,
             entries: queries,
