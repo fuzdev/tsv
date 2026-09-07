@@ -212,7 +212,7 @@ pub(in crate::printer) fn has_leftmost_object_expression(expr: &internal::Expres
 /// Shared with the signature-param path (`build_signature_params_doc`) so bodyless
 /// declarations (declare / overload) and type-member signatures (method / call /
 /// construct) hug the lone param exactly like value-param functions do.
-pub(in crate::printer) fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
+fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => true,
         internal::Expression::AssignmentPattern(ap) => {
@@ -403,7 +403,7 @@ pub(in crate::printer) fn callback_signature_has_breaking_comments(
 ///
 /// Shared with the signature-param path (`build_signature_params_doc`) — see
 /// `is_huggable_pattern`.
-pub(in crate::printer) fn has_huggable_type_annotation(expr: &internal::Expression<'_>) -> bool {
+fn has_huggable_type_annotation(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::Identifier(id) => id
             .type_annotation()
@@ -413,6 +413,61 @@ pub(in crate::printer) fn has_huggable_type_annotation(expr: &internal::Expressi
 }
 
 impl<'a> Printer<'a> {
+    /// Whether both delimiter gaps around a lone parameter are free of comments to emit —
+    /// the shared precondition of the sole-parameter hug at all three parameter builders.
+    ///
+    /// A comment in either gap declines the hug outright: the hug arm emits neither gap and
+    /// must not grow an emitter for one, so an unclaimed gap would be a DROP
+    /// (`docs/comments.md` hazard 4). The breakable path places it instead.
+    ///
+    /// `open` is the position the parameter's leading gap starts at (just past the `(`) and
+    /// `close` the `)`. Either may be `None` when the caller could not locate its parens —
+    /// the gap then collapses onto the parameter's own edge and is empty by construction.
+    /// `comments_present` is the caller's zero-comment window gate, so a comment-free
+    /// signature answers `true` without a search; a caller that has not computed one yet
+    /// passes `true`.
+    pub(in crate::printer) fn param_delimiter_gaps_empty(
+        &self,
+        param: &internal::Expression<'_>,
+        open: Option<u32>,
+        close: Option<u32>,
+        comments_present: bool,
+    ) -> bool {
+        !comments_present
+            || (open.is_none_or(|o| !self.has_comments_to_emit_between(o, param.span().start))
+                && close.is_none_or(|c| !self.has_comments_to_emit_between(param.span().end, c)))
+    }
+
+    /// Prettier's **`shouldHugTheOnlyFunctionParameter`** (`print/function-parameters.js`):
+    /// a lone parameter that is an object/array pattern, or carries an object-type
+    /// annotation, hugs — `({` and `}: T)` stay welded to the signature while the pattern's
+    /// own group breaks, instead of the parameter LIST breaking around it.
+    ///
+    /// Shared by the value-param path ([`Self::build_params_doc_with_comments`] — function
+    /// declarations, expressions, methods, arrows) and the signature path
+    /// ([`Self::build_signature_params_doc`] — bodyless `declare`/overload functions and
+    /// type-member method/call/construct signatures), which asked it in two identical
+    /// spellings. The function/constructor-TYPE path is deliberately NOT a caller: it hugs
+    /// through its own narrower predicate (`get_type_literal_from_identifier`, TypeLiteral
+    /// only), which is an open divergence documented there — keeping it out of this gate is
+    /// what makes that difference one visible line rather than a third near-copy.
+    ///
+    /// See [`Self::param_delimiter_gaps_empty`] for the comment precondition and
+    /// [`Self::param_has_own_line_decorators`] for the decorator one (an own-line parameter
+    /// decorator forces the list to expand, which the hug cannot express).
+    pub(in crate::printer) fn hugs_sole_parameter(
+        &self,
+        params: &[internal::Expression<'_>],
+        open: Option<u32>,
+        close: Option<u32>,
+        comments_present: bool,
+    ) -> bool {
+        params.len() == 1
+            && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
+            && self.param_delimiter_gaps_empty(&params[0], open, close, comments_present)
+            && !self.param_has_own_line_decorators(&params[0])
+    }
+
     /// Build a doc with `context` active so the outermost curried arrow chain in
     /// it picks the right flattened layout. The arrow printer consumes the
     /// context at entry (`replace(None)`); restoring the prior value here keeps it
@@ -2297,21 +2352,12 @@ impl<'a> Printer<'a> {
         //   function fn(
         //       a?: { b: T },
         //   ): void {}
-        let no_leading_comments = !comments_present
-            || !self.has_comments_to_emit_between(
-                params_start.unwrap_or_else(|| params[0].span().start),
-                params[0].span().start,
-            );
-        let no_trailing_comments = !comments_present
-            || trailing_comments_end
-                .is_none_or(|end| !self.has_comments_to_emit_between(params[0].span().end, end));
-        let should_hug_single_pattern = params.len() == 1
-            && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
-            && no_leading_comments
-            && no_trailing_comments
-            // An own-line parameter decorator forces the list to expand (prettier),
-            // which the hug can't express — fall through to the breakable path.
-            && !self.param_has_own_line_decorators(&params[0]);
+        let should_hug_single_pattern = self.hugs_sole_parameter(
+            params,
+            params_start,
+            trailing_comments_end,
+            comments_present,
+        );
 
         if should_hug_single_pattern {
             // Hug mode: just ( + pattern + optional trailing comma + )

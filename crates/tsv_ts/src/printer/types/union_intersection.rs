@@ -1968,8 +1968,11 @@ impl<'a> Printer<'a> {
         // starting at index 1 (`A & { … } & { … }`) — stays at base and its body
         // indents just one level, while a `}`→non-object tail and every later member
         // carry the continuation indent. `is_huggable_type` is Prettier's
-        // `isObjectType` (`TSTypeLiteral`/`TSMappedType`), read on the raw member (no
-        // paren-unwrap) to match Prettier's node check.
+        // `isObjectType` (`TSTypeLiteral`/`TSMappedType`), and it reads through the
+        // member's redundant parens — asking it on the RAW member instead hands
+        // `({ … }) & B` the breakable `line` of the neither-object arm, so pass 1 breaks
+        // the `&` and pass 2 (no paren left) hugs it. The rule and its reason live on
+        // `is_huggable_type`; ask it directly and never re-derive the check here.
         //
         // This subsumes the old huggable-pair / last-huggable separator special-cases
         // and the blanket `indent(continuations)`; the first member always stays at
@@ -2245,8 +2248,9 @@ impl<'a> Printer<'a> {
             // anything once the comment is glued to what follows it.
             let leading_run_ends_line = own_line_leading.iter().any(|c| !self.comment_hugs_next(c));
 
-            // Per Prettier's `printIntersectionType` per-boundary branch, on the raw
-            // members' `isObjectType` (matching the no-comment loop):
+            // Per Prettier's `printIntersectionType` per-boundary branch, on the members'
+            // `isObjectType` (matching the no-comment loop — `is_huggable_type` reads
+            // through a member's redundant parens, and its doc says why):
             // - both objects → space-hug, indent only once `was_indented` is latched;
             // - neither object, or a leading own-line comment → break + indent;
             // - object↔non-object transition → space-hug, indent (and latch) past index 1.

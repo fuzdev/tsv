@@ -6,8 +6,9 @@
 // - Signature parameters (shared with type members)
 // - Return type annotations
 
-use super::super::expressions::functions::{has_huggable_type_annotation, is_huggable_pattern};
-use super::helpers::type_args_should_wrap_for_return_type;
+use super::helpers::{
+    is_huggable_type, type_args_should_wrap_for_return_type, unwrap_parenthesized,
+};
 use super::{BlankRule, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::layout::hang_after_operator;
@@ -23,8 +24,19 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// - The content expands internally
 /// - The closing `}` comes on its own line when broken
 ///
-/// Note: Only TypeLiteral is handled specially. Mapped types (`{ [K in T]: V }`)
-/// also pass `is_huggable_type` but use standard param formatting.
+/// The annotation is read through `unwrap_parenthesized`: prettier's TS AST carries no
+/// `TSParenthesizedType`, so its `isObjectType` sees a redundant paren's inner node and
+/// matching it means unwrapping. tsv KEEPS the paren node (it decides the output parens),
+/// so a raw read declines the hug for `(a: ({ … }))` and breaks the parameter list —
+/// while the non-hug path prints the annotation without the paren anyway.
+///
+/// ⚠️ Only TypeLiteral is matched. A mapped type (`{ [K in T]: V }`) passes
+/// `is_huggable_type` — and prettier's own `isObjectType` accepts it — so `(a: {⏎ [K in
+/// T]: U;⏎}) => void` SHOULD hug here and does not; it falls to the breakable path and
+/// prettier's form is not reached. That is an open divergence, not a design choice: the
+/// hug arm below builds a group-less `TSTypeLiteral` and has no mapped-type twin. The
+/// value-param and type-member signature paths (which route through
+/// `has_huggable_type_annotation`) hug a mapped annotation correctly today.
 fn get_type_literal_from_identifier<'a>(
     expr: &'a internal::Expression<'a>,
 ) -> Option<(
@@ -35,7 +47,7 @@ fn get_type_literal_from_identifier<'a>(
     match expr {
         internal::Expression::Identifier(id) => {
             id.type_annotation()
-                .and_then(|ann| match ann.type_annotation {
+                .and_then(|ann| match unwrap_parenthesized(ann.type_annotation) {
                     TSType::TypeLiteral(t) => Some((id, ann, t)),
                     _ => None,
                 })
@@ -71,10 +83,7 @@ pub(in crate::printer) fn return_type_triggers_grouping(
     return_type_doc: DocId,
     d: &DocArena,
 ) -> bool {
-    matches!(
-        return_type.type_annotation,
-        TSType::TypeLiteral(_) | TSType::Mapped(_)
-    ) || d.will_break(return_type_doc)
+    is_huggable_type(return_type.type_annotation) || d.will_break(return_type_doc)
 }
 
 /// Prettier's `shouldGroupFunctionParameters`: wrap params in their own group
@@ -125,6 +134,26 @@ pub(in crate::printer) fn group_params_if_should(
 }
 
 impl<'a> Printer<'a> {
+    /// Whether a huggable annotation's redundant paren shell holds no comment to emit
+    /// AFTER the type it wraps — `(a: ({ … } /* c */))` answers `false`, an
+    /// unparenthesized annotation trivially `true` (the range collapses).
+    ///
+    /// The hug arm builds the UNWRAPPED type literal, so the shell's own gaps get no
+    /// emitter of their own (`docs/comments.md` hazard 1 — a builder that reassembles a
+    /// node must claim on its own seam). The LEADING gap has a home: it merges into the
+    /// `:`→literal run the arm already emits, which is why that window ends at the literal.
+    /// The trailing gap has none — the arm's last push is the literal's doc — so, like the
+    /// two delimiter gaps beside it, a comment there declines the hug and the breakable
+    /// path places it. That is also what the paren-free spelling does with a comment in the
+    /// same position, so declining keeps the two authorings agreeing.
+    fn paren_shell_trailing_gap_empty(
+        &self,
+        annotation: &internal::TSTypeAnnotation<'_>,
+        inner: tsv_lang::Span,
+    ) -> bool {
+        !self.has_comments_to_emit_between(inner.end, annotation.type_annotation.span().end)
+    }
+
     //
     // Function Type Return Types
     //
@@ -722,22 +751,12 @@ impl<'a> Printer<'a> {
         // Check for line comments or own-line block comments that force multiline
         let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));
 
-        // Prettier's shouldHugFunctionParameters: a single param that's an object/array
-        // pattern (or carries an object/type-literal annotation) hugs — `(o: {` and
-        // `}: T)` stay together while the object's own group breaks, instead of the
-        // param LIST breaking around it. Mirrors `build_params_doc_with_comments` for
-        // value params; this is the signature-context path (bodyless declare/overload
-        // functions, method/call/construct signatures). Skipped when a comment sits in
-        // the `(`→param or param→`)` gap — the breakable path below places those.
-        let no_hug_comments = paren_pos
-            .is_none_or(|p| !self.has_comments_to_emit_between(p + 1, params[0].span().start))
-            && close_paren_pos
-                .is_none_or(|c| !self.has_comments_to_emit_between(params[0].span().end, c));
-        if params.len() == 1
-            && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
-            && no_hug_comments
-            && !self.param_has_own_line_decorators(&params[0])
-        {
+        // The sole-parameter hug, shared with the value-param path
+        // ([`Printer::hugs_sole_parameter`]); this is the signature-context caller
+        // (bodyless declare/overload functions, method/call/construct signatures). The
+        // window gate below is computed after this point, so the hug searches its two
+        // delimiter gaps unconditionally.
+        if self.hugs_sole_parameter(params, paren_pos.map(|p| p + 1), close_paren_pos, true) {
             return d.parens(self.build_function_type_param_expression_doc(&params[0]));
         }
         let end_boundary =
@@ -1031,22 +1050,24 @@ impl<'a> Printer<'a> {
             //   fn: (
             //       options: { repo: LocalRepo; log: Logger },
             //   ) => ReturnType
-            let no_leading_comments = !window_has_comments
-                || paren_pos.is_none_or(|pos| {
-                    !self.has_comments_to_emit_between(pos + 1, params[0].span().start)
-                });
-            // A comment in either delimiter gap declines the hug outright, so the
-            // breakable path below is what places it — the hug arm emits neither gap and
-            // must not grow an emitter for one. `no_trailing_comments` asks exactly the
-            // range `[param end, close paren)` that `end_boundary` spans, so the arm's
-            // trailing gap is provably empty; with no `)` located `end_boundary` collapses
-            // onto the param end and the range is empty again.
-            let no_trailing_comments = !window_has_comments
-                || close_paren_pos
-                    .is_none_or(|cp| !self.has_comments_to_emit_between(params[0].span().end, cp));
-            let huggable_param = if params.len() == 1 && no_leading_comments && no_trailing_comments
-            {
+            // The two delimiter gaps decline the hug exactly as they do at the other two
+            // param builders ([`Printer::param_delimiter_gaps_empty`]) — the hug arm emits
+            // neither gap and must not grow an emitter for one.
+            //
+            // ⚠️ This path does NOT share [`Printer::hugs_sole_parameter`], the gate the
+            // value-param and signature paths agree through. Its predicate is
+            // `get_type_literal_from_identifier` — TypeLiteral only, where the shared one
+            // accepts a mapped type too — which is the open divergence documented on that
+            // function. When the mapped-type twin lands, this becomes that call.
+            let huggable_param = if params.len() == 1
+                && self.param_delimiter_gaps_empty(
+                    &params[0],
+                    paren_pos.map(|p| p + 1),
+                    close_paren_pos,
+                    window_has_comments,
+                ) {
                 get_type_literal_from_identifier(&params[0])
+                    .filter(|&(_, ann, lit)| self.paren_shell_trailing_gap_empty(ann, lit.span))
             } else {
                 None
             };
@@ -1076,8 +1097,16 @@ impl<'a> Printer<'a> {
                         // Build type annotation with TypeLiteral that has softlines but no
                         // group wrapper. Extract comments between `:` and the TypeLiteral
                         // (e.g., `x: /* c */ { a: T }`)
+                        //
+                        // The window ends at the LITERAL, not at the annotation's own type:
+                        // this arm prints the literal, so a redundant paren shell around it
+                        // is dropped and its leading gap is part of this one
+                        // (`x: (/* c */ { a: T })`). Ending at the shell's `(` instead left
+                        // that gap with no emitter and dropped the comment. The shell's
+                        // TRAILING gap has no such home and declines the hug outright —
+                        // see `paren_shell_trailing_gap_empty`.
                         let colon_end = type_ann.span.start + 1;
-                        let type_start = type_ann.type_annotation.span().start;
+                        let type_start = type_literal.span.start;
                         let mut annotation: DocBuf = smallvec![d.text(": ")];
                         if window_has_comments
                             && let Some(comments) = self

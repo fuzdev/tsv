@@ -1,7 +1,7 @@
 // Type-argument instantiation (`<T, U>`) rendering
 
 use super::Printer;
-use super::helpers::{is_huggable_type, is_simple_type_arg, unwrap_parenthesized};
+use super::helpers::{is_huggable_type, is_simple_type_arg};
 use crate::ast::internal::{self, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
@@ -103,9 +103,7 @@ impl<'a> Printer<'a> {
     /// inlined `<…>` has no break point and an overflowing head breaks *around* the brackets
     /// (the enclosing operand, or the assignment `=`) instead of inside them.
     pub(in crate::printer) fn type_arg_hugs(&self, ty: &TSType<'_>) -> bool {
-        is_simple_type_arg(ty)
-            || is_huggable_type(unwrap_parenthesized(ty))
-            || self.type_arg_union_prints_hugged(ty)
+        is_simple_type_arg(ty) || is_huggable_type(ty) || self.type_arg_union_prints_hugged(ty)
     }
 
     /// Comments that force the `<...>` list to the multiline layout: line
