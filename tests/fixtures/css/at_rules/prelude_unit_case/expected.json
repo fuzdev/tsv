@@ -1,0 +1,156 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 374,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 240,
+				"end": 303,
+				"name": "supports",
+				"prelude": "(a: 2N) and (b: 2N + 1)",
+				"block": {
+					"type": "Block",
+					"start": 274,
+					"end": 303,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 278,
+								"end": 279,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 278,
+										"end": 279,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 278,
+														"end": 279
+													}
+												],
+												"start": 278,
+												"end": 279
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 280,
+								"end": 300,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 285,
+										"end": 295,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 278,
+							"end": 300
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 305,
+				"end": 365,
+				"name": "media",
+				"prelude": "(a: 2n) and (b: 2n + 1)",
+				"block": {
+					"type": "Block",
+					"start": 336,
+					"end": 365,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 340,
+								"end": 341,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 340,
+										"end": 341,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 340,
+														"end": 341
+													}
+												],
+												"start": 340,
+												"end": 341
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 342,
+								"end": 362,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 347,
+										"end": 357,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 340,
+							"end": 362
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the media reader lowercases a number's unit before its `<an+b>` gate and prints\n\tthe lowercased one; the value reader has no gate and passes an unknown unit's case\n\tstraight through, so one authoring has two canonical forms ",
+				"start": 9,
+				"end": 238
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 366,
+			"styles": "\n\t/* the media reader lowercases a number's unit before its `<an+b>` gate and prints\n\tthe lowercased one; the value reader has no gate and passes an unknown unit's case\n\tstraight through, so one authoring has two canonical forms */\n\t@supports (a: 2N) and (b: 2N + 1) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (a: 2n) and (b: 2n + 1) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 375,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

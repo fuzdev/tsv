@@ -19,4 +19,9 @@
 			color: red;
 		}
 	}
+	@media CALC(A) and (min-width: 1px) {
+		a {
+			color: red;
+		}
+	}
 </style>

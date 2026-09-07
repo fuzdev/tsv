@@ -47,13 +47,13 @@ pub(crate) enum PreludeReader {
     /// `media-type` and `media-value` print through `adjustNumbers` (`print/misc.js`), a regex
     /// pass over the raw text.
     ///
-    /// ⚠️ **`media-feature` — name position — takes no number pass at all**, only
+    /// **`media-feature` — name position — takes no number pass at all**, only
     /// `maybeToLowerCase(adjustStrings(value.replaceAll(/ +/g, " ")))`. Name position is
-    /// everything before the `:`, and the **whole** interior when there is none, so the
-    /// boolean `(0.50)` and range `(WIDTH >= 1.50)` / `(1.50 < width < 2.50)` forms are all
-    /// name. tsv runs this reader over the whole prelude instead, so it normalizes numbers
-    /// prettier keeps there. The boundary is already drawn one pass later by
-    /// [`feature_name_end`], which `lowercase_media_feature_names` asks.
+    /// everything before the expression's splitting `:`, and the **whole** interior when
+    /// there is none, so the boolean `(0.50)` and range `(WIDTH >= 1.50)` /
+    /// `(1.50 < width < 2.50)` forms are all name. [`feature_name_end`] draws that line for
+    /// both passes — the number one here and the case fold in
+    /// `lowercase_media_feature_names`.
     MediaQuery,
 }
 
@@ -62,18 +62,27 @@ pub(crate) enum PreludeReader {
 /// verbatim, and quoted strings get prettier's quote normalization (prefer single, swapping
 /// only to minimize escaping), which is `adjustStrings` on both paths.
 ///
+/// **Where the number pass runs at all** is the media path's first question, because
+/// `parseMediaQuery` is a node split rather than one text and `adjustNumbers` prints only
+/// `media-type` and `media-value`. A **`media-feature`** — everything up to a feature
+/// expression's splitting `:`, and its whole interior when there is none — takes
+/// `maybeToLowerCase(adjustStrings(…))` and no number pass, so `@media (1.50: 2.50)` is
+/// `(1.50: 2.5)`: the name's number kept, the value's normalized. [`feature_name_end`] draws
+/// that boundary, asked here at each top-level `(` and again by
+/// [`lowercase_media_feature_names`] for the case fold — one line, two passes. The value
+/// path has no such split: `parseValue` reads a prelude as one value.
+///
 /// **Numbers.** A number that is its own token normalizes to canonical form (`.50` → `0.5`)
 /// on both paths; what follows it is where they part. [`PreludeReader::Value`] prints a
 /// `value-number` node as `printCssNumber(value) + printUnit(unit)` with **no gate on the
 /// unit** — whatever trails the number is the unit and rides through unchanged, so `1.50abc`
 /// is `1.5abc`. [`PreludeReader::MediaQuery`] runs `adjustNumbers`' `(WORD_PART)?(NUMBER)(UNIT)?`
 /// regex, which returns the **whole match verbatim** unless the unit it captured is empty,
-/// the `<an+b>` `n`, or a unit CSS defines — so `1.50abc` stays. Unit *casing* is
-/// [`canonical_unit`]'s question on the value path. On the media path it is not:
-/// `adjustNumbers` lowercases the captured unit **before** its gate and prints the lowercased
-/// one, so the `<an+b>` `n` folds there whatever [`canonical_unit`] says (`2N` → `2n`, where
-/// `@supports` keeps `2N`). ⚠️ tsv asks [`canonical_unit`] on both, so the media `n` is a
-/// divergence — see the unit-extent TODO on the number arm.
+/// the `<an+b>` `n`, or a unit CSS defines — so `1.50abc` stays. Unit *casing* parts with it:
+/// the value path asks [`canonical_unit`] (`printUnit` of the author's spelling), the media
+/// path lowercases the unit **before** the gate and prints `printUnit` of *that*, so the
+/// `<an+b>` `n` folds there and not on the value path (`2N` → `2n` under `@media`, `2N` under
+/// `@supports`) — [`prelude_unit`].
 ///
 /// **A number abutting the run before it** is that run's own tail, not a token of its own:
 /// the canonical form of a `.`-leading number carries a leading `0`, and appending it to an
@@ -107,11 +116,15 @@ pub(crate) enum PreludeReader {
 /// content is copied verbatim (a path like `url(sprite1.50.png)` is never number/unit-normalized).
 /// A quoted `url("…")` is a function with a `<string>` arg and takes normal quote normalization.
 ///
-/// ⚠️ That opacity is a **value-reader** rule — `parse-value.js` special-cases the `url` func,
-/// while `adjustNumbers` is a regex with no url concept and normalizes straight through one
-/// (`@media (a: url(1.50))` is `url(1.5)` to prettier). This arm is unconditional on both
-/// paths, so on the media path it is a divergence rather than parity — the mirror of the `#`
-/// arm below, which *is* restricted to [`PreludeReader::Value`].
+/// That opacity is a **value-reader** rule — `parse-value.js` special-cases the `url` func,
+/// while `adjustNumbers` is a regex with no url concept and normalizes straight through one.
+/// So on the media path the arm is dropped in **`media-value` position only**
+/// (`@media (a: url(1.50))` → `url(1.5)`): a `url()` in *name* position is inside a
+/// `media-feature`, which takes no number pass, and one at depth 0 is a `media-url` node,
+/// which `adjustNumbers` never prints either — both keep their content
+/// (`@media (url(1.50): a)`, `@custom-media --a url(1.50)`). The `#` arm below is the mirror
+/// image: it *is* restricted to [`PreludeReader::Value`], since `adjustNumbers` has no hash
+/// concept at all.
 pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
     let bytes = input.as_bytes();
     let mut out = String::with_capacity(input.len());
@@ -129,6 +142,13 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
     // to it, so a number abutting it here is that run's own tail rather than a value of
     // its own — see the number arm.
     let mut prev_run_absorbs_digit = false;
+    // The media reader's NODE SPLIT, for the number pass: the offset where the feature
+    // expression currently open stops being `media-feature` NAME text — its splitting
+    // colon, or its own `)` when it has none. Set at each **top-level** `(` on the media
+    // path and never cleared, which needs no reset: it is always inside (or at the end of)
+    // the group that set it, so `i < media_name_until` is false everywhere after that
+    // group closes and at every position on the value path, where it stays 0.
+    let mut media_name_until = 0usize;
 
     while i < bytes.len() {
         let b = bytes[i];
@@ -233,9 +253,17 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
             // tsv the only one preserving them. The parser's own recognition, which does
             // decode the escape (`printer::values::function_name_is`), answers a different
             // question — an `@import` prelude the lexer tokenized, not this raw text.
+            //
+            // The opacity is the VALUE reader's rule, so the media path keeps it everywhere
+            // its number pass does not run — name position and depth 0 — and drops it in
+            // `media-value` position, where `adjustNumbers` walks the node's raw text with
+            // no url concept.
+            let media_value_text = path == PreludeReader::MediaQuery
+                && media_node_at(paren_depth, i, media_name_until) == MediaNode::Value;
             if ident.eq_ignore_ascii_case("url")
                 && bytes.get(i) == Some(&b'(')
                 && !url_arg_is_quoted(input, i)
+                && !media_value_text
             {
                 out.push_str(consume_paren_group(input, &mut i));
                 continue;
@@ -310,6 +338,7 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
         // A number (not attached to an identifier — those are consumed above).
         let num_len = crate::number::number_part_len(&input[i..]);
         if num_len > 0 {
+            let num_start = i;
             let num = &input[i..i + num_len];
             i += num_len;
             // Trailing unit. ⚠️ The two readers disagree and only one is implemented here:
@@ -337,9 +366,14 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
                     PreludeReader::Value => true,
                     // `adjustNumbers` returns the whole `(WORD_PART)?(NUMBER)(UNIT)?` match
                     // verbatim unless the captured unit is empty, the `<an+b>` `n`, or one
-                    // CSS defines — so `1abc` is left alone.
+                    // CSS defines — so `1abc` is left alone. And it runs on a `media-value`
+                    // or a `media-type`, never on the `media-feature` NAME this number may
+                    // sit in.
                     PreludeReader::MediaQuery => {
-                        unit.is_empty() || unit.eq_ignore_ascii_case("n") || is_known_css_unit(unit)
+                        media_node_at(paren_depth, num_start, media_name_until) != MediaNode::Name
+                            && (unit.is_empty()
+                                || unit.eq_ignore_ascii_case("n")
+                                || is_known_css_unit(unit))
                     }
                 };
             let normalized = normalizes
@@ -355,9 +389,7 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
                 .filter(|n| !(after_absorbing_run && n.starts_with(is_css_ident_code_point)));
             if let Some(normalized) = normalized {
                 out.push_str(&normalized);
-                // `canonical_unit` lowercases a known unit (`PX`→`px`) and leaves the
-                // `n`/empty/unknown cases untouched (none is a known unit).
-                out.push_str(&canonical_unit(unit));
+                out.push_str(&prelude_unit(unit, path));
             } else {
                 out.push_str(num);
                 out.push_str(unit);
@@ -378,6 +410,22 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
         // its matching `)` closes it.
         match ch {
             '(' => {
+                // A **top-level** `(` opens a media-feature expression, whose interior
+                // `parseMediaFeature` cuts into a `media-feature` name and a `media-value`
+                // at its splitting colon. Only the value half reaches `adjustNumbers`, so
+                // the boundary is taken here, once per expression, and read by the number
+                // and `url()` arms above. A nested `(` opens no expression of its own —
+                // the split is per top-level group, which is why the colon
+                // `feature_name_end` finds may sit at any depth inside one. Nor does a
+                // `<function-token>`'s own paren: `@media calc(1.50)` is a `media-type`,
+                // which `adjustNumbers` prints in full (`calc(1.5)`).
+                if path == PreludeReader::MediaQuery
+                    && paren_depth == 0
+                    && opens_feature_expression(bytes, i)
+                {
+                    let (group_end, _) = scan_paren_group(input, i);
+                    media_name_until = i + feature_name_end(&input[i..group_end]);
+                }
                 paren_depth += 1;
                 if after_preserve_ident && preserve_from.is_none() {
                     preserve_from = Some(paren_depth);
@@ -396,6 +444,64 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
     }
 
     out
+}
+
+/// Which node of `parseMediaQuery`'s split byte `i` sits in — the one question both of
+/// [`normalize_value_text`]'s media-path rules are keyed on.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MediaNode {
+    /// Query level — outside every paren: a `media-type`, `media-keyword` or `media-url`.
+    /// Of these only a `media-type` takes `adjustNumbers`, and it is also the only one that
+    /// can carry a bare number, so reporting them alike costs nothing; a `url()` here stays
+    /// opaque because the url arm asks for [`MediaNode::Value`] and gets this.
+    Type,
+    /// A `media-feature`: name position, `maybeToLowerCase(adjustStrings(…))` and **no**
+    /// number pass.
+    Name,
+    /// A `media-value`: `adjustNumbers` over the node's raw text, `url()` and all.
+    ///
+    /// Also what a media TYPE's own function call reports (`@media calc(url(1.50))`), the
+    /// one place the three variants do not name the oracle's node kinds one-to-one. It is
+    /// behaviourally exact: `adjustNumbers` walks a `media-type`'s raw text exactly as it
+    /// walks a `media-value`'s, url and all — and prettier agrees, printing `calc(url(1.5))`.
+    Value,
+}
+
+/// Read [`MediaNode`] off the two pieces of state the scan carries: its paren depth, and
+/// `media_name_until` — the boundary [`normalize_value_text`] took from [`feature_name_end`]
+/// at the enclosing expression's own `(`.
+///
+/// Only meaningful on [`PreludeReader::MediaQuery`]; the value path has no split, leaves
+/// `media_name_until` at 0, and its callers gate on the path before asking.
+fn media_node_at(paren_depth: usize, i: usize, media_name_until: usize) -> MediaNode {
+    if i < media_name_until {
+        MediaNode::Name
+    } else if paren_depth >= 1 {
+        MediaNode::Value
+    } else {
+        MediaNode::Type
+    }
+}
+
+/// `printUnit` of the unit `path`'s reader captured — the two readers capture it
+/// differently and it shows in its **case**.
+///
+/// The value reader hands `printUnit` the author's own spelling, so an unknown unit comes
+/// back unchanged (`2N` stays `2N`, `printUnit` finding no `n` in its map). `adjustNumbers`
+/// lowercases the captured unit *before* the gate that admits the `<an+b>` `n` and prints
+/// `printUnit` of that, so the media path folds it (`2N` → `2n`). Every *known* unit agrees
+/// either way — [`canonical_unit`] lowercases it — and an unknown one never reaches here on
+/// the media path at all, its gate having refused the whole match.
+fn prelude_unit(unit: &str, path: PreludeReader) -> Cow<'_, str> {
+    match path {
+        // `canonical_unit` lowercases a known unit (`PX`→`px`) and leaves the
+        // `n`/empty/unknown cases untouched (none is a known unit).
+        PreludeReader::Value => canonical_unit(unit),
+        PreludeReader::MediaQuery if unit.bytes().any(|b| b.is_ascii_uppercase()) => {
+            Cow::Owned(unit.to_ascii_lowercase())
+        }
+        PreludeReader::MediaQuery => Cow::Borrowed(unit),
+    }
 }
 
 /// Whether the `url(` opening at `open` (the `(` byte index) is immediately
@@ -615,8 +721,10 @@ fn ident_sequence_end(s: &str, start: usize) -> usize {
 /// value (`(min-width: calc(…))`, `(width: min(…))`). A grouped/complex condition — a
 /// nested `(` that opens a sub-condition (`(not (hover))`, `((a) and (b))`) — is left
 /// verbatim, matching prettier's media-query parser, which treats those as
-/// `media-unknown`. (A function-call `(` is told apart from a sub-condition `(` by
-/// whether it immediately follows an identifier; see `scan_paren_group`.) (One small
+/// `media-unknown`. A `(` glued to an identifier is neither: it is a
+/// `<function-token>`'s own paren, and a media TYPE holding one
+/// (`@media CALC(A)`) is not a feature name and does not fold at all — see
+/// [`opens_feature_expression`], the one test all three passes read. (One small
 /// divergence:
 /// prettier's parser partially lowercases the *first* feature in `((A) and (B))`; tsv
 /// preserves the whole grouped condition for consistency — see
@@ -654,7 +762,7 @@ pub(crate) fn lowercase_media_feature_names(query: &str) -> Cow<'_, str> {
             continue;
         }
         match bytes[i] {
-            b'(' => {
+            b'(' if opens_feature_expression(bytes, i) => {
                 // A top-level `(` opens a media-feature-expression. A group that
                 // contains a nested *sub-condition* `(` is grouped/complex — copy it
                 // verbatim (prettier's parser treats it as `media-unknown`); a nested
@@ -668,7 +776,8 @@ pub(crate) fn lowercase_media_feature_names(query: &str) -> Cow<'_, str> {
                 i = end;
             }
             _ => {
-                // Depth-0 content (media types, `and`/`or`/`not`/`only`): verbatim.
+                // Depth-0 content (media types, `and`/`or`/`not`/`only`, and a media
+                // type's own function call): verbatim.
                 let ch = query[i..].chars().next().unwrap_or('\0');
                 out.push(ch);
                 i += ch.len_utf8();
@@ -713,24 +822,33 @@ fn trivia_span_at(s: &str, i: usize) -> Option<usize> {
     }
 }
 
-/// Whether `b` is a byte that can end a CSS identifier (a function name, right before
-/// its `(`) — ASCII alphanumeric, `-`, `_`, or any non-ASCII byte (part of a
-/// multi-byte ident char). Used to tell a function-call `(` (`calc(`, `min(`) from the
-/// `(` that opens a grouped sub-condition.
+/// Does the `(` at `i` open a **media-feature expression**, rather than being a
+/// `<function-token>`'s own paren?
 ///
-/// This mirrors the CSS Syntax 3 tokenizer (§"Consume an ident-like token"): an ident
-/// sequence *immediately* followed by `(` is consumed as a `<function-token>`. So a `(`
-/// preceded by an ident byte is a function call; a `(` preceded by whitespace/`(`/a
-/// connector opens a `( <media-condition> )` per the Media Queries 4 grammar.
-fn is_ident_byte(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b >= 0x80
+/// CSS Syntax 3 §"Consume an ident-like token": an ident sequence *immediately* followed by
+/// `(` is one `<function-token>`, so a `(` glued to an ident byte is a call and everything
+/// else — a `(` at the start, after whitespace, after another `(`, after a connector — opens
+/// a `( <media-condition> )` per the Media Queries 4 grammar.
+///
+/// The single spelling of that question, read at three points: the nested-`(` classification
+/// in [`scan_paren_group`], and the top-level `(` in each of the two passes over a media
+/// prelude ([`normalize_value_text`]'s number pass and
+/// [`lowercase_media_feature_names`]'s case fold). Both passes are keyed on it for the same
+/// reason — `@media calc(1.50)` is a `media-type`, which takes `adjustNumbers` and no
+/// lowercase, where an expression's name takes the lowercase and no numbers. Two spellings
+/// of it is how the two passes came to disagree about where a name even starts.
+fn opens_feature_expression(bytes: &[u8], i: usize) -> bool {
+    // The byte before, if any, must not be one that can end an ident: ASCII alphanumeric,
+    // `-`, `_`, or any non-ASCII byte (the tail of a multi-byte ident char).
+    let ends_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b >= 0x80;
+    i == 0 || !ends_ident(bytes[i - 1])
 }
 
 /// Scan a parenthesized group starting at the `(` at `open`. Returns
 /// `(index_just_past_the_matching_close_paren, contains_a_nested_sub_condition)`,
-/// skipping comments/strings. A nested `(` that immediately follows an identifier byte
-/// is a function call in the value (`calc(`) and does **not** set the flag; only a `(`
-/// opening a sub-condition does. For an unbalanced group, returns end-of-input.
+/// skipping comments/strings. A nested `(` that is a function call in the value (`calc(`)
+/// does **not** set the flag — see [`opens_feature_expression`]; only a `(` opening a
+/// sub-condition does. For an unbalanced group, returns end-of-input.
 fn scan_paren_group(s: &str, open: usize) -> (usize, bool) {
     let bytes = s.as_bytes();
     let mut i = open + 1;
@@ -758,8 +876,7 @@ fn scan_paren_group(s: &str, open: usize) -> (usize, bool) {
                 // `(min-width: calc(…))`). Only a `(` that opens a real sub-condition
                 // (preceded by `(`, whitespace, or a connector keyword) marks the group
                 // as grouped/complex.
-                let is_function_call = i > 0 && is_ident_byte(bytes[i - 1]);
-                if !is_function_call {
+                if opens_feature_expression(bytes, i) {
                     has_nested = true;
                 }
                 depth += 1;
@@ -781,10 +898,18 @@ fn scan_paren_group(s: &str, open: usize) -> (usize, bool) {
 /// Where the feature **name** ends inside `group` (a whole `(…)` slice): the byte index of
 /// the name→value `:`, or `group.len()` for a boolean or range feature, which has none.
 ///
-/// Trivia, escapes and a value function call's own parens are all stepped, so the `:` found
-/// is one that really separates a name from a value — not one inside a comment or string,
-/// not an escaped one (`(A\:B: 1px)` is a name carrying a `:`, per
-/// [`ident_sequence_end`]), and not one nested in a call (`(a: url(x:y))`).
+/// The **first** colon at any depth inside the group, which is `parseMediaFeature`'s own
+/// rule: it splits in `normal` mode and its parens do not protect it, so
+/// `(calc(1:1.50): a)` splits *inside* the call — prettier prints `(calc(1: 1.5): a)`, the
+/// `1.50` past the split being value text. The parser's node split reads it the same way
+/// (`parse_raw_prelude_content`'s `feature_colon_seen`, set by the first `Colon` at
+/// `paren_depth >= 1`), so printer and parser draw one line.
+///
+/// Trivia and escapes are stepped, so the `:` found is one that really separates a name from
+/// a value — not one inside a comment or string, and not an escaped one (`(A\:B: 1px)` is a
+/// name carrying a `:`, per [`ident_sequence_end`]). ⚠️ That is deliberately **narrower than
+/// prettier**, whose split is a raw scan with no notion of either; the divergence it leaves
+/// is sanctioned in `docs/conformance_prettier_css.md` §CSS: At-Rules.
 fn feature_name_end(group: &str) -> usize {
     debug_assert!(
         group.starts_with('('),
@@ -792,7 +917,9 @@ fn feature_name_end(group: &str) -> usize {
     );
     let bytes = group.as_bytes();
     let mut i = 0;
-    // `group` opens with its own `(`, so the name sits at depth 1.
+    // `group` opens with its own `(`, so the name starts at depth 1 — and a colon deeper
+    // than that still splits, so the depth is only here to keep the group's own `(` from
+    // reading as one.
     let mut depth = 0usize;
     while i < group.len() {
         if let Some(end) = trivia_span_at(group, i) {
@@ -806,7 +933,7 @@ fn feature_name_end(group: &str) -> usize {
         match bytes[i] {
             b'(' => depth += 1,
             b')' => depth = depth.saturating_sub(1),
-            b':' if depth == 1 => return i,
+            b':' if depth >= 1 => return i,
             _ => {}
         }
         i += 1;
@@ -1336,6 +1463,17 @@ mod tests {
         ));
         // A comment in the expression is preserved; the name still lowercases.
         assert_eq!(f("(MIN-WIDTH: /* c */ 1px)"), "(min-width: /* c */ 1px)");
+        // A `(` glued to an ident opens a `<function-token>`, not an expression, so a media
+        // TYPE carrying a call is not a feature name and nothing in it folds.
+        assert_eq!(f("CALC(A)"), "CALC(A)");
+        assert_eq!(
+            f("CALC(A) and (MIN-WIDTH: 1px)"),
+            "CALC(A) and (min-width: 1px)"
+        );
+        // The colon a call's parens hold is still the expression's splitting one, so a
+        // name may run into a call and its remainder is value text.
+        assert_eq!(f("(CALC(1:2): A)"), "(calc(1:2): A)");
+        assert_eq!(f("(A(B:C))"), "(a(b:C))");
     }
 
     #[test]
@@ -1377,7 +1515,9 @@ mod tests {
             normalize_value_text("(background: url(\"v2.00.png\"))", PreludeReader::Value),
             "(background: url('v2.00.png'))"
         );
-        // url opacity is unconditional — it holds on either path.
+        // The media path walks into a `media-value`'s url (see
+        // `the_two_prelude_readers_answer_a_number_differently`) — and finds nothing to do
+        // here, the word part `x1` absorbing the number that abuts it either way.
         assert_eq!(
             normalize_value_text("(a: url(x1.50))", PreludeReader::MediaQuery),
             "(a: url(x1.50))"
@@ -1692,6 +1832,27 @@ mod tests {
         // A unit both readers accept normalizes on both, casing included.
         assert_eq!(value("(a: 1.50PX)"), "(a: 1.5px)");
         assert_eq!(media("(a: 1.50PX)"), "(a: 1.5px)");
+        // The `<an+b>` `n` is where the unit's CASE parts: `adjustNumbers` lowercases what
+        // it captured before its gate and prints that, where `printUnit` is handed the
+        // author's own spelling and finds no `n` in its map.
+        assert_eq!(value("(a: 2N)"), "(a: 2N)");
+        assert_eq!(media("(a: 2N)"), "(a: 2n)");
+        assert_eq!(value("(a: 2N + 1)"), "(a: 2N + 1)");
+        assert_eq!(media("(a: 2N + 1)"), "(a: 2n + 1)");
+
+        // `<url-token>` opacity is the value reader's rule: `parse-value.js` special-cases
+        // the func, where `adjustNumbers` is a regex with no url concept and walks straight
+        // through one in `media-value` position.
+        assert_eq!(value("(a: url(1.50))"), "(a: url(1.50))");
+        assert_eq!(media("(a: url(1.50))"), "(a: url(1.5))");
+        assert_eq!(media("(a: url(1.50px) b)"), "(a: url(1.5px) b)");
+        // Only there, though — a `url()` in NAME position sits in a `media-feature`, which
+        // takes no number pass, and one at depth 0 is a `media-url` node, which
+        // `adjustNumbers` never prints either.
+        assert_eq!(media("(url(1.50): a)"), "(url(1.50): a)");
+        assert_eq!(media("(url(1.50))"), "(url(1.50))");
+        assert_eq!(media("a url(1.50)"), "a url(1.50)");
+        assert_eq!(media("(a: b) url(1.50)"), "(a: b) url(1.50)");
 
         // A number's own unit absorbs the number after it on the value path (one word), and
         // absorbs nothing on the media path (the regex re-splits at the second number).
@@ -1731,6 +1892,59 @@ mod tests {
         assert_eq!(media("(a: $$a.50)"), "(a: $$a.50)");
         // With no word part and no digits in the tail, the run ends where it did.
         assert_eq!(media("(a: $-.50)"), "(a: $-0.5)");
+    }
+
+    /// `adjustNumbers` prints a `media-type` and a `media-value`, never a `media-feature`,
+    /// so the media reader's number pass stops at the boundary [`feature_name_end`] draws —
+    /// the expression's first colon, or its whole interior when it has none.
+    #[test]
+    fn the_media_readers_number_pass_skips_feature_name_position() {
+        let media = |s: &str| normalize_value_text(s, PreludeReader::MediaQuery);
+
+        // The headline: one expression, two halves, two answers.
+        assert_eq!(media("(1.50: 2.50)"), "(1.50: 2.5)");
+        // No colon, so the whole interior is name — the boolean and both range forms.
+        assert_eq!(media("(0.50)"), "(0.50)");
+        assert_eq!(media("(width >= 1.50)"), "(width >= 1.50)");
+        assert_eq!(media("(1.50 < width < 2.50)"), "(1.50 < width < 2.50)");
+        // A call's parens do not protect the colon, so a name may run into one and a value
+        // may start inside one.
+        assert_eq!(media("(calc(1.50): a)"), "(calc(1.50): a)");
+        assert_eq!(media("(calc(1.50))"), "(calc(1.50))");
+        assert_eq!(media("(calc(1:1.50): a)"), "(calc(1:1.5): a)");
+        // Nor do a grouped condition's: the split is per TOP-LEVEL group, at its first
+        // colon wherever that sits, which is what keeps a nested feature's value normalized.
+        assert_eq!(media("(not (a: 1.50))"), "(not (a: 1.5))");
+        assert_eq!(
+            media("((1.50: a) and (b: 1.50))"),
+            "((1.50: a) and (b: 1.5))"
+        );
+        assert_eq!(media("((1.50))"), "((1.50))");
+        // Depth 0 is `media-type` position and does take the pass.
+        assert_eq!(media("1.50"), "1.5");
+        assert_eq!(media("1.50, (a: 1.50)"), "1.5, (a: 1.5)");
+        assert_eq!(media("not (1.50: a)"), "not (1.50: a)");
+        // A `(` glued to an ident is a `<function-token>`'s, not an expression's, so a
+        // media type carrying a call takes the pass through it.
+        assert_eq!(media("calc(1.50)"), "calc(1.5)");
+        assert_eq!(
+            media("calc(1.50) and (calc(1.50): a)"),
+            "calc(1.5) and (calc(1.50): a)"
+        );
+        // Every top-level group carries its own split.
+        assert_eq!(media("(a: 1.50) and (2.50: b)"), "(a: 1.5) and (2.50: b)");
+        assert_eq!(media("(1.50: a), (b: 2.50)"), "(1.50: a), (b: 2.5)");
+        // Trivia is stepped, so a colon inside it splits nothing and the name reaches past
+        // it — deliberately narrower than prettier's raw scan (docs/conformance_prettier_css.md
+        // §CSS: At-Rules), and the same reading `feature_name_end` gives the case fold.
+        assert_eq!(media("(1.50 /* c */: a)"), "(1.50 /* c */: a)");
+        assert_eq!(media("(/* : */ 1.50: a)"), "(/* : */ 1.50: a)");
+        assert_eq!(media(r"(a\:b: 1.50)"), r"(a\:b: 1.5)");
+        // The value path has no such split — `parseValue` reads a prelude as one value.
+        assert_eq!(
+            normalize_value_text("(1.50: 2.50)", PreludeReader::Value),
+            "(1.5: 2.5)"
+        );
     }
 
     /// The hex fold is asked of the **whole** hash word, so a colour is a colour only when
