@@ -8,5 +8,10 @@
 		padding: var(--b, x\,y);
 		gap: a, b\,;
 		inset: a\+b;
+		/* the whitespace normalizer's own delimiter strips reach the payload too: a value
+		the comment path re-emits from source, and a paren shell the value parser left opaque */
+		left: (1px\ ) /* c */;
+		right: f(1px\ , 2px) /* c */;
+		bottom: (a b c\ )(d);
 	}
 </style>

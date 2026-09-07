@@ -18,6 +18,9 @@
 		/* an unquoted url() is opaque, so its content is copied whether or not the
 		value carries a comment */
 		background-image: url(a1.50.png) /* comment */;
+		/* a parenthesized group takes the rules too, with the comment inside it or after */
+		left: (1.5px /* comment */ 2px);
+		right: (1.5px) /* comment */;
 		/* an escape is copied whole, so the number past its terminator is its own token */
 		top: \31 0.5px /* comment */ 2px;
 	}

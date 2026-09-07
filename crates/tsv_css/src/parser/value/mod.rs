@@ -301,7 +301,27 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
         name_part = &name_region[..=name_part.len()];
     }
 
-    if name_part.is_empty() || !is_function_name(name_part) {
+    // An **empty** name is the parenthesized group (`(1.5)`, `(100vw - 1.5px)`) — CSS Syntax 3
+    // §"component value" calls it a `()`-block, a *simple block* whose associated token is the
+    // `(`, and gives it the same payload a function has ("a value consisting of a list of
+    // component values"): only the name/token tells the two apart. So its members parse and
+    // reach the ordinary number / colour / string / dimension printers, which is also
+    // prettier's model — `parseValue` gives a bare `(…)` a `function` node whose `value` is
+    // `''`. Read as an opaque identifier instead, the group switched every value-level rule
+    // off for its whole interior. The name validation is asked only when there is a name to
+    // ask about, so nothing else widens.
+    //
+    // ⚠️ An empty name can only ever BE the group's own opener, which is what keeps the
+    // escape-blind search for `paren_pos` above sound in this arm too: `s` reaches here
+    // trimmed, so `s[..paren_pos]` trims to nothing only when `paren_pos` is 0. A `(` found
+    // inside an escape or a string always has bytes before it, so it always yields a
+    // *non-empty* name — and one the validation rejects, per the ⚠️ on the search.
+    //
+    // The other two associated tokens are deliberately NOT read this way: `[a]` and `{a}` are
+    // left opaque, which is where prettier's own value parser leaves them (`[1.50]` keeps its
+    // number on both sides, and a `{}`-block is the whole-value form css-syntax-3 restricts to
+    // custom properties — `css/values/variables/block_value_svelte_prettier_divergence`).
+    if !name_part.is_empty() && !is_function_name(name_part) {
         return None;
     }
 

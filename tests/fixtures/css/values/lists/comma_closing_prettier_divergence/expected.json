@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 465,
+		"end": 560,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 456,
+					"end": 551,
 					"children": [
 						{
 							"type": "Declaration",
@@ -63,22 +63,29 @@
 						},
 						{
 							"type": "Declaration",
-							"start": 369,
-							"end": 376,
+							"start": 376,
+							"end": 402,
+							"property": "border-image",
+							"value": "(red, blue,)"
+						},
+						{
+							"type": "Declaration",
+							"start": 464,
+							"end": 471,
 							"property": "--x",
 							"value": "a,"
 						},
 						{
 							"type": "Declaration",
-							"start": 434,
-							"end": 452,
+							"start": 529,
+							"end": 547,
 							"property": "--y",
 							"value": "rgb(1, 2, 3,)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 456
+				"end": 551
 			}
 		],
 		"comments": [
@@ -102,27 +109,33 @@
 			},
 			{
 				"type": "CSSComment",
-				"value": " a custom property substitutes its tokens verbatim ",
+				"value": " and so does a nameless parenthesized group, which is one ",
 				"start": 311,
-				"end": 366
+				"end": 373
+			},
+			{
+				"type": "CSSComment",
+				"value": " a custom property substitutes its tokens verbatim ",
+				"start": 406,
+				"end": 461
 			},
 			{
 				"type": "CSSComment",
 				"value": " and the rule reaches a function nested in one ",
-				"start": 380,
-				"end": 431
+				"start": 475,
+				"end": 526
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 457,
-			"styles": "\n\tdiv {\n\t\t/* a comma closing the value list is authored content, so it is kept */\n\t\ttransition: a,;\n\t\t/* the same, in a list that breaks one element per line */\n\t\ttransition:\n\t\t\ta 1s ease,\n\t\t\tb 2s ease,;\n\t\t/* a function's argument list takes the same rule */\n\t\tbackground: linear-gradient(red, blue,);\n\t\t/* a custom property substitutes its tokens verbatim */\n\t\t--x: a,;\n\t\t/* and the rule reaches a function nested in one */\n\t\t--y: rgb(1, 2, 3,);\n\t}\n",
+			"end": 552,
+			"styles": "\n\tdiv {\n\t\t/* a comma closing the value list is authored content, so it is kept */\n\t\ttransition: a,;\n\t\t/* the same, in a list that breaks one element per line */\n\t\ttransition:\n\t\t\ta 1s ease,\n\t\t\tb 2s ease,;\n\t\t/* a function's argument list takes the same rule */\n\t\tbackground: linear-gradient(red, blue,);\n\t\t/* and so does a nameless parenthesized group, which is one */\n\t\tborder-image: (red, blue,);\n\t\t/* a custom property substitutes its tokens verbatim */\n\t\t--x: a,;\n\t\t/* and the rule reaches a function nested in one */\n\t\t--y: rgb(1, 2, 3,);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 466,
+	"end": 561,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

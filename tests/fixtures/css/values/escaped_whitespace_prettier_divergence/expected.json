@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 186,
+		"end": 443,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 177,
+					"end": 434,
 					"children": [
 						{
 							"type": "Declaration",
@@ -95,24 +95,66 @@
 							"end": 173,
 							"property": "inset",
 							"value": "a\\+b"
+						},
+						{
+							"type": "Declaration",
+							"start": 353,
+							"end": 374,
+							"property": "left",
+							"value": "(1px\\ )"
+						},
+						{
+							"type": "Declaration",
+							"start": 378,
+							"end": 406,
+							"property": "right",
+							"value": "f(1px\\ , 2px)"
+						},
+						{
+							"type": "Declaration",
+							"start": 410,
+							"end": 430,
+							"property": "bottom",
+							"value": "(a b c\\ )(d)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 177
+				"end": 434
 			}
 		],
-		"comments": [],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the whitespace normalizer's own delimiter strips reach the payload too: a value\n\t\tthe comment path re-emits from source, and a paren shell the value parser left opaque ",
+				"start": 177,
+				"end": 350
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 367,
+				"end": 374,
+				"position": 8
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 399,
+				"end": 406,
+				"position": 14
+			}
+		],
 		"content": {
 			"start": 7,
-			"end": 178,
-			"styles": "\n\tdiv {\n\t\twidth: 50px\\ ;\n\t\theight: var(--a, 50px\\ );\n\t\tmargin: calc(1px\\ );\n\t\ttop: calc\\ (1px);\n\t\tcolor: a\\ b;\n\t\tpadding: var(--b, x\\,y);\n\t\tgap: a, b\\,;\n\t\tinset: a\\+b;\n\t}\n",
+			"end": 435,
+			"styles": "\n\tdiv {\n\t\twidth: 50px\\ ;\n\t\theight: var(--a, 50px\\ );\n\t\tmargin: calc(1px\\ );\n\t\ttop: calc\\ (1px);\n\t\tcolor: a\\ b;\n\t\tpadding: var(--b, x\\,y);\n\t\tgap: a, b\\,;\n\t\tinset: a\\+b;\n\t\t/* the whitespace normalizer's own delimiter strips reach the payload too: a value\n\t\tthe comment path re-emits from source, and a paren shell the value parser left opaque */\n\t\tleft: (1px\\ ) /* c */;\n\t\tright: f(1px\\ , 2px) /* c */;\n\t\tbottom: (a b c\\ )(d);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 187,
+	"end": 444,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
