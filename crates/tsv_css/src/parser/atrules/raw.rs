@@ -248,6 +248,17 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         let pads_boolean_operator = is_bool_op
             && last_non_whitespace_kind != Some(TokenKind::LeftParen)
             && paren_depth == 0;
+        // A comment INSIDE a feature expression is that node's own text for the same
+        // reason, and prettier inserts nothing there: the name half only collapses its
+        // whitespace runs and the value half keeps them, so a comment the author glued to
+        // the expression's paren, to a name or to a value stays glued
+        // (`(/* c */a: b)`, `(a: b/* c */)` are prettier fixed points). Read on both sides
+        // of the token like the operator's, so the pair can never leave a one-sided space.
+        // ⚠️ Depth 0 is NOT this rule, and tsv models no node split there at all: prettier
+        // joins query-level nodes with one space and returns a `media-unknown` verbatim, so
+        // `@media a/* c */b` is one node it keeps whole where tsv pads. An open gap,
+        // cataloged in conformance_prettier_css.md §CSS: At-Rules.
+        let pads_comment = is_comment && paren_depth == 0;
 
         // Whitespace-rewriting (property/boolean/comma spacing) applies only to the
         // normalized media-reader path; verbatim raw at-rules keep the source spacing.
@@ -258,7 +269,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             // cannot show.
             let has_trailing_space = trailing_spaces > 0 || ends_in_verbatim_run;
 
-            if (is_comment || pads_boolean_operator) && !has_trailing_space {
+            if (pads_comment || pads_boolean_operator) && !has_trailing_space {
                 prelude.push(' ');
                 trailing_spaces += 1;
             }
@@ -311,7 +322,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             if pads_boolean_operator {
                 prelude.push(' ');
                 trailing_spaces += 1;
-            } else if is_comment {
+            } else if pads_comment {
                 // Add space after comment, but not if followed by comma, close paren, or semicolon
                 if !matches!(
                     parser.current_kind,
