@@ -1138,43 +1138,6 @@ const empty_statement_removal: DivergencePattern = {
 	}
 };
 
-const css_value_ratio: DivergencePattern = {
-	id: 'css_value_ratio',
-	description: 'Ratio spacing normalized in CSS',
-	languages: ['css', 'svelte'],
-	conformance_sections: ['CSS: Values'],
-	fixtures: ['css/values/ratio/ratio_prettier_divergence'],
-	detect(ctx) {
-		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
-
-		// Look for ratio patterns (digit / digit) with spacing differences
-		const ratio_pattern = /\d+\s*\/\s*\d+/;
-
-		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			if (!is_in_css_context(hunk, ctx)) return false;
-
-			const removed_has_ratio = hunk.removed_lines.some((l) => ratio_pattern.test(l));
-			const added_has_ratio = hunk.added_lines.some((l) => ratio_pattern.test(l));
-			if (!removed_has_ratio || !added_has_ratio) return false;
-
-			// Check for spacing differences around /
-			const removed_spacing = hunk.removed_lines.some((l) => /\d+\s{2,}\/|\/ {2,}\d+/.test(l));
-			const added_normalized = hunk.added_lines.some((l) => /\d+ \/ \d+/.test(l));
-			return removed_spacing && added_normalized;
-		});
-
-		if (hunk_indices.length > 0) {
-			return {
-				pattern: 'css_value_ratio',
-				confidence: 'likely',
-				hunk_indices,
-				reason: 'Ratio spacing normalized in CSS'
-			};
-		}
-		return null;
-	}
-};
-
 // ─── CSS-specific patterns ──────────────────────────────────────────────────
 
 const css_unit_serialize_case: DivergencePattern = {
@@ -3951,7 +3914,6 @@ export const PATTERNS: DivergencePattern[] = [
 	attr_value_single_quote,
 	svelte_element_this_string,
 	empty_statement_removal,
-	css_value_ratio,
 
 	// 2. CSS-specific patterns
 	css_url_opaque,
