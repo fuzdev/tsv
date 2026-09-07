@@ -538,11 +538,18 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 - Intersection types (`A & B`)
 - Discriminated unions
 - A **redundant paren carries no layout signal**: a paren'd member formats exactly as the bare
-  spelling does — `({ … }) & B` keeps the `&` hugged to the object's `}` like `{ … } & B`. The
-  rule is uniform across every `isObjectType` gate (the intersection separator, the
-  sole-parameter hug, the parameter grouping), and it is why `is_huggable_type` reads through
+  spelling does — `({ … }) & B` keeps the `&` hugged to the object's `}` like `{ … } & B`, and
+  `G<({ … }) | null>` hugs the `<` like `G<{ … } | null>`. The rule is uniform across every
+  `isObjectType` gate (the intersection separator, the sole-parameter hug, the parameter
+  grouping, both slots of the union hug), and it is why `is_huggable_type` reads through
   `unwrap_parenthesized` — prettier's TS AST carries no paren node, so matching its check means
   unwrapping, never reading the raw member
+- ⚠️ A **comment** is the one thing the paren does carry, and only at the union hug: prettier
+  drops the paren node but keeps the UNION's range over it, so a comment written inside a
+  member's shell (`({ … } /* c */) | null`) attaches to that member and bails the hug, while the
+  same comment outside the shell (`{ … } /* c */ | null`, outside the union's range) attaches to
+  the parent and leaves it alone. `Printer::union_member_shell_holds_comment` is that clause —
+  the half of `types.some((t) => hasComment(t))` the between-member scan cannot reach
 
 ### Function Types
 

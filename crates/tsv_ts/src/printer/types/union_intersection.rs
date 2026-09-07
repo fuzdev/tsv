@@ -7,7 +7,7 @@
 
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, is_huggable_type, outermost_paren,
+    intersection_has_huggable_last_type, is_huggable_type, outermost_paren, paren_shell_gaps,
     type_needs_parens_in_union_or_intersection, union_has_brace_member, union_hug_shape,
     unwrap_parenthesized,
 };
@@ -1284,8 +1284,15 @@ impl<'a> Printer<'a> {
     ///   block-only, so a line comment there would be silently DROPPED, and it could not
     ///   be inlined regardless (a `//` runs to end-of-line and would swallow the member).
     ///   `union_has_comments_between_members` cannot answer this: the gap is *before* the
-    ///   first member, not *between* two. A **block** there stays hugged and inline
-    ///   (`/* c */ { a: 1 } | null`), matching prettier.
+    ///   first member, not *between* two. A **block** there stays hugged and inline —
+    ///   ⚠️ an **open divergence**, not parity: the gap is non-empty only for a
+    ///   leading-operator union (`G<| /* c */ { a: 1 } | null>`), where the block sits
+    ///   inside the union's own range and prettier attaches it to the first member and
+    ///   expands. The bare `/* c */ { … } | null` spelling prettier *does* hug leaves this
+    ///   range empty and never reaches the probe, which is why the two read alike;
+    /// - inside a member's own redundant **paren shell** (`({ … } /* c */) | null`) —
+    ///   [`Self::union_member_shell_holds_comment`], the other half of
+    ///   `types.some((t) => hasComment(t))` that the between-member scan cannot reach.
     ///
     /// A comment nested *inside* a member (`{ /* c */ a: 1 }`) attaches to a child node,
     /// not the member, so it never blocks the hug — the member's own doc renders it.
@@ -1309,9 +1316,37 @@ impl<'a> Printer<'a> {
             return true;
         }
         !self.union_has_comments_between_members(union)
+            && !self.union_member_shell_holds_comment(union)
             && !union.types.first().is_some_and(|first| {
                 self.has_line_comments_between(union.span.start, first.span().start)
             })
+    }
+
+    /// Whether any member carries a comment in its own redundant **paren shell** — either
+    /// of [`paren_shell_gaps`]' two windows, so a doubly-nested `((/* c */ { … }))` counts
+    /// like the single layer it strips to.
+    ///
+    /// The detached-model half of prettier's `types.some((t) => hasComment(t))` that the
+    /// between-member scan cannot see. Prettier's TS AST drops the paren node but keeps the
+    /// UNION's range over it, so a comment written inside a member's shell falls between the
+    /// union's range and the member's own — it attaches to that member as a leading or
+    /// trailing comment, and `shouldHugUnionType` bails. The same comment written OUTSIDE
+    /// the shell (`/* c */ { … } | null`) falls outside the union's range entirely, attaches
+    /// to the parent, and prettier hugs — so this is a real difference between the two
+    /// authorings, not a paren-independence break: the paren is what puts the comment inside
+    /// the union.
+    ///
+    /// A comment nested deeper inside the member (`({ /* c */ a: 1 })`) sits within the
+    /// unwrapped inner's own span and never counts, matching the rule
+    /// [`Self::union_prints_hugged`] states for the paren-free spelling.
+    ///
+    /// **Axis**: on-page, like every other clause of that layout gate.
+    fn union_member_shell_holds_comment(&self, union: &TSUnionType<'_>) -> bool {
+        union.types.iter().filter_map(outermost_paren).any(|shell| {
+            let (leading, trailing) = paren_shell_gaps(shell);
+            self.has_comments_on_page_between(leading.start, leading.end)
+                || self.has_comments_on_page_between(trailing.start, trailing.end)
+        })
     }
 
     /// Whether any comment sits in a gap *between* two consecutive members — the

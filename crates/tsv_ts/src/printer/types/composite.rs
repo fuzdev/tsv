@@ -9,8 +9,9 @@
 // - Entity names: `A.B.C`
 
 use super::helpers::{
-    type_needs_parens_for_array_element, type_needs_parens_for_conditional_check,
-    type_needs_parens_for_conditional_extends, unwrap_parenthesized,
+    outermost_paren, paren_shell_gaps, type_needs_parens_for_array_element,
+    type_needs_parens_for_conditional_check, type_needs_parens_for_conditional_extends,
+    unwrap_parenthesized,
 };
 use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
 use crate::ast::internal::{
@@ -56,25 +57,6 @@ fn tuple_elem_span(ty: &TSType<'_>) -> Span {
 /// per-branch `indent` then doubled the nested conditional's own always-on indent.
 fn conditional_branch_is_nested(branch: &TSType<'_>) -> bool {
     matches!(unwrap_parenthesized(branch), TSType::Conditional(_))
-}
-
-/// The **deep** interior gaps of a conditional branch's redundant paren shell, as
-/// `(leading, trailing)` — from the outermost `(` to the fully-unwrapped inner type, and
-/// from that type back out to the outermost `)`. `None` when the branch carries no shell.
-///
-/// Deep, not per-paren, for the reason [`Printer::stripped_paren_leading_line_comments`]
-/// widened: a comment in a doubly-nested shell (`((/* c */ T))`) falls *between* the two
-/// `(`s, where either paren's own window is blind to it.
-fn branch_shell_gaps(branch: &TSType<'_>) -> Option<(Span, Span)> {
-    if !matches!(branch, TSType::Parenthesized(_)) {
-        return None;
-    }
-    let shell = branch.span();
-    let inner = unwrap_parenthesized(branch).span();
-    Some((
-        Span::new(shell.start + 1, inner.start),
-        Span::new(inner.end, shell.end - 1),
-    ))
 }
 
 /// How an array type renders its `[]` suffix — the verdict
@@ -360,7 +342,7 @@ impl<'a> Printer<'a> {
         shell_leading_run: ShellLeadingRun,
     ) -> DocId {
         let d = self.d();
-        let Some((leading, trailing)) = branch_shell_gaps(branch) else {
+        let Some((leading, trailing)) = outermost_paren(branch).map(paren_shell_gaps) else {
             return self.build_conditional_type_doc_inner(inner);
         };
         if self.nested_branch_shell_retains(branch) {
@@ -405,7 +387,7 @@ impl<'a> Printer<'a> {
     /// A **trailing block** stays inline (prettier keeps `? (A extends B ? C : D /* c */)`
     /// flat), so only the leading gap consults the wider own-line gate.
     fn nested_branch_shell_forces_break(&self, branch: &TSType<'_>) -> bool {
-        let Some((leading, trailing)) = branch_shell_gaps(branch) else {
+        let Some((leading, trailing)) = outermost_paren(branch).map(paren_shell_gaps) else {
             return false;
         };
         conditional_branch_is_nested(branch)
@@ -429,7 +411,7 @@ impl<'a> Printer<'a> {
     /// where the reparse — the shell now gone — re-collapses the conditional onto one
     /// line, so the output was not a fixed point.
     fn nested_branch_shell_retains(&self, branch: &TSType<'_>) -> bool {
-        let Some((_, trailing)) = branch_shell_gaps(branch) else {
+        let Some((_, trailing)) = outermost_paren(branch).map(paren_shell_gaps) else {
             return false;
         };
         self.has_line_comments_between(trailing.start, trailing.end)
