@@ -62,6 +62,8 @@ use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+
+use crate::printer::comments::TrailingBlank;
 use tsv_lang::source_scan::{find_char_skipping_comments, skip_comment};
 
 /// How [`Printer::with_stripped_paren_trailing`] emits a trailing **block**
@@ -1429,6 +1431,27 @@ impl<'a> Printer<'a> {
         inner: &TSType<'_>,
         trailing_block: TrailingBlock,
     ) -> DocId {
+        self.with_stripped_paren_trailing_blank(
+            value_doc,
+            original,
+            inner,
+            trailing_block,
+            TrailingBlank::Drop,
+        )
+    }
+
+    /// [`Self::with_stripped_paren_trailing`] with the author-BLANK policy named. The plain
+    /// spelling answers [`TrailingBlank::Drop`] — every hang seam's run lands at the end of
+    /// the value it trails, where nothing reads a blank above it back. A union member's
+    /// lifted run is the one destination that keeps it; see [`TrailingBlank`].
+    pub(in crate::printer) fn with_stripped_paren_trailing_blank(
+        &self,
+        value_doc: DocId,
+        original: &TSType<'_>,
+        inner: &TSType<'_>,
+        trailing_block: TrailingBlock,
+        blank: TrailingBlank,
+    ) -> DocId {
         // Not a stripped shell → nothing was lifted out of a trailing gap.
         if original.span() == inner.span() {
             return value_doc;
@@ -1441,9 +1464,12 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts: DocBuf = smallvec![value_doc];
         let needs_break = match trailing_block {
-            TrailingBlock::Inline => {
-                self.push_trailing_comments_in_range(&mut parts, trailing_start, trailing_end)
-            }
+            TrailingBlock::Inline => self.push_trailing_comments_in_range_blank(
+                &mut parts,
+                trailing_start,
+                trailing_end,
+                blank,
+            ),
             TrailingBlock::Deferred => {
                 let mut has_line_comment = false;
                 // The in-source cursor the own-line question is asked against — it
