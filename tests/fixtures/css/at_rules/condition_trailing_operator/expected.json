@@ -1,0 +1,260 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 774,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 165,
+				"end": 186,
+				"name": "supports",
+				"prelude": "(a: b) and",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 188,
+				"end": 219,
+				"name": "supports",
+				"prelude": "(a: b) and (c: d) or",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 221,
+				"end": 242,
+				"name": "supports",
+				"prelude": "(a: b) not",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 244,
+				"end": 258,
+				"name": "supports",
+				"prelude": "and",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 323,
+				"end": 351,
+				"name": "supports",
+				"prelude": "(a: b) AND OR NOT",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 353,
+				"end": 382,
+				"name": "supports",
+				"prelude": "(a: b)  and",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 384,
+				"end": 413,
+				"name": "supports",
+				"prelude": "(a: b) and",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 507,
+				"end": 530,
+				"name": "supports",
+				"prelude": "((a: b) and)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 532,
+				"end": 569,
+				"name": "import",
+				"prelude": "'a.css' supports((a: b) and)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 644,
+				"end": 706,
+				"name": "supports",
+				"prelude": "(a: b) and (c: d)",
+				"block": {
+					"type": "Block",
+					"start": 672,
+					"end": 706,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 676,
+								"end": 682,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 676,
+										"end": 682,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class",
+														"start": 676,
+														"end": 682
+													}
+												],
+												"start": 676,
+												"end": 682
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 683,
+								"end": 703,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 688,
+										"end": 698,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 676,
+							"end": 703
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 709,
+				"end": 765,
+				"name": "container",
+				"prelude": "(a: b) and",
+				"block": {
+					"type": "Block",
+					"start": 731,
+					"end": 765,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 735,
+								"end": 741,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 735,
+										"end": 741,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class",
+														"start": 735,
+														"end": 741
+													}
+												],
+												"start": 735,
+												"end": 741
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 742,
+								"end": 762,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 747,
+										"end": 757,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 735,
+							"end": 762
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " every operator binds its operand to the RIGHT, so one with nothing after it is the\n\tcondition's own last word: it is kept, and it takes no separator ",
+				"start": 9,
+				"end": 163
+			},
+			{
+				"type": "CSSComment",
+				"value": " the whole run is kept, in source order and source case ",
+				"start": 261,
+				"end": 321
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 370,
+				"end": 377,
+				"position": 7
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 405,
+				"end": 412,
+				"position": 11
+			},
+			{
+				"type": "CSSComment",
+				"value": " inside a group the same word has no operand either, so it takes no space before `)` ",
+				"start": 416,
+				"end": 505
+			},
+			{
+				"type": "CSSComment",
+				"value": " control: an operator that joins two operands keeps its separator ",
+				"start": 572,
+				"end": 642
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 766,
+			"styles": "\n\t/* every operator binds its operand to the RIGHT, so one with nothing after it is the\n\tcondition's own last word: it is kept, and it takes no separator */\n\t@supports (a: b) and;\n\t@supports (a: b) and (c: d) or;\n\t@supports (a: b) not;\n\t@supports and;\n\n\t/* the whole run is kept, in source order and source case */\n\t@supports (a: b) AND OR NOT;\n\t@supports (a: b) /* c */ and;\n\t@supports (a: b) and /* c */;\n\n\t/* inside a group the same word has no operand either, so it takes no space before `)` */\n\t@supports ((a: b) and);\n\t@import 'a.css' supports((a: b) and);\n\n\t/* control: an operator that joins two operands keeps its separator */\n\t@supports (a: b) and (c: d) {\n\t\t.class {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@container (a: b) and {\n\t\t.class {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 775,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

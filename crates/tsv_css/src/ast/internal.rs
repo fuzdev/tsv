@@ -787,6 +787,25 @@ pub struct ScopeLimit<'arena> {
 pub struct ConditionQuery<'arena> {
     /// The condition parts connected by `and`/`or`
     pub parts: &'arena [ConditionPart<'arena>],
+    /// The run of boolean operators the reader consumed but could not bind, with the
+    /// comments between them, in source order and source case (`(a: b) /* c */ and`).
+    ///
+    /// Every operator in both grammars binds its operand to the **right** — `<media-and>
+    /// = and <media-in-parens>`, `<media-not> = not <media-in-parens>` (mediaqueries-4
+    /// §"Syntax"), and `<supports-condition> = not <supports-in-parens> |
+    /// <supports-in-parens> [ and <supports-in-parens> ]*` (css-conditional-3
+    /// §"@supports") — so an operator with nothing after it is the query's own last word
+    /// rather than a term of it, and has no part to ride on. It is malformed input, but
+    /// the parser is deliberately permissive: dropping the token loses content the
+    /// canonical parser keeps in its `prelude`, so the run is carried here instead.
+    /// `None` whenever the query bound everything it consumed, which is every well-formed
+    /// condition.
+    ///
+    /// Held as one normalized text rather than a keyword list because the comments among
+    /// the operators keep their authored positions (`/* c */ and` and `and /* c */` are
+    /// distinct), and it is the query's **span** that makes it whole: the span reaches
+    /// past the run, so the wire prelude (`span.extract`) carries it too.
+    pub trailing_operators: Option<&'arena str>,
 }
 
 /// One piece of a `ConditionPart`'s content.

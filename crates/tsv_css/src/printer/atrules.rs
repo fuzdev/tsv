@@ -507,18 +507,20 @@ impl<'a> Printer<'a> {
                 .as_ref()
                 .map_or(atrule.span.end, |b| b.span.start);
             let comments = self.comment_blocks_in_range(atrule.name_span.end, region_end);
-            let name = kind.name();
-            if name.is_none() && comments.is_empty() {
-                return;
+            // A prelude that is *only* an operator (`@supports and;`) is partless too —
+            // the operand it wanted is exactly the part that never came — so this branch
+            // owns the run beside the name and the comments. All three read the same way:
+            // each piece the prelude has takes one leading space, and one with no piece at
+            // all takes none.
+            let pieces = [
+                kind.name(),
+                (!comments.is_empty()).then_some(comments.as_str()),
+                condition.trailing_operators,
+            ];
+            for piece in pieces.into_iter().flatten() {
+                self.write(" ");
+                self.write(piece);
             }
-            self.write(" ");
-            if let Some(n) = name {
-                self.write(n);
-                if !comments.is_empty() {
-                    self.write(" ");
-                }
-            }
-            self.write(&comments);
             return;
         }
 
@@ -752,6 +754,9 @@ impl<'a> Printer<'a> {
                     chunk.push(d.text_pooled(&trailing));
                 }
             }
+            if let Some(tail) = self.trailing_operators_doc(condition) {
+                chunk.push(tail);
+            }
             return d.concat(&chunk);
         }
 
@@ -813,9 +818,33 @@ impl<'a> Printer<'a> {
             }
         }
 
+        if let Some(tail) = self.trailing_operators_doc(condition)
+            && let Some(last_chunk) = fill_parts.pop()
+        {
+            fill_parts.push(d.concat(&[last_chunk, tail]));
+        }
+
         let fill = d.fill(&fill_parts);
         let fill = d.with_context(fill, DocContext::reserving(suffix_width));
         d.indent(fill)
+    }
+
+    /// The tail carrying the query's run of operators with no operand, if it has one —
+    /// ` ` then the run verbatim, to append to whatever printed the last part.
+    ///
+    /// **No break point**: a `line` here would be a wrap opportunity with nothing on its
+    /// far side, the stranded separator [`Self::build_and_or_wrap_doc`] refuses for the
+    /// same reason on the text path — a connector is a break point only where it joins
+    /// two segments.
+    ///
+    /// It can never collide with the trailing-comment claim beside it. A comment inside
+    /// the run is carried *by* the run (the parser un-registers it there), so whenever
+    /// this is `Some`, the `comment_blocks_in_range` sweep over the same stretch found
+    /// nothing.
+    fn trailing_operators_doc(&self, condition: &internal::ConditionQuery<'_>) -> Option<DocId> {
+        let trailing_operators = condition.trailing_operators?;
+        let d = self.d();
+        Some(d.concat(&[d.text(" "), d.text_pooled(trailing_operators)]))
     }
 
     /// Extract comments from a source range, split around the connector keyword.
