@@ -1,0 +1,156 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 404,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 177,
+				"end": 287,
+				"name": "supports",
+				"prelude": "(a: 1a.50) and (b: 1.5.50) and (c: 0.5) and (d: $1.50) and (e: $a1.50)",
+				"block": {
+					"type": "Block",
+					"start": 258,
+					"end": 287,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 262,
+								"end": 263,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 262,
+										"end": 263,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "f",
+														"start": 262,
+														"end": 263
+													}
+												],
+												"start": 262,
+												"end": 263
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 264,
+								"end": 284,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 269,
+										"end": 279,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 262,
+							"end": 284
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 289,
+				"end": 395,
+				"name": "media",
+				"prelude": "(a: 1a0.5) and (b: 1.50.5) and (c: 0.5) and (d: $1.5) and (e: $a1.50)",
+				"block": {
+					"type": "Block",
+					"start": 366,
+					"end": 395,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 370,
+								"end": 371,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 370,
+										"end": 371,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "f",
+														"start": 370,
+														"end": 371
+													}
+												],
+												"start": 370,
+												"end": 371
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 372,
+								"end": 392,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 377,
+										"end": 387,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 370,
+							"end": 392
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a number abutting the run before it is that run's own tail, but the two prelude\n\tpaths disagree about which runs count, so one authoring has two canonical forms ",
+				"start": 9,
+				"end": 175
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 396,
+			"styles": "\n\t/* a number abutting the run before it is that run's own tail, but the two prelude\n\tpaths disagree about which runs count, so one authoring has two canonical forms */\n\t@supports (a: 1a.50) and (b: 1.5.50) and (c: 0.5) and (d: $1.50) and (e: $a1.50) {\n\t\tf {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (a: 1a0.5) and (b: 1.50.5) and (c: 0.5) and (d: $1.5) and (e: $a1.50) {\n\t\tf {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 405,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

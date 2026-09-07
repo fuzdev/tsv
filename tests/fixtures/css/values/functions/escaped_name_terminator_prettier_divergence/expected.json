@@ -1,0 +1,107 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 485,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 476,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 249,
+							"end": 265,
+							"property": "color",
+							"value": "c\\41(0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 340,
+							"end": 364,
+							"property": "border-color",
+							"value": "c\\41x(0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 446,
+							"end": 472,
+							"property": "outline-color",
+							"value": "c\\41-x(0.1)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 476
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the author glued the name to its `(`: a hex escape's terminator is optional and\n\t\t`(` is no hex digit, so the ident sequence ends there either way and the run is the\n\t\tsame function token — tsv keeps the spelling it was given ",
+				"start": 15,
+				"end": 246
+			},
+			{
+				"type": "CSSComment",
+				"value": " the escape is not even last here, so nothing needs terminating ",
+				"start": 269,
+				"end": 337
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier's insertion does not fire on a name carrying an interior `-` ",
+				"start": 368,
+				"end": 443
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 477,
+			"styles": "\n\ta {\n\t\t/* the author glued the name to its `(`: a hex escape's terminator is optional and\n\t\t`(` is no hex digit, so the ident sequence ends there either way and the run is the\n\t\tsame function token — tsv keeps the spelling it was given */\n\t\tcolor: c\\41(0.1);\n\t\t/* the escape is not even last here, so nothing needs terminating */\n\t\tborder-color: c\\41x(0.1);\n\t\t/* prettier's insertion does not fire on a name carrying an interior `-` */\n\t\toutline-color: c\\41-x(0.1);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 486,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

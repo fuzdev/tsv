@@ -1,0 +1,412 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 874,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 157,
+				"end": 224,
+				"name": "supports",
+				"prelude": "(a: #1.50) and (b: #1.50px)",
+				"block": {
+					"type": "Block",
+					"start": 195,
+					"end": 224,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 199,
+								"end": 200,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 199,
+										"end": 200,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 199,
+														"end": 200
+													}
+												],
+												"start": 199,
+												"end": 200
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 201,
+								"end": 221,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 206,
+										"end": 216,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 199,
+							"end": 221
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 226,
+				"end": 288,
+				"name": "media",
+				"prelude": "(a: #1.5) and (b: #1.5px)",
+				"block": {
+					"type": "Block",
+					"start": 259,
+					"end": 288,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 263,
+								"end": 264,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 263,
+										"end": 264,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 263,
+														"end": 264
+													}
+												],
+												"start": 263,
+												"end": 264
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 265,
+								"end": 285,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 270,
+										"end": 280,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 263,
+							"end": 285
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 390,
+				"end": 455,
+				"name": "supports",
+				"prelude": "(a: #0.5) and (b: #ABCDE)",
+				"block": {
+					"type": "Block",
+					"start": 426,
+					"end": 455,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 430,
+								"end": 431,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 430,
+										"end": 431,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 430,
+														"end": 431
+													}
+												],
+												"start": 430,
+												"end": 431
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 432,
+								"end": 452,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 437,
+										"end": 447,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 430,
+							"end": 452
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 457,
+				"end": 519,
+				"name": "media",
+				"prelude": "(a: #0.5) and (b: #ABCDE)",
+				"block": {
+					"type": "Block",
+					"start": 490,
+					"end": 519,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 494,
+								"end": 495,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 494,
+										"end": 495,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "c",
+														"start": 494,
+														"end": 495
+													}
+												],
+												"start": 494,
+												"end": 495
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 496,
+								"end": 516,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 501,
+										"end": 511,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 494,
+							"end": 516
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 670,
+				"end": 768,
+				"name": "supports",
+				"prelude": "(a: #FFF.5) and (b: #FFF/5) and (c: #FFFé) and (d: #fff 5)",
+				"block": {
+					"type": "Block",
+					"start": 739,
+					"end": 768,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 743,
+								"end": 744,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 743,
+										"end": 744,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "e",
+														"start": 743,
+														"end": 744
+													}
+												],
+												"start": 743,
+												"end": 744
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 745,
+								"end": 765,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 750,
+										"end": 760,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 743,
+							"end": 765
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 770,
+				"end": 865,
+				"name": "media",
+				"prelude": "(a: #FFF.5) and (b: #FFF/5) and (c: #FFFé) and (d: #FFF 5)",
+				"block": {
+					"type": "Block",
+					"start": 836,
+					"end": 865,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 840,
+								"end": 841,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 840,
+										"end": 841,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "e",
+														"start": 840,
+														"end": 841
+													}
+												],
+												"start": 840,
+												"end": 841
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 842,
+								"end": 862,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 847,
+										"end": 857,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 840,
+							"end": 862
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a number abutting the `#`-token before it: the value path keeps the pair as one\n\tword, the media path re-splits it and normalizes the number ",
+				"start": 9,
+				"end": 155
+			},
+			{
+				"type": "CSSComment",
+				"value": " a `#` with no ident content after it heads no token, so the number normalizes on\n\tboth paths ",
+				"start": 290,
+				"end": 388
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same extent decides the hex fold: a colour is a colour only when the token\n\tends at its digits, so a word running on past them is not one ",
+				"start": 521,
+				"end": 668
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 866,
+			"styles": "\n\t/* a number abutting the `#`-token before it: the value path keeps the pair as one\n\tword, the media path re-splits it and normalizes the number */\n\t@supports (a: #1.50) and (b: #1.50px) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (a: #1.5) and (b: #1.5px) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* a `#` with no ident content after it heads no token, so the number normalizes on\n\tboth paths */\n\t@supports (a: #0.5) and (b: #ABCDE) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (a: #0.5) and (b: #ABCDE) {\n\t\tc {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* the same extent decides the hex fold: a colour is a colour only when the token\n\tends at its digits, so a word running on past them is not one */\n\t@supports (a: #FFF.5) and (b: #FFF/5) and (c: #FFFé) and (d: #fff 5) {\n\t\te {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (a: #FFF.5) and (b: #FFF/5) and (c: #FFFé) and (d: #FFF 5) {\n\t\te {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 875,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

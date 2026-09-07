@@ -139,6 +139,22 @@ pub(crate) fn escape_len(s: &str, i: usize) -> Option<usize> {
     Some(1 + hex + terminator)
 }
 
+/// If a CSS escape starts at byte `i`, the index just past it (so `s[i..end]` is the whole
+/// escape, its optional whitespace terminator included); otherwise `None`.
+///
+/// The guarded, end-returning face of [`escape_len`], and the one spelling of the
+/// `\`-then-`escape_len` pair every scanner that walks a value, prelude or name uses.
+/// `None` covers both "not an escape here" and "a `\` that starts none" (trailing, or
+/// before a newline — §4.3.4); a caller that must tell those apart tests the byte itself
+/// first. `escape_len` itself asserts its `\`, so this guard is what makes the
+/// position-agnostic call legal.
+pub(crate) fn escape_span_at(s: &str, i: usize) -> Option<usize> {
+    if s.as_bytes().get(i) != Some(&b'\\') {
+        return None;
+    }
+    Some(i + escape_len(s, i)?)
+}
+
 /// Does `s`, decoded as [`decode_escape_sequences`] would decode it, equal `kw` ASCII
 /// case-insensitively?
 ///
@@ -303,6 +319,48 @@ pub(crate) fn trim_start_css(s: &str) -> &str {
     trimmed
 }
 
+/// Does `name` end with a **live** CSS hex escape (`\` + 1..=6 hex digits)?
+///
+/// Such an escape consumes a single following whitespace as its *terminator*, and §4.3.7
+/// makes that whitespace part of the escape — so it is inside the identifier token, not
+/// beside it. A trim that takes it off is reaching inside a token, and the two readers that
+/// re-emit such a name have to put it back: a property name against its colon
+/// (`\41 : red`), and a function name against its `(` (`c\41 (1px)`, where the ident
+/// sequence ends flush with the paren and the whole run is one `<function-token>`).
+/// [`trim_end_preserving_escape`] does not cover this — it restores the payload of an
+/// *open* escape (a trailing `\`), and a hex escape's backslash is not trailing.
+///
+/// A literal char after the escape (`ab\44 cd`) or an escaped backslash (`\\41`) does not
+/// end with a live escape. **Live** means the escape still *needs* its terminator: one that
+/// already carries it (`\41 `) is complete, so re-emitting a separator would double it —
+/// hence the final hex-digit check, which answers that case rather than relying on every
+/// caller to have trimmed first.
+///
+/// Walks forward through [`escape_span_at`] rather than scanning backward for hex digits:
+/// that is the crate's single definition of how far an escape reaches, so an escaped backslash
+/// (`\\41` — a literal `\` followed by the ordinary text `41`) falls out of the walk instead
+/// of needing its own parity/lookback rule here.
+pub(crate) fn ends_with_live_hex_escape(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    let mut i = 0;
+    let mut ends_with_escape = false;
+    while i < bytes.len() {
+        if let Some(end) = escape_span_at(name, i) {
+            // A hex escape is the one whose first payload byte is a hex digit — and it is
+            // still *live* only if it ends ON a hex digit, i.e. `escape_len` found no
+            // whitespace terminator to swallow.
+            ends_with_escape = bytes[i + 1].is_ascii_hexdigit()
+                && end == bytes.len()
+                && bytes[end - 1].is_ascii_hexdigit();
+            i = end;
+            continue;
+        }
+        ends_with_escape = false;
+        i += 1;
+    }
+    ends_with_escape
+}
+
 /// Both ends at once: [`trim_start_css`] then [`trim_end_preserving_escape`] — the CSS
 /// counterpart of `str::trim`, and the one spelling every value-boundary trim takes (a
 /// value's text, a function's name and arguments, a color channel, a `url()` payload, a
@@ -322,6 +380,27 @@ mod tests {
         assert_eq!(decode_escape_sequences(r"\\"), r"\");
         assert_eq!(decode_escape_sequences(r#"\""#), r#"""#);
         assert_eq!(decode_escape_sequences(r"\'"), r"'");
+    }
+
+    /// The predicate both name readers ask before restoring an escape's terminator — a
+    /// property name against its colon, a function name against its `(`.
+    #[test]
+    fn a_live_hex_escape_is_one_still_owed_its_terminator() {
+        assert!(ends_with_live_hex_escape(r"c\41"));
+        assert!(ends_with_live_hex_escape(r"\41"));
+        assert!(ends_with_live_hex_escape(r"c\4")); // one digit is a hex escape too
+        assert!(ends_with_live_hex_escape(r"c\41abc")); // six digits, all hex
+        // Already terminated: the escape carries its whitespace, so nothing is owed.
+        assert!(!ends_with_live_hex_escape("c\\41 "));
+        // Ended by a literal, so the escape closed on its own.
+        assert!(!ends_with_live_hex_escape(r"c\41x"));
+        // A literal escape takes exactly one code point and needs no terminator.
+        assert!(!ends_with_live_hex_escape(r"c\g"));
+        // An escaped backslash is a completed `\\` followed by ordinary text.
+        assert!(!ends_with_live_hex_escape(r"c\\41"));
+        // No escape at all.
+        assert!(!ends_with_live_hex_escape("c41"));
+        assert!(!ends_with_live_hex_escape(""));
     }
 
     #[test]

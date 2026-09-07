@@ -1,0 +1,72 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 419,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 186,
+				"end": 228,
+				"name": "import",
+				"prelude": "'a.css' (a: 1.5abc) and (b: #fff)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 230,
+				"end": 272,
+				"name": "import",
+				"prelude": "'b.css' (a: 1a.50) and (b: #1.50)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 345,
+				"end": 372,
+				"name": "import",
+				"prelude": "'c.css' (a: 0.5px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 374,
+				"end": 410,
+				"name": "import",
+				"prelude": "'d.css' layer(e) (a: 0.5px)",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " `@import`'s prelude is value-parsed, like `@supports`: a number normalizes whatever\n\tits unit, a hex colour lowercases, and a number abutting the token before it is kept ",
+				"start": 9,
+				"end": 184
+			},
+			{
+				"type": "CSSComment",
+				"value": " a single parenthesized condition reaches the same normalization ",
+				"start": 274,
+				"end": 343
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 411,
+			"styles": "\n\t/* `@import`'s prelude is value-parsed, like `@supports`: a number normalizes whatever\n\tits unit, a hex colour lowercases, and a number abutting the token before it is kept */\n\t@import 'a.css' (a: 1.5abc) and (b: #fff);\n\t@import 'b.css' (a: 1a.50) and (b: #1.50);\n\t/* a single parenthesized condition reaches the same normalization */\n\t@import 'c.css' (a: 0.5px);\n\t@import 'd.css' layer(e) (a: 0.5px);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 420,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

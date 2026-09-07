@@ -1,0 +1,107 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 516,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 507,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 261,
+							"end": 278,
+							"property": "color",
+							"value": "c\\41 (0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 416,
+							"end": 441,
+							"property": "border-color",
+							"value": "c\\41 x(0.1)"
+						},
+						{
+							"type": "Declaration",
+							"start": 479,
+							"end": 503,
+							"property": "outline-color",
+							"value": "\\41 (0.1)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 507
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a hex escape takes an optional whitespace TERMINATOR that belongs to the escape\n\t\t(CSS Syntax 3 §4.3.7), so the ident sequence ends against the `(` and the whole\n\t\tthing is one function token — the space is inside the name, not beside it ",
+				"start": 15,
+				"end": 258
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same escape ended by a literal instead needs no terminator, so the space\n\t\there would be a real separator — there is none ",
+				"start": 282,
+				"end": 413
+			},
+			{
+				"type": "CSSComment",
+				"value": " a name that IS the escape ",
+				"start": 445,
+				"end": 476
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 508,
+			"styles": "\n\ta {\n\t\t/* a hex escape takes an optional whitespace TERMINATOR that belongs to the escape\n\t\t(CSS Syntax 3 §4.3.7), so the ident sequence ends against the `(` and the whole\n\t\tthing is one function token — the space is inside the name, not beside it */\n\t\tcolor: c\\41 (0.1);\n\t\t/* the same escape ended by a literal instead needs no terminator, so the space\n\t\there would be a real separator — there is none */\n\t\tborder-color: c\\41 x(0.1);\n\t\t/* a name that IS the escape */\n\t\toutline-color: \\41 (0.1);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 517,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

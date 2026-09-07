@@ -19,38 +19,72 @@ use std::borrow::Cow;
 
 use super::boundary_ws::boundary_run_spelling;
 use crate::color::is_hex_color_body;
+use crate::escapes::escape_span_at;
 use numbers::{canonical_unit, is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
 
-/// Normalize CSS numbers and string quotes within a raw prelude string,
-/// mirroring prettier's `adjustNumbers(adjustStrings(...))` for at-rule preludes
-/// it parses as values (`@media`/`@supports`/`@import`). `/* */` comments are
-/// copied verbatim. A number is normalized only when it isn't part of an
-/// identifier (`min-width` is untouched) and its trailing unit is a known CSS
-/// unit or empty (so `1abc` is left alone); unit casing is preserved. Quoted
-/// strings get prettier's quote normalization (prefer single, swapping only to
-/// minimize escaping) — `@container`, which isn't value-parsed, never reaches
-/// this function so its prelude stays raw.
+/// Which of prettier's two prelude readers an at-rule's prelude goes through — the axis
+/// every rule in [`normalize_value_text`] is keyed on.
 ///
-/// `#`-prefixed tokens: when `lowercase_hex` is set (only `@supports`, whose
-/// condition parts are real declarations), a hex **color** — `#` + exactly 3, 4,
-/// 6, or 8 ASCII hex digits — is lowercased (`#FFF` → `#fff`), matching prettier.
-/// Any other `#`-token — an off-length run (`#ABCDE`), a non-hex token, or one
-/// inside a `selector(...)` group (a case-sensitive ID selector) — is copied
-/// verbatim, as is every `#`-token under `@media`/`@import` (`lowercase_hex` off),
-/// where prettier preserves case.
+/// `parser-postcss.js` routes a prelude by at-rule name: `@media` (and `@custom-media`) to
+/// `parseMediaQuery`, and `@supports` — plus every `isModuleRuleName` at-rule, of which
+/// `@import` is the one tsv formats — to `parseValue`. The two readers tokenize the same
+/// text differently and print through different arms, so one authoring can have two
+/// canonical forms, and a rule keyed on the wrong one is wrong on three counts at once:
+/// the unit gate, the hex fold, and which runs absorb a following number.
 ///
-/// An unquoted `url(...)` is a `<url-token>` — opaque per CSS Syntax 3 §4.3.6, so
-/// its whole content is copied verbatim regardless of `lowercase_hex` (a path like
-/// `url(sprite1.50.png)` is never number/unit-normalized). A quoted `url("…")` is a
-/// function with a `<string>` arg and takes normal quote normalization.
+/// `@container` is on neither list — prettier keeps its params raw — so it never reaches
+/// this function and its prelude stays verbatim.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PreludeReader {
+    /// `@supports` and `@import`: `parseValue` (postcss-values-parser) → `value-*` nodes,
+    /// printed as `printCssNumber(value) + printUnit(unit)` / `value-word`.
+    Value,
+    /// `@media`: `parseMediaQuery` → a `media-value` node, printed through `adjustNumbers`
+    /// (`print/misc.js`), a regex pass over the raw text.
+    MediaQuery,
+}
+
+/// Normalize CSS numbers and string quotes within a raw at-rule prelude string, mirroring
+/// whichever of prettier's two prelude readers `path` names. `/* */` comments are copied
+/// verbatim, and quoted strings get prettier's quote normalization (prefer single, swapping
+/// only to minimize escaping), which is `adjustStrings` on both paths.
 ///
-/// A number **abutting the identifier before it** is that identifier's own tail, not a
-/// value: `x1.50` is the ident `x1` then `.50`, and giving the number its canonical leading
-/// zero would hand the `0` to the ident (`x10` then `.5`). Such a pair is copied verbatim,
-/// unit included — the same rule prettier states as `(WORD_PART)?(NUMBER)(UNIT)?` returned
-/// unchanged when the word part matched.
-pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
+/// **Numbers.** A number that is its own token normalizes to canonical form (`.50` → `0.5`)
+/// on both paths; what follows it is where they part. [`PreludeReader::Value`] prints a
+/// `value-number` node as `printCssNumber(value) + printUnit(unit)` with **no gate on the
+/// unit** — whatever trails the number is the unit and rides through unchanged, so `1.50abc`
+/// is `1.5abc`. [`PreludeReader::MediaQuery`] runs `adjustNumbers`' `(WORD_PART)?(NUMBER)(UNIT)?`
+/// regex, which returns the **whole match verbatim** unless the unit it captured is empty,
+/// the `<an+b>` `n`, or a unit CSS defines — so `1.50abc` stays. Unit *casing* is
+/// [`canonical_unit`]'s question on both.
+///
+/// **A number abutting the run before it** is that run's own tail, not a token of its own:
+/// the canonical form of a `.`-leading number carries a leading `0`, and appending it to an
+/// ident code point hands the `0` to the run (`x1` + `.50` → `x10` + `.5`, two different
+/// tokens). Such a pair is copied verbatim, unit included. *Which* runs count is the second
+/// place the paths part. On the value path a word is one token through to its end, so an
+/// ident, a `#`-token and a number's own unit all absorb. On the media path only a
+/// `WORD_PART` does — `[$@]?[_a-z\u{80}-\u{FFFF}][\w\u{80}-\u{FFFF}-]*`, so a run whose tail
+/// after a `$`/`@` is digits is no word part and the regex reads those digits as the head of
+/// the number (`$1.50` → `$1.5`), while a number's unit and a `#` absorb nothing at all
+/// (`1a` + `.50` → `1a0.5`, `#1.50` → `#1.5`).
+///
+/// **`#`-prefixed tokens.** A `#` followed by an ident code point or a valid escape is a
+/// `<hash-token>` whose value is the ident sequence after it (CSS Syntax 3 §4.3.1); anything
+/// else — `#.50` — leaves a bare `<delim-token>`. On [`PreludeReader::Value`] a hex **color**
+/// (`#` + exactly 3, 4, 6, or 8 ASCII hex digits) is lowercased (`#FFF` → `#fff`), matching
+/// prettier's `value-word` arm; any other hash token — an off-length run (`#ABCDE`), a
+/// non-hex token, or one inside a `selector(...)` group (a case-sensitive ID selector) — is
+/// copied verbatim. On [`PreludeReader::MediaQuery`] the `#` is not a token head at all:
+/// `adjustNumbers` is a regex over raw text with no hash arm, so the `#` is copied as the
+/// delimiter it is and the run after it takes the ordinary ident/number arms.
+///
+/// An unquoted `url(...)` is a `<url-token>` — opaque per CSS Syntax 3 §4.3.6, so its whole
+/// content is copied verbatim on either path (a path like `url(sprite1.50.png)` is never
+/// number/unit-normalized). A quoted `url("…")` is a function with a `<string>` arg and takes
+/// normal quote normalization.
+pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
     let bytes = input.as_bytes();
     let mut out = String::with_capacity(input.len());
     let mut i = 0;
@@ -149,6 +183,11 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
                     break;
                 }
             }
+            // How much of the run this path emits, and whether a number abutting it merges
+            // into it — the two readers' answers stated side by side in `ident_run_split`.
+            // The media path can end the run short of what the loop above read.
+            let (emit_len, absorbs) = ident_run_split(&input[start..i], path);
+            i = start + emit_len;
             let ident = &input[start..i];
             out.push_str(ident);
 
@@ -178,34 +217,53 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
             // an ID selector's `#` is case-sensitive (numbers inside stay on the normal
             // path — the documented `selector()` over-normalization).
             prev_ident_preserve_fn = ident.eq_ignore_ascii_case("selector");
-            // A digit appended to this run joins it only when the run's last code point is
-            // a CSS *ident* code point (§"ident code point": letter, digit, `-`, `_`,
-            // non-ASCII). `$` and `@`, which this module's deliberately permissive ident
-            // class also admits so preprocessor-flavoured preludes stay readable, are
-            // delim tokens that absorb nothing — `$` + `.50` may safely become `$0.5`.
-            prev_run_absorbs_digit = ident.ends_with(is_css_ident_code_point);
+            prev_run_absorbs_digit = absorbs;
             continue;
         }
 
-        // A `#`-prefixed token. A hex color (`#` + 3/4/6/8 hex digits) in an
-        // `@supports` value lowercases (matching prettier); everything else — an
-        // off-length run, a non-hex token, exponent-looking hex under
-        // `@media`/`@import`, or a `#` inside a `selector(...)` group (a case-sensitive
-        // ID) — is copied verbatim (so `#1e2` isn't mangled and IDs survive). An
-        // unquoted `url(...)` never reaches here (opaque, consumed above).
-        if b == b'#' {
+        // A `#`-prefixed token, on the value path only. `#` + an ident sequence is a
+        // `<hash-token>` (CSS Syntax 3 §4.3.1), and postcss-values-parser reads that whole
+        // word as one `value-word`: a hex color (`#` + 3/4/6/8 hex digits) lowercases,
+        // matching prettier, and everything else — an off-length run (`#ABCDE`), a non-hex
+        // token, an exponent-looking one (`#1e2`), or a `#` inside a `selector(...)` group
+        // (a case-sensitive ID) — is copied verbatim. An unquoted `url(...)` never reaches
+        // here (opaque, consumed above).
+        //
+        // ⚠️ The media path has **no hash arm at all** — `adjustNumbers` is a regex over raw
+        // text and knows nothing of hash tokens, so the `#` falls through to the delimiter
+        // arm below and the run after it takes the ordinary ident/number arms
+        // (`#1.50` → `#1.5`, `#abc1.50` verbatim behind its word part). Giving the media
+        // path this arm is what produced `#10.5`: the hash token ended at `#1`, the `.50`
+        // then normalized on its own, and its canonical leading `0` joined the token before
+        // it — a hash whose value changed from `1` to `10`, matching neither oracle.
+        if b == b'#' && path == PreludeReader::Value {
             let start = i;
             i += 1;
             let body_start = i;
-            while let Some(c) = input[i..].chars().next() {
-                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                    i += c.len_utf8();
-                } else {
-                    break;
+            // Two phases, because the two questions have different answers. **Whether** a
+            // token starts here is CSS Syntax 3 §4.3.1's: `#` heads a `<hash-token>` only
+            // when an ident code point follows, and otherwise is a bare `<delim-token>`
+            // whose neighbour is a token of its own (`#.50` is `#` then `.50` → `#0.5`).
+            // **How far** it then reaches is postcss-values-parser's, which is wider — see
+            // `is_hash_word_char`.
+            if let Some(c) = input[i..].chars().next()
+                && is_css_ident_code_point(c)
+            {
+                i += c.len_utf8();
+                while let Some(c) = input[i..].chars().next() {
+                    if is_hash_word_char(c) {
+                        i += c.len_utf8();
+                    } else {
+                        break;
+                    }
                 }
             }
             let body = &input[body_start..i];
-            if lowercase_hex && preserve_from.is_none() && is_hex_color_body(body) {
+            // ⚠️ The fold is asked of the **whole** word, not of a hex-shaped prefix of it.
+            // A narrower body reads `#FFF.5` as the colour `#FFF` followed by `.5` and folds
+            // it to `#fff.5` — recasing a token that is no colour at all, which is exactly
+            // what "any other hash token is copied verbatim" exists to prevent.
+            if preserve_from.is_none() && is_hex_color_body(body) {
                 out.push('#');
                 for c in body.chars() {
                     out.push(c.to_ascii_lowercase());
@@ -213,6 +271,11 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
             } else {
                 out.push_str(&input[start..i]);
             }
+            // A hash token absorbs an abutting number the way an ident run does — the word
+            // runs on through it (`#1` + `.50` stays `#1.50`). A `#` that heads no token
+            // (`#.50`, a bare `<delim-token>`: the next code point is no ident code point)
+            // absorbs nothing, so the number after it normalizes on this path too.
+            prev_run_absorbs_digit = !body.is_empty();
             continue;
         }
 
@@ -230,35 +293,48 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
             let unit = &input[unit_start..i];
             // Inside a `selector(...)` group the digits are selector syntax — an
             // `<an+b>` term, an attribute value — not a `<number>` with a canonical
-            // serialization, so they are copied verbatim like the `#`-token above; so is
-            // a number carrying a unit CSS doesn't define (`1abc`).
-            let normalized = (preserve_from.is_none()
-                && (unit.is_empty() || unit.eq_ignore_ascii_case("n") || is_known_css_unit(unit)))
-            .then(|| normalize_css_number(num))
-            // A number abutting the identifier run just emitted must not begin with a
-            // character that identifier would absorb: the canonical form of a `.`-leading
-            // number carries a leading `0`, so `x1` + `.50` came back as `x10` + `.5` —
-            // two different tokens. The pair is copied through instead, which is what
-            // prettier's own scan does (`print/misc.js`: a `(WORD_PART)?(NUMBER)(UNIT)?`
-            // match is returned verbatim when the word part matched). A signed number is
-            // never at risk, since the sign it keeps merges with nothing — `x+1.50` still
-            // normalizes.
-            //
-            // Only the ident arm sets `after_absorbing_run`. A number after a *number*
-            // (`1a` + `.50`) or a `#`-token (`#1` + `.50`) merges the same way, but
-            // prettier's two prelude paths disagree about those — `@supports` prints value
-            // nodes, `@media` runs the regex — so each is its own oracle question, tracked
-            // in the CSS checklist §Escapes.
-            .filter(|n| !(after_absorbing_run && n.starts_with(is_css_ident_code_point)));
+            // serialization, so they are copied verbatim like the `#`-token above.
+            let normalizes = preserve_from.is_none()
+                && match path {
+                    // `[printCssNumber(node.value), printUnit(node.unit)]` — the value node
+                    // carries whatever trailed the number as its unit and no gate reads it,
+                    // so the number normalizes and the unit rides through (`1.50abc` →
+                    // `1.5abc`). `printUnit` is `canonical_unit` below.
+                    PreludeReader::Value => true,
+                    // `adjustNumbers` returns the whole `(WORD_PART)?(NUMBER)(UNIT)?` match
+                    // verbatim unless the captured unit is empty, the `<an+b>` `n`, or one
+                    // CSS defines — so `1abc` is left alone.
+                    PreludeReader::MediaQuery => {
+                        unit.is_empty() || unit.eq_ignore_ascii_case("n") || is_known_css_unit(unit)
+                    }
+                };
+            let normalized = normalizes
+                .then(|| normalize_css_number(num))
+                // A number abutting the run just emitted must not begin with a character
+                // that run would absorb: the canonical form of a `.`-leading number carries
+                // a leading `0`, so `x1` + `.50` came back as `x10` + `.5` — two different
+                // tokens. The pair is copied through instead, which is what prettier's own
+                // scan does (`print/misc.js`: a `(WORD_PART)?(NUMBER)(UNIT)?` match is
+                // returned verbatim when the word part matched). A signed number is never at
+                // risk, since the sign it keeps merges with nothing — `x+1.50` still
+                // normalizes.
+                .filter(|n| !(after_absorbing_run && n.starts_with(is_css_ident_code_point)));
             if let Some(normalized) = normalized {
                 out.push_str(&normalized);
                 // `canonical_unit` lowercases a known unit (`PX`→`px`) and leaves the
-                // `n`/empty cases untouched (neither is a known unit).
+                // `n`/empty/unknown cases untouched (none is a known unit).
                 out.push_str(&canonical_unit(unit));
             } else {
                 out.push_str(num);
                 out.push_str(unit);
             }
+            // On the value path the number and its unit are one word, so a number abutting
+            // *them* is that word's tail too (`1a` + `.50`, `1.5` + `.50`). Asked of what was
+            // just emitted, which answers for either branch and lets the unit speak when
+            // there is one. The media path's regex re-splits at the next number instead, so
+            // a unit absorbs nothing there (`1a` + `.50` → `1a0.5`).
+            prev_run_absorbs_digit =
+                path == PreludeReader::Value && out.ends_with(is_css_ident_code_point);
             continue;
         }
 
@@ -364,6 +440,86 @@ fn is_css_ident_code_point(ch: char) -> bool {
         || ch == '-'
         || ch == '_'
         || crate::lexer::is_non_ascii_identifier_codepoint(ch)
+}
+
+/// Can `ch` continue the word a `<hash-token>` heads on the value path — the run whose whole
+/// text the hex-colour fold is asked of?
+///
+/// [`is_css_ident_code_point`] decides whether the token starts at all (§4.3.1) and would
+/// also end it, but how far it *reaches* has a different oracle: postcss-values-parser reads
+/// a `#` word further than the spec's ident sequence, and the gap is exactly where the fold
+/// went wrong. `#FFF.5` is `#FFF` + `.5` to the spec, so a spec-width body found the colour
+/// `#FFF` inside a token that is none and recased it to `#fff.5`; prettier keeps the word
+/// whole and preserves it.
+///
+/// The class is therefore **measured against prettier**, not derived: `.`, `/` and non-ASCII
+/// continue the word (`#FFF.5`, `#FFF/5`, `#FFFé` all stay), while whitespace, `,`, `:` and
+/// `+` end it (`#FFF 5` → `#fff 5`). The two error directions are not symmetric — a class
+/// too wide only declines a fold prettier makes, a class too narrow **recases a token** — so
+/// an unmeasured character is better in than out.
+fn is_hash_word_char(ch: char) -> bool {
+    is_css_ident_code_point(ch) || ch == '.' || ch == '/'
+}
+
+/// Can `ch` begin `adjustNumbers`' `WORD_PART` — `[$@]?` **`[_a-z\u{80}-\u{FFFF}]`**
+/// `[\w\u{80}-\u{FFFF}-]*`, the media path's notion of "a word precedes this number"?
+///
+/// [`is_ident_start`] without `$`/`@`: the regex allows those only as the optional single
+/// character *before* the start class, never as the start itself.
+fn is_media_word_part_start(ch: char) -> bool {
+    is_ident_start(ch) && ch != '$' && ch != '@'
+}
+
+/// Split the ident run `run` the way `adjustNumbers`' regex reads it, for a run that a
+/// number abuts.
+///
+/// Returns `(emit_len, absorbs)` — how much of `run` is the run proper, the rest being where
+/// prettier's `NUMBER` begins, and whether a `WORD_PART` reaches the run's end (which is what
+/// makes the regex return the abutting number's match verbatim).
+///
+/// `$`/`@` are in this module's ident class and in neither of the regex's two classes, so
+/// they can only ever be `WORD_PART`'s optional leading character. Everything after the
+/// **last** of them is continuation-class by construction — this run holds nothing else — so
+/// a word part reaches the run's end exactly when that tail holds one character the start
+/// class accepts. When none does, the tail is digits and `-`, and the regex's `NUMBER`
+/// begins at the first digit in it: `a$1` + `.50` is the run `a$` then the number `1.50`
+/// (→ `a$1.5`), and `$` + `.50` is the run `$` then `.50` (→ `$0.5`).
+fn media_word_part_split(run: &str) -> (usize, bool) {
+    let tail_start = run
+        .char_indices()
+        .filter(|&(_, c)| c == '$' || c == '@')
+        .map(|(i, c)| i + c.len_utf8())
+        .next_back()
+        .unwrap_or(0);
+    let tail = &run[tail_start..];
+    if tail.chars().any(is_media_word_part_start) {
+        return (run.len(), true);
+    }
+    let emit_len = tail
+        .char_indices()
+        .find(|&(_, c)| c.is_ascii_digit())
+        .map_or(run.len(), |(i, _)| tail_start + i);
+    (emit_len, false)
+}
+
+/// How `path`'s reader takes the ident run `run`: how much of it is the run proper — the
+/// rest being where prettier's own `NUMBER` begins — and whether a number abutting it merges
+/// into it.
+///
+/// On the value path postcss-values-parser reads a word through to its end, so the whole run
+/// is emitted and the only question is whether its last code point is a CSS **ident** code
+/// point (§"ident code point": letter, digit, `-`, `_`, non-ASCII). `$` and `@`, which this
+/// module's deliberately permissive ident class also admits so preprocessor-flavoured
+/// preludes stay readable, are `<delim-token>`s that absorb nothing — `$` + `.50` may safely
+/// become `$0.5`.
+///
+/// On the media path the question is `adjustNumbers`' `WORD_PART` instead, which can end the
+/// run short of what this module read — see [`media_word_part_split`].
+fn ident_run_split(run: &str, path: PreludeReader) -> (usize, bool) {
+    match path {
+        PreludeReader::Value => (run.len(), run.ends_with(is_css_ident_code_point)),
+        PreludeReader::MediaQuery => media_word_part_split(run),
+    }
 }
 
 /// How far does the ident **sequence** starting at `start` reach — [`is_ident_continue`]'s
@@ -511,24 +667,6 @@ fn trivia_span_at(s: &str, i: usize) -> Option<usize> {
         b'"' | b'\'' => Some(skip_string(s, i)),
         _ => None,
     }
-}
-
-/// If a CSS escape starts at byte `i`, the index just past it (so `s[i..end]` is the whole
-/// escape, its optional whitespace terminator included); otherwise `None`.
-///
-/// The escape twin of [`trivia_span_at`], and the one spelling of the `\`-then-
-/// [`crate::escapes::escape_len`] pair every scanner in this module walks. `None` covers
-/// both "not an escape here" and "a `\` that starts none" (trailing, or before a newline —
-/// §4.3.4); a caller that must tell those apart tests the byte itself first.
-///
-/// ⚠️ Deliberately **not** folded into [`trivia_span_at`]: an escape is content, so a caller
-/// copies it where it skips trivia, and the two media-feature scanners want opposite things
-/// from it — see that function's note.
-fn escape_span_at(s: &str, i: usize) -> Option<usize> {
-    if s.as_bytes().get(i) != Some(&b'\\') {
-        return None;
-    }
-    Some(i + crate::escapes::escape_len(s, i)?)
 }
 
 /// Whether `b` is a byte that can end a CSS identifier (a function name, right before
@@ -838,7 +976,7 @@ pub(crate) fn extract_property_name(
         let run = boundary_run_spelling(&property_part[bare.len()..]);
         if !run.is_empty() {
             Cow::Owned(format!("{bare}{run}"))
-        } else if ends_with_hex_escape(bare) {
+        } else if crate::escapes::ends_with_live_hex_escape(bare) {
             Cow::Owned(format!("{bare} "))
         } else {
             Cow::Borrowed(bare)
@@ -932,43 +1070,6 @@ pub(crate) fn lowercase_at_rule_name(name: &str) -> Cow<'_, str> {
         return Cow::Borrowed(name);
     }
     Cow::Owned(name.to_ascii_lowercase())
-}
-
-/// Returns true if `name` ends with a **live** CSS hex escape (`\` + 1..=6 hex digits).
-///
-/// Such an escape consumes a single following whitespace as its terminator; that
-/// whitespace is part of the identifier token and must be preserved (e.g. the space
-/// before `:` in a property name `\41 : red`). A literal char after the escape
-/// (`ab\44 cd`) or an escaped backslash (`\\41`) does not end with a live escape.
-///
-/// **Live** means the escape still *needs* its terminator: an escape that already carries
-/// one (`\41 `) is complete, so re-emitting a separator would double it. That case cannot
-/// reach the caller today (it passes a trimmed name), but the predicate answers it
-/// correctly rather than relying on the caller — hence the final hex-digit check.
-///
-/// Walks forward through [`escape_span_at`] rather than scanning backward for hex digits:
-/// that is the crate's single definition of how far an escape reaches, so an
-/// escaped backslash (`\\41` — a literal `\` followed by the ordinary text `41`) falls out
-/// of the walk instead of needing its own parity/lookback rule here.
-fn ends_with_hex_escape(name: &str) -> bool {
-    let bytes = name.as_bytes();
-    let mut i = 0;
-    let mut ends_with_escape = false;
-    while i < bytes.len() {
-        if let Some(end) = escape_span_at(name, i) {
-            // A hex escape is the one whose first payload byte is a hex digit — and it is
-            // still *live* only if it ends ON a hex digit, i.e. `escape_len` found no
-            // whitespace terminator to swallow.
-            ends_with_escape = bytes[i + 1].is_ascii_hexdigit()
-                && end == bytes.len()
-                && bytes[end - 1].is_ascii_hexdigit();
-            i = end;
-            continue;
-        }
-        ends_with_escape = false;
-        i += 1;
-    }
-    ends_with_escape
 }
 
 /// Extract and format string value from declaration source
@@ -1195,8 +1296,8 @@ mod tests {
 
     #[test]
     fn test_normalize_value_text_hex() {
-        // `@supports` (lowercase_hex = true): a hex color of a valid length lowercases.
-        let sup = |s: &str| normalize_value_text(s, true);
+        // The value path (`@supports`, `@import`): a hex color of a valid length lowercases.
+        let sup = |s: &str| normalize_value_text(s, PreludeReader::Value);
         assert_eq!(sup("(background: #FFF)"), "(background: #fff)"); // 3-digit
         assert_eq!(sup("(a: #ABCD)"), "(a: #abcd)"); // 4-digit RGBA
         assert_eq!(sup("(a: #AABBCC)"), "(a: #aabbcc)"); // 6-digit
@@ -1229,22 +1330,23 @@ mod tests {
         assert_eq!(sup("url()"), "url()"); // empty url-token
         // A quoted `url("…")` is a `<string>` arg: quotes normalize, content preserved.
         assert_eq!(
-            normalize_value_text("(background: url(\"v2.00.png\"))", true),
+            normalize_value_text("(background: url(\"v2.00.png\"))", PreludeReader::Value),
             "(background: url('v2.00.png'))"
         );
-        // url opacity is unconditional (independent of `lowercase_hex`).
+        // url opacity is unconditional — it holds on either path.
         assert_eq!(
-            normalize_value_text("(a: url(x1.50))", false),
+            normalize_value_text("(a: url(x1.50))", PreludeReader::MediaQuery),
             "(a: url(x1.50))"
         );
 
-        // `@media`/`@import` (lowercase_hex = false): every `#`-token is preserved.
+        // The media path (`@media`): the regex has no hash arm, so a `#` is copied as the
+        // delimiter it is and its run keeps its case.
         assert_eq!(
-            normalize_value_text("(min-width: #FFF)", false),
+            normalize_value_text("(min-width: #FFF)", PreludeReader::MediaQuery),
             "(min-width: #FFF)"
         );
         assert_eq!(
-            normalize_value_text("(margin: .5px)", false),
+            normalize_value_text("(margin: .5px)", PreludeReader::MediaQuery),
             "(margin: 0.5px)"
         );
     }
@@ -1262,38 +1364,38 @@ mod tests {
     fn an_escaped_paren_does_not_close_a_url_token() {
         // The two normalizations the tail would otherwise take.
         assert_eq!(
-            normalize_value_text(r"(a: url(x\)1.50))", true),
+            normalize_value_text(r"(a: url(x\)1.50))", PreludeReader::Value),
             r"(a: url(x\)1.50))"
         );
         assert_eq!(
-            normalize_value_text(r"(a: url(x\)y#FFF))", true),
+            normalize_value_text(r"(a: url(x\)y#FFF))", PreludeReader::Value),
             r"(a: url(x\)y#FFF))"
         );
         // An escaped OPEN paren nests nothing either — the token still ends at the first
         // unescaped `)`, so `1.50` stays inside it.
         assert_eq!(
-            normalize_value_text(r"(a: url(x\(1.50))", true),
+            normalize_value_text(r"(a: url(x\(1.50))", PreludeReader::Value),
             r"(a: url(x\(1.50))"
         );
         // A hex escape carries its whitespace terminator, so the `)` here is the escape's
         // payload and not a close.
         assert_eq!(
-            normalize_value_text(r"(a: url(x\29 1.50))", true),
+            normalize_value_text(r"(a: url(x\29 1.50))", PreludeReader::Value),
             r"(a: url(x\29 1.50))"
         );
         // Unbalanced: the group runs to end of input rather than stopping at the escape.
         assert_eq!(
-            normalize_value_text(r"(a: url(x\)1.50)", true),
+            normalize_value_text(r"(a: url(x\)1.50)", PreludeReader::Value),
             r"(a: url(x\)1.50)"
         );
         // A trailing `\` starts no escape, so the `)` before it still closes.
         assert_eq!(
-            normalize_value_text(r"(a: url(x1.50)\)", true),
+            normalize_value_text(r"(a: url(x1.50)\)", PreludeReader::Value),
             r"(a: url(x1.50)\)"
         );
         // Control: no escape, so the token is opaque for the ordinary reason.
         assert_eq!(
-            normalize_value_text("(a: url(x1.50))", true),
+            normalize_value_text("(a: url(x1.50))", PreludeReader::Value),
             "(a: url(x1.50))"
         );
     }
@@ -1465,39 +1567,154 @@ mod tests {
     #[test]
     fn a_number_abutting_an_identifier_is_copied_verbatim() {
         // `x1` + `.50`, not `x10` + `.5`.
-        assert_eq!(normalize_value_text("(a: x1.50)", true), "(a: x1.50)");
+        assert_eq!(
+            normalize_value_text("(a: x1.50)", PreludeReader::Value),
+            "(a: x1.50)"
+        );
         // The unit rides along verbatim too — no `canonical_unit` lowercasing.
-        assert_eq!(normalize_value_text("(a: x.50PX)", true), "(a: x.50PX)");
+        assert_eq!(
+            normalize_value_text("(a: x.50PX)", PreludeReader::Value),
+            "(a: x.50PX)"
+        );
         // A leading `--` reaches the ident arm at the first letter, so it is covered.
-        assert_eq!(normalize_value_text("(a: --x.50)", true), "(a: --x.50)");
+        assert_eq!(
+            normalize_value_text("(a: --x.50)", PreludeReader::Value),
+            "(a: --x.50)"
+        );
         // Separated by whitespace, the number is a value of its own and normalizes.
-        assert_eq!(normalize_value_text("(a: x .50)", true), "(a: x 0.5)");
+        assert_eq!(
+            normalize_value_text("(a: x .50)", PreludeReader::Value),
+            "(a: x 0.5)"
+        );
         // So does one that starts the value.
-        assert_eq!(normalize_value_text("(a: .50px)", true), "(a: 0.5px)");
+        assert_eq!(
+            normalize_value_text("(a: .50px)", PreludeReader::Value),
+            "(a: 0.5px)"
+        );
         // A signed number keeps its sign, which merges with nothing, so it normalizes even
         // against an identifier. (`x-1` is one ident run, so `x-1.50` is the glued case.)
-        assert_eq!(normalize_value_text("(a: x+1.50)", true), "(a: x+1.5)");
-        assert_eq!(normalize_value_text("(a: x-1.50)", true), "(a: x-1.50)");
+        assert_eq!(
+            normalize_value_text("(a: x+1.50)", PreludeReader::Value),
+            "(a: x+1.5)"
+        );
+        assert_eq!(
+            normalize_value_text("(a: x-1.50)", PreludeReader::Value),
+            "(a: x-1.50)"
+        );
         // `$` and `@` are `<delim-token>`s, not ident code points, so nothing merges into
         // them even though this module's ident class reads them as run starts.
-        assert_eq!(normalize_value_text("(a: $.50)", false), "(a: $0.5)");
-        assert_eq!(normalize_value_text("(a: @.50)", false), "(a: @0.5)");
-        assert_eq!(normalize_value_text("(a: $x.50)", false), "(a: $x.50)");
+        assert_eq!(
+            normalize_value_text("(a: $.50)", PreludeReader::MediaQuery),
+            "(a: $0.5)"
+        );
+        assert_eq!(
+            normalize_value_text("(a: @.50)", PreludeReader::MediaQuery),
+            "(a: @0.5)"
+        );
+        assert_eq!(
+            normalize_value_text("(a: $x.50)", PreludeReader::MediaQuery),
+            "(a: $x.50)"
+        );
         // An escape does not make a word part (prettier's own scan reads no `\` either),
         // so the number after one still normalizes — matching prettier.
         assert_eq!(
-            normalize_value_text(r"(a: \41 2.50px)", true),
+            normalize_value_text(r"(a: \41 2.50px)", PreludeReader::Value),
             r"(a: \41 2.5px)"
         );
         assert_eq!(
-            normalize_value_text(r"(a: x\41 .50)", true),
+            normalize_value_text(r"(a: x\41 .50)", PreludeReader::Value),
             r"(a: x\41 0.5)"
         );
         // The ident arm's own `url(` exit clears the word part: what follows the group is
         // not the ident's tail.
         assert_eq!(
-            normalize_value_text("(a: url(x).50)", true),
+            normalize_value_text("(a: url(x).50)", PreludeReader::Value),
             "(a: url(x)0.5)"
         );
+    }
+
+    /// The three rules keyed on [`PreludeReader`], each measured against the reader prettier
+    /// actually uses: the unit gate, the hex fold, and which runs absorb a number. One
+    /// authoring, two canonical forms — so every case is asserted on both paths.
+    #[test]
+    fn the_two_prelude_readers_answer_a_number_differently() {
+        let value = |s: &str| normalize_value_text(s, PreludeReader::Value);
+        let media = |s: &str| normalize_value_text(s, PreludeReader::MediaQuery);
+
+        // The unit gate. `printUnit` has none — whatever trails the number is the unit —
+        // where `adjustNumbers` keeps the whole match on a unit CSS doesn't define.
+        assert_eq!(value("(a: 1.50abc)"), "(a: 1.5abc)");
+        assert_eq!(media("(a: 1.50abc)"), "(a: 1.50abc)");
+        // A unit both readers accept normalizes on both, casing included.
+        assert_eq!(value("(a: 1.50PX)"), "(a: 1.5px)");
+        assert_eq!(media("(a: 1.50PX)"), "(a: 1.5px)");
+
+        // A number's own unit absorbs the number after it on the value path (one word), and
+        // absorbs nothing on the media path (the regex re-splits at the second number).
+        assert_eq!(value("(a: 1a.50)"), "(a: 1a.50)");
+        assert_eq!(media("(a: 1a.50)"), "(a: 1a0.5)");
+        // The same with no unit between them — a second `.` ends the first number.
+        assert_eq!(value("(a: 1.5.50)"), "(a: 1.5.50)");
+        assert_eq!(media("(a: 1.5.50)"), "(a: 1.50.5)");
+
+        // A `<hash-token>` absorbs on the value path (postcss-values-parser reads the word
+        // whole); the media path has no hash arm at all, so the `#` is a bare delimiter and
+        // the run after it takes the ordinary number arm.
+        assert_eq!(value("(a: #1.50)"), "(a: #1.50)");
+        assert_eq!(media("(a: #1.50)"), "(a: #1.5)");
+        assert_eq!(value("(a: #1.50px)"), "(a: #1.50px)");
+        assert_eq!(media("(a: #1.50px)"), "(a: #1.5px)");
+        // A `#` followed by no ident code point heads no hash token (§4.3.1 leaves a
+        // `<delim-token>`), so the number normalizes on both.
+        assert_eq!(value("(a: #.50)"), "(a: #0.5)");
+        assert_eq!(media("(a: #.50)"), "(a: #0.5)");
+        // A hash token's own ident run still absorbs on the media path, via its word part.
+        assert_eq!(value("(a: #abc1.50)"), "(a: #abc1.50)");
+        assert_eq!(media("(a: #abc1.50)"), "(a: #abc1.50)");
+        // The hex fold is the value reader's alone.
+        assert_eq!(value("(a: #FFF)"), "(a: #fff)");
+        assert_eq!(media("(a: #FFF)"), "(a: #FFF)");
+
+        // `$`/`@` head no `WORD_PART` (`[$@]?` must be followed by a letter or `_`), so the
+        // media reader's number starts inside the run this module read as one ident.
+        assert_eq!(value("(a: $1.50)"), "(a: $1.50)");
+        assert_eq!(media("(a: $1.50)"), "(a: $1.5)");
+        assert_eq!(media("(a: x$1.50)"), "(a: x$1.5)");
+        // A word part after the `$` absorbs again, on both.
+        assert_eq!(value("(a: $a1.50)"), "(a: $a1.50)");
+        assert_eq!(media("(a: $a1.50)"), "(a: $a1.50)");
+        // …and the word part may start anywhere after the last `$`/`@`.
+        assert_eq!(media("(a: $$a.50)"), "(a: $$a.50)");
+        // With no word part and no digits in the tail, the run ends where it did.
+        assert_eq!(media("(a: $-.50)"), "(a: $-0.5)");
+    }
+
+    /// The hex fold is asked of the **whole** hash word, so a colour is a colour only when
+    /// the token ends at its digits. A body narrowed to the hex-shaped prefix recased a
+    /// token that is no colour (`#FFF.5` → `#fff.5`).
+    #[test]
+    fn the_hex_fold_reads_the_whole_hash_word() {
+        let value = |s: &str| normalize_value_text(s, PreludeReader::Value);
+
+        // The word runs on past the digits — no colour here, so nothing is recased.
+        assert_eq!(value("(a: #FFF.5)"), "(a: #FFF.5)");
+        assert_eq!(value("(a: #FFF/5)"), "(a: #FFF/5)");
+        assert_eq!(value("(a: #FFFé)"), "(a: #FFFé)");
+        assert_eq!(value("(a: #FFF-x)"), "(a: #FFF-x)");
+        assert_eq!(value("(a: #FFF_x)"), "(a: #FFF_x)");
+        assert_eq!(value("(a: #ABCD.5)"), "(a: #ABCD.5)");
+        // A separator ends the word, so the colour before it folds.
+        assert_eq!(value("(a: #FFF 5)"), "(a: #fff 5)");
+        assert_eq!(value("(a: #FFF)"), "(a: #fff)");
+        // A word of hex-colour length folds however it got there.
+        assert_eq!(value("(a: #FFF9)"), "(a: #fff9)");
+
+        // Whether the token starts at all stays §4.3.1's question, and its answer is
+        // narrower than the word class: `.` continues a hash word but heads none, so `#.50`
+        // is a bare delimiter and the number after it is its own token.
+        assert_eq!(value("(a: #.50)"), "(a: #0.5)");
+        // `-` IS an ident code point, so it heads one — and the word then absorbs, which is
+        // what keeps `#-` a hash token whose value is `-` rather than `-0`.
+        assert_eq!(value("(a: #-.50)"), "(a: #-.50)");
     }
 }

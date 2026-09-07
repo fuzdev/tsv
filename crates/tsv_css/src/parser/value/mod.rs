@@ -13,7 +13,7 @@ pub(crate) mod scan;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
-use crate::escapes::{trim_css, trim_end_preserving_escape, trim_start_css};
+use crate::escapes::{ends_with_live_hex_escape, trim_end_preserving_escape, trim_start_css};
 use crate::parser::value::lists::ValueSeparator;
 use bumpalo::Bump;
 use tsv_lang::Span;
@@ -279,7 +279,27 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
     // Unicode `str::trim` would cut a non-ASCII space (an NBSP) out of the name's span, and
     // the printer emits the name from that span, so the character would be dropped. Kept in
     // `name_part`, it fails the validation below and the value stays an opaque identifier.
-    let name_part = trim_css(&s[..paren_pos]);
+    let name_region = trim_start_css(&s[..paren_pos]);
+    let mut name_part = trim_end_preserving_escape(name_region);
+
+    // ⚠️ A hex escape's optional whitespace **terminator** belongs to the escape (§4.3.7),
+    // so a name ending in a live one owns the character the trim just took — the space in
+    // `c\41 (1px)` is inside the ident sequence, which therefore ends flush with the `(` and
+    // makes the whole run one `<function-token>`. Give it back, the same restore the
+    // property name against its colon already makes (`\41 : red`). The printer emits the
+    // name from this span, so without it the author's spelling is rewritten to `c\41(1px)`.
+    // Not folded into `trim_end_preserving_escape`, which restores an *open* escape's
+    // payload (a trailing `\`): at every other site it serves, what follows the trimmed text
+    // is the value's own end, where prettier drops the terminator and tsv matches it.
+    //
+    // Only one character, and only the escape's own: any further whitespace is a real gap,
+    // which would have split the value in two before this scan ever saw it.
+    if name_part.len() < name_region.len()
+        && matches!(name_region.as_bytes()[name_part.len()], b' ' | b'\t')
+        && ends_with_live_hex_escape(name_part)
+    {
+        name_part = &name_region[..=name_part.len()];
+    }
 
     if name_part.is_empty() || !is_function_name(name_part) {
         return None;
