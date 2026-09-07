@@ -212,4 +212,91 @@
 	type AI = (a // c78
 	// c79
 ) & b & c & d;
+	// THE INTERSECTION'S OTHER ARM. A member carrying LEADING comments takes its run
+	// inside the per-member offset in a UNION (case I) — prettier's `union-type.js`
+	// splits on `hasComment(node, Leading)`. No such handler fires for an INTERSECTION,
+	// so a leading comment decides nothing there: the run still lifts to the member seam,
+	// and the shell's own leading run is emitted ahead of the member
+	type AJ = (/* c80 */ a // c81
+	// c82
+) & c;
+
+	// a REQUIRED pair, whose leading run therefore lands OUTSIDE the pair the member
+	// position re-applies
+	type AK = (/* c83 */ (a: 1) => void // c84
+	// c85
+) & c;
+
+	// a nested intersection, the same
+	type AL = (/* c86 */ a & b // c87
+	// c88
+) & c;
+
+	// an object member, whose boundary hugs the `&` and still opens for the run
+	type AM = (/* c89 */ { x: X } // c90
+	// c91
+) & c;
+
+	// two leading blocks keep the author's glue
+	type AN = (/* c92 */ /* c93 */ a // c94
+	// c95
+) & c;
+
+	// A LATER member's run is held for its own boundary too, not left queued inside the
+	// member doc: the run is a deferred `line_suffix` and renders its break at the indent
+	// it was queued at, so only the boundary that follows the member can place it
+	type AP = { x: X } & (a // c96
+	// c97
+) & b;
+
+	// the shell one member in, where the run would otherwise ride out past the `;`
+	type AQ = z & ({ x: X } // c98
+	// c99
+) & c;
+
+	// and in the middle of four, where every boundary past it is untouched
+	type AR = a & ({ x: X } // c100
+	// c101
+) & b & c;
+
+	// The boundary opens for a run that ENDS a line only where the run also STARTS one:
+	// a `//` on the member's own line is that member's trailing comment, never the next
+	// member's leading one, so an object-adjacent boundary hugs and the run trails the
+	// statement — which is prettier's answer at both positions
+	type AS = z & ({ x: X } // c102
+) & c;
+
+	type AT = ({ x: X } // c103
+) & c;
+
+	// The forced-multiline loop is the compact one's TWIN and must answer the hold the same
+	// way: an isolated between-member comment routes here, and a member's lifted run is
+	// still only placeable at the boundary that FOLLOWS it
+	type AU = z &
+	// c104
+	({ x: X } // c105
+	// c106
+) & c;
+
+	// the first member's run, held on this path too
+	type AV = ({ x: X } // c107
+	// c108
+) & a &
+	// c109
+	b;
+
+	// and a later member's, at position 1 of four
+	type AW = a & ({ x: X } // c110
+	// c111
+) & b &
+	// c112
+	c;
+
+	// the boundary disjunct comes with it: a run that ends a line has no line to end on a
+	// boundary that hugs an object, so it would ride out past the `;`
+	type AX = a & (b // c113
+	// c114
+) & { x: X } &
+	// c115
+	c;
 </script>
