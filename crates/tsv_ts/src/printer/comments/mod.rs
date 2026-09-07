@@ -251,6 +251,34 @@ impl LeadingGlue {
     }
 }
 
+/// Whether a deferred own-line comment in a trailing run keeps the author's BLANK line
+/// above it (prettier's `isPreviousLineEmpty(locStart(comment))`).
+///
+/// **The answer belongs to the run's DESTINATION, not to the gap it is read from**, which
+/// is why it is the caller's to give. A run that still trails the node it was written after
+/// keeps the blank, and prettier keeps it too. A run the enclosing composite re-reads as the
+/// NEXT member's LEADING run does not: prettier's `printLeadingComment` asks
+/// `isNextLineEmpty` — a blank BELOW — so a blank above the comment has nowhere to land and
+/// both formatters drop it.
+///
+/// The two lifted union / intersection member runs are exactly that split
+/// (`Printer::member_hoisted_trailing_shell`). The union's stays trailing: prettier's
+/// `handleUnionTypeComments` binds every in-union comment to the PRECEDING member, so the
+/// blank survives at both formatters. The intersection's does not — no such handler fires
+/// there, the comment attaches to the following member, and its `&` has been pulled back
+/// onto the previous member's line, so an emitted blank would sit *after* the operator where
+/// the author wrote it before: the fabrication
+/// `Printer::build_intersection_type_doc_with_line_comments` already refuses for its own gap
+/// run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum TrailingBlank {
+    /// Keep an author blank directly above an own-line comment in the run.
+    Keep,
+    /// Drop it — the run lands where the reparse reads it as a leading run, which has no
+    /// blank-above rule to reproduce it with.
+    Drop,
+}
+
 impl<'a> Printer<'a> {
     /// Push one **block** comment with `spacing` applied to its outer edges — the single
     /// definition of what [`CommentSpacing`] means for a comment that does not end its
@@ -1057,6 +1085,19 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
     ) -> bool {
+        self.push_trailing_comments_in_range_blank(parts, start, end, TrailingBlank::Drop)
+    }
+
+    /// [`Self::push_trailing_comments_in_range`] with the author-BLANK policy named — see
+    /// [`TrailingBlank`] for whose question it is. The plain spelling answers `Drop`, which
+    /// is every gap whose run keeps landing where it was written.
+    pub(in crate::printer) fn push_trailing_comments_in_range_blank(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        end: u32,
+        blank: TrailingBlank,
+    ) -> bool {
         let mut has_line_comment = false;
         // Cursor over what physically precedes each comment — an **in-source** question
         // (docs/comments.md §the three axes), so it advances over every comment emitted
@@ -1076,7 +1117,17 @@ impl<'a> Printer<'a> {
             // render *before* the deferred text and the pair would come out reordered.
             let deferred = is_line || has_line_comment;
             parts.push(if deferred && own_line {
-                self.build_trailing_comment_doc_own_line(comment)
+                // The author BLANK directly above the comment, where the caller's
+                // destination keeps it: `isPreviousLineEmpty(locStart(comment))`, the same
+                // question every non-deferred trailing run asks
+                // ([`Self::push_adjacent_blank_hardline`]). `blank_scan_start` floors the
+                // backward walk so a comment already emitted in this gap cannot pass its
+                // own newlines off as the author's.
+                let blank_above = blank == TrailingBlank::Keep && {
+                    let floor = self.blank_scan_start(prev_end, comment.span.start);
+                    self.previous_line_is_empty(floor, comment.span.start)
+                };
+                self.build_trailing_comment_doc_own_line_blank(comment, blank_above)
             } else {
                 self.build_trailing_comment_doc(comment)
             });
