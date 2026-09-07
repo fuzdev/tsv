@@ -35,6 +35,14 @@ fully-unwrapped inner's end, the symmetry the leading side already had). Asked o
 layer alone it read an empty gap, called the nest stripped, and let an enclosing gap claim the
 LEADING run out of a pair that then printed it too — the same comment twice (`B3`).
 
+An author **blank** above an own-line comment in that run survives (`A3`, `B4`). The blank's
+fate belongs to the run's *destination* (`Printer::TrailingBlank`), and these runs have none —
+they stay in the region they were written in, so `isPreviousLineEmpty` still has the line above
+the comment to read, exactly as every non-deferred trailing run in the printer does. The
+deferred hang seams answer the other way, because there the run lands where the reparse reads
+it as a *leading* run and `printLeadingComment` asks `isNextLineEmpty` instead. Prettier offers
+no oracle either way here — it carries the whole run out past the `;`.
+
 `unformatted_ours_flat.svelte` carries the flat authoring and
 `unformatted_ours_paren_layer.svelte` the same thing with one extra redundant layer on each
 shell; both reach `input` under tsv only. Prettier is non-idempotent on its own output here —

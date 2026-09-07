@@ -648,7 +648,18 @@ impl<'a> Printer<'a> {
                         inner.push(c);
                     }
                     inner.push(index_doc);
-                    self.push_trailing_comments_in_range(&mut inner, gap_start, i.span.end);
+                    // The author BLANK above an own-line comment in that run survives, as
+                    // it does in the retained paren shell's gap
+                    // ([`Self::build_open_paren_shell_doc`]): the run stays inside the
+                    // brackets it was written in, and [`TrailingBlank`] is a question about
+                    // the run's destination. The two shapes are one claim — the
+                    // `type_suffix_trailing_comment_run` divergence pairs them.
+                    self.push_trailing_comments_in_range_blank(
+                        &mut inner,
+                        gap_start,
+                        i.span.end,
+                        TrailingBlank::Keep,
+                    );
                     parts.push(d.indent_hardline(d.concat(&inner)));
                     parts.push(d.hardline());
                 } else {
@@ -1456,8 +1467,35 @@ impl<'a> Printer<'a> {
         if original.span() == inner.span() {
             return value_doc;
         }
-        let trailing_start = inner.span().end;
-        let trailing_end = original.span().end;
+        self.with_stripped_paren_trailing_range(
+            value_doc,
+            inner.span().end,
+            original.span().end,
+            trailing_block,
+            blank,
+        )
+    }
+
+    /// [`Self::with_stripped_paren_trailing_blank`] over an explicit window, for the one
+    /// caller that lifts only PART of a shell's trailing gap.
+    ///
+    /// The whole gap is the default because a lifted run normally travels intact: it ends
+    /// up trailing the member either way, so nothing is emitted between the member and the
+    /// run to split it around. An INTERSECTION member is the exception — its loop has
+    /// already emitted `" &"` by the time it places the run — so the run's inline prefix
+    /// must be emitted back at the member and only the deferred tail travels
+    /// (`Printer::stripped_paren_trailing_run_from`). ⚠️ The two emitters must PARTITION the
+    /// gap: whatever the caller emits itself has to end exactly where `start` begins, or
+    /// the comments between are dropped, and overlap double-prints them
+    /// ([`comments.md`](../../../../docs/comments.md) hazard 3).
+    pub(in crate::printer) fn with_stripped_paren_trailing_range(
+        &self,
+        value_doc: DocId,
+        trailing_start: u32,
+        trailing_end: u32,
+        trailing_block: TrailingBlock,
+        blank: TrailingBlank,
+    ) -> DocId {
         if !self.has_comments_to_emit_between(trailing_start, trailing_end) {
             return value_doc;
         }
@@ -1992,7 +2030,20 @@ impl<'a> Printer<'a> {
         let mut body: DocBuf = DocBuf::new();
         self.push_paren_shell_leading_run(&mut body, resume, inner_start, ShellLeadingRun::Here);
         body.push(inner_doc);
-        self.push_trailing_comments_in_range(&mut body, inner_end, paren_close);
+        // The author BLANK above an own-line comment SURVIVES here, unlike at the hang
+        // seams the plain spelling serves ([`TrailingBlank`]): this run's destination is
+        // the gap it was written in — the shell is RETAINED, so the run stays between the
+        // author's own parens, on the author's own lines — and a stationary run is exactly
+        // what `isPreviousLineEmpty` still reads a blank above. Prettier offers no oracle
+        // (it strips the shell and carries the whole run out past the `;`), so this is
+        // tsv's own rule, the same one every non-deferred trailing run already follows
+        // ([`Self::push_adjacent_blank_hardline`]).
+        self.push_trailing_comments_in_range_blank(
+            &mut body,
+            inner_end,
+            paren_close,
+            TrailingBlank::Keep,
+        );
         let mut parts: DocBuf = smallvec![d.text("(")];
         parts.extend(glued);
         parts.push(d.indent_hardline(d.concat(&body)));
