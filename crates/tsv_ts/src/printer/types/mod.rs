@@ -50,6 +50,8 @@ use crate::ast::internal::{TSImportType, TSIntersectionType, TSParenthesizedType
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, ShellLeadingRun};
+use helpers::outermost_paren;
+use helpers::paren_shell_gaps;
 use helpers::type_needs_parens_for_array_element;
 use helpers::type_needs_parens_for_conditional_check;
 use helpers::type_needs_parens_for_indexed_access_object;
@@ -133,8 +135,9 @@ impl<'t> HeadShell<'t> {
 #[derive(Clone, Copy)]
 pub(in crate::printer) enum RequiredParenRun {
     /// The operand IS a redundant shell: the required pair collapses onto it and renders
-    /// the shell's own deep interior gaps.
-    Shell,
+    /// the shell's own deep interior gaps, carried here as [`paren_shell_gaps`]' two
+    /// windows so the resolver and the emitter cannot come to mean different shells.
+    Shell { leading: Span, trailing: Span },
     /// The shell sits at the operand's leading printed EDGE, and this is its claim: the
     /// pair opens over that region and the operand prints whole inside it.
     Edge(Span),
@@ -848,9 +851,8 @@ impl<'a> Printer<'a> {
 
     /// Collect the leading line-comment run in a stripped paren shell — the deep-window
     /// collector paired with [`Self::stripped_paren_has_leading_line_comment`]. Scans
-    /// the whole discarded shell, from the OUTERMOST `(` to the fully-unwrapped inner
-    /// type's start (`unwrap_parenthesized`), where the shallow predicate sees only one
-    /// paren's own gap.
+    /// the whole discarded shell via [`paren_shell_gaps`], where the shallow predicate
+    /// [`Self::paren_inner_comment_flags`] sees only one paren's own gap.
     ///
     /// Returns the run ONLY when stripping the shell would relocate it losslessly: the
     /// leading gap holds ≥1 comment, ALL line comments, AND there is no comment in the
@@ -869,19 +871,21 @@ impl<'a> Printer<'a> {
         &self,
         ty: &TSType<'_>,
     ) -> CommentVec<'_> {
-        if !matches!(ty, TSType::Parenthesized(_)) {
+        let Some(shell) = outermost_paren(ty) else {
             return smallvec![];
-        }
-        let inner = unwrap_parenthesized(ty);
+        };
+        // Both halves come from [`paren_shell_gaps`] — the one spelling of this window, so
+        // this collector cannot drift from the predicates that gate the same strip.
+        let (leading, trailing) = paren_shell_gaps(shell);
         let lead: CommentVec<'_> = self
-            .comments_to_emit_between(ty.span().start + 1, inner.span().start)
+            .comments_to_emit_between(leading.start, leading.end)
             .collect();
         // Non-empty + all line comments ⇒ ≥1 leading line comment and no block comment
         // in the leading gap; the trailing check rules out a comment between the inner
         // and the outermost `)`.
         if !lead.is_empty()
             && lead.iter().all(|c| !c.is_block)
-            && !self.has_comments_to_emit_between(inner.span().end, ty.span().end - 1)
+            && !self.has_comments_to_emit_between(trailing.start, trailing.end)
         {
             return lead;
         }
@@ -913,11 +917,10 @@ impl<'a> Printer<'a> {
         &self,
         ty: &TSType<'_>,
     ) -> bool {
-        matches!(ty, TSType::Parenthesized(_))
-            && self.has_line_comments_between(
-                ty.span().start + 1,
-                unwrap_parenthesized(ty).span().start,
-            )
+        outermost_paren(ty).is_some_and(|shell| {
+            let (leading, _) = paren_shell_gaps(shell);
+            self.has_line_comments_between(leading.start, leading.end)
+        })
     }
 
     /// The shared keyword→value seam for a hang position whose caller strips redundant
@@ -1710,6 +1713,18 @@ impl<'a> Printer<'a> {
     /// type, trailing = between the inner type and `)`. Used both to decide
     /// whether redundant parens can be stripped and to emit the comments in place
     /// when they can't.
+    ///
+    /// ⚠️ **This is the SHALLOW, per-layer question, and its twin is deep.** The window
+    /// stops at the DIRECT child, so on `((/* c */ T))` the outer layer reads `(false,
+    /// false)` and the comment belongs to the inner one. That is right for every caller
+    /// here — each is a per-layer descent or a per-layer emitter, and a layer that answers
+    /// "clean" is precisely the one that may be peeled. A caller asking about the shell as
+    /// a WHOLE — which is what a layout gate reading "does the author's shell hold a
+    /// comment" wants, since redundant layers strip as a unit — must take
+    /// [`paren_shell_gaps`] instead; asking this one
+    /// there has twice produced a dropped or double-printed comment. The axis differs too:
+    /// these flags are **to-emit**, while `paren_shell_gaps` returns bare spans the caller
+    /// queries on whichever axis its question needs.
     pub(in crate::printer) fn paren_inner_comment_flags(
         &self,
         p: &TSParenthesizedType<'_>,
@@ -1732,10 +1747,7 @@ impl<'a> Printer<'a> {
     /// question — that function consults this too, so an enclosing layout and the shell's
     /// own emission cannot disagree.
     pub(in crate::printer) fn paren_retains_for_trailing_run(&self, ty: &TSType<'_>) -> bool {
-        let TSType::Parenthesized(p) = ty else {
-            return false;
-        };
-        self.paren_shell_retains_for_trailing_run(p)
+        outermost_paren(ty).is_some_and(|p| self.paren_shell_retains_for_trailing_run(p))
     }
 
     /// Build `ty`'s doc and wrap it in the parens an enclosing construct **requires**
@@ -1866,8 +1878,14 @@ impl<'a> Printer<'a> {
     /// SHELL arm needs none: [`Self::leading_edge_shell`] declines the descent outright
     /// where the pair around the shell opens, so no gap can have claimed it.
     fn required_paren_open_run(&self, ty: &TSType<'_>) -> Option<RequiredParenRun> {
-        if self.stripped_paren_hang_has_leading_line_comment(ty) {
-            return Some(RequiredParenRun::Shell);
+        // The `let` is implied by the predicate, which is itself keyed on
+        // [`outermost_paren`] — it is spelled out to carry the shell here rather than have
+        // the emitter re-derive the window the predicate just measured.
+        if self.stripped_paren_hang_has_leading_line_comment(ty)
+            && let Some(shell) = outermost_paren(ty)
+        {
+            let (leading, trailing) = paren_shell_gaps(shell);
+            return Some(RequiredParenRun::Shell { leading, trailing });
         }
         self.leading_edge_shell_line_comment_claim(ty)
             .filter(|claim| !self.shell_leading_run_claimed(claim.start, claim.end))
@@ -1901,16 +1919,13 @@ impl<'a> Printer<'a> {
         run: RequiredParenRun,
     ) -> DocId {
         match run {
-            RequiredParenRun::Shell => {
-                let inner = unwrap_parenthesized(ty);
-                self.build_open_paren_shell_doc(
-                    ty.span().start + 1,
-                    inner.span().start,
-                    self.build_type_doc(inner),
-                    inner.span().end,
-                    ty.span().end - 1,
-                )
-            }
+            RequiredParenRun::Shell { leading, trailing } => self.build_open_paren_shell_doc(
+                leading.start,
+                leading.end,
+                self.build_type_doc(unwrap_parenthesized(ty)),
+                trailing.start,
+                trailing.end,
+            ),
             RequiredParenRun::Edge(claim) => {
                 let end = ty.span().end;
                 self.build_open_paren_shell_doc(
@@ -1970,16 +1985,13 @@ impl<'a> Printer<'a> {
         // a leading comment takes its own real `hardline` either way, so it neither adds
         // to nor cancels the retention.
         //
-        // The window is the DEEP one — from the fully-unwrapped inner's end, not from the
-        // direct child's — because redundant layers strip as a UNIT and print one pair
-        // between them: `((⏎// c⏎A // t⏎))` retains, and asking only the outer layer's own
-        // trailing gap (empty, the `// t` sitting one layer in) called it stripped while
-        // the inner pair retained and printed the leading run itself, beside the enclosing
-        // gap's copy — a DOUBLE-PRINT. It is also the symmetry the leading side already
-        // has ([`Self::stripped_paren_hang_has_leading_line_comment`] reads to the
-        // unwrapped inner's START).
-        let inner_end = unwrap_parenthesized(p.type_annotation).span().end;
-        self.has_line_comments_between(inner_end, p.span.end)
+        // The window is [`paren_shell_gaps`]'s DEEP trailing half, which is why that pair
+        // is one function: asking only the outer layer's own trailing gap (empty, a `// t`
+        // sitting one layer in) called `((⏎// c⏎A // t⏎))` stripped while the inner pair
+        // retained and printed the leading run itself, beside the enclosing gap's copy —
+        // a DOUBLE-PRINT.
+        let (_, trailing) = paren_shell_gaps(p);
+        self.has_line_comments_between(trailing.start, trailing.end)
             && !self.type_member_separator_follows(p.span.end)
     }
 

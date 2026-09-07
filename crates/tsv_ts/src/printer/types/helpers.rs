@@ -8,6 +8,7 @@
 use crate::ast::internal::{
     self, TSIntersectionType, TSKeywordKind, TSLiteralType, TSType, TSUnionType,
 };
+use tsv_lang::Span;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
 //
@@ -130,16 +131,12 @@ pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
 /// — this is one *clause* of that gate, never the gate. It is safe to ask bare (unlike
 /// [`union_hug_shape`], it makes no claim to answer "does this hug?").
 ///
-/// ⚠️ **Reads the RAW member, so it is spelled out here rather than delegating to
-/// [`is_huggable_type`]** (which is the same `isObjectType` but unwrapped). It is the
-/// other clause of the gate [`union_hug_shape`] answers, and the two must agree about a
-/// parenthesized member or the gate reads two ways about one union — see
-/// [`is_object_like_type`] for why that gate cannot unwrap yet. Both move together.
+/// ⚠️ **Reads through the paren shell, via [`is_huggable_type`]** — the same
+/// `isObjectType` this narrows, so a `({ … })` member answers the same here as it does at
+/// [`union_hug_shape`]'s [`is_object_like_type`]. The two are clauses of one gate and must
+/// agree about a parenthesized member, or the gate reads two ways about one union.
 pub(super) fn union_has_brace_member(union: &TSUnionType<'_>) -> bool {
-    union
-        .types
-        .iter()
-        .any(|t| matches!(t, TSType::TypeLiteral(_) | TSType::Mapped(_)))
+    union.types.iter().any(is_huggable_type)
 }
 
 /// The retained-paren shell around `ts_type` — its **outermost** `TSParenthesizedType`
@@ -158,13 +155,46 @@ pub(super) fn union_has_brace_member(union: &TSUnionType<'_>) -> bool {
 /// pair those builders emit, so the whole `(`…`)` region is one author gap. Bounding a
 /// gap scan by an inner layer's span stops it short and drops everything between the two
 /// closers (`((A | B) /* c */)[]`, `[((A | B) /* c */)?]`).
-pub(super) fn outermost_paren<'a>(
+pub(in crate::printer) fn outermost_paren<'a>(
     ts_type: &'a TSType<'a>,
 ) -> Option<&'a internal::TSParenthesizedType<'a>> {
     match ts_type {
         TSType::Parenthesized(p) => Some(p),
         _ => None,
     }
+}
+
+/// The **deep** interior gaps of a redundant paren shell, as `(leading, trailing)` — from
+/// the outermost `(` to the fully-unwrapped inner type, and from that type back out to the
+/// outermost `)`. Pair it with [`outermost_paren`] for a type that may carry no shell:
+/// `outermost_paren(ty).map(paren_shell_gaps)`.
+///
+/// **Deep, not per-paren**, and that is the whole reason this is one function rather than a
+/// span pair each caller derives: redundant layers strip as a UNIT and print a single pair
+/// between them, so a comment in a doubly-nested shell (`((/* c */ T))`) falls *between* the
+/// two `(`s, where either layer's own window is blind to it. Both halves have been widened
+/// to this window one at a time, each after a bug — the leading half at
+/// [`Printer::stripped_paren_hang_has_leading_line_comment`](super::super::Printer::stripped_paren_hang_has_leading_line_comment),
+/// the trailing half at
+/// [`Printer::paren_shell_retains_for_trailing_run`](super::super::Printer::paren_shell_retains_for_trailing_run),
+/// where asking only the outer layer's own trailing gap called a shell stripped while the
+/// inner pair retained and printed the leading run itself, beside the enclosing gap's copy
+/// (a DOUBLE-PRINT). Every caller that reads a shell's own comments asks here — the type
+/// builders, the required-paren emitter, and `ignore.rs`'s directive-freeze scans alike — so
+/// the two halves cannot drift apart again.
+///
+/// The paren bytes themselves are excluded, which changes no comment query — a comment can
+/// neither begin at the `(` nor end past the `)` — but keeps the spans meaning exactly "the
+/// author's gap". That is why a caller whose hand-rolled window included them
+/// (`t.span().start` rather than `+ 1`) converts to this pair unchanged.
+pub(in crate::printer) fn paren_shell_gaps(
+    shell: &internal::TSParenthesizedType<'_>,
+) -> (Span, Span) {
+    let inner = unwrap_parenthesized(shell.type_annotation).span();
+    (
+        Span::new(shell.span.start + 1, inner.start),
+        Span::new(inner.end, shell.span.end - 1),
+    )
 }
 
 /// Check if a type is "huggable" - brace-delimited types that expand internally.
@@ -238,28 +268,38 @@ pub(super) fn union_hug_shape(union: &TSUnionType<'_>) -> bool {
 /// Check if a type is "object-like" for union hugging purposes.
 /// Matches Prettier's `isObjectLikeType`: TSTypeLiteral and TSTypeReference.
 ///
-/// ⚠️ **Deliberately reads the RAW member**, unlike [`is_huggable_type`] and every other
-/// `isObjectType`-family predicate here. Prettier's AST has no paren node, so matching it
-/// *would* mean unwrapping — and a raw read is why `G<({ … }) | null>` declines the hug
-/// the bare spelling takes. Unwrapping is blocked, not undesirable: it makes a one-member
-/// union whose member is a paren shell reach the hug, where two emitters fill the shell's
-/// leading-run position and one authored comment prints twice
-/// (`single_member_intersection_leading_gap_shell_run_prettier_divergence`, the `q<| /* c */
-/// (// d⏎ P)>` case). Fix that double-print first; the unwrap is a one-word change after.
+/// ⚠️ **Reads through [`unwrap_parenthesized`], for the reason [`is_huggable_type`]
+/// states**: prettier's TS AST carries no paren node, so matching its `isObjectLikeType`
+/// means matching the node the paren wraps. A raw read is why `G<({ … }) | null>` used to
+/// decline the hug its paren-free spelling takes.
+///
+/// The unwrap widens what reaches the hug, and the comment gate is what makes that safe:
+/// prettier bails `shouldHugUnionType` on `types.some((t) => hasComment(t))`, and a comment
+/// the author wrote inside a member's shell attaches to that member — so a paren'd member
+/// carrying one must decline the hug exactly as the bare spelling does.
+/// `Printer::union_member_shell_holds_comment` is that clause — without it a one-member
+/// union whose member is a paren shell reaches the hug, where the hug's own leading-run
+/// emitter and the enclosing gap that claimed the shell's region both fill one position and
+/// an authored comment prints TWICE
+/// (`single_member_intersection_leading_gap_shell_run_prettier_divergence`, the
+/// `q<| /* c */ (// d⏎ P)>` case).
 #[inline]
 fn is_object_like_type(ts_type: &TSType<'_>) -> bool {
-    matches!(ts_type, TSType::TypeLiteral(_) | TSType::TypeReference(_))
+    matches!(
+        unwrap_parenthesized(ts_type),
+        TSType::TypeLiteral(_) | TSType::TypeReference(_)
+    )
 }
 
 /// Check if a type is a "void type" for union hugging purposes.
 /// Matches Prettier's `isVoidType`: void and null keywords.
 ///
-/// Raw for the same reason as [`is_object_like_type`] — the two are the two slots of one
-/// gate, so they move together or not at all.
+/// Unwrapped for the same reason as [`is_object_like_type`] — the two are the two slots of
+/// one gate, so they move together or not at all.
 #[inline]
 fn is_void_type(ts_type: &TSType<'_>) -> bool {
     matches!(
-        ts_type,
+        unwrap_parenthesized(ts_type),
         TSType::Keyword(kw) if matches!(kw.kind, TSKeywordKind::Void | TSKeywordKind::Null)
     )
 }
