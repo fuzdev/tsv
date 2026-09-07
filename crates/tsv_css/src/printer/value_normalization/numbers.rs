@@ -97,9 +97,12 @@ ascii_keyword_set! {
 
     /// Is `unit` a known CSS unit (ASCII-case-insensitive)?
     ///
-    /// Gates number normalization in raw prelude text — only a number with a known unit
-    /// (or no unit) is normalized, matching prettier's `adjustNumbers` (which checks
-    /// `css-units-list`).
+    /// Gates number normalization in raw prelude text on the **media** path only — there a
+    /// number is normalized just when its unit is known (or empty, or the `<an+b>` `n`),
+    /// matching prettier's `adjustNumbers` (which checks `css-units-list`). The **value**
+    /// path has no unit gate at all: `printUnit` passes an unknown unit straight through,
+    /// so `@supports (a: 1.50abc)` is `1.5abc` where `@media` keeps `1.50abc`. See
+    /// `PreludeReader`.
     pub(crate) fn is_known_css_unit;
 
     // Absolute length

@@ -28,7 +28,10 @@ use tsv_lang::printing::format_string_literal;
 ///
 /// `parser-postcss.js` routes a prelude by at-rule name: `@media` (and `@custom-media`) to
 /// `parseMediaQuery`, and `@supports` — plus every `isModuleRuleName` at-rule, of which
-/// `@import` is the one tsv formats — to `parseValue`. The two readers tokenize the same
+/// `@import` is the one tsv formats — to `parseValue`. ⚠️ tsv's own routing
+/// (`parser/atrules/mod.rs`) tests `media` alone, so a `@custom-media` prelude never reaches
+/// this function at all and stays verbatim — the reader split below describes prettier
+/// faithfully and tsv only for `@media`. The two readers tokenize the same
 /// text differently and print through different arms, so one authoring can have two
 /// canonical forms, and a rule keyed on the wrong one is wrong on three counts at once:
 /// the unit gate, the hex fold, and which runs absorb a following number.
@@ -40,8 +43,18 @@ pub(crate) enum PreludeReader {
     /// `@supports` and `@import`: `parseValue` (postcss-values-parser) → `value-*` nodes,
     /// printed as `printCssNumber(value) + printUnit(unit)` / `value-word`.
     Value,
-    /// `@media`: `parseMediaQuery` → a `media-value` node, printed through `adjustNumbers`
-    /// (`print/misc.js`), a regex pass over the raw text.
+    /// `@media`: `parseMediaQuery` → a node split (`media-type`, `media-feature`,
+    /// `media-colon`, `media-value`, `media-keyword`, `media-url`, `media-unknown`), of which
+    /// `media-type` and `media-value` print through `adjustNumbers` (`print/misc.js`), a regex
+    /// pass over the raw text.
+    ///
+    /// ⚠️ **`media-feature` — name position — takes no number pass at all**, only
+    /// `maybeToLowerCase(adjustStrings(value.replaceAll(/ +/g, " ")))`. Name position is
+    /// everything before the `:`, and the **whole** interior when there is none, so the
+    /// boolean `(0.50)` and range `(WIDTH >= 1.50)` / `(1.50 < width < 2.50)` forms are all
+    /// name. tsv runs this reader over the whole prelude instead, so it normalizes numbers
+    /// prettier keeps there. The boundary is already drawn one pass later by
+    /// [`feature_name_end`], which `lowercase_media_feature_names` asks.
     MediaQuery,
 }
 
@@ -57,14 +70,25 @@ pub(crate) enum PreludeReader {
 /// is `1.5abc`. [`PreludeReader::MediaQuery`] runs `adjustNumbers`' `(WORD_PART)?(NUMBER)(UNIT)?`
 /// regex, which returns the **whole match verbatim** unless the unit it captured is empty,
 /// the `<an+b>` `n`, or a unit CSS defines — so `1.50abc` stays. Unit *casing* is
-/// [`canonical_unit`]'s question on both.
+/// [`canonical_unit`]'s question on the value path. On the media path it is not:
+/// `adjustNumbers` lowercases the captured unit **before** its gate and prints the lowercased
+/// one, so the `<an+b>` `n` folds there whatever [`canonical_unit`] says (`2N` → `2n`, where
+/// `@supports` keeps `2N`). ⚠️ tsv asks [`canonical_unit`] on both, so the media `n` is a
+/// divergence — see the unit-extent TODO on the number arm.
 ///
 /// **A number abutting the run before it** is that run's own tail, not a token of its own:
 /// the canonical form of a `.`-leading number carries a leading `0`, and appending it to an
 /// ident code point hands the `0` to the run (`x1` + `.50` → `x10` + `.5`, two different
 /// tokens). Such a pair is copied verbatim, unit included. *Which* runs count is the second
 /// place the paths part. On the value path a word is one token through to its end, so an
-/// ident, a `#`-token and a number's own unit all absorb. On the media path only a
+/// ident, a `#`-token and a number's own unit all absorb. ⚠️ "Through to its end" is not a
+/// character class, and this module's is too narrow twice over: postcss-values-parser's
+/// `splitWord` **glues consecutive `word` tokens**, so punctuation that ends one word and
+/// starts the next still leaves them one node (`x!1.50`, `x;1.50`, `x|1.50` all absorb); and
+/// the tokenizer's word-end set depends on the word's **first** character (`wordEndRe` for a
+/// non-digit start, `numEndRe` — which adds `-` and a bare `/` — for a digit start), so
+/// `x-1.50` is one word where `9-1.50` is two, and `x/1.50` is one where `9/1.50` is two.
+/// No character class can hold that second axis. On the media path only a
 /// `WORD_PART` does — `[$@]?[_a-z\u{80}-\u{FFFF}][\w\u{80}-\u{FFFF}-]*`, so a run whose tail
 /// after a `$`/`@` is digits is no word part and the regex reads those digits as the head of
 /// the number (`$1.50` → `$1.5`), while a number's unit and a `#` absorb nothing at all
@@ -81,9 +105,14 @@ pub(crate) enum PreludeReader {
 /// delimiter it is and the run after it takes the ordinary ident/number arms.
 ///
 /// An unquoted `url(...)` is a `<url-token>` — opaque per CSS Syntax 3 §4.3.6, so its whole
-/// content is copied verbatim on either path (a path like `url(sprite1.50.png)` is never
-/// number/unit-normalized). A quoted `url("…")` is a function with a `<string>` arg and takes
-/// normal quote normalization.
+/// content is copied verbatim (a path like `url(sprite1.50.png)` is never number/unit-normalized).
+/// A quoted `url("…")` is a function with a `<string>` arg and takes normal quote normalization.
+///
+/// ⚠️ That opacity is a **value-reader** rule — `parse-value.js` special-cases the `url` func,
+/// while `adjustNumbers` is a regex with no url concept and normalizes straight through one
+/// (`@media (a: url(1.50))` is `url(1.5)` to prettier). This arm is unconditional on both
+/// paths, so on the media path it is a divergence rather than parity — the mirror of the `#`
+/// arm below, which *is* restricted to [`PreludeReader::Value`].
 pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
     let bytes = input.as_bytes();
     let mut out = String::with_capacity(input.len());
@@ -284,8 +313,14 @@ pub(crate) fn normalize_value_text(input: &str, path: PreludeReader) -> String {
         if num_len > 0 {
             let num = &input[i..i + num_len];
             i += num_len;
-            // Trailing unit: ASCII letters only (matches prettier's unit regex;
-            // `%` and operators are not part of the unit).
+            // Trailing unit. ⚠️ The two readers disagree and only one is implemented here:
+            // `[a-z]+` is `adjustNumbers`' `STANDARD_UNIT_REGEX`, i.e. the **media** rule, where
+            // `%` and operators do end the unit. The value reader's unit is
+            // `word.replace(NUMBER_RE, '')` — the whole rest of the glued word — so `50%.5` is
+            // the number `50` with unit `%.5` and `.50#FFF` the number `.50` with unit `#FFF`,
+            // both of which prettier prints verbatim. `split_number_and_unit` (numbers.rs) is
+            // the value rule, already correct, and serves the declaration-value path.
+            // TODO: take the value rule from that sibling on `PreludeReader::Value`.
             let unit_start = i;
             while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
                 i += 1;
@@ -452,11 +487,21 @@ fn is_css_ident_code_point(ch: char) -> bool {
 /// `#FFF` inside a token that is none and recased it to `#fff.5`; prettier keeps the word
 /// whole and preserves it.
 ///
-/// The class is therefore **measured against prettier**, not derived: `.`, `/` and non-ASCII
-/// continue the word (`#FFF.5`, `#FFF/5`, `#FFFé` all stay), while whitespace, `,`, `:` and
-/// `+` end it (`#FFF 5` → `#fff 5`). The two error directions are not symmetric — a class
-/// too wide only declines a fold prettier makes, a class too narrow **recases a token** — so
-/// an unmeasured character is better in than out.
+/// ⚠️ **This class is a sample, not the rule, and it is too narrow.** The real oracle is the
+/// postcss-values-parser tokenizer plus `splitWord`'s gluing of consecutive `word` tokens: the
+/// word ends only where a **non-`word` token** intervenes — whitespace, `,`, `:`, `{`, `}`,
+/// an operator (`+` / `-` / `*` / `/`), an atword, a string, a comment — or where a `(` makes
+/// the run a function rather than a word. Everything else glues, so `#FFF!5`, `#FFF;5`,
+/// `#FFF|5`, `#FFF~5`, `#FFF>5`, `#FFF[5`, `#FFF]5`, `#FFF&5`, `#FFF^5`, `#FFF?5`, `#FFF=5`,
+/// `#FFF\5` and `#FFF<5` are each one word to prettier and none of them a colour — where this
+/// class ends the word and tsv folds. The two error directions are not symmetric — a class too
+/// wide only declines a fold prettier makes, a class too narrow **recases a token** — and
+/// every one of those misses is on the recasing side.
+///
+/// The characters the class does hold (`.`, `/`, non-ASCII, and every ident code point) are
+/// right; what it lacks is the ~20 punctuation characters above and the tokenizer's
+/// digit-initial axis. TODO: take the extent from the oracle's tokenizer rather than from
+/// this class.
 fn is_hash_word_char(ch: char) -> bool {
     is_css_ident_code_point(ch) || ch == '.' || ch == '/'
 }
