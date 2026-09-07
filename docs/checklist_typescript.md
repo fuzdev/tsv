@@ -537,6 +537,12 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 - Union types (`A | B`)
 - Intersection types (`A & B`)
 - Discriminated unions
+- A **redundant paren carries no layout signal**: a paren'd member formats exactly as the bare
+  spelling does — `({ … }) & B` keeps the `&` hugged to the object's `}` like `{ … } & B`. The
+  rule is uniform across every `isObjectType` gate (the intersection separator, the
+  sole-parameter hug, the parameter grouping), and it is why `is_huggable_type` reads through
+  `unwrap_parenthesized` — prettier's TS AST carries no paren node, so matching its check means
+  unwrapping, never reading the raw member
 
 ### Function Types
 

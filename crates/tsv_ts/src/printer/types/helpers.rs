@@ -129,6 +129,12 @@ pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
 /// [`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged)
 /// — this is one *clause* of that gate, never the gate. It is safe to ask bare (unlike
 /// [`union_hug_shape`], it makes no claim to answer "does this hug?").
+///
+/// ⚠️ **Reads the RAW member, so it is spelled out here rather than delegating to
+/// [`is_huggable_type`]** (which is the same `isObjectType` but unwrapped). It is the
+/// other clause of the gate [`union_hug_shape`] answers, and the two must agree about a
+/// parenthesized member or the gate reads two ways about one union — see
+/// [`is_object_like_type`] for why that gate cannot unwrap yet. Both move together.
 pub(super) fn union_has_brace_member(union: &TSUnionType<'_>) -> bool {
     union
         .types
@@ -163,11 +169,26 @@ pub(super) fn outermost_paren<'a>(
 
 /// Check if a type is "huggable" - brace-delimited types that expand internally.
 ///
-/// TypeLiteral (`{ a: T }`) and Mapped (`{ [K in T]: V }`) types are huggable:
-/// they handle their own expansion and should keep `{` hugged to the context.
+/// Prettier's **`isObjectType`** (`utilities/node-types.js`), minus its Flow-only
+/// `ObjectTypeAnnotation` arm. TypeLiteral (`{ a: T }`) and Mapped (`{ [K in T]: V }`)
+/// types are huggable: they handle their own expansion and should keep `{` hugged to
+/// the context.
+///
+/// ⚠️ **Reads through [`unwrap_parenthesized`], and every caller depends on that.**
+/// Prettier's TS AST carries no `TSParenthesizedType` — its parser drops a redundant type
+/// paren before any printing runs — so `isObjectType` always sees the inner node. tsv
+/// KEEPS the paren node (it decides the output parens), so a raw read answers `false` for
+/// `({ … })` and silently changes a layout the redundant paren is supposed to leave alone.
+/// That bug has been live at four separate gates — the intersection separator, the
+/// sole-parameter hug, the parameter grouping and the union hug. **Matching prettier's
+/// node check means unwrapping**; do not "read the raw member to match Prettier" here or
+/// at any caller.
 #[inline]
-pub fn is_huggable_type(ts_type: &TSType<'_>) -> bool {
-    matches!(ts_type, TSType::TypeLiteral(_) | TSType::Mapped(_))
+pub(in crate::printer) fn is_huggable_type(ts_type: &TSType<'_>) -> bool {
+    matches!(
+        unwrap_parenthesized(ts_type),
+        TSType::TypeLiteral(_) | TSType::Mapped(_)
+    )
 }
 
 /// The **syntactic shape** a hugging union must have — exactly one object-like
@@ -216,6 +237,15 @@ pub(super) fn union_hug_shape(union: &TSUnionType<'_>) -> bool {
 
 /// Check if a type is "object-like" for union hugging purposes.
 /// Matches Prettier's `isObjectLikeType`: TSTypeLiteral and TSTypeReference.
+///
+/// ⚠️ **Deliberately reads the RAW member**, unlike [`is_huggable_type`] and every other
+/// `isObjectType`-family predicate here. Prettier's AST has no paren node, so matching it
+/// *would* mean unwrapping — and a raw read is why `G<({ … }) | null>` declines the hug
+/// the bare spelling takes. Unwrapping is blocked, not undesirable: it makes a one-member
+/// union whose member is a paren shell reach the hug, where two emitters fill the shell's
+/// leading-run position and one authored comment prints twice
+/// (`single_member_intersection_leading_gap_shell_run_prettier_divergence`, the `q<| /* c */
+/// (// d⏎ P)>` case). Fix that double-print first; the unwrap is a one-word change after.
 #[inline]
 fn is_object_like_type(ts_type: &TSType<'_>) -> bool {
     matches!(ts_type, TSType::TypeLiteral(_) | TSType::TypeReference(_))
@@ -223,6 +253,9 @@ fn is_object_like_type(ts_type: &TSType<'_>) -> bool {
 
 /// Check if a type is a "void type" for union hugging purposes.
 /// Matches Prettier's `isVoidType`: void and null keywords.
+///
+/// Raw for the same reason as [`is_object_like_type`] — the two are the two slots of one
+/// gate, so they move together or not at all.
 #[inline]
 fn is_void_type(ts_type: &TSType<'_>) -> bool {
     matches!(
@@ -236,11 +269,10 @@ fn is_void_type(ts_type: &TSType<'_>) -> bool {
 /// Huggable types expand independently and should not have breaks/indent applied
 /// around them in the parent context. This keeps patterns like `& {` hugged together.
 #[inline]
-pub fn intersection_has_huggable_last_type(intersection: &TSIntersectionType<'_>) -> bool {
-    intersection
-        .types
-        .last()
-        .is_some_and(|t| is_huggable_type(unwrap_parenthesized(t)))
+pub(in crate::printer) fn intersection_has_huggable_last_type(
+    intersection: &TSIntersectionType<'_>,
+) -> bool {
+    intersection.types.last().is_some_and(is_huggable_type)
 }
 
 /// Check if the first type in an intersection is "expanding" (like TypeLiteral or MappedType).
@@ -249,11 +281,10 @@ pub fn intersection_has_huggable_last_type(intersection: &TSIntersectionType<'_>
 /// the continuation should use space instead of line to keep `} & Type` together.
 /// This is the mirror of `intersection_has_huggable_last_type` for the first position.
 #[inline]
-pub fn intersection_has_expanding_first_type(intersection: &TSIntersectionType<'_>) -> bool {
-    intersection
-        .types
-        .first()
-        .is_some_and(|t| is_huggable_type(unwrap_parenthesized(t)))
+pub(in crate::printer) fn intersection_has_expanding_first_type(
+    intersection: &TSIntersectionType<'_>,
+) -> bool {
+    intersection.types.first().is_some_and(is_huggable_type)
 }
 
 //
