@@ -63,15 +63,21 @@ fn span_of(node: &serde_json::Value) -> Option<(usize, usize)> {
 /// script/style and frozen `<template>` bodies never were regions — only a top-level `Script`
 /// carries a `Program` span.)
 ///
-/// TODO: `<style>` content is still unnamed, so no comment is probed there. `Style` carries
-/// a `content_span` that names it in one line, and the prerequisite is met — the ledger
-/// registers CSS in-block `CssBlockChild::Comment` AST nodes (a declaration-VALUE comment is
-/// still never lexed as a `Comment`, so it stays outside the model by construction), so
-/// probing `<style>` now exercises a genuinely guarded surface rather than mostly a
-/// registration gap. What remains is a **yield / cost** call: naming this region measured
-/// +154k sites (+20% gate runtime) over `tests/fixtures` under the old scope, and its finding
-/// surface wants re-measuring against the extended ledger before it earns that cost. `<style>`
-/// probing stays a follow-up.
+/// TODO: `<style>` content is still unnamed, so no comment is probed there. `Root::css`'s
+/// `content_span` names it in one line, and the prerequisite is met — the ledger registers
+/// CSS in-block `CssBlockChild::Comment` AST nodes (a declaration-VALUE comment is still
+/// never lexed as a `Comment`, so it stays outside the model by construction). A
+/// discovery run with that region named, opted in for `gap_audit` alone, found two
+/// comment-emitter bugs on its first pass — a dropped `selector()` list-comma comment and a
+/// double-printed at-rule prelude comment after a same-line sibling, both invisible to
+/// every other gate and both now fixed and fixtured — and measured the cost at about +16%
+/// sites and +8–12% CPU over `tests/fixtures`. Switching it on is the queued follow-up.
+/// Two constraints when it lands: this function is shared substrate, and `ignore_audit`
+/// injects the JS `// prettier-ignore` spelling, which is wrong inside CSS — so the region
+/// must be a per-consumer opt-in beside this walk, never a line inside it; and only the
+/// TOP-LEVEL `<style>` qualifies, whose island registers host-absolute spans under the
+/// host's ledger key — a nested `<style>` ELEMENT re-parses island-relative and would trip
+/// the mis-attribution hazard `gap_audit`'s bystander mapping names.
 pub(crate) fn code_regions(source: &str, parser: ParserType) -> Vec<(usize, usize)> {
     match parser {
         ParserType::TypeScript | ParserType::Css => vec![(0, source.len())],

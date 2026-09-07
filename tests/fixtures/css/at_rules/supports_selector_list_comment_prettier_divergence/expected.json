@@ -1,0 +1,433 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 868,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 67,
+				"end": 134,
+				"name": "import",
+				"prelude": "url('a.css') supports(selector(.class1,  .class2))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 199,
+				"end": 276,
+				"name": "supports",
+				"prelude": "selector(.class1,  .class2)",
+				"block": {
+					"type": "Block",
+					"start": 245,
+					"end": 276,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 249,
+								"end": 252,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 249,
+										"end": 252,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 249,
+														"end": 252
+													}
+												],
+												"start": 249,
+												"end": 252
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 253,
+								"end": 273,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 258,
+										"end": 268,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 249,
+							"end": 273
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 338,
+				"end": 415,
+				"name": "supports",
+				"prelude": "selector(.class1 , .class2)",
+				"block": {
+					"type": "Block",
+					"start": 384,
+					"end": 415,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 388,
+								"end": 391,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 388,
+										"end": 391,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 388,
+														"end": 391
+													}
+												],
+												"start": 388,
+												"end": 391
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 392,
+								"end": 412,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 397,
+										"end": 407,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 388,
+							"end": 412
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 454,
+				"end": 549,
+				"name": "supports",
+				"prelude": "selector(.class1 ,  .class2, .class3)",
+				"block": {
+					"type": "Block",
+					"start": 518,
+					"end": 549,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 522,
+								"end": 525,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 522,
+										"end": 525,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 522,
+														"end": 525
+													}
+												],
+												"start": 522,
+												"end": 525
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 526,
+								"end": 546,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 531,
+										"end": 541,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 522,
+							"end": 546
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 627,
+				"end": 723,
+				"name": "supports",
+				"prelude": "selector(.class1,   .class2 > .class3)",
+				"block": {
+					"type": "Block",
+					"start": 692,
+					"end": 723,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 696,
+								"end": 699,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 696,
+										"end": 699,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 696,
+														"end": 699
+													}
+												],
+												"start": 696,
+												"end": 699
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 700,
+								"end": 720,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 705,
+										"end": 715,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 696,
+							"end": 720
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 762,
+				"end": 859,
+				"name": "supports",
+				"prelude": "selector(.class1 , .class2) and (display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 828,
+					"end": 859,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 832,
+								"end": 835,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 832,
+										"end": 835,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 832,
+														"end": 835
+													}
+												],
+												"start": 832,
+												"end": 835
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 836,
+								"end": 856,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 841,
+										"end": 851,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 832,
+							"end": 856
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " The same seam in an `@import` prelude's supports() ",
+				"start": 9,
+				"end": 65
+			},
+			{
+				"type": "CSSComment",
+				"value": " c0 ",
+				"start": 115,
+				"end": 123,
+				"position": 40
+			},
+			{
+				"type": "CSSComment",
+				"value": " A comment after the list comma leads the next selector ",
+				"start": 137,
+				"end": 197
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 227,
+				"end": 235,
+				"position": 18
+			},
+			{
+				"type": "CSSComment",
+				"value": " A comment before the list comma trails the selector ",
+				"start": 279,
+				"end": 336
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 365,
+				"end": 373,
+				"position": 17
+			},
+			{
+				"type": "CSSComment",
+				"value": " Both, in a three-member list ",
+				"start": 418,
+				"end": 452
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 481,
+				"end": 489,
+				"position": 17
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 491,
+				"end": 499,
+				"position": 19
+			},
+			{
+				"type": "CSSComment",
+				"value": " A run of comments, and a selector with a combinator after the comma ",
+				"start": 552,
+				"end": 625
+			},
+			{
+				"type": "CSSComment",
+				"value": " c5 ",
+				"start": 655,
+				"end": 663,
+				"position": 18
+			},
+			{
+				"type": "CSSComment",
+				"value": " c6 ",
+				"start": 664,
+				"end": 672,
+				"position": 19
+			},
+			{
+				"type": "CSSComment",
+				"value": " Beside a condition connector ",
+				"start": 726,
+				"end": 760
+			},
+			{
+				"type": "CSSComment",
+				"value": " c7 ",
+				"start": 789,
+				"end": 797,
+				"position": 17
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 860,
+			"styles": "\n\t/* The same seam in an `@import` prelude's supports() */\n\t@import url('a.css') supports(selector(.class1, /* c0 */ .class2));\n\n\t/* A comment after the list comma leads the next selector */\n\t@supports selector(.class1, /* c1 */ .class2) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A comment before the list comma trails the selector */\n\t@supports selector(.class1 /* c2 */, .class2) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* Both, in a three-member list */\n\t@supports selector(.class1 /* c3 */, /* c4 */ .class2, .class3) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A run of comments, and a selector with a combinator after the comma */\n\t@supports selector(.class1, /* c5 */ /* c6 */ .class2 > .class3) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* Beside a condition connector */\n\t@supports selector(.class1 /* c7 */, .class2) and (display: grid) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 869,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

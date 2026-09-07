@@ -358,12 +358,21 @@ the short version:
   comments, so the `line` payload is inert in a `.css` file.
 - **`code_regions`' reach.** A gap the region walk doesn't name is a gap never probed. Today
   a `.svelte` file's `<style>` content is unprobed — so a Svelte fixture containing only a
-  `<style>` block yields **zero sites**. That gap is held back by **yield, not difficulty**:
-  `Style::content_span` names it in a line, but measured over `tests/fixtures` — before the
-  CSS in-block ledger extension, so re-measure before pricing it — it was +154k
-  sites (+20% runtime) for 3 shapes, all `@import`-prelude double-prints. The thinness is
-  structural — CSS's remaining unguarded comment surface is the declaration-value one the
-  ledger cannot see at all — so the census, not the ledger, is what covers it.
+  `<style>` block yields **zero sites**. `Root::css`'s `content_span` names it in a line, and
+  a discovery run with it named (a `gap_audit`-only opt-in — `code_regions` is shared
+  substrate, and `ignore_audit`'s injected directive is the JS spelling, wrong inside CSS)
+  found two real emitter bugs on its first pass, a dropped `selector()` list-comma comment
+  ([supports_selector_list_comment](../tests/fixtures/css/at_rules/supports_selector_list_comment_prettier_divergence/))
+  and a double-printed at-rule prelude comment after a same-line sibling
+  ([atrule_prelude_after_sibling](../tests/fixtures/css/tokens/comments/atrule_prelude_after_sibling/)),
+  both fixed-point outputs no other gate could reach; the cost measured about +16% sites and
+  +8–12% CPU over `tests/fixtures`, and with both fixed the region yields no shape over the
+  fixtures or the real-code corpus. Switching it on is the queued follow-up. Only the
+  **top-level** `<style>` qualifies — its island registers host-absolute spans under the
+  host's ledger key; a nested `<style>` *element* re-parses island-relative, and probing one
+  first needs the bystander mapping to carry the finding's `DocumentKey` (the TODO in
+  `gap_audit.rs`). What stays outside the model regardless is the declaration-value comment
+  the ledger cannot see at all — the census, not the ledger, covers that surface.
   A **foreign-language `<script>` body** (a `lang`/`type` outside the JS/TS family) is a
   different case: it is excluded on purpose rather than deferred, because the printer
   freezes it verbatim

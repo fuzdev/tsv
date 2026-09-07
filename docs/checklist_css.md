@@ -85,11 +85,17 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
 - Comments in `::slotted()` / `::part()` / unknown-pseudo args (leading/trailing gaps preserved; the interior positions — between `::part()` names, or `::slotted()` compound-internal — are rejected by parseCss but preserved + normalized by tsv, a `_svelte_prettier_divergence`)
 - Comments in `:dir()` / `:lang()` / `::highlight()` identifier args (leading/trailing gaps preserved + normalized; parseCss accepts → a `_prettier_divergence`)
 - Comments in a `@supports`/`@import` `selector()` argument — an argument that parses as a
-  selector carries them through the selector printer; one that doesn't is a
+  selector carries them through the selector printer, its list-comma seam included (a
+  comment beside the comma keeps its side of it, `selector(.a /* c */, /* d */ .b)`; a
+  `_prettier_divergence` on the spacing, like a rule's own list); one that doesn't is a
   `<general-enclosed>`, where no whitespace is inserted at all, so a glued comment stays
   glued on each side (a space would turn a compound into a descendant)
 - Comments in declarations
 - Comments in at-rules
+- A prelude comment of a top-level at-rule whose previous sibling ends on the SAME line
+  (`a{color:red}@supports /* c */ (display:grid){…}`, `@import 'a';@import /* c */ 'b';`)
+  prints once, in its own prelude — the previous node's trailing claim stops at the next
+  node's start
 - Consecutive comments
 - Nested comment closing (spec-compliant)
 - Comments on the wire AST — `parseCss` hangs a flat, source-ordered `CSSComment[]` off both
