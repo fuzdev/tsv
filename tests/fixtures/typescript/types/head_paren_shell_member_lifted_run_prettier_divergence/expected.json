@@ -1,0 +1,1288 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 644,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block run at the member's leading printed EDGE, one link down under an array suffix",
+			"start": 20,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 123,
+			"end": 131,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 4
+				},
+				"end": {
+					"line": 4,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 136,
+			"end": 141,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 17
+				},
+				"end": {
+					"line": 4,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 146,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 4
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the line-comment spelling of the same edge",
+			"start": 161,
+			"end": 206,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 221,
+			"end": 226,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 4
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 235,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 8
+				},
+				"end": {
+					"line": 11,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 245,
+			"end": 250,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 4
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same edge under an indexed access",
+			"start": 260,
+			"end": 300,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 315,
+			"end": 323,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 4
+				},
+				"end": {
+					"line": 17,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 331,
+			"end": 336,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 20
+				},
+				"end": {
+					"line": 17,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 341,
+			"end": 346,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 4
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a LATER member, whose inline (block) edge run still leads it",
+			"start": 356,
+			"end": 419,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c10 ",
+			"start": 440,
+			"end": 449,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 4
+				},
+				"end": {
+					"line": 24,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 454,
+			"end": 460,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 18
+				},
+				"end": {
+					"line": 24,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c12",
+			"start": 465,
+			"end": 471,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 4
+				},
+				"end": {
+					"line": 25,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a later member whose OWN-LINE edge run is relocated above the `|`, where it leads",
+			"start": 481,
+			"end": 565,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " nothing",
+			"start": 567,
+			"end": 577,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 596,
+			"end": 602,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c14",
+			"start": 611,
+			"end": 617,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 8
+				},
+				"end": {
+					"line": 33,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c15",
+			"start": 620,
+			"end": 626,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 2
+				},
+				"end": {
+					"line": 34,
+					"column": 8
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 643,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 634,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 36,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 110,
+					"end": 158,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 115,
+						"end": 116,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 121,
+						"end": 157,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSArrayType",
+								"start": 132,
+								"end": 135,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 4,
+										"column": 16
+									}
+								},
+								"elementType": {
+									"type": "TSTypeReference",
+									"start": 132,
+									"end": 133,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 13
+										},
+										"end": {
+											"line": 4,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 132,
+										"end": 133,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 13
+											},
+											"end": {
+												"line": 4,
+												"column": 14
+											}
+										},
+										"name": "B"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 123,
+										"end": 131
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 136,
+										"end": 141
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 156,
+								"end": 157,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 4
+									},
+									"end": {
+										"line": 6,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 156,
+									"end": 157,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 4
+										},
+										"end": {
+											"line": 6,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 146,
+										"end": 151
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block run at the member's leading printed EDGE, one link down under an array suffix",
+							"start": 20,
+							"end": 108
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 208,
+					"end": 257,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 213,
+						"end": 214,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 219,
+						"end": 256,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 2
+							},
+							"end": {
+								"line": 13,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSArrayType",
+								"start": 231,
+								"end": 234,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 4
+									},
+									"end": {
+										"line": 11,
+										"column": 7
+									}
+								},
+								"elementType": {
+									"type": "TSTypeReference",
+									"start": 231,
+									"end": 232,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 4
+										},
+										"end": {
+											"line": 11,
+											"column": 5
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 231,
+										"end": 232,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 4
+											},
+											"end": {
+												"line": 11,
+												"column": 5
+											}
+										},
+										"name": "B"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 221,
+										"end": 226
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c5",
+										"start": 235,
+										"end": 240
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 255,
+								"end": 256,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 4
+									},
+									"end": {
+										"line": 13,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 255,
+									"end": 256,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 4
+										},
+										"end": {
+											"line": 13,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c6",
+										"start": 245,
+										"end": 250
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the line-comment spelling of the same edge",
+							"start": 161,
+							"end": 206
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 302,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 307,
+						"end": 308,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 6
+							},
+							"end": {
+								"line": 16,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 313,
+						"end": 352,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 2
+							},
+							"end": {
+								"line": 19,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSIndexedAccessType",
+								"start": 324,
+								"end": 330,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 13
+									},
+									"end": {
+										"line": 17,
+										"column": 19
+									}
+								},
+								"objectType": {
+									"type": "TSTypeReference",
+									"start": 324,
+									"end": 325,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 13
+										},
+										"end": {
+											"line": 17,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 324,
+										"end": 325,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 13
+											},
+											"end": {
+												"line": 17,
+												"column": 14
+											}
+										},
+										"name": "B"
+									}
+								},
+								"indexType": {
+									"type": "TSLiteralType",
+									"start": 326,
+									"end": 329,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 15
+										},
+										"end": {
+											"line": 17,
+											"column": 18
+										}
+									},
+									"literal": {
+										"type": "Literal",
+										"start": 326,
+										"end": 329,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 15
+											},
+											"end": {
+												"line": 17,
+												"column": 18
+											}
+										},
+										"value": "k",
+										"raw": "'k'"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c7 ",
+										"start": 315,
+										"end": 323
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c8",
+										"start": 331,
+										"end": 336
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 351,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 4
+									},
+									"end": {
+										"line": 19,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 351,
+									"end": 352,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 4
+										},
+										"end": {
+											"line": 19,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c9",
+										"start": 341,
+										"end": 346
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same edge under an indexed access",
+							"start": 260,
+							"end": 300
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 421,
+					"end": 478,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 426,
+						"end": 427,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 7
+							}
+						},
+						"name": "J"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 432,
+						"end": 477,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 2
+							},
+							"end": {
+								"line": 26,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 434,
+								"end": 435,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 4
+									},
+									"end": {
+										"line": 23,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 434,
+									"end": 435,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 4
+										},
+										"end": {
+											"line": 23,
+											"column": 5
+										}
+									},
+									"name": "z"
+								}
+							},
+							{
+								"type": "TSArrayType",
+								"start": 450,
+								"end": 453,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 14
+									},
+									"end": {
+										"line": 24,
+										"column": 17
+									}
+								},
+								"elementType": {
+									"type": "TSTypeReference",
+									"start": 450,
+									"end": 451,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 14
+										},
+										"end": {
+											"line": 24,
+											"column": 15
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 450,
+										"end": 451,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 14
+											},
+											"end": {
+												"line": 24,
+												"column": 15
+											}
+										},
+										"name": "B"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c10 ",
+										"start": 440,
+										"end": 449
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c11",
+										"start": 454,
+										"end": 460
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 476,
+								"end": 477,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 4
+									},
+									"end": {
+										"line": 26,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 476,
+									"end": 477,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 4
+										},
+										"end": {
+											"line": 26,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c12",
+										"start": 465,
+										"end": 471
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a LATER member, whose inline (block) edge run still leads it",
+							"start": 356,
+							"end": 419
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 579,
+					"end": 633,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 584,
+						"end": 585,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 6
+							},
+							"end": {
+								"line": 30,
+								"column": 7
+							}
+						},
+						"name": "M"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 590,
+						"end": 632,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 2
+							},
+							"end": {
+								"line": 35,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 592,
+								"end": 593,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 4
+									},
+									"end": {
+										"line": 31,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 592,
+									"end": 593,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 4
+										},
+										"end": {
+											"line": 31,
+											"column": 5
+										}
+									},
+									"name": "z"
+								}
+							},
+							{
+								"type": "TSArrayType",
+								"start": 607,
+								"end": 610,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 4
+									},
+									"end": {
+										"line": 33,
+										"column": 7
+									}
+								},
+								"elementType": {
+									"type": "TSTypeReference",
+									"start": 607,
+									"end": 608,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 4
+										},
+										"end": {
+											"line": 33,
+											"column": 5
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 607,
+										"end": 608,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 4
+											},
+											"end": {
+												"line": 33,
+												"column": 5
+											}
+										},
+										"name": "B"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c13",
+										"start": 596,
+										"end": 602
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c14",
+										"start": 611,
+										"end": 617
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 631,
+								"end": 632,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 4
+									},
+									"end": {
+										"line": 35,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 631,
+									"end": 632,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 4
+										},
+										"end": {
+											"line": 35,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c15",
+										"start": 620,
+										"end": 626
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a later member whose OWN-LINE edge run is relocated above the `|`, where it leads",
+							"start": 481,
+							"end": 565
+						},
+						{
+							"type": "Line",
+							"value": " nothing",
+							"start": 567,
+							"end": 577
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

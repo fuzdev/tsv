@@ -105,6 +105,25 @@ pub(in crate::printer) struct StrippedParenHang<'t> {
     pub(in crate::printer) claimed_shell: Option<Span>,
 }
 
+/// Which comments make a stripped paren shell a leading **edge** — the axis the two
+/// questions asked of [`Printer::head_stripped_paren_shell`]'s descent part on. The LINK
+/// SET is one shape and stays one function; only what counts as a run at the bottom of it
+/// differs, and naming the axis is what keeps the two from being read as one answer.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EdgeRun {
+    /// A `//` only — the **ownership** question ([`Printer::leading_edge_shell_claim`]).
+    /// A gap can host a relocated run only by opening over hardlines, and a line comment
+    /// is the one thing that forces one; a block run renders inline exactly where the
+    /// shell would have printed it, so no gap needs to take it over.
+    LineComment,
+    /// Any comment — the **printed-region** question
+    /// ([`Printer::leading_edge_printed_run`]). What a union member's layout splits on is
+    /// whether anything at all prints ahead of the member's first code token, and a block
+    /// there counts exactly as a `//` does: once the shells strip, the reparse reads both
+    /// out of the member's own leading gap.
+    LineOrBlock,
+}
+
 /// The redundant paren shell at a value's leading printed **edge**, plus the start of
 /// the transparent head REGION the enclosing gap owns — see
 /// [`Printer::head_stripped_paren_shell`].
@@ -930,9 +949,21 @@ impl<'a> Printer<'a> {
         &self,
         ty: &TSType<'_>,
     ) -> bool {
+        self.stripped_paren_hang_has_leading_run(ty, EdgeRun::LineComment)
+    }
+
+    /// [`Self::stripped_paren_hang_has_leading_line_comment`] on either axis
+    /// ([`EdgeRun`]) — the one window read, so widening the KIND cannot also move the
+    /// window.
+    fn stripped_paren_hang_has_leading_run(&self, ty: &TSType<'_>, run: EdgeRun) -> bool {
         outermost_paren(ty).is_some_and(|shell| {
             let (leading, _) = paren_shell_gaps(shell);
-            self.has_line_comments_between(leading.start, leading.end)
+            match run {
+                EdgeRun::LineComment => self.has_line_comments_between(leading.start, leading.end),
+                EdgeRun::LineOrBlock => {
+                    self.has_comments_to_emit_between(leading.start, leading.end)
+                }
+            }
         })
     }
 
@@ -1020,11 +1051,44 @@ impl<'a> Printer<'a> {
     /// shell that IS the item (a union member hoists it, a retained one keeps its parens),
     /// so only the leading-EDGE half is theirs to claim.
     pub(in crate::printer) fn leading_edge_shell_claim(&self, ty: &TSType<'_>) -> Option<Span> {
-        let head = self.head_stripped_paren_shell(ty)?;
+        self.leading_edge_region(ty, EdgeRun::LineComment)
+    }
+
+    /// The leading-edge shell's comment region on either axis — one body, so the two
+    /// questions cannot come to measure different windows for the same descent
+    /// ([`EdgeRun`]).
+    fn leading_edge_region(&self, ty: &TSType<'_>, run: EdgeRun) -> Option<Span> {
+        let head = self.head_stripped_paren_shell(ty, run)?;
         Some(Span::new(
             head.region_start,
             unwrap_parenthesized(head.shell).span().start,
         ))
+    }
+
+    /// Whether a leading-EDGE shell inside `ty` prints a comment run ahead of `ty`'s first
+    /// code token — [`Self::leading_edge_shell_claim`]'s kind-agnostic sibling, and a
+    /// question about the OUTPUT rather than about who owns the bytes.
+    ///
+    /// A union member's layout splits on prettier's `hasComment(node, Leading)`, and once
+    /// the shells strip, a run one link down (`((⏎// c⏎B)[] // t⏎)`) is in the member's own
+    /// leading gap — which is exactly where the reparse reads it. Asked only about the
+    /// member's own shell, pass 1 answered "no leading comments" and pass 2 "yes", so the
+    /// member's lifted trailing run changed sides of the per-member `align(2)` between
+    /// them. A **block** counts for the same reason a `//` does: what decides the split is
+    /// that something prints first, not what kind of comment it is
+    /// ([`EdgeRun::LineOrBlock`]).
+    ///
+    /// The descent's own declines are already the right ones inside `ty`: a shell the
+    /// trailing-run rule retains, and one whose required pair OPENS around the run, both
+    /// print a `(` before the comment — so nothing leads the item and the region is empty.
+    ///
+    /// Returns the region, not a verdict: a caller whose layout can RELOCATE part of the
+    /// run has to read it. The union's later members do exactly that — an own-line comment
+    /// goes above the `| `, where the reparse binds it to the member above — so they ask
+    /// [`Printer::union_gap_inline_run_start`] of these bytes, the same split the gap arm
+    /// takes ([`Printer::union_member_has_leading_comments`]).
+    pub(in crate::printer) fn leading_edge_printed_run(&self, ty: &TSType<'_>) -> Option<Span> {
+        self.leading_edge_region(ty, EdgeRun::LineOrBlock)
     }
 
     /// The pair every gap that can hold a leading-edge shell's run needs, in one call: the
@@ -1151,21 +1215,31 @@ impl<'a> Printer<'a> {
     /// see [`Self::intersection_member_run_owned_downstream`]. A shell the trailing-run
     /// rule retains, and one holding a routed format-ignore directive, decline for the
     /// reasons the seam above and [`Self::paren_interior_routed_inner`] give.
-    fn head_stripped_paren_shell<'t>(&self, ty: &'t TSType<'t>) -> Option<HeadShell<'t>> {
+    fn head_stripped_paren_shell<'t>(
+        &self,
+        ty: &'t TSType<'t>,
+        run: EdgeRun,
+    ) -> Option<HeadShell<'t>> {
         match ty {
-            TSType::Array(a) => {
-                self.required_pair_head_shell(a.element_type, type_needs_parens_for_array_element)
-            }
+            TSType::Array(a) => self.required_pair_head_shell(
+                a.element_type,
+                type_needs_parens_for_array_element,
+                run,
+            ),
             TSType::IndexedAccess(i) => self.required_pair_head_shell(
                 i.object_type,
                 type_needs_parens_for_indexed_access_object,
+                run,
             ),
-            TSType::Conditional(c) => {
-                self.required_pair_head_shell(c.check_type, type_needs_parens_for_conditional_check)
-            }
+            TSType::Conditional(c) => self.required_pair_head_shell(
+                c.check_type,
+                type_needs_parens_for_conditional_check,
+                run,
+            ),
             TSType::Optional(o) => self.required_pair_head_shell(
                 o.type_annotation,
                 type_needs_parens_for_optional_element,
+                run,
             ),
             TSType::Intersection(i) => {
                 // ⚠️ The intersection's OWN Rule A leading-run freeze slices its first
@@ -1209,8 +1283,12 @@ impl<'a> Printer<'a> {
                 {
                     return None;
                 }
-                self.leading_edge_shell(first, self.intersection_member_run_owned_downstream(i))
-                    .map(|head| head.opened_at(i.span.start))
+                self.leading_edge_shell(
+                    first,
+                    self.intersection_member_run_owned_downstream(i),
+                    run,
+                )
+                .map(|head| head.opened_at(i.span.start))
             }
             // A ONE-member union is the intersection link's twin, and only in the
             // one-member spelling: prettier drops the node in postprocess, so it prints as
@@ -1228,14 +1306,32 @@ impl<'a> Printer<'a> {
                 // The collapse builds the member with `union_member_parens(1)`, which
                 // requires no pair of its own, so nothing downstream of this gap emits the
                 // run.
-                self.leading_edge_shell(first, false)
+                self.leading_edge_shell(first, false, run)
                     .map(|head| head.opened_at(u.span.start))
             }
-            TSType::Parenthesized(p) if self.paren_inner_comment_flags(p) == (false, false) => {
-                self.head_stripped_paren_shell(p.type_annotation)
+            TSType::Parenthesized(p) if self.head_layer_peels(p) => {
+                self.head_stripped_paren_shell(p.type_annotation, run)
             }
             _ => None,
         }
+    }
+
+    /// Whether the descent peels a redundant paren LAYER — the sixth arm's own test.
+    ///
+    /// A layer carrying a **leading** run is never peeled: it is the seam's FIRST branch
+    /// (the shell IS the value), so peeling would walk past the very run being asked about.
+    ///
+    /// A layer carrying a **trailing** run peels all the same, and only a layer the
+    /// trailing rule RETAINS stops the descent — that pair prints its `(` ahead of
+    /// everything, so nothing inside it is at the leading edge any more. ⚠️ The test was
+    /// once "no comments at all", on the reading that a trailing run always retains its
+    /// layer; it does not — a member a `|` / `&` separator follows STRIPS and defers the
+    /// run past the `)` ([`Self::paren_retains_for_trailing_run`]), which is the whole
+    /// carve-out that rule is built around. Read the coarse way, one extra pair from the
+    /// author (`((⏎// c⏎B)[] // t⏎)`) stopped the descent at a node that prints nothing and
+    /// the leading run went unseen at every reader of this seam.
+    fn head_layer_peels(&self, p: &TSParenthesizedType<'_>) -> bool {
+        !self.paren_inner_comment_flags(p).0 && !self.paren_shell_retains_for_trailing_run(p)
     }
 
     /// One link of [`Self::head_stripped_paren_shell`]'s descent: `head` is the leading
@@ -1262,11 +1358,12 @@ impl<'a> Printer<'a> {
         &self,
         head: &'t TSType<'t>,
         downstream_owns_run: bool,
+        run: EdgeRun,
     ) -> Option<HeadShell<'t>> {
         if downstream_owns_run || self.paren_interior_routed_inner(head).is_some() {
             return None;
         }
-        if self.stripped_paren_hang_has_leading_line_comment(head)
+        if self.stripped_paren_hang_has_leading_run(head, run)
             && !self.paren_retains_for_trailing_run(head)
         {
             return Some(HeadShell {
@@ -1274,7 +1371,7 @@ impl<'a> Printer<'a> {
                 region_start: head.span().start,
             });
         }
-        self.head_stripped_paren_shell(head)
+        self.head_stripped_paren_shell(head, run)
     }
 
     /// [`Self::leading_edge_shell`] for the three links whose head is rendered by the plain
@@ -1287,10 +1384,12 @@ impl<'a> Printer<'a> {
         &self,
         head: &'t TSType<'t>,
         needs_parens: fn(&TSType<'_>) -> bool,
+        run: EdgeRun,
     ) -> Option<HeadShell<'t>> {
         self.leading_edge_shell(
             head,
             self.required_paren_pair_opens_for_leading_run(head, needs_parens),
+            run,
         )
     }
 
