@@ -86,18 +86,91 @@ fn needs_separator_before(prev: Option<TokenKind>, trailing_spaces: usize) -> bo
 /// thing it can't do is report where the last comment ended, and the query's span has
 /// to cover it — a trailing `(a) /* c */` gap is inside the prelude the printer
 /// re-emits from. Hence the loop, in one place rather than at each gap.
+///
+/// `unbound` collects the gap's comments as it goes — the query cannot yet know whether
+/// a part will follow to bind them, and one that never does keeps them (see
+/// [`ConditionQuery::trailing_operators`]). A part that does binds them, and the query
+/// loop clears the buffer.
 fn skip_gap_registering_comments(
     parser: &mut CssParser<'_, '_>,
     end: &mut usize,
+    unbound: &mut UnboundRun,
 ) -> Result<(), ParseError> {
     parser.skip_whitespace()?;
     while parser.check(TokenKind::Comment) {
         parser.register_current_comment();
+        unbound.push_comment(parser.current_value());
         *end = parser.base_offset() + parser.current_end;
         parser.advance()?;
         parser.skip_whitespace()?;
     }
     Ok(())
+}
+
+/// What a condition query has consumed since its last part — the operators it may yet
+/// fail to bind, and the gap comments collected beside them.
+///
+/// The three facts move together (a part binds all of them at once), so they are one
+/// value: keeping them as parallel locals is how a site comes to update two of the three.
+struct UnboundRun {
+    /// The words so far, a single space between them whatever the author wrote — the run's
+    /// spacing is the grammar's, exactly as a condition part's is (`parse_condition_part`
+    /// builds `part_buf` the same way). Each word is pushed **verbatim** from source, so an
+    /// operator keeps its case (`AND` stays `AND`) and a comment its interior.
+    text: String,
+    /// Whether an operator is in there, rather than only comments. A gap that ends the
+    /// query holding just comments (`@container b /* c */ {`) is the ordinary
+    /// trailing-comment claim's, and those stay registered for it — so only an operator
+    /// turns the buffer into a run.
+    has_operator: bool,
+    /// The comment registry's length when the run began, to truncate back to if it does
+    /// end up claiming its comments.
+    comments_len: usize,
+}
+
+impl UnboundRun {
+    /// A fresh run, with the comment registry standing at `comments_len`.
+    fn new(comments_len: usize) -> Self {
+        Self {
+            text: String::new(),
+            has_operator: false,
+            comments_len,
+        }
+    }
+
+    /// Collect a gap comment — not yet a run, since a part may still bind it.
+    fn push_comment(&mut self, comment: &str) {
+        self.push_word(comment);
+    }
+
+    /// Collect an operator, which is what makes the buffer a run.
+    fn push_operator(&mut self, operator: &str) {
+        self.push_word(operator);
+        self.has_operator = true;
+    }
+
+    fn push_word(&mut self, word: &str) {
+        if !self.text.is_empty() {
+            self.text.push(' ');
+        }
+        self.text.push_str(word);
+    }
+
+    /// A part bound everything collected so far: its connector rides the part and its gap
+    /// comments stay registered for the printer's separator, so the run restarts here —
+    /// in place, keeping the buffer's allocation across a many-part query.
+    fn bind(&mut self, comments_len: usize) {
+        self.text.clear();
+        self.has_operator = false;
+        self.comments_len = comments_len;
+    }
+
+    /// The run's text and the comment-registry length to truncate back to, or `None` when
+    /// the query bound everything it consumed — every well-formed condition.
+    fn finish(&self) -> Option<(&str, usize)> {
+        self.has_operator
+            .then_some((self.text.as_str(), self.comments_len))
+    }
 }
 
 /// Can a boolean operator (`and`/`or`/`not`) begin at this point in a condition?
@@ -170,10 +243,13 @@ pub(super) fn parse_condition_query<'arena>(
     // author's case (`AND` stays `AND`); set in lockstep with `current_connector`.
     let mut current_connector_raw: Option<&'arena str> = None;
     let mut end_pos = start;
+    // What the loop has consumed since the last part; whatever is left when the query ends
+    // is `ConditionQuery::trailing_operators`.
+    let mut unbound = UnboundRun::new(parser.comments.len());
 
     while !parser.at_prelude_end() {
         // The gap before a part (`(a) /* comment */ and (b)`)
-        skip_gap_registering_comments(parser, &mut end_pos)?;
+        skip_gap_registering_comments(parser, &mut end_pos, &mut unbound)?;
 
         // Check for `and`/`or` connector. CSS grammar keywords are ASCII
         // case-insensitive (CSS Syntax 3), so `AND`/`Or` connect like `and`; the
@@ -194,9 +270,14 @@ pub(super) fn parse_condition_query<'arena>(
                 // This is a connector between parts
                 current_connector = Some(conn);
                 current_connector_raw = Some(parser.alloc_str_in(parser.current_value()));
+                unbound.push_operator(parser.current_value());
+                // Widen over the keyword itself, so a connector that never finds its
+                // part still lies inside the query's span (a part that does follow
+                // widens past it anyway).
+                end_pos = parser.base_offset() + parser.current_end;
                 parser.advance()?;
                 // The gap after a connector (`and /* comment */ (b)`)
-                skip_gap_registering_comments(parser, &mut end_pos)?;
+                skip_gap_registering_comments(parser, &mut end_pos, &mut unbound)?;
                 continue;
             }
         }
@@ -210,15 +291,32 @@ pub(super) fn parse_condition_query<'arena>(
         )? {
             ConditionPartOutcome::Parsed { part, end, .. } => {
                 end_pos = end;
+                unbound.bind(parser.comments.len());
                 if let Some(part) = part {
                     parts.push(part);
                 }
             }
             // Not a valid condition part, so the query ends here; the caller reports
-            // whatever follows.
-            ConditionPartOutcome::NotAPart => break,
+            // whatever follows. A `not` prefix the part reader consumed before giving up
+            // comes back with it — the reader took those bytes, so it owes them.
+            ConditionPartOutcome::NotAPart { consumed, end } => {
+                if let Some(consumed) = consumed {
+                    unbound.push_operator(consumed);
+                }
+                end_pos = end;
+                break;
+            }
         }
     }
+
+    // Whatever is left is a run of operators with no operand. Its comments were
+    // registered on the way in, when a part might still have bound them; they ride the
+    // run's own text now, so drop the registrations or both would print it — the pair
+    // `CssParser::rewind_to` keeps together, for the same reason.
+    let trailing_operators = unbound.finish().map(|(text, comments_len)| {
+        parser.comments.truncate(comments_len);
+        parser.alloc_str_in(text)
+    });
 
     let span = Span {
         start: start as u32,
@@ -228,6 +326,7 @@ pub(super) fn parse_condition_query<'arena>(
     Ok((
         ConditionQuery {
             parts: parts.into_bump_slice(),
+            trailing_operators,
         },
         span,
     ))
@@ -243,8 +342,14 @@ enum ConditionPartOutcome<'arena> {
         end: usize,
         closed: bool,
     },
-    /// The current token can't start a condition part, and nothing was consumed.
-    NotAPart,
+    /// The current token can't start a condition part. `consumed` is the `not` prefix
+    /// the reader had already taken (with any comments after it) — the one thing it
+    /// consumes before it can tell, and content the query owes back rather than drops;
+    /// `None` on the ordinary path, where nothing was consumed. `end` is the widened end.
+    NotAPart {
+        consumed: Option<&'arena str>,
+        end: usize,
+    },
 }
 
 /// Parse one condition part — an optional leading `not`, an optional function name,
@@ -287,6 +392,10 @@ fn parse_condition_part<'arena>(
         if ident.eq_ignore_ascii_case("not") {
             part_buf.push_str(parser.current_value());
             trailing_spaces = 0;
+            // Widen over the keyword before consuming it: a `not` whose operand never
+            // arrives is handed back to the query with this end (`NotAPart`), and the
+            // query's span has to reach it.
+            end_pos = parser.base_offset() + parser.current_end;
             parser.advance()?;
             parser.skip_whitespace()?;
             // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
@@ -319,8 +428,19 @@ fn parse_condition_part<'arena>(
 
     // Now parse the parenthesized condition
     if !parser.check(TokenKind::LeftParen) {
-        // Not a valid @supports part — nothing consumed, so the query ends here.
-        return Ok(ConditionPartOutcome::NotAPart);
+        // Not a valid @supports part, so the query ends here. Only the `not` prefix
+        // above can have consumed anything by now (a function token is an identifier
+        // glued to its `(`, so that branch always finds one); it goes back to the query
+        // as the operator-with-no-operand it is, rather than being dropped with the
+        // buffer.
+        let consumed = (!part_buf.is_empty()).then(|| {
+            parser
+                .alloc_str_in(part_buf.trim_end_matches(crate::whitespace::is_boundary_whitespace))
+        });
+        return Ok(ConditionPartOutcome::NotAPart {
+            consumed,
+            end: end_pos,
+        });
     }
 
     // Whether the part's own closing `)` was reached. False means the content ran
@@ -503,8 +623,15 @@ fn parse_condition_part<'arena>(
         end_pos = parser.base_offset() + parser.current_end;
         parser.advance()?;
 
-        // Add space after boolean operators
-        if is_bool_op && !parser.check(TokenKind::Whitespace) {
+        // Add space after boolean operators — a separator to the operand the grammar
+        // binds to their right (`and <supports-in-parens>`), so a `)` closing the group
+        // means there is nothing to separate from and the space would strand before it
+        // (`((a: b) and )`). The comment's own pad below reads the same `)`, and the
+        // text path states the rule once more (`Printer::build_and_or_wrap_doc`).
+        if is_bool_op
+            && !parser.check(TokenKind::Whitespace)
+            && !parser.check(TokenKind::RightParen)
+        {
             part_buf.push(' ');
             trailing_spaces += 1;
         }
@@ -630,7 +757,11 @@ pub(super) fn parse_supports_function_condition<'arena>(
     }
     Ok(Some((
         ConditionQuery {
+            // The query loop never runs here, so nothing can go unbound: the one part is
+            // the function's parenthesized argument, and an operator inside it is the
+            // part's own text.
             parts: parts.into_bump_slice(),
+            trailing_operators: None,
         },
         Span {
             start: start as u32,
