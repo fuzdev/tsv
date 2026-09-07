@@ -12,6 +12,12 @@ use tsv_lang::{ParseError, Span};
 /// other raw at-rule — `@layer`, `@namespace`, `@keyframes`, …) preserves internal
 /// whitespace verbatim, matching prettier and Svelte. `url()` inner whitespace is trimmed
 /// in both modes (a spec-mandated `<url-token>` normalization).
+///
+/// ⚠️ `@custom-media` is currently inside that "every other", and there it does **not** match
+/// prettier, which routes `["media", "custom-media"]` alike to `parseMediaQuery` — so its
+/// prelude keeps its authored whitespace, feature-name case, unit case and number spellings.
+/// TODO: route `@custom-media` to the media path. The prelude *span* is the same either way
+/// and `convert` emits from the span, so only the printer-facing `content` would move.
 pub(super) fn parse_raw_prelude_content<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     normalize_whitespace: bool,
