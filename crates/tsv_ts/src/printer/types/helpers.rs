@@ -238,9 +238,8 @@ pub(in crate::printer) fn is_huggable_type(ts_type: &TSType<'_>) -> bool {
 /// keyword keeps its operand glued while the members explode below it
 /// (`type A = Foo<| {…} /* c */⏎| null>`). That is a bug class, not a hypothetical
 /// — five gates asked it bare. Every caller must pair it with `union_prints_hugged`
-/// (see [`Self::union_return_hugs`](super::super::Printer::union_return_hugs) and
-/// [`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged)
-/// for the two shapes that do).
+/// (see [`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged)
+/// for the one shape that does).
 pub(super) fn union_hug_shape(union: &TSUnionType<'_>) -> bool {
     // Find exactly one object-like type
     let mut object_idx = None;
