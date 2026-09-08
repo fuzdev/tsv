@@ -397,7 +397,7 @@ mod tests {
             has_format_ignore: false,
             comment_free_window: None,
         };
-        let printer = Printer::with_context(&arena, &inputs, EmbedContext::default(), 0);
+        let printer = Printer::with_context(&arena, &inputs, EmbedContext::line_owning(), 0);
         assert_eq!(
             printer.find_else_keyword_end_between(0, source.len() as u32),
             None
