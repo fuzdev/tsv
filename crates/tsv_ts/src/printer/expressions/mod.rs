@@ -981,6 +981,9 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
 
+        // A transparent one-member composite is its member here, the `|` dropped and its
+        // head gap folded into the keyword→type gap ([`Printer::transparent_value`]).
+        let type_annotation = self.transparent_value(type_annotation);
         // Find the keyword position
         let expr_end = expression.span().end;
         let type_start = type_annotation.span().start;

@@ -514,7 +514,22 @@ impl<'a> Printer<'a> {
                 !head.frozen && interior_frozen_inner.is_none(),
                 "an alone-on-line directive always takes the force-break branch"
             );
-            let build_value = || -> DocId { self.build_type_doc(value_type) };
+            // Under the head's claim: a transparent one-member composite at the value's
+            // leading edge (`(| /* c */ a) & b`, `(& /* c */ {…})[]`) widened the window
+            // above so this gap's emitters print its head run, and the composite's own
+            // emitter must stand down for the build (docs/comments.md hazard 3).
+            let build_value = || -> DocId {
+                self.with_claimed_shell_leading_run(head.claimed_shell, || {
+                    self.build_type_doc(value_type)
+                })
+            };
+            // The intersection arms build their own hanging doc — under the same claim,
+            // since the intersection's first member is a descent link of that seam.
+            let build_intersection = |i: &internal::TSIntersectionType<'_>| -> DocId {
+                self.with_claimed_shell_leading_run(head.claimed_shell, || {
+                    self.intersection_hanging_with_indent(i)
+                })
+            };
             // A block run the author broke AFTER (`type A = /* c */⏎<value>`) takes
             // prettier's break-after-operator for EVERY value kind — `chooseLayout`'s
             // `hasLeadingOwnLineComment` arm wins ahead of the per-kind layouts, so it
@@ -621,7 +636,7 @@ impl<'a> Printer<'a> {
                 // continuation member sits one level in under `type`, where prettier's
                 // `printIntersectionType` indent puts it.
                 let type_doc = match value_type {
-                    TSType::Intersection(i) => self.intersection_hanging_with_indent(i),
+                    TSType::Intersection(i) => build_intersection(i),
                     _ => build_value(),
                 };
                 parts.push(d.text(" "));
@@ -641,7 +656,7 @@ impl<'a> Printer<'a> {
                 // behavior — `type B = a & // c⏎\tb`). The over-break this arm fixes is
                 // always comment-free (a fit-driven break), so gate the marker on the
                 // absence of a forced break and glue the comment case as before.
-                let inter_doc = self.intersection_hanging_with_indent(i);
+                let inter_doc = build_intersection(i);
                 if d.will_break(inter_doc) {
                     parts.push(d.text(" "));
                     parts.push(make_rhs(inter_doc));

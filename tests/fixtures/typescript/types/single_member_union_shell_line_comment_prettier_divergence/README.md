@@ -35,8 +35,9 @@ is the enclosing gap's, since a one-member union is a descent link of the leadin
 is where the reparse — finding the collapsed member — also puts it. `C1` is the same
 authoring without the `|`, the form every case above lands on.
 
-The union's own leading `|`→member gap is a different question and still routes: a `//`
-written *there* (`| // c⏎A`) takes the multiline layout, keeping the pipe.
+The union's own leading `|`→member gap is the same transparency one node up: a `//`
+written *there* (`| // c⏎A`) is the enclosing seam's and takes its continuation, the pipe
+dropped — [union_single_member_head_line_comment](../union_single_member_head_line_comment_prettier_divergence/).
 
 The **delimiter-line** question is not this one and is answered from the source: at `M` and
 `P` the author wrote `| (` between the `[` / `(` and the comment, so nothing is glued to the
