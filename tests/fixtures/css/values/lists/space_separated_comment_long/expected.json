@@ -1,0 +1,353 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 2422,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 2413,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 81,
+							"end": 176,
+							"property": "background",
+							"value": "1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						},
+						{
+							"type": "Declaration",
+							"start": 270,
+							"end": 370,
+							"property": "background",
+							"value": "1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						},
+						{
+							"type": "Declaration",
+							"start": 424,
+							"end": 519,
+							"property": "background",
+							"value": "1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 564,
+							"end": 664,
+							"property": "background",
+							"value": "1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 714,
+							"end": 809,
+							"property": "background",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 900,
+							"end": 1000,
+							"property": "background",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1133,
+							"end": 1244,
+							"property": "background",
+							"value": "1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t 2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1322,
+							"end": 1422,
+							"property": "background",
+							"value": "1px   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1476,
+							"end": 1571,
+							"property": "--prop",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1635,
+							"end": 1735,
+							"property": "--prop",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1816,
+							"end": 1911,
+							"property": "prop000000000000000000000000000",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 1941,
+							"end": 2041,
+							"property": "prop000000000000000000000000000",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 2306,
+							"end": 2409,
+							"property": "prop000000000000000000000000000",
+							"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 2413
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " trailing comment: 100 columns with the `;` stays inline ",
+				"start": 17,
+				"end": 78
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 169,
+				"end": 176,
+				"position": 76
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 columns: the trailing comment is a fill item and wraps to a continuation line ",
+				"start": 180,
+				"end": 267
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 363,
+				"end": 370,
+				"position": 81
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading comment: 100 columns stays inline ",
+				"start": 374,
+				"end": 421
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 436,
+				"end": 443,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 columns: the last word wraps ",
+				"start": 523,
+				"end": 561
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 576,
+				"end": 583,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " mid comment: 100 columns stays inline ",
+				"start": 668,
+				"end": 711
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 730,
+				"end": 737,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 columns: the comment stays with the word before it and the last word wraps ",
+				"start": 813,
+				"end": 897
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 916,
+				"end": 923,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " a mid comment is a fill item of its own: when the word before it fills the line, the ",
+				"start": 1004,
+				"end": 1094
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment wraps with the tail ",
+				"start": 1097,
+				"end": 1130
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1233,
+				"end": 1240,
+				"position": 88
+			},
+			{
+				"type": "CSSComment",
+				"value": " a multi-comment run is two fill items; 102 columns wraps the tail ",
+				"start": 1248,
+				"end": 1319
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 1338,
+				"end": 1346,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 1347,
+				"end": 1355,
+				"position": 5
+			},
+			{
+				"type": "CSSComment",
+				"value": " custom property: 100 columns stays inline ",
+				"start": 1426,
+				"end": 1473
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1488,
+				"end": 1495,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 columns wraps with the same continuation indent ",
+				"start": 1575,
+				"end": 1632
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1647,
+				"end": 1654,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " a long property moves the boundary with it: 100 columns stays inline ",
+				"start": 1739,
+				"end": 1813
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1853,
+				"end": 1860,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " 102 columns wraps ",
+				"start": 1915,
+				"end": 1938
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1978,
+				"end": 1985,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " a leading comment run is a fill item too: at 100 columns it fills the first line exactly ",
+				"start": 2045,
+				"end": 2139
+			},
+			{
+				"type": "CSSComment",
+				"value": " with the word after it and the tail wraps; one column more and the run and the word part ",
+				"start": 2142,
+				"end": 2236
+			},
+			{
+				"type": "CSSComment",
+				"value": " (space_separated_leading_comment_long_prettier_divergence) ",
+				"start": 2239,
+				"end": 2303
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 2339,
+				"end": 2346,
+				"position": 0
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 2414,
+			"styles": "\n\tdiv {\n\t\t/* trailing comment: 100 columns with the `;` stays inline */\n\t\tbackground: 1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa /* c */;\n\t\t/* 102 columns: the trailing comment is a fill item and wraps to a continuation line */\n\t\tbackground: 1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t/* c */;\n\t\t/* leading comment: 100 columns stays inline */\n\t\tbackground: /* c */ 1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px;\n\t\t/* 102 columns: the last word wraps */\n\t\tbackground: /* c */ 1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px;\n\t\t/* mid comment: 100 columns stays inline */\n\t\tbackground: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px;\n\t\t/* 102 columns: the comment stays with the word before it and the last word wraps */\n\t\tbackground: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px;\n\t\t/* a mid comment is a fill item of its own: when the word before it fills the line, the */\n\t\t/* comment wraps with the tail */\n\t\tbackground: 1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t/* c */ 2px;\n\t\t/* a multi-comment run is two fill items; 102 columns wraps the tail */\n\t\tbackground: 1px /* c1 */ /* c2 */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px;\n\t\t/* custom property: 100 columns stays inline */\n\t\t--prop: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px;\n\t\t/* 102 columns wraps with the same continuation indent */\n\t\t--prop: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px;\n\t\t/* a long property moves the boundary with it: 100 columns stays inline */\n\t\tprop000000000000000000000000000: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px;\n\t\t/* 102 columns wraps */\n\t\tprop000000000000000000000000000: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px;\n\t\t/* a leading comment run is a fill item too: at 100 columns it fills the first line exactly */\n\t\t/* with the word after it and the tail wraps; one column more and the run and the word part */\n\t\t/* (space_separated_leading_comment_long_prettier_divergence) */\n\t\tprop000000000000000000000000000: /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 2423,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

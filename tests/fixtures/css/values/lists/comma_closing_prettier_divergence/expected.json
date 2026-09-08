@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 560,
+		"end": 677,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 551,
+					"end": 668,
 					"children": [
 						{
 							"type": "Declaration",
@@ -81,11 +81,18 @@
 							"end": 547,
 							"property": "--y",
 							"value": "rgb(1, 2, 3,)"
+						},
+						{
+							"type": "Declaration",
+							"start": 646,
+							"end": 664,
+							"property": "--z",
+							"value": "a , b,"
 						}
 					]
 				},
 				"start": 9,
-				"end": 551
+				"end": 668
 			}
 		],
 		"comments": [
@@ -124,18 +131,31 @@
 				"value": " and the rule reaches a function nested in one ",
 				"start": 475,
 				"end": 526
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment in the list puts it on the source-text path, which spells the comma back too ",
+				"start": 551,
+				"end": 643
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 653,
+				"end": 660,
+				"position": 2
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 552,
-			"styles": "\n\tdiv {\n\t\t/* a comma closing the value list is authored content, so it is kept */\n\t\ttransition: a,;\n\t\t/* the same, in a list that breaks one element per line */\n\t\ttransition:\n\t\t\ta 1s ease,\n\t\t\tb 2s ease,;\n\t\t/* a function's argument list takes the same rule */\n\t\tbackground: linear-gradient(red, blue,);\n\t\t/* and so does a nameless parenthesized group, which is one */\n\t\tborder-image: (red, blue,);\n\t\t/* a custom property substitutes its tokens verbatim */\n\t\t--x: a,;\n\t\t/* and the rule reaches a function nested in one */\n\t\t--y: rgb(1, 2, 3,);\n\t}\n",
+			"end": 669,
+			"styles": "\n\tdiv {\n\t\t/* a comma closing the value list is authored content, so it is kept */\n\t\ttransition: a,;\n\t\t/* the same, in a list that breaks one element per line */\n\t\ttransition:\n\t\t\ta 1s ease,\n\t\t\tb 2s ease,;\n\t\t/* a function's argument list takes the same rule */\n\t\tbackground: linear-gradient(red, blue,);\n\t\t/* and so does a nameless parenthesized group, which is one */\n\t\tborder-image: (red, blue,);\n\t\t/* a custom property substitutes its tokens verbatim */\n\t\t--x: a,;\n\t\t/* and the rule reaches a function nested in one */\n\t\t--y: rgb(1, 2, 3,);\n\t\t/* a comment in the list puts it on the source-text path, which spells the comma back too */\n\t\t--z: a /* c */, b,;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 561,
+	"end": 678,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
