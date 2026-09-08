@@ -31,4 +31,23 @@
 		/* b */
 		& // c
 		B;
+	// the earlier comments may come from a stripped paren shell's LIFTED run rather than
+	// from the operator gap itself; the run is deferred past the `)` and still keeps its
+	// place ahead of the comment the author wrote on the `&`'s line
+	type A6 = (a // c1
+	// c2
+	) & // x
+	b;
+
+	// the same across an object-adjacent boundary
+	type A7 = { x: X } & (a // c1
+	// c2
+	) & // x
+	b;
+
+	// control: a ONE-comment lifted run leaves nothing to interleave, so both formatters
+	// agree here
+	type A8 = (a // c1
+	) & // x
+	b;
 </script>
