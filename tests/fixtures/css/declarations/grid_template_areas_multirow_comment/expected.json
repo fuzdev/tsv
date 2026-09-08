@@ -1,0 +1,335 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1415,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 1406,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 61,
+							"end": 107,
+							"property": "grid-template-areas",
+							"value": "'a a'\n\t\t\t'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 140,
+							"end": 186,
+							"property": "grid-template-areas",
+							"value": "'a a' \n\t\t\t'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 240,
+							"end": 289,
+							"property": "grid-template-areas",
+							"value": "'a a'\n\t\t\t\n\t\t\t'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 323,
+							"end": 369,
+							"property": "grid-template-areas",
+							"value": "'a a'\n\t\t\t 'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 423,
+							"end": 479,
+							"property": "grid-template-areas",
+							"value": "'a a'  \n\t\t\t'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 537,
+							"end": 588,
+							"property": "grid-template-areas",
+							"value": "'a a' \n\t\t\t'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 665,
+							"end": 711,
+							"property": "grid-template-areas",
+							"value": "'a a'\n\t\t\t'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 765,
+							"end": 805,
+							"property": "grid-template-areas",
+							"value": "'a a' 'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 858,
+							"end": 898,
+							"property": "grid-template-areas",
+							"value": "'a a'  'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 979,
+							"end": 1025,
+							"property": "grid-template-areas",
+							"value": "'a a' 'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 1069,
+							"end": 1126,
+							"property": "grid-template-areas",
+							"value": "'a a'\n\t\t\t'b c'  !important"
+						},
+						{
+							"type": "Declaration",
+							"start": 1190,
+							"end": 1318,
+							"property": "grid-template-areas",
+							"value": "'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa' \n\t\t\t'b c'"
+						},
+						{
+							"type": "Declaration",
+							"start": 1371,
+							"end": 1402,
+							"property": "grid",
+							"value": "'a a' \n\t\t\t'b c'"
+						}
+					]
+				},
+				"start": 9,
+				"end": 1406
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " trailing comment after the last row ",
+				"start": 17,
+				"end": 58
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 100,
+				"end": 107,
+				"position": 15
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment ending a row ",
+				"start": 111,
+				"end": 137
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 170,
+				"end": 177,
+				"position": 6
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment on a line of its own between rows ",
+				"start": 190,
+				"end": 237
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 273,
+				"end": 280,
+				"position": 9
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment opening a row ",
+				"start": 293,
+				"end": 320
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 356,
+				"end": 363,
+				"position": 9
+			},
+			{
+				"type": "CSSComment",
+				"value": " a run of two comments ends a row together ",
+				"start": 373,
+				"end": 420
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 453,
+				"end": 461,
+				"position": 6
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 462,
+				"end": 470,
+				"position": 7
+			},
+			{
+				"type": "CSSComment",
+				"value": " a multi-line comment ends the row it opens on ",
+				"start": 483,
+				"end": 534
+			},
+			{
+				"type": "CSSComment",
+				"value": " c\n\t\t\td ",
+				"start": 567,
+				"end": 579,
+				"position": 6
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading run stays on the colon's line; the rows break beneath it ",
+				"start": 592,
+				"end": 662
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 686,
+				"end": 693,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading run with inline rows stays inline ",
+				"start": 715,
+				"end": 762
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 786,
+				"end": 793,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " comment between inline rows stays inline ",
+				"start": 809,
+				"end": 855
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 885,
+				"end": 892,
+				"position": 6
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment on a line of its own after inline rows is a row of its own ",
+				"start": 902,
+				"end": 976
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1018,
+				"end": 1025,
+				"position": 15
+			},
+			{
+				"type": "CSSComment",
+				"value": " !important follows the last row ",
+				"start": 1029,
+				"end": 1066
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1108,
+				"end": 1115,
+				"position": 15
+			},
+			{
+				"type": "CSSComment",
+				"value": " a row is a line, not a fill: a long row never wraps ",
+				"start": 1130,
+				"end": 1187
+			},
+			{
+				"type": "CSSComment",
+				"value": " cccccccccc ",
+				"start": 1293,
+				"end": 1309,
+				"position": 79
+			},
+			{
+				"type": "CSSComment",
+				"value": " the `grid` shorthand takes the same rule ",
+				"start": 1322,
+				"end": 1368
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1386,
+				"end": 1393,
+				"position": 6
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1407,
+			"styles": "\n\tdiv {\n\t\t/* trailing comment after the last row */\n\t\tgrid-template-areas:\n\t\t\t'a a'\n\t\t\t'b c' /* c */;\n\t\t/* comment ending a row */\n\t\tgrid-template-areas:\n\t\t\t'a a' /* c */\n\t\t\t'b c';\n\t\t/* comment on a line of its own between rows */\n\t\tgrid-template-areas:\n\t\t\t'a a'\n\t\t\t/* c */\n\t\t\t'b c';\n\t\t/* comment opening a row */\n\t\tgrid-template-areas:\n\t\t\t'a a'\n\t\t\t/* c */ 'b c';\n\t\t/* a run of two comments ends a row together */\n\t\tgrid-template-areas:\n\t\t\t'a a' /* c1 */ /* c2 */\n\t\t\t'b c';\n\t\t/* a multi-line comment ends the row it opens on */\n\t\tgrid-template-areas:\n\t\t\t'a a' /* c\n\t\t\td */\n\t\t\t'b c';\n\t\t/* leading run stays on the colon's line; the rows break beneath it */\n\t\tgrid-template-areas: /* c */\n\t\t\t'a a'\n\t\t\t'b c';\n\t\t/* leading run with inline rows stays inline */\n\t\tgrid-template-areas: /* c */ 'a a' 'b c';\n\t\t/* comment between inline rows stays inline */\n\t\tgrid-template-areas: 'a a' /* c */ 'b c';\n\t\t/* a comment on a line of its own after inline rows is a row of its own */\n\t\tgrid-template-areas:\n\t\t\t'a a' 'b c'\n\t\t\t/* c */;\n\t\t/* !important follows the last row */\n\t\tgrid-template-areas:\n\t\t\t'a a'\n\t\t\t'b c' /* c */ !important;\n\t\t/* a row is a line, not a fill: a long row never wraps */\n\t\tgrid-template-areas:\n\t\t\t'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa' /* cccccccccc */\n\t\t\t'b c';\n\t\t/* the `grid` shorthand takes the same rule */\n\t\tgrid:\n\t\t\t'a a' /* c */\n\t\t\t'b c';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1416,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

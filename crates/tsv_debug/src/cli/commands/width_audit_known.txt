@@ -39,8 +39,9 @@
 # FAILS (a fix landed, or the fixture that carried it moved — re-pin).
 #
 # Regenerate with `deno task width:audit:update`.
-# shapes: 35
+# shapes: 36
 svelte	'	-	'
+svelte	'	-	*/
 svelte	)	-	;
 svelte	/*	-	*/
 svelte	//	-	)

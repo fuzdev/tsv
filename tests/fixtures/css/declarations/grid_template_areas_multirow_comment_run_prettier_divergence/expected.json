@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 186,
+		"end": 187,
 		"attributes": [],
 		"children": [
 			{
@@ -10,26 +10,26 @@
 				"prelude": {
 					"type": "SelectorList",
 					"start": 9,
-					"end": 16,
+					"end": 12,
 					"children": [
 						{
 							"type": "ComplexSelector",
 							"start": 9,
-							"end": 16,
+							"end": 12,
 							"children": [
 								{
 									"type": "RelativeSelector",
 									"combinator": null,
 									"selectors": [
 										{
-											"type": "ClassSelector",
-											"name": "class1",
+											"type": "TypeSelector",
+											"name": "div",
 											"start": 9,
-											"end": 16
+											"end": 12
 										}
 									],
 									"start": 9,
-									"end": 16
+									"end": 12
 								}
 							]
 						}
@@ -37,68 +37,54 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 17,
-					"end": 177,
+					"start": 13,
+					"end": 178,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 21,
-							"end": 41,
-							"property": "color",
-							"value": ""
-						},
-						{
-							"type": "Declaration",
-							"start": 131,
-							"end": 173,
+							"start": 120,
+							"end": 174,
 							"property": "grid-template-areas",
-							"value": ""
+							"value": "'x x'\n\t\t\t'y z'"
 						}
 					]
 				},
 				"start": 9,
-				"end": 177
+				"end": 178
 			}
 		],
 		"comments": [
 			{
 				"type": "CSSComment",
-				"value": " comment ",
-				"start": 28,
-				"end": 41,
-				"position": 0
-			},
-			{
-				"type": "CSSComment",
-				"value": " a grid value of nothing but comments: on different source lines they are rows ",
-				"start": 45,
-				"end": 128
+				"value": " a run of two comments opening a multirow value stays on the colon's line, joined single-spaced ",
+				"start": 17,
+				"end": 117
 			},
 			{
 				"type": "CSSComment",
 				"value": " a ",
-				"start": 155,
-				"end": 162,
+				"start": 141,
+				"end": 148,
 				"position": 0
 			},
 			{
 				"type": "CSSComment",
 				"value": " b ",
-				"start": 166,
-				"end": 173,
+				"start": 149,
+				"end": 156,
 				"position": 0
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 178,
-			"styles": "\n\t.class1 {\n\t\tcolor: /* comment */;\n\t\t/* a grid value of nothing but comments: on different source lines they are rows */\n\t\tgrid-template-areas:\n\t\t\t/* a */\n\t\t\t/* b */;\n\t}\n",
+			"end": 179,
+			"styles": "\n\tdiv {\n\t\t/* a run of two comments opening a multirow value stays on the colon's line, joined single-spaced */\n\t\tgrid-template-areas: /* a */ /* b */\n\t\t\t'x x'\n\t\t\t'y z';\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 187,
+	"end": 188,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
