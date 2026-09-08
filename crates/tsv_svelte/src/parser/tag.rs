@@ -84,27 +84,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         let decl_offset = tag_content_start + subslice_offset(tag_content, decl_str);
 
-        // `{@const}` must be a single declarator (unlike the bare `{const}`/`{let}`
-        // tags) — Svelte rejects `{@const a = 1, b = 2}`. A top-level `,` is the
-        // multi-declarator signal; a `,` inside a comment or string is not.
-        if super::find_top_level_delim(
-            decl_str.as_bytes(),
-            0,
-            decl_str.len(),
-            b',',
-            TriviaProfile::JS,
-        )
-        .is_some()
-        {
-            return Err(self.error_msg_at(
-                "{@const ...} must consist of a single variable declaration",
-                decl_offset,
-            ));
-        }
-
         // Find the top-level `=` (not the nested `=` of a destructuring default)
-        // separating id from init, then parse both sides.
-        let eq_pos = self.find_top_level_equals(decl_str)?;
+        // separating id from init, then parse both sides. The single-declarator rule
+        // (`{@const a = 1, b = 2}`) is enforced on the parsed init inside
+        // `parse_declarator`, where the *node* answers whether a bare comma is there at
+        // all — a byte scan cannot, because it reads a type argument's `,` as a
+        // separator (`{@const a: Map<A, B> = expr}`).
+        let eq_pos = self.find_top_level_equals(decl_str, decl_offset)?;
         let (id, init) = self.parse_declarator(decl_str, decl_offset, eq_pos)?;
 
         Ok(FragmentNode::ConstTag(ConstTag {
@@ -236,7 +222,54 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // converts ObjectExpression/ArrayExpression to patterns), init an expression.
         let id = self.parse_ts_pattern(id_str, id_offset)?;
         let init = self.parse_ts_expression(init_str, init_offset)?;
+        self.reject_multi_declarator(&init, init_str, init_offset)?;
         Ok((id, init))
+    }
+
+    /// Reject a `{@const}` whose init is a **bare** sequence — the second declarator of
+    /// `{@const a = 1, b = 2}`, which Svelte refuses (`const_tag_invalid_expression`)
+    /// while allowing the parenthesized `{@const a = (1, 2)}`.
+    ///
+    /// The two halves of the question have two different oracles, and asking either one
+    /// alone is a bug:
+    ///
+    /// - *Is there a bare top-level comma at all?* Only the **node** knows — a scan over
+    ///   the head cannot, for the reason [`super::find_top_level_delim`] states: it reads
+    ///   a type argument's `,` as a separator and rejects `{@const a: Map<A, B> = expr}` /
+    ///   `{@const a = fn<A, B>(expr)}`.
+    /// - *Did the author parenthesize it?* Only the **source** knows. Both parsers drop
+    ///   the parens — tsv has no `ParenthesizedExpression` and Svelte runs
+    ///   `remove_parens` — so `(1, 2)` and `1, 2` reach here as the same node. Svelte
+    ///   reads the source for a `(` between the init's start and the node's own start;
+    ///   the depth scan below answers it the other way round, since a comma the author
+    ///   parenthesized is not at depth 0. The two agree on the boundary shapes —
+    ///   `(1), 2` and `(1, 2), (3, 4)` reject, `((1), 2)` and `((1, 2), 3)` do not.
+    ///
+    /// Gating the scan on the node is what makes it sound: a `SequenceExpression`'s own
+    /// separators are top-level commas by construction, so the untracked `<`/`>` interior
+    /// can no longer produce a false positive.
+    fn reject_multi_declarator(
+        &self,
+        init: &Expression<'arena>,
+        init_str: &str,
+        init_offset: usize,
+    ) -> Result<(), ParseError> {
+        if !matches!(init, Expression::SequenceExpression(_)) {
+            return Ok(());
+        }
+        match super::find_top_level_delim(
+            init_str.as_bytes(),
+            0,
+            init_str.len(),
+            b',',
+            TriviaProfile::JS,
+        ) {
+            Some(comma) => Err(self.error_msg_at(
+                "{@const ...} must consist of a single variable declaration",
+                init_offset + comma,
+            )),
+            None => Ok(()),
+        }
     }
 
     /// Reject a comment in the `{@const}` **binding** — the gaps Svelte's reader cannot
@@ -260,13 +293,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let end = bytes.len();
 
         // Depth keeps a pattern's interior out of it — a comment inside `{ a }` or `[ a ]` is
-        // acorn's, not Svelte's. Deliberately NOT tracking `<`/`>`: a type argument's interior
-        // is already covered by the annotation rule below, while a relational `>` in a
-        // destructuring default (`{ a = b > c }`) would decrement a depth it never opened.
-        // `annot_colon` is the annotation opener
-        // (an object pattern's `:` is nested, so a top-level one can only be that), and
-        // `pending_annotation_comment` holds a comment that is legal *so far* and becomes a
-        // violation only if nothing significant follows it.
+        // acorn's, not Svelte's. `<`/`>` is untracked for `find_top_level_delim`'s reason, and
+        // costs nothing here: a type argument's interior is already covered by the annotation
+        // rule below. `annot_colon` is the annotation opener (an object pattern's `:` is
+        // nested, so a top-level one can only be that), and `pending_annotation_comment`
+        // holds a comment that is legal *so far* and becomes a violation only if nothing
+        // significant follows it.
         let mut depth = 0usize;
         let mut annot_colon: Option<usize> = None;
         let mut seen_significant = false;
@@ -324,9 +356,32 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Find the top-level `=` in a declaration string (not inside brackets/braces,
     /// strings, or comments) — the one separating the binding from its initializer.
-    fn find_top_level_equals(&self, s: &str) -> Result<usize, ParseError> {
-        super::find_top_level_delim(s.as_bytes(), 0, s.len(), b'=', TriviaProfile::JS)
-            .ok_or_else(|| ParseError::invalid_syntax("Expected '=' in declaration".to_string(), 0))
+    /// `offset` is `s`'s byte offset in the source, for the error position.
+    ///
+    /// This is one of the two callers [`super::find_top_level_delim`] warns about. An `=`
+    /// followed by `>` is the arrow of a function-type annotation
+    /// (`{@const f: (a: A) => B = expr}`), not the declarator's own `=`, so the search
+    /// steps over it and resumes — depth-correctly, since every offset that scan returns
+    /// is already at depth 0. Only `=>` is reachable: the split takes the **first**
+    /// top-level `=`, and everything ahead of it is a binding and its annotation, where
+    /// no other compound `=` operator is legal. The preceding byte is deliberately NOT
+    /// tested — a type argument list closes on `>`, so `{@const a: Map<A>= expr}` would
+    /// lose its assignment.
+    fn find_top_level_equals(&self, s: &str, offset: usize) -> Result<usize, ParseError> {
+        let bytes = s.as_bytes();
+        let mut from = 0;
+        while let Some(pos) =
+            super::find_top_level_delim(bytes, from, bytes.len(), b'=', TriviaProfile::JS)
+        {
+            if bytes.get(pos + 1) != Some(&b'>') {
+                return Ok(pos);
+            }
+            from = pos + 1;
+        }
+        // Svelte's own `eat('=', true)`, reached once `read_pattern` has consumed the
+        // binding — the same diagnostic `reject_binding_comments` raises for the gaps
+        // around it, pointing at the end of what was read rather than at byte 0.
+        Err(self.error_msg_at("Expected token =", offset + s.len()))
     }
 
     /// Parse a debug tag: {@debug} or {@debug x, y, z}
