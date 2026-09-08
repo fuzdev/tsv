@@ -54,6 +54,25 @@ pub(super) fn is_empty_element(value: &CssValue<'_>) -> bool {
     matches!(value, CssValue::Identifier { span } if span.start >= span.end)
 }
 
+/// Peel the leading comment run off a value's space-split `words` — the `/* … */` items
+/// ahead of its first content word — for the colon's line, where postcss holds it
+/// (`raws.between`, the same reading `print_decl_multiline` hoists by).
+///
+/// Peels only when content remains: an all-comment slice stays whole, since hoisting it
+/// would leave nothing beneath the colon (a comma list would strand its bare `,`; a grid
+/// value's comments are its rows). Returns the peeled run, empty when nothing was.
+fn peel_leading_comment_run<'s>(words: &mut Vec<&'s str>) -> Vec<&'s str> {
+    let run_len = words
+        .iter()
+        .take_while(|word| word.starts_with("/*"))
+        .count();
+    if run_len < words.len() {
+        words.drain(..run_len).collect()
+    } else {
+        Vec::new()
+    }
+}
+
 /// Did the author write a **closing** comma — a separator with nothing after it — at the
 /// end of this comma list?
 ///
@@ -344,14 +363,16 @@ impl<'a> Printer<'a> {
         let doc = match &decl.value {
             CssValue::CommaSeparated { values, span } => {
                 let fill = self.build_comma_fill_doc(values, span.end_usize());
-                let d = self.d();
-                let body = d.group(d.indent(d.concat(&[d.line(), fill])));
-                d.concat(&[d.text(":"), body])
+                self.build_broken_head_value_decl_doc(fill, &[])
             }
             CssValue::List { values, .. } => {
                 let parts = self.build_space_fill_parts(values);
                 let fill = self.d().fill(&parts);
-                self.build_space_value_decl_doc(fill)
+                if Self::is_grid_row_property(decl.property) {
+                    self.build_broken_head_value_decl_doc(fill, &[])
+                } else {
+                    self.build_space_value_decl_doc(fill)
+                }
             }
             // The dispatch in `print_css_declaration` only routes comma/space lists here;
             // fall back to the plain `: value` form rather than panicking, matching the
@@ -612,9 +633,17 @@ impl<'a> Printer<'a> {
             let doc = self.build_comma_fill_doc_from_text(&normalized);
             self.write_arena_doc(doc);
         } else {
-            let parts = value_normalization::split_by_space_preserving_parens(&normalized);
-            let fill = self.build_fill_doc_from_strings(&parts);
-            let doc = self.build_space_value_decl_doc(fill);
+            let mut parts = value_normalization::split_by_space_preserving_parens(&normalized);
+            let doc = if Self::is_grid_row_property(decl.property) {
+                // The leading run is the colon's, as on the comma shape; an all-comment
+                // value is not peeled, so its comments stay the rows they are.
+                let leading_run = peel_leading_comment_run(&mut parts);
+                let fill = self.build_fill_doc_from_strings(&parts);
+                self.build_broken_head_value_decl_doc(fill, &leading_run)
+            } else {
+                let fill = self.build_fill_doc_from_strings(&parts);
+                self.build_space_value_decl_doc(fill)
+            };
             self.write_arena_doc(doc);
         }
         self.write_declaration_end(decl);
@@ -648,14 +677,7 @@ impl<'a> Printer<'a> {
                 crate::escapes::trim_start_css(crate::escapes::trim_end_preserving_escape(element));
             let mut words = value_normalization::split_by_space_preserving_parens(element);
             if i == 0 {
-                let run_len = words
-                    .iter()
-                    .take_while(|word| word.starts_with("/*"))
-                    .count();
-                // Peel only when content remains: an all-comment element 0 stays whole.
-                if run_len < words.len() {
-                    leading_run.extend(words.drain(..run_len));
-                }
+                leading_run = peel_leading_comment_run(&mut words);
             }
             let element_doc = match words.as_slice() {
                 [] => d.empty(),
@@ -674,15 +696,7 @@ impl<'a> Printer<'a> {
             parts.push(d.concat(&[last, d.text(",")]));
         }
 
-        // The `;` is reserved on the fill's own last item, as in `build_comma_fill_doc`.
-        let fill = d.with_context(d.fill(&parts), DocContext::reserving(1));
-        let body = d.group(d.indent(d.concat(&[d.line(), fill])));
-        if leading_run.is_empty() {
-            d.concat(&[d.text(":"), body])
-        } else {
-            let run = leading_run.join(" ");
-            d.concat(&[d.text(": "), d.text_pooled(&run), body])
-        }
+        self.build_broken_head_value_decl_doc(d.fill(&parts), &leading_run)
     }
 
     /// Print declaration with string value
@@ -751,11 +765,12 @@ impl<'a> Printer<'a> {
     /// *opens* the value is `raws.between` material instead, hoisted to the colon's line
     /// and outside the decision (`grid-template-areas: /* c */⏎'a' 'b'` stays inline).
     ///
-    /// tsv takes the rule for a value whose content members are all **row strings** — the
-    /// `grid-template-areas` shape, and the string form of the `grid` shorthand. A value
-    /// mixing tracks and functions (`grid-template-columns:⏎repeat(2, 1fr)⏎auto`) is not
-    /// routed here and packs inline; prettier breaks it too, and widening the class is a
-    /// separate, corpus-measurable change.
+    /// tsv takes the rule for every space-separated value of those properties — the row
+    /// strings of `grid-template-areas`, and the track lists of `grid-template-columns` /
+    /// `-rows` (line names, sizes, `repeat()` / `minmax()` / `fit-content()`, `subgrid`),
+    /// and the `grid` / `grid-template` shorthands' mix of both with `/`. A member's kind
+    /// plays no part beyond a string's interior not counting; which line a member starts
+    /// on is the whole question.
     ///
     /// The comment members come from the value parser: the whitespace split makes a
     /// top-level comment run its own `Identifier` member (`split_top_level`'s
@@ -766,8 +781,7 @@ impl<'a> Printer<'a> {
         &self,
         decl: &'v internal::CssDeclaration<'v>,
     ) -> Option<GridMultirowPlan<'v>> {
-        let prop = decl.property;
-        if !(prop == "grid" || prop.starts_with("grid-template")) {
+        if !Self::is_grid_row_property(decl.property) {
             return None;
         }
         let CssValue::List { values, .. } = &decl.value else {
@@ -780,16 +794,10 @@ impl<'a> Printer<'a> {
         if members.len() < 2 {
             return None;
         }
-        // Every content member a row string. A value of nothing but comments qualifies
-        // too: postcss leaves the run in the value when no word follows it (it is
-        // `raws.between` only ahead of one), so prettier's grid rule reads those
-        // comments as nodes and breaks them one per line like rows.
-        if !members
-            .iter()
-            .all(|m| matches!(m, CssValue::String { .. }) || self.is_value_comment_member(m))
-        {
-            return None;
-        }
+        // A value of nothing but comments qualifies too: postcss leaves the run in the
+        // value when no word follows it (it is `raws.between` only ahead of one), so
+        // prettier's grid rule reads those comments as nodes and breaks them one per line
+        // like rows.
         members
             .windows(2)
             .any(|pair| self.grid_row_breaks_before(&pair[0], &pair[1]))
@@ -799,28 +807,26 @@ impl<'a> Printer<'a> {
             })
     }
 
-    /// Is this space-separated list member a comment run — the `Identifier` the value
-    /// parser makes of a top-level `/* … */` (`split_top_level`'s `comment_is_element`)?
-    fn is_value_comment_member(&self, member: &CssValue<'_>) -> bool {
-        matches!(
-            member,
-            CssValue::Identifier { span }
-                if crate::comments::is_comment_start(self.source.as_bytes(), span.start_usize())
-        )
-    }
-
     /// Does `next` open a new grid row — do the two members' source lines differ?
     ///
     /// Prettier compares the nodes' `source.start.line`, and the line its value tokenizer
-    /// assigns is what decides: the count advances through a **comment**'s interior but not
+    /// assigns is what decides: the count advances through a **comment**'s interior and a
+    /// **function**'s (`repeat(2,⏎1fr) auto` breaks before `auto`; a comment after the
+    /// `)` opens a row of its own and the word after the comment stays beside it), but not
     /// through a **string**'s (an escaped-newline continuation, `'a\⏎b'`), so the question
-    /// is whether a newline sits in the gap between the two, or inside `prev` when `prev`
-    /// is a comment — `'a' /* c⏎d */ 'b'` breaks before `'b'`, `'a\⏎b' 'c'` stays inline.
+    /// is whether a newline sits anywhere from `prev`'s start to `next`'s — or from
+    /// `prev`'s end when `prev` is a string — `'a' /* c⏎d */ 'b'` breaks before `'b'`,
+    /// `'a\⏎b' 'c'` stays inline.
+    ///
+    /// A string nested inside a function member is the one shape this reading misreads: its
+    /// escaped newline does not advance prettier's count either, but the scan here does not
+    /// step over it. That cell is already a different divergence — tsv expands a function
+    /// holding such a string on every property — so the row read is not what decides it.
     fn grid_row_breaks_before(&self, prev: &CssValue<'_>, next: &CssValue<'_>) -> bool {
-        let from = if self.is_value_comment_member(prev) {
-            prev.span().start_usize()
-        } else {
+        let from = if matches!(prev, CssValue::String { .. }) {
             prev.span().end_usize()
+        } else {
+            prev.span().start_usize()
         };
         let to = next.span().start_usize();
         from <= to && self.source.as_bytes()[from..to].contains(&b'\n')
@@ -934,6 +940,9 @@ impl<'a> Printer<'a> {
     /// becoming a part of its own: `fill` reads the parts as alternating content and
     /// separators, so a bare `,` appended after the final content lands in separator
     /// position and could be left stranded on its own line when the fill breaks.
+    ///
+    /// The bare fill: the `;` reserve and the break-after-the-colon group are the caller's
+    /// (`build_broken_head_value_decl_doc`).
     fn build_comma_fill_doc(&self, values: &[CssValue<'_>], list_end: usize) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -965,11 +974,7 @@ impl<'a> Printer<'a> {
             parts.push(d.concat(&[last, d.text(",")]));
         }
 
-        // Reserve 1 char for trailing semicolon to prevent fill from packing
-        // to exactly printWidth and then exceeding when ';' is added
-        let context = DocContext::reserving(1);
-        let fill = d.fill(&parts);
-        d.with_context(fill, context)
+        d.fill(&parts)
     }
 
     /// Build fill parts for space-separated values (shared helper)
@@ -991,7 +996,8 @@ impl<'a> Printer<'a> {
     /// The declaration doc of a space-separated value given its fill: `: ` + `indent(fill)`.
     ///
     /// One shape for the AST fill (`print_decl_value_list`) and the text fill the
-    /// comment-bearing value takes (`print_decl_with_comments`), so the two cannot drift.
+    /// comment-bearing value takes (`print_decl_with_comments`), so the two cannot drift;
+    /// a grid property's value takes `build_broken_head_value_decl_doc` from both instead.
     /// The fill packs greedily — flat `item1 item2 item3`, broken `item1 item2⏎\titem3` —
     /// and the whole list is the declaration's value, so what follows it is the `;`: one
     /// column, reserved on the fill's last item so it breaks rather than letting the
@@ -1002,6 +1008,44 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let fill = d.with_context(fill, DocContext::reserving(1));
         d.concat(&[d.text(": "), d.indent(fill)])
+    }
+
+    /// Is this the `grid` shorthand or a `grid-template*` property — the properties whose
+    /// value prettier lays out by the author's source lines (`grid_multirow_plan`)?
+    fn is_grid_row_property(property: &str) -> bool {
+        property == "grid" || property.starts_with("grid-template")
+    }
+
+    /// The declaration doc of a value that breaks **after the colon** given its fill: `:` +
+    /// `group(indent([line, fill]))`, the `;` reserved on the fill's last item, a leading
+    /// comment run kept on the colon's line ahead of the group (`: /* c */`).
+    ///
+    /// One shape for three values: the comma list (`build_comma_fill_doc`, and its text twin
+    /// `build_comma_fill_doc_from_text` for the comment-bearing list), and a **grid**
+    /// property's space-separated value on both the AST and the text path — the row-shaped
+    /// twin of `build_space_value_decl_doc`. The group breaks exactly when the fill would,
+    /// and then the fill packs greedily beneath the colon.
+    ///
+    /// A grid value takes it because prettier's grid rule reads the OUTPUT's line breaks as
+    /// rows on the next pass (`grid_multirow_plan` takes the same rule): each wrapped line
+    /// is a row, and a first row left on the colon's line is re-rowed beneath it — by
+    /// prettier and by tsv alike. So the plain fill shape (`prop: item1 item2⏎\titem3`) was
+    /// never a fixed point for a grid property; it converged only on the second pass.
+    /// Breaking the head with the value puts the wrap straight onto the row layout that pass
+    /// would produce, the leading run staying where the row read leaves it (postcss
+    /// `raws.between`, outside the row decision). Prettier itself never wraps a grid value —
+    /// it overruns — so the shape is tsv's print-width stance applied to prettier's own row
+    /// rule (`grid_template_wrap_long_prettier_divergence`).
+    fn build_broken_head_value_decl_doc(&self, fill: DocId, leading_run: &[&str]) -> DocId {
+        let d = self.d();
+        let fill = d.with_context(fill, DocContext::reserving(1));
+        let body = d.group(d.indent(d.concat(&[d.line(), fill])));
+        if leading_run.is_empty() {
+            d.concat(&[d.text(":"), body])
+        } else {
+            let run = leading_run.join(" ");
+            d.concat(&[d.text(": "), d.text_pooled(&run), body])
+        }
     }
 
     /// Print function arguments from source, preserving comments
