@@ -1,0 +1,50 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 226,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 137,
+				"end": 166,
+				"name": "custom-selector",
+				"prelude": ":--a h1, h2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 168,
+				"end": 217,
+				"name": "custom-selector",
+				"prelude": ":--b .class1 > .class2, .class3",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the at-rule name is ASCII case-insensitive: any spelling lowercases and routes the\n\tprelude through the selector printer ",
+				"start": 9,
+				"end": 135
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 218,
+			"styles": "\n\t/* the at-rule name is ASCII case-insensitive: any spelling lowercases and routes the\n\tprelude through the selector printer */\n\t@custom-selector :--a h1, h2;\n\t@custom-selector :--b .class1 > .class2, .class3;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 227,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

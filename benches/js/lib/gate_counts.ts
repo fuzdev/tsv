@@ -430,7 +430,12 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// stderr and exit code `cmp`'d between a HEAD-`preludes.rs` and a tip release binary):
 	// this file is the only mover, and the `--all` run confirms it — `partial` / `safety` /
 	// `errors` identical.
-	css: 137
+	//
+	// 137 → 141: four files arrive from `unknown` — `@custom-selector` now ROUTES to the
+	// selector printer, the last standard-CSS at-rule missing from the prelude routing
+	// table. Reasoning and the bucket-list diff on `CORPUS_FORMAT_UNKNOWN_PIN`'s `18 → 14`
+	// step.
+	css: 141
 };
 
 /**
@@ -656,7 +661,25 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// the whole gates view: these five files are the ONLY ones that change bucket in any
 	// language, and `partial` / `safety` / `errors` / `expected_errors` are identical
 	// file-for-file, `typescript` and `svelte` unmoved in every bucket.
-	css: 18
+	//
+	// 18 → 14: four files LEAVE for `match` (`match` 137 → 141), the routing table's last
+	// standard-CSS gap — `atrule/custom-selector.css`, `attribute/custom-selector.css`,
+	// `stylefmt-repo/custom-selectors/…`, `stylefmt-repo/cssnext-example/…`. Prettier's
+	// `custom-selector` arm splits the `:--name` off a `@custom-selector` prelude and hands
+	// the rest to `parseSelector`, printing name, `line`, then the selectors joined `,` +
+	// `line` in one indented group; tsv's table had no arm, so the prelude fell to the
+	// verbatim raw branch — no comma respacing, no combinator spacing, no attribute-quote
+	// normalization, and no way to break a long list at its commas. tsv now reads the same
+	// shape (`:` glued to a `--` ident, a gap, a strict complex-selector list) into its own
+	// `PreludeValue::CustomSelector` and prints it through the selector printer's comma seam.
+	// Printer-only: the wire prelude is `strip_css_comments(span.extract(source))` for the
+	// new arm and the raw arm alike, the span the raw reader's in both.
+	//
+	// Measured by the ritual's old-binary/new-binary `--all --json` bucket-list diff over
+	// the whole gates view: these four files are the ONLY ones that change bucket in any
+	// language, and `partial` / `safety` / `errors` / `expected_errors` are identical
+	// file-for-file, `typescript` and `svelte` unmoved in every bucket.
+	css: 14
 };
 
 /**

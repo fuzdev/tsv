@@ -1,0 +1,151 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 674,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 200,
+				"end": 233,
+				"name": "custom-selector",
+				"prelude": ":--a h1, h2, h3",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 235,
+				"end": 268,
+				"name": "custom-selector",
+				"prelude": ":--KeepName div",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 270,
+				"end": 331,
+				"name": "custom-selector",
+				"prelude": ":--b .class1 > .class2 ~ span + a, div span",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 333,
+				"end": 387,
+				"name": "custom-selector",
+				"prelude": ":--c :hover, :focus-within, ::before",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 389,
+				"end": 466,
+				"name": "custom-selector",
+				"prelude": ":--d :is(.class1, .class2), :not(.class3):nth-child(2n + 1)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 468,
+				"end": 534,
+				"name": "custom-selector",
+				"prelude": ":--e [data-attr='value'], [data-attr^='value' i]",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 536,
+				"end": 587,
+				"name": "custom-selector",
+				"prelude": ":--f :global(.class1), :--a:hover",
+				"block": null
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 638,
+					"end": 646,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 638,
+							"end": 646,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "--a",
+											"args": null,
+											"start": 638,
+											"end": 642
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "--c",
+											"args": null,
+											"start": 642,
+											"end": 646
+										}
+									],
+									"start": 638,
+									"end": 646
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 647,
+					"end": 665,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 651,
+							"end": 661,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 638,
+				"end": 665
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " `@custom-selector :--name <selector-list>`: the `:--name` keeps its case (an\n\tauthor-defined name has no canonical casing); the list formats as any selector list,\n\tcomma-joined inline ",
+				"start": 9,
+				"end": 198
+			},
+			{
+				"type": "CSSComment",
+				"value": " a defined name is used as a pseudo-class ",
+				"start": 590,
+				"end": 636
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 666,
+			"styles": "\n\t/* `@custom-selector :--name <selector-list>`: the `:--name` keeps its case (an\n\tauthor-defined name has no canonical casing); the list formats as any selector list,\n\tcomma-joined inline */\n\t@custom-selector :--a h1, h2, h3;\n\t@custom-selector :--KeepName div;\n\t@custom-selector :--b .class1 > .class2 ~ span + a, div span;\n\t@custom-selector :--c :hover, :focus-within, ::before;\n\t@custom-selector :--d :is(.class1, .class2), :not(.class3):nth-child(2n + 1);\n\t@custom-selector :--e [data-attr='value'], [data-attr^='value' i];\n\t@custom-selector :--f :global(.class1), :--a:hover;\n\n\t/* a defined name is used as a pseudo-class */\n\t:--a:--c {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 675,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
