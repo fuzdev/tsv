@@ -1664,15 +1664,21 @@ const PRINTER_ONLY_JUNCTURES: [(&str, &str); 17] = [
 /// `a<NBSP>` matches nothing.
 ///
 /// ⚠️ **This is not one gap, and reading it as one is what let the class back in.** Every
-/// claim whose left neighbour can be a name owes the separator, and the family has five:
+/// claim whose left neighbour can be a name owes the separator, and the family has six:
 /// the attribute selector's `[name<HERE>]`, a selector list's `,` (`a.x <NBSP>, c`), an
 /// explicit combinator's symbol (`a <NBSP>> b`), a pseudo-argument list's `)`
-/// (`:is(a <NBSP>)`), and every interior gap of the commented attribute rebuild
-/// (`[a/* c */ <NBSP>=b]`). One rule answers all of them —
+/// (`:is(a <NBSP>)`), every interior gap of the commented attribute rebuild
+/// (`[a/* c */ <NBSP>=b]`), and a condition prelude's part head behind a CONNECTOR
+/// (`@supports and <NBSP>(a: b)`). One rule answers all of them —
 /// `Printer::name_run_separator` from a source position, `name_run_separator_after` from
 /// built text — so the templates below are one per EMITTER, with the non-name left
 /// neighbours (`a[b] <NBSP>,`, `* <NBSP>,`) beside them as the controls that keep the
 /// separator from becoming unconditional.
+///
+/// ⚠️ The connector is the one member whose glue this test's own assertion cannot see:
+/// `named_nodes` reads the wire's NAMED nodes, and a condition prelude is a string.
+/// `a_connector_never_absorbs_the_run_behind_it` below is its assertion, and it is a
+/// different one — that the connector still READS as a connector on the next pass.
 #[test]
 fn a_preserved_run_never_moves_a_names_boundary() {
     for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
@@ -1733,6 +1739,53 @@ fn a_preserved_run_never_moves_a_names_boundary() {
     }
 }
 
+/// A connector is a NAME, so the part head behind it owes the same separator every other
+/// name-adjacent claim owes.
+///
+/// The sixth member of `a_preserved_run_never_moves_a_names_boundary`'s family, tested apart
+/// because that test's instrument cannot reach it: its assertion is over the wire's NAMED
+/// nodes, and a condition prelude is a string. What goes wrong here is not a name in the wire
+/// but the prelude's READING — `read_identifier` takes every code point at or above U+00A0 as
+/// content, so a run emitted flush after `and` re-parses as the single identifier
+/// `and<NBSP>`, which is no connector at all and drops the whole prelude to the raw path.
+/// Nothing is dropped, the output is its own fixed point, and counting, reparse and
+/// idempotency all stay green — the only tell is that the condition path's own NORMALIZATION
+/// stops. So that is what is asserted, rather than the separator alone: the emitted value is
+/// re-denormalized and must normalize again.
+///
+/// The juncture only exists because the printer emits a LEADING connector at all; before that
+/// the word was dropped and nothing stood to the run's left but the at-keyword.
+#[test]
+fn a_connector_never_absorbs_the_run_behind_it() {
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        for template in [
+            "<style>@supports and {T}(a:b) { c { color: red; } }</style>",
+            "<style>@supports and or {T}(a:b) { c { color: red; } }</style>",
+            "<style>@container name and {T}(a:b) { c { color: red; } }</style>",
+            "<style>@supports (a:b) and {T}(c:d) { e { color: red; } }</style>",
+        ] {
+            let src = component(&template.replace("{T}", ch));
+            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let run_at = out.find(ch).unwrap_or_else(|| {
+                panic!("{label} {template}: the run must survive the format — got {out:?}")
+            });
+            assert!(
+                out[..run_at].ends_with(' '),
+                "{label} {template}: an ASCII space ends the connector before the run, or the \
+                 two re-parse as one identifier — got {out:?}"
+            );
+            // The separator's whole purpose, asserted rather than assumed.
+            let again =
+                tsv_svelte::format_str(&out.replace(": ", ":")).expect("output should re-format");
+            assert!(
+                again.contains("(a: b)") || again.contains("(c: d)"),
+                "{label} {template}: the emitted connector no longer READS as one, so the \
+                 prelude fell to the raw path and stopped normalizing — got {again:?}"
+            );
+        }
+    }
+}
+
 /// A rebuilt head and the claim beside it must not BOTH keep the run.
 ///
 /// The mirror image of the test above, and the other failure mode
@@ -1758,6 +1811,12 @@ fn a_rebuilt_head_and_its_claim_never_both_keep_the_run() {
             "<style>@container name {T}(a: b) { c { color: red; } }</style>",
             "<style>@supports (a: b) and {T}(c: d) { e { color: red; } }</style>",
             "<style>@supports {T}(a: b) { c { color: red; } }</style>",
+            // A LEADING connector puts a part head after a word the printer emits from the
+            // AST rather than from source — the same claim, one gap the query never had
+            // until the printer started emitting that connector at all.
+            "<style>@supports and {T}(a: b) { c { color: red; } }</style>",
+            "<style>@container name and {T}(a: b) { c { color: red; } }</style>",
+            "<style>@supports and or {T}(a: b) { c { color: red; } }</style>",
         ] {
             let src = component(&template.replace("{T}", ch));
             let out = tsv_svelte::format_str(&src).expect("component should format");

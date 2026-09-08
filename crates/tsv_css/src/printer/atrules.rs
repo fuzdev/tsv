@@ -669,12 +669,19 @@ impl<'a> Printer<'a> {
 
     /// Build the doc tree for an `@supports`/`@container` condition prelude.
     ///
-    /// A single condition has no break point — it's a plain concat (leading comment,
-    /// content, then trailing comment), emitted inline like prettier. Two or more
-    /// conditions become `indent(fill([...]))`: the connector (`and`/`or`) and any
-    /// comments split around it ride a breakable separator (the connector stays on
-    /// the line before the break), and the trailing ` {`/`;` is reserved via the
-    /// fill's `trailing_reserve` so the boundary breaks at print width.
+    /// A single condition has no break point — it's a plain concat (head, content, tail),
+    /// emitted inline like prettier. Two or more conditions become `indent(fill([...]))`:
+    /// the connector (`and`/`or`) and any comments split around it ride a breakable
+    /// separator (the connector stays on the line before the break), and the trailing
+    /// ` {`/`;` is reserved via the fill's `trailing_reserve` so the boundary breaks at
+    /// print width.
+    ///
+    /// ⚠️ **The two arms differ in their BREAK POINTS and in nothing else**, and every bug
+    /// this builder has had came of one arm quietly answering a shared question its own way
+    /// (the single-part arm printed no connector at all while its twin did). The head is
+    /// `leading_first` and the tail is [`Self::condition_tail_doc`], both reached from both
+    /// arms; a question that is not about where the line breaks belongs in one of those, not
+    /// inline in an arm.
     fn build_condition_query_doc(
         &self,
         kind: ConditionKind<'_>,
@@ -694,45 +701,58 @@ impl<'a> Printer<'a> {
             d.concat(&segments)
         };
 
-        // The leading comments before the first part (after the optional name) — and the
-        // boundary run of that same gap, which is the ONE gap of a condition prelude the
-        // printer regenerates rather than carrying inside a part's own text
-        // (`@supports <NBSP>(a: b)`, `@container name <NBSP>(…)`). Flush against the part,
-        // after the comments, like every other claim; see `printer/boundary_ws.rs`.
+        // The gap between the optional name and the first part: its comments, the first
+        // part's own connector run, and the boundary run
+        // (`Self::condition_part_head_ws`), which lands flush against the part after them
+        // all, like every other claim.
+        //
+        // ⚠️ That gap can hold a **connector run** — the first part's own, since a
+        // connector with no operand on its LEFT still binds the part on its right
+        // (`@supports and (a: b)`, `@container name and (a: b)`). It is emitted here for
+        // the same reason the separator below emits an interior one, and the gap's
+        // comments split around it the same way: the whole question is one question, and
+        // an arm that answers only "which comments" drops the run's words silently.
         let leading_first = |part: &internal::ConditionPart<'_>| -> DocId {
-            let leading = name_end_pos
-                .map(|start| self.comment_blocks_in_range(start, part.span.start))
-                .unwrap_or_default();
-            // The run reaches PAST the part's own span start: a condition part opens on
-            // whatever token the lexer produced, and a boundary run at the head of the
-            // prelude IS that token (`@supports <NBSP>(a: b)` opens the part on the run, not
-            // on the `(`). So the sweep runs from the name's end to the part's first real
-            // byte, which `skip_gap_trivia` finds with the boundary class the parser skipped
-            // by — one range covering both the gap before the part and the trivia inside it.
-            let kept = name_end_pos
+            let (before, after) = name_end_pos
                 .map(|start| {
-                    self.boundary_ws_in_gap(
-                        start,
-                        super::boundary_ws::skip_gap_trivia(
-                            self.source,
-                            part.span.start,
-                            part.span.end,
-                        ),
-                    )
+                    self.extract_comments_split_by_connector(start, part.span.start, part.connector)
                 })
                 .unwrap_or_default();
-            if leading.is_empty() && kept.is_empty() {
-                content_doc(part)
-            } else if leading.is_empty() {
-                d.concat(&[d.text_pooled(&kept), content_doc(part)])
-            } else {
-                d.concat(&[
-                    d.text_pooled(&leading),
-                    d.text(" "),
-                    d.text_pooled(&kept),
-                    content_doc(part),
-                ])
+            let kept = name_end_pos
+                .map(|start| self.condition_part_head_ws(start, part))
+                .unwrap_or_default();
+            let mut head = DocBuf::new();
+            for piece in [
+                before.as_str(),
+                part.connector_run.unwrap_or_default(),
+                after.as_str(),
+            ] {
+                if piece.is_empty() {
+                    continue;
+                }
+                if !head.is_empty() {
+                    head.push(d.text(" "));
+                }
+                head.push(d.text_pooled(piece));
             }
+            if head.is_empty() {
+                if kept.is_empty() {
+                    return content_doc(part);
+                }
+                return d.concat(&[d.text_pooled(&kept), content_doc(part)]);
+            }
+            // ⚠️ The space is the NAME SEPARATOR, not decoration: a connector is an
+            // identifier, and `read_identifier` takes every code point at or above U+00A0 as
+            // content, so a boundary run emitted flush after one re-parses as the single name
+            // `and<NBSP>` — a prelude that then falls to the raw path, its condition
+            // unreadable, and a fixed point either way. `printer/boundary_ws.rs` §Where a
+            // claim is emitted states the rule for the family this juncture joined.
+            head.push(d.text(" "));
+            if !kept.is_empty() {
+                head.push(d.text_pooled(&kept));
+            }
+            head.push(content_doc(part));
+            d.concat(&head)
         };
 
         if parts.len() <= 1 {
@@ -745,19 +765,11 @@ impl<'a> Printer<'a> {
             let Some(first) = parts.first() else {
                 return d.text("");
             };
-            let mut chunk = DocBuf::new();
-            chunk.push(leading_first(first));
-            if let Some(span) = prelude_span {
-                let trailing = self.comment_blocks_in_range(first.span.end, span.end);
-                if !trailing.is_empty() {
-                    chunk.push(d.text(" "));
-                    chunk.push(d.text_pooled(&trailing));
-                }
-            }
-            if let Some(tail) = self.trailing_operators_doc(condition) {
-                chunk.push(tail);
-            }
-            return d.concat(&chunk);
+            let head = leading_first(first);
+            return match self.condition_tail_doc(first, prelude_span, condition) {
+                Some(tail) => d.concat(&[head, tail]),
+                None => head,
+            };
         }
 
         // Multiple conditions: a fill whose separators carry the connectors.
@@ -780,11 +792,11 @@ impl<'a> Printer<'a> {
                 sep.push(d.text(" "));
                 sep.push(d.text_pooled(&before));
             }
-            // Emit the connector's source case (`AND` stays `AND`), preserved like
-            // prettier. `connector_raw` is `Some` whenever `connector` is.
-            if let Some(conn_raw) = part.connector_raw {
+            // Emit the connector run's source text (`AND` stays `AND`), preserved like
+            // prettier. `connector_run` is `Some` whenever `connector` is.
+            if let Some(conn_run) = part.connector_run {
                 sep.push(d.text(" "));
-                sep.push(d.text_pooled(conn_raw));
+                sep.push(d.text_pooled(conn_run));
             }
             sep.push(d.line());
             fill_parts.push(d.concat(&sep));
@@ -797,10 +809,7 @@ impl<'a> Printer<'a> {
             // This part's own head run, exactly as `leading_first` claims the first part's —
             // bounded at the part's span so it can never reach back over the connector, whose
             // side of the gap rides out in the separator above.
-            let kept = self.boundary_ws_in_gap(
-                part.span.start,
-                super::boundary_ws::skip_gap_trivia(self.source, part.span.start, part.span.end),
-            );
+            let kept = self.condition_part_head_ws(part.span.start, part);
             if !kept.is_empty() {
                 chunk.push(d.text_pooled(&kept));
             }
@@ -808,17 +817,11 @@ impl<'a> Printer<'a> {
             fill_parts.push(d.concat(&chunk));
         }
 
-        // Trailing comments after the last part ride its line.
-        if let (Some(last), Some(span)) = (parts.last(), prelude_span) {
-            let trailing = self.comment_blocks_in_range(last.span.end, span.end);
-            if !trailing.is_empty()
-                && let Some(last_chunk) = fill_parts.pop()
-            {
-                fill_parts.push(d.concat(&[last_chunk, d.text(" "), d.text_pooled(&trailing)]));
-            }
-        }
-
-        if let Some(tail) = self.trailing_operators_doc(condition)
+        // The query's tail rides the last part's line, exactly as it rides the only part's
+        // in the single-part arm above.
+        if let Some(tail) = parts
+            .last()
+            .and_then(|last| self.condition_tail_doc(last, prelude_span, condition))
             && let Some(last_chunk) = fill_parts.pop()
         {
             fill_parts.push(d.concat(&[last_chunk, tail]));
@@ -827,6 +830,38 @@ impl<'a> Printer<'a> {
         let fill = d.fill(&fill_parts);
         let fill = d.with_context(fill, DocContext::reserving(suffix_width));
         d.indent(fill)
+    }
+
+    /// The query's own tail, to append to whatever printed its LAST part: the comments
+    /// standing between that part and the end of the prelude, then the run of operators with
+    /// no operand ([`Self::trailing_operators_doc`]).
+    ///
+    /// One emitter because [`Self::build_condition_query_doc`]'s two arms ask the same two
+    /// questions of the same stretch, and an arm that answers one of them its own way is
+    /// exactly the drift this prelude has already paid for once — the single-part arm emitted
+    /// no connector at all while its twin did. The two arms differ in where the tail LANDS (a
+    /// concat, or the fill's last chunk), which is all they should differ in.
+    ///
+    /// `None` when the query has neither, so a caller need not concat an empty doc.
+    fn condition_tail_doc(
+        &self,
+        last: &internal::ConditionPart<'_>,
+        prelude_span: Option<Span>,
+        condition: &internal::ConditionQuery<'_>,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let mut tail = DocBuf::new();
+        if let Some(span) = prelude_span {
+            let trailing = self.comment_blocks_in_range(last.span.end, span.end);
+            if !trailing.is_empty() {
+                tail.push(d.text(" "));
+                tail.push(d.text_pooled(&trailing));
+            }
+        }
+        if let Some(operators) = self.trailing_operators_doc(condition) {
+            tail.push(operators);
+        }
+        (!tail.is_empty()).then(|| d.concat(&tail))
     }
 
     /// The tail carrying the query's run of operators with no operand, if it has one —
@@ -847,6 +882,29 @@ impl<'a> Printer<'a> {
         Some(d.concat(&[d.text(" "), d.text_pooled(trailing_operators)]))
     }
 
+    /// The boundary-whitespace run at a condition part's head — the ONE gap of a condition
+    /// prelude the printer regenerates rather than carrying inside a part's own text
+    /// (`@supports <NBSP>(a: b)`, `@container name <NBSP>(…)`), so the ONE gap that owes a
+    /// claim (`printer/boundary_ws.rs` §Who claims where).
+    ///
+    /// The sweep reaches PAST the part's own span start: a condition part opens on whatever
+    /// token the lexer produced, and a boundary run at the head of the prelude IS that token
+    /// (`@supports <NBSP>(a: b)` opens the part on the run, not on the `(`). So it runs from
+    /// `gap_start` to the part's first real byte, which `skip_gap_trivia` finds with the
+    /// boundary class the parser skipped by — one range covering both the gap before the part
+    /// and the trivia inside it.
+    ///
+    /// `gap_start` is the caller's, and the two callers differ deliberately: the first part
+    /// sweeps from the name's end (there being no previous part), every later one from its own
+    /// span start, so it can never reach back over the connector whose side of the gap rides
+    /// out in the separator.
+    fn condition_part_head_ws(&self, gap_start: u32, part: &internal::ConditionPart<'_>) -> String {
+        self.boundary_ws_in_gap(
+            gap_start,
+            super::boundary_ws::skip_gap_trivia(self.source, part.span.start, part.span.end),
+        )
+    }
+
     /// Extract comments from a source range, split around the connector keyword.
     ///
     /// Returns (comments_before_connector, comments_after_connector); for
@@ -858,6 +916,18 @@ impl<'a> Printer<'a> {
     /// accepts uppercase connectors (`AND`/`Or`), which CSS Syntax 3 makes valid.
     /// With no connector (or none found) the whole run goes before. Delegates the
     /// binning + join to the shared `split_comments_at`.
+    ///
+    /// ⚠️ The gap may hold a **run** of operators (`(a: b) and or (c: d)`), and this
+    /// scans for the *first* spelling of `connector` — the run's LAST kind — so the
+    /// position it splits at can be any operator of the run, not reliably the last.
+    /// It bins every registered comment correctly all the same, and the reason is the
+    /// parser's, not this scan's: a comment *inside* the run rides
+    /// `ConditionPart::connector_run`'s own text and gives up its registration, so the
+    /// only comments left to bin sit before the run's first word or after its last —
+    /// on whichever side of the split point that puts them, which for those two is the
+    /// same side either way. Don't "improve" this into a last-occurrence scan without
+    /// that fact: it is what makes the whole family correct, not the choice of
+    /// occurrence.
     fn extract_comments_split_by_connector(
         &self,
         start: u32,

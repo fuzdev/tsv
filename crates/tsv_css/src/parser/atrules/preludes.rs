@@ -87,19 +87,19 @@ fn needs_separator_before(prev: Option<TokenKind>, trailing_spaces: usize) -> bo
 /// to cover it — a trailing `(a) /* c */` gap is inside the prelude the printer
 /// re-emits from. Hence the loop, in one place rather than at each gap.
 ///
-/// `unbound` collects the gap's comments as it goes — the query cannot yet know whether
+/// `run` collects the gap's comments as it goes — the query cannot yet know whether
 /// a part will follow to bind them, and one that never does keeps them (see
 /// [`ConditionQuery::trailing_operators`]). A part that does binds them, and the query
 /// loop clears the buffer.
 fn skip_gap_registering_comments(
     parser: &mut CssParser<'_, '_>,
     end: &mut usize,
-    unbound: &mut UnboundRun,
+    run: &mut OperatorRun,
 ) -> Result<(), ParseError> {
     parser.skip_whitespace()?;
     while parser.check(TokenKind::Comment) {
         parser.register_current_comment();
-        unbound.push_comment(parser.current_value());
+        run.push_comment(parser.current_value());
         *end = parser.base_offset() + parser.current_end;
         parser.advance()?;
         parser.skip_whitespace()?;
@@ -107,33 +107,58 @@ fn skip_gap_registering_comments(
     Ok(())
 }
 
-/// What a condition query has consumed since its last part — the operators it may yet
-/// fail to bind, and the gap comments collected beside them.
+/// What a condition query has consumed since its last part — the operators, whether a
+/// part will bind them or not, and the gap comments collected beside them.
 ///
-/// The three facts move together (a part binds all of them at once), so they are one
-/// value: keeping them as parallel locals is how a site comes to update two of the three.
-struct UnboundRun {
+/// The facts move together (a part binds all of them at once), so they are one value:
+/// keeping them as parallel locals is how a site comes to update some of them.
+///
+/// The buffer answers **two** questions off one walk, which is why they share it: the
+/// operator run a following part binds ([`Self::connector_run`], which becomes that
+/// part's `connector_run`) and the one no part ever comes for ([`Self::finish`], which
+/// becomes the query's `trailing_operators`). They differ only in their bounds — the
+/// bound run stops at the first and last *operator*, so the comments on either side of
+/// it stay the printer's to claim, while the unbound one is the whole gap, there being
+/// no part left to claim anything. Named for the material rather than for either answer:
+/// whether the run is bound is a question you ask it, not a fact about the buffer.
+struct OperatorRun {
     /// The words so far, a single space between them whatever the author wrote — the run's
     /// spacing is the grammar's, exactly as a condition part's is (`parse_condition_part`
     /// builds `part_buf` the same way). Each word is pushed **verbatim** from source, so an
     /// operator keeps its case (`AND` stays `AND`) and a comment its interior.
     text: String,
-    /// Whether an operator is in there, rather than only comments. A gap that ends the
-    /// query holding just comments (`@container b /* c */ {`) is the ordinary
-    /// trailing-comment claim's, and those stay registered for it — so only an operator
-    /// turns the buffer into a run.
-    has_operator: bool,
+    /// The bound run's bounds, set once an operator lands. `None` while the buffer holds
+    /// only comments — a gap that ends the query holding just those
+    /// (`@container b /* c */ {`) is the ordinary trailing-comment claim's, and they stay
+    /// registered for it, so only an operator turns the buffer into a run.
+    ///
+    /// One `Option` rather than three fields because the three are meaningless apart: an
+    /// end with no start, or a registry length belonging to an operator that never landed,
+    /// are states this buffer must not be able to hold.
+    operators: Option<OperatorBounds>,
     /// The comment registry's length when the run began, to truncate back to if it does
     /// end up claiming its comments.
     comments_len: usize,
 }
 
-impl UnboundRun {
+/// Where a bound run sits in [`OperatorRun::text`], and what the comment registry owes it.
+struct OperatorBounds {
+    /// Where the run's first operator starts.
+    start: usize,
+    /// Where its last operator ends. Everything between the two is run text — the later
+    /// operators and the comments among them.
+    end: usize,
+    /// The registry's length when the **first** operator landed, to truncate back to when a
+    /// later one proves the comments since then are inside the run's own text.
+    comments_len: usize,
+}
+
+impl OperatorRun {
     /// A fresh run, with the comment registry standing at `comments_len`.
     fn new(comments_len: usize) -> Self {
         Self {
             text: String::new(),
-            has_operator: false,
+            operators: None,
             comments_len,
         }
     }
@@ -144,32 +169,76 @@ impl UnboundRun {
     }
 
     /// Collect an operator, which is what makes the buffer a run.
-    fn push_operator(&mut self, operator: &str) {
-        self.push_word(operator);
-        self.has_operator = true;
+    ///
+    /// `comments_len` is the registry's length now. The return is the length to truncate
+    /// it back to, `Some` only for an operator that is **not** the run's first: the
+    /// comments registered since that first one sit *between* two operators, so the run's
+    /// own text carries them and their registration has to go, or the printer's gap sweep
+    /// would print each a second time.
+    ///
+    /// `#[must_use]` is the pairing's enforcement — a caller that pushes an operator and
+    /// drops the answer leaves a comment for two emitters to print, and the double print is
+    /// invisible to every fixed-point gate.
+    #[must_use]
+    fn push_operator(&mut self, operator: &str, comments_len: usize) -> Option<usize> {
+        // Read before the push: `None` here is exactly "this is the run's first operator".
+        let unregister_to = self.operators.as_ref().map(|bounds| bounds.comments_len);
+        let start = self.push_word(operator);
+        match &mut self.operators {
+            Some(bounds) => bounds.end = self.text.len(),
+            None => {
+                self.operators = Some(OperatorBounds {
+                    start,
+                    end: self.text.len(),
+                    comments_len,
+                });
+            }
+        }
+        unregister_to
     }
 
-    fn push_word(&mut self, word: &str) {
+    /// Push a word and report where it landed in `text`.
+    fn push_word(&mut self, word: &str) -> usize {
         if !self.text.is_empty() {
             self.text.push(' ');
         }
+        let start = self.text.len();
         self.text.push_str(word);
+        start
     }
 
-    /// A part bound everything collected so far: its connector rides the part and its gap
-    /// comments stay registered for the printer's separator, so the run restarts here —
-    /// in place, keeping the buffer's allocation across a many-part query.
+    /// The operator run a part would bind — first operator through last, the comments
+    /// between them included — or `None` when nothing but comments has been collected.
+    ///
+    /// Bounded at the operators on **both** ends, unlike [`Self::finish`]: a comment
+    /// before the first (`(a: b) /* c */ and (c: d)`) or after the last (`and /* c */
+    /// (c: d)`) is one the printer's own gap sweep claims onto its authored side of the
+    /// separator, so the run must not swallow it.
+    fn connector_run(&self) -> Option<&str> {
+        self.operators
+            .as_ref()
+            .map(|bounds| &self.text[bounds.start..bounds.end])
+    }
+
+    /// A part bound everything collected so far: its connector run rides the part and the
+    /// gap comments outside that run stay registered for the printer's separator, so the
+    /// run restarts here — in place, keeping the buffer's allocation across a many-part
+    /// query.
     fn bind(&mut self, comments_len: usize) {
         self.text.clear();
-        self.has_operator = false;
+        self.operators = None;
         self.comments_len = comments_len;
     }
 
     /// The run's text and the comment-registry length to truncate back to, or `None` when
     /// the query bound everything it consumed — every well-formed condition.
+    ///
+    /// The whole buffer, comments on both ends included: no part is coming to claim them,
+    /// so the run is the only carrier they have.
     fn finish(&self) -> Option<(&str, usize)> {
-        self.has_operator
-            .then_some((self.text.as_str(), self.comments_len))
+        self.operators
+            .as_ref()
+            .map(|_| (self.text.as_str(), self.comments_len))
     }
 }
 
@@ -239,21 +308,19 @@ pub(super) fn parse_condition_query<'arena>(
     let start = parser.base_offset() + parser.current_start;
     let mut parts = parser.bvec();
     let mut current_connector: Option<ConditionConnector> = None;
-    // The connector's verbatim source text, kept so the printer can preserve the
-    // author's case (`AND` stays `AND`); set in lockstep with `current_connector`.
-    let mut current_connector_raw: Option<&'arena str> = None;
     let mut end_pos = start;
-    // What the loop has consumed since the last part; whatever is left when the query ends
-    // is `ConditionQuery::trailing_operators`.
-    let mut unbound = UnboundRun::new(parser.comments.len());
+    // What the loop has consumed since the last part — the connector run a part binds
+    // (`ConditionPart::connector_run`, whose source text and case the printer preserves),
+    // or, if none ever comes, `ConditionQuery::trailing_operators`.
+    let mut run = OperatorRun::new(parser.comments.len());
 
     while !parser.at_prelude_end() {
         // The gap before a part (`(a) /* comment */ and (b)`)
-        skip_gap_registering_comments(parser, &mut end_pos, &mut unbound)?;
+        skip_gap_registering_comments(parser, &mut end_pos, &mut run)?;
 
         // Check for `and`/`or` connector. CSS grammar keywords are ASCII
         // case-insensitive (CSS Syntax 3), so `AND`/`Or` connect like `and`; the
-        // enum normalizes for logic but the source case is kept in `connector_raw`
+        // enum normalizes for logic but the run's source text is kept in `connector_run`
         // and preserved by the printer (matching prettier).
         if parser.check(TokenKind::Identifier) {
             let ident = parser.current_identifier();
@@ -267,31 +334,39 @@ pub(super) fn parse_condition_query<'arena>(
             };
 
             if let Some(conn) = connector {
-                // This is a connector between parts
+                // This is a connector between parts. `current_connector` is the run's
+                // LAST operator — the one whose kind the printer splits the gap's
+                // comments around — while the run itself keeps every word.
                 current_connector = Some(conn);
-                current_connector_raw = Some(parser.alloc_str_in(parser.current_value()));
-                unbound.push_operator(parser.current_value());
+                if let Some(comments_len) =
+                    run.push_operator(parser.current_value(), parser.comments.len())
+                {
+                    parser.comments.truncate(comments_len);
+                }
                 // Widen over the keyword itself, so a connector that never finds its
                 // part still lies inside the query's span (a part that does follow
                 // widens past it anyway).
                 end_pos = parser.base_offset() + parser.current_end;
                 parser.advance()?;
                 // The gap after a connector (`and /* comment */ (b)`)
-                skip_gap_registering_comments(parser, &mut end_pos, &mut unbound)?;
+                skip_gap_registering_comments(parser, &mut end_pos, &mut run)?;
                 continue;
             }
         }
 
+        // The run this part binds, allocated once here rather than per operator.
+        let connector_run: Option<&'arena str> =
+            run.connector_run().map(|text| parser.alloc_str_in(text));
         match parse_condition_part(
             parser,
             current_connector.take(),
-            current_connector_raw.take(),
+            connector_run,
             end_pos,
             reader,
         )? {
             ConditionPartOutcome::Parsed { part, end, .. } => {
                 end_pos = end;
-                unbound.bind(parser.comments.len());
+                run.bind(parser.comments.len());
                 if let Some(part) = part {
                     parts.push(part);
                 }
@@ -301,7 +376,11 @@ pub(super) fn parse_condition_query<'arena>(
             // comes back with it — the reader took those bytes, so it owes them.
             ConditionPartOutcome::NotAPart { consumed, end } => {
                 if let Some(consumed) = consumed {
-                    unbound.push_operator(consumed);
+                    // No part is coming, so `finish` truncates the registry past this
+                    // anyway; honored all the same, so one rule holds at every call.
+                    if let Some(comments_len) = run.push_operator(consumed, parser.comments.len()) {
+                        parser.comments.truncate(comments_len);
+                    }
                 }
                 end_pos = end;
                 break;
@@ -313,7 +392,7 @@ pub(super) fn parse_condition_query<'arena>(
     // registered on the way in, when a part might still have bound them; they ride the
     // run's own text now, so drop the registrations or both would print it — the pair
     // `CssParser::rewind_to` keeps together, for the same reason.
-    let trailing_operators = unbound.finish().map(|(text, comments_len)| {
+    let trailing_operators = run.finish().map(|(text, comments_len)| {
         parser.comments.truncate(comments_len);
         parser.alloc_str_in(text)
     });
@@ -362,7 +441,7 @@ enum ConditionPartOutcome<'arena> {
 fn parse_condition_part<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     connector: Option<ConditionConnector>,
-    connector_raw: Option<&'arena str>,
+    connector_run: Option<&'arena str>,
     mut end_pos: usize,
     reader: ConditionReader,
 ) -> Result<ConditionPartOutcome<'arena>, ParseError> {
@@ -705,7 +784,7 @@ fn parse_condition_part<'arena>(
         .all(|segment| matches!(segment, ConditionSegment::Text(text) if text.is_empty()));
     let part = (!is_empty).then(|| ConditionPart {
         connector,
-        connector_raw,
+        connector_run,
         segments: segments.into_bump_slice(),
         span: Span {
             start: part_start,
