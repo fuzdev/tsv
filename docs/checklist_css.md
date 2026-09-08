@@ -372,6 +372,18 @@ Spec: `css-conditional-5` (container queries and their units moved here; `css-co
 - `@namespace url(<unquoted>)` (e.g. `@namespace svg url(http://www.w3.org/2000/svg)`) —
   opaque content preserved verbatim, incl. the `://` colon
 
+### Legacy `progid:` Values
+
+- A declaration value whose content begins with `progid:` (the IE filter syntax,
+  `filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#FF0000', …)`) is
+  **opaque**: printed verbatim from source — no number, quote, hex or unit normalization,
+  interior whitespace and newlines kept, never wrapped — with a leading comment run on the
+  colon's line and `!important` normalized as usual. Prettier's rule (`value-unknown`),
+  read ASCII-case-insensitively (postcss rejects the other spellings; no oracle there).
+  Comments inside the value are kept where prettier drops them, and a `progid:` after
+  another member is an ordinary glued token, not the trigger (see
+  `conformance_prettier_css.md` → CSS: Values, "`progid:` opaque value")
+
 ### unicode-range
 
 - Single codepoint `U+26`, range `U+0-7F` / `U+0025-00FF`, wildcard `U+4??`
@@ -384,7 +396,10 @@ Spec: `css-conditional-5` (container queries and their units moved here; `css-co
 
 ### Declaration Modifiers
 
-- `!important`
+- `!important` — `!`/`important` normalized to a single ` !important`; comments around
+  it kept in place; whitespace between it and the `;` dropped (prettier copies that
+  whitespace verbatim — `conformance_prettier_css.md` → CSS: Values, "`!important`
+  trailing whitespace")
 
 ---
 

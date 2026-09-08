@@ -433,7 +433,9 @@ impl<'a> Printer<'a> {
         }
 
         // Dispatch to appropriate handler based on value type and formatting needs
-        if let Some(plan) = self.grid_multirow_plan(decl) {
+        if let Some((run, content_start)) = self.progid_opaque_value(decl) {
+            self.print_decl_progid_opaque(decl, run, content_start);
+        } else if let Some(plan) = self.grid_multirow_plan(decl) {
             self.print_decl_grid_multirow(decl, plan);
         } else if let Some(plan) = self.multiline_plan(decl) {
             self.print_decl_multiline(decl, plan);
@@ -459,6 +461,77 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Is this declaration's value the opaque `progid:` kind — the legacy IE filter syntax
+    /// (`filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#FF0000', …)`),
+    /// which no value grammar describes and which prettier freezes verbatim?
+    ///
+    /// Returns the leading comment run to keep on the colon's line, if any, and the
+    /// absolute offset where the frozen content begins. The trigger is prettier's
+    /// (`parser-postcss.js`: `value.startsWith("progid:")` on the value postcss hands it,
+    /// which has already moved a leading comment run into `raws.between`), read here
+    /// ASCII-case-insensitively: postcss's parser only recognizes the lowercase spelling
+    /// ahead of a top-level `:` and throws "Missed semicolon" on any other, so prettier has
+    /// no output for `PROGID:` at all, and tsv — whose parser accepts it — freezes it by the
+    /// same reasoning rather than normalizing a value it does not understand
+    /// (`css/values/progid_opaque_case_prettier_divergence`).
+    ///
+    /// The comment-free check is a byte compare on the value's first bytes; only a
+    /// declaration that both carries a block comment (`has_block_comment`, O(1)) and opens
+    /// its value with one pays the run lex.
+    fn progid_opaque_value(
+        &self,
+        decl: &internal::CssDeclaration<'_>,
+    ) -> Option<(Option<Span>, u32)> {
+        fn starts_with_progid(text: &str) -> bool {
+            text.as_bytes()
+                .get(..7)
+                .is_some_and(|head| head.eq_ignore_ascii_case(b"progid:"))
+        }
+        let decl_source = decl.span.extract(self.source);
+        let value = &decl_source[decl.colon_pos() + 1..];
+        let trimmed = crate::escapes::trim_start_css(value);
+        let value_start = decl.colon_offset + 1 + (value.len() - trimmed.len()) as u32;
+        if starts_with_progid(trimmed) {
+            return Some((None, value_start));
+        }
+        if !decl.has_block_comment || !trimmed.starts_with("/*") {
+            return None;
+        }
+        let (run, content_start) =
+            self.leading_value_comment_run(Span::new(value_start, decl.span.end))?;
+        starts_with_progid(&self.source[content_start as usize..])
+            .then_some((Some(run), content_start))
+    }
+
+    /// Print the opaque `progid:` value (`progid_opaque_value`): `: `, the leading comment
+    /// run whitespace-normalized on the colon's line (`raws.between` material, as on every
+    /// other value path), then the content **verbatim** from source — numbers, quotes, hex,
+    /// unit case, interior whitespace and newlines all as written, never wrapped — and the
+    /// `!important` tail through `write_declaration_end` as usual. Prettier's shape, with
+    /// one deliberate difference: a comment inside the value is content here and stays,
+    /// where prettier prints postcss's comment-stripped `value` string and drops it
+    /// (`css/values/progid_opaque_prettier_divergence`). The trailing whitespace before
+    /// the `;` is the one thing trimmed, as postcss's `raw()` trims it too.
+    fn print_decl_progid_opaque(
+        &mut self,
+        decl: &internal::CssDeclaration<'_>,
+        run: Option<Span>,
+        content_start: u32,
+    ) {
+        self.write(": ");
+        if let Some(run) = run {
+            self.write_hoisted_run(run);
+            self.write(" ");
+        }
+        let content = &self.source[content_start as usize..decl.span.end_usize()];
+        let content = crate::escapes::trim_end_preserving_escape(content);
+        self.write_verbatim_span(Span::new(
+            content_start,
+            content_start + content.len() as u32,
+        ));
+        self.write_declaration_end(decl);
+    }
+
     /// The head of a declaration whose value breaks beneath its colon: the `:`, the hoisted
     /// leading comment run if any, and the newline — `prop:⏎` or `prop: /* c */⏎`.
     ///
@@ -474,10 +547,18 @@ impl<'a> Printer<'a> {
         self.write(":");
         if let Some(run) = hoisted {
             self.write(" ");
-            let text = value_normalization::normalize_css_whitespace(run.extract(self.source));
-            self.write(&text);
+            self.write_hoisted_run(run);
         }
         self.write("\n");
+    }
+
+    /// Write a value's leading comment run onto the colon's line — postcss `raws.between`
+    /// material, whitespace-normalized so a run of comments is joined single-spaced.
+    /// One spelling for the span-based emitters (`write_broken_value_head`,
+    /// `print_decl_progid_opaque`); the text-path twins join their already-split words.
+    fn write_hoisted_run(&mut self, run: Span) {
+        let text = value_normalization::normalize_css_whitespace(run.extract(self.source));
+        self.write(&text);
     }
 
     /// Print declaration with multiline formatting, per the layout `multiline_plan`

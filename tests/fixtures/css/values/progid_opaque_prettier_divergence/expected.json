@@ -1,0 +1,168 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 738,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 729,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 87,
+							"end": 137,
+							"property": "filter",
+							"value": "progid:X.Y(a=1.50)  progid:Z.W(b=2)"
+						},
+						{
+							"type": "Declaration",
+							"start": 206,
+							"end": 240,
+							"property": "filter",
+							"value": "progid:X.Y(a=1.50)"
+						},
+						{
+							"type": "Declaration",
+							"start": 319,
+							"end": 372,
+							"property": "filter",
+							"value": "progid:X.Y(a=1.50)  !important"
+						},
+						{
+							"type": "Declaration",
+							"start": 462,
+							"end": 510,
+							"property": "filter",
+							"value": "progid:X.Y(a=1.50)progid:Z.W(b=2)"
+						},
+						{
+							"type": "Declaration",
+							"start": 675,
+							"end": 725,
+							"property": "filter",
+							"value": "alpha(opacity=50) progid:X.Y(a=1.50) 1.5px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 729
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comment inside an opaque value is kept where it was written ",
+				"start": 17,
+				"end": 84
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 114,
+				"end": 121,
+				"position": 19
+			},
+			{
+				"type": "CSSComment",
+				"value": " a trailing comment is kept, and nothing trails the value ",
+				"start": 141,
+				"end": 203
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 233,
+				"end": 240,
+				"position": 19
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment ahead of `!important` is kept too, like the one after it ",
+				"start": 244,
+				"end": 316
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 346,
+				"end": 353,
+				"position": 19
+			},
+			{
+				"type": "CSSComment",
+				"value": " d ",
+				"start": 365,
+				"end": 372,
+				"position": 31
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment glued to its neighbours on both sides is content on both formatters ",
+				"start": 376,
+				"end": 459
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 488,
+				"end": 495,
+				"position": 18
+			},
+			{
+				"type": "CSSComment",
+				"value": " the trigger is the value's first bytes: a `progid:` after another member is an ordinary\n\t\t   glued token kept whole, and the numbers around it normalize ",
+				"start": 514,
+				"end": 672
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 730,
+			"styles": "\n\tdiv {\n\t\t/* a comment inside an opaque value is kept where it was written */\n\t\tfilter: progid:X.Y(a=1.50) /* c */ progid:Z.W(b=2);\n\t\t/* a trailing comment is kept, and nothing trails the value */\n\t\tfilter: progid:X.Y(a=1.50) /* c */;\n\t\t/* a comment ahead of `!important` is kept too, like the one after it */\n\t\tfilter: progid:X.Y(a=1.50) /* c */ !important /* d */;\n\t\t/* a comment glued to its neighbours on both sides is content on both formatters */\n\t\tfilter: progid:X.Y(a=1.50)/* c */progid:Z.W(b=2);\n\t\t/* the trigger is the value's first bytes: a `progid:` after another member is an ordinary\n\t\t   glued token kept whole, and the numbers around it normalize */\n\t\tfilter: alpha(opacity=50) progid:X.Y(a=1.50) 1.5px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 739,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
