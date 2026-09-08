@@ -11,6 +11,13 @@ line each one gets.
 drops the earlier ones below it (`A & // c⏎// x⏎B`) — lossless, but it **reorders**: `// c`
 was written after `// x` and prints above it.
 
+The earlier comments need not have been written in the gap at all: a **stripped paren
+shell's lifted run** (`(a // c1⏎// c2⏎) & // x⏎b`) is deferred past the `)` and lands in the
+same place, and prettier interleaves it the same way — its fixed point is
+`a & // c1⏎↹// x⏎↹// c2⏎↹b`, the author's `// x` pulled up between the two comments of one
+run (`A6`, `A7`). A **one-comment** lifted run has nothing to interleave and both formatters
+agree (`A8`, the control).
+
 Per Comment Position Philosophy, a comment's position is information, and so is its order
 relative to its neighbours — tsv preserves both rather than re-binding one comment to the
 operator. The forms are dual-stable: prettier holds its own output, and `input.svelte` here

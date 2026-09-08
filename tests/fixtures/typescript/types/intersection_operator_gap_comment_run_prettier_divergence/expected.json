@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 666,
+	"end": 1184,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -281,24 +281,248 @@
 					"column": 6
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the earlier comments may come from a stripped paren shell's LIFTED run rather than",
+			"start": 657,
+			"end": 742,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " from the operator gap itself; the run is deferred past the `)` and still keeps its",
+			"start": 744,
+			"end": 829,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " place ahead of the comment the author wrote on the `&`'s line",
+			"start": 831,
+			"end": 895,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 911,
+			"end": 916,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 15
+				},
+				"end": {
+					"line": 37,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 919,
+			"end": 924,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " x",
+			"start": 927,
+			"end": 931,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 2
+				},
+				"end": {
+					"line": 39,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same across an object-adjacent boundary",
+			"start": 939,
+			"end": 985,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 42,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 1012,
+			"end": 1017,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 26
+				},
+				"end": {
+					"line": 43,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 1020,
+			"end": 1025,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 2
+				},
+				"end": {
+					"line": 44,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " x",
+			"start": 1028,
+			"end": 1032,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 2
+				},
+				"end": {
+					"line": 45,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: a ONE-comment lifted run leaves nothing to interleave, so both formatters",
+			"start": 1040,
+			"end": 1125,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 1
+				},
+				"end": {
+					"line": 48,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " agree here",
+			"start": 1127,
+			"end": 1140,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 1
+				},
+				"end": {
+					"line": 49,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 1156,
+			"end": 1161,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 15
+				},
+				"end": {
+					"line": 50,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " x",
+			"start": 1164,
+			"end": 1168,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 2
+				},
+				"end": {
+					"line": 51,
+					"column": 6
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 665,
+		"end": 1183,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 656,
+			"end": 1174,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 34,
+					"line": 53,
 					"column": 9
 				}
 			},
@@ -1067,6 +1291,527 @@
 							"value": " an own-line block ahead of the operator and a `//` trailing it stay on separate lines",
 							"start": 530,
 							"end": 618
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 897,
+					"end": 936,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 902,
+						"end": 904,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 6
+							},
+							"end": {
+								"line": 37,
+								"column": 8
+							}
+						},
+						"name": "A6"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 907,
+						"end": 935,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 11
+							},
+							"end": {
+								"line": 40,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 907,
+								"end": 908,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 11
+									},
+									"end": {
+										"line": 37,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 907,
+									"end": 908,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 11
+										},
+										"end": {
+											"line": 37,
+											"column": 12
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 934,
+								"end": 935,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 2
+									},
+									"end": {
+										"line": 40,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 934,
+									"end": 935,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 2
+										},
+										"end": {
+											"line": 40,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 911,
+										"end": 916
+									},
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 919,
+										"end": 924
+									},
+									{
+										"type": "Line",
+										"value": " x",
+										"start": 927,
+										"end": 931
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the earlier comments may come from a stripped paren shell's LIFTED run rather than",
+							"start": 657,
+							"end": 742
+						},
+						{
+							"type": "Line",
+							"value": " from the operator gap itself; the run is deferred past the `)` and still keeps its",
+							"start": 744,
+							"end": 829
+						},
+						{
+							"type": "Line",
+							"value": " place ahead of the comment the author wrote on the `&`'s line",
+							"start": 831,
+							"end": 895
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 987,
+					"end": 1037,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 1
+						},
+						"end": {
+							"line": 46,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 992,
+						"end": 994,
+						"loc": {
+							"start": {
+								"line": 43,
+								"column": 6
+							},
+							"end": {
+								"line": 43,
+								"column": 8
+							}
+						},
+						"name": "A7"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 997,
+						"end": 1036,
+						"loc": {
+							"start": {
+								"line": 43,
+								"column": 11
+							},
+							"end": {
+								"line": 46,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeLiteral",
+								"start": 997,
+								"end": 1005,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 11
+									},
+									"end": {
+										"line": 43,
+										"column": 19
+									}
+								},
+								"members": [
+									{
+										"type": "TSPropertySignature",
+										"start": 999,
+										"end": 1003,
+										"loc": {
+											"start": {
+												"line": 43,
+												"column": 13
+											},
+											"end": {
+												"line": 43,
+												"column": 17
+											}
+										},
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 999,
+											"end": 1000,
+											"loc": {
+												"start": {
+													"line": 43,
+													"column": 13
+												},
+												"end": {
+													"line": 43,
+													"column": 14
+												}
+											},
+											"name": "x"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1000,
+											"end": 1003,
+											"loc": {
+												"start": {
+													"line": 43,
+													"column": 14
+												},
+												"end": {
+													"line": 43,
+													"column": 17
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 1002,
+												"end": 1003,
+												"loc": {
+													"start": {
+														"line": 43,
+														"column": 16
+													},
+													"end": {
+														"line": 43,
+														"column": 17
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1002,
+													"end": 1003,
+													"loc": {
+														"start": {
+															"line": 43,
+															"column": 16
+														},
+														"end": {
+															"line": 43,
+															"column": 17
+														}
+													},
+													"name": "X"
+												}
+											}
+										}
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1008,
+								"end": 1009,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 22
+									},
+									"end": {
+										"line": 43,
+										"column": 23
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1008,
+									"end": 1009,
+									"loc": {
+										"start": {
+											"line": 43,
+											"column": 22
+										},
+										"end": {
+											"line": 43,
+											"column": 23
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1035,
+								"end": 1036,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 2
+									},
+									"end": {
+										"line": 46,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1035,
+									"end": 1036,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 2
+										},
+										"end": {
+											"line": 46,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 1012,
+										"end": 1017
+									},
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 1020,
+										"end": 1025
+									},
+									{
+										"type": "Line",
+										"value": " x",
+										"start": 1028,
+										"end": 1032
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same across an object-adjacent boundary",
+							"start": 939,
+							"end": 985
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1142,
+					"end": 1173,
+					"loc": {
+						"start": {
+							"line": 50,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1147,
+						"end": 1149,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 6
+							},
+							"end": {
+								"line": 50,
+								"column": 8
+							}
+						},
+						"name": "A8"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 1152,
+						"end": 1172,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 11
+							},
+							"end": {
+								"line": 52,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1152,
+								"end": 1153,
+								"loc": {
+									"start": {
+										"line": 50,
+										"column": 11
+									},
+									"end": {
+										"line": 50,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1152,
+									"end": 1153,
+									"loc": {
+										"start": {
+											"line": 50,
+											"column": 11
+										},
+										"end": {
+											"line": 50,
+											"column": 12
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1171,
+								"end": 1172,
+								"loc": {
+									"start": {
+										"line": 52,
+										"column": 2
+									},
+									"end": {
+										"line": 52,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1171,
+									"end": 1172,
+									"loc": {
+										"start": {
+											"line": 52,
+											"column": 2
+										},
+										"end": {
+											"line": 52,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 1156,
+										"end": 1161
+									},
+									{
+										"type": "Line",
+										"value": " x",
+										"start": 1164,
+										"end": 1168
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: a ONE-comment lifted run leaves nothing to interleave, so both formatters",
+							"start": 1040,
+							"end": 1125
+						},
+						{
+							"type": "Line",
+							"value": " agree here",
+							"start": 1127,
+							"end": 1140
 						}
 					]
 				}

@@ -36,6 +36,15 @@ the parens being gone: prettier's own form here is **non-idempotent** (`type A2 
 collapses to `type A2 = B | A; // c2` on its second pass). Retaining the shell keeps the
 comment inside the construct it was written in and is a fixed point in one pass.
 
+The retain is the **shell's** verdict, not the trailing run's alone, so a `//` in the same
+shell's LEADING region does not strip it either (`A5`) — nor does one at the member's leading
+printed EDGE one link down, where the shells strip as a unit and the retained pair ends up
+holding both runs (`A6`). Stripping for the leading run would defer the trailing one past the
+`;` all the same, which is the whole thing this retain exists to prevent. `A7` is the
+intersection's last member, which already answered it, and `A8`/`A9` the **sole** member of
+either composite, whatever its inner: no separator follows a lone member, so the same rule
+decides it.
+
 `unformatted_ours_flat.svelte` carries the flat authorings (plus the one-member-union `|`
 for `A4`), which reach `input` under tsv only.
 

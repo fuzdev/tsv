@@ -2038,8 +2038,10 @@ impl<'a> Printer<'a> {
     /// ([`comments.md`](../../../../docs/comments.md) hazard 3). The gates that ask this
     /// question all run BEFORE any claim is set, so the filter is inert for them and
     /// decides only at emission, which is the only place two emitters could collide. The
-    /// SHELL arm needs none: [`Self::leading_edge_shell`] declines the descent outright
-    /// where the pair around the shell opens, so no gap can have claimed it.
+    /// SHELL arm takes it too, and needs its own statement of why: no *descent* can have
+    /// claimed that run ([`Self::leading_edge_shell`] declines outright where the pair
+    /// around the shell opens), but an intersection's first-member HOIST claims the shell
+    /// directly rather than by descending into it.
     fn required_paren_open_run(&self, ty: &TSType<'_>) -> Option<RequiredParenRun> {
         // The `let` is implied by the predicate, which is itself keyed on
         // [`outermost_paren`] — it is spelled out to carry the shell here rather than have
@@ -2048,7 +2050,18 @@ impl<'a> Printer<'a> {
             && let Some(shell) = outermost_paren(ty)
         {
             let (leading, trailing) = paren_shell_gaps(shell);
-            return Some(RequiredParenRun::Shell { leading, trailing });
+            // The same "no enclosing gap" licence the EDGE arm below takes, and for the
+            // same reason: an intersection's first-member HOIST claims exactly this
+            // window (it emits the run above the whole intersection and hands the member
+            // to the ordinary builder), so opening the pair here printed it a second time
+            // ([`comments.md`](../../../../docs/comments.md) hazard 3) —
+            // `type T = // c⏎↹( // c⏎↹↹B & C⏎↹) & D`. The arm once needed none, on the
+            // reading that [`Self::leading_edge_shell`] declines the descent wherever this
+            // pair opens, so no gap could have claimed it; that covers the DESCENT's
+            // claims and not the hoist's, which is a claim over the shell itself.
+            if !self.shell_leading_run_claimed(shell.span.start, leading.end) {
+                return Some(RequiredParenRun::Shell { leading, trailing });
+            }
         }
         self.leading_edge_shell_line_comment_claim(ty)
             .filter(|claim| !self.shell_leading_run_claimed(claim.start, claim.end))
@@ -2341,10 +2354,30 @@ impl<'a> Printer<'a> {
         // (`union_intersection_parens_line_comment`; the last member has no separator
         // and retains — `type_suffix_trailing_comment_union_member`).
         if self.paren_shell_retains_for_trailing_run(p) {
+            // ⚠️ **The retained shell's leading region reaches past its own gap.** A
+            // redundant shell at the inner's leading printed EDGE (`(⏎(// c⏎A) & B // t⏎)`)
+            // strips, so its run lands just inside THIS `(` — physically in this shell's
+            // leading region, and exactly where the reparse reads it back. Left to the
+            // inner's own emitter it printed from wherever that type built it: inside the
+            // groups the inner had opened (a conditional inner BROKE on the pass that had
+            // the edge shell and stayed flat on the pass that did not) and at the indent
+            // that type chose (a nested intersection took one level too many). The window
+            // widens over the run and the shell stands down under the claim — one emitter
+            // for one gap, on both passes ([`Self::leading_edge_claim_and_start`], the
+            // pair every such gap takes).
+            //
+            // No enclosing gap can have claimed it first: a layer the trailing-run rule
+            // retains STOPS the leading-edge descent ([`Self::head_layer_peels`]), because
+            // this pair prints its `(` ahead of everything inside it — so this is the
+            // innermost gap that can own the run, and the only one.
+            let (edge_claim, run_start) =
+                self.leading_edge_claim_and_start(false, p.type_annotation);
             return self.build_open_paren_shell_doc(
                 paren_open,
-                inner_start,
-                self.build_type_doc(p.type_annotation),
+                run_start,
+                self.with_claimed_shell_leading_run(edge_claim, || {
+                    self.build_type_doc(p.type_annotation)
+                }),
                 inner_end,
                 paren_close,
             );
