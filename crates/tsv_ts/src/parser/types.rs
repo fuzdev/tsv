@@ -1854,7 +1854,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // fail as a stray token further along: `<out out T>` is a duplicate modifier
             // in every context, adjudicable from the construct alone — the
             // unconditional-local bucket tsv rejects rather than defers (see
-            // `../../CLAUDE.md` §Strict Mode Only), and the same call tsv already makes
+            // `../../CLAUDE.md` §Strictness), and the same call tsv already makes
             // one position over for a class member (`public public foo`). ⚠️ tsc's
             // parser instead accepts and raises TS1030 `'out' modifier already seen`
             // from its grammar checker, and prettier collapses the repeat — so this is

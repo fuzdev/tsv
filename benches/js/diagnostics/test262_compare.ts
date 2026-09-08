@@ -5,11 +5,11 @@
  *   cargo run -p tsv_debug test262 --emit-manifest <file>
  * (tsv's graded strict subset — each row carries the test's `expected` verdict
  * and tsv's actual verdict), runs oxc-parser over the same files at the same
- * goal tsv grades each at (`module`-flagged → module, else strict script — tsv
- * supports both goals, always strict) and under the same harness strict-mode
- * transform (`graded_source`), and buckets the agreement so a tsv
- * failure can be triaged as a real bug vs. a shared limitation. The two starred buckets
- * are the actionable output:
+ * goal tsv grades each at (`module`-flagged → module, else script, made strict
+ * by the harness prefix) and under the same harness strict-mode transform
+ * (`graded_source`), and buckets the agreement so a tsv failure can be triaged
+ * as a real bug vs. a shared limitation. The two starred buckets are the
+ * actionable output:
  *   - positives where tsv rejects but oxc accepts → tsv real-bug candidates
  *   - negatives where oxc rejects but tsv accepts → tsv early-error gaps
  *
@@ -94,13 +94,14 @@ function graded_source(source: string, entry: ManifestEntry): string {
  * manifest). So an `await`-as-identifier test, valid only in a script, lands in
  * `both-accept` rather than `both-reject`.
  *
- * The goal axis matches; strictness is not carried by the goal here, because
- * oxc's `'script'` is sloppy while tsv's `Goal::Script` is strict. The source
- * closes most of that gap: a row the manifest marks `strict` at script goal is
- * handed over with the harness's `"use strict";` prefix (`graded_source`), which
- * puts oxc in strict mode too. What remains is a row that is neither `module`
- * nor `strict` — sloppy for oxc, strict for tsv — the residual caveat
- * docs/conformance_test262.md §Differential describes.
+ * The goal axis matches, and strictness is not carried by the goal on either
+ * side: oxc's `'script'` is sloppy and so is tsv's `Goal::Script`. The source is
+ * what makes a row strict on both: a row the manifest marks `strict` at script
+ * goal is handed over with the harness's `"use strict";` prefix
+ * (`graded_source`). What remains is a row that is neither `module` nor `strict`
+ * — sloppy on both sides, but tsv refuses `with` and the Annex B grammar under
+ * every mode — the residual caveat docs/conformance_test262.md §Differential
+ * describes.
  *
  * A non-empty `errors` array, or a throw, counts as reject.
  */

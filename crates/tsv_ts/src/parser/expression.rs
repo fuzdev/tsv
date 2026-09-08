@@ -1547,10 +1547,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Parse a Number token into a Literal, handling BigInt suffix
+    /// Parse a Number token into a Literal, handling BigInt suffix.
+    ///
+    /// The one gate on the **leading-zero** literals — `LegacyOctalIntegerLiteral`
+    /// (`010`) and `NonOctalDecimalIntegerLiteral` (`08`). The lexer reads both under
+    /// every mode; strict code disallows them *by production* (ecma262
+    /// sec-strict-mode-of-ecmascript), so the rejection belongs here, where the token
+    /// becomes a node and the enclosing code's strictness is settled. Every position a
+    /// numeric literal can occupy routes through this — an expression, an object or
+    /// class key, a literal type, a `TSLiteralType`'s negated operand, and a type
+    /// member's key — so the gate is stated once.
     pub(crate) fn parse_number_or_bigint_literal(&self) -> Result<Literal<'arena>, ParseError> {
         let (start, end) = self.current_pos();
         let raw = self.current_value();
+        let bytes = raw.as_bytes();
+        if self.strict
+            && bytes.first() == Some(&b'0')
+            && bytes.get(1).is_some_and(u8::is_ascii_digit)
+        {
+            return Err(self.error_msg_at(
+                "Leading-zero literals are not allowed in strict mode. Use '0o' for octal.",
+                start,
+            ));
+        }
         if raw.ends_with('n') {
             // BigInt — no stored payload; digits via `Literal::bigint_digits(source)`.
             Ok(Literal {
@@ -2772,19 +2791,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a function/arrow block body, marking its directive prologue.
     ///
     /// Function bodies (unlike arbitrary blocks) carry a directive prologue per
-    /// acorn — see `adapt_directive_prologue`.
+    /// acorn — see `note_directive` — so this is also a strictness scope: a
+    /// `"use strict"` at the head makes the body and everything nested in it strict,
+    /// and the mode is restored for the code that follows. The parameters were
+    /// parsed by the caller under the *outer* mode, which is correct — acorn does
+    /// the same, and the rule against a directive in a non-simple-parameter function
+    /// is a deferred early error.
     pub(super) fn parse_function_body(&mut self) -> Result<BlockStatement<'arena>, ParseError> {
-        let (mut body, span) = self.parse_block_body()?;
-        // Mark the directive prologue on the owned buffer before freezing it.
-        self.adapt_directive_prologue(&mut body);
-        Ok(BlockStatement {
-            body: body.into_bump_slice(),
-            span,
+        self.with_strict_scope(|p| {
+            let (body, span) = p.parse_block_body(true)?;
+            Ok(BlockStatement {
+                body: body.into_bump_slice(),
+                span,
+            })
         })
     }
 
     pub(super) fn parse_block_statement(&mut self) -> Result<BlockStatement<'arena>, ParseError> {
-        let (body, span) = self.parse_block_body()?;
+        let (body, span) = self.parse_block_body(false)?;
         Ok(BlockStatement {
             body: body.into_bump_slice(),
             span,
@@ -2792,10 +2816,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a `{ … }` block's statements into an arena buffer plus the block's
-    /// span. Shared by `parse_block_statement` and `parse_function_body`; the
-    /// latter mutates the buffer (directive prologue) before freezing it.
+    /// span. Shared by `parse_block_statement` and `parse_function_body`;
+    /// `directives` is what tells the two apart — only a function body carries a
+    /// directive prologue, so a `"use strict"` heading a plain nested block is an
+    /// ordinary expression statement that turns nothing on.
     fn parse_block_body(
         &mut self,
+        directives: bool,
     ) -> Result<(bumpalo::collections::Vec<'arena, Statement<'arena>>, Span), ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
@@ -2803,12 +2830,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut body = self.bvec();
 
         // Parse statements until we hit '}'
+        let mut in_prologue = directives;
         while !self.check(&TokenKind::BraceClose) {
             if self.check(&TokenKind::Eof) {
                 return Err(self.error_msg("Unexpected end of file in block"));
             }
 
-            let stmt = self.parse_statement()?;
+            let mut stmt = self.parse_statement()?;
+            if in_prologue {
+                in_prologue = self.note_directive(&mut stmt);
+            }
             body.push(stmt);
         }
 

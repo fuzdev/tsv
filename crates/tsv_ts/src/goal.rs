@@ -2,11 +2,14 @@
 //!
 //! The goal is a parse-time input — literally which symbol the grammar starts
 //! from (`ParseScript` vs `ParseModule` in the spec). It governs *syntactic
-//! availability* of a handful of constructs and nothing else. It is orthogonal
-//! to strictness: `tsv` is **always strict** (it has no sloppy mode and never
-//! inspects a `"use strict"` directive), so `Goal` toggles only the
-//! goal-specific grammar, not the lexical/early-error rejections that strict
-//! mode owns.
+//! availability* of a handful of constructs and nothing else.
+//!
+//! It is orthogonal to **strictness**, which is a property of the source text
+//! rather than of the goal, with one coupling: Module code is strict by
+//! definition, while Script code is strict only once a `"use strict"` directive
+//! prologue says so. So `Goal` itself toggles the goal-specific grammar below;
+//! what strict code disallows is decided separately, by the parser's `strict`
+//! state.
 
 /// The syntactic goal symbol a parse runs against.
 ///
@@ -15,8 +18,8 @@
 /// exists for standalone scripts and parser-conformance grading, where the
 /// goal-specific constructs differ.
 ///
-/// Both variants are **strict** — the only axis this enum moves is the goal
-/// symbol. The four constructs that differ between the goals:
+/// The only axis this enum moves is the goal symbol. The four constructs that
+/// differ between the goals:
 ///
 /// | construct | `Module` | `Script` |
 /// | --- | --- | --- |
@@ -35,8 +38,11 @@ pub enum Goal {
     Module,
     /// `ParseScript` — `await` is an ordinary identifier (the top level is
     /// `[~Await]`); `import`/`export` declarations, `import.meta`, and top-level
-    /// `await` expressions are syntax errors. Still strict (`tsv` has no sloppy
-    /// mode), so `with`, legacy octal, etc. remain rejected.
+    /// `await` expressions are syntax errors. Script code is **sloppy** unless its
+    /// directive prologue holds a `"use strict"`, so a leading-zero numeric
+    /// literal (`010`, `08`) parses where a module rejects it. `with` is rejected
+    /// under every mode, and the Annex B web-compatibility grammar is out of scope
+    /// at both goals.
     Script,
 }
 

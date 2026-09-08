@@ -231,17 +231,17 @@ const BEYOND_ACORN_SANCTIONS: BeyondAcornSanction[] = [
 	{
 		pattern: 'elidedEmbeddedStatementsReplacedWithSemicolon.ts',
 		category: 'grammar',
-		reason: '`with` statement — no strict-mode production (CLAUDE.md §Strict Mode Only)'
+		reason: '`with` statement — no strict-mode production (CLAUDE.md §Strictness)'
 	},
 	{
 		pattern: 'withStatementInternalComments.ts',
 		category: 'grammar',
-		reason: '`with` statement — no strict-mode production (CLAUDE.md §Strict Mode Only)'
+		reason: '`with` statement — no strict-mode production (CLAUDE.md §Strictness)'
 	},
 	{
 		pattern: 'topLevelVarHoistingCommonJS.ts',
 		category: 'grammar',
-		reason: '`with` statement — no strict-mode production (CLAUDE.md §Strict Mode Only)'
+		reason: '`with` statement — no strict-mode production (CLAUDE.md §Strictness)'
 	},
 	// PrivateIdentifier has exactly three productions: a ClassElementName, a member
 	// access, and the left operand of `in`. tsc's parser reads it as any property

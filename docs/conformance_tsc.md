@@ -175,7 +175,7 @@ nothing fails the gate, so a fixed gap must leave its ledger the day it is fixed
   refuse what tsc refuses) drops it with agreement unchanged. The two `unexpected`
   buckets staying empty is what settles a drop.
 - **Over-acceptance is two numbers, and only one is a question.** `checker` is the
-  deferred-early-error posture by design ([CLAUDE.md §Strict Mode Only](../CLAUDE.md#strict-mode-only),
+  deferred-early-error posture by design ([CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive),
   [conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)):
   tsc's own parser built the tree and a later grammar check refused it, exactly where
   tsv's future diagnostics layer will refuse it. `parser` is tsv taking what tsc's parser

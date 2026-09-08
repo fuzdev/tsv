@@ -195,8 +195,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 KeywordKind::Break => self.parse_break_statement(),
                 KeywordKind::Continue => self.parse_continue_statement(),
                 KeywordKind::Debugger => self.parse_debugger_statement(),
-                // The `with` statement is sloppy-mode only and tsv is strict-only, so it
-                // is refused at its keyword rather than by an accident further along.
+                // The `with` statement is sloppy-mode only and tsv rejects it under
+                // every mode, so it is refused at its keyword rather than by an
+                // accident further along.
                 // (Lexing it as an identifier would make `with (a);` read as a CALL
                 // and reprint as `with(a);` — a sloppy-mode program silently
                 // reinterpreted instead of rejected.)
@@ -335,29 +336,53 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
-    /// Mark the directive prologue of a `Program` or function body.
+    /// Mark a just-parsed statement as a directive while a `Program` or function
+    /// body's **directive prologue** is still open, returning whether the prologue
+    /// continues past it.
     ///
-    /// Mirrors acorn's `adaptDirectivePrologue`: the leading run of
-    /// unparenthesized string-literal expression statements are directives
-    /// (`"use strict";` and friends). Iteration stops at the first statement
-    /// that isn't a directive candidate.
-    pub(super) fn adapt_directive_prologue(&self, statements: &mut [Statement<'arena>]) {
-        for stmt in statements {
-            let Statement::ExpressionStatement(expr_stmt) = stmt else {
-                break;
-            };
-            let Expression::Literal(lit) = &expr_stmt.expression else {
-                break;
-            };
-            if !matches!(lit.value, LiteralValue::String(_)) {
-                break;
-            }
-            // Reject parenthesized strings: the statement must open with a quote.
-            let local_start = (expr_stmt.span.start as usize).saturating_sub(self.base_offset);
-            if !matches!(self.source.as_bytes().get(local_start), Some(b'"' | b'\'')) {
-                break;
-            }
-            expr_stmt.is_directive = true;
+    /// Mirrors acorn's `adaptDirectivePrologue`: the leading run of unparenthesized
+    /// string-literal expression statements are directives (`"use strict";` and
+    /// friends), and the first statement that is not a directive candidate ends the
+    /// run. It is called *per statement* rather than over the finished body because
+    /// a `"use strict"` directive changes how the statements after it are graded —
+    /// the strictness must be established before the next statement's tokens are
+    /// consumed, not after the body is closed.
+    ///
+    /// A directive's text is compared against the source **byte-exactly**, quotes
+    /// included: ecma262 sec-directive-prologues defines a Use Strict Directive as
+    /// one whose string literal is the exact code point sequence `use strict` with
+    /// no escapes and no line continuations, so `"use\u0020strict"` is an ordinary
+    /// directive that does not turn strict mode on.
+    pub(super) fn note_directive(&mut self, stmt: &mut Statement<'arena>) -> bool {
+        let Statement::ExpressionStatement(expr_stmt) = stmt else {
+            return false;
+        };
+        let Expression::Literal(lit) = &expr_stmt.expression else {
+            return false;
+        };
+        if !matches!(lit.value, LiteralValue::String(_)) {
+            return false;
         }
+        // Reject parenthesized strings: the statement must open with a quote.
+        let local_start = (expr_stmt.span.start as usize).saturating_sub(self.base_offset);
+        let Some(rest @ [b'"' | b'\'', ..]) = self.source.as_bytes().get(local_start..) else {
+            return false;
+        };
+        expr_stmt.is_directive = true;
+        if rest.starts_with(USE_STRICT_DOUBLE) || rest.starts_with(USE_STRICT_SINGLE) {
+            self.strict = true;
+            // TODO: a legacy octal string escape (`"\7"`) in an *earlier* prologue
+            // literal is retroactively a syntax error once this fires (ecma262
+            // sec-string-literals: implementations must enforce the strict rules for
+            // such literals). The re-check over the statements already in this body's
+            // buffer belongs here, once the escape gate exists to run.
+        }
+        true
     }
 }
+
+/// The two byte-exact spellings of a Use Strict Directive, quotes included. A
+/// literal whose closing quote is the twelfth byte can hold nothing but these ten
+/// characters, so a prefix match on the statement's source is the whole test.
+const USE_STRICT_DOUBLE: &[u8] = b"\"use strict\"";
+const USE_STRICT_SINGLE: &[u8] = b"'use strict'";

@@ -182,12 +182,14 @@ and package READMEs for the full API and CLI flags:
     don't regress the focused artifacts
 - modern and Web-conformant
   - up-to-date with web specs (roughly aiming for late-stage TC39 proposals and up)
-  - JS and TS parse in strict mode only - sloppy-mode-only syntax like `with` is
-    rejected, while strict-mode early errors (e.g. duplicate params, reserved-word
-    bindings) still parse for now, with enforcement deferred to a future
-    diagnostics layer. The parse goal defaults to Module, with an opt-in Script
-    goal (`--goal script`); since Svelte and TypeScript are inherently strict
-    modules, this affects only standalone JS scripts to force modern patterns
+  - strictness follows the spec: a module is strict, a script is strict once its
+    directive prologue holds a `"use strict"`. The parse goal defaults to Module,
+    with an opt-in Script goal (`--goal script`), and since Svelte and TypeScript
+    are inherently strict modules the sloppy reading only ever affects standalone
+    JS scripts. The `with` statement is rejected under every mode, the Annex B
+    web-compatibility grammar is out of scope at both goals, and strict-mode
+    early errors (e.g. duplicate params, reserved-word bindings) still parse for
+    now, with enforcement deferred to a future diagnostics layer
 
 Each language is a self-contained Rust crate exposing the same
 `parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - no

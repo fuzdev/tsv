@@ -215,17 +215,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }),
             )
         } else if self.check(&TokenKind::Number) {
-            // Number literal key: {0: string, 1: number}
-            let (key_start, key_end) = self.current_pos();
-            let value = self.current_value().parse::<f64>().unwrap_or(f64::NAN);
+            // Number literal key: {0: string, 1: number}. Routed through the one
+            // numeric-literal reader so this key reads its radix prefixes, separators
+            // and BigInt suffix like every other position — and is graded by the same
+            // strict-mode leading-zero gate.
+            let literal = self.parse_number_or_bigint_literal()?;
             self.advance()?;
-            (
-                false,
-                Expression::Literal(Literal {
-                    value: LiteralValue::Number(value),
-                    span: Span::new(key_start as u32, key_end as u32),
-                }),
-            )
+            (false, Expression::Literal(literal))
         } else {
             return Err(self.error_expected("property name"));
         };

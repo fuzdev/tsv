@@ -57,9 +57,10 @@ divergence from acorn, which rejects them (see
 See [Scope](#what-we-skip).
 
 **Positive parse conformance is 100%** at each test's declared goal (`module`-flagged
-→ `Module`; the run-both-ways default + `onlyStrict` → strict `Script`). The lone
+→ `Module`; the run-both-ways default + `onlyStrict` → `Script`, made strict by the
+harness prefix where `onlyStrict` declares it). The lone
 exception — the sloppy-by-content `raw` test `language/comments/hashbang/use-strict.js`
-— is **skipped** as out of scope for a strict-only parser (the sloppy-mode bucket; see
+— is **skipped** as out of scope for the graded strict subset (the sloppy-mode bucket; see
 [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis)), not graded; the
 other 27 in-scope `raw` tests stay graded. _(Methodology for any future failure: parse
 each `../test262/<path>` with `canonical_parse` and bucket on whether it yields an AST.)_
@@ -147,7 +148,7 @@ What tsv does *not* defer is the guards the same productions carry:
 and the name reading is unreachable rather than merely invalid. Out of scope
 (skipped, not graded as failures): **sloppy-mode-only**
 constructs (`with`, the AnnexB `f() = g()` / `for (var a = x in b)` forms, legacy
-octal — tsv is strict-only) and **plugin-gated syntax** not in the oracle config
+octal — all in the skipped `noStrict` and AnnexB buckets) and **plugin-gated syntax** not in the oracle config
 (some decorator forms).
 
 Most negative failures are the early-error under-enforcement noted above (duplicate
@@ -227,13 +228,13 @@ entity name (`A.B.C`): a string/number/empty reference (`import x = 'foo'`,
 
 - `negative.phase: runtime` - Requires execution
 - `negative.phase: resolution` - Requires module resolution
-- `flags: [noStrict]` - Requires sloppy mode (tsv is strict-only). A `flags: [raw]`
-  test (verbatim source, no harness) also runs in non-strict mode only per
-  test262/INTERPRETING.md, but nearly all exercise mode-independent syntax (hashbang,
-  HTML-close comments, `"use strict"` directive prologues) tsv grades correctly at
-  their goal, so those stay graded. Only a raw test whose verdict genuinely needs
-  sloppy semantics — it uses a construct tsv rejects as strict-only (`with`, legacy
-  octal) — is skipped, like `noStrict`. That list (`SLOPPY_ONLY_RAW_TESTS` in
+- `flags: [noStrict]` - Declares a sloppy-only run, outside the graded strict subset.
+  A `flags: [raw]` test (verbatim source, no harness) also runs in non-strict mode only
+  per test262/INTERPRETING.md, but nearly all exercise mode-independent syntax
+  (hashbang, HTML-close comments, `"use strict"` directive prologues) tsv grades
+  correctly at their goal, so those stay graded. Only a raw test whose verdict genuinely
+  needs the sloppy run — it uses a construct tsv rejects under every mode, such as
+  `with` — is skipped, like `noStrict`. That list (`SLOPPY_ONLY_RAW_TESTS` in
   `crates/tsv_debug/src/test262/runner.rs`) is currently the single
   `language/comments/hashbang/use-strict.js`
 - `flags: [raw]` together with `flags: [onlyStrict]` - contradictory metadata (a raw
@@ -405,16 +406,23 @@ Pass rate: 0/1 (0.0%)
 
 ## Design Decision: Strict Mode Only, Explicit Goal Axis
 
-**tsv parses as strict mode only** — there is no sloppy mode and no `"use strict"`
-detection. This matches our use cases (TypeScript is always strict; ES modules and
-Svelte `<script>` are always strict). Tests with `flags: [noStrict]` (sloppy) are
-skipped as out of scope. A `flags: [raw]` test (verbatim source, no harness) also runs
-in non-strict mode only per test262/INTERPRETING.md, but nearly all exercise
-mode-independent syntax (hashbang, HTML-close comments, directive prologues) a
-strict-only parser grades correctly, so those stay graded at their goal. The lone raw
-test that is sloppy *by content* — `hashbang/use-strict.js`, whose `#!` turns
-`"use strict"` into a comment, leaving a sloppy `with` — is out of scope for the same
-reason `noStrict` is, so it is skipped (sloppy-mode bucket), not graded as a failure.
+**Every graded run is either strict, or mode-independent by declaration.** Strictness
+itself is a property of the source text — a module is strict, a script is strict once
+its directive prologue says so (see
+[CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)).
+A `module` test is strict by its goal; an `onlyStrict` test is made strict by the
+harness prefix; a run-both-ways test (no flag — the bulk of the suite) is graded once,
+at a bare `Script`, and its own declaration is that the verdict is the same in both
+modes, so that one run loses nothing. This matches tsv's use cases (TypeScript is always
+strict; ES modules and Svelte `<script>` are always strict).
+Tests with `flags: [noStrict]`, which declare a sloppy-only run, are skipped as out of
+scope. A `flags: [raw]` test (verbatim source, no harness) also runs in non-strict mode
+only per test262/INTERPRETING.md, but nearly all exercise mode-independent syntax
+(hashbang, HTML-close comments, directive prologues) whose verdict is the same either
+way, so those stay graded at their goal. The lone raw test that is sloppy *by content*
+— `hashbang/use-strict.js`, whose `#!` turns `"use strict"` into a comment, leaving a
+`with` statement tsv rejects under every mode — is out of scope for the same reason
+`noStrict` is, so it is skipped (sloppy-mode bucket), not graded as a failure.
 
 **A `flags: [onlyStrict]` test is graded through the harness's own transform.** Such a
 test declares a single run, the strict one, and test262-harness produces it by inserting
@@ -428,11 +436,13 @@ a test declaring both is refused rather than graded, so the runner never modifie
 source. The differential consumer applies the same prefix, keyed on the manifest's
 `strict` and `module` fields, so both parsers see the same source.
 
-**Strict and the *goal* symbol are orthogonal axes** (ECMAScript §11.2.2): a parse
-runs against either `Goal::Module` or `Goal::Script`, both strict. tsv exposes this
-as `tsv_ts::parse_with_goal` (and `tsv parse|format --goal script|module`),
-defaulting to **`Module`** — correct for Svelte `<script>` and ~all real TS. The
-goal toggles only the four goal-specific constructs:
+**Strict and the *goal* symbol are orthogonal axes** (ECMAScript §11.2.2), with one
+coupling: a parse runs against either `Goal::Module` or `Goal::Script`, and Module code
+is strict by definition while Script code is strict only once its directive prologue
+holds a `"use strict"`. tsv exposes the goal as `tsv_ts::parse_with_goal` (and
+`tsv parse|format --goal script|module`), defaulting to **`Module`** — correct for
+Svelte `<script>` and ~all real TS. The goal toggles only the four goal-specific
+constructs:
 
 | construct | `Module` | `Script` |
 | --- | --- | --- |
@@ -446,8 +456,8 @@ the goal.
 
 **The runner grades each test at its declared goal**: a `module`-flagged test as
 `Module`, everything else it grades (the run-both-ways default + `onlyStrict`) as a
-strict `Script`. So the `await`-as-identifier tests (valid only in a strict Script)
-parse correctly — making tsv **more spec-correct than acorn-as-module**, which is
+`Script`, strict where the harness prefix says so. So the `await`-as-identifier tests
+(valid only in a Script) parse correctly — making tsv **more spec-correct than acorn-as-module**, which is
 module-only. This is a deliberate, spec-grounded divergence from the drop-in oracle's
 *module-mode* behavior, not a bug. The context tracking is a single `[Await]` flag
 saved/restored at every function-like scope boundary (async → `[+Await]`, non-async
@@ -487,20 +497,21 @@ each at the **same goal tsv grades it at** (`module`-flagged →
 `sourceType: 'module'`, else `'script'`) and from the **same source** — a row the
 manifest marks `strict` at script goal is handed over with the harness's
 `"use strict";` prefix, exactly as the runner grades it. Strictness is not carried
-by the goal here: oxc's `'script'` is **sloppy** while tsv's `Goal::Script` is
-strict, and the prefix is what closes that gap on the rows that carry it. The
-residual caveat is the rows that are neither `module` nor `strict` — sloppy for
-oxc, strict for tsv — where a *sloppy-by-content* script would show up as a
-positive "tsv rejects, oxc accepts" candidate even though it's a sanctioned
-strict-only divergence, not a bug. The one known such test
+by the goal on either side: oxc's `'script'` is **sloppy** and so is tsv's
+`Goal::Script`, and the prefix is what makes both strict on the rows that carry it.
+The residual caveat is the rows that are neither `module` nor `strict` — sloppy on
+both sides, but tsv refuses `with` and the Annex B web-compatibility grammar under
+every mode, so a script using one would show up as a positive "tsv rejects, oxc
+accepts" candidate even though it's a sanctioned divergence, not a bug. The one
+known such test
 (`hashbang/use-strict.js` — see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
 is skipped before grading, so it never enters the manifest; any future sloppy-by-content
 script would surface here and want the same treatment. The two
 actionable buckets:
 
 - **positives where tsv rejects but oxc accepts** → tsv real-bug candidates (modulo
-  the strict-vs-sloppy-script caveat above, which reaches only the rows that are
-  neither `module` nor `strict`)
+  the sloppy-script caveat above, which reaches only the rows that are neither
+  `module` nor `strict`)
 - **negatives where oxc rejects but tsv accepts** → tsv early-error gaps (the
   deferred-diagnostics map; tsv under-enforces early errors by design)
 

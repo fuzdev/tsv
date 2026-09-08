@@ -119,7 +119,7 @@ fn printer_normalizes_to_canonical_order() {
 /// already seen` from its grammar checker, exactly as it does the TS1029 ordering rule
 /// tsv *defers*. The two are graded differently on purpose — a duplicate is
 /// **unconditional-local** (invalid in every context, adjudicable from the construct
-/// alone), the bucket `CLAUDE.md` §Strict Mode Only rejects rather than defers, and the
+/// alone), the bucket `CLAUDE.md` §Strictness rejects rather than defers, and the
 /// call tsv already makes one position over for a class member (`public public foo`).
 /// acorn agrees with the verdict, so the drop-in rejection is pinned as ordinary
 /// `input_invalid_*` files in

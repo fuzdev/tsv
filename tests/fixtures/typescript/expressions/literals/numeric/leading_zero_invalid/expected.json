@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 411,
+	"end": 493,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " A leading `0` is a valid numeric literal only before `.`, `e`, `n`, a radix",
+			"value": " In a module — always strict code — a leading `0` is a valid numeric literal only",
 			"start": 10,
-			"end": 88,
+			"end": 93,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 79
+					"column": 84
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " prefix (`x`/`b`/`o`), or end — never before another digit or a `_` separator",
-			"start": 90,
-			"end": 169,
+			"value": " before `.`, `e`, `n`, a radix prefix (`x`/`b`/`o`), or end, never before another",
+			"start": 95,
+			"end": 178,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,15 +38,15 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 80
+					"column": 84
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " (those are the strict-mode-illegal legacy-octal / non-octal-decimal forms).",
-			"start": 171,
-			"end": 249,
+			"value": " digit (the legacy-octal / non-octal-decimal forms strict code disallows). A `_`",
+			"start": 180,
+			"end": 262,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -54,7 +54,23 @@
 				},
 				"end": {
 					"line": 4,
-					"column": 79
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " separator after the leading `0` is a syntax error in every mode.",
+			"start": 264,
+			"end": 331,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 68
 				}
 			}
 		}
@@ -62,63 +78,63 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 410,
+		"end": 492,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 401,
+			"end": 483,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 13,
+					"line": 14,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 251,
-					"end": 266,
+					"start": 333,
+					"end": 348,
 					"loc": {
 						"start": {
-							"line": 5,
+							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 5,
+							"line": 6,
 							"column": 16
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 257,
-							"end": 265,
+							"start": 339,
+							"end": 347,
 							"loc": {
 								"start": {
-									"line": 5,
+									"line": 6,
 									"column": 7
 								},
 								"end": {
-									"line": 5,
+									"line": 6,
 									"column": 15
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 257,
-								"end": 261,
+								"start": 339,
+								"end": 343,
 								"loc": {
 									"start": {
-										"line": 5,
+										"line": 6,
 										"column": 7
 									},
 									"end": {
-										"line": 5,
+										"line": 6,
 										"column": 11
 									}
 								},
@@ -126,15 +142,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 264,
-								"end": 265,
+								"start": 346,
+								"end": 347,
 								"loc": {
 									"start": {
-										"line": 5,
+										"line": 6,
 										"column": 14
 									},
 									"end": {
-										"line": 5,
+										"line": 6,
 										"column": 15
 									}
 								},
@@ -147,64 +163,70 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " A leading `0` is a valid numeric literal only before `.`, `e`, `n`, a radix",
+							"value": " In a module — always strict code — a leading `0` is a valid numeric literal only",
 							"start": 10,
-							"end": 88
+							"end": 93
 						},
 						{
 							"type": "Line",
-							"value": " prefix (`x`/`b`/`o`), or end — never before another digit or a `_` separator",
-							"start": 90,
-							"end": 169
+							"value": " before `.`, `e`, `n`, a radix prefix (`x`/`b`/`o`), or end, never before another",
+							"start": 95,
+							"end": 178
 						},
 						{
 							"type": "Line",
-							"value": " (those are the strict-mode-illegal legacy-octal / non-octal-decimal forms).",
-							"start": 171,
-							"end": 249
+							"value": " digit (the legacy-octal / non-octal-decimal forms strict code disallows). A `_`",
+							"start": 180,
+							"end": 262
+						},
+						{
+							"type": "Line",
+							"value": " separator after the leading `0` is a syntax error in every mode.",
+							"start": 264,
+							"end": 331
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 268,
-					"end": 285,
+					"start": 350,
+					"end": 367,
 					"loc": {
 						"start": {
-							"line": 6,
+							"line": 7,
 							"column": 1
 						},
 						"end": {
-							"line": 6,
+							"line": 7,
 							"column": 18
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 274,
-							"end": 284,
+							"start": 356,
+							"end": 366,
 							"loc": {
 								"start": {
-									"line": 6,
+									"line": 7,
 									"column": 7
 								},
 								"end": {
-									"line": 6,
+									"line": 7,
 									"column": 17
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 274,
-								"end": 278,
+								"start": 356,
+								"end": 360,
 								"loc": {
 									"start": {
-										"line": 6,
+										"line": 7,
 										"column": 7
 									},
 									"end": {
-										"line": 6,
+										"line": 7,
 										"column": 11
 									}
 								},
@@ -212,15 +234,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 281,
-								"end": 284,
+								"start": 363,
+								"end": 366,
 								"loc": {
 									"start": {
-										"line": 6,
+										"line": 7,
 										"column": 14
 									},
 									"end": {
-										"line": 6,
+										"line": 7,
 										"column": 17
 									}
 								},
@@ -233,44 +255,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 287,
-					"end": 303,
+					"start": 369,
+					"end": 385,
 					"loc": {
 						"start": {
-							"line": 7,
+							"line": 8,
 							"column": 1
 						},
 						"end": {
-							"line": 7,
+							"line": 8,
 							"column": 17
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 293,
-							"end": 302,
+							"start": 375,
+							"end": 384,
 							"loc": {
 								"start": {
-									"line": 7,
+									"line": 8,
 									"column": 7
 								},
 								"end": {
-									"line": 7,
+									"line": 8,
 									"column": 16
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 293,
-								"end": 296,
+								"start": 375,
+								"end": 378,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 8,
 										"column": 7
 									},
 									"end": {
-										"line": 7,
+										"line": 8,
 										"column": 10
 									}
 								},
@@ -278,15 +300,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 299,
-								"end": 302,
+								"start": 381,
+								"end": 384,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 8,
 										"column": 13
 									},
 									"end": {
-										"line": 7,
+										"line": 8,
 										"column": 16
 									}
 								},
@@ -299,44 +321,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 305,
-					"end": 320,
+					"start": 387,
+					"end": 402,
 					"loc": {
 						"start": {
-							"line": 8,
+							"line": 9,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
+							"line": 9,
 							"column": 16
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 311,
-							"end": 319,
+							"start": 393,
+							"end": 401,
 							"loc": {
 								"start": {
-									"line": 8,
+									"line": 9,
 									"column": 7
 								},
 								"end": {
-									"line": 8,
+									"line": 9,
 									"column": 15
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 311,
-								"end": 314,
+								"start": 393,
+								"end": 396,
 								"loc": {
 									"start": {
-										"line": 8,
+										"line": 9,
 										"column": 7
 									},
 									"end": {
-										"line": 8,
+										"line": 9,
 										"column": 10
 									}
 								},
@@ -344,15 +366,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 317,
-								"end": 319,
+								"start": 399,
+								"end": 401,
 								"loc": {
 									"start": {
-										"line": 8,
+										"line": 9,
 										"column": 13
 									},
 									"end": {
-										"line": 8,
+										"line": 9,
 										"column": 15
 									}
 								},
@@ -366,44 +388,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 322,
-					"end": 339,
+					"start": 404,
+					"end": 421,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 10,
 							"column": 1
 						},
 						"end": {
-							"line": 9,
+							"line": 10,
 							"column": 18
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 328,
-							"end": 338,
+							"start": 410,
+							"end": 420,
 							"loc": {
 								"start": {
-									"line": 9,
+									"line": 10,
 									"column": 7
 								},
 								"end": {
-									"line": 9,
+									"line": 10,
 									"column": 17
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 328,
-								"end": 331,
+								"start": 410,
+								"end": 413,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 10,
 										"column": 7
 									},
 									"end": {
-										"line": 9,
+										"line": 10,
 										"column": 10
 									}
 								},
@@ -411,15 +433,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 334,
-								"end": 338,
+								"start": 416,
+								"end": 420,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 10,
 										"column": 13
 									},
 									"end": {
-										"line": 9,
+										"line": 10,
 										"column": 17
 									}
 								},
@@ -432,44 +454,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 341,
-					"end": 357,
+					"start": 423,
+					"end": 439,
 					"loc": {
 						"start": {
-							"line": 10,
+							"line": 11,
 							"column": 1
 						},
 						"end": {
-							"line": 10,
+							"line": 11,
 							"column": 17
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 347,
-							"end": 356,
+							"start": 429,
+							"end": 438,
 							"loc": {
 								"start": {
-									"line": 10,
+									"line": 11,
 									"column": 7
 								},
 								"end": {
-									"line": 10,
+									"line": 11,
 									"column": 16
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 347,
-								"end": 350,
+								"start": 429,
+								"end": 432,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 11,
 										"column": 7
 									},
 									"end": {
-										"line": 10,
+										"line": 11,
 										"column": 10
 									}
 								},
@@ -477,15 +499,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 353,
-								"end": 356,
+								"start": 435,
+								"end": 438,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 11,
 										"column": 13
 									},
 									"end": {
-										"line": 10,
+										"line": 11,
 										"column": 16
 									}
 								},
@@ -498,44 +520,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 359,
-					"end": 375,
+					"start": 441,
+					"end": 457,
 					"loc": {
 						"start": {
-							"line": 11,
+							"line": 12,
 							"column": 1
 						},
 						"end": {
-							"line": 11,
+							"line": 12,
 							"column": 17
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 365,
-							"end": 374,
+							"start": 447,
+							"end": 456,
 							"loc": {
 								"start": {
-									"line": 11,
+									"line": 12,
 									"column": 7
 								},
 								"end": {
-									"line": 11,
+									"line": 12,
 									"column": 16
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 365,
-								"end": 368,
+								"start": 447,
+								"end": 450,
 								"loc": {
 									"start": {
-										"line": 11,
+										"line": 12,
 										"column": 7
 									},
 									"end": {
-										"line": 11,
+										"line": 12,
 										"column": 10
 									}
 								},
@@ -543,15 +565,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 371,
-								"end": 374,
+								"start": 453,
+								"end": 456,
 								"loc": {
 									"start": {
-										"line": 11,
+										"line": 12,
 										"column": 13
 									},
 									"end": {
-										"line": 11,
+										"line": 12,
 										"column": 16
 									}
 								},
@@ -564,44 +586,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 377,
-					"end": 400,
+					"start": 459,
+					"end": 482,
 					"loc": {
 						"start": {
-							"line": 12,
+							"line": 13,
 							"column": 1
 						},
 						"end": {
-							"line": 12,
+							"line": 13,
 							"column": 24
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 383,
-							"end": 399,
+							"start": 465,
+							"end": 481,
 							"loc": {
 								"start": {
-									"line": 12,
+									"line": 13,
 									"column": 7
 								},
 								"end": {
-									"line": 12,
+									"line": 13,
 									"column": 23
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 383,
-								"end": 392,
+								"start": 465,
+								"end": 474,
 								"loc": {
 									"start": {
-										"line": 12,
+										"line": 13,
 										"column": 7
 									},
 									"end": {
-										"line": 12,
+										"line": 13,
 										"column": 16
 									}
 								},
@@ -609,15 +631,15 @@
 							},
 							"init": {
 								"type": "Literal",
-								"start": 395,
-								"end": 399,
+								"start": 477,
+								"end": 481,
 								"loc": {
 									"start": {
-										"line": 12,
+										"line": 13,
 										"column": 19
 									},
 									"end": {
-										"line": 12,
+										"line": 13,
 										"column": 23
 									}
 								},

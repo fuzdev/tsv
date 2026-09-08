@@ -263,6 +263,21 @@ pub struct Parser<'a, 'arena> {
     /// not an await-expression: under `Goal::Script` it is an ordinary
     /// identifier (`await_is_identifier`), under `Goal::Module` it is reserved.
     in_await: bool,
+    /// Whether the code being parsed is **strict**. Seeded from the goal — Module
+    /// code is always strict, Script code starts sloppy — and turned on (never off)
+    /// by a `"use strict"` directive prologue, by entering a class, and by
+    /// inheritance into every nested scope. It is a property of the source text,
+    /// not of the goal: unlike `[Await]`/`[Yield]` it is never *cleared* going
+    /// inward, so its scopes save-and-restore rather than replace
+    /// ([`Parser::with_strict_scope`]).
+    ///
+    /// It gates the constructs strict code disallows *by production* — today the
+    /// leading-zero numeric literals (`010`, `08`), read by
+    /// `parse_number_or_bigint_literal` at the moment the token becomes a node.
+    /// Strict-mode **early errors** (duplicate parameters, reserved words as
+    /// binding names, an assignment to `eval`) are a separate, deferred question:
+    /// they parse under every mode and belong to the diagnostics layer.
+    strict: bool,
     /// The `[Yield]` grammar context. `true` (`[+Yield]`) inside a generator
     /// function's params **and** body; reset to `false` (`[~Yield]`) on entering
     /// any non-generator function-like scope (a plain function, an arrow, a class
@@ -446,6 +461,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
             in_await: matches!(goal, Goal::Module),
+            // Module code is strict by definition (ecma262 sec-strict-mode-code);
+            // Script code is strict only once a `"use strict"` prologue says so.
+            strict: matches!(goal, Goal::Module),
             // Top level is `[~Yield]` in both goals — a generator scope is entered
             // only via `*` on a function/method (see `with_fn_context`).
             in_yield: false,
@@ -1171,6 +1189,43 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         result
     }
 
+    /// Run `f` in a fresh **strictness scope**: `f` may turn strict mode on (a
+    /// `"use strict"` directive prologue at its head), and the flag is restored on
+    /// the way out, on success and error alike. Wraps the two bodies that carry a
+    /// directive prologue — a `Program` ([`Parser::parse`]) and a function body
+    /// (`parse_function_body`).
+    ///
+    /// Strictness is *inherited*, never cleared, so this saves and restores rather
+    /// than replacing (the shape `with_fn_context` takes for `[Await]`/`[Yield]`,
+    /// which a nested scope does reset). It is a combinator and not a bare
+    /// assignment for the reason [`Parser::checkpoint`] states: the checkpoint
+    /// carries no context flags, on the promise that every one of them is restored
+    /// by its own combinator — a hand-rolled save/restore pair would leak past the
+    /// one speculative parse.
+    pub(super) fn with_strict_scope<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let saved = self.strict;
+        let result = f(self);
+        self.strict = saved;
+        result
+    }
+
+    /// Run `f` with strict mode **on**, restoring the flag afterward (on success and
+    /// error alike). This is the one region that is strict by construction rather
+    /// than by directive: a class's id, heritage clause and body (ecma262
+    /// sec-class-definitions: *all parts of a ClassDeclaration or ClassExpression
+    /// are strict mode code*), which is why `class C extends (010) {}` is an error
+    /// even in a sloppy script. Takes no value because strictness only ever turns
+    /// on — see [`Parser::with_strict_scope`] for the directive-driven case.
+    pub(super) fn with_strict_class_scope<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        self.with_context_flag(|p| &mut p.strict, true, f)
+    }
+
     /// Run `f` with the function-type-disallowed context set to `value`,
     /// restoring it afterward (on success and error alike). A single-flag
     /// `with_context_flag` wrapper. Set `true` around union/intersection constituent and
@@ -1319,8 +1374,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ParseError::invalid_syntax(format!("Unexpected keyword '{kw}'"), self.current_pos().0)
     }
 
-    /// Create an error for the `with` statement — sloppy-mode only, and tsv parses
-    /// strict mode only. Named rather than folded into `error_unexpected_keyword` so the
+    /// Create an error for the `with` statement — sloppy-mode only, and refused under
+    /// every mode. Named rather than folded into `error_unexpected_keyword` so the
     /// message says *why* the word is refused; a bare "unexpected keyword" reads like a
     /// parser gap for a construct that is deliberately out of scope.
     pub(super) fn error_with_statement(&self) -> ParseError {
@@ -2179,12 +2234,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     pub fn parse(&mut self) -> Result<Program<'arena>, ParseError> {
         let start = self.base_offset; // Start at base_offset for embedded contexts
-        let mut body = self.bvec();
 
-        while self.current.kind != TokenKind::Eof {
-            body.push(self.parse_module_item()?);
-        }
-        self.adapt_directive_prologue(&mut body);
+        // The outermost strictness scope: a Script's `"use strict"` prologue turns
+        // strict mode on for everything after it, and the flag is restored on the way
+        // out so a re-used parser starts from the goal's own seed again.
+        let body = self.with_strict_scope(|p| {
+            let mut body = p.bvec();
+            let mut in_prologue = true;
+            while p.current.kind != TokenKind::Eof {
+                let mut item = p.parse_module_item()?;
+                if in_prologue {
+                    in_prologue = p.note_directive(&mut item);
+                }
+                body.push(item);
+            }
+            Ok(body)
+        })?;
 
         // Use current_pos() to get global position (includes base_offset)
         let (_, end) = self.current_pos();

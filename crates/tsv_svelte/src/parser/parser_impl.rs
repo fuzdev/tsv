@@ -92,7 +92,7 @@ pub(crate) struct EmbeddedParseMark {
 /// `read_identifier` rejects every one (`e.unexpected_reserved_word`), at PARSE time and
 /// regardless of mode — so this is a rule of Svelte's own template grammar, not a JS early
 /// error, which is why it is enforced here rather than deferred the way tsv's TypeScript
-/// parser defers "reserved word as identifier" (root `CLAUDE.md` §Strict Mode Only).
+/// parser defers "reserved word as identifier" (root `CLAUDE.md` §Strictness).
 ///
 /// Canonical calls `read_identifier` from **six** positions and every one takes this rule:
 /// a `{#snippet}` name and an `{#each}` index (`1-parse/state/tag.js`), the

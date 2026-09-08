@@ -16,7 +16,7 @@
 //! (`svelte/src/utils.js:43`) — the JS keywords plus the strict-mode future-reserved set
 //! plus `eval` / `arguments` — applied at PARSE time in both modes, so it is a rule of
 //! Svelte's template grammar rather than a JS early error and tsv enforces it rather than
-//! deferring it (root `CLAUDE.md` §Strict Mode Only).
+//! deferring it (root `CLAUDE.md` §Strictness).
 //!
 //! ⚠️ The one position that really does defer is `read_pattern`'s **destructuring** branch
 //! (`{#each xs as { p }}`), which falls through to acorn only because `read_identifier`

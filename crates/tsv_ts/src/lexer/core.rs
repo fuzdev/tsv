@@ -7,6 +7,14 @@ use super::lex_err;
 use super::token::{Token, TokenKind, keyword_at};
 use tsv_lang::ParseError;
 
+/// The one message for a `NumericLiteralSeparator` inside a leading-zero literal —
+/// raised both for a `_` directly after the `0` (`0_0`) and for one inside the
+/// integer run of either legacy form (`08_1`, `010_1`). The
+/// `LegacyOctalLikeDecimalIntegerLiteral` productions carry no `[Sep]` parameter,
+/// so neither spelling is grammatical in any mode.
+const LEGACY_SEPARATOR_MSG: &str =
+    "Numeric separators are not allowed in legacy octal-like literals";
+
 /// Byte length of the UTF-8 sequence whose lead byte is `lead`. Used to advance
 /// the byte cursor past one character without decoding it.
 #[inline]
@@ -784,9 +792,11 @@ impl<'a> Lexer<'a> {
     /// single number entry point, so the "identifier directly after a number"
     /// boundary rule (ecma262 12.9.3) lives here once. Mirrors the `_into`
     /// write-through of the other large scanners so the dispatch arm is one
-    /// `return`. Errors on the strict-mode-illegal leading-zero literals — legacy
-    /// octal (`0777`), non-octal decimal (`08`/`09`), and the separator forms
-    /// (`0_0`) — all disallowed because tsv is strict-only.
+    /// `return`. **Mode-free**: the two leading-zero forms (legacy octal `0777`,
+    /// non-octal decimal `08`/`09`) lex under every strictness, and the strict-mode
+    /// rejection is the parser's, taken where the token becomes a node. The
+    /// separator forms (`0_0`) are the exception — they are a syntax error in every
+    /// mode, so they error here.
     fn scan_number_into(
         &mut self,
         start: usize,
@@ -824,28 +834,54 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 Some(b'0'..=b'9') => {
-                    // Leading-zero decimal literals — `LegacyOctalIntegerLiteral`
-                    // (`010`, all octal digits) and `NonOctalDecimalIntegerLiteral`
-                    // (`08`/`09`/`089`, containing an 8 or 9) — are disallowed in
-                    // strict mode (ecma262 Annex B.1.1; the strict early error at
-                    // sec-additional-syntax-numeric-literals). ES modules are always
-                    // strict and tsv has no sloppy mode, so both always reject. A
-                    // leading `0` is a valid literal only before `.`/`e`/`n`/a radix
-                    // prefix/end — never before another digit.
-                    return Err(lex_err(
-                        "Leading-zero literals are not allowed in strict mode. Use '0o' for octal.",
-                        start,
-                    ));
+                    // The two leading-zero forms ECMAScript keeps alive for Script
+                    // code: `LegacyOctalIntegerLiteral` (`010`, octal digits only)
+                    // and `NonOctalDecimalIntegerLiteral` (`08`/`09`/`089`, an `8`
+                    // or `9` in the run). Both are disallowed in strict code — a
+                    // *production disallowance*, ecma262 sec-strict-mode-of-ecmascript
+                    // — so they are legal only in a sloppy Script. The lexer reads
+                    // both and records nothing: the strictness a leading-zero literal
+                    // is graded under is the parser's to know, at the point the token
+                    // becomes a node (`parse_number_or_bigint_literal`), which also
+                    // keeps a *peeked* token on the far side of a strictness boundary
+                    // from ever being rejected under the wrong mode.
+                    self.advance(); // consume '0'
+                    let mut all_octal = true;
+                    while let Some(b) = self.cur_byte() {
+                        if b.is_ascii_digit() {
+                            if b >= b'8' {
+                                all_octal = false;
+                            }
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    if self.cur_byte() == Some(b'_') {
+                        return Err(lex_err(LEGACY_SEPARATOR_MSG, start));
+                    }
+                    if !all_octal {
+                        // Demoted to decimal, so a fraction and an exponent are
+                        // grammatical (`08.5e1` = 850) — and a separator inside the
+                        // *fraction* is ordinary (`08.5_1`), which is why the
+                        // integer run above is scanned separator-free by hand.
+                        self.scan_decimal_number()?;
+                    }
+                    // `LegacyOctalIntegerLiteral` ends at its digit run: the
+                    // production admits no fraction and no exponent, so a following
+                    // `.` is the next token (`010.toString()` is a member access) and
+                    // a following `e` hits the identifier-boundary check below
+                    // (`0777e2`). Neither form takes a BigInt `n` (`010n`, `08n`),
+                    // which the same check rejects.
+                    bigint_allowed = false;
                 }
                 Some(b'_') => {
                     // A `NumericLiteralSeparator` cannot appear in a leading-zero
                     // legacy form (`0_0`/`0_8` — the `LegacyOctalLikeDecimalInteger`
                     // productions carry no `[Sep]` parameter), so a `_` immediately
-                    // after a leading `0` is rejected.
-                    return Err(lex_err(
-                        "Numeric separators are not allowed in legacy octal-like literals",
-                        start,
-                    ));
+                    // after a leading `0` is rejected. Unlike the leading-zero digit
+                    // forms above this holds in *every* mode, so it stays a lex error.
+                    return Err(lex_err(LEGACY_SEPARATOR_MSG, start));
                 }
                 _ => {
                     // Regular number or float starting with 0 (e.g. `0`, `0.5`,

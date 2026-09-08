@@ -418,25 +418,39 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        // Parse optional class name (`implements` excluded — it begins the heritage
-        // clause of an anonymous class; see `take_class_name`).
-        let id = self.take_class_name()?;
+        // Every part of a class is strict code (ecma262 sec-class-definitions), and
+        // the scope opens at the `class` keyword — ahead of the heritage clause, so
+        // `class C extends (010) {}` is an error even in a sloppy script.
+        let (id, type_parameters, super_class, super_type_parameters, implements, body) = self
+            .with_strict_class_scope(|p| {
+                // Parse optional class name (`implements` excluded — it begins the
+                // heritage clause of an anonymous class; see `take_class_name`).
+                let id = p.take_class_name()?;
 
-        // Parse type parameters (TypeScript generics): class Foo<T>
-        let type_parameters = self.parse_optional_type_parameters()?;
+                // Parse type parameters (TypeScript generics): class Foo<T>
+                let type_parameters = p.parse_optional_type_parameters()?;
 
-        // Parse optional `extends` clause
-        let (super_class, super_type_parameters) = self.parse_optional_extends_clause()?;
+                // Parse optional `extends` clause
+                let (super_class, super_type_parameters) = p.parse_optional_extends_clause()?;
 
-        // Parse optional `implements` clause
-        let implements: &'arena [_] = if self.eat_contextual_keyword("implements") {
-            self.parse_interface_heritage_list()?.into_bump_slice()
-        } else {
-            &[]
-        };
+                // Parse optional `implements` clause
+                let implements: &'arena [_] = if p.eat_contextual_keyword("implements") {
+                    p.parse_interface_heritage_list()?.into_bump_slice()
+                } else {
+                    &[]
+                };
 
-        // Parse class body
-        let body = self.parse_class_body()?;
+                // Parse class body
+                let body = p.parse_class_body()?;
+                Ok((
+                    id,
+                    type_parameters,
+                    super_class,
+                    super_type_parameters,
+                    implements,
+                    body,
+                ))
+            })?;
         let end = body.span.end;
 
         Ok(ParsedExpr::from_expr(
@@ -497,26 +511,42 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `take_class_name`). `export default class implements Foo {}` (spec-valid, name
         // optional) parses where acorn-typescript rejects it (`implements` reserved); a
         // `name_required` declaration (`class implements Foo {}` / no name) still errors.
-        let id = self.take_class_name()?;
-        if name_required && id.is_none() {
-            return Err(self.error_expected_after("class name", "class"));
-        }
+        // Every part of a class is strict code (ecma262 sec-class-definitions), and
+        // the scope opens at the `class` keyword — ahead of the heritage clause, so
+        // `class C extends (010) {}` is an error even in a sloppy script. Static
+        // blocks and field initializers are inside the body, so they inherit it.
+        let (id, type_parameters, super_class, super_type_parameters, implements, body) = self
+            .with_strict_class_scope(|p| {
+                let id = p.take_class_name()?;
+                if name_required && id.is_none() {
+                    return Err(p.error_expected_after("class name", "class"));
+                }
 
-        // Parse type parameters (TypeScript generics): class Foo<T>()
-        let type_parameters = self.parse_optional_type_parameters()?;
+                // Parse type parameters (TypeScript generics): class Foo<T>()
+                let type_parameters = p.parse_optional_type_parameters()?;
 
-        // Parse optional `extends` clause
-        let (super_class, super_type_parameters) = self.parse_optional_extends_clause()?;
+                // Parse optional `extends` clause
+                let (super_class, super_type_parameters) = p.parse_optional_extends_clause()?;
 
-        // Parse optional `implements` clause
-        let implements: &'arena [_] = if self.eat_contextual_keyword("implements") {
-            self.parse_interface_heritage_list()?.into_bump_slice()
-        } else {
-            &[]
-        };
+                // Parse optional `implements` clause
+                let implements: &'arena [_] = if p.eat_contextual_keyword("implements") {
+                    p.parse_interface_heritage_list()?.into_bump_slice()
+                } else {
+                    &[]
+                };
 
-        // Parse class body (ambient members share the concrete grammar; see `parse_class_body`)
-        let body = self.parse_class_body()?;
+                // Parse class body (ambient members share the concrete grammar; see
+                // `parse_class_body`)
+                let body = p.parse_class_body()?;
+                Ok((
+                    id,
+                    type_parameters,
+                    super_class,
+                    super_type_parameters,
+                    implements,
+                    body,
+                ))
+            })?;
         let end = body.span.end;
 
         Ok(ClassDeclaration {
