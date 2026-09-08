@@ -65,7 +65,15 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
   outside the AST), so the printer re-emits its text; the comments keep their authored
   positions and everything between them still takes the value reader's rules, so a number, a
   hex color, a unit's case and a string's quote normalize exactly as they do without a comment
-  (`printer/declarations.rs` → `value_normalization::normalize_value_with_comments`)
+  (`printer/declarations.rs` → `value_normalization::normalize_value_with_comments`). The text
+  is then laid out as a **fill over its parts**, not one write, so the value wraps at the print
+  width the way its comment-free twin does: a space-separated value takes the twin's
+  `indent(fill)` with every part — comments included — a fill item, and a comma list that did not
+  break per element takes the twin's break-after-the-colon group over a greedy element fill, a
+  leading comment run staying on the colon's line. The boundary is measured from the real column,
+  so a long property moves it. Prettier's differences — the `;` overage, the leading run it glues
+  to the first word and overruns with, and a multi-line comment it measures as one run of text —
+  are cataloged in [conformance_prettier_css.md §CSS: Values](conformance_prettier_css.md#css-values)
 - Comments in selectors
 - Comments in `:nth-*()` args — in every position: before the An+B term, **inside** it
   (`:nth-child(2n /* c */ + 1)`, either interior gap of the `['+' | '-'] <signless-integer>`

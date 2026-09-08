@@ -1,0 +1,162 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 757,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 748,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 69,
+							"end": 164,
+							"property": "background",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 240,
+							"end": 339,
+							"property": "background",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 388,
+							"end": 483,
+							"property": "prop000000000000000000000000000",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 487,
+							"end": 586,
+							"property": "prop000000000000000000000000000",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 645,
+							"end": 744,
+							"property": "background",
+							"value": "1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						}
+					]
+				},
+				"start": 9,
+				"end": 748
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " mid comment, 100 columns with the `;`: fits ",
+				"start": 17,
+				"end": 66
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 85,
+				"end": 92,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 columns: the `;` would be the 101st, so the last word wraps ",
+				"start": 168,
+				"end": 237
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 256,
+				"end": 263,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same boundary at a long property ",
+				"start": 343,
+				"end": 385
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 425,
+				"end": 432,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 524,
+				"end": 531,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " a trailing comment is the fill item that wraps ",
+				"start": 590,
+				"end": 642
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 737,
+				"end": 744,
+				"position": 80
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 749,
+			"styles": "\n\tdiv {\n\t\t/* mid comment, 100 columns with the `;`: fits */\n\t\tbackground: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px;\n\t\t/* 101 columns: the `;` would be the 101st, so the last word wraps */\n\t\tbackground: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px;\n\t\t/* the same boundary at a long property */\n\t\tprop000000000000000000000000000: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px;\n\t\tprop000000000000000000000000000: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px;\n\t\t/* a trailing comment is the fill item that wraps */\n\t\tbackground: 1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t/* c */;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 758,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

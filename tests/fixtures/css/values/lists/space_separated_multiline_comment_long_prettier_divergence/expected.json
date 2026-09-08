@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 627,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 618,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 191,
+							"end": 317,
+							"property": "background",
+							"value": "1px  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px"
+						},
+						{
+							"type": "Declaration",
+							"start": 487,
+							"end": 614,
+							"property": "background",
+							"value": "1px  2px\n\t\t\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 3px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 618
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comment's interior newline restarts the column: the word after its last line fits when\n\t\t   that line is 100 columns, measured from where the comment actually ends ",
+				"start": 17,
+				"end": 188
+			},
+			{
+				"type": "CSSComment",
+				"value": " a\n\t\tbbbbbbbb ",
+				"start": 207,
+				"end": 225,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " the fill continues past the comment at the real column: a short word stays on the\n\t\t   comment's line, the long one after it wraps and takes the tail with it ",
+				"start": 321,
+				"end": 484
+			},
+			{
+				"type": "CSSComment",
+				"value": " a\n\t\tbbbbbbbb ",
+				"start": 503,
+				"end": 521,
+				"position": 4
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 619,
+			"styles": "\n\tdiv {\n\t\t/* a comment's interior newline restarts the column: the word after its last line fits when\n\t\t   that line is 100 columns, measured from where the comment actually ends */\n\t\tbackground: 1px /* a\n\t\tbbbbbbbb */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t2px;\n\t\t/* the fill continues past the comment at the real column: a short word stays on the\n\t\t   comment's line, the long one after it wraps and takes the tail with it */\n\t\tbackground: 1px /* a\n\t\tbbbbbbbb */ 2px\n\t\t\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 3px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 628,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

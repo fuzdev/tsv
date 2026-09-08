@@ -548,13 +548,113 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Print declaration with comments in value (non-function)
+    /// Print a non-function declaration value that holds comments.
+    ///
+    /// CSS value comments aren't in the AST, so the value is re-emitted from its normalized
+    /// source text (`extract_value_with_comments`) — but as a **fill over its space-separated
+    /// parts**, not one write, so it wraps at the print width the way its comment-free twin
+    /// does (`build_space_fill_doc`: `: ` literal, `indent(fill)`, the `;` reserved). Every
+    /// part is a fill item, a comment included: a trailing comment wraps onto the continuation
+    /// by itself, and a **leading** run (`prop: /* c */ word`) parts from the first word when
+    /// the head does not fit — where prettier, which holds that run in postcss `raws.between`
+    /// glued to the word, overruns (`space_separated_leading_comment_long_prettier_divergence`).
+    /// Rendering the doc from the real current column is what makes a long property move the
+    /// boundary with it; a width test measured from the indent alone would not.
+    ///
+    /// A **comma** list that reaches here (one `multiline_plan` declined to break: a leading
+    /// run before single-node elements, a comment inside a function element, a custom
+    /// property's list) takes the comma twin's shape instead — `build_comma_fill_doc`'s
+    /// break-after-the-colon group over a greedy element fill — via
+    /// `build_comma_fill_doc_from_text`. The two are told apart by the AST's value kind, not
+    /// the text: a comma inside a function's parens is not a list.
     fn print_decl_with_comments(&mut self, decl: &internal::CssDeclaration<'_>, decl_source: &str) {
-        self.write(": ");
         let normalized =
             value_normalization::extract_value_with_comments(decl_source, decl.colon_pos());
-        self.write(&normalized);
+        let is_comma_list =
+            matches!(&decl.value, CssValue::CommaSeparated { values, .. } if values.len() > 1);
+        if is_comma_list {
+            let doc = self.build_comma_fill_doc_from_text(&normalized);
+            self.write_arena_doc(doc);
+        } else {
+            self.write(": ");
+            let parts = value_normalization::split_by_space_preserving_parens(&normalized);
+            let doc = {
+                let d = self.d();
+                // The `;` rides the fill's own last item, as in `build_space_fill_doc`.
+                let fill = d.with_context(
+                    self.build_fill_doc_from_strings(&parts),
+                    DocContext::reserving(1),
+                );
+                d.indent(fill)
+            };
+            self.write_arena_doc(doc);
+        }
         self.write_declaration_end(decl);
+    }
+
+    /// The comment-bearing comma list's doc — `build_comma_fill_doc`'s shape built from the
+    /// normalized value TEXT, since the comments live in the text and not in the AST.
+    ///
+    /// Returns the whole `: value` doc, the colon included, because a **leading comment run**
+    /// belongs to the colon's line and not to the list: it is postcss `raws.between` material
+    /// (the same reading `print_decl_multiline` hoists by), so it prints as `: /* c */` ahead
+    /// of the group whose `line` breaks the elements beneath it — `font-family: /* c */⏎\tf0,
+    /// f1;`, the comment-free twin's `font-family:⏎\tf0, f1;` with the run in the gap. A
+    /// comment-only element 0 (`/* c */, b`) is not peeled: hoisting it would strand a bare
+    /// `,` on the continuation, the same decline `hoistable_leading_run` makes.
+    ///
+    /// Each element splits at its top-level spaces into its own `group(indent(fill))`, the
+    /// per-element continuation the comment-free twin gives a space-separated item, and the
+    /// closing comma is spelled back onto the last element (`has_closing_comma`) — the same
+    /// reasons as there.
+    fn build_comma_fill_doc_from_text(&self, value: &str) -> DocId {
+        let d = self.d();
+        let content = crate::escapes::trim_end_preserving_escape(value);
+        let elements = value_normalization::split_args_by_comma(content);
+        let closing_comma = value_normalization::has_closing_comma(content, &elements);
+
+        let mut leading_run: Vec<&str> = Vec::new();
+        let mut parts = DocBuf::with_capacity(elements.len() * 2);
+        for (i, element) in elements.iter().enumerate() {
+            let element =
+                crate::escapes::trim_start_css(crate::escapes::trim_end_preserving_escape(element));
+            let mut words = value_normalization::split_by_space_preserving_parens(element);
+            if i == 0 {
+                let run_len = words
+                    .iter()
+                    .take_while(|word| word.starts_with("/*"))
+                    .count();
+                // Peel only when content remains: an all-comment element 0 stays whole.
+                if run_len < words.len() {
+                    leading_run.extend(words.drain(..run_len));
+                }
+            }
+            let element_doc = match words.as_slice() {
+                [] => d.empty(),
+                [word] => d.text_pooled(word),
+                words => {
+                    let fill = self.build_fill_doc_from_strings(words);
+                    d.group(d.indent(fill))
+                }
+            };
+            parts.push(element_doc);
+            if i < elements.len() - 1 {
+                parts.push(d.concat(&[d.text(","), d.line()]));
+            }
+        }
+        if closing_comma && let Some(last) = parts.pop() {
+            parts.push(d.concat(&[last, d.text(",")]));
+        }
+
+        // The `;` is reserved on the fill's own last item, as in `build_comma_fill_doc`.
+        let fill = d.with_context(d.fill(&parts), DocContext::reserving(1));
+        let body = d.group(d.indent(d.concat(&[d.line(), fill])));
+        if leading_run.is_empty() {
+            d.concat(&[d.text(":"), body])
+        } else {
+            let run = leading_run.join(" ");
+            d.concat(&[d.text(": "), d.text_pooled(&run), body])
+        }
     }
 
     /// Print declaration with string value
@@ -933,7 +1033,7 @@ impl<'a> Printer<'a> {
             };
 
         // Build and write fill doc
-        let fill_doc = self.build_fill_parts_from_strings(value_parts);
+        let fill_doc = self.build_fill_doc_from_strings(value_parts);
         if use_continuation {
             self.indent_level += 1;
         }
@@ -943,8 +1043,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build fill doc parts from string slices
-    fn build_fill_parts_from_strings(&self, parts: &[&str]) -> DocId {
+    /// A fill over string parts — `[part1, line, part2, …]` — the text-path twin of
+    /// `build_space_fill_parts`, for the comment-bearing values whose parts are slices of the
+    /// normalized source rather than AST nodes.
+    fn build_fill_doc_from_strings(&self, parts: &[&str]) -> DocId {
         let d = self.d();
         let mut doc_parts = DocBuf::with_capacity(parts.len() * 2);
         for (i, part) in parts.iter().enumerate() {

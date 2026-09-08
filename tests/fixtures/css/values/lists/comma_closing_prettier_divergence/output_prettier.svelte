@@ -14,5 +14,7 @@
 		--x: a;
 		/* and the rule reaches a function nested in one */
 		--y: rgb(1, 2, 3);
+		/* a comment in the list puts it on the source-text path, which spells the comma back too */
+		--z: a /* c */, b;
 	}
 </style>
