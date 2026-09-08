@@ -1,0 +1,110 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 292,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 156,
+					"end": 157,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 156,
+							"end": 157,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 156,
+											"end": 157
+										}
+									],
+									"start": 156,
+									"end": 157
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 158,
+					"end": 185,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 162,
+							"end": 181,
+							"property": "color",
+							"value": "fn(//x, 0.1)"
+						}
+					]
+				},
+				"start": 156,
+				"end": 185
+			},
+			{
+				"type": "Atrule",
+				"start": 187,
+				"end": 219,
+				"name": "supports",
+				"prelude": "(a: fn(//x, 0.1))",
+				"block": {
+					"type": "Block",
+					"start": 215,
+					"end": 219,
+					"children": []
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 221,
+				"end": 257,
+				"name": "import",
+				"prelude": "'a.css' screen fn(//x, 0.1)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 259,
+				"end": 283,
+				"name": "import",
+				"prelude": "ur fn(//x, 0.1)",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " CSS has no line comments: a `//` inside a function's parens is two `/` delimiters, and\n\tthe argument list normalizes around it as any other ",
+				"start": 9,
+				"end": 154
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 284,
+			"styles": "\n\t/* CSS has no line comments: a `//` inside a function's parens is two `/` delimiters, and\n\tthe argument list normalizes around it as any other */\n\ta {\n\t\tcolor: fn(//x, 0.1);\n\t}\n\t@supports (a: fn(//x, 0.1)) {\n\t}\n\t@import 'a.css' screen fn(//x, 0.1);\n\t@import ur fn(//x, 0.1);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 293,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

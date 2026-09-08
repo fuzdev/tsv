@@ -1,0 +1,131 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 584,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 191,
+				"end": 211,
+				"name": "import",
+				"prelude": "'a.css' 1e3",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 213,
+				"end": 231,
+				"name": "import",
+				"prelude": "'a.css' 5",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 233,
+				"end": 254,
+				"name": "import",
+				"prelude": "'a.css' #fff",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 256,
+				"end": 279,
+				"name": "import",
+				"prelude": "'a.css' url(x)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 281,
+				"end": 301,
+				"name": "import",
+				"prelude": "'a.css' 'b'",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 303,
+				"end": 326,
+				"name": "import",
+				"prelude": "url(a.css) 1px",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 399,
+				"end": 428,
+				"name": "import",
+				"prelude": "'a.css' layer(a) 1e3",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 430,
+				"end": 457,
+				"name": "import",
+				"prelude": "'a.css' 1e3 screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 459,
+				"end": 494,
+				"name": "import",
+				"prelude": "'a.css' 1e3 and (a: 0.5px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 548,
+				"end": 575,
+				"name": "import",
+				"prelude": "'a.css' screen",
+				"block": {
+					"type": "Block",
+					"start": 571,
+					"end": 575,
+					"children": []
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the component after the url()/string is any value, not only a media type or condition:\n\ta number, a hex colour, a url() and a string all take the value reader's normalization ",
+				"start": 9,
+				"end": 189
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same after a layer() and ahead of a media type or condition ",
+				"start": 328,
+				"end": 397
+			},
+			{
+				"type": "CSSComment",
+				"value": " the tail ends at a block as it does at a `;` ",
+				"start": 496,
+				"end": 546
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 576,
+			"styles": "\n\t/* the component after the url()/string is any value, not only a media type or condition:\n\ta number, a hex colour, a url() and a string all take the value reader's normalization */\n\t@import 'a.css' 1e3;\n\t@import 'a.css' 5;\n\t@import 'a.css' #fff;\n\t@import 'a.css' url(x);\n\t@import 'a.css' 'b';\n\t@import url(a.css) 1px;\n\t/* the same after a layer() and ahead of a media type or condition */\n\t@import 'a.css' layer(a) 1e3;\n\t@import 'a.css' 1e3 screen;\n\t@import 'a.css' 1e3 and (a: 0.5px);\n\t/* the tail ends at a block as it does at a `;` */\n\t@import 'a.css' screen {\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 585,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

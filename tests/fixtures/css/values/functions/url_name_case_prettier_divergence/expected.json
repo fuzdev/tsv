@@ -1,0 +1,126 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 325,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 169,
+					"end": 170,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 169,
+							"end": 170,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 169,
+											"end": 170
+										}
+									],
+									"start": 169,
+									"end": 170
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 171,
+					"end": 232,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 175,
+							"end": 187,
+							"property": "b",
+							"value": "URL(x ,y)"
+						},
+						{
+							"type": "Declaration",
+							"start": 191,
+							"end": 211,
+							"property": "c",
+							"value": "URL(x ,y)"
+						},
+						{
+							"type": "Declaration",
+							"start": 215,
+							"end": 228,
+							"property": "d",
+							"value": "Url(a,.50)"
+						}
+					]
+				},
+				"start": 169,
+				"end": 232
+			},
+			{
+				"type": "Atrule",
+				"start": 234,
+				"end": 252,
+				"name": "import",
+				"prelude": "URL(x ,y)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 254,
+				"end": 280,
+				"name": "import",
+				"prelude": "'a.css' URL(x ,y)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 282,
+				"end": 316,
+				"name": "import",
+				"prelude": "'a.css' screen Url(a,.50)",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " `url` is ASCII case-insensitive: `URL(x ,y)` is one opaque url-token whose content is\n\tkept verbatim, in a declaration and in an `@import` prelude alike ",
+				"start": 9,
+				"end": 167
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 194,
+				"end": 201,
+				"position": 0
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 317,
+			"styles": "\n\t/* `url` is ASCII case-insensitive: `URL(x ,y)` is one opaque url-token whose content is\n\tkept verbatim, in a declaration and in an `@import` prelude alike */\n\ta {\n\t\tb: URL(x ,y);\n\t\tc: /* c */ URL(x ,y);\n\t\td: Url(a,.50);\n\t}\n\t@import URL(x ,y);\n\t@import 'a.css' URL(x ,y);\n\t@import 'a.css' screen Url(a,.50);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 326,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

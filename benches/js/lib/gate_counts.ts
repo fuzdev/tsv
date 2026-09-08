@@ -414,7 +414,23 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 133 → 138: five files arrive from `unknown`, closing the at-rule prelude ROUTING
 	// TABLE and the media reader's node split. Reasoning and the bucket-list diff on
 	// `CORPUS_FORMAT_UNKNOWN_PIN`'s `23 → 18` step.
-	css: 138
+	//
+	// 138 → 137: prettier's `css/no-semicolon/url.css` leaves `match` for `known` — the ONE
+	// mover of the `@import` prelude reader's positional fix (a value in first position, or
+	// directly after the url/string, now reaches the value reader instead of the verbatim
+	// fallback / a reject). The file is `@import ur⏎  l(//fonts…:400,400italic);`, a `url(`
+	// split in two: prettier reads the `//` as a loose-mode line comment, throws on the paren
+	// it swallowed, and freezes the prelude verbatim; tsv reads two `/` delimiters and
+	// normalizes the list around them, as it already did for the same value after a media
+	// type, under `@supports` and in a declaration. The old match was the raw fallback
+	// matching a frozen value by accident. Cataloged (conformance_prettier_css.md §CSS: Values,
+	// "Line-comment spelling in a function argument"), detected by `css_line_comment_freeze`,
+	// so `unknown` is unmoved at 18. Measured by a per-file shape differential over the 3,268
+	// `find`-enumerated css + svelte files of the corpus and the prettier suites (stdout,
+	// stderr and exit code `cmp`'d between a HEAD-`preludes.rs` and a tip release binary):
+	// this file is the only mover, and the `--all` run confirms it — `partial` / `safety` /
+	// `errors` identical.
+	css: 137
 };
 
 /**

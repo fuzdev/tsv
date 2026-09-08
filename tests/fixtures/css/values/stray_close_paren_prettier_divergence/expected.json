@@ -1,0 +1,133 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 400,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 194,
+					"end": 195,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 194,
+							"end": 195,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 194,
+											"end": 195
+										}
+									],
+									"start": 194,
+									"end": 195
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 196,
+					"end": 273,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 200,
+							"end": 208,
+							"property": "b",
+							"value": "x ) y"
+						},
+						{
+							"type": "Declaration",
+							"start": 212,
+							"end": 224,
+							"property": "c",
+							"value": "x ) 0.5px"
+						},
+						{
+							"type": "Declaration",
+							"start": 228,
+							"end": 248,
+							"property": "d",
+							"value": "x ) 0.5px"
+						},
+						{
+							"type": "Declaration",
+							"start": 252,
+							"end": 269,
+							"property": "e",
+							"value": "(a: 0.5px) ) y"
+						}
+					]
+				},
+				"start": 194,
+				"end": 273
+			},
+			{
+				"type": "Atrule",
+				"start": 275,
+				"end": 306,
+				"name": "import",
+				"prelude": "'a.css' screen ) print",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 308,
+				"end": 339,
+				"name": "import",
+				"prelude": "'a.css' screen ) 0.5px",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 341,
+				"end": 391,
+				"name": "import",
+				"prelude": "'a.css' screen and (a: 0.5px) ) print, tv",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a `)` with no `(` to close is a token between two values: the separator space before\n\tit stays, and the rest of the value normalizes as any other, wherever the value reader runs ",
+				"start": 9,
+				"end": 192
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 231,
+				"end": 238,
+				"position": 0
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 392,
+			"styles": "\n\t/* a `)` with no `(` to close is a token between two values: the separator space before\n\tit stays, and the rest of the value normalizes as any other, wherever the value reader runs */\n\ta {\n\t\tb: x ) y;\n\t\tc: x ) 0.5px;\n\t\td: /* c */ x ) 0.5px;\n\t\te: (a: 0.5px) ) y;\n\t}\n\t@import 'a.css' screen ) print;\n\t@import 'a.css' screen ) 0.5px;\n\t@import 'a.css' screen and (a: 0.5px) ) print, tv;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 401,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

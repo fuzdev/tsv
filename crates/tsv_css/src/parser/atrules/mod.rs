@@ -102,10 +102,11 @@ pub(crate) fn parse_atrule<'arena>(
 
     // Parse prelude based on at-rule type
     let prelude = if name_lc == "import" {
-        // Parse @import prelude structurally (url/string + layer/supports/media). A
-        // prelude that doesn't lead with a `<url>`/`<string>` isn't a structurable
-        // @import; it falls back to a raw verbatim prelude internally (same CSS-Syntax
-        // rationale as the `@supports`/`@container` fallback below).
+        // Parse @import prelude structurally: a `url()`/string head, `layer`/`supports()`
+        // calls, then one verbatim tail (the media-query list, or whatever else the author
+        // wrote) to the prelude end. Nothing here rejects short of the prelude's own end —
+        // parseCss stores any prelude raw — so the fallback below is not needed; only an
+        // empty prelude takes the raw path internally.
         parse_import_prelude(parser)?
     } else if name_lc == "scope" {
         // Parse @scope prelude as structured selector lists (`PreludeValue::Selectors`).
@@ -160,8 +161,8 @@ pub(crate) fn parse_atrule<'arena>(
     // is NOT a parse error (parseCss stores it raw, prettier prints it verbatim).
     // `parse_condition_query` breaks off at the first token it can't fold in, leaving
     // those tokens unconsumed; re-emit the whole prelude verbatim instead of erroring at
-    // the block boundary below. (`@import` does the equivalent fallback internally, since
-    // its structured parse requires a leading `<url>`/`<string>` rather than trailing off.)
+    // the block boundary below. (`@import` needs none: its reader consumes every prelude to
+    // the boundary, structuring what it can and keeping the rest as one verbatim tail.)
     let prelude = if matches!(name_lc, "supports" | "container") && !parser.at_prelude_end() {
         reconsume_prelude_as_raw(parser, prelude_start_raw)?
     } else {
@@ -198,8 +199,8 @@ pub(crate) fn parse_atrule<'arena>(
 }
 
 /// Re-emit an at-rule prelude that couldn't be structured (a non-condition
-/// `@supports`/`@container`, or a non-`<url>`/`<string>` `@import`) as a raw verbatim
-/// prelude.
+/// `@supports`/`@container`, or an `@import` prelude holding nothing but whitespace and
+/// comments) as a raw verbatim prelude.
 ///
 /// Consumes the remaining prelude tokens up to the block boundary and rebuilds the
 /// **whole** prelude — from `prelude_start_raw`, the raw (base-offset-free) source

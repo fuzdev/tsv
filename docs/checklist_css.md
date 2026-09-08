@@ -350,7 +350,12 @@ Spec: `css-conditional-5` (container queries and their units moved here; `css-co
 - `url()` with quoted string (quote normalized `"…"` → `'…'`)
 - `url()` with unquoted string — opaque content preserved verbatim, incl. `?` query
   strings, `url(#anchor)`, and trailing/empty comma segments (`url(a,b,)`, `url(c,,d)`);
-  surrounding whitespace trimmed
+  surrounding whitespace trimmed — in any spelling of the name (`URL(x ,y)`, ASCII
+  case-insensitive per CSS Syntax 3 §4.3.4), and wherever a value is re-read from source
+  text (a declaration carrying a comment, an `@import` prelude's tail)
+- A stray `)` in a value (`x ) y`, `x )`) is a bare `<)-token>` between two values: its
+  separator space collapses to one and the rest of the value normalizes, at every position
+  the value reader runs (declaration, `@import` prelude)
 - Data URIs
 - `@import url(<unquoted>)` (e.g. `@import url(a.css?x=1)`)
 - `@namespace url(<unquoted>)` (e.g. `@namespace svg url(http://www.w3.org/2000/svg)`) —
@@ -450,9 +455,9 @@ Specs: `css-color-3`, `css-color-4`, `css-color-5` (Level 5 is widely shipped)
 > and owes its leftovers back — see the operator-binds-right rule in
 > [`../crates/tsv_css/CLAUDE.md`](../crates/tsv_css/CLAUDE.md); a `selector()` argument parses
 > one level deeper, as the selector the grammar says it is, and prints through the selector
-> printer), `@import` (url/string +
-> `layer()`/`supports()`/media, falling back to raw when it doesn't lead with a url/string —
-> its `supports()` argument is a `<supports-condition>`, read and printed by the `@supports`
+> printer), `@import` (a structured head — a url/string opener, `layer()`/`supports()`
+> calls — and one verbatim tail to the prelude end, the media-query list or whatever else
+> the author wrote, value-normalized at print time — its `supports()` argument is a `<supports-condition>`, read and printed by the `@supports`
 > machinery above), and `@scope` (forgiving selector lists).
 > **Raw text**: `@media` — kept verbatim to preserve comments, with the printer locating
 > `and`/`or` boundaries at print time for wrapping. **Raw text** likewise for everything else
@@ -467,6 +472,7 @@ Specs: `css-color-3`, `css-color-4`, `css-color-5` (Level 5 is widely shipped)
 - `@import` (basic)
 - `@import` with media-query condition (media-type-led `screen and (…)` or a bare `<media-condition>` `(max-width: 40px)`)
 - `@import` with a comma-separated `<media-query-list>`, including an empty entry (`, screen`, `screen, , print`)
+- `@import` whose prelude matches no grammar — a value in place of the url (`@import 1e3;`), directly after it (`@import 'a.css' #fff;`, `url(x)`, `'b'`, `layer(a) 1e3`) or ahead of a block (`@import 'a.css' screen {}`) — accepted as `parseCss` accepts it and value-normalized at every position alike
 - `@namespace`
 - `@media`
 - `@page`
