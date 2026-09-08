@@ -1,0 +1,89 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 297,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 184,
+				"end": 196,
+				"name": "import",
+				"prelude": "1e3",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 198,
+				"end": 211,
+				"name": "import",
+				"prelude": "#fff",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 213,
+				"end": 227,
+				"name": "import",
+				"prelude": "0.5px",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 229,
+				"end": 245,
+				"name": "import",
+				"prelude": "foo 1e3",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 247,
+				"end": 266,
+				"name": "import",
+				"prelude": "(a: 0.5px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 268,
+				"end": 288,
+				"name": "import",
+				"prelude": "1e3",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a prelude that leads with no url()/string is value-read like the rest of `@import`:\n\ta number normalizes, a hex colour lowercases, at the first position as after a url ",
+				"start": 9,
+				"end": 182
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 276,
+				"end": 283,
+				"position": 0
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 289,
+			"styles": "\n\t/* a prelude that leads with no url()/string is value-read like the rest of `@import`:\n\ta number normalizes, a hex colour lowercases, at the first position as after a url */\n\t@import 1e3;\n\t@import #fff;\n\t@import 0.5px;\n\t@import foo 1e3;\n\t@import (a: 0.5px);\n\t@import /* c */ 1e3;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 298,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

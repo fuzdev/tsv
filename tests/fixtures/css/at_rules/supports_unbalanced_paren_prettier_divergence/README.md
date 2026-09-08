@@ -23,5 +23,4 @@ preludes prettier *does* accept verbatim (`@supports margin: 0`, `@supports
 `@container` counterpart is
 [container_non_condition_prelude](../container_non_condition_prelude/).
 
-See [conformance_prettier_ts.mdNone](../../../../../docs/conformance_prettier_ts.md#prettier-rejects-valid-input)
-§Prettier rejects valid input.
+See [conformance_prettier_ts.md §Prettier rejects valid input](../../../../../docs/conformance_prettier_ts.md#prettier-rejects-valid-input).

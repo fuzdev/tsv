@@ -22,10 +22,46 @@ fn emit_opaque(
     consumed: &str,
 ) {
     result.push_str(consumed);
+    step_past(chars, byte_pos, consumed);
+}
+
+/// Step the iterator and `byte_pos` past `consumed` — the stepping half of
+/// [`emit_opaque`], for an arm that emits a *rewritten* form of what it consumed.
+fn step_past(
+    chars: &mut std::iter::Peekable<impl Iterator<Item = char>>,
+    byte_pos: &mut usize,
+    consumed: &str,
+) {
     for _ in 0..consumed.chars().count() - 1 {
         chars.next();
     }
     *byte_pos += consumed.len() - consumed.chars().next().map_or(0, char::len_utf8);
+}
+
+/// The unquoted `url(...)` token starting at `start` in `s`, if one does: the ident `url`
+/// (ASCII case-insensitive, and not the tail of a longer ident — `foourl(` is the function
+/// `foourl`) glued to a `(` whose argument is not a string. The extent is
+/// [`super::consume_paren_group`]'s, the same bounding scan the value pass copies the
+/// token with.
+fn unquoted_url_token_at(s: &str, start: usize) -> Option<&str> {
+    let bytes = s.as_bytes();
+    let open = start + 3;
+    if bytes.get(open) != Some(&b'(') || !s[start..open].eq_ignore_ascii_case("url") {
+        return None;
+    }
+    if s[..start]
+        .chars()
+        .next_back()
+        .is_some_and(super::is_css_ident_code_point)
+    {
+        return None;
+    }
+    if super::url_arg_is_quoted(s, open) {
+        return None;
+    }
+    let mut end = open;
+    super::consume_paren_group(s, &mut end);
+    Some(&s[start..end])
 }
 
 /// Normalize CSS whitespace in extracted source text
@@ -79,6 +115,13 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     let mut in_string = false;
     let mut string_delim = '\0';
     let mut pending_space = false;
+    // Open `(` groups: the `)` arm strips the padding before a `)` only when it closes
+    // one. A `)` with no `(` open is a bare `<)-token>` between two values (CSS Syntax 3
+    // §5.4.7), and the whitespace before it is a separator like any other — collapsed to
+    // one space, never removed (`screen ) print` keeps its space; prettier's value parser
+    // throws on the unbalanced paren and freezes the whole value verbatim, so it keeps it
+    // too — see `stray_close_paren`).
+    let mut paren_depth = 0usize;
     // How far into `result` the last **literal whitespace escape** emitted below reaches.
     // The `)` and `,` arms strip the spaces before their delimiter, and an escape's payload
     // IS a space (`(1px\ )`, `(a\ ,b)`) — stripping it strands the backslash onto the
@@ -185,12 +228,32 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
             continue;
         }
 
+        // An unquoted `url(...)` is one opaque `<url-token>` (CSS Syntax 3 §4.3.6): its
+        // content is copied verbatim — a comma inside it is content, not the separator the
+        // arm below spaces (`url(x,y)` and `url(x ,y)` are two different urls, and
+        // prettier keeps each) — and only the padding inside its parens trims, the same
+        // `trim_url_raw` the token takes when the lexer hands it to the printer whole. This
+        // normalizer sees one only where a value is re-read from source text: an `@import`
+        // prelude's tail, or a declaration value carrying a comment.
+        if let Some(raw) = unquoted_url_token_at(s, ch_start) {
+            if pending_space && !result.is_empty() {
+                result.push(' ');
+            }
+            pending_space = false;
+            // `trim_url_raw` is `None` only for text with no `(`, and this token has one.
+            let trimmed = crate::url::trim_url_raw(raw).unwrap_or(Cow::Borrowed(raw));
+            result.push_str(&trimmed);
+            step_past(&mut chars, &mut byte_pos, raw);
+            continue;
+        }
+
         // Opening paren - skip following whitespace
         if ch == '(' {
             if pending_space && !result.is_empty() {
                 result.push(' ');
             }
             pending_space = false;
+            paren_depth += 1;
             result.push(ch);
             // Skip whitespace after opening paren (ASCII only — NBSP and other
             // Unicode whitespace are value content, not separators).
@@ -201,10 +264,16 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
             continue;
         }
 
-        // Closing paren - remove trailing whitespace (never an escape's payload)
+        // Closing paren - remove trailing whitespace (never an escape's payload) when it
+        // closes a group; a stray `)` keeps its separator space (see `paren_depth`).
         if ch == ')' {
-            while result.len() > escape_payload_end && result.ends_with(' ') {
-                result.pop();
+            if paren_depth > 0 {
+                paren_depth -= 1;
+                while result.len() > escape_payload_end && result.ends_with(' ') {
+                    result.pop();
+                }
+            } else if pending_space && !result.is_empty() {
+                result.push(' ');
             }
             result.push(ch);
             pending_space = false;
@@ -623,6 +692,41 @@ mod tests {
         // not protected. Same split `trim_end_preserving_escape` makes at a value's own end.
         assert_eq!(normalize_css_whitespace("(a\\41 )"), "(a\\41)");
         assert_eq!(normalize_css_whitespace("(a\\41 ,b)"), "(a\\41, b)");
+    }
+
+    /// An unquoted `url(...)` is one opaque `<url-token>` (§4.3.6): its content is
+    /// verbatim — a comma inside it is content, not the separator the comma arm spaces —
+    /// and only the padding inside its parens trims. A quoted `url("…")` is a function
+    /// with a string argument and takes the ordinary arms.
+    #[test]
+    fn an_unquoted_url_token_is_opaque() {
+        assert_eq!(normalize_css_whitespace("url(x,y)"), "url(x,y)");
+        assert_eq!(normalize_css_whitespace("url(x ,y)"), "url(x ,y)");
+        assert_eq!(normalize_css_whitespace("URL( x ,y )"), "URL(x ,y)");
+        assert_eq!(normalize_css_whitespace("a  url( x,y )  b"), "a url(x,y) b");
+        // Nested parens stay whole (`url_nested_reformat`), and an escaped `)` closes
+        // nothing (§4.3.6 consumes an escape as url content).
+        assert_eq!(normalize_css_whitespace("url(a(b,c))"), "url(a(b,c))");
+        assert_eq!(normalize_css_whitespace("url(a\\),b)"), "url(a\\),b)");
+        // A quoted argument is a function call, so its list normalizes.
+        assert_eq!(normalize_css_whitespace("url( 'x' ,y )"), "url('x', y)");
+        // `url` as the tail of a longer ident names a different function.
+        assert_eq!(normalize_css_whitespace("fooURL(x,y)"), "fooURL(x, y)");
+    }
+
+    /// A `)` with no `(` open is a bare `<)-token>` between two values (§5.4.7): the
+    /// separator before it collapses to one space rather than stripping. Only a group's
+    /// own padding strips, and a stray `)` opens none — nor does it consume a later
+    /// group's balance.
+    #[test]
+    fn a_stray_close_paren_keeps_its_separator() {
+        assert_eq!(
+            normalize_css_whitespace("screen  )  print"),
+            "screen ) print"
+        );
+        assert_eq!(normalize_css_whitespace("screen )"), "screen )");
+        assert_eq!(normalize_css_whitespace("( a ) ) ( b )"), "(a) ) (b)");
+        assert_eq!(normalize_css_whitespace(")a"), ")a");
     }
 
     #[test]

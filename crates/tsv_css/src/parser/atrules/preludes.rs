@@ -997,9 +997,10 @@ pub(super) fn parse_scope_prelude<'arena>(
     })
 }
 
-/// Parse @import prelude into structured values
+/// Parse an `@import` prelude into structured values.
 ///
-/// CSS Syntax: `@import [ <url> | <string> ] [ layer | layer(<layer-name>) ]? <import-conditions> ;`
+/// CSS Syntax (css-cascade-5 §"Importing Style Sheets"):
+/// `@import [ <url> | <string> ] [ layer | layer(<layer-name>) ]? <import-conditions> ;`
 ///
 /// Examples:
 /// - `url('styles.css')`
@@ -1009,6 +1010,29 @@ pub(super) fn parse_scope_prelude<'arena>(
 /// - `url('narrow.css') supports(display: flex) screen`
 /// - `url('a.css') screen and (min-width: 5px)` (media-type-led query)
 /// - `url('b.css') (max-width: 40px)` (bare `<media-condition>` query)
+///
+/// The grammar is a guide to what gets *structured*, not to what gets *accepted*. Per
+/// CSS Syntax 3 an at-rule prelude is consumed as component values whatever they are —
+/// an `@import` that matches no grammar is dropped at cascade, never a parse error — and
+/// `parseCss` (the parity oracle) stores any prelude raw. So the reader is in two parts:
+/// a **structured head** — a run of functions (`url()`, `layer()`, `supports()`, any
+/// other) and the bare `layer` keyword, which may open with a `<string>` or an unquoted
+/// `<url-token>` — and one **verbatim tail** from the first token the head does not own to
+/// the prelude end (`{`, `;`, EOF), the text recovered from `span` at print time. The tail
+/// is where the `<media-query-list>` lives, and it is also where anything else lands: a
+/// number, a hex colour, a `url()`, a string, a stray `)`. Prettier reads the whole prelude
+/// through `parseValue`, so the printer runs the value reader's normalization over the
+/// tail wherever it starts — a prelude with no url/string (`@import 1E3;`) is *all* tail
+/// and normalizes exactly as the same token after a url (`@import 'a.css' 1E3;`) or after
+/// a media type (`@import 'a.css' screen 1E3;`). Only a prelude with nothing in it but
+/// whitespace and comments (`@import;`, `@import /* c */;`) takes the raw fallback, since
+/// a tail needs a token to start at.
+///
+/// A leading `,` starts the tail too: mediaqueries-4 §Syntax parses a `<media-query-list>`
+/// by parsing "a comma-separated list of component values, then parsing each entry as a
+/// `<media-query>`", so an entry that matches no `<media-query>` — an empty one included —
+/// is a grammar mismatch that §"Error Handling" replaces with `not all`, never a parse
+/// error.
 pub(super) fn parse_import_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<PreludeValue<'arena>, ParseError> {
@@ -1017,16 +1041,21 @@ pub(super) fn parse_import_prelude<'arena>(
     let start = parser.span_pos(parser.current_start);
     let mut values = parser.bvec();
 
-    // Register a leading comment between `@import` and the url()/string (e.g.
-    // `@import /* c */ url(...)`). Svelte strips it from the prelude; the printer
+    // Register a leading comment between `@import` and the first value (e.g.
+    // `@import /* c */ url(...)`). Svelte strips it from the prelude string; the printer
     // reconstructs it from `self.comments`.
     parser.skip_whitespace_registering_comments()?;
 
-    // Parse first value: url() function or bare string
-    if is_function_token(parser) {
-        // url() function
-        values.push(parse_function_value(parser)?);
-    } else if let TokenKind::String { .. } = &parser.current_kind {
+    if parser.at_prelude_end() {
+        // Nothing but whitespace and comments (`@import;`, `@import /* c */;`): no token
+        // for a tail to start at. Reconsume as a raw prelude — zero-width for the empty
+        // case (→ `""`), and carrying the comment verbatim otherwise, as `parseCss` does.
+        return super::reconsume_prelude_as_raw(parser, prelude_start_raw);
+    }
+
+    // The two head openers the loop below does not take: a bare string, and an unquoted
+    // url-token. A function opens the head through the loop like any later one.
+    if let TokenKind::String { .. } = &parser.current_kind {
         // Bare string — the inner text is recovered verbatim from `span` at print time
         // (span-for-verbatim, zero alloc); the quote char from `source[span.start]`.
         let value_start = parser.span_pos(parser.current_start);
@@ -1046,14 +1075,14 @@ pub(super) fn parse_import_prelude<'arena>(
         // `parse_function_value`'s empty-args url shape (name + span): the printer and the
         // public-AST conversion reconstruct the verbatim, inner-ws-trimmed `url(...)` from
         // the function span, so structured `@import url(…) layer/supports/media` wrapping
-        // still works (unlike a raw fallback, which would drop that structure).
+        // still works (unlike the tail, which would keep it as text).
         //
         // A url-token with a *nested* `(` (e.g. `url(a(b))`) is excluded above: the lexer
         // stops the url scan at the first unescaped `)` (css-syntax §4.3.6), truncating the
         // token to `url(a(b)` and leaving a dangling `)`, so the structured split would
         // reject at the trailing `)`. parseCss reads such a prelude raw to `;` (and prettier
-        // prints it verbatim), so fall through to the raw path below — the same one
-        // `@namespace url(a(b))` already takes.
+        // prints it verbatim), so it goes to the tail below — the same verbatim text
+        // `@namespace url(a(b))` takes.
         let value_start = parser.span_pos(parser.current_start);
         let value_end = parser.span_pos(parser.current_end);
         // The name is the token text up to its `(` — the ident that opened the url-token,
@@ -1086,23 +1115,14 @@ pub(super) fn parse_import_prelude<'arena>(
             },
         });
         parser.advance()?;
-    } else {
-        // Not a `<url>`/`<string>` first value, so this isn't a structurable @import.
-        // Per CSS Syntax 3 the prelude is still consumed as component values (an invalid
-        // `@import` is dropped at cascade, not a parse error); parseCss stores it raw and
-        // prettier prints it verbatim. Reconsume the whole prelude — including the empty
-        // `@import;` case (nothing to consume → a zero-width raw prelude → `""`).
-        return super::reconsume_prelude_as_raw(parser, prelude_start_raw);
     }
 
+    // The structured head: `url()` / `layer()` / `supports()` (any function) and the bare
+    // `layer` keyword. The first token that is neither starts the tail.
     parser.skip_whitespace_registering_comments()?;
-
-    // Parse optional layer(), supports() functions and other conditions
-    while !parser.check(TokenKind::Semicolon) && !parser.check(TokenKind::Eof) {
+    while !parser.at_prelude_end() {
         if is_function_token(parser) {
-            // layer() or supports() function
             values.push(parse_function_value(parser)?);
-            parser.skip_whitespace_registering_comments()?;
         } else if parser.check(TokenKind::Identifier) && parser.current_identifier() == "layer" {
             // Bare "layer" keyword (without function call); text recovered from
             // `span` at print time (span-for-verbatim).
@@ -1115,54 +1135,35 @@ pub(super) fn parse_import_prelude<'arena>(
                 },
             });
             parser.advance()?;
-            parser.skip_whitespace_registering_comments()?;
-        } else if parser.check(TokenKind::Identifier)
-            || parser.check(TokenKind::LeftParen)
-            || parser.check(TokenKind::Comma)
-        {
-            // Media-query-list — the last prelude component (css-cascade-5
-            // §import-conditions). Consume the rest verbatim to `;`/EOF, preserving
-            // original whitespace; the text is recovered from `span` at print time.
-            // A query may lead with a media type (`screen and (…)`, an identifier) OR a
-            // bare `<media-condition>` (`(max-width: 40px)`, `(width < 100px)`, a `(`) —
-            // Media Queries 4 §media-query makes a lone `<media-condition>` a valid query,
-            // so both starts are accepted. A leading `,` starts the list too: mediaqueries-4
-            // §Syntax parses a `<media-query-list>` by parsing "a comma-separated list of
-            // component values, then parsing each entry as a `<media-query>`", so an entry
-            // that matches no `<media-query>` — an empty one included — is a grammar
-            // mismatch that §"Error Handling" replaces with `not all`, never a parse error.
-            // Rejecting it here made the structured `@import` reader stricter than the raw
-            // `@media` one on the identical list (and stricter than `parseCss`, which keeps
-            // the whole prelude raw). Any other leading token (e.g. a stray `)`) is not a
-            // media-query start and falls through to the reject below.
-            let media_local_start = parser.current_start;
-            let media_start = parser.span_pos(media_local_start);
-            let mut media_local_end = parser.current_end;
-
-            while !parser.check(TokenKind::Semicolon) && !parser.check(TokenKind::Eof) {
-                if !parser.check(TokenKind::Whitespace) {
-                    media_local_end = parser.current_end;
-                }
-                parser.advance()?;
-            }
-
-            let media_end = parser.span_pos(media_local_end);
-
-            // Media-query text recovered verbatim from `span` at print time.
-            if media_local_end > media_local_start {
-                values.push(CssValue::Identifier {
-                    span: Span {
-                        start: media_start,
-                        end: media_end,
-                    },
-                });
-            }
-            break;
         } else {
-            // Not a media-query start (e.g. a stray `)`); leave it for the caller to
-            // reject as an unterminated at-rule prelude.
             break;
         }
+        parser.skip_whitespace_registering_comments()?;
+    }
+
+    // The tail: everything from here to the prelude end, verbatim, with its original
+    // whitespace — one `Identifier` value the printer normalizes as a whole (the media
+    // condition is the common content; see the doc comment). Its end is the last
+    // non-whitespace token's, so the value's span (and the wire prelude read from it)
+    // is outer-trimmed like every other prelude.
+    if !parser.at_prelude_end() {
+        let tail_local_start = parser.current_start;
+        let tail_start = parser.span_pos(tail_local_start);
+        let mut tail_local_end = parser.current_end;
+
+        while !parser.at_prelude_end() {
+            if !parser.check(TokenKind::Whitespace) {
+                tail_local_end = parser.current_end;
+            }
+            parser.advance()?;
+        }
+
+        values.push(CssValue::Identifier {
+            span: Span {
+                start: tail_start,
+                end: parser.span_pos(tail_local_end),
+            },
+        });
     }
 
     let end = values.last().map_or(start, |v| v.span().end);

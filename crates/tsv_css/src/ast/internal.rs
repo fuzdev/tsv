@@ -692,8 +692,12 @@ pub enum Color {
 /// - @keyframes: raw animation name
 #[derive(Debug, Clone)]
 pub enum PreludeValue<'arena> {
-    /// Structured values (for @import)
-    /// Example: `url('styles.css') layer(base)` → [Function(url), Function(layer)]
+    /// Structured values (for @import): a `url()`/string head and `layer`/`supports()`
+    /// calls, then the rest of the prelude to its end as one verbatim `Identifier` tail —
+    /// the media-query list when the author wrote one, any other value otherwise
+    /// (`parse_import_prelude`).
+    /// Example: `url('styles.css') layer(base) screen` → [Function(url), Function(layer),
+    /// Identifier(screen)]
     Values {
         values: &'arena [CssValue<'arena>],
         span: Span,
