@@ -93,16 +93,16 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 615,
-			"end": 622,
+			"start": 617,
+			"end": 624,
 			"loc": {
 				"start": {
 					"line": 14,
-					"column": 4
+					"column": 6
 				},
 				"end": {
 					"line": 14,
-					"column": 11
+					"column": 13
 				}
 			}
 		},
@@ -830,12 +830,12 @@
 						},
 						"falseType": {
 							"type": "TSUnionType",
-							"start": 623,
+							"start": 615,
 							"end": 766,
 							"loc": {
 								"start": {
 									"line": 14,
-									"column": 12
+									"column": 4
 								},
 								"end": {
 									"line": 16,
@@ -872,7 +872,15 @@
 											}
 										},
 										"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-									}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 617,
+											"end": 624
+										}
+									]
 								},
 								{
 									"type": "TSTypeReference",
@@ -935,14 +943,6 @@
 										},
 										"name": "Ccccccccccccccccccccccccccccccccccccccccccc"
 									}
-								}
-							],
-							"leadingComments": [
-								{
-									"type": "Block",
-									"value": " c ",
-									"start": 615,
-									"end": 622
 								}
 							]
 						}

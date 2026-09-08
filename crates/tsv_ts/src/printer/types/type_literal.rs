@@ -13,7 +13,9 @@ use super::{Printer, StandaloneGlue};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
-use crate::printer::{MemberBlankScan, MemberBody, MemberFreeze, MemberSeam, ShellLeadingRun};
+use crate::printer::{
+    LeadingGlue, MemberBlankScan, MemberBody, MemberFreeze, MemberSeam, ShellLeadingRun,
+};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -521,8 +523,15 @@ impl<'a> Printer<'a> {
     /// indexed-access *index* uses bracket delimiters, not parens, so it expands
     /// inline rather than through here. See `type_param_fits_rhs_long`.
     pub(super) fn build_expanded_parenthesized_union_opt(&self, ty: &TSType<'_>) -> Option<DocId> {
+        // The seam's glue answer where a shell is authored — its `(`→union gap is the
+        // shell's own, and a block there declines the hug at the seam
+        // (`build_parenthesized_union_doc` hands a glued run into the union); a
+        // synthetic shell has no gap, so the union answers from its span.
         if let TSType::Union(u) = unwrap_parenthesized(ty)
-            && !self.union_prints_hugged(u)
+            && !outermost_paren(ty).map_or_else(
+                || self.union_prints_hugged(u),
+                |p| self.union_seam_hugs(p.span.start + 1, u),
+            )
         {
             // The real paren node, not `None`: with it the builder emits the shell's own
             // two gaps, so a commented shell takes this expanded layout too. Declining on
@@ -570,7 +579,6 @@ impl<'a> Printer<'a> {
         shell_leading_run: ShellLeadingRun,
     ) -> DocId {
         let d = self.d();
-        let union_doc = self.build_union_type_doc(union);
 
         let mut needs_break = false;
         // A `//` the author glued to the `(` keeps that line, as at every other opening
@@ -586,20 +594,48 @@ impl<'a> Printer<'a> {
                 doc.map(|doc| (doc, resume))
             });
         needs_break |= glued.is_some();
+        // An authored shell's `(`→union gap is this seam's: a block run glued to the
+        // first member is handed into the union (`build_union_value_doc`), where it
+        // declines the hug and lands after the pipe (`(⏎| /* c */ {…}⏎| null)[]`,
+        // `union_hug_gap_block_comment_container`); the shell's own emitter below then
+        // stops at the handed run's start, so exactly one of the two prints it.
+        let gap_start = paren.map(|p| glued.map_or(p.span.start + 1, |(_, resume)| resume));
+        let handed = gap_start.and_then(|g| self.union_external_leading_run_start(g, union));
+        let union_doc = match gap_start {
+            Some(g) => self.build_union_value_doc(g, union).doc,
+            None => self.build_union_type_doc(union),
+        };
         let mut indented: DocBuf = smallvec![d.softline()];
-        if let Some(p) = paren {
+        if let Some(g) = gap_start {
             // Leading comments between `(` and the union. Block comments stay inline
             // (`(/* c */ a | b)`). A leading *line* comment reaches here only for
             // `ShellLeadingRun::Here` — the paren-union member of an outer union, whose
             // comment tsv keeps inside the parens leading the inner union (for every
             // member, not just the first). A line comment must end its line, so it forces
             // the paren group to break.
-            needs_break |= self.push_paren_shell_leading_run(
-                &mut indented,
-                glued.map_or(p.span.start + 1, |(_, resume)| resume),
-                union.span.start,
-                shell_leading_run,
-            );
+            //
+            // Ahead of a union that still HUGS behind the run — a block the author broke
+            // after (`(/* c */⏎{ … } | null)`; a glued one was handed in above) — the run
+            // takes the shared leading-run emitter instead, whose soft `line` keeps that
+            // break when the shell breaks. Glued onto the union, the broke-after block
+            // came back as the glued spelling, which the next pass binds to the first
+            // member and declines: two forms for one authoring. The line-comment routing
+            // is unaffected: a `//` in this gap declines the hug.
+            if handed.is_none() && self.union_hugs_behind_seam_run(g, union) {
+                self.push_leading_comment_run(
+                    &mut indented,
+                    self.comments_to_emit_between(g, union.span.start),
+                    union.span.start,
+                    LeadingGlue::Adjacent,
+                );
+            } else {
+                needs_break |= self.push_paren_shell_leading_run(
+                    &mut indented,
+                    g,
+                    handed.unwrap_or(union.span.start),
+                    shell_leading_run,
+                );
+            }
         }
         indented.push(union_doc);
         if let Some(p) = paren {

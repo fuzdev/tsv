@@ -102,8 +102,14 @@ impl<'a> Printer<'a> {
     /// **not** inline: `build_single_type_arg_inline` emits no group and no softlines, so an
     /// inlined `<…>` has no break point and an overflowing head breaks *around* the brackets
     /// (the enclosing operand, or the assignment `=`) instead of inside them.
-    pub(in crate::printer) fn type_arg_hugs(&self, ty: &TSType<'_>) -> bool {
-        is_simple_type_arg(ty) || is_huggable_type(ty) || self.type_arg_union_prints_hugged(ty)
+    ///
+    /// `gap_start` is the byte after the list's `<`: the `<`→argument gap is this seam's,
+    /// and a block comment in it declines the union hug at the seam
+    /// ([`Self::type_arg_union_prints_hugged`]).
+    pub(in crate::printer) fn type_arg_hugs(&self, gap_start: u32, ty: &TSType<'_>) -> bool {
+        is_simple_type_arg(ty)
+            || is_huggable_type(ty)
+            || self.type_arg_union_prints_hugged(gap_start, ty)
     }
 
     /// Comments that force the `<...>` list to the multiline layout: line
@@ -212,7 +218,7 @@ impl<'a> Printer<'a> {
         // A single argument inlines only when it hugs; a non-hugging one (an intersection, a
         // function type, a conditional) falls through to the group below, which is what gives
         // the `<…>` a break point of its own.
-        if args.params.len() == 1 && self.type_arg_hugs(&args.params[0]) {
+        if args.params.len() == 1 && self.type_arg_hugs(args.span.start + 1, &args.params[0]) {
             return self.build_single_type_arg_inline(args, has_comments);
         }
 
@@ -240,13 +246,21 @@ impl<'a> Printer<'a> {
             args.span,
             args.params.len(),
             |i| args.params[i].span(),
-            |i, frozen| {
+            |i, frozen, gap_start| {
                 if frozen {
                     self.build_frozen_list_member_doc(&args.params[i])
+                } else if let TSType::Union(u) = &args.params[i] {
+                    // The `<`/`,`→argument gap is this seam's: a block run glued to
+                    // the union's first member is handed in (`build_union_value_doc`),
+                    // declining the hug and landing after the pipe once the argument
+                    // breaks (`union_hug_gap_block_comment_container`); the list's gap
+                    // emitter stopped at the claim below.
+                    self.build_union_value_doc(gap_start, u).doc
                 } else {
                     self.build_type_arg_doc(&args.params[i], true)
                 }
             },
+            |i, gap_start| self.union_seam_run_handoff(gap_start, &args.params[i]),
             |i| self.frozen_list_member_multiline(&args.params[i]),
             has_comments,
         ))

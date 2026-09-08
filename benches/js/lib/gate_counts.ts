@@ -624,7 +624,20 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// what keeps `language-tools/…/typescript-plugin/src/language-service/find-references.ts`
 	// (`fn(cb, <ts.ReferenceEntry[]>[])`) byte-identical once the short-chain ladder that had
 	// been holding it broken out is gone.
-	typescript: 89,
+	//
+	// 89 → 88: `prettier/tests/format/typescript/type-parameters-arguments/10732.ts` leaves for
+	// `match`. The mapped type's `[key in constraint]` binding now carries prettier's bracket
+	// group (`group(["[", indent([softline, …]), softline, "]"])`, `mapped-type.js`), so a
+	// binding too wide for its line breaks INSIDE the brackets with the key one level in and
+	// the `]` on its own line, and a constraint union hangs after `in` inside them — where the
+	// old flat `[key in …]` exploded a long constraint beside the `[`. Measured by the
+	// baseline-vs-tip byte A/B over the prettier `typescript` + `js` suites (2,113 files):
+	// three movers, this one and the two mapped-type comment files
+	// (`typescript/comments/mapped-types.ts`, `typescript/prettier-ignore/mapped-types.ts`),
+	// which take the same bracket break and stay `unknown` on their pre-existing
+	// comment-position hunks alone — the union-hug seam work landing alongside moved no suite
+	// file, glued-block unions being absent from an already-formatted corpus.
+	typescript: 88,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.
