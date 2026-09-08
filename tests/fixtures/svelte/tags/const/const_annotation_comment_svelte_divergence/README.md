@@ -34,7 +34,24 @@ once and attaches once. The distinct-comment set is identical, `ast_diff`
 confirms semantic equivalence, and the formatter — which locates comments by
 position — is unaffected and matches prettier on every case here.
 
-## The second claim: which source the DEDENT reads
+## The second claim: the two copies need not land on the same NODE
+
+`a1`'s two copies both land on `T` (`leadingComments: [c1, c1]`), so the
+divergence there reads as a longer list. `a6` puts the same comment at a **union
+seam**, where they split: `add_comments` walks with the whole accumulated array
+as its queue, so `A` takes the first copy as a `trailingComments` (the gap to the
+comment is `/^[,) \t]*$/`) and `B` then finds the second still queued and ahead of
+its own start, taking it as a `leadingComments`. Canonical therefore carries an
+attachment tsv has **nowhere**, not merely one more entry in a list tsv also
+writes.
+
+`a0` is the null control, and it is what makes the attachment the duplicate's
+and not the seam's: the same comment at the same seam in a plain `<script>`,
+which Svelte reads **once**. There canonical attaches it to `A` alone — exactly
+what tsv emits at `a6` — so a single copy of the comment produces tsv's answer
+under canonical's own walk.
+
+## The third claim: which source the DEDENT reads
 
 `a5` is a multi-line block comment inside the annotation, and it pins the other
 thing `read_type_annotation`'s synthetic source decides. acorn's `onComment`

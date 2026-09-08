@@ -201,6 +201,10 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Basic const (`{@const x = value}`)
 - Const with destructuring
 - Const in various contexts (if, each, await)
+- A type annotation whose TS syntax the head's own splitter must read through — a `,`
+  inside type arguments and the `=>` of a function type, on either side of the `=`
+- The head is printed verbatim by prettier once the binding is annotated (see
+  [conformance_prettier_svelte.md §Svelte: annotated `{@const}` head verbatim](./conformance_prettier_svelte.md#svelte-annotated-const-head-verbatim))
 - Own line in its fragment, except when glued to content on both sides (shared with the
   declaration tag — see [conformance_prettier_svelte.md §Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style))
 

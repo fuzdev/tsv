@@ -370,8 +370,10 @@ impl<'a> Printer<'a> {
                 // and whose comment is gap trivia here, so the gap holds only
                 // trivia and the one comma). A comment before the comma trails the
                 // previous identifier; one after it leads this one. Scanning
-                // trivia-aware — the same scan `parse_const_tag` uses — keeps a `,`
-                // inside a comment from mis-anchoring the split.
+                // trivia-aware keeps a `,` inside a comment from mis-anchoring the
+                // split. Sound here where the same scan is not on a declarator head:
+                // the gap between two identifiers holds only trivia and the comma, so
+                // there is no type argument list whose `,` it could read as this one.
                 let comma = crate::parser::find_top_level_delim(
                     self.source.as_bytes(),
                     last_end as usize,
