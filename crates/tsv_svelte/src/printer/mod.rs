@@ -1152,6 +1152,10 @@ fn format_root<'a>(
         tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
     }
 
+    // The template printer deliberately leaves `EmbedContext::printer_owns_line` at its
+    // default: after an island's closing `}` the rest of the line is this printer's markup,
+    // so a `//` an island defers past its own doc would come out as page text. Every island
+    // recipe spreads `..self.embed` and inherits that; `<script>` declares ownership itself.
     let mut printer = Printer::with_line_breaks(
         arena,
         source,

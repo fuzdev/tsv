@@ -366,7 +366,17 @@ fn format_program_in(
     canonical: bool,
 ) -> String {
     let inputs = PrinterInputs::for_document(source, program.comments, line_breaks.table());
-    let mut printer = make_printer(arena, &inputs, EmbedContext::default());
+    // This printer IS the document — a break after any doc it builds is its own, so an
+    // emitter may defer a `//` to the end of a line (`EmbedContext::printer_owns_line`,
+    // whose default is the conservative answer for an embedded caller).
+    let mut printer = make_printer(
+        arena,
+        &inputs,
+        EmbedContext {
+            printer_owns_line: true,
+            ..EmbedContext::default()
+        },
+    );
     if canonical {
         printer.set_canonical();
     }

@@ -953,7 +953,17 @@ mod tests {
             has_format_ignore: false,
             comment_free_window: None,
         };
-        Printer::with_context(arena, &inputs, EmbedContext::default(), 0)
+        // A test printer stands in for a whole document, so it owns its lines
+        // (`EmbedContext::printer_owns_line`); the default is the embedded caller's answer.
+        Printer::with_context(
+            arena,
+            &inputs,
+            EmbedContext {
+                printer_owns_line: true,
+                ..EmbedContext::default()
+            },
+            0,
+        )
     }
 
     /// Helper to create an identifier expression. Tests fabricate spans with no

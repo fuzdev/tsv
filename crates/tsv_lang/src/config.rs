@@ -117,6 +117,26 @@ pub struct EmbedContext {
     /// `group(join([",", line]))`. See `docs/conformance_prettier_svelte.md` §Svelte:
     /// Blocks.
     pub root_sequence_indents: bool,
+    /// Whether **this printer owns the whole output line** — whether a break after this doc
+    /// is still its own. True for a standalone document and for a Svelte `<script>` body;
+    /// false for every Svelte TEMPLATE island (an attribute value, a spread, a directive
+    /// value, an expression tag, a block head, a prefixed tag, `{@const}`), where the text
+    /// past the closing `}` is the host's markup. The fourth build-time field.
+    ///
+    /// What it licenses is a deferral: an emitter that pushes a `//` past the end of what it
+    /// prints (`line_suffix`, flushed by whatever break comes next) is lossless only while
+    /// that break is still this doc's. In a template island it is not — the deferred comment
+    /// lands in the HOST's line and comes out as rendered page text. The one reader today is
+    /// the member chain's trailing-member collapse (`tsv_ts`'s
+    /// `trailing_member_gap_line_comment`), which expands the chain rather than defer; a new
+    /// deferral that can outlive its own doc owes the same question.
+    ///
+    /// ⚠️ **`false` is the default because it is the SAFE answer.** A host that forgets to
+    /// declare ownership loses a collapse it could have had — cosmetic, and loud (it moves
+    /// `<script>` fixtures on the first run). The opposite polarity fails silently: the
+    /// escaped comment is a fixed point, reparses, and is printed exactly once, so no gate in
+    /// `check` sees it. Only a printer that genuinely ends its own lines may set this.
+    pub printer_owns_line: bool,
 }
 
 impl Default for EmbedContext {
@@ -128,6 +148,7 @@ impl Default for EmbedContext {
             mode: LayoutMode::Standalone,
             jsdoc_cast_cannot_hang: false,
             root_sequence_indents: false,
+            printer_owns_line: false,
         }
     }
 }

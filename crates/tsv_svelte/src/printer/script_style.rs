@@ -47,7 +47,15 @@ impl<'a> Printer<'a> {
         // Note: We use default embed (base_indent_offset=0) for accurate width calculations.
         // Template indent fallback (when source has no whitespace) is handled separately
         // in the TypeScript printer with a hardcoded default of 1 for Svelte context.
-        let embed = tsv_lang::EmbedContext::default();
+        // A `<script>` body is the one Svelte island whose printer owns whole LINES: its
+        // statements end with breaks of their own and the closing `</script>` takes a fresh
+        // line, so a `//` deferred to a line end still lands in JS. Every TEMPLATE island
+        // leaves `printer_owns_line` at its safe default — past a `{…}` the rest of the line
+        // is markup, and a deferred comment would come out as page text.
+        let embed = tsv_lang::EmbedContext {
+            printer_owns_line: true,
+            ..tsv_lang::EmbedContext::default()
+        };
         let script_doc_id = tsv_ts::build_program_doc(
             self.d(),
             &script.content,
