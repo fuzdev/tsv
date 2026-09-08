@@ -1,0 +1,376 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 2428,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 2419,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 58,
+							"end": 96,
+							"property": "grid-template-columns",
+							"value": "[a] 1fr [b] 2fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 147,
+							"end": 191,
+							"property": "grid-template-columns",
+							"value": "[a] 1fr\n\t\t\t[b] 2fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 240,
+							"end": 287,
+							"property": "grid-template-columns",
+							"value": "[a]\n\t\t\t1fr\n\t\t\t[b] 2fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 323,
+							"end": 374,
+							"property": "grid-template-rows",
+							"value": "[a] auto\n\t\t\t[b c] 1fr\n\t\t\t[d]"
+						},
+						{
+							"type": "Declaration",
+							"start": 426,
+							"end": 474,
+							"property": "grid-template-columns",
+							"value": "repeat(2, 1fr)\n\t\t\tauto"
+						},
+						{
+							"type": "Declaration",
+							"start": 478,
+							"end": 552,
+							"property": "grid-template-columns",
+							"value": "minmax(100px, 1fr)\n\t\t\tminmax(200px, 2fr)\n\t\t\tauto"
+						},
+						{
+							"type": "Declaration",
+							"start": 621,
+							"end": 673,
+							"property": "grid-template-columns",
+							"value": "[a] 1fr [b] 2fr\n\t\t\t[c] 3fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 752,
+							"end": 786,
+							"property": "grid",
+							"value": "'a' 1fr\n\t\t\t'b' 2fr / auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 826,
+							"end": 867,
+							"property": "grid",
+							"value": "'a' 1fr\n\t\t\t'b' 2fr\n\t\t\t/ auto 1fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 923,
+							"end": 976,
+							"property": "grid-template",
+							"value": "'a a' 1fr\n\t\t\t'b c' 2fr / 1fr\n\t\t\t1fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 1009,
+							"end": 1065,
+							"property": "grid-template-columns",
+							"value": "repeat(2, 1fr) \n\t\t\tauto"
+						},
+						{
+							"type": "Declaration",
+							"start": 1142,
+							"end": 1194,
+							"property": "grid-template-columns",
+							"value": "[a] 1fr\n\t\t\t[b] 2fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 1252,
+							"end": 1309,
+							"property": "grid-template-columns",
+							"value": "[a] 1fr \n\t\t\t[b] 2fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 1377,
+							"end": 1423,
+							"property": "grid-template-columns",
+							"value": "[a] 1.5fr\n\t\t\t[b] 2fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 1476,
+							"end": 1550,
+							"property": "grid-template-columns",
+							"value": "fit-content(100px)\n\t\t\tmin-content\n\t\t\tmax-content"
+						},
+						{
+							"type": "Declaration",
+							"start": 1554,
+							"end": 1590,
+							"property": "grid-template-columns",
+							"value": "50%\n\t\t\t50%"
+						},
+						{
+							"type": "Declaration",
+							"start": 1619,
+							"end": 1661,
+							"property": "grid-template-columns",
+							"value": "[] 1fr\n\t\t\t[] 2fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 1703,
+							"end": 1766,
+							"property": "grid-template-columns",
+							"value": "subgrid [a]\n\t\t\trepeat(auto-fill, [b])"
+						},
+						{
+							"type": "Declaration",
+							"start": 1814,
+							"end": 1851,
+							"property": "grid",
+							"value": "auto-flow dense\n\t\t\t/ 1fr 2fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 1917,
+							"end": 1979,
+							"property": "grid-template",
+							"value": "[a] 'x' 1fr [b]\n\t\t\t[c] 'y' 2fr [d]\n\t\t\t/ auto"
+						},
+						{
+							"type": "Declaration",
+							"start": 2039,
+							"end": 2080,
+							"property": "grid-template-columns",
+							"value": "1fr 2fr !important"
+						},
+						{
+							"type": "Declaration",
+							"start": 2145,
+							"end": 2168,
+							"property": "grid-auto-rows",
+							"value": "1fr 2fr"
+						},
+						{
+							"type": "Declaration",
+							"start": 2255,
+							"end": 2415,
+							"property": "grid-template-columns",
+							"value": "repeat(auto-fill, minmax(100px, 1fr)) repeat(auto-fill, minmax(100px, 1fr)) repeat(\n\t\t\t\tauto-fill,\n\t\t\t\tminmax(100px, 1fr)\n\t\t\t)\n\t\t\tauto"
+						}
+					]
+				},
+				"start": 9,
+				"end": 2419
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " single track list - stays inline ",
+				"start": 17,
+				"end": 55
+			},
+			{
+				"type": "CSSComment",
+				"value": " named lines - each row on its own line ",
+				"start": 100,
+				"end": 144
+			},
+			{
+				"type": "CSSComment",
+				"value": " a lone line name is a row of its own ",
+				"start": 195,
+				"end": 237
+			},
+			{
+				"type": "CSSComment",
+				"value": " rows of two tracks each ",
+				"start": 291,
+				"end": 320
+			},
+			{
+				"type": "CSSComment",
+				"value": " function members - each on its own line ",
+				"start": 378,
+				"end": 423
+			},
+			{
+				"type": "CSSComment",
+				"value": " a row of several tracks stays a row; the next row breaks ",
+				"start": 556,
+				"end": 618
+			},
+			{
+				"type": "CSSComment",
+				"value": " the grid shorthand: areas with tracks, and a slash on the last row ",
+				"start": 677,
+				"end": 749
+			},
+			{
+				"type": "CSSComment",
+				"value": " the slash opens its own row ",
+				"start": 790,
+				"end": 823
+			},
+			{
+				"type": "CSSComment",
+				"value": " grid-template mixes area strings and tracks ",
+				"start": 871,
+				"end": 920
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment ends a row ",
+				"start": 980,
+				"end": 1006
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1050,
+				"end": 1057,
+				"position": 15
+			},
+			{
+				"type": "CSSComment",
+				"value": " leading run stays on the colon's line; the rows break beneath it ",
+				"start": 1069,
+				"end": 1139
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 1165,
+				"end": 1172,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " a multi-line comment ends the row it opens on ",
+				"start": 1198,
+				"end": 1249
+			},
+			{
+				"type": "CSSComment",
+				"value": " c\n\t\t\td ",
+				"start": 1286,
+				"end": 1298,
+				"position": 8
+			},
+			{
+				"type": "CSSComment",
+				"value": " numbers and units normalize on a row like anywhere else ",
+				"start": 1313,
+				"end": 1374
+			},
+			{
+				"type": "CSSComment",
+				"value": " track sizes of every kind are rows alike ",
+				"start": 1427,
+				"end": 1473
+			},
+			{
+				"type": "CSSComment",
+				"value": " empty line names ",
+				"start": 1594,
+				"end": 1616
+			},
+			{
+				"type": "CSSComment",
+				"value": " subgrid with a line-name list ",
+				"start": 1665,
+				"end": 1700
+			},
+			{
+				"type": "CSSComment",
+				"value": " the grid shorthand's auto-flow form ",
+				"start": 1770,
+				"end": 1811
+			},
+			{
+				"type": "CSSComment",
+				"value": " grid-template with line names around the area strings ",
+				"start": 1855,
+				"end": 1914
+			},
+			{
+				"type": "CSSComment",
+				"value": " !important is not a track: it never opens a row ",
+				"start": 1983,
+				"end": 2036
+			},
+			{
+				"type": "CSSComment",
+				"value": " only grid and grid-template* read the author's lines ",
+				"start": 2084,
+				"end": 2142
+			},
+			{
+				"type": "CSSComment",
+				"value": " a long row never wraps as a fill; a function on it breaks by its own group ",
+				"start": 2172,
+				"end": 2252
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 2420,
+			"styles": "\n\tdiv {\n\t\t/* single track list - stays inline */\n\t\tgrid-template-columns: [a] 1fr [b] 2fr;\n\t\t/* named lines - each row on its own line */\n\t\tgrid-template-columns:\n\t\t\t[a] 1fr\n\t\t\t[b] 2fr;\n\t\t/* a lone line name is a row of its own */\n\t\tgrid-template-columns:\n\t\t\t[a]\n\t\t\t1fr\n\t\t\t[b] 2fr;\n\t\t/* rows of two tracks each */\n\t\tgrid-template-rows:\n\t\t\t[a] auto\n\t\t\t[b c] 1fr\n\t\t\t[d];\n\t\t/* function members - each on its own line */\n\t\tgrid-template-columns:\n\t\t\trepeat(2, 1fr)\n\t\t\tauto;\n\t\tgrid-template-columns:\n\t\t\tminmax(100px, 1fr)\n\t\t\tminmax(200px, 2fr)\n\t\t\tauto;\n\t\t/* a row of several tracks stays a row; the next row breaks */\n\t\tgrid-template-columns:\n\t\t\t[a] 1fr [b] 2fr\n\t\t\t[c] 3fr;\n\t\t/* the grid shorthand: areas with tracks, and a slash on the last row */\n\t\tgrid:\n\t\t\t'a' 1fr\n\t\t\t'b' 2fr / auto;\n\t\t/* the slash opens its own row */\n\t\tgrid:\n\t\t\t'a' 1fr\n\t\t\t'b' 2fr\n\t\t\t/ auto 1fr;\n\t\t/* grid-template mixes area strings and tracks */\n\t\tgrid-template:\n\t\t\t'a a' 1fr\n\t\t\t'b c' 2fr / 1fr\n\t\t\t1fr;\n\t\t/* a comment ends a row */\n\t\tgrid-template-columns:\n\t\t\trepeat(2, 1fr) /* c */\n\t\t\tauto;\n\t\t/* leading run stays on the colon's line; the rows break beneath it */\n\t\tgrid-template-columns: /* c */\n\t\t\t[a] 1fr\n\t\t\t[b] 2fr;\n\t\t/* a multi-line comment ends the row it opens on */\n\t\tgrid-template-columns:\n\t\t\t[a] 1fr /* c\n\t\t\td */\n\t\t\t[b] 2fr;\n\t\t/* numbers and units normalize on a row like anywhere else */\n\t\tgrid-template-columns:\n\t\t\t[a] 1.5fr\n\t\t\t[b] 2fr;\n\t\t/* track sizes of every kind are rows alike */\n\t\tgrid-template-columns:\n\t\t\tfit-content(100px)\n\t\t\tmin-content\n\t\t\tmax-content;\n\t\tgrid-template-columns:\n\t\t\t50%\n\t\t\t50%;\n\t\t/* empty line names */\n\t\tgrid-template-columns:\n\t\t\t[] 1fr\n\t\t\t[] 2fr;\n\t\t/* subgrid with a line-name list */\n\t\tgrid-template-columns:\n\t\t\tsubgrid [a]\n\t\t\trepeat(auto-fill, [b]);\n\t\t/* the grid shorthand's auto-flow form */\n\t\tgrid:\n\t\t\tauto-flow dense\n\t\t\t/ 1fr 2fr;\n\t\t/* grid-template with line names around the area strings */\n\t\tgrid-template:\n\t\t\t[a] 'x' 1fr [b]\n\t\t\t[c] 'y' 2fr [d]\n\t\t\t/ auto;\n\t\t/* !important is not a track: it never opens a row */\n\t\tgrid-template-columns: 1fr 2fr !important;\n\t\t/* only grid and grid-template* read the author's lines */\n\t\tgrid-auto-rows: 1fr 2fr;\n\t\t/* a long row never wraps as a fill; a function on it breaks by its own group */\n\t\tgrid-template-columns:\n\t\t\trepeat(auto-fill, minmax(100px, 1fr)) repeat(auto-fill, minmax(100px, 1fr)) repeat(\n\t\t\t\tauto-fill,\n\t\t\t\tminmax(100px, 1fr)\n\t\t\t)\n\t\t\tauto;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 2429,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

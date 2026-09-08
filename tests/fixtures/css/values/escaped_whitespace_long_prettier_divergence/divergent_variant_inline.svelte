@@ -5,8 +5,6 @@
 
 		/* over the width: the value wraps into rows beneath the colon, breaking at a real separator
 		   — never on the escaped space, which is inside an ident */
-		grid-template-areas:
-			aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd
-			xxxxx\yyyyy;
+		grid-template-areas: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd xxxxx\yyyyy;
 	}
 </style>

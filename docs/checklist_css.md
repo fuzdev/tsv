@@ -634,11 +634,23 @@ Spec: `css-grid-1`
 - `repeat()`
 - `fit-content()`
 - Named grid lines (`[name]`)
-- Multi-row string values on `grid` / `grid-template*` are **source-position-dependent** —
-  the one place CSS formatting reads the author's line breaks. Consecutive string values
-  written on different source lines wrap one-per-line; the same values written inline stay
-  inline (`grid-template-areas: 'a a' 'b b'`). Matches prettier
-  (`comma-separated-value-group.js`)
+- Multi-row values on `grid` / `grid-template*` are **source-position-dependent** — the
+  one place CSS formatting reads the author's line breaks. Consecutive value nodes written
+  on different source lines wrap one-per-line; the same values written inline stay inline
+  (`grid-template-areas: 'a a' 'b b'`). Matches prettier (`comma-separated-value-group.js`)
+- The rule reads every kind of member alike — track lists as well as area strings: line
+  names (`[a]`, `[b c]`, `[]`), sizes (`1fr`, `50%`, `min-content`), `repeat()` /
+  `minmax()` / `fit-content()`, `subgrid`, the `grid` shorthand's `auto-flow dense /` form,
+  the `/` (a node that can open its own row), and `grid-template`'s names-around-strings
+  form. A multi-line **function** member ends the row it opens on (`repeat(2,⏎1fr) auto`
+  breaks before `auto`; a comment after the `)` opens a row and the word after the comment
+  stays beside it), a string's escaped newline does not; `!important` is not a node and
+  never opens a row; `grid-auto-*` does not read the author's lines. A row never wraps as a
+  fill, but a function on a wide row breaks by its own group. Matches prettier
+  ([grid_template_tracks_multirow](../tests/fixtures/css/declarations/grid_template_tracks_multirow/));
+  a comment inside a function member or inside line names stays there and the row still
+  breaks
+  ([grid_template_tracks_multirow_comment](../tests/fixtures/css/declarations/grid_template_tracks_multirow_comment/))
 - A comment in a multi-row value is a node of the same rule and rides the row its source
   line puts it on — trailing the last row, ending a row, on a line of its own, opening a
   row, a run of two, a multi-line comment (which ends the row it opens on); the run that
@@ -647,9 +659,15 @@ Spec: `css-grid-1`
   ([grid_template_areas_multirow_comment](../tests/fixtures/css/declarations/grid_template_areas_multirow_comment/));
   a newline *inside* the opening run is the after-colon whitespace divergence
   ([grid_template_areas_multirow_comment_run](../tests/fixtures/css/declarations/grid_template_areas_multirow_comment_run_prettier_divergence/))
-- ⚠️ A multi-row value of **tracks** (`grid-template-columns:⏎[a] 1fr⏎[b] 2fr`,
-  `grid:⏎'a' 1fr⏎'b' 2fr / auto`) packs inline where prettier keeps the rows — the
-  multirow class is row strings only; corpus-absent, unpinned
+- A grid value authored on one line past the print width wraps into rows **beneath the
+  colon** (`prop:⏎\t[a] … 1fr [b] 2fr;`), the leading run kept on the colon's line — the one
+  wrap shape the row read reproduces on the next pass (a first row left on the colon's line is
+  re-rowed by both formatters). Prettier never wraps a grid value
+  ([grid_template_wrap_long](../tests/fixtures/css/declarations/grid_template_wrap_long_prettier_divergence/))
+- ⚠️ A newline *inside* line names (`[a⏎b] 1fr`): prettier's value tokenizer makes `[a` and
+  `b]` two nodes, so its grid rule breaks between them and keeps `1fr` beside `b]`; tsv holds
+  the bracket as one member and normalizes it to `[a b]` (as both formatters do off the grid
+  properties). Rare, unpinned
 
 ### Easing Functions
 
