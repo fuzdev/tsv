@@ -6,7 +6,7 @@
 // - Return type annotations
 
 use super::helpers::{type_args_should_wrap_for_return_type, unwrap_parenthesized};
-use super::{CommentSpacing, Printer, TrailingBlock};
+use super::{CommentSpacing, Printer, TrailingBlock, UnionValueDoc};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
@@ -229,26 +229,22 @@ impl<'a> Printer<'a> {
             // Handle unions/intersections with width-based breaking
             // Short: `param: Type1 | Type2`
             // Long: `param:\n\t| Type1\n\t| Type2`
+            // Hugged: `param: {\n\t…\n} | null` (the union seam decides; see below)
             //
             // This pattern matches index signature type annotation handling.
-            // For unions/intersections, wrap in group + indent + line so they break after `:`
-            // and inherit breaking from this context's group. Redundant comment-free
-            // parens are stripped first so `(A | B)` / `(A & B)` get the bare layout
-            // (prettier strips them too); other parens keep the `_` fall-through.
-            match self.unwrap_redundant_parens(ty) {
+            // For a non-hugging union and for intersections, wrap in group + indent + line
+            // so they break after `:` and inherit breaking from this context's group.
+            // Redundant comment-free parens are stripped first so `(A | B)` / `(A & B)`
+            // get the bare layout (prettier strips them too); other parens keep the `_`
+            // fall-through.
+            let value_type = self.unwrap_redundant_parens(ty);
+            match value_type {
                 TSType::Union(u) => {
-                    // A glued block run between `:` and a union with no authored
-                    // leading `|` is handed INTO the union, which binds it to the
-                    // first member after its synthesized `| ` — the same seam as the
-                    // alias RHS (`build_union_value_doc`). Exactly one of the two
-                    // prints the run.
-                    let (type_doc, run_handed) = self.build_union_value_doc(colon_end, u);
-                    self.hang_annotation_union_doc(
-                        colon_end,
-                        type_start,
-                        type_doc,
-                        gap_has_comments && !run_handed,
-                    )
+                    // The one union seam for every annotation position: a hugging
+                    // union (`{ … } | null`) keeps `: ` glued — a parameter's annotation
+                    // hugs exactly as a variable's or a property's does — and any other
+                    // union hangs after the `:`.
+                    self.build_annotation_union_doc(colon_end, type_start, u, gap_has_comments)
                 }
                 TSType::Intersection(i) => {
                     // Build intersection with proper indentation for type annotation context:
@@ -383,6 +379,110 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// The `: <union>` doc for every annotation position — the one place the hug
+    /// question is asked at the `:` seam, shared by the plain entry
+    /// ([`Self::build_type_annotation_doc_parens`] — parameters, destructured and rest
+    /// bindings, index-signature values) and the wrapping entry
+    /// ([`Self::build_type_annotation_doc_with_wrapping`] — variables, class properties,
+    /// property signatures, return types). The two share it so the positions cannot
+    /// disagree: prettier's union printer decides the hug on the union alone, and an
+    /// entry that hangs every union after the `:` breaks a parameter's `{ … } | null`
+    /// after `a:` while the same annotation on a variable hugs.
+    ///
+    /// `type_start` is the gap's far end — the caller's own window, so the hang path is
+    /// each entry's own. `gap_may_have_comments` is the caller's zero-comment gate over
+    /// (at least) the `:`→type gap; a `true` only turns on the gap-run lookups below.
+    ///
+    /// The hug is [`Self::build_hugged_union_after_operator_doc`]'s; every other union
+    /// **hangs** ([`Self::hang_annotation_union_doc`]) — it breaks after the `:` with the
+    /// members indented, the gap run riding inside the hang group.
+    fn build_annotation_union_doc(
+        &self,
+        colon_end: u32,
+        type_start: u32,
+        u: &internal::TSUnionType<'_>,
+        gap_may_have_comments: bool,
+    ) -> DocId {
+        // A glued block run between `:` and a union with no authored leading `|` is
+        // handed INTO the union — the same value seam as the alias RHS
+        // (`build_union_value_doc`); the caller-side `comments_doc` then stays `None`
+        // so exactly one of the two prints the run (docs/comments.md hazard 3). A
+        // handed run also declines the hug (`hugged` is read off the same call, never
+        // re-derived from the bare predicate): prettier binds that comment to the first
+        // member, and a union with a commented member breaks after the `:`.
+        let UnionValueDoc {
+            doc: type_doc,
+            run_handed,
+            hugged,
+        } = self.build_union_value_doc(colon_end, u);
+        let gap_run = gap_may_have_comments && !run_handed;
+
+        // Glued comments between `:` and the union (`: /* c */ A | B`), for the hug
+        // arm; the hang path routes the run through `hang_annotation_union_doc` instead.
+        let comments_doc = || {
+            gap_run
+                .then(|| {
+                    self.build_inline_comments_between_doc_trailing_space_opt(colon_end, type_start)
+                })
+                .flatten()
+        };
+
+        if let Some(hugged) =
+            self.build_hugged_union_after_operator_doc(": ", hugged, comments_doc, type_doc)
+        {
+            return hugged;
+        }
+
+        self.hang_annotation_union_doc(colon_end, type_start, type_doc, gap_run)
+    }
+
+    /// The `<op> <union>` doc for an operator→union seam whose union HUGS — `: { … } | null`,
+    /// `: Map<…> | null`, `is { … } | null` — or `None` when the union hangs after the
+    /// operator, which each caller emits itself (the annotation's
+    /// [`Self::hang_annotation_union_doc`] carries the gap run inside the hang group; the
+    /// predicate's plain `hang_after_operator` does not). Shared by
+    /// [`Self::build_annotation_union_doc`] and the type predicate's `is` seam, and spelled
+    /// through the function type's own `joined` at its `=>`, so the hug is one rule: a
+    /// hugging union keeps `<op> ` glued with no break-after-operator fallback. A brace
+    /// member (`{ … } | null` / `| void`) owns its own expansion and the void member trails
+    /// the `}`; a reference member (`Map<…> | null`) lets its type arguments own the break
+    /// (`: Map<⏎string,⏎number⏎> | null`, `union_hug_reference_long`). Prettier's union
+    /// printer prints a hugging union with no group of its own, so nothing above the member
+    /// can break — a break after the operator for a union that DOES hug was a tsv-only
+    /// second state, pinned by no fixture and matching prettier nowhere.
+    /// ⚠️ Not the sanctioned `return_type_generic_union_long` family: that one is a `null`
+    /// member INSIDE a type argument (`Promise<A | null>`), where prettier hugs the `<…>` past
+    /// the print width, and it lives in [`union_has_brace_member`]'s narrowing of the
+    /// type-ARGUMENT hug, not at any operator seam.
+    ///
+    /// `hugged` is whether the union's doc prints hugged — the value seams read it off
+    /// [`UnionValueDoc`] (a glued block run handed into the union declines the hug: prettier
+    /// binds that comment to the first member, and the union then breaks after the operator,
+    /// `union_hug_gap_block_comment`); the predicate's `is` seam, where prettier binds the
+    /// same comment to the predicate's annotation and keeps hugging, asks the bare
+    /// [`Self::union_prints_hugged`]. The caller passes the answer of the doc it built, never
+    /// a re-derivation, so the seam and the union cannot disagree.
+    ///
+    /// `operator` is the seam's spaced text (`": "`) and `comments_doc` the gap's inline
+    /// comment run, built lazily: only the hug emits it here — its layout never synthesizes
+    /// the break the hang emission's soft separators key on — and the comment-free common
+    /// path carries no empty child.
+    ///
+    /// [`union_has_brace_member`]: super::helpers::union_has_brace_member
+    pub(in crate::printer) fn build_hugged_union_after_operator_doc(
+        &self,
+        operator: &'static str,
+        hugged: bool,
+        comments_doc: impl FnOnce() -> Option<DocId>,
+        type_doc: DocId,
+    ) -> Option<DocId> {
+        let d = self.d();
+        hugged.then(|| match comments_doc() {
+            Some(c) => d.concat(&[d.text(operator), c, type_doc]),
+            None => d.concat(&[d.text(operator), type_doc]),
+        })
+    }
+
     /// Emit `: <run?><union>` with the gap's unclaimed run riding INSIDE the hang
     /// group via the value-gap leading emitter, so each comment's separator (space /
     /// soft `line` / hardline — `push_leading_comment_run`'s three-way rule)
@@ -419,12 +519,14 @@ impl<'a> Printer<'a> {
     /// For `TypeReference<Args>`, `build_type_arguments_doc` wraps the type
     /// arguments at the width boundary.
     ///
-    /// For Union types, uses break-after-colon layout:
+    /// For a non-hugging union, the break-after-colon layout:
     /// ```text
     /// property:
     ///     | string
     ///     | number;
     /// ```
+    /// A hugging union (`{ … } | null`, `Map<…> | null`) keeps `: ` glued instead — the
+    /// shared `:` seam, [`Self::build_annotation_union_doc`].
     ///
     /// For other types, delegates to `build_type_annotation_doc`.
     ///
@@ -482,7 +584,7 @@ impl<'a> Printer<'a> {
 
         // One window search over the whole annotation gates every comment query below.
         // Each of them — the `:`→type gap, the type-name→type-args gap, and the member
-        // gaps `union_return_hugs` inspects — is bounded inside `annotation.span`
+        // gaps `union_prints_hugged` inspects — is bounded inside `annotation.span`
         // (`: Type`), and a comment only counts when it lies fully inside the queried
         // range. So a comment-free annotation provably has none in any of them: the
         // per-gap searches are skipped and the `empty()` children they would feed into
@@ -555,71 +657,9 @@ impl<'a> Printer<'a> {
         let value_type = self.unwrap_redundant_parens(annotation.type_annotation);
         let value_type_start = value_type.span().start;
 
-        // Handle Union types - break after colon with indent when long
+        // Union types: hug the `:` when the union prints hugged, else hang after it.
         if let TSType::Union(u) = value_type {
-            // A glued block run between `:` and a union with no authored leading `|`
-            // is handed INTO the union — the same value seam as the alias RHS and the
-            // simple-annotation arm (`build_union_value_doc`); the caller-side
-            // `comments_doc` then stays `None` so exactly one of the two prints the
-            // run.
-            let (type_doc, run_handed) = self.build_union_value_doc(colon_end, u);
-            let gap_run = has_comments && !run_handed;
-
-            // Glued comments between `:` and the union (`: /* c */ A | B`), for the
-            // two hug paths below — their layouts never synthesize the break the
-            // hang emission's soft separators key on. Built lazily: the hang path
-            // routes the run through `hang_annotation_union_doc` instead, and the
-            // comment-free common path carries no empty child.
-            let comments_doc = || {
-                gap_run
-                    .then(|| {
-                        self.build_inline_comments_between_doc_trailing_space_opt(
-                            colon_end,
-                            value_type_start,
-                        )
-                    })
-                    .flatten()
-            };
-
-            // A brace-hugging union return (`{ … } | null` / `| void`) hugs `:`
-            // block-style, like the type-alias RHS — the object owns its own expansion
-            // and the void member trails the `}`. Prettier never breaks after `:` here
-            // (it hugs even behind a very long method name), so there is no
-            // break-after-colon fallback. `union_return_hugs` scopes it: a
-            // `Promise<…> | null` `TSTypeReference` member is excluded (the sanctioned
-            // `return_type_generic_union_long` print-width family, handled by the
-            // `union_prints_hugged` branch below), and any comment that makes the printer
-            // decline the hug disqualifies it here too.
-            if self.union_return_hugs(value_type, colon_end, value_type_start) {
-                return match comments_doc() {
-                    Some(c) => d.concat(&[d.text(": "), c, type_doc]),
-                    None => d.concat(&[d.text(": "), type_doc]),
-                };
-            }
-
-            if self.union_prints_hugged(u) {
-                // A should-hug union that didn't take the brace-hug above: a
-                // `TSTypeReference` object-like member with only void siblings
-                // (`Promise<…> | null`), or a brace union whose member/gap comment
-                // disqualified the hug. Uses conditional_group to bypass the renderer's
-                // will_break check: an inner group may break, but that shouldn't force
-                // the annotation to break after `:`. The conditional_group calls fits()
-                // directly, which correctly handles nested hardlines (returns true).
-                // State 0: `: Promise<…> | null` (inline, no break after colon)
-                // State 1: `:\n  Promise<…> | null` (break after colon, for long names)
-                return match comments_doc() {
-                    Some(c) => d.conditional_group(&[
-                        d.concat(&[d.text(": "), c, type_doc]),
-                        d.concat(&[d.text(":"), d.indent_line(d.concat(&[c, type_doc]))]),
-                    ]),
-                    None => d.conditional_group(&[
-                        d.concat(&[d.text(": "), type_doc]),
-                        d.concat(&[d.text(":"), d.indent_line(type_doc)]),
-                    ]),
-                };
-            }
-
-            return self.hang_annotation_union_doc(colon_end, value_type_start, type_doc, gap_run);
+            return self.build_annotation_union_doc(colon_end, value_type_start, u, has_comments);
         }
 
         // Handle Intersection types - first member hugs `:`, continuations indented.

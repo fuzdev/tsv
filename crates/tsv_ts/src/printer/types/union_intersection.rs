@@ -26,6 +26,50 @@ use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// The union VALUE doc an operator seam prints, from
+/// [`Printer::build_union_value_doc`] — the doc together with the two facts the seam's
+/// own layout must agree with.
+pub(in crate::printer) struct UnionValueDoc {
+    pub doc: DocId,
+    /// Whether the gap's glued leading run was handed INTO the union (the union prints
+    /// it, after the pipe its broken layout synthesizes); the seam emits the gap's
+    /// comments itself ONLY when this is `false` (docs/comments.md hazard 3).
+    pub run_handed: bool,
+    /// Whether `doc` prints hugged (`{ … } | null` with the member owning its
+    /// expansion). The seam keeps its operator glued exactly when this holds; a handed
+    /// run always declines it.
+    pub hugged: bool,
+}
+
+/// What stands AHEAD of a union, for the hug question ([`Printer::union_prints_hugged_with`]):
+/// a block comment glued to the first member sits in the enclosing seam's gap, outside
+/// `union.span`, and whether the union may keep hugging behind it is a fact about that
+/// seam, which the union cannot read off its own span.
+#[derive(Clone, Copy)]
+enum UnionLeadingGap {
+    /// A VALUE seam — the alias `=`, the annotation `:`, the function-type `=>`, the
+    /// mapped-type value — whose gap runs from `gap_start` (just past the operator) to
+    /// the first member. A block comment anywhere in it declines the hug
+    /// ([`Printer::union_prints_hugged_with`]): glued to the member it is prettier's own
+    /// rule — the comment binds to the first member, `types.some((t) => hasComment(t))`
+    /// bails and the union breaks after the operator — whether handed in from the seam's
+    /// gap ([`Printer::build_union_value_doc`], `handed`) or authored after the union's
+    /// leading pipe (`| /* c */ { … }`); a block the author BROKE after collapses onto
+    /// the member at these seams (the single-line-block rule every keyword→value gap
+    /// applies), so it must decide as the glued spelling it becomes, or the collapsed
+    /// output declines on the next pass (F1). One rule, so every spelling is one fixed
+    /// point (`union_hug_gap_block_comment`).
+    ValueSeam { gap_start: u32, handed: Option<u32> },
+    /// Any other position — a type argument's `<`, a tuple's `[`, a paren shell, an
+    /// `as` / `satisfies` keyword, a conditional's keywords, the predicate's `is`: the
+    /// enclosing seam prints its own gap ahead of the union, and the union answers the
+    /// hug from its span alone, so a glued block keeps it hugging. Right at `is` and at
+    /// a conditional's CHECK (prettier binds the comment to the parent that starts
+    /// where the union does); an open divergence at the rest, where prettier binds it
+    /// to the member — see [`Printer::union_prints_hugged`].
+    Other,
+}
+
 /// What [`Printer::build_intersection_member_body_doc`] hands back for one continuation
 /// member — three answers its caller's loop needs and cannot re-derive, named because a
 /// bare tuple of them reads as three unrelated values at the call site.
@@ -1069,57 +1113,47 @@ impl<'a> Printer<'a> {
     /// (`Printer::type_member_separator_follows`), so the LAST member — whose line
     /// ends only at the statement's tail — retains its shell instead.
     pub(in crate::printer) fn build_union_type_doc(&self, union: &TSUnionType<'_>) -> DocId {
-        self.build_union_type_doc_inner(union, None)
+        self.build_union_type_doc_inner(union, UnionLeadingGap::Other)
     }
 
-    /// [`Self::build_union_type_doc`] with a glued leading block run handed in from
-    /// OUTSIDE `union.span` — the value-seam analog of the intersection's
-    /// [`LeadingGap`] claim, for the value positions a union can occupy (alias RHS,
-    /// annotation, return type). With no authored leading `|` the union's span
-    /// starts at its first member, so a run between the operator (`=`/`:`) and the
-    /// member is invisible to the in-span first-member gap — printed by the caller,
-    /// it lands AHEAD of the `|` the broken layout synthesizes (`/* c */ | A`), a
-    /// position prettier never produces (it binds the comment to the first member:
-    /// `| /* c */ A`), while the same program with the `|` authored already prints
-    /// prettier's form — two fixed points keyed on pure layout. Handed in, the
-    /// first-member arm places the run after its `if_break` pipe: the flat render
-    /// keeps the caller's bytes (`/* c */ A | B`), the broken one matches prettier.
-    /// The paths that never synthesize a first `| ` on a fresh line (hug,
-    /// single-member collapse, the line-comment layout) emit the run glued ahead of
-    /// the union — the caller's legacy position, byte-identical.
+    /// Build a union VALUE doc for an operator seam (`=` / `:` / `=>` at `gap_start`),
+    /// handing the gap's glued leading block run into the union when
+    /// [`Self::union_external_leading_run_start`] accepts — the value-seam analog of the
+    /// intersection's [`LeadingGap`] claim. With no authored leading `|` the union's span
+    /// starts at its first member, so a run between the operator and the member is
+    /// invisible to the in-span first-member gap — printed by the caller, it lands AHEAD
+    /// of the `|` the broken layout synthesizes (`/* c */ | A`), a position prettier never
+    /// produces (it binds the comment to the first member: `| /* c */ A`), while the same
+    /// program with the `|` authored already prints prettier's form — two fixed points
+    /// keyed on pure layout. Handed in, the first-member arm places the run after its
+    /// `if_break` pipe: the flat render keeps the caller's bytes (`/* c */ A | B`), the
+    /// broken one matches prettier. The paths that never synthesize a first `| ` on a
+    /// fresh line (single-member collapse, the line-comment layout) emit the run glued
+    /// ahead of the union — the caller's legacy position, byte-identical.
     ///
-    /// `run_start` is where the run's first comment begins; the run ends at the
-    /// first member. Gate with [`Self::union_external_leading_run_start`] — exactly
-    /// one of caller and union must print the run (docs/comments.md hazard 3).
-    fn build_union_type_doc_with_leading_run(
-        &self,
-        union: &TSUnionType<'_>,
-        run_start: u32,
-    ) -> DocId {
-        self.build_union_type_doc_inner(union, Some(run_start))
-    }
-
-    /// Build a union VALUE doc for an operator seam (`=` / `:` at `gap_start`),
-    /// handing the gap's glued leading run into the union when
-    /// [`Self::union_external_leading_run_start`] accepts. Returns the doc and
-    /// whether the run was handed in — the caller emits the gap's comments itself
-    /// ONLY when it was not: exactly one of the two prints the run
-    /// (docs/comments.md hazard 3).
+    /// The result carries whether the run was handed in — the caller emits the gap's
+    /// comments itself ONLY when it was not: exactly one of the two prints the run
+    /// (docs/comments.md hazard 3) — and
+    /// whether the doc prints **hugged**, the one answer the seam's own layout must
+    /// agree with — read here, beside the doc, so a seam cannot pair the doc with a
+    /// re-derivation: at a value seam a glued block ahead of the first member declines
+    /// the hug ([`UnionLeadingGap::ValueSeam`]), handed in or authored after the pipe,
+    /// which the bare [`Self::union_prints_hugged`] does not see.
     pub(in crate::printer) fn build_union_value_doc(
         &self,
         gap_start: u32,
         union: &TSUnionType<'_>,
-    ) -> (DocId, bool) {
-        match self.union_external_leading_run_start(gap_start, union) {
-            Some(start) => (
-                self.build_union_type_doc_with_leading_run(union, start),
-                true,
-            ),
-            None => (self.build_union_type_doc(union), false),
+    ) -> UnionValueDoc {
+        let handed = self.union_external_leading_run_start(gap_start, union);
+        let gap = UnionLeadingGap::ValueSeam { gap_start, handed };
+        UnionValueDoc {
+            doc: self.build_union_type_doc_inner(union, gap),
+            run_handed: handed.is_some(),
+            hugged: self.union_prints_hugged_with(union, gap),
         }
     }
 
-    /// The caller-side gate for [`Self::build_union_type_doc_with_leading_run`]:
+    /// The caller-side gate for [`Self::build_union_value_doc`]:
     /// `Some(run start)` when `[gap_start, first member)` holds a to-emit run the
     /// union should print instead of the caller. Declines — the caller keeps its
     /// own seam — when:
@@ -1159,7 +1193,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Prepend an external leading run (see
-    /// [`Self::build_union_type_doc_with_leading_run`]) in the caller's legacy
+    /// [`Self::build_union_value_doc`]) in the caller's legacy
     /// glued position, for the union paths whose layout has no synthesized-pipe
     /// seam to bind it to.
     fn with_union_external_run_prefix(
@@ -1175,12 +1209,12 @@ impl<'a> Printer<'a> {
         self.d().concat(&[run, doc])
     }
 
-    fn build_union_type_doc_inner(
-        &self,
-        union: &TSUnionType<'_>,
-        external_run_start: Option<u32>,
-    ) -> DocId {
+    fn build_union_type_doc_inner(&self, union: &TSUnionType<'_>, gap: UnionLeadingGap) -> DocId {
         let d = self.d();
+        let external_run_start = match gap {
+            UnionLeadingGap::ValueSeam { handed, .. } => handed,
+            UnionLeadingGap::Other => None,
+        };
         if union.types.is_empty() {
             return d.empty();
         }
@@ -1248,7 +1282,14 @@ impl<'a> Printer<'a> {
         // nested *inside* a member (e.g. `{ /* c */ a: 1 }`) attaches to a child
         // node, not the member, so it must not block the hug — the member's own
         // doc renders it.
-        if self.union_prints_hugged(union) {
+        //
+        // At a VALUE seam a block AHEAD of the first member (`: /* c */ { … } | null`,
+        // handed in from the seam's gap, or `: | /* c */ { … }` after an authored pipe)
+        // is such a member comment too (`gap`): the union then does not hug — it breaks
+        // after the operator and, once the member overflows, takes the one-per-line form
+        // with the run after the synthesized pipe (`| /* c */ {`), which is where a
+        // handed run lands. The seam reads the same answer off `UnionValueDoc::hugged`.
+        if self.union_prints_hugged_with(union, gap) {
             let mut parts = DocBuf::new();
             // Extract leading block comments before the first type
             // (e.g., `| /* c */ A` — comment between leading `|` and first member)
@@ -1903,41 +1944,6 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Check if a union type has any comments between consecutive members.
-    ///
-    /// Matches prettier's `hasComment(node)` for the detached comment model:
-    /// comments between member spans correspond to attached trailing/leading
-    /// comments in prettier's AST.
-    /// True when a return-type union hugs its brace member block-style
-    /// (`{ … } | null` / `| void`) instead of breaking before it — the object owns
-    /// its own expansion, the same layout the type-alias RHS / `as` cast use. The
-    /// single source of truth shared by the function-type `=>` return
-    /// (`build_function_type_return_doc`) and the `: Type` annotation return
-    /// (`build_type_annotation_doc_with_wrapping`), so the two arms can't drift (the
-    /// drift is exactly what let the hug miss those contexts before).
-    ///
-    /// Requires the brace-member shape (`union_has_brace_member` — a
-    /// `TypeLiteral`/`Mapped`; excludes the `Promise<…> | null` `TSTypeReference`
-    /// print-width family). A comment prettier's `shouldHugUnionType` would bail on —
-    /// between two members, or in the operator→union gap `[gap_start, gap_end]` —
-    /// disqualifies the hug; an *inside-object* comment (`{ /* c */ … }`) does not.
-    /// `gap_start`/`gap_end` bound the source between the `=>`/`:` and the union.
-    pub(crate) fn union_return_hugs(
-        &self,
-        value_type: &TSType<'_>,
-        gap_start: u32,
-        gap_end: u32,
-    ) -> bool {
-        // The `:`→union gap is this site's own question; the hug itself is not
-        // re-derived here but delegated (via `type_arg_union_prints_hugged`) to
-        // [`Self::union_prints_hugged`]. A gate spelling out its own subset of
-        // that predicate's comment checks misses the leading `|`→first-member line
-        // comment, so a comment that makes the printer decline the hug still reads as
-        // "hug" here and kept `: ` glued while the members exploded below it.
-        self.type_arg_union_prints_hugged(value_type)
-            && !self.has_comments_to_emit_between(gap_start, gap_end)
-    }
-
     /// Whether a **type argument** actually prints hugged — [`Self::union_prints_hugged`]
     /// (which owns the whole hug question, shape *and* comments) narrowed by
     /// [`union_has_brace_member`] (the type-argument-only extra clause).
@@ -1974,17 +1980,23 @@ impl<'a> Printer<'a> {
     ///   block-only, so a line comment there would be silently DROPPED, and it could not
     ///   be inlined regardless (a `//` runs to end-of-line and would swallow the member).
     ///   `union_has_comments_between_members` cannot answer this: the gap is *before* the
-    ///   first member, not *between* two. A **block** there stays hugged and inline —
-    ///   ⚠️ an **open divergence**, not parity: prettier attaches such a comment to the
-    ///   first member, so `types.some((t) => hasComment(t))` bails and it expands
-    ///   one-member-per-line. Two things hide it. The probe is *line*-only, and its range is
-    ///   anchored at `union.span.start` — which for the plain `/* c */ { … } | null`
-    ///   spelling IS the first member's own start, an empty range the comment sits before.
-    ///   So neither the leading-operator spelling (`G<| /* c */ { … } | null>`, where the
-    ///   range is non-empty but the comment is a block) nor the plain one reaches it, and
-    ///   tsv hugs both at all seven positions. Widening the probe to any comment fixes only
-    ///   the first; the second needs the gap measured from the union's *enclosing* anchor
-    ///   (the `<`, `=` or `:`), not from its own span;
+    ///   first member, not *between* two. A **block** glued ahead of the first member —
+    ///   `| /* c */ { … } | null` in that gap, or `/* c */ { … } | null` in the enclosing
+    ///   seam's gap, outside `union.span` (for the plain spelling the span starts AT the
+    ///   first member) — is prettier's `hasComment` on the member too: it binds such a
+    ///   comment to the outermost node starting right after it, the member unless a
+    ///   parent starts there (the predicate's annotation at `is`, a conditional's check),
+    ///   and the union expands one-member-per-line with the comment after the pipe.
+    ///   ⚠️ tsv applies that at the VALUE seams alone ([`UnionLeadingGap::ValueSeam`]:
+    ///   the alias `=`, the annotation `:`, the function-type `=>`, the mapped value —
+    ///   `union_hug_gap_block_comment`), where the seam hands the run into the union.
+    ///   At every other position ([`UnionLeadingGap::Other`] — a type argument's `<`, a
+    ///   tuple's `[`, a paren shell, `as` / `satisfies`, a type parameter's bound, a
+    ///   conditional's `extends` / `?` / `:`, an indexed access, a mapped `in`) the
+    ///   enclosing seam prints the run ahead of the union and the union hugs behind it,
+    ///   both spellings — an **open divergence**, stable, one class: each such seam would
+    ///   have to hand its run in (or hang) the way the value seams do, or its gap
+    ///   emitter welds `/* c */ | {` to the operator once the union declines;
     /// - inside a member's own redundant **paren shell** (`({ … } /* c */) | null`) —
     ///   [`Self::union_member_shell_holds_comment`], the other half of
     ///   `types.some((t) => hasComment(t))` that the between-member scan cannot reach.
@@ -2002,7 +2014,33 @@ impl<'a> Printer<'a> {
     /// pairwise scan would report "no comments" for an owned one, hugging a union whose
     /// members the printer expands.
     pub(crate) fn union_prints_hugged(&self, union: &TSUnionType<'_>) -> bool {
+        self.union_prints_hugged_with(union, UnionLeadingGap::Other)
+    }
+
+    /// [`Self::union_prints_hugged`] with the enclosing seam's word on a block glued
+    /// ahead of the first member ([`UnionLeadingGap`]) — the one clause that lives
+    /// outside the union's own span, or ahead of its authored pipe, and so cannot be read
+    /// off the union alone. The value seams ask it through
+    /// [`Self::build_union_value_doc`], beside the doc it governs; everyone else asks
+    /// [`Self::union_prints_hugged`] (`Other`).
+    fn union_prints_hugged_with(&self, union: &TSUnionType<'_>, gap: UnionLeadingGap) -> bool {
         if !union_hug_shape(union) {
+            return false;
+        }
+        let Some(first) = union.types.first() else {
+            return false;
+        };
+        let first_start = first.span().start;
+        // At a value seam, a block anywhere between the operator and the first member —
+        // in the seam's own gap, outside the span, or after an authored pipe — declines
+        // (see the doc above): asked before the in-span fast path, which cannot see the
+        // seam's gap. One range from the operator, so a handed run, a broke-after block
+        // and the in-span spelling are one question.
+        if let UnionLeadingGap::ValueSeam { gap_start, .. } = gap
+            && self
+                .comments_on_page_between(gap_start, first_start)
+                .any(|c| c.is_block)
+        {
             return false;
         }
         // Zero-comment fast path — an **on-page** question, since it short-circuits the
@@ -2012,9 +2050,10 @@ impl<'a> Printer<'a> {
         }
         !self.union_has_comments_between_members(union)
             && !self.union_member_shell_holds_comment(union)
-            && !union.types.first().is_some_and(|first| {
-                self.has_line_comments_between(union.span.start, first.span().start)
-            })
+            // A line comment in the leading `|`→first-member gap declines everywhere
+            // (the hug path could not print it); a block there is the value seam's
+            // question above, and hugs at every other position.
+            && !self.has_line_comments_between(union.span.start, first_start)
     }
 
     /// Whether any member carries a comment in its own redundant **paren shell** — either
@@ -2033,7 +2072,8 @@ impl<'a> Printer<'a> {
     /// would let the paren'd spellings hug while their bare twins expand, which is the
     /// divergence, not the parity. The bare twins are already declined by
     /// [`Self::union_has_comments_between_members`] — except the leading placement, which
-    /// neither reaches (see [`Self::union_prints_hugged`]'s open divergence).
+    /// that scan cannot reach: a value seam declines it by handing the run into the union
+    /// (see [`Self::union_prints_hugged`]), and the positions with no handoff still hug it.
     ///
     /// A comment nested deeper inside the member (`({ /* c */ a: 1 })`) sits within the
     /// unwrapped inner's own span and never counts, matching the rule

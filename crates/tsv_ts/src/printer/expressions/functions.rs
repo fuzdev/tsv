@@ -443,14 +443,13 @@ impl<'a> Printer<'a> {
     /// annotation, hugs — `({` and `}: T)` stay welded to the signature while the pattern's
     /// own group breaks, instead of the parameter LIST breaking around it.
     ///
-    /// Shared by the value-param path ([`Self::build_params_doc_with_comments`] — function
-    /// declarations, expressions, methods, arrows) and the signature path
-    /// ([`Self::build_signature_params_doc`] — bodyless `declare`/overload functions and
-    /// type-member method/call/construct signatures), which asked it in two identical
-    /// spellings. The function/constructor-TYPE path is deliberately NOT a caller: it hugs
-    /// through its own narrower predicate (`get_type_literal_from_identifier`, TypeLiteral
-    /// only), which is an open divergence documented there — keeping it out of this gate is
-    /// what makes that difference one visible line rather than a third near-copy.
+    /// Shared by all three parameter builders — the value-param path
+    /// ([`Self::build_params_doc_with_comments`] — function declarations, expressions,
+    /// methods, arrows), the signature path ([`Self::build_signature_params_doc`] — bodyless
+    /// `declare`/overload functions and type-member method/call/construct signatures) and
+    /// the function/constructor-TYPE path (`build_function_params_doc`), so the hug cannot
+    /// drift between them; each hugs through [`Self::build_hugged_literal_param_doc`] and
+    /// its own ordinary parameter doc.
     ///
     /// See [`Self::param_delimiter_gaps_empty`] for the comment precondition and
     /// [`Self::param_has_own_line_decorators`] for the decorator one (an own-line parameter
@@ -2360,8 +2359,12 @@ impl<'a> Printer<'a> {
         );
 
         if should_hug_single_pattern {
-            // Hug mode: just ( + pattern + optional trailing comma + )
-            let param_doc = self.build_function_parameter_doc(&params[0]);
+            // Hug mode: `(` + param + `)`. An object-literal annotation takes the shared
+            // group-less arm (`build_hugged_literal_param_doc`) so the object breaks before
+            // a breakable return type; every other shape hugs its ordinary doc.
+            let param_doc = self
+                .build_hugged_literal_param_doc(&params[0], comments_present)
+                .unwrap_or_else(|| self.build_function_parameter_doc(&params[0]));
             return d.parens(param_doc);
         }
 

@@ -13,7 +13,10 @@ use super::helpers::{
     type_needs_parens_for_conditional_check, type_needs_parens_for_conditional_extends,
     unwrap_parenthesized,
 };
-use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
+use super::{
+    BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock,
+    UnionValueDoc,
+};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
@@ -1621,15 +1624,29 @@ impl<'a> Printer<'a> {
                 value_doc,
             );
         } else {
-            tail_parts.push(self.build_comments_between(
-                colon_pos + 1,
-                type_ann.span().start,
-                CommentSpacing::Leading,
-            ));
+            let gap_comments = || {
+                self.build_comments_between(
+                    colon_pos + 1,
+                    type_ann.span().start,
+                    CommentSpacing::Leading,
+                )
+            };
             match self.unwrap_redundant_parens(type_ann) {
                 TSType::Union(u) => {
-                    let type_doc = self.build_union_type_doc(u);
-                    if self.union_prints_hugged(u) {
+                    // The same value seam as the annotation `:` (`build_union_value_doc`):
+                    // a glued block run in the gap is handed INTO the union — bound to
+                    // the first member, declining the hug, as prettier binds it — and
+                    // then the gap's comments are the union's to print, not this arm's
+                    // (docs/comments.md hazard 3).
+                    let UnionValueDoc {
+                        doc: type_doc,
+                        run_handed,
+                        hugged,
+                    } = self.build_union_value_doc(colon_pos + 1, u);
+                    if !run_handed {
+                        tail_parts.push(gap_comments());
+                    }
+                    if hugged {
                         tail_parts.push(d.text(" "));
                         tail_parts.push(type_doc);
                     } else {
@@ -1637,10 +1654,12 @@ impl<'a> Printer<'a> {
                     }
                 }
                 TSType::Intersection(i) => {
+                    tail_parts.push(gap_comments());
                     tail_parts.push(d.text(" "));
                     tail_parts.push(self.intersection_hanging_with_indent(i));
                 }
                 _ => {
+                    tail_parts.push(gap_comments());
                     tail_parts.push(d.text(" "));
                     tail_parts.push(self.build_type_doc(type_ann));
                 }
