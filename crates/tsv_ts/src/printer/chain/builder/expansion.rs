@@ -121,7 +121,7 @@ pub(super) fn has_comments_forcing_expansion<'a>(
 ///   its authored line and weld behind a same-line one.
 ///
 /// The collapse's licence is that the deferral is **lossless**, and it stops exactly
-/// where that stops — so a SAME-LINE `//` forces too, in the two places something else
+/// where that stops — so a SAME-LINE `//` forces too, in the three places something else
 /// can reach the line it is about to take:
 ///
 /// 1. **another comment in the same gap**, behind it. The flat path emits the follower
@@ -139,6 +139,14 @@ pub(super) fn has_comments_forcing_expansion<'a>(
 ///    reordering past a block (`fn().bar; /* c1 */ // c`). Conservative by design: a
 ///    layout break between the two only makes the expansion unneeded, never wrong
 ///    (trailing_member_gap_comment_statement_trailer).
+/// 3. **the host's own output**, whenever this printer does NOT own the line it would defer
+///    to (`!EmbedContext::printer_owns_line` — every Svelte template island). The `//` rides
+///    to the end of a line the HOST owns: past the island's closing `}` the document is
+///    markup, so the comment comes out as rendered page TEXT
+///    (`<a href={fn().bar}>t</a> // c`) — a different page, not a weld. Unlike the two above
+///    this one is not about another comment at all, so no source read can see it; the
+///    printer that owns its lines declares that, and everyone else gets the safe answer by
+///    default (svelte/expressions/chain_trailing_member_gap_line_comment).
 fn trailing_member_gap_line_comment<'a>(
     node: &ChainNode<'a>,
     chain_end: u32,
@@ -171,11 +179,14 @@ fn trailing_member_gap_line_comment<'a>(
         }
         deferred_line_seen = true;
     }
-    // The trailer read asks about the CHAIN's end, not the comment's, so it is
-    // loop-invariant — and only a same-line `//` that survived the scan has anything to
-    // ask it. Kept out of the loop, it runs at most once per chain build, and never at
-    // all for the authorings the arms above already answer.
-    deferred_line_seen && printer.trailer_follows_through_closers(chain_end)
+    // Neither read below is about a comment in this gap — one is who owns the output line,
+    // the other the CHAIN's end — so both are loop-invariant, and only a same-line `//` that
+    // survived the scan has anything to ask them. Kept out of the loop, they run at most
+    // once per chain build, and never at all for the authorings the arms above already
+    // answer. The ownership read is first: it is a field load where the trailer read is a
+    // comment search.
+    deferred_line_seen
+        && (!printer.embed.printer_owns_line || printer.trailer_follows_through_closers(chain_end))
 }
 
 /// Check if a call node has complex (non-simple) arguments

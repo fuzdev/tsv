@@ -321,7 +321,7 @@ What's shared through tsv_lang vs reimplemented per language, and why:
 - Doc builder (shared: Yes, should-be: Yes) — Core formatting engine — the largest tsv_lang module, single renderer everywhere
 - Comment model (shared: Yes, should-be: Yes) — Detached model with O(log n) lookup, classification, batch helpers
 - Width / indent (shared: Yes, should-be: Yes) — Hardcoded as `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts in `tsv_lang::config`
-- EmbedContext (shared: Yes, should-be: Yes) — Embedding state (base_indent_offset, first_line_offset, suffix_width, mode, jsdoc_cast_cannot_hang, root_sequence_indents)
+- EmbedContext (shared: Yes, should-be: Yes) — Embedding state (base_indent_offset, first_line_offset, suffix_width, mode, jsdoc_cast_cannot_hang, root_sequence_indents, printer_owns_line)
 - String formatting (shared: Yes, should-be: Yes) — Quote selection, escape swapping, visual width
 - Error types (shared: Yes, should-be: Yes) — ParseError with context enrichment
 - Position tracking (shared: Yes, should-be: Yes) — Span (u32), LocationTracker

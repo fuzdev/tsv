@@ -50,8 +50,8 @@ pub enum LayoutMode {
 /// ⚠️ **The width fields are read at render, not at doc-build.** The three width fields are
 /// consumed by the renderer, so they act only on the context handed to `arena_print_doc_*`.
 /// The context handed to a `build_*_doc` call reaches nothing but [`LayoutMode`],
-/// [`Self::jsdoc_cast_cannot_hang`] and [`Self::root_sequence_indents`] (the three
-/// build-time fields): that doc is rendered
+/// [`Self::jsdoc_cast_cannot_hang`], [`Self::root_sequence_indents`] and
+/// [`Self::printer_owns_line`] (the four build-time fields): that doc is rendered
 /// later, under whatever context its host passes — so a width set there is inert, and a
 /// layout choice that looks keyed to one is really keyed to `mode`. (Same reason a
 /// build-time `current_column()` is always 0: build-time width state is disconnected from
@@ -117,6 +117,30 @@ pub struct EmbedContext {
     /// `group(join([",", line]))`. See `docs/conformance_prettier_svelte.md` §Svelte:
     /// Blocks.
     pub root_sequence_indents: bool,
+    /// Whether **this printer owns the whole output line** — whether a break after this doc
+    /// is still its own. True for a standalone document and for a Svelte `<script>` body;
+    /// false for every Svelte TEMPLATE island, where the text past the closing `}` is the
+    /// host's markup. The fourth build-time field, claimed through [`Self::line_owning`].
+    ///
+    /// What it licenses is a deferral: an emitter that pushes a `//` past the end of what it
+    /// prints (`line_suffix`, flushed by whatever break comes next) is lossless only while
+    /// that break is still this doc's. In a template island it is not — the deferred comment
+    /// lands in the HOST's line and comes out as rendered page text. The one reader today is
+    /// the member chain's trailing-member collapse (`tsv_ts`'s
+    /// `trailing_member_gap_line_comment`), which expands the chain rather than defer; a new
+    /// deferral that can outlive its own doc owes the same question.
+    ///
+    /// ⚠️ **Not derivable from [`LayoutMode`]**, though it looks it: an island built through
+    /// tsv_svelte's `cannot_hang_embed` rebases on the template printer's own context, whose
+    /// mode is `Standalone` — so `!is_embedded()` would claim ownership for it. Two axes,
+    /// asked separately.
+    ///
+    /// ⚠️ **`false` is the default because it is the SAFE answer.** A host that forgets to
+    /// declare ownership loses a collapse it could have had — cosmetic, and loud (it moves
+    /// `<script>` fixtures on the first run). The opposite polarity fails silently: the
+    /// escaped comment is a fixed point, reparses, and is printed exactly once, so no gate in
+    /// `check` sees it.
+    pub printer_owns_line: bool,
 }
 
 impl Default for EmbedContext {
@@ -128,11 +152,26 @@ impl Default for EmbedContext {
             mode: LayoutMode::Standalone,
             jsdoc_cast_cannot_hang: false,
             root_sequence_indents: false,
+            printer_owns_line: false,
         }
     }
 }
 
 impl EmbedContext {
+    /// The context of a printer that owns its whole output lines — a standalone document, or
+    /// a Svelte `<script>` body. Default in every other field.
+    ///
+    /// The one place [`Self::printer_owns_line`] is claimed: by name rather than by field,
+    /// because only a printer that genuinely ends its own lines may make the claim and the
+    /// wrong polarity fails silently.
+    #[inline]
+    pub fn line_owning() -> Self {
+        Self {
+            printer_owns_line: true,
+            ..Self::default()
+        }
+    }
+
     /// Convenience: is this an embedded fragment?
     #[inline]
     pub fn is_embedded(&self) -> bool {

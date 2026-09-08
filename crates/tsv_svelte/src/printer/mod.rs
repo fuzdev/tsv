@@ -1152,6 +1152,13 @@ fn format_root<'a>(
         tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
     }
 
+    // The template printer deliberately leaves `EmbedContext::printer_owns_line` at its
+    // default: after an island's closing `}` the rest of the line is this printer's markup,
+    // so a `//` an island defers past its own doc would come out as page text. What carries
+    // that to every island is the FIELD's default polarity, not a spread convention — the
+    // recipes rebase on two different bases (`..self.embed` for the heads, a fresh
+    // `EmbedContext::default()` in `build_unprefixed_value_doc`), and only both being false
+    // makes them agree. `<script>` claims ownership by name instead (`script_style.rs`).
     let mut printer = Printer::with_line_breaks(
         arena,
         source,
