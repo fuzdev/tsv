@@ -34,7 +34,7 @@ the reflowed one. The three binding defaults reach their layout through
 `build_assignment_pattern_doc` rather than the shared assignment layout, so each has to
 apply the rule itself (`Printer::is_own_line_jsdoc_cast`).
 
-⚠️ That predicate is deliberately **narrower** than `owned_leading_comment_effect`, which
+⚠️ That predicate is deliberately **narrower** than `owned_leading_comment_hangs`, which
 also hangs an *indentable* owned block (`= /*⏎ * c⏎ */ 1`). Prettier hangs such a block at a
 **declarator** and keeps it inline at a binding default; tsv matches both, so widening the
 test here would break a match that already holds

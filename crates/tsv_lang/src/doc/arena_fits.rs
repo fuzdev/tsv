@@ -138,8 +138,14 @@ pub(super) fn arena_fits_with_lookahead(
         if let DocNode::Text(t) = node {
             match t.cached_width() {
                 CachedWidth::Width(w) => remaining -= w as isize,
-                // Newline-bearing text ends the line — everything so far fit.
-                CachedWidth::HasNewline => return true,
+                // Newline-bearing text ends the line — once its first line is
+                // charged to it, the same reading as the `MultilineText` arm
+                // below: what the text puts on this line still has to fit, and
+                // the newline then ends the measure in either mode.
+                CachedWidth::HasNewline { first_width } => {
+                    remaining -= first_width as isize;
+                    return remaining >= 0;
+                }
             }
         } else if current_mode == Mode::Flat
             && !pending_flush

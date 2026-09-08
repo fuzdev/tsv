@@ -15,7 +15,6 @@
 
 use crate::ast::internal::{self, AssignmentOperator, Expression, JsdocCast};
 use crate::printer::ArrowChainContext;
-use crate::printer::OwnedCommentEffect;
 use crate::printer::Printer;
 use crate::printer::calls::chain_has_calls;
 use crate::printer::chain::chain_paren_leading_gap;
@@ -923,11 +922,11 @@ pub struct RhsCommentInfo {
     pub has_line_comment: bool,
     /// The gap's run is glued through to the value
     /// ([`Printer::comment_run_glued_through`]), so a `will_break` on `comments` is a
-    /// preserved multiline block's interior — the to-emit twin of
-    /// [`OwnedCommentEffect::Pins`] — and must not hang the value. `false` when the
-    /// run has an own-line separator (a real hardline the value must sit under), or
-    /// when `comments` is `None`.
-    pub pinned: bool,
+    /// preserved multiline block's interior and must not hang the value: the layout
+    /// stays width-decided, with the run's first line charged to the operator's line by
+    /// the fits walk. `false` when the run has an own-line separator (a real hardline
+    /// the value must sit under), or when `comments` is `None`.
+    pub glued_through: bool,
     /// When `Some`, scan for trailing comments from stripped grouping parens between
     /// the RHS end and this boundary, wrapping in parens if found.
     pub boundary: Option<u32>,
@@ -944,7 +943,7 @@ impl RhsCommentInfo {
         Self {
             comments: None,
             has_line_comment: false,
-            pinned: false,
+            glued_through: false,
             boundary: None,
             frozen,
         }
@@ -1046,20 +1045,15 @@ impl<'a> Printer<'a> {
         if layout != AssignmentLayout::BreakAfterOperator
             && let Some(comments_doc) = rhs_info.comments
             && d.will_break(comments_doc)
+            // A break that is a preserved multiline block's interior in a run glued
+            // through to the value (`= /* x⏎y */ /* c */ v`) is not an own-line
+            // separator: prettier does not hang the run, and the layout stays
+            // width-decided — the fits walk charges the run's first line to the
+            // operator's line, so `Fluid` breaks there exactly when that line does
+            // not fit.
+            && !rhs_info.glued_through
         {
-            if rhs_info.pinned {
-                // The break is a preserved multiline block's interior in a run glued
-                // through to the value (`= /* x⏎y */ /* c */ v`) — the to-emit twin of
-                // `OwnedCommentEffect::Pins` below: the operator's line already ends
-                // inside the comment, so a width-decided break at the operator decides
-                // nothing, and prettier keeps the run on the operator's line. Only
-                // `Fluid` converts, exactly as the owned arm does.
-                if layout == AssignmentLayout::Fluid {
-                    layout = AssignmentLayout::NeverBreakAfterOperator;
-                }
-            } else {
-                layout = AssignmentLayout::BreakAfterOperator;
-            }
+            layout = AssignmentLayout::BreakAfterOperator;
         }
         // Member-only AND call chains with line comments break internally at the
         // comment location (the chain formatter does this — see
@@ -1080,24 +1074,14 @@ impl<'a> Printer<'a> {
         // A comment the RHS *owns* (a JSDoc cast, a bundler annotation) is glued to its
         // first token and travels inside its doc, so it is never in `rhs_comments` — the
         // gap emits nothing for it. It is still on the page and still decides the layout,
-        // so ask the node. Both halves come off one lookup; see
-        // `owned_leading_comment_effect`.
-        let owned_comment_effect = self.owned_leading_comment_effect(right_expr);
-        // An indentable owned comment hangs the value.
+        // so ask the node: an indentable owned comment hangs the value
+        // (`owned_leading_comment_hangs`); a preserved multi-line one takes no arm and is
+        // placed by width like any other text, its first line charged to the operator's
+        // line.
         if layout != AssignmentLayout::BreakAfterOperator
-            && owned_comment_effect == Some(OwnedCommentEffect::Hangs)
+            && self.owned_leading_comment_hangs(right_expr)
         {
             layout = AssignmentLayout::BreakAfterOperator;
-        }
-        // The other half: a *preserved* multi-line owned comment ends the operator's line
-        // inside itself, so a width-decided break at the operator decides nothing — take
-        // the never-break form. Only `Fluid` is affected in practice (it is the one
-        // width-decided layout here), and this deliberately does
-        // not override a `BreakAfterOperator` the value itself earned.
-        if layout == AssignmentLayout::Fluid
-            && owned_comment_effect == Some(OwnedCommentEffect::Pins)
-        {
-            layout = AssignmentLayout::NeverBreakAfterOperator;
         }
 
         // Signal the arrow printer that a curried arrow-chain RHS should use the
@@ -1139,7 +1123,7 @@ impl<'a> Printer<'a> {
         //   takes NeverBreakAfterOperator for it), a multiline block whose interior newline
         //   must print (`a = b/* a⏎b */.map(fn)`), a glued block the chain formatter breaks
         //   per-member for, or an owned leading comment printing inside the value's doc (a
-        //   JSDoc cast, a bundler annotation — `owned_comment_effect`, whose span sits
+        //   JSDoc cast, a bundler annotation — `owned_leading_comment_at`, whose span sits
         //   BEFORE the RHS span and so needs its own arm). The exemption is deliberately
         //   ONE span predicate (on-page, the layout axis) plus the owned arm — not a
         //   per-gap enumeration: the RHS is classified through `unwrap_expression` (strips
@@ -1163,7 +1147,7 @@ impl<'a> Printer<'a> {
             {
                 let core_expr = unwrap_expression(right_expr);
                 let rhs_span = right_expr.span();
-                owned_comment_effect.is_some()
+                self.owned_leading_comment_at(rhs_span.start).is_some()
                     || self.has_comments_on_page_between(rhs_span.start, rhs_span.end)
                     || chain_has_multiline_string_arg(core_expr, self.source)
                     || !is_poorly_breakable_chain(core_expr, self)

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 693,
+	"end": 665,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 376,
-				"data": "\n\tWhitespace-sensitive: inside <pre> every inter-tag byte is content, so tsv's layout\n\tvocabulary (whitespace-boundary breaks, block-style moves, tags intact) has no\n\trender-safe break point and the over-width welded run stands. Prettier instead\n\tdangles the closing tag's `>` (`</b⏎\\t>tail` — the break lands inside tag syntax,\n\trender-free) to duck under printWidth.\n"
+				"end": 354,
+				"data": "\n\tWhitespace-sensitive: inside <pre> every inter-tag byte is content, so a welded run has\n\tno whitespace boundary to break at. The one render-free break is inside tag syntax: a\n\tclosing tag whose content ends on a visible byte splits and dangles its `>`\n\t(`</b⏎\\t>tail`), the ws-sensitive family rule. At exactly 100 columns the run stays intact.\n"
 			},
 			{
 				"type": "Text",
-				"start": 376,
-				"end": 377,
+				"start": 354,
+				"end": 355,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 377,
-				"end": 490,
+				"start": 355,
+				"end": 468,
 				"name": "pre",
 				"name_loc": {
 					"start": {
-						"line": 8,
+						"line": 7,
 						"column": 1,
-						"character": 378
+						"character": 356
 					},
 					"end": {
-						"line": 8,
+						"line": 7,
 						"column": 4,
-						"character": 381
+						"character": 359
 					}
 				},
 				"attributes": [],
@@ -43,26 +43,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 382,
-							"end": 438,
+							"start": 360,
+							"end": 416,
 							"raw": "\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
 							"data": "\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
 						},
 						{
 							"type": "RegularElement",
-							"start": 438,
-							"end": 451,
+							"start": 416,
+							"end": 429,
 							"name": "b",
 							"name_loc": {
 								"start": {
-									"line": 9,
+									"line": 8,
 									"column": 56,
-									"character": 439
+									"character": 417
 								},
 								"end": {
-									"line": 9,
+									"line": 8,
 									"column": 57,
-									"character": 440
+									"character": 418
 								}
 							},
 							"attributes": [],
@@ -71,8 +71,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 441,
-										"end": 447,
+										"start": 419,
+										"end": 425,
 										"raw": "welded",
 										"data": "welded"
 									}
@@ -81,8 +81,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 451,
-							"end": 484,
+							"start": 429,
+							"end": 462,
 							"raw": "tail stays intact at one hundred\n",
 							"data": "tail stays intact at one hundred\n"
 						}
@@ -91,39 +91,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 490,
-				"end": 492,
+				"start": 468,
+				"end": 470,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 492,
-				"end": 577,
-				"data": " One char over: prettier dangles the closing `>`, tsv leaves the line intact. "
+				"start": 470,
+				"end": 547,
+				"data": " One char over: the closing `>` dangles to duck under the print width "
 			},
 			{
 				"type": "Text",
-				"start": 577,
-				"end": 578,
+				"start": 547,
+				"end": 548,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 578,
-				"end": 692,
+				"start": 548,
+				"end": 664,
 				"name": "pre",
 				"name_loc": {
 					"start": {
-						"line": 13,
+						"line": 12,
 						"column": 1,
-						"character": 579
+						"character": 549
 					},
 					"end": {
-						"line": 13,
+						"line": 12,
 						"column": 4,
-						"character": 582
+						"character": 552
 					}
 				},
 				"attributes": [],
@@ -132,26 +132,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 583,
-							"end": 636,
+							"start": 553,
+							"end": 606,
 							"raw": "\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
 							"data": "\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
 						},
 						{
 							"type": "RegularElement",
-							"start": 636,
-							"end": 649,
+							"start": 606,
+							"end": 621,
 							"name": "b",
 							"name_loc": {
 								"start": {
-									"line": 14,
+									"line": 13,
 									"column": 53,
-									"character": 637
+									"character": 607
 								},
 								"end": {
-									"line": 14,
+									"line": 13,
 									"column": 54,
-									"character": 638
+									"character": 608
 								}
 							},
 							"attributes": [],
@@ -160,8 +160,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 639,
-										"end": 645,
+										"start": 609,
+										"end": 615,
 										"raw": "welded",
 										"data": "welded"
 									}
@@ -170,8 +170,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 649,
-							"end": 686,
+							"start": 621,
+							"end": 658,
 							"raw": "tail stays intact at one hundred one\n",
 							"data": "tail stays intact at one hundred one\n"
 						}

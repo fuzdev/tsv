@@ -1374,7 +1374,7 @@ impl<'a> Printer<'a> {
                     // so without the matching hang the `(` lands at the member's own indent
                     // and the next pass collapses it — an authoring with no fixed point. Same
                     // narrow test, same reason, as the binding defaults; the wider
-                    // `owned_leading_comment_effect` would also hang an indentable block this
+                    // `owned_leading_comment_hangs` would also hang an indentable block this
                     // member keeps inline (`member_init_multiline_block_comment`).
                     d.concat(&[id_doc, d.text(" ="), hang_after_operator(d, value_doc)])
                 } else {

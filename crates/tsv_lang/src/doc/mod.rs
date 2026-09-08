@@ -197,9 +197,9 @@ mod arena_tests {
     }
 
     #[test]
-    fn test_text_width_precompute_clamps_below_sentinels() {
+    fn test_text_width_precompute_clamps_below_flag() {
         use super::arena::DocNode;
-        use super::types::CachedWidth;
+        use super::types::{CachedWidth, TEXT_WIDTH_NEWLINE_FLAG};
 
         let cached = |s: &str| {
             let arena = DocArena::new();
@@ -211,16 +211,16 @@ mod arena_tests {
             t.cached_width()
         };
 
-        const MAX_CACHEABLE: u16 = u16::MAX - 1; // one below TEXT_WIDTH_HAS_NEWLINE
+        const MAX_CACHEABLE: u16 = TEXT_WIDTH_NEWLINE_FLAG - 1; // one below the flag
 
-        // Width 65,534 (32,767 CJK × 2): the widest exactly-cacheable text.
+        // Width 32,766 (16,383 CJK × 2): the widest text one below the clamp.
         assert_eq!(
-            cached(&"中".repeat(32_767)),
-            CachedWidth::Width(MAX_CACHEABLE)
+            cached(&"中".repeat(16_383)),
+            CachedWidth::Width(MAX_CACHEABLE - 1)
         );
-        // Width 65,535 would alias TEXT_WIDTH_HAS_NEWLINE; must clamp.
+        // Width 32,768 would set TEXT_WIDTH_NEWLINE_FLAG; must clamp.
         assert_eq!(
-            cached(&("中".repeat(32_767) + "x")),
+            cached(&"中".repeat(16_384)),
             CachedWidth::Width(MAX_CACHEABLE)
         );
         // Width 65,536+ would wrap under a bare `as u16` (→ "always fits");
@@ -229,18 +229,31 @@ mod arena_tests {
             cached(&"中".repeat(40_000)),
             CachedWidth::Width(MAX_CACHEABLE)
         );
-        // Newline-bearing text is flagged, never measured.
-        assert_eq!(cached("中\n中"), CachedWidth::HasNewline);
+        // Newline-bearing text is flagged, with its FIRST line's width beside
+        // the flag — the tail is never measured, and a first line as wide as
+        // the flag clamps like a single line.
+        assert_eq!(cached("中\n中"), CachedWidth::HasNewline { first_width: 2 });
+        assert_eq!(
+            cached("a\tb\n中中中中"),
+            CachedWidth::HasNewline { first_width: 4 }
+        );
+        assert_eq!(
+            cached(&("中".repeat(16_384) + "\nx")),
+            CachedWidth::HasNewline {
+                first_width: MAX_CACHEABLE
+            }
+        );
     }
 
     // `MultilineText::first_width` precomputes the first line's visual width with
-    // the same `.min(TEXT_WIDTH_HAS_NEWLINE - 1)` clamp as `pooled_text_width`
+    // the same clamp below `TEXT_WIDTH_NEWLINE_FLAG` as `pooled_text_width`
     // (arena.rs `multiline_text`). No corpus reaches the clamp — it needs a
-    // ~65k-column first line — so this is the only gate over that arm (mutation
+    // ~32k-column first line — so this is the only gate over that arm (mutation
     // survivor: the `- 1` in the clamp).
     #[test]
-    fn test_multiline_first_width_precompute_clamps_below_sentinels() {
+    fn test_multiline_first_width_precompute_clamps_below_flag() {
         use super::arena::DocNode;
+        use super::types::TEXT_WIDTH_NEWLINE_FLAG;
 
         let a = DocArena::new();
         let first_width = |s: &str| {
@@ -252,19 +265,19 @@ mod arena_tests {
             *first_width
         };
 
-        const MAX_CACHEABLE: u16 = u16::MAX - 1; // one below TEXT_WIDTH_HAS_NEWLINE
+        const MAX_CACHEABLE: u16 = TEXT_WIDTH_NEWLINE_FLAG - 1; // one below the flag
 
         // Ordinary first lines carry their exact visual width (tabs = TAB_WIDTH).
         assert_eq!(first_width("abcd\ntail"), 4);
         assert_eq!(first_width("a\tb\ntail"), 4);
-        // First line 65,534 cols (32,767 CJK × 2): the widest exactly cacheable.
+        // First line 32,766 cols (16,383 CJK × 2): one below the clamp.
         assert_eq!(
-            first_width(&("中".repeat(32_767) + "\ntail")),
-            MAX_CACHEABLE
+            first_width(&("中".repeat(16_383) + "\ntail")),
+            MAX_CACHEABLE - 1
         );
-        // First line 65,535 cols would alias TEXT_WIDTH_HAS_NEWLINE; must clamp.
+        // First line 32,768 cols would set TEXT_WIDTH_NEWLINE_FLAG; must clamp.
         assert_eq!(
-            first_width(&("中".repeat(32_767) + "x\ntail")),
+            first_width(&("中".repeat(16_384) + "\ntail")),
             MAX_CACHEABLE
         );
         // Only the first line is measured; a wide continuation line is irrelevant.
@@ -290,14 +303,20 @@ mod arena_tests {
         // and repeat (cache hit) agree.
         assert_eq!(cached_static(&a, ",="), CachedWidth::Width(2));
         assert_eq!(cached_static(&a, ",="), CachedWidth::Width(2));
-        // A newline-bearing static routes to the sentinel through the same
-        // cache, exactly like pooled text.
-        assert_eq!(cached_static(&a, "a\nb"), CachedWidth::HasNewline);
+        // A newline-bearing static routes to the flagged first-line width
+        // through the same cache, exactly like pooled text.
+        assert_eq!(
+            cached_static(&a, "a\nb"),
+            CachedWidth::HasNewline { first_width: 1 }
+        );
         // The cache survives reset() (entries key on 'static addresses):
-        // the next document still reads real widths, including the sentinel.
+        // the next document still reads real widths, including the flag.
         a.reset();
         assert_eq!(cached_static(&a, ",="), CachedWidth::Width(2));
-        assert_eq!(cached_static(&a, "a\nb"), CachedWidth::HasNewline);
+        assert_eq!(
+            cached_static(&a, "a\nb"),
+            CachedWidth::HasNewline { first_width: 1 }
+        );
         // The empty() fast path bypasses the cache with a constant width 0,
         // which must agree with what the cache would compute.
         assert_eq!(cached_static(&a, ""), CachedWidth::Width(0));
@@ -1705,16 +1724,25 @@ mod arena_tests {
     }
 
     #[test]
-    fn test_fits_flat_newline_text_defers_to_walk() {
+    fn test_fits_flat_newline_text_charges_its_first_line() {
         let a = DocArena::new();
-        // Static newline text: cached as HAS_NEWLINE (via the static width
-        // cache), contains '\n' → walk returns true.
-        assert!(fits_flat(&a, a.text("a\nb"), 0));
-        // Pooled newline text: cached as HAS_NEWLINE → same early-true path.
-        // Both cases pin the eager width policy — the newline sentinel is set at
-        // build, which is what lets fits answer without borrowing the text pool
-        // and without the document source.
-        assert!(fits_flat(&a, a.text_pooled("café\nx"), 0));
-        assert!(fits_flat(&a, a.text_pooled("a\nb"), 0));
+        // Static newline text: cached under the newline flag (via the static
+        // width cache) with its first line's width — the walk charges that line
+        // and then returns true, so the text fits at 1 and not at 0.
+        assert!(fits_flat(&a, a.text("a\nb"), 1));
+        assert!(!fits_flat(&a, a.text("a\nb"), 0));
+        // Pooled newline text: the same flagged slot, the same charge. Both
+        // cases pin the eager width policy — the first-line width is measured
+        // at build, which is what lets fits answer without borrowing the text
+        // pool and without the document source.
+        assert!(fits_flat(&a, a.text_pooled("café\nx"), 4));
+        assert!(!fits_flat(&a, a.text_pooled("café\nx"), 3));
+        // Only the first line is charged: a wide tail never reaches the measure.
+        let wide_tail = a.text_pooled(&format!("ab\n{}", "x".repeat(500)));
+        assert!(fits_flat(&a, wide_tail, 2));
+        assert!(!fits_flat(&a, wide_tail, 1));
+        // A hardline after the text is never reached — the text ended the line.
+        let followed = a.concat(&[a.text_pooled("ab\nc"), a.text_pooled(&"y".repeat(50))]);
+        assert!(fits_flat(&a, followed, 2));
     }
 }
