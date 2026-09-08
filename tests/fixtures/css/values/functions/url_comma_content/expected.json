@@ -1,0 +1,126 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 338,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 169,
+					"end": 170,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 169,
+							"end": 170,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 169,
+											"end": 170
+										}
+									],
+									"start": 169,
+									"end": 170
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 171,
+					"end": 222,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 175,
+							"end": 194,
+							"property": "b",
+							"value": "url(x,y)"
+						},
+						{
+							"type": "Declaration",
+							"start": 198,
+							"end": 218,
+							"property": "c",
+							"value": "url(x ,y)"
+						}
+					]
+				},
+				"start": 169,
+				"end": 222
+			},
+			{
+				"type": "Atrule",
+				"start": 224,
+				"end": 256,
+				"name": "import",
+				"prelude": "'a.css' screen url(x,y)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 258,
+				"end": 284,
+				"name": "import",
+				"prelude": "'a.css' url(x ,y)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 286,
+				"end": 329,
+				"name": "import",
+				"prelude": "'a.css' screen url(x,y) and (a: b)",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comma inside an unquoted url() is content: the token is kept verbatim, only the\n\tpadding inside its parens trims, wherever the value is read from text ",
+				"start": 9,
+				"end": 167
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 178,
+				"end": 185,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 201,
+				"end": 208,
+				"position": 0
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 330,
+			"styles": "\n\t/* a comma inside an unquoted url() is content: the token is kept verbatim, only the\n\tpadding inside its parens trims, wherever the value is read from text */\n\ta {\n\t\tb: /* c */ url(x,y);\n\t\tc: /* c */ url(x ,y);\n\t}\n\t@import 'a.css' screen url(x,y);\n\t@import 'a.css' url(x ,y);\n\t@import 'a.css' screen url(x,y) and (a: b);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 339,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

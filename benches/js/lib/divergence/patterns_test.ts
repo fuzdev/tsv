@@ -2673,6 +2673,65 @@ Deno.test('css_scss_directive_number: negative - dropped numeric value not claim
 	assertEquals(match, null);
 });
 
+// ─── css_line_comment_freeze (positive + negatives) ────────────────────────
+
+Deno.test('css_line_comment_freeze: positive - a `//` argument normalized, prettier frozen', () => {
+	// Prettier's loose value tokenizer reads `//x,.10)` as a line comment, throws on the
+	// unbalanced paren, and prints the value verbatim; tsv spaces the comma and gives the
+	// number its leading zero. Same numeric-token count, identical skeleton → claim.
+	const prettier = '<style>\n\ta {\n\t\tcolor: fn(//x,.10);\n\t}\n</style>';
+	const ours = '<style>\n\ta {\n\t\tcolor: fn(//x, 0.1);\n\t}\n</style>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('css_line_comment_freeze', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'css_line_comment_freeze');
+});
+
+Deno.test(
+	"css_line_comment_freeze: positive - the split-url prelude of prettier's own suite",
+	() => {
+		// `css/no-semicolon/url.css`: `ur⏎  l(//fonts…:400,400italic)` — prettier keeps the
+		// author's line break and glued comma inside the frozen prelude; tsv collapses the
+		// run and spaces the comma. A line-count change is still one whitespace-only hunk.
+		const prettier = '@import ur\n  l(//fonts.fuz.dev/css?family=Open+Sans:400,400italic);\n';
+		const ours = '@import ur l(//fonts.fuz.dev/css?family=Open+Sans:400, 400italic);\n';
+		const ctx = make_context(ours, prettier, 'css');
+		assertNotEquals(run_pattern('css_line_comment_freeze', ctx), null);
+	}
+);
+
+Deno.test('css_line_comment_freeze: negative - `//` inside url() is opaque on both sides', () => {
+	// An unquoted `url(//…)` is one `<url-token>` for both formatters, so a `//` there
+	// freezes nothing — a comma-spacing hunk inside it is some other divergence's.
+	const prettier = '<style>\n\ta {\n\t\tcolor: url(//x,y);\n\t}\n</style>';
+	const ours = '<style>\n\ta {\n\t\tcolor: url(//x, y);\n\t}\n</style>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('css_line_comment_freeze', ctx), null);
+});
+
+Deno.test('css_line_comment_freeze: negative - `//` inside a string is content', () => {
+	const prettier = "<style>\n\ta {\n\t\tcolor: fn('//x',.10);\n\t}\n</style>";
+	const ours = "<style>\n\ta {\n\t\tcolor: fn('//x', 0.1);\n\t}\n</style>";
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('css_line_comment_freeze', ctx), null);
+});
+
+Deno.test('css_line_comment_freeze: negative - a dropped argument is not claimed', () => {
+	// The content-preservation gate: ours drops `y` from the frozen list. The skeletons
+	// differ, so the hunk stays unexplained.
+	const prettier = '<style>\n\ta {\n\t\tcolor: fn(//x,y);\n\t}\n</style>';
+	const ours = '<style>\n\ta {\n\t\tcolor: fn(//x);\n\t}\n</style>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('css_line_comment_freeze', ctx), null);
+});
+
+Deno.test('css_line_comment_freeze: negative - a dropped number is not claimed', () => {
+	const prettier = '<style>\n\ta {\n\t\tcolor: fn(//x,.10);\n\t}\n</style>';
+	const ours = '<style>\n\ta {\n\t\tcolor: fn(//x, );\n\t}\n</style>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('css_line_comment_freeze', ctx), null);
+});
+
 // ─── foreign_body_freeze (positive + unterminated-open negatives) ──────────
 
 Deno.test('foreign_body_freeze: positive - a frozen <style> body tsv keeps verbatim', () => {
@@ -2772,6 +2831,7 @@ Deno.test('may_alter_char_frequency: only deliberately-declared patterns may vou
 	assertEquals(vouching, [
 		'bom_strip',
 		'comment_preserved',
+		'css_line_comment_freeze',
 		'css_scss_directive_number',
 		'self_closing_nonvoid'
 	]);

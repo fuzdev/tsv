@@ -1381,6 +1381,59 @@ const css_scss_directive_number: DivergencePattern = {
 	}
 };
 
+const css_line_comment_freeze: DivergencePattern = {
+	id: 'css_line_comment_freeze',
+	description:
+		'A `//` inside a function argument list is delimiter content tsv normalizes around; prettier reads it as a loose-mode line comment, throws on the paren it swallowed, and freezes the whole value verbatim',
+	languages: ['css', 'svelte'],
+	conformance_sections: ['CSS: Values'],
+	fixtures: ['css/values/functions/line_comment_arg_prettier_divergence'],
+	// The frozen value keeps its authored number spellings (`.10` where tsv prints `0.1`),
+	// so digit counts differ. The detect below carries the same matching proof as
+	// css_scss_directive_number: identical non-numeric skeletons AND equal numeric-token
+	// counts, so a number can be re-spelled but never dropped or added.
+	may_alter_char_frequency: true,
+	detect(ctx) {
+		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
+
+		// The trigger, read on PRETTIER's side (the frozen authoring): a `//` inside an
+		// open paren that is not a `url(`. Strings and unquoted `url(…)` groups are
+		// blanked first — a `//` inside either is content on both sides (a string is a
+		// string, a `<url-token>` is opaque, css-syntax §4.3.6) and never freezes
+		// anything. postcss-values-parser's url exemption keys on the lowercase word
+		// `url` exactly, so `URL(//x)` DOES freeze; the blanking is case-sensitive to
+		// match. What remains must hold a `(` with a `//` before its `)`.
+		const blank_opaque = (text: string) =>
+			text.replace(/'[^']*'|"[^"]*"/g, "''").replace(/\burl\([^)]*\)/g, 'url()');
+		const line_comment_in_parens = /\([^()]*\/\//;
+		// Whitespace + number-format chars stripped: the freeze keeps the author's
+		// spacing, comma gluing and number spelling, and tsv changes nothing else.
+		const skeleton = (lines: string[]) => lines.join('\n').replace(/[\s\d.]/g, '');
+		const number_token = /\d*\.\d+|\d+/g;
+		const count_numbers = (lines: string[]) => (lines.join('\n').match(number_token) ?? []).length;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			if (!is_in_css_context(hunk, ctx)) return false;
+			if (hunk.removed_lines.length === 0 || hunk.added_lines.length === 0) return false;
+			if (!line_comment_in_parens.test(blank_opaque(hunk.removed_lines.join('\n')))) return false;
+			if (skeleton(hunk.removed_lines) !== skeleton(hunk.added_lines)) return false;
+			// Numeric content may be re-spelled but never dropped/added.
+			return count_numbers(hunk.removed_lines) === count_numbers(hunk.added_lines);
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'css_line_comment_freeze',
+				confidence: 'likely',
+				hunk_indices,
+				reason:
+					'a `//` in a function argument list normalized as delimiter content; prettier reads a loose-mode line comment and freezes the value verbatim'
+			};
+		}
+		return null;
+	}
+};
+
 const css_selector_divergence: DivergencePattern = {
 	id: 'css_selector_divergence',
 	description: 'CSS selector formatting divergence',
@@ -3922,6 +3975,7 @@ export const PATTERNS: DivergencePattern[] = [
 	css_atrule_long_wrap,
 	css_atrule_stable_quirk,
 	css_scss_directive_number,
+	css_line_comment_freeze,
 	css_selector_divergence,
 	css_comment_stable_quirk,
 

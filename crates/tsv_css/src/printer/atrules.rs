@@ -164,8 +164,12 @@ impl<'a> Printer<'a> {
                     let glue_next =
                         self.source.as_bytes().get(value.span().start as usize) == Some(&b',');
                     self.write_import_gap_comments(prev_end, value.span().start, i > 0, glue_next);
-                    // The media condition of an `@import` prelude — its last value, and the
-                    // only one that is a bare identifier run rather than a string/function.
+                    // The verbatim tail of an `@import` prelude — its last value when the
+                    // parser read one (`parse_import_prelude`): the media condition in the
+                    // common case, but any value the author put after the structured head,
+                    // or the whole prelude when it leads with no url/string. A bare `layer`
+                    // keyword is the other `Identifier` and lands here only when it is last,
+                    // where the normalization below is inert on it.
                     if is_import
                         && i == values.len() - 1
                         && let internal::CssValue::Identifier {
