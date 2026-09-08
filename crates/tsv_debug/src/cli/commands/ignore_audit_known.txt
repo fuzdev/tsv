@@ -32,7 +32,7 @@
 # known bugs.
 #
 # Format: KIND<TAB>POSITION
-# shapes: 33
+# shapes: 34
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.typeParameters
 UNHONORED	AssignmentExpression.left
@@ -65,4 +65,5 @@ OVERFROZEN	Identifier.decorators
 UNSTABLE	ConditionalExpression.alternate
 UNSTABLE	MemberExpression.object
 UNSTABLE	TSNonNullExpression.expression
+UNSTABLE	TSParenthesizedType.typeAnnotation
 UNSTABLE	TSUnionType.types
