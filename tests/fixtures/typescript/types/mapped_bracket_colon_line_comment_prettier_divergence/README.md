@@ -15,13 +15,11 @@ The own-line authoring (`[K in keyof T]⏎// c⏎: V;`) pulls up to the same
 continuation form under tsv in one pass. Prettier reaches its in-bracket
 landing from that authoring non-idempotently: pass 1 crosses the `:` and
 hangs the value (`[K in keyof T]: // c⏎V;`), pass 2 moves the comment inside
-the brackets. That landing is prettier-stable but **not** tsv-stable: tsv
-rewrites it to its own bracket-break layout, keeping `K in keyof T` on the `[`
-line (`[K in keyof T // c⏎]: V;` — the
-[mapped_key_line_comment](../mapped_key_line_comment_prettier_divergence/)
-fixed point), a third stable form — so the landing is pinned as
-`divergent_variant_own_line.svelte` with prettier's unstable first pass as
-`prettier_intermediate_to_divergent_variant_own_line.svelte`.
+the brackets. That landing is stable under both formatters (the
+[mapped_key_line_comment](../mapped_key_line_comment/) fixed point — a `//`
+trailing the constraint breaks the bracket group in both), so it is pinned as
+`variant_own_line.svelte` with prettier's unstable first pass as
+`prettier_intermediate_to_variant_own_line.svelte`.
 
 `unformatted_ours_compact.svelte` is the glued spelling (`]// c⏎:V`): tsv
 normalizes it to input; prettier lands on its in-bracket form.

@@ -1177,13 +1177,12 @@ impl<'a> Printer<'a> {
     /// (`"as"` / `"satisfies"`).
     ///
     /// Returns `None` to fall through to the caller's inline layout — for
-    /// non-union or hugging types, or when a comment sits between the keyword and
-    /// the type.
-    ///
-    /// TODO: a comment before a *breaking* union (`x as /* c */ A | B` past print
-    /// width) still misses the hanging indent. Prettier is non-idempotent here (it
-    /// relocates the comment across the keyword), so the target is a
-    /// comment-position-philosophy case, not a clean match — deferred.
+    /// non-union or hugging types. A block comment between the keyword and the
+    /// union rides inside the hang (`build_union_hanging_indent_doc`): glued to the
+    /// first member it declines the hug and lands after the pipe (`x as⏎\t| /* c */
+    /// {…}⏎\t| null`, `union_hug_gap_block_comment_cast`), otherwise it leads the union
+    /// on its own line. Prettier relocates a block the author broke after across the
+    /// keyword (`x /* c */ as {`) — a comment-position divergence tsv keeps.
     fn cast_union_hanging_tail(
         &self,
         keyword: &'static str,
@@ -1202,12 +1201,10 @@ impl<'a> Printer<'a> {
             return None;
         }
         let keyword_len = keyword.len() as u32;
-        if keyword_pos
-            .is_some_and(|pos| self.has_comments_to_emit_between(pos + keyword_len, type_start))
-        {
-            return None;
-        }
-        let hanging = self.build_union_hanging_indent_doc(type_annotation)?;
+        // The seam's gap opens at the keyword's end; with no keyword position on hand
+        // the gap is empty by construction and opens at the type itself.
+        let gap_start = keyword_pos.map_or(type_start, |pos| pos + keyword_len);
+        let hanging = self.build_union_hanging_indent_doc(gap_start, type_annotation)?;
         let d = self.d();
         Some(d.concat(&[d.text(" "), d.text(keyword), hanging]))
     }

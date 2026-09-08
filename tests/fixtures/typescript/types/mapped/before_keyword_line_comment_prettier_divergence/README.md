@@ -7,17 +7,20 @@ operand cannot stay on the comment's line — inlining would swallow them
 (content loss). tsv keeps the comment where the author wrote it — trailing the
 name / constraint — and drops the whole `in T` / `as U` tail to a continuation
 line **indented one level** (uniform forced-continuation indent). Prettier
-instead **expands the brackets** and floats the comment *past* the keyword to
-the end of the binding.
+instead floats the comment *past* the keyword to the end of the binding.
 
 ```ts
-// tsv (preserve + continuation)   // prettier (expand + float past the keyword)
+// tsv (preserve + continuation)   // prettier (float past the keyword)
 type A = {                         type A = {
-	[K // c                           [
-		in T]: V;                        K in T // c
-};                                    ]: V;
-                                   };
+	[                                 [
+		K // c                           K in T // c
+			in T                       ]: V;
+	]: V;                          };
+};
 ```
+
+Both break the `[…]` brackets (a `//` inside them forces the bracket group
+open); the divergence is the comment's position and the tail's continuation.
 
 Prettier's float is **information-destructive on a run**: `K // c1⏎// c2⏎in T`
 merges both comments onto one line **in reverse order** (`K in // c2 // c1⏎T`,

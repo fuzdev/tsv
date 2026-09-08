@@ -98,7 +98,8 @@ impl<'a> Printer<'a> {
             decl.span,
             decl.params.len(),
             |i| decl.params[i].span,
-            |i, frozen| self.build_type_parameter_item_doc(&decl.params[i], frozen),
+            |i, frozen, _| self.build_type_parameter_item_doc(&decl.params[i], frozen),
+            |_, _| None,
             |i| !self.is_same_line(decl.params[i].span.start, decl.params[i].span.end),
             has_comments,
         )
@@ -562,7 +563,8 @@ impl<'a> Printer<'a> {
                 // on its own line (and expands the `<…>` via the gate in
                 // `has_expanding_comments_in_type_param_declaration`). A
                 // single-line block comment (own-line, trailing, or glued) collapses inline
-                // and keeps `<…>` collapsed (the fall-through below). Type position: a
+                // and keeps `<…>` collapsed (the fall-through below) — except ahead of a
+                // union, which takes the hanging tail with the run inside. Type position: a
                 // trailing block lifted from a stripped shell trails the value inline
                 // before the `,`/`>`.
                 let value_doc = self.with_claimed_shell_leading_run(head.claimed_shell, || {
@@ -574,6 +576,17 @@ impl<'a> Printer<'a> {
                     head.value_start,
                     value_doc,
                 );
+                return;
+            }
+            // A union takes the hanging tail with the gap's block run riding inside it
+            // (`build_union_hanging_indent_doc`): a run glued to the first member is
+            // handed into the union and declines its hug, so `extends /* c */ { … } |
+            // null` breaks after the keyword like any commented union rather than
+            // gluing the run and hugging behind it (`union_hug_gap_block_comment_keyword`).
+            // Asked ahead of the inline-block arm, whose glue is the wrong answer for
+            // exactly that run; a union the seam still hugs falls through to it.
+            if let Some(hanging) = self.build_union_hanging_indent_doc(keyword_end, value_type) {
+                parts.push(hanging);
                 return;
             }
             if let Some(comments) = self.build_comments_between_filtered_opt(
@@ -589,10 +602,12 @@ impl<'a> Printer<'a> {
                 return;
             }
         }
-        // No comments: a non-hugging union breaks after the keyword with a
-        // hanging indent (Prettier's shouldIndentUnionType — true for type
-        // parameter constraints and defaults).
-        if let Some(hanging) = self.build_union_hanging_indent_doc(value_type) {
+        // No comments (or no keyword gap on hand): a non-hugging union breaks after the
+        // keyword with a hanging indent (Prettier's shouldIndentUnionType — true for
+        // type parameter constraints and defaults).
+        if let Some(hanging) = self
+            .build_union_hanging_indent_doc(head.gap_start.unwrap_or(head.value_start), value_type)
+        {
             parts.push(hanging);
             return;
         }
@@ -687,7 +702,7 @@ impl<'a> Printer<'a> {
         // brace-delimited object/mapped type is handled by the curly-hug case above.)
         if inst.params.len() == 1
             && (is_simple_type_arg(&inst.params[0])
-                || self.type_arg_union_prints_hugged(&inst.params[0]))
+                || self.type_arg_union_prints_hugged(inst.span.start + 1, &inst.params[0]))
         {
             return self.build_single_type_arg_inline(inst, has_comments);
         }
@@ -733,12 +748,14 @@ impl<'a> Printer<'a> {
     /// merely written *below* the previous item does, and takes the soft `line` this
     /// list's own group then decides. That is why the leading run goes through the shared
     /// emitter rather than a spacing enum: the separator is not a property of the layout.
+    #[expect(clippy::too_many_arguments)] // the item family's three callbacks + the list's own facts; a bundle would re-thread them
     pub(in crate::printer) fn build_angle_list_doc(
         &self,
         span: Span,
         count: usize,
         item_span: impl Fn(usize) -> Span,
-        item_doc: impl Fn(usize, bool) -> DocId,
+        item_doc: impl Fn(usize, bool, u32) -> DocId,
+        item_run_claim: impl Fn(usize, u32) -> Option<u32>,
         frozen_forces_break: impl Fn(usize) -> bool,
         has_comments: bool,
     ) -> DocId {
@@ -761,10 +778,18 @@ impl<'a> Printer<'a> {
             // authorings. A hardcoded space would reach the second, and an expansion gate
             // ([`Printer::block_comment_owns_its_line`]) routing every own-line run to
             // the all-hardline builder would hide that.
+            //
+            // The item may CLAIM the glued run at the end of its gap (`item_run_claim`
+            // — a union argument hands it into its own doc, where it binds to the
+            // first member: `Foo<⏎| /* c */ {…}⏎| null⏎>`); this emitter then stops at
+            // the claim so exactly one of the two prints it (docs/comments.md hazard 3).
+            let gap_start = prev_end;
             if has_comments {
+                let leading_end =
+                    item_run_claim(i, gap_start).unwrap_or_else(|| item_span(i).start);
                 inner_parts.extend(self.build_leading_comments_multiline(
                     prev_end,
-                    item_span(i).start,
+                    leading_end,
                     None,
                 ));
             }
@@ -776,7 +801,7 @@ impl<'a> Printer<'a> {
                 force_break = true;
             }
 
-            inner_parts.push(item_doc(i, frozen));
+            inner_parts.push(item_doc(i, frozen, gap_start));
 
             if has_comments {
                 let item_end = item_span(i).end;

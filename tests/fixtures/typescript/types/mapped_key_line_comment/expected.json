@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 232,
+	"end": 254,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " Line comment trailing the mapped key constraint (before `]`): the `]` drops to",
+			"value": " Line comment trailing the mapped key constraint (before `]`): the brackets break,",
 			"start": 20,
-			"end": 101,
+			"end": 104,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 82
+					"column": 85
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " its own line so the `//` can't swallow it, keeping `K in T` on the `[` line.",
-			"start": 103,
-			"end": 182,
+			"value": " `K in T` on its own indented line and the `]` on its own, so the `//` can't",
+			"start": 106,
+			"end": 184,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,22 +38,38 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 80
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " swallow it.",
+			"start": 186,
+			"end": 200,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 15
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 205,
-			"end": 209,
+			"start": 227,
+			"end": 231,
 			"loc": {
 				"start": {
-					"line": 5,
+					"line": 7,
 					"column": 10
 				},
 				"end": {
-					"line": 5,
+					"line": 7,
 					"column": 14
 				}
 			}
@@ -62,48 +78,48 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 231,
+		"end": 253,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 222,
+			"end": 244,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 8,
+					"line": 10,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 184,
-					"end": 221,
+					"start": 202,
+					"end": 243,
 					"loc": {
 						"start": {
-							"line": 4,
+							"line": 5,
 							"column": 1
 						},
 						"end": {
-							"line": 7,
+							"line": 9,
 							"column": 3
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 189,
-						"end": 190,
+						"start": 207,
+						"end": 208,
 						"loc": {
 							"start": {
-								"line": 4,
+								"line": 5,
 								"column": 6
 							},
 							"end": {
-								"line": 4,
+								"line": 5,
 								"column": 7
 							}
 						},
@@ -111,58 +127,58 @@
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
-						"start": 193,
-						"end": 220,
+						"start": 211,
+						"end": 242,
 						"loc": {
 							"start": {
-								"line": 4,
+								"line": 5,
 								"column": 10
 							},
 							"end": {
-								"line": 7,
+								"line": 9,
 								"column": 2
 							}
 						},
 						"typeParameter": {
 							"type": "TSTypeParameter",
-							"start": 198,
-							"end": 204,
+							"start": 220,
+							"end": 226,
 							"loc": {
 								"start": {
-									"line": 5,
+									"line": 7,
 									"column": 3
 								},
 								"end": {
-									"line": 5,
+									"line": 7,
 									"column": 9
 								}
 							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeReference",
-								"start": 203,
-								"end": 204,
+								"start": 225,
+								"end": 226,
 								"loc": {
 									"start": {
-										"line": 5,
+										"line": 7,
 										"column": 8
 									},
 									"end": {
-										"line": 5,
+										"line": 7,
 										"column": 9
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 203,
-									"end": 204,
+									"start": 225,
+									"end": 226,
 									"loc": {
 										"start": {
-											"line": 5,
+											"line": 7,
 											"column": 8
 										},
 										"end": {
-											"line": 5,
+											"line": 7,
 											"column": 9
 										}
 									},
@@ -173,37 +189,37 @@
 								{
 									"type": "Line",
 									"value": " c",
-									"start": 205,
-									"end": 209
+									"start": 227,
+									"end": 231
 								}
 							]
 						},
 						"nameType": null,
 						"typeAnnotation": {
 							"type": "TSTypeReference",
-							"start": 215,
-							"end": 216,
+							"start": 237,
+							"end": 238,
 							"loc": {
 								"start": {
-									"line": 6,
+									"line": 8,
 									"column": 5
 								},
 								"end": {
-									"line": 6,
+									"line": 8,
 									"column": 6
 								}
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 215,
-								"end": 216,
+								"start": 237,
+								"end": 238,
 								"loc": {
 									"start": {
-										"line": 6,
+										"line": 8,
 										"column": 5
 									},
 									"end": {
-										"line": 6,
+										"line": 8,
 										"column": 6
 									}
 								},
@@ -214,15 +230,21 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Line comment trailing the mapped key constraint (before `]`): the `]` drops to",
+							"value": " Line comment trailing the mapped key constraint (before `]`): the brackets break,",
 							"start": 20,
-							"end": 101
+							"end": 104
 						},
 						{
 							"type": "Line",
-							"value": " its own line so the `//` can't swallow it, keeping `K in T` on the `[` line.",
-							"start": 103,
-							"end": 182
+							"value": " `K in T` on its own indented line and the `]` on its own, so the `//` can't",
+							"start": 106,
+							"end": 184
+						},
+						{
+							"type": "Line",
+							"value": " swallow it.",
+							"start": 186,
+							"end": 200
 						}
 					]
 				}
