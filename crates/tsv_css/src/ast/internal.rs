@@ -725,6 +725,23 @@ pub enum PreludeValue<'arena> {
         span: Span,
     },
 
+    /// `@custom-selector` (css-extensions-1: `@custom-selector <custom-selector>
+    /// <selector-list> ;`): the `:--name` and the strict complex-selector list it
+    /// aliases. The name is a span, printed from source — an `<extension-name>` is
+    /// author-defined and keeps its case, like `@custom-media`'s. A prelude that is not
+    /// this shape (no name, nothing after the name, a list the selector parser rejects)
+    /// takes the `Raw` arm instead (`parse_custom_selector_prelude`).
+    /// Example: `:--heading h1, h2` → name `:--heading`, list [h1, h2]
+    CustomSelector {
+        /// The `:--name` span, from the `:` through the ident.
+        name: Span,
+        list: SelectorList<'arena>,
+        /// The prelude's raw-reader span: first token after the at-rule name to the
+        /// `;` / `{` terminator (trailing whitespace included), the same bounds the `Raw`
+        /// arm captures, so routing between the two moves no wire byte.
+        span: Span,
+    },
+
     /// @supports condition (structured for line-width wrapping)
     /// Example: `(display: grid) and (flex: 1)` → parts connected by `and`/`or`
     Supports {
@@ -878,6 +895,7 @@ impl PreludeValue<'_> {
             PreludeValue::Values { span, .. } => *span,
             PreludeValue::Raw { span, .. } => *span,
             PreludeValue::Selectors { span, .. } => *span,
+            PreludeValue::CustomSelector { span, .. } => *span,
             PreludeValue::Supports { span, .. } => *span,
             PreludeValue::Container { span, .. } => *span,
             PreludeValue::Media { span, .. } => *span,
