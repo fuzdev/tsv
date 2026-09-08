@@ -1,0 +1,387 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1085,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 167,
+				"end": 188,
+				"name": "supports",
+				"prelude": "and (a: b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 190,
+				"end": 210,
+				"name": "supports",
+				"prelude": "or (a: b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 212,
+				"end": 233,
+				"name": "supports",
+				"prelude": "AND (a: b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 235,
+				"end": 267,
+				"name": "supports",
+				"prelude": "and (a: b) and (c: d)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 350,
+				"end": 375,
+				"name": "supports",
+				"prelude": "and and (a: b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 377,
+				"end": 401,
+				"name": "supports",
+				"prelude": "and or (a: b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 403,
+				"end": 435,
+				"name": "supports",
+				"prelude": "(a: b) and and (c: d)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 524,
+				"end": 553,
+				"name": "supports",
+				"prelude": "and (a: b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 555,
+				"end": 584,
+				"name": "supports",
+				"prelude": "and  (a: b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 586,
+				"end": 634,
+				"name": "supports",
+				"prelude": "and  or  (d: e)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 636,
+				"end": 675,
+				"name": "supports",
+				"prelude": "(a: b) and  or (d: e)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 754,
+				"end": 775,
+				"name": "supports",
+				"prelude": "not (a: b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 777,
+				"end": 802,
+				"name": "supports",
+				"prelude": "and not (a: b)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 805,
+				"end": 867,
+				"name": "container",
+				"prelude": "name1 and (a: b)",
+				"block": {
+					"type": "Block",
+					"start": 833,
+					"end": 867,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 837,
+								"end": 843,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 837,
+										"end": 843,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class",
+														"start": 837,
+														"end": 843
+													}
+												],
+												"start": 837,
+												"end": 843
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 844,
+								"end": 864,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 849,
+										"end": 859,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 837,
+							"end": 864
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 944,
+				"end": 1000,
+				"name": "container",
+				"prelude": "and (a: b)",
+				"block": {
+					"type": "Block",
+					"start": 966,
+					"end": 1000,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 970,
+								"end": 976,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 970,
+										"end": 976,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class",
+														"start": 970,
+														"end": 976
+													}
+												],
+												"start": 970,
+												"end": 976
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 977,
+								"end": 997,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 982,
+										"end": 992,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 970,
+							"end": 997
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 1003,
+				"end": 1076,
+				"name": "container",
+				"prelude": "name1 and (a: b) and (c: d)",
+				"block": {
+					"type": "Block",
+					"start": 1042,
+					"end": 1076,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 1046,
+								"end": 1052,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 1046,
+										"end": 1052,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "class",
+														"start": 1046,
+														"end": 1052
+													}
+												],
+												"start": 1046,
+												"end": 1052
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 1053,
+								"end": 1073,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 1058,
+										"end": 1068,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 1046,
+							"end": 1073
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a connector binds its operand to the RIGHT, so one with nothing on its LEFT still\n\tbelongs to the part that follows it: it is kept, in its source case ",
+				"start": 9,
+				"end": 165
+			},
+			{
+				"type": "CSSComment",
+				"value": " every word of a run is kept, at either end of a part and in source order ",
+				"start": 270,
+				"end": 348
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment keeps the side of the run the author wrote it on, inside the run too ",
+				"start": 438,
+				"end": 522
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 534,
+				"end": 541,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 569,
+				"end": 576,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " a ",
+				"start": 596,
+				"end": 603,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " b ",
+				"start": 608,
+				"end": 615,
+				"position": 4
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 619,
+				"end": 626,
+				"position": 8
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 657,
+				"end": 664,
+				"position": 11
+			},
+			{
+				"type": "CSSComment",
+				"value": " control: `not` is a segment of the part it prefixes, not a connector ",
+				"start": 678,
+				"end": 752
+			},
+			{
+				"type": "CSSComment",
+				"value": " the container name is optional, and a leading connector is not one ",
+				"start": 870,
+				"end": 942
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1077,
+			"styles": "\n\t/* a connector binds its operand to the RIGHT, so one with nothing on its LEFT still\n\tbelongs to the part that follows it: it is kept, in its source case */\n\t@supports and (a: b);\n\t@supports or (a: b);\n\t@supports AND (a: b);\n\t@supports and (a: b) and (c: d);\n\n\t/* every word of a run is kept, at either end of a part and in source order */\n\t@supports and and (a: b);\n\t@supports and or (a: b);\n\t@supports (a: b) and and (c: d);\n\n\t/* a comment keeps the side of the run the author wrote it on, inside the run too */\n\t@supports /* c */ and (a: b);\n\t@supports and /* c */ (a: b);\n\t@supports /* a */ and /* b */ or /* c */ (d: e);\n\t@supports (a: b) and /* c */ or (d: e);\n\n\t/* control: `not` is a segment of the part it prefixes, not a connector */\n\t@supports not (a: b);\n\t@supports and not (a: b);\n\n\t@container name1 and (a: b) {\n\t\t.class {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* the container name is optional, and a leading connector is not one */\n\t@container and (a: b) {\n\t\t.class {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@container name1 and (a: b) and (c: d) {\n\t\t.class {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1086,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -834,14 +834,25 @@ pub enum ConditionSegment<'arena> {
 /// `not`-prefixed or function-style like `selector(...)`).
 #[derive(Debug, Clone)]
 pub struct ConditionPart<'arena> {
-    /// The connector before this part (None for first part). Normalized to the
-    /// `And`/`Or` enum for logic (comment-split, presence); the original source
-    /// **case** is carried separately in `connector_raw` for output.
+    /// The **last** connector before this part (None for first part). Normalized to
+    /// the `And`/`Or` enum for logic (comment-split, presence); the source text of
+    /// the whole run it ends is carried separately in `connector_run` for output.
     pub connector: Option<ConditionConnector>,
-    /// The connector's verbatim source text (`and`/`AND`/`Or`/…), emitted by the
-    /// printer so the author's case is preserved (matching prettier). `Some` iff
-    /// `connector` is `Some`.
-    pub connector_raw: Option<&'arena str>,
+    /// The run of connectors this part binds to, verbatim from source — the words
+    /// from the first through the last, single-space joined, with any comments
+    /// *between* them carried along in source order.
+    ///
+    /// Usually one word (`and`/`AND`/`Or`/…), emitted by the printer so the author's
+    /// case is preserved (matching prettier). A grammar-legal query has exactly one,
+    /// but the reader is permissive and `parseCss` keeps every word of a run
+    /// (`(a: b) and or (c: d)`), so dropping all but the last would be content loss.
+    /// A comment inside the run is **un-registered** when the run claims it (the
+    /// `rewind_to` pairing) — the run's own text prints it, and a registration would
+    /// have the printer's gap sweep print it a second time. Comments *outside* the
+    /// run (before its first word, after its last) stay registered and are claimed by
+    /// that sweep, which is what keeps them on their authored side of the run.
+    /// `Some` iff `connector` is `Some`.
+    pub connector_run: Option<&'arena str>,
     /// The condition content (e.g., `(display: grid)` or `not (color: red)`) as a
     /// run of segments — one `Text` segment unless the part holds a `selector()`
     /// argument. A leading `not` keeps its source case (preserved like the

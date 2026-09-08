@@ -41,9 +41,15 @@
 //   [`name_run_separator_after`] (from the text it is appending to) for the ASCII space that
 //   ends the name first. ⚠️ That is **not** one gap: the attribute selector's `[name<HERE>]`,
 //   a selector list's `,` (`a.x <NBSP>, c`), an explicit combinator's symbol
-//   (`a <NBSP>> b`), a pseudo-argument list's `)` (`:is(a <NBSP>)`) and the commented
-//   attribute rebuild's every interior gap all have a name on their left, and each was a live
-//   glue. A claim added anywhere new owes the same question.
+//   (`a <NBSP>> b`), a pseudo-argument list's `)` (`:is(a <NBSP>)`), the commented
+//   attribute rebuild's every interior gap, and a condition prelude's part head behind a
+//   CONNECTOR (`@supports and <NBSP>(a: b)` — the connector is an identifier like any other)
+//   all have a name on their left, and each was a live glue. A claim added anywhere new owes
+//   the same question. The condition one answers it structurally rather than by asking:
+//   `build_condition_query_doc`'s head pieces are joined and *followed* by one space, so the
+//   run can never land flush against the last of them; its tell is not a changed name in the
+//   wire but a prelude that stops reading as a condition at all
+//   (`a_connector_never_absorbs_the_run_behind_it`).
 // - ahead of a COMBINATOR symbol the printer regenerates a space after the run, so the run's
 //   own ASCII tail is trimmed or the line grows a column per pass.
 //
@@ -65,7 +71,7 @@
 // | a declaration's property→colon gap | `extract_property_name`, through [`boundary_run_spelling`] |
 // | a block child's rebuilt head (declaration / at-rule / comment) | [`Printer::write_head_boundary_ws`] |
 // | a block's tail before `}` | [`Printer::write_block_tail_boundary_ws`] |
-// | a condition prelude's part heads | `build_condition_query_doc` |
+// | a condition prelude's part heads (behind the name, a connector, or nothing) | `Printer::condition_part_head_ws` |
 //
 // A **rule** child needs no head claim: its selector's first compound already claims the same
 // run, and a second claim would print it twice.
