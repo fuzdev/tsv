@@ -1158,14 +1158,51 @@ mod arena_tests {
         let pad = a.text("PADDING");
 
         // The head does not fit in the 5 remaining columns but does fit at column 0, so the
-        // control drops it; the glued fill must not, since there is no break point there.
+        // control drops it and fills on from the fresh line (`xxxx` rides beside it, `y` wraps);
+        // the glued fill must not drop, since there is no break point there.
         assert_eq!(
             render_pw_tab(&a, a.concat(&[pad, glued]), 12),
             "PADDINGwwwwww\nxxxx y"
         );
         assert_eq!(
             render_pw_tab(&a, a.concat(&[pad, a.fill(&parts)]), 12),
-            "PADDING\nwwwwww\nxxxx y"
+            "PADDING\nwwwwww xxxx\ny"
+        );
+    }
+
+    /// The mid-fill drop fills on from the fresh line: a newline-bearing text ends the line in
+    /// the fits walk, so the pair check `[text, line, word]` returns fits without measuring the
+    /// word; a word that then does not fit after the text's last line drops, and the separator
+    /// after it is re-measured from the fresh line — the next item rides beside the word when the
+    /// pair fits, and wraps beneath it otherwise. Isolating it unconditionally stranded `xx`.
+    #[test]
+    fn test_fill_mid_fill_drop_fills_from_fresh_line() {
+        let a = DocArena::new();
+        let multiline = a.text("c\nccccccc");
+        let fits = [
+            multiline,
+            a.line(),
+            a.text("wwwwww"),
+            a.line(),
+            a.text("xx"),
+        ];
+        let wraps = [
+            multiline,
+            a.line(),
+            a.text("wwwwww"),
+            a.line(),
+            a.text("xxxxxx"),
+        ];
+
+        // `ccccccc wwwwww` is 14 > 12, so the word drops; `wwwwww xx` is 9 and packs.
+        assert_eq!(
+            render_pw_tab(&a, a.fill(&fits), 12),
+            "c\nccccccc\nwwwwww xx"
+        );
+        // `wwwwww xxxxxx` is 13 > 12: the tail wraps beneath the dropped word.
+        assert_eq!(
+            render_pw_tab(&a, a.fill(&wraps), 12),
+            "c\nccccccc\nwwwwww\nxxxxxx"
         );
     }
 

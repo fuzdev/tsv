@@ -7,7 +7,9 @@ declaration's trailing `;` would be the 101st column.
 tsv: wraps the last fill item to a continuation line (every line ≤100)
 Prettier: tolerates the **1-char** overage — the comment-bearing value takes the same `fill()` as
 the comment-free one, and that fill doesn't count the parent's trailing `;`. The item that wraps
-is whichever fill item is last: a word, or a trailing comment.
+is whichever fill item is last: a word, or a trailing comment. The same boundary holds on the
+fresh line a word drops to after a multi-line comment's last line — the tail pairs with it at 100
+columns with the `;`, and wraps at 101.
 
 ## Reason
 
@@ -21,3 +23,5 @@ that. See [conformance_prettier_css.md §CSS: Values](../../../../../../docs/con
   102 wraps) for every comment position, and the leading run's glue
 - [space_separated_long_wrap](../space_separated_long_wrap_prettier_divergence/) — the comment-free
   twin
+- [space_separated_multiline_comment_wrap_long](../space_separated_multiline_comment_wrap_long/) — the
+  agreeing cells (100 fits, 102 wraps) of that fresh-line fill

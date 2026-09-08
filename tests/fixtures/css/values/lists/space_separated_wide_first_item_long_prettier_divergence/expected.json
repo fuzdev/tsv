@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 808,
+		"end": 865,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 799,
+					"end": 856,
 					"children": [
 						{
 							"type": "Declaration",
@@ -49,29 +49,29 @@
 						},
 						{
 							"type": "Declaration",
-							"start": 317,
-							"end": 424,
+							"start": 357,
+							"end": 461,
 							"property": "background",
-							"value": "'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaa'\n\t\t\t2px"
+							"value": "'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaa' 2px"
 						},
 						{
 							"type": "Declaration",
-							"start": 495,
-							"end": 606,
+							"start": 532,
+							"end": 643,
 							"property": "background",
 							"value": "'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaa'\n\t\t\t 2px"
 						},
 						{
 							"type": "Declaration",
-							"start": 680,
-							"end": 795,
+							"start": 737,
+							"end": 852,
 							"property": "background",
-							"value": "'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaa'\n\t\t\t 2px"
+							"value": "'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaa' \n\t\t\t2px"
 						}
 					]
 				},
 				"start": 9,
-				"end": 799
+				"end": 856
 			}
 		],
 		"comments": [
@@ -83,47 +83,53 @@
 			},
 			{
 				"type": "CSSComment",
-				"value": " one column more: the first item cannot fit on the colon's line and drops to a fresh line ",
+				"value": " one column more: the first item cannot fit on the colon's line and drops to a fresh line, ",
 				"start": 220,
-				"end": 314
+				"end": 315
+			},
+			{
+				"type": "CSSComment",
+				"value": " where the tail fills beside it ",
+				"start": 318,
+				"end": 354
 			},
 			{
 				"type": "CSSComment",
 				"value": " the same boundary with a comment in the value: 100 columns ",
-				"start": 428,
-				"end": 492
+				"start": 465,
+				"end": 529
 			},
 			{
 				"type": "CSSComment",
 				"value": " c ",
-				"start": 595,
-				"end": 602,
+				"start": 632,
+				"end": 639,
 				"position": 88
 			},
 			{
 				"type": "CSSComment",
-				"value": " 101 columns: the first item drops, the comment rides the tail ",
-				"start": 610,
-				"end": 677
+				"value": " 101 columns: the first item drops, the comment fills beside it and the tail wraps ",
+				"start": 647,
+				"end": 734
 			},
 			{
 				"type": "CSSComment",
 				"value": " c ",
-				"start": 784,
-				"end": 791,
-				"position": 89
+				"start": 838,
+				"end": 845,
+				"position": 86
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 800,
-			"styles": "\n\tdiv {\n\t\t/* the first item fills the colon's line to exactly 100 columns; the tail wraps beneath it */\n\t\tbackground: 'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaa'\n\t\t\t2px;\n\t\t/* one column more: the first item cannot fit on the colon's line and drops to a fresh line */\n\t\tbackground:\n\t\t\t'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaa'\n\t\t\t2px;\n\t\t/* the same boundary with a comment in the value: 100 columns */\n\t\tbackground: 'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaa'\n\t\t\t/* c */ 2px;\n\t\t/* 101 columns: the first item drops, the comment rides the tail */\n\t\tbackground:\n\t\t\t'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaa'\n\t\t\t/* c */ 2px;\n\t}\n",
+			"end": 857,
+			"styles": "\n\tdiv {\n\t\t/* the first item fills the colon's line to exactly 100 columns; the tail wraps beneath it */\n\t\tbackground: 'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaa'\n\t\t\t2px;\n\t\t/* one column more: the first item cannot fit on the colon's line and drops to a fresh line, */\n\t\t/* where the tail fills beside it */\n\t\tbackground:\n\t\t\t'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaa' 2px;\n\t\t/* the same boundary with a comment in the value: 100 columns */\n\t\tbackground: 'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaa'\n\t\t\t/* c */ 2px;\n\t\t/* 101 columns: the first item drops, the comment fills beside it and the tail wraps */\n\t\tbackground:\n\t\t\t'aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaaaaaa aaaaaa' /* c */\n\t\t\t2px;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 809,
+	"end": 866,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

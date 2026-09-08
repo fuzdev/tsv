@@ -216,11 +216,7 @@ pub(super) fn render_fill_iterative(
             // stranding a stray leading space at the head of the continuation line (the
             // fill-break-before-an-expression-tag non-idempotency).
             if arena.is_collapsible_line(content) {
-                let sep_mode = if content_fits {
-                    Mode::Flat
-                } else {
-                    Mode::Break
-                };
+                let sep_mode = Mode::from_fits(content_fits);
                 render_single_doc(
                     ctx,
                     content,
@@ -321,7 +317,7 @@ pub(super) fn render_fill_iterative(
             } else {
                 content_fits
             };
-            let sep_mode = if sep_fits { Mode::Flat } else { Mode::Break };
+            let sep_mode = Mode::from_fits(sep_fits);
             render_single_doc(
                 ctx,
                 separator,
@@ -468,15 +464,30 @@ pub(super) fn render_fill_iterative(
                         Mode::Flat,
                         should_remeasure,
                     );
-                    // The Svelte after-element fold's lead element dropped to its own line from
-                    // mid-fill (a preceding word pushed it). It fits intact here, so let the trailing
-                    // text flow greedily after it — the short inline element packs like any other fill
-                    // word (conformance_prettier_svelte.md §Svelte: Inline content block-style, "a text run
-                    // flows as one fill"), and the same-line-authored drop converges with the
-                    // newline-authored one instead of one flowing and the other isolating (an F1
-                    // break).
-                    let sep_mode =
-                        hug_terminal_sep_mode(ctx, context, next_content, *pos, has_line_suffix);
+                    // The dropped item fits intact on its fresh line, so it now sits where an
+                    // at-line-start item would, and the separator after it takes that arm's rule:
+                    // the pair check, re-measured from the real column — the next item hugs when
+                    // it fits after the one space, else takes its own line. The drop is tsv's own
+                    // shape (prettier's fill renders an unfit item in place and breaks after it),
+                    // so the question is what the fill does next from the fresh line, and the
+                    // answer is the same greedy packing every line start gets. Every fill: a CSS
+                    // value whose first item is too wide for the colon's line
+                    // (`space_separated_wide_first_item_long_prettier_divergence`) and the word a
+                    // multi-line comment's last line could not hold
+                    // (`space_separated_multiline_comment_wrap_long`) — where the isolating Break
+                    // stranded the tail (`'<item>'⏎2px`) after a drop the pair check never saw,
+                    // because the walk had returned true at the comment's newline without measuring
+                    // the word. The Svelte after-element fold reaches the same arm with its lead
+                    // element, the trailing text flowing after it (conformance_prettier_svelte.md
+                    // §Svelte: Inline content block-style, "a text run flows as one fill"), so the
+                    // same-line-authored drop converges with the newline-authored one instead of
+                    // one flowing and the other isolating (an F1 break).
+                    let sep_mode = Mode::from_fits(next_fits_after_space(
+                        ctx,
+                        next_content,
+                        *pos,
+                        has_line_suffix,
+                    ));
                     render_single_doc(
                         ctx,
                         separator,
@@ -632,10 +643,10 @@ fn flow_lookahead(arena: &DocArena, rest_commands: &[ArenaCommand]) -> SmallVec<
 /// entire content of the decision, and what each arm's comment argues for. Naming the pair keeps
 /// that argument the readable part instead of burying it under repeated plumbing.
 ///
-/// The two **hug** arms deliberately don't route through here: their separator mode is
-/// [`hug_terminal_sep_mode`] of the column the content just left, so the mode cannot exist until
-/// the content has rendered. That ordering is the rule, not an oversight, so those arms stay
-/// written out.
+/// The two **re-measuring** arms deliberately don't route through here: their separator mode is
+/// [`next_fits_after_space`] / [`hug_terminal_sep_mode`] of the column the content just left, so
+/// the mode cannot exist until the content has rendered. That ordering is the rule, not an
+/// oversight, so those arms stay written out.
 #[inline]
 #[expect(clippy::too_many_arguments)]
 fn render_pair(
@@ -708,13 +719,35 @@ fn is_glued_head(context: &DocContext, offset: usize) -> bool {
     context.glued_lead() && offset == 0
 }
 
-/// Terminal-tail separator mode for the Svelte after-element fold, shared by Case 3's two drop
-/// arms (the mid-fill drop and the at-line-start wrapped drop). After the fold's lead element has
-/// rendered on its own line, the trailing text hugs the dangled `>` — separator rendered Flat, the
-/// one space it stands for — when the next item actually fits at the resulting column (`+ 1` for
-/// that space), and takes its own line (Break) otherwise. Gated on the fold via
-/// [`DocContext::after_element_fold`]; every non-fold fill keeps the isolating Break, where a
-/// wrapped item never lets the next hug its last line.
+/// Does the next fill item fit flat after one space at `pos` — the separator's own width plus
+/// the item's? The pair check re-asked from the column an item was actually rendered to, which
+/// is what Case 3's `both_fit` could not know ahead of a drop or a wrap: the mid-fill drop arm
+/// asks it for every fill, [`hug_terminal_sep_mode`] for the after-element fold alone.
+#[inline]
+fn next_fits_after_space(
+    ctx: &RenderCtx<'_>,
+    next_content: DocId,
+    pos: usize,
+    has_line_suffix: bool,
+) -> bool {
+    arena_fits_with_lookahead(
+        ctx.arena,
+        next_content,
+        Mode::Flat,
+        &[],
+        ctx.render.print_width.saturating_sub(pos + 1) as isize,
+        has_line_suffix,
+    )
+}
+
+/// Terminal-tail separator mode for the Svelte after-element fold at Case 3's at-line-start
+/// wrapped drop. After the fold's lead element has rendered on its own line, the trailing text
+/// hugs the dangled `>` — separator rendered Flat, the one space it stands for — when the next
+/// item actually fits at the resulting column ([`next_fits_after_space`]), and takes its own
+/// line (Break) otherwise. Gated on the fold via [`DocContext::after_element_fold`]; every
+/// non-fold fill keeps the isolating Break, where a wrapped item never lets the next hug its
+/// last line. The mid-fill drop arm, where the dropped item fits whole on its fresh line, is not
+/// a wrapped item and asks the ungated question instead.
 #[inline]
 fn hug_terminal_sep_mode(
     ctx: &RenderCtx<'_>,
@@ -723,18 +756,8 @@ fn hug_terminal_sep_mode(
     pos: usize,
     has_line_suffix: bool,
 ) -> Mode {
-    if context.after_element_fold()
-        && arena_fits_with_lookahead(
-            ctx.arena,
-            next_content,
-            Mode::Flat,
-            &[],
-            ctx.render.print_width.saturating_sub(pos + 1) as isize,
-            has_line_suffix,
-        )
-    {
-        Mode::Flat
-    } else {
-        Mode::Break
-    }
+    Mode::from_fits(
+        context.after_element_fold()
+            && next_fits_after_space(ctx, next_content, pos, has_line_suffix),
+    )
 }

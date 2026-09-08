@@ -20,5 +20,7 @@ See [conformance_prettier_css.md §CSS: Values](../../../../../../docs/conforman
 ## Related
 
 - [space_separated_comment_long](../space_separated_comment_long/) — the single-line comment fill
+- [space_separated_multiline_comment_wrap_long](../space_separated_multiline_comment_wrap_long/) — one
+  column more: the word drops to a fresh line and the tail fills beside it, on both formatters
 - [multi_line_gap](../../../tokens/comments/multi_line_gap_prettier_divergence/) — the interior stays
   verbatim at its authored column

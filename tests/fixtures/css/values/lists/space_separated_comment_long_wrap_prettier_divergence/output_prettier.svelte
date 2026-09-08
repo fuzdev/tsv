@@ -7,6 +7,11 @@
 		/* the same boundary at a long property */
 		prop000000000000000000000000000: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px;
 		prop000000000000000000000000000: 1px /* c */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px;
+		/* the same `;` boundary on the fresh line a word drops to after a multi-line comment's last */
+		/* line: 101 columns with the tail, so the tail wraps */
+		background: 1px /* a
+		bbbbbbbb */
+			aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2px;
 		/* a trailing comment is the fill item that wraps */
 		background: 1px aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa /* c */;
 	}
