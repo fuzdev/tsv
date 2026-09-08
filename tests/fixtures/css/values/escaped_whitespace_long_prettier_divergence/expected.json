@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 411,
+		"end": 508,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 402,
+					"end": 499,
 					"children": [
 						{
 							"type": "Declaration",
@@ -49,15 +49,15 @@
 						},
 						{
 							"type": "Declaration",
-							"start": 299,
-							"end": 398,
+							"start": 370,
+							"end": 495,
 							"property": "grid-template-areas",
-							"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd\n\t\t\txxxxx\\ yyyyy"
+							"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd\n\t\t\txxxxx\\ yyyyy"
 						}
 					]
 				},
 				"start": 9,
-				"end": 402
+				"end": 499
 			}
 		],
 		"comments": [
@@ -69,21 +69,21 @@
 			},
 			{
 				"type": "CSSComment",
-				"value": " 101 chars: must break — but NOT on the escaped space, which is inside an ident ",
+				"value": " over the width: the value wraps into rows beneath the colon, breaking at a real separator\n\t\t   — never on the escaped space, which is inside an ident ",
 				"start": 212,
-				"end": 296
+				"end": 367
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 403,
-			"styles": "\n\tdiv {\n\t\t/* 100 chars: fits exactly, stays inline (the escaped space is content, not a wrap point) */\n\t\tgrid-template-areas: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd xxxxx\\ yyyyy;\n\n\t\t/* 101 chars: must break — but NOT on the escaped space, which is inside an ident */\n\t\tgrid-template-areas: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd\n\t\t\txxxxx\\ yyyyy;\n\t}\n",
+			"end": 500,
+			"styles": "\n\tdiv {\n\t\t/* 100 chars: fits exactly, stays inline (the escaped space is content, not a wrap point) */\n\t\tgrid-template-areas: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd xxxxx\\ yyyyy;\n\n\t\t/* over the width: the value wraps into rows beneath the colon, breaking at a real separator\n\t\t   — never on the escaped space, which is inside an ident */\n\t\tgrid-template-areas:\n\t\t\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd\n\t\t\txxxxx\\ yyyyy;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 412,
+	"end": 509,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
