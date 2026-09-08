@@ -692,7 +692,23 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// the whole gates view: these four files are the ONLY ones that change bucket in any
 	// language, and `partial` / `safety` / `errors` / `expected_errors` are identical
 	// file-for-file, `typescript` and `svelte` unmoved in every bucket.
-	css: 14
+	//
+	// 14 → 15: `parens/parens.css` ARRIVES from `partial` (`partial` 9 → 8) — an improving
+	// move that reads as the opposite. The file's one explained hunk was `css_value_wrap` /
+	// `fill_101_boundary`: tsv wrapped its 181-column `filter: progid:…Shadow(…) progid:…`
+	// value where prettier's `value-unknown` arm freezes any value starting with `progid:`.
+	// tsv now takes the same opaque class (`progid_opaque_value` in `declarations.rs`, a
+	// verbatim source slice — no normalization, no wrap; cataloged in
+	// conformance_prettier_css.md §CSS: Values, "`progid:` opaque value"), so that hunk is
+	// GONE and the file is left with its five pre-existing unexplained hunks (the
+	// `1 * 1 (1) * 1` operator respacing, `round(1.5) / 2`, `func(+20px, + 20px)`, the
+	// `'test'+1` string-arithmetic family, `"("attr(title)")"`) — zero explained, so it
+	// classifies `unknown`. Measured by the ritual's old-binary/new-binary `--all --filter
+	// css --json` bucket-list diff: this file is the ONLY mover in any css bucket, `safety`
+	// / `errors` / `expected_errors` identical file-for-file, `match` unmoved at 141
+	// (`colon/colon.css`, the other `progid:` file, carries nothing the pass would touch),
+	// and the full `--all` run has `typescript` and `svelte` unmoved in every bucket.
+	css: 15
 };
 
 /**
@@ -740,7 +756,11 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// what carries it to `match` (see `CORPUS_FORMAT_UNKNOWN_PIN`); `partial` is unmoved by
 	// that second half, and 22 is re-measured on the merged tree.
 	typescript: 22,
-	css: 9
+	// 9 → 8: `prettier/tests/format/css/parens/parens.css` leaves for `unknown` — its one
+	// explained hunk, the wrapped `progid:` value, is FIXED (tsv freezes the value as
+	// prettier does), leaving the five unexplained hunks it always carried. Reasoning and the
+	// bucket-list diff on `CORPUS_FORMAT_UNKNOWN_PIN`'s `14 → 15` step.
+	css: 8
 };
 
 /**
