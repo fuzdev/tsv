@@ -639,6 +639,17 @@ Spec: `css-grid-1`
   written on different source lines wrap one-per-line; the same values written inline stay
   inline (`grid-template-areas: 'a a' 'b b'`). Matches prettier
   (`comma-separated-value-group.js`)
+- A comment in a multi-row value is a node of the same rule and rides the row its source
+  line puts it on — trailing the last row, ending a row, on a line of its own, opening a
+  row, a run of two, a multi-line comment (which ends the row it opens on); the run that
+  opens the value stays on the colon's line, outside the row decision; `!important`
+  follows the last row; a row never wraps whatever its width. Matches prettier
+  ([grid_template_areas_multirow_comment](../tests/fixtures/css/declarations/grid_template_areas_multirow_comment/));
+  a newline *inside* the opening run is the after-colon whitespace divergence
+  ([grid_template_areas_multirow_comment_run](../tests/fixtures/css/declarations/grid_template_areas_multirow_comment_run_prettier_divergence/))
+- ⚠️ A multi-row value of **tracks** (`grid-template-columns:⏎[a] 1fr⏎[b] 2fr`,
+  `grid:⏎'a' 1fr⏎'b' 2fr / auto`) packs inline where prettier keeps the rows — the
+  multirow class is row strings only; corpus-absent, unpinned
 
 ### Easing Functions
 
