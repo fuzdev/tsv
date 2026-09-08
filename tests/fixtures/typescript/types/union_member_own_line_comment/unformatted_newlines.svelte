@@ -95,4 +95,15 @@
 
 
 		'y';
+
+	// own-line comment before a later member, first member carrying a leading comment —
+	// the relocated comment takes the first member's two-column offset (prettier binds it
+	// to that member as a trailing comment), whether the leading comment sits after the
+	// synthesized pipe or was glued ahead of the union
+	type K = | /* k1 */ 'x' |
+/* k2 */
+		'y';
+	type L = /* l1 */ 'x' |
+
+/* l2 */ 'y';
 </script>

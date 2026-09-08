@@ -552,9 +552,10 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
   agree: it is the half of `types.some((t) => hasComment(t))` the between-member scan cannot
   reach, and without it the unwrap above would hug the paren'd spelling while the bare twin
   expands
-- A block comment **glued ahead of the first member** (`/* c */ { … } | null`, and the
-  leading-operator `| /* c */ { … } | null`) binds to that member and bails the hug in both
-  formatters, at every enclosing seam — the value seams (`:`, `=`, `=>`, the mapped value),
+- A block comment **glued ahead of the first member** (`/* c */ { … } | null`, the
+  leading-operator `| /* c */ { … } | null`, and a block glued to an AUTHORED leading pipe —
+  `/* c */ | { … }`, `/* c */ |⏎{ … }` — which prettier's union span starts at) binds to that
+  member and bails the hug in both formatters, at every enclosing seam — the value seams (`:`, `=`, `=>`, the mapped value),
   the containers (`<`, a tuple's or indexed access's `[`, a paren shell's `(`, `keyof (`), and
   the keywords (`as` / `satisfies`, a type parameter's `extends` / `=`, a conditional's
   `extends` / `?` / `:`, a mapped `in`). The seam hands the run into the union
@@ -563,8 +564,14 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
   `UnionValueDoc::hugged`. Two parent positions keep hugging behind it, as prettier does
   (`UnionLeadingGap::Parent`): the type predicate's `is` and a conditional's check type. A
   block the author *separated* from the member by a newline binds to the union and leaves the
-  hug intact; the seam then hangs it on its own line (`union_hug_gap_block_comment` and its
-  `_container` / `_cast` / `_keyword` siblings, `union_hug_gap_broke_after_block_comment`)
+  hug intact; the seam then hangs it on its own line — in tsv whether or not a leading pipe
+  was authored (prettier reads an own-line block AFTER an authored pipe as the member's, the
+  one open divergence in this family). Two glued shapes keep the hug in both formatters: a
+  MULTI-LINE block ahead of the union's span (`: /* c⏎d */ { … } | null` — the union's, so it
+  stays glued at the seam and, in a union that does not hug, ahead of the first pipe; after an
+  authored pipe it is the member's like any other), and the sole member of a single-member
+  union, which is its member (`union_hug_gap_block_comment` and its `_container` / `_cast` /
+  `_keyword` / `_leading_pipe` / `_multiline` siblings, `union_hug_gap_broke_after_block_comment`)
 
 ### Function Types
 
