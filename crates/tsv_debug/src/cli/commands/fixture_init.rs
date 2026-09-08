@@ -1,12 +1,14 @@
 use crate::cli::CliError;
 use crate::deno;
 use crate::diff::LINE_WIDTH_THRESHOLD;
-use crate::fixtures::{self, InputType, find_input_file};
+use crate::fixtures::{self, GOAL_FILENAME, InputType, find_input_file};
 use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use std::path::Path;
+use tsv_cli::cli::commands::parse::parse_goal_arg;
 use tsv_lang::printing::visual_width;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
+use tsv_ts::Goal;
 
 /// Create or reinitialize a fixture (formats through prettier + generates expected.json).
 ///
@@ -30,6 +32,15 @@ pub struct FixtureInitCommand {
     #[argh(option)]
     content: Option<String>,
 
+    /// parse goal for a TypeScript fixture: script | module. `script` writes the
+    /// `goal` marker and generates expected.json at acorn's `sourceType: 'script'`;
+    /// `module` removes any marker. Either move happens only on a successful
+    /// regeneration of expected.json — on failure the marker is left as it was.
+    /// Omitting the flag keeps the directory's existing marker, and no marker means
+    /// module. Rejected for svelte/css inputs, which have no goal.
+    #[argh(option)]
+    goal: Option<String>,
+
     /// fixture directory path
     #[argh(positional)]
     dir: String,
@@ -46,6 +57,30 @@ impl FixtureInitCommand {
 
         // Determine input type from --parser flag, existing file, or default
         let input_type = resolve_input_type(self.parser.as_deref(), dir)?;
+
+        // The parse goal applies to the TS family only. An explicit --goal
+        // (re)writes the `goal` marker below; without one the fixture keeps
+        // whatever goal its directory already declares, so a bare reinit of a
+        // script fixture regenerates expected.json at the goal it is graded at.
+        let goal_flag = match self.goal {
+            None => None,
+            Some(ref goal_arg) => {
+                if !matches!(input_type, InputType::TypeScript | InputType::SvelteTs) {
+                    eprintln!(
+                        "Error: --goal applies to .ts / .svelte.ts fixtures; svelte <script> is always a module and css has no goal"
+                    );
+                    return Err(CliError::Failed);
+                }
+                match parse_goal_arg(Some(goal_arg)) {
+                    Ok(goal) => Some(goal),
+                    Err(e) => {
+                        eprintln!("Error: {e}");
+                        return Err(CliError::Failed);
+                    }
+                }
+            }
+        };
+        let goal = goal_flag.unwrap_or_else(|| fixtures::read_goal_marker(dir));
 
         // Get content from --content, --stdin, or existing file
         let raw_content = match resolve_content(
@@ -105,29 +140,81 @@ impl FixtureInitCommand {
         print_line_width_summary(&formatted, &self.dir);
 
         // Generate expected.json from canonical parser
-        let parse_result = deno::parse_by_type(&formatted, input_type.parser_type()).await;
+        let parse_result =
+            deno::parse_by_type_with_goal(&formatted, input_type.parser_type(), goal).await;
 
-        match parse_result {
+        let expected_written = match parse_result {
             Ok(ast) => match to_json_with_tabs(&ast) {
                 Ok(json) => {
                     let json_content = format!("{json}\n");
                     let expected_path = dir.join("expected.json");
                     match fixtures::write_file(&expected_path, &json_content) {
-                        Ok(()) => println!("✓ expected.json"),
-                        Err(e) => eprintln!("✗ Failed to write expected.json: {e}"),
+                        Ok(()) => {
+                            println!("✓ expected.json");
+                            true
+                        }
+                        Err(e) => {
+                            eprintln!("✗ Failed to write expected.json: {e}");
+                            false
+                        }
                     }
                 }
                 Err(e) => {
                     eprintln!("⚠ Failed to serialize AST: {e}");
+                    false
                 }
             },
             Err(e) => {
                 eprintln!("⚠ Canonical parse failed (expected for TDD): {e}");
+                false
+            }
+        };
+
+        // The `goal` marker travels with the expected.json it describes:
+        // `Script` writes it, `Module` (the default) is spelled by its absence,
+        // so a reinit that flips the goal drops a stale marker. It moves only
+        // once the parse at that goal has landed — a marker written beside an
+        // expected.json generated at the other goal would be a fixture claiming
+        // two goals at once.
+        if let Some(goal) = goal_flag {
+            if expected_written {
+                if let Err(e) = write_goal_marker(dir, goal) {
+                    eprintln!("Error: {e}");
+                    return Err(CliError::Failed);
+                }
+            } else {
+                eprintln!(
+                    "⚠ {GOAL_FILENAME} left unchanged (expected.json was not regenerated, so the marker would disagree with it)"
+                );
             }
         }
 
         println!("\nFixture initialized: {}", self.dir);
         Ok(())
+    }
+}
+
+/// Write or clear the fixture's `goal` marker.
+///
+/// `Goal::Script` writes the marker (`script`, the spelling the fixture model
+/// reads back); `Goal::Module` is the default goal and is spelled by the
+/// marker's absence, so an existing marker is removed rather than rewritten.
+fn write_goal_marker(dir: &Path, goal: Goal) -> Result<(), String> {
+    let path = fixtures::goal_marker_path(dir);
+    match goal {
+        Goal::Script => {
+            fixtures::write_file(&path, &format!("{}\n", goal.source_type()))?;
+            println!("✓ {GOAL_FILENAME} ({})", goal.source_type());
+            Ok(())
+        }
+        Goal::Module => match std::fs::remove_file(&path) {
+            Ok(()) => {
+                println!("✓ {GOAL_FILENAME} removed (module is the default goal)");
+                Ok(())
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(format!("Failed to remove {}: {e}", path.display())),
+        },
     }
 }
 

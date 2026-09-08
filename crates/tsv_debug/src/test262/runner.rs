@@ -4,6 +4,7 @@
 
 use super::discovery::TestFile;
 use super::frontmatter;
+use std::borrow::Cow;
 use std::fs;
 
 /// Result of running a single test.
@@ -42,6 +43,12 @@ pub enum SkipReason {
     /// Test requires a syntactic proposal tsv does not implement (the named
     /// `features:` entry); see `frontmatter::UNIMPLEMENTED_FEATURES`.
     UnimplementedFeature(&'static str),
+    /// Test carries both `raw` and `onlyStrict`, which contradict each other:
+    /// `raw` forbids any modification of the source, `onlyStrict` is graded
+    /// through the harness's prepended `"use strict"` directive. No such test
+    /// exists in test262 — the bucket is what makes that a checked fact rather
+    /// than an assumption `graded_source` rests on.
+    RawStrictConflict,
 }
 
 /// Summary of test results.
@@ -56,6 +63,7 @@ pub struct TestSummary {
     pub skipped_no_frontmatter: usize,
     pub skipped_sloppy_mode: usize,
     pub skipped_unimplemented_feature: usize,
+    pub skipped_raw_strict_conflict: usize,
     pub skipped_filtered: usize,
     pub failures: Vec<(String, FailureReason)>,
 }
@@ -68,6 +76,7 @@ impl TestSummary {
             + self.skipped_no_frontmatter
             + self.skipped_sloppy_mode
             + self.skipped_unimplemented_feature
+            + self.skipped_raw_strict_conflict
     }
 }
 
@@ -96,6 +105,7 @@ impl TestSummary {
                 SkipReason::NoFrontmatter => self.skipped_no_frontmatter += 1,
                 SkipReason::SloppyModeRequired => self.skipped_sloppy_mode += 1,
                 SkipReason::UnimplementedFeature(_) => self.skipped_unimplemented_feature += 1,
+                SkipReason::RawStrictConflict => self.skipped_raw_strict_conflict += 1,
             },
         }
     }
@@ -130,7 +140,46 @@ enum Classification {
         is_negative_parse: bool,
         /// Whether the test carries `flags: [module]`.
         module: bool,
+        /// Whether the test carries `flags: [onlyStrict]` — it declares a single
+        /// strict run, so the harness's `"use strict"` transform applies
+        /// (`graded_source`).
+        only_strict: bool,
     },
+}
+
+/// The directive test262-harness inserts as the initial character sequence of a
+/// test's source before running it in strict mode
+/// (test262/INTERPRETING.md §Strict Mode). The tests never carry it themselves.
+const USE_STRICT_PREFIX: &str = "\"use strict\";\n";
+
+/// The source tsv grades: the test's file content with test262-harness's
+/// strict-mode transform applied where the harness would apply it.
+///
+/// An `onlyStrict` test declares exactly one run, the strict one, and the
+/// harness produces that run by prepending [`USE_STRICT_PREFIX`] — so the file
+/// alone is not what the suite means by the test. A `module` test is strict by
+/// the goal itself and takes no prefix; so does everything else tsv grades,
+/// which is passed through verbatim (a `raw` test, which forbids any source
+/// modification, is refused by `classify` if it ever declares `onlyStrict`).
+///
+/// The prefix shifts every byte offset by its length and every line number by
+/// one. Nothing here reads a position: `run_test` only formats the parse error
+/// into a human-facing failure message — which says so, via
+/// [`takes_strict_prefix`] — and `grade_for_manifest` reduces it to a
+/// [`Verdict`], so the shift is display-only.
+fn graded_source(content: &str, module: bool, only_strict: bool) -> Cow<'_, str> {
+    if takes_strict_prefix(module, only_strict) {
+        Cow::Owned(format!("{USE_STRICT_PREFIX}{content}"))
+    } else {
+        Cow::Borrowed(content)
+    }
+}
+
+/// Whether the graded source carries [`USE_STRICT_PREFIX`]: an `onlyStrict` test
+/// at script goal is the one shape the harness prepends it to. Spelled once, so
+/// `graded_source` and the failure message that reports the line shift agree.
+fn takes_strict_prefix(module: bool, only_strict: bool) -> bool {
+    only_strict && !module
 }
 
 /// `raw` tests (`flags: [raw]`) whose parse verdict genuinely depends on sloppy
@@ -195,9 +244,17 @@ fn classify(relative_path: &str, content: &str) -> Classification {
     if frontmatter.requires_sloppy_mode() || is_sloppy_only_raw(&frontmatter, relative_path) {
         return Classification::Skip(SkipReason::SloppyModeRequired);
     }
+    // `raw` and `onlyStrict` are contradictory — the first forbids modifying the
+    // source, the second is graded through the harness's prepended directive — so
+    // there is no source to grade honestly. test262 carries no such test; refusing
+    // it here is what lets `graded_source` prepend on `onlyStrict` alone.
+    if frontmatter.is_raw() && frontmatter.requires_strict_mode() {
+        return Classification::Skip(SkipReason::RawStrictConflict);
+    }
     Classification::Grade {
         is_negative_parse: frontmatter.is_negative_parse(),
         module: frontmatter.is_module(),
+        only_strict: frontmatter.requires_strict_mode(),
     }
 }
 
@@ -232,8 +289,14 @@ pub fn run_test(test: &TestFile) -> (TestResult, Option<bool>) {
         Classification::Grade {
             is_negative_parse,
             module,
+            only_strict,
         } => (
-            run_parse_test(&content, is_negative_parse, goal_for(module)),
+            run_parse_test(
+                &graded_source(&content, module, only_strict),
+                is_negative_parse,
+                goal_for(module),
+                takes_strict_prefix(module, only_strict),
+            ),
             Some(is_negative_parse),
         ),
     }
@@ -267,9 +330,11 @@ pub struct ManifestEntry {
     /// and the consumer mirrors that goal in the alternative parser — so an
     /// `await`-as-identifier script test lands in `both-accept`, not `both-reject`.
     pub module: bool,
-    /// Always `true` for the graded subset — tsv is strict under both goals and
-    /// skips sloppy tests (`noStrict`, and the sloppy-by-content `raw` test).
-    /// Emitted for transparency / future flexibility.
+    /// Whether the graded parse is a strict-mode one *by the test's own
+    /// declaration*: `module` (strict by the goal) or `onlyStrict` (strict by
+    /// the harness's prepended `"use strict"` — see `graded_source`). A consumer
+    /// reproducing tsv's parse applies the same directive when this is `true`
+    /// and `module` is `false`.
     pub strict: bool,
     /// What test262 expects: `accept` for positives, `reject` for parse negatives.
     pub expected: Verdict,
@@ -311,6 +376,7 @@ pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
     let Classification::Grade {
         is_negative_parse,
         module,
+        only_strict,
     } = classify(&test.relative_path, &content)
     else {
         return None;
@@ -321,8 +387,9 @@ pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
     } else {
         Verdict::Accept
     };
+    let source = graded_source(&content, module, only_strict);
     let arena = bumpalo::Bump::new();
-    let tsv = match tsv_ts::parse_with_goal(&content, goal_for(module), &arena) {
+    let tsv = match tsv_ts::parse_with_goal(&source, goal_for(module), &arena) {
         Ok(_) => Verdict::Accept,
         Err(_) => Verdict::Reject,
     };
@@ -330,14 +397,25 @@ pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
     Some(ManifestEntry {
         relative_path: test.relative_path.clone(),
         module,
-        strict: true,
+        strict: module || only_strict,
         expected,
         tsv,
     })
 }
 
 /// Run a parse test and return the result.
-fn run_parse_test(content: &str, is_negative_parse: bool, goal: tsv_ts::Goal) -> TestResult {
+///
+/// `strict_prefixed` says whether `content` carries the harness's
+/// [`USE_STRICT_PREFIX`]. Every position the rendered parse error carries — the
+/// byte `position` and the `line_number` in its context — counts from the start
+/// of that source rather than the file's, so the failure message names both
+/// shifts.
+fn run_parse_test(
+    content: &str,
+    is_negative_parse: bool,
+    goal: tsv_ts::Goal,
+    strict_prefixed: bool,
+) -> TestResult {
     // Try to parse the content as TypeScript/JS at the test's goal.
     // Note: test262 tests are pure ECMAScript, so we parse as TypeScript
     // (which is a superset of JS)
@@ -350,7 +428,20 @@ fn run_parse_test(content: &str, is_negative_parse: bool, goal: tsv_ts::Goal) ->
 
         // Positive test failed: should have parsed but didn't
         (Err(error), false) => {
-            TestResult::Failed(FailureReason::UnexpectedParseError(format!("{error:?}")))
+            let note = if strict_prefixed {
+                // The prefix is one line and `USE_STRICT_PREFIX.len()` bytes, so
+                // every position in the render is off the file's by exactly that.
+                Cow::Owned(format!(
+                    " (source graded with the `\"use strict\";` prefix: `position` is +{} \
+                     bytes and `line_number` +1 against the file)",
+                    USE_STRICT_PREFIX.len()
+                ))
+            } else {
+                Cow::Borrowed("")
+            };
+            TestResult::Failed(FailureReason::UnexpectedParseError(format!(
+                "{error:?}{note}"
+            )))
         }
 
         // Negative test passed: failed to parse as expected
@@ -453,5 +544,61 @@ mod tests {
             classify("test/x.js", no_strict),
             Classification::Skip(SkipReason::SloppyModeRequired)
         ));
+    }
+
+    /// `onlyStrict` reaches the graded classification, so the harness's
+    /// strict-mode transform can be applied to it.
+    #[test]
+    fn classify_reports_only_strict() {
+        let only_strict = "/*---\nflags: [onlyStrict]\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", only_strict),
+            Classification::Grade {
+                only_strict: true,
+                module: false,
+                ..
+            }
+        ));
+
+        let plain = "/*---\nesid: sec-example\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", plain),
+            Classification::Grade {
+                only_strict: false,
+                ..
+            }
+        ));
+    }
+
+    /// `raw` and `onlyStrict` contradict each other, so such a test is refused
+    /// rather than graded against a source neither flag sanctions.
+    #[test]
+    fn classify_skips_raw_with_only_strict() {
+        let conflict = "/*---\nflags: [raw, onlyStrict]\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", conflict),
+            Classification::Skip(SkipReason::RawStrictConflict)
+        ));
+
+        // Either flag alone still grades.
+        let raw_only = "/*---\nflags: [raw]\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", raw_only),
+            Classification::Grade { .. }
+        ));
+    }
+
+    /// The directive is prepended for `onlyStrict` only — a `module` test is
+    /// strict by its goal, and everything else is graded verbatim.
+    #[test]
+    fn graded_source_prefixes_only_strict() {
+        let content = "var x = 1;\n";
+        assert_eq!(
+            graded_source(content, false, true),
+            format!("\"use strict\";\n{content}")
+        );
+        assert_eq!(graded_source(content, false, false), content);
+        assert_eq!(graded_source(content, true, false), content);
+        assert_eq!(graded_source(content, true, true), content);
     }
 }

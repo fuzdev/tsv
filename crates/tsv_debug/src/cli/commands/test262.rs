@@ -259,13 +259,38 @@ impl Test262Command {
             summary.negative_passed, summary.negative_failed
         );
         if summary.skipped() > 0 {
+            // Every reason `TestSummary::skipped` sums, so the parts always add up
+            // to the total; a reason that never fired is dropped rather than
+            // printed as a zero, so the line names only what actually happened.
+            let reasons: Vec<String> = [
+                ("sloppy mode", summary.skipped_sloppy_mode),
+                (
+                    "unimplemented feature",
+                    summary.skipped_unimplemented_feature,
+                ),
+                ("runtime", summary.skipped_runtime),
+                ("resolution", summary.skipped_resolution),
+                ("no frontmatter", summary.skipped_no_frontmatter),
+                ("raw + onlyStrict", summary.skipped_raw_strict_conflict),
+            ]
+            .into_iter()
+            .filter(|&(_, count)| count > 0)
+            .map(|(label, count)| format!("{label}: {count}"))
+            .collect();
             println!(
-                "  Skipped:        {} (sloppy mode: {}, unimplemented feature: {}, runtime: {}, resolution: {})",
+                "  Skipped:        {} ({})",
                 summary.skipped(),
-                summary.skipped_sloppy_mode,
-                summary.skipped_unimplemented_feature,
-                summary.skipped_runtime,
-                summary.skipped_resolution,
+                reasons.join(", ")
+            );
+        }
+        // Contradictory `raw` + `onlyStrict` metadata: no test262 test carries it,
+        // so this is silent unless the suite changes shape under us. The count also
+        // rides the `Skipped:` parenthetical above so that line sums; this one is the
+        // loud signal, deliberately repeated.
+        if summary.skipped_raw_strict_conflict > 0 {
+            println!(
+                "  ⚠ {} test(s) skipped for contradictory `raw` + `onlyStrict` flags",
+                summary.skipped_raw_strict_conflict
             );
         }
         println!();

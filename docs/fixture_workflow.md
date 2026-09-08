@@ -113,7 +113,24 @@ EOF
 cargo run -p tsv_debug fixture_init tests/fixtures/.../name   # reformat existing input
 ```
 
-Options: `--parser typescript|css|svelte-ts` (default: svelte; `ts` and `svelte.ts` are accepted aliases), `--force` (overwrite existing).
+Options: `--parser typescript|css|svelte-ts` (default: svelte; `ts` and `svelte.ts` are accepted aliases), `--force` (overwrite existing), `--goal script|module`.
+
+`--goal script` builds a **standalone-script** fixture: it writes the `goal` marker and
+generates `expected.json` from acorn at `sourceType: 'script'`, so `await` is an ordinary
+identifier and `import`/`export`/`import.meta` are syntax errors — the two sides of the
+fixture then agree on the goal it is graded at. It applies to `.ts` / `.svelte.ts` inputs
+only (Svelte `<script>` is always a module, CSS has no goal); `--goal module` removes any
+marker. Either move lands only on a successful regeneration of `expected.json` — on
+failure the marker is left as it was, so it never describes a file generated at the other
+goal. With no `--goal` the directory's existing marker is kept, and no marker means
+module — so a bare reinit of a script fixture regenerates `expected.json` at script goal.
+See [fixture_naming.md](./fixture_naming.md#the-goal-marker) and
+[fixture_overview.md](./fixture_overview.md).
+
+```bash
+cargo run -p tsv_debug fixture_init tests/fixtures/typescript/script_goal/name \
+  --parser typescript --goal script --content 'const await = 1;'
+```
 
 After running, **read the generated `input.svelte`** to verify structure. For `long` fixtures, **check the line widths in the output** — do not estimate widths manually.
 

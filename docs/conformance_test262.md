@@ -22,7 +22,7 @@ discovered tests (46,544 graded after skips).
 - **Overall**: 43,977/46,544 (94.5%)
 - **Positive pass rate**: 100% — every test tsv grades and that should parse does,
   graded at each test's declared goal (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
-- **Skipped**: 2,592 (sloppy mode: 2,520, unimplemented feature: 0, runtime: 38, resolution: 34)
+- **Skipped**: 2,592 (sloppy mode: 2,520, runtime: 38, resolution: 34)
 
 The remaining negative failures are early-error *under-enforcement* (programs that
 parse under the syntactic grammar but the spec rejects semantically — duplicate
@@ -236,6 +236,10 @@ entity name (`A.B.C`): a string/number/empty reference (`import x = 'foo'`,
   octal) — is skipped, like `noStrict`. That list (`SLOPPY_ONLY_RAW_TESTS` in
   `crates/tsv_debug/src/test262/runner.rs`) is currently the single
   `language/comments/hashbang/use-strict.js`
+- `flags: [raw]` together with `flags: [onlyStrict]` - contradictory metadata (a raw
+  test forbids the source modification the strict run needs), refused as a counted skip
+  rather than graded under either reading; no test in the pinned checkout carries it, so
+  the count is a tripwire for the suite changing shape
 - `features:` naming an **unimplemented syntactic proposal** - skipped in both
   polarities so the score reflects conformance on syntax tsv aims to support, not
   unimplemented scope. The skip set lives in
@@ -365,7 +369,7 @@ Processing: 49136/49136
 Results:
   Positive tests: 42113 passed, 0 failed
   Negative tests: 1864 passed, 2567 failed
-  Skipped:        2592 (sloppy mode: 2520, unimplemented feature: 0, runtime: 38, resolution: 34)
+  Skipped:        2592 (sloppy mode: 2520, runtime: 38, resolution: 34)
 
 Pass rate: 43977/46544 (94.5%)
 ```
@@ -412,6 +416,18 @@ test that is sloppy *by content* — `hashbang/use-strict.js`, whose `#!` turns
 `"use strict"` into a comment, leaving a sloppy `with` — is out of scope for the same
 reason `noStrict` is, so it is skipped (sloppy-mode bucket), not graded as a failure.
 
+**A `flags: [onlyStrict]` test is graded through the harness's own transform.** Such a
+test declares a single run, the strict one, and test262-harness produces it by inserting
+`"use strict";\n` as the initial character sequence of the source
+(test262/INTERPRETING.md §Strict Mode) — the tests never carry the directive themselves.
+The runner prepends the same string (`graded_source` in
+`crates/tsv_debug/src/test262/runner.rs`), so what tsv parses is what the suite means by
+the test rather than the file alone. A `module` test is strict by its goal and takes no
+prefix; `raw`, which forbids any source modification, never co-occurs with `onlyStrict` —
+a test declaring both is refused rather than graded, so the runner never modifies a raw
+source. The differential consumer applies the same prefix, keyed on the manifest's
+`strict` and `module` fields, so both parsers see the same source.
+
 **Strict and the *goal* symbol are orthogonal axes** (ECMAScript §11.2.2): a parse
 runs against either `Goal::Module` or `Goal::Script`, both strict. tsv exposes this
 as `tsv_ts::parse_with_goal` (and `tsv parse|format --goal script|module`),
@@ -447,7 +463,8 @@ each verdict against [oxc-parser](https://github.com/oxc-project/oxc):
 
 ```bash
 # 1. Rust emits the manifest: one row per graded test (relative path, module
-#    flag, expected verdict, tsv verdict). Honors the same path filters.
+#    flag, strict flag, expected verdict, tsv verdict). Honors the same path
+#    filters.
 cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json
 
 # 2. Deno consumer runs oxc-parser over the same files at each test's goal
@@ -464,20 +481,26 @@ oxc-parser is the alternative with a real, gradable accept/reject verdict
 format/lint), so it has no verdict to grade; it stays a *formatter* subject in
 the bench, not here.
 
-**Fairness — same subset, same goal.** The consumer runs oxc over *only* the
-tests tsv grades (the strict, non-sloppy, parse-phase subset), parsing each at the
-**same goal tsv grades it at** (`module`-flagged → `sourceType: 'module'`, else
-`'script'`) — so the two sides agree on the goal axis. One caveat: oxc's `'script'`
-is **sloppy** while tsv's `Goal::Script` is strict, so a *sloppy-by-content* script
-would show up as a positive "tsv rejects, oxc accepts" candidate even though it's a
-sanctioned strict-only divergence, not a bug. The one known such test
+**Fairness — same subset, same goal, same source.** The consumer runs oxc over
+*only* the tests tsv grades (the strict, non-sloppy, parse-phase subset), parsing
+each at the **same goal tsv grades it at** (`module`-flagged →
+`sourceType: 'module'`, else `'script'`) and from the **same source** — a row the
+manifest marks `strict` at script goal is handed over with the harness's
+`"use strict";` prefix, exactly as the runner grades it. Strictness is not carried
+by the goal here: oxc's `'script'` is **sloppy** while tsv's `Goal::Script` is
+strict, and the prefix is what closes that gap on the rows that carry it. The
+residual caveat is the rows that are neither `module` nor `strict` — sloppy for
+oxc, strict for tsv — where a *sloppy-by-content* script would show up as a
+positive "tsv rejects, oxc accepts" candidate even though it's a sanctioned
+strict-only divergence, not a bug. The one known such test
 (`hashbang/use-strict.js` — see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
 is skipped before grading, so it never enters the manifest; any future sloppy-by-content
 script would surface here and want the same treatment. The two
 actionable buckets:
 
 - **positives where tsv rejects but oxc accepts** → tsv real-bug candidates (modulo
-  the strict-vs-sloppy-script caveat above)
+  the strict-vs-sloppy-script caveat above, which reaches only the rows that are
+  neither `module` nor `strict`)
 - **negatives where oxc rejects but tsv accepts** → tsv early-error gaps (the
   deferred-diagnostics map; tsv under-enforces early errors by design)
 

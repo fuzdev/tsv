@@ -699,6 +699,20 @@ div {
 
 ---
 
+## The `goal` marker
+
+A fixture directory declares its parse **goal** with a marker file named `goal` whose
+content is the goal's name — in practice `script`, since `module` is the default and is
+spelled by the marker's absence. It is valid on `.ts` / `.svelte.ts` fixtures only: Svelte
+`<script>` is always a module and CSS has no goal. The in-tree examples live under
+`tests/fixtures/typescript/script_goal/`.
+
+What the marker means for grading, and the rule that rejects it elsewhere:
+[fixture_overview.md](./fixture_overview.md). The `--goal` flag that writes it:
+[fixture_workflow.md](./fixture_workflow.md#12-create-with-fixture_init).
+
+---
+
 ## Invalid Syntax File Naming (`input_invalid_*`)
 
 Files testing parser rejection use `input_invalid_<description>.<ext>`.

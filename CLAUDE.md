@@ -182,7 +182,7 @@ All `fixtures:*` tasks accept positional patterns (multiple = OR); `fixtures:val
 
 ```bash
 deno task fixtures:list              # list all fixtures (read-only)
-deno task fixtures:init <dir>        # create/reinit a fixture (alias of `tsv_debug fixture_init`; --content/--stdin/--force)
+deno task fixtures:init <dir>        # create/reinit a fixture (alias of `tsv_debug fixture_init`; --content/--stdin/--force/--goal)
 deno task fixtures:validate          # validate (use during fixture work; --prettier-only skips our parser/formatter)
 deno task fixtures:update            # regenerate expected.json + output_prettier.svelte (source of truth)
 deno task fixtures:update:parsed     # regenerate expected.json only (run when parser changes)
@@ -707,7 +707,9 @@ cargo run -p tsv_debug line_width file.svelte
 ```bash
 # fixture_init - create/reinit a fixture (formats through prettier + generates expected.json)
 cargo run -p tsv_debug fixture_init <dir> --content '<code>'   # or --stdin; bare = reformat existing input
-# Also: --parser <svelte|typescript|css|svelte-ts> (aliases ts, svelte.ts), --force (overwrite)
+# Also: --parser <svelte|typescript|css|svelte-ts> (aliases ts, svelte.ts), --force (overwrite),
+#       --goal <script|module> (.ts/.svelte.ts only: writes the `goal` marker and generates
+#       expected.json at that acorn sourceType; omitted keeps the directory's existing marker)
 
 # fixtures_validate - verify fixtures are correct (CI). --prettier-only skips our parser/formatter.
 # Cross-fixture duplicate detection is skipped when filters are active; a parser mismatch with
