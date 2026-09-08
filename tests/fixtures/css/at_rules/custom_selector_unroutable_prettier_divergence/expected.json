@@ -1,0 +1,99 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 563,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 152,
+				"end": 174,
+				"name": "custom-selector",
+				"prelude": ":--a",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 176,
+				"end": 199,
+				"name": "custom-selector",
+				"prelude": "h1,h2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 375,
+				"end": 403,
+				"name": "custom-selector",
+				"prelude": ":-- h1, h2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 405,
+				"end": 436,
+				"name": "custom-selector",
+				"prelude": ":\\-\\-b h1, h2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 507,
+				"end": 554,
+				"name": "custom-selector",
+				"prelude": ":--c",
+				"block": {
+					"type": "Block",
+					"start": 529,
+					"end": 554,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 533,
+							"end": 550,
+							"property": "expansion",
+							"value": "h1, h2"
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a prelude that is not `:--name` + whitespace + a selector list is kept verbatim:\n\ta name with nothing after it, and a list with no name ",
+				"start": 9,
+				"end": 150
+			},
+			{
+				"type": "CSSComment",
+				"value": " the shortest extension name, `--` itself, is a name like any other, and so is one\n\twhose dashes are escaped (the name is the decoded identifier; the spelling is kept) ",
+				"start": 201,
+				"end": 373
+			},
+			{
+				"type": "CSSComment",
+				"value": " the draft's block form: a bare name, then a declaration block ",
+				"start": 438,
+				"end": 505
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 555,
+			"styles": "\n\t/* a prelude that is not `:--name` + whitespace + a selector list is kept verbatim:\n\ta name with nothing after it, and a list with no name */\n\t@custom-selector :--a;\n\t@custom-selector h1,h2;\n\t/* the shortest extension name, `--` itself, is a name like any other, and so is one\n\twhose dashes are escaped (the name is the decoded identifier; the spelling is kept) */\n\t@custom-selector :-- h1, h2;\n\t@custom-selector :\\-\\-b h1, h2;\n\t/* the draft's block form: a bare name, then a declaration block */\n\t@custom-selector :--c {\n\t\texpansion: h1, h2;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 564,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

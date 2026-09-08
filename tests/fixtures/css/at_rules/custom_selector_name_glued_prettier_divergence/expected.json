@@ -1,0 +1,50 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 227,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 147,
+				"end": 181,
+				"name": "custom-selector",
+				"prelude": ":--a:hover h1,h2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 183,
+				"end": 218,
+				"name": "custom-selector",
+				"prelude": ":--b.class1 h1,h2",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a name with selector tokens glued to it is not `:--name` + whitespace + a list, so\n\tthe prelude is kept as authored, list included ",
+				"start": 9,
+				"end": 145
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 219,
+			"styles": "\n\t/* a name with selector tokens glued to it is not `:--name` + whitespace + a list, so\n\tthe prelude is kept as authored, list included */\n\t@custom-selector :--a:hover h1,h2;\n\t@custom-selector :--b.class1 h1,h2;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 228,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

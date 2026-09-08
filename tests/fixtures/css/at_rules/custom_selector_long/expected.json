@@ -1,0 +1,84 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 842,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 94,
+				"end": 192,
+				"name": "custom-selector",
+				"prelude": ":--aaaaaaaaaaaaaaaaaaaaaaaa .class1, .class2, .class3, .class4, .class5, .class6",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 289,
+				"end": 400,
+				"name": "custom-selector",
+				"prelude": ":--aaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t.class1,\n\t\t.class2,\n\t\t.class3,\n\t\t.class4,\n\t\t.class5,\n\t\t.class6",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 496,
+				"end": 638,
+				"name": "custom-selector",
+				"prelude": ":--a\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t> .bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,\n\t\t.class2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 714,
+				"end": 833,
+				"name": "custom-selector",
+				"prelude": ":--aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\th1,\n\t\th2",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the whole prelude is one group: at 100 chars it stays inline (the `;` counts) ",
+				"start": 9,
+				"end": 92
+			},
+			{
+				"type": "CSSComment",
+				"value": " at 101 every selector goes to its own indented line and the name stays on the head line ",
+				"start": 194,
+				"end": 287
+			},
+			{
+				"type": "CSSComment",
+				"value": " a selector that overflows the broken list breaks at its combinator, indented once more ",
+				"start": 402,
+				"end": 494
+			},
+			{
+				"type": "CSSComment",
+				"value": " a long name alone breaks the list even when each selector is short ",
+				"start": 640,
+				"end": 712
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 834,
+			"styles": "\n\t/* the whole prelude is one group: at 100 chars it stays inline (the `;` counts) */\n\t@custom-selector :--aaaaaaaaaaaaaaaaaaaaaaaa .class1, .class2, .class3, .class4, .class5, .class6;\n\t/* at 101 every selector goes to its own indented line and the name stays on the head line */\n\t@custom-selector :--aaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t.class1,\n\t\t.class2,\n\t\t.class3,\n\t\t.class4,\n\t\t.class5,\n\t\t.class6;\n\t/* a selector that overflows the broken list breaks at its combinator, indented once more */\n\t@custom-selector :--a\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t\t> .bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,\n\t\t.class2;\n\t/* a long name alone breaks the list even when each selector is short */\n\t@custom-selector :--aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\th1,\n\t\th2;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 843,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

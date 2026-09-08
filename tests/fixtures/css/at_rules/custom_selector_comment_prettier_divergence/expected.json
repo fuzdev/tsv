@@ -1,0 +1,124 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 440,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 188,
+				"end": 226,
+				"name": "custom-selector",
+				"prelude": ":--a h1, h2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 228,
+				"end": 266,
+				"name": "custom-selector",
+				"prelude": ":--b  h1, h2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 268,
+				"end": 306,
+				"name": "custom-selector",
+				"prelude": ":--c h1 , h2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 308,
+				"end": 346,
+				"name": "custom-selector",
+				"prelude": ":--d h1,  h2",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 348,
+				"end": 391,
+				"name": "custom-selector",
+				"prelude": ":--e h1  > h2, h3",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 393,
+				"end": 431,
+				"name": "custom-selector",
+				"prelude": ":--f h1, h2",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a comment in the prelude is preserved at every gap, padded by one space on each side:\n\tleading, after the name, before and after a comma, in a combinator gap, and trailing ",
+				"start": 9,
+				"end": 186
+			},
+			{
+				"type": "CSSComment",
+				"value": " c1 ",
+				"start": 205,
+				"end": 213,
+				"position": 0
+			},
+			{
+				"type": "CSSComment",
+				"value": " c2 ",
+				"start": 250,
+				"end": 258,
+				"position": 5
+			},
+			{
+				"type": "CSSComment",
+				"value": " c3 ",
+				"start": 293,
+				"end": 301,
+				"position": 8
+			},
+			{
+				"type": "CSSComment",
+				"value": " c4 ",
+				"start": 334,
+				"end": 342,
+				"position": 9
+			},
+			{
+				"type": "CSSComment",
+				"value": " c5 ",
+				"start": 373,
+				"end": 381,
+				"position": 8
+			},
+			{
+				"type": "CSSComment",
+				"value": " c6 ",
+				"start": 422,
+				"end": 430,
+				"position": 12
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 432,
+			"styles": "\n\t/* a comment in the prelude is preserved at every gap, padded by one space on each side:\n\tleading, after the name, before and after a comma, in a combinator gap, and trailing */\n\t@custom-selector /* c1 */ :--a h1, h2;\n\t@custom-selector :--b /* c2 */ h1, h2;\n\t@custom-selector :--c h1 /* c3 */, h2;\n\t@custom-selector :--d h1, /* c4 */ h2;\n\t@custom-selector :--e h1 /* c5 */ > h2, h3;\n\t@custom-selector :--f h1, h2 /* c6 */;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 441,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

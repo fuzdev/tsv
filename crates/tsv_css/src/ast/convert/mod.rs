@@ -326,6 +326,11 @@ pub(super) fn convert_prelude_to_string<'src>(
         // `span` for fidelity (a bare `@scope` has a zero-width span → `""`), like the
         // sibling raw/condition branches.
         internal::PreludeValue::Selectors { span, .. } => strip_css_comments(span.extract(source)),
+        // `@custom-selector`: the span is the raw reader's, so the routed and the
+        // verbatim-fallback preludes emit the same bytes.
+        internal::PreludeValue::CustomSelector { span, .. } => {
+            strip_css_comments(span.extract(source))
+        }
         internal::PreludeValue::Supports { span, .. } => strip_css_comments(span.extract(source)),
         internal::PreludeValue::Container { span, .. } => strip_css_comments(span.extract(source)),
         internal::PreludeValue::Media { span, .. } => strip_css_comments(span.extract(source)),

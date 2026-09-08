@@ -997,6 +997,107 @@ pub(super) fn parse_scope_prelude<'arena>(
     })
 }
 
+/// Parse a `@custom-selector` prelude into a `PreludeValue::CustomSelector`, or fall back
+/// to the verbatim raw prelude when it is not one.
+///
+/// css-extensions-1: `@custom-selector = @custom-selector <custom-selector> <selector-list> ;`
+/// with `<custom-selector> = <custom-arg>? : <extension-name> [ ( <custom-arg>+# ) ]?` and
+/// "no whitespace between `:` and `<extension-name>`". tsv structures the shape that is
+/// implemented (postcss-preset-env) and that prettier routes: a `:` glued to a `--`-led
+/// ident, a whitespace or comment gap, then a strict `<complex-selector-list>` — the
+/// gap is what separates the name from a list that begins with a pseudo-class, since
+/// `:--x:hover` would otherwise read as one compound. Prettier's arm is the same split
+/// (`params.match(/:--\S+\s+/)`, the rest to `parseSelector`); the `$arg` forms are
+/// draft-only and take the fallback.
+///
+/// The fallback is a **rewind and replay** of the raw reader, not a reconsume: the
+/// selector parser registers the comments it steps over, and a comment registered by an
+/// abandoned parse would print twice (once from the raw `content`, once from the gap
+/// sweep — `rewind_to`'s own contract). Nothing here rejects: an at-rule prelude is
+/// consumed as component values whatever they are (CSS Syntax 3) and `parseCss` stores
+/// any prelude raw, so a name with nothing after it (`@custom-selector :--a;`), a list
+/// with no name, or a list the strict parser rejects is kept verbatim. The span is the
+/// raw reader's in both arms — first token to the terminator — so the wire prelude is the
+/// same bytes either way.
+pub(super) fn parse_custom_selector_prelude<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<PreludeValue<'arena>, ParseError> {
+    // The raw offset the replay restarts from, and the registrations it discards.
+    let prelude_start_raw = parser.current_start;
+    let comments_len = parser.comments.len();
+    let span_start = parser.span_pos(prelude_start_raw);
+
+    if let Some((name, list)) = parse_custom_selector_head_and_list(parser)? {
+        // Trailing gap: `h2 /* c */;` — the selector parser leaves a comment before the
+        // terminator unconsumed (a rule's pre-brace comment is its caller's), so register
+        // it here for the printer's trailing sweep.
+        parser.skip_whitespace_registering_comments()?;
+        if parser.at_prelude_end() {
+            let span = Span {
+                start: span_start,
+                end: parser.span_pos(parser.current_start),
+            };
+            return Ok(PreludeValue::CustomSelector { name, list, span });
+        }
+    }
+
+    parser.rewind_to(prelude_start_raw, comments_len)?;
+    let (content, span) = super::raw::parse_raw_prelude_content(parser, false, false)?;
+    Ok(PreludeValue::Raw { content, span })
+}
+
+/// The structured half of `parse_custom_selector_prelude`: the `:--name`, its gap, and
+/// the list. `None` for any prelude that is not that shape, leaving the parser wherever
+/// the mismatch was found — the caller rewinds.
+fn parse_custom_selector_head_and_list<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<Option<(Span, SelectorList<'arena>)>, ParseError> {
+    // Leading gap: `@custom-selector /* c */ :--a` (the shared name skip in `parse_atrule`
+    // is a plain whitespace skip, so a leading comment is the current token on entry).
+    parser.skip_whitespace_registering_comments()?;
+
+    // `:` glued to a `--`-led identifier. The lexer emits the two as separate tokens, so
+    // the glue is the ident starting at the colon's end. The `--` test reads the DECODED
+    // ident (an `<extension-name>` is "any identifier that starts with two dashes", and an
+    // escape's payload is ident content — `\-\-a` is the name `--a`); the span the printer
+    // emits keeps the author's spelling.
+    if !parser.check(TokenKind::Colon) {
+        return Ok(None);
+    }
+    let name_start = parser.span_pos(parser.current_start);
+    let colon_end = parser.current_end;
+    parser.advance()?;
+    if !parser.check(TokenKind::Identifier)
+        || parser.current_start != colon_end
+        || !parser.current_identifier().starts_with("--")
+    {
+        return Ok(None);
+    }
+    let name = Span {
+        start: name_start,
+        end: parser.span_pos(parser.current_end),
+    };
+    parser.advance()?;
+
+    // The name→list gap must hold whitespace or a comment: the list may open with a
+    // pseudo-class, and `:--x:hover` is one compound, not a name and a list.
+    let before = parser.comments.len();
+    let saw_whitespace = parser.skip_boundary_whitespace_registering_comments()?;
+    if !saw_whitespace && parser.comments.len() == before {
+        return Ok(None);
+    }
+    if parser.at_prelude_end() {
+        return Ok(None);
+    }
+
+    // Strict list (`<selector-list>` — not the forgiving production `:is()` takes): a
+    // list the selector parser rejects is not structured, it is kept as authored.
+    let Ok(list) = parse_complex_selector_list(parser) else {
+        return Ok(None);
+    };
+    Ok(Some((name, list)))
+}
+
 /// Parse an `@import` prelude into structured values.
 ///
 /// CSS Syntax (css-cascade-5 §"Importing Style Sheets"):

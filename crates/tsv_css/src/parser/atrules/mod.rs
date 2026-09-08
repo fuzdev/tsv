@@ -14,8 +14,8 @@ use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
 use self::preludes::{
-    ConditionReader, parse_condition_query, parse_container_prelude, parse_import_prelude,
-    parse_scope_prelude,
+    ConditionReader, parse_condition_query, parse_container_prelude, parse_custom_selector_prelude,
+    parse_import_prelude, parse_scope_prelude,
 };
 use self::raw::parse_raw_prelude_content;
 
@@ -111,6 +111,13 @@ pub(crate) fn parse_atrule<'arena>(
     } else if name_lc == "scope" {
         // Parse @scope prelude as structured selector lists (`PreludeValue::Selectors`).
         parse_scope_prelude(parser)?
+    } else if name_lc == "custom-selector" {
+        // `@custom-selector :--name <selector-list>` — the third prelude reader (the
+        // selector printer), the one standard-CSS at-rule prettier routes to
+        // `parseSelector`. Dispatched on the lowercased name like every at-rule here;
+        // prettier's own test is case-sensitive (a cataloged divergence). Falls back to
+        // the raw prelude internally when the shape does not match.
+        parse_custom_selector_prelude(parser)?
     } else if name_lc == "supports" {
         // Parse @supports prelude as structured conditions (for line-width wrapping)
         let (condition, span) = parse_condition_query(parser, ConditionReader::Value)?;

@@ -458,13 +458,17 @@ Specs: `css-color-3`, `css-color-4`, `css-color-5` (Level 5 is widely shipped)
 > printer), `@import` (a structured head — a url/string opener, `layer()`/`supports()`
 > calls — and one verbatim tail to the prelude end, the media-query list or whatever else
 > the author wrote, value-normalized at print time — its `supports()` argument is a `<supports-condition>`, read and printed by the `@supports`
-> machinery above), and `@scope` (forgiving selector lists).
-> **Raw text**: `@media` — kept verbatim to preserve comments, with the printer locating
-> `and`/`or` boundaries at print time for wrapping. **Raw text** likewise for everything else
-> (`@keyframes`, `@layer`, `@page`, …), since they have no `property: value` / media-query
-> grammar; `@namespace` is the exception that takes a normalizing path. In every case the
-> public AST stays source-verbatim. Full structured parsing (range syntax, media features) may
-> be added for tooling use cases (linting, type checking).
+> machinery above), `@scope` (forgiving selector lists), and `@custom-selector` (the
+> `:--name`, then a strict complex-selector list printed through the selector printer —
+> one group that breaks one selector per line under the name; a prelude of any other shape
+> falls back to the raw text, so a nameless list or a bare name is kept as authored).
+> **Raw text**: `@media` and `@custom-media` — kept verbatim to preserve comments, with the
+> printer locating `and`/`or` boundaries at print time for wrapping. **Raw text** likewise
+> for everything else (`@keyframes`, `@layer`, `@page`, …), since they have no
+> `property: value` / media-query grammar; `@namespace` is the exception that takes a
+> normalizing path. In every case the public AST stays source-verbatim. Full structured
+> parsing (range syntax, media features) may be added for tooling use cases (linting, type
+> checking).
 
 ### Core At-Rules
 
@@ -518,6 +522,8 @@ Spec: `css-anchor-position-1` (Chromium shipped)
 
 - `@starting-style`
 - `@scope`
+- `@custom-media` (css-extensions-1 draft; postcss-preset-env) — the media reader, its `--name` case-preserved
+- `@custom-selector` (css-extensions-1 draft; postcss-preset-env) — `:--name` + a strict selector list, the list normalized and broken as a rule head's is, comments in every gap preserved; the `$arg` forms of the draft's `<custom-selector>` production, a name with tokens glued to it, and a prelude the selector parser rejects stay verbatim
 - `@counter-style`
 - `@font-feature-values`
 - `@font-palette-values`
