@@ -29,6 +29,19 @@ struct MultilinePlan<'v> {
     first_members: Option<&'v [CssValue<'v>]>,
 }
 
+/// How a grid property's multi-row value lays out, decided once — the grid twin of
+/// `MultilinePlan`, and like it, its existence *is* the layout decision:
+/// `grid_multirow_plan` returns `Some` exactly when the value takes one row per line.
+struct GridMultirowPlan<'v> {
+    /// The leading comment run to emit on the colon's line — postcss `raws.between`
+    /// material (`leading_value_comment_run`), outside the row decision entirely.
+    hoisted: Option<Span>,
+    /// The members beneath it, at least two: every row string, and every comment run
+    /// between them, in source order. Which member opens a row is a source question
+    /// (`grid_row_breaks_before`), asked again at emit time.
+    members: &'v [CssValue<'v>],
+}
+
 /// Is this comma-list element the **empty** one — the nothing between two top-level
 /// commas (`transition: a,,b`, `,a`)?
 ///
@@ -253,16 +266,31 @@ impl<'a> Printer<'a> {
         decl: &internal::CssDeclaration<'_>,
         values: &'v [CssValue<'v>],
     ) -> Option<(Span, &'v [CssValue<'v>])> {
-        if !decl.has_block_comment {
-            return None;
-        }
-        let (run, content_start) = self.leading_value_comment_run(decl.value.span())?;
         let CssValue::List {
             values: members, ..
         } = values.first()?
         else {
             return None;
         };
+        self.hoistable_leading_run_of(decl, members)
+    }
+
+    /// The leading comment run of this declaration's value, paired with the `members` at
+    /// or after it — the hoist's two halves, for a value whose space-separated members
+    /// are `members`. `None` when there is nothing to hoist, or when the run's end is not a
+    /// member boundary (`content_members`). The comma list asks for element 0's members
+    /// (`hoistable_leading_run`), the grid multirow for the whole value's.
+    ///
+    /// Gated on the O(1) `has_block_comment`, so a comment-free value never pays the lex.
+    fn hoistable_leading_run_of<'v>(
+        &self,
+        decl: &internal::CssDeclaration<'_>,
+        members: &'v [CssValue<'v>],
+    ) -> Option<(Span, &'v [CssValue<'v>])> {
+        if !decl.has_block_comment {
+            return None;
+        }
+        let (run, content_start) = self.leading_value_comment_run(decl.value.span())?;
         Some((run, Self::content_members(members, content_start)?))
     }
 
@@ -321,9 +349,9 @@ impl<'a> Printer<'a> {
                 d.concat(&[d.text(":"), body])
             }
             CssValue::List { values, .. } => {
-                let fill = self.build_space_fill_doc(values);
-                let d = self.d();
-                d.concat(&[d.text(": "), d.indent(fill)])
+                let parts = self.build_space_fill_parts(values);
+                let fill = self.d().fill(&parts);
+                self.build_space_value_decl_doc(fill)
             }
             // The dispatch in `print_css_declaration` only routes comma/space lists here;
             // fall back to the plain `: value` form rather than panicking, matching the
@@ -384,8 +412,8 @@ impl<'a> Printer<'a> {
         }
 
         // Dispatch to appropriate handler based on value type and formatting needs
-        if self.is_grid_multirow_value(decl) {
-            self.print_decl_grid_multirow(decl);
+        if let Some(plan) = self.grid_multirow_plan(decl) {
+            self.print_decl_grid_multirow(decl, plan);
         } else if let Some(plan) = self.multiline_plan(decl) {
             self.print_decl_multiline(decl, plan);
         } else if matches!(
@@ -410,6 +438,27 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The head of a declaration whose value breaks beneath its colon: the `:`, the hoisted
+    /// leading comment run if any, and the newline — `prop:⏎` or `prop: /* c */⏎`.
+    ///
+    /// Shared by the broken comma list (`print_decl_multiline`) and the grid multirow
+    /// (`print_decl_grid_multirow`), so the two spell the hoist one way. The run is
+    /// `raws.between` material: it stays on the colon's line and the value breaks beneath
+    /// it. Whitespace normalization only, so a run of comments is joined single-spaced —
+    /// deliberately NOT the value seam (`normalize_value_with_comments`) the comment-bearing
+    /// paths take, because the run is between-material rather than value content and holds
+    /// nothing but comments and the gaps between them. The value's own members print from
+    /// the AST beneath, where every value-level rule already runs.
+    fn write_broken_value_head(&mut self, hoisted: Option<Span>) {
+        self.write(":");
+        if let Some(run) = hoisted {
+            self.write(" ");
+            let text = value_normalization::normalize_css_whitespace(run.extract(self.source));
+            self.write(&text);
+        }
+        self.write("\n");
+    }
+
     /// Print declaration with multiline formatting, per the layout `multiline_plan`
     /// already decided.
     fn print_decl_multiline<'v>(
@@ -417,20 +466,7 @@ impl<'a> Printer<'a> {
         decl: &'v internal::CssDeclaration<'v>,
         plan: MultilinePlan<'v>,
     ) {
-        self.write(":");
-        // A leading comment run is `raws.between` material, so it stays on the colon's
-        // line and the value breaks beneath it. Whitespace normalization only, so a run of
-        // them is joined single-spaced — deliberately NOT the value seam
-        // (`normalize_value_with_comments`) the comment-bearing paths take, because this run
-        // is between-material rather than value content and holds nothing but comments and
-        // the gaps between them. The value's own members print from the AST below, where
-        // every value-level rule already runs.
-        if let Some(run) = plan.hoisted {
-            self.write(" ");
-            let text = value_normalization::normalize_css_whitespace(run.extract(self.source));
-            self.write(&text);
-        }
-        self.write("\n");
+        self.write_broken_value_head(plan.hoisted);
         self.indent_level += 1;
         self.print_css_value_multiline(&decl.value, plan.first_members);
         self.indent_level -= 1;
@@ -553,7 +589,7 @@ impl<'a> Printer<'a> {
     /// CSS value comments aren't in the AST, so the value is re-emitted from its normalized
     /// source text (`extract_value_with_comments`) — but as a **fill over its space-separated
     /// parts**, not one write, so it wraps at the print width the way its comment-free twin
-    /// does (`build_space_fill_doc`: `: ` literal, `indent(fill)`, the `;` reserved). Every
+    /// does (`build_space_value_decl_doc`: `: ` + `indent(fill)`, the `;` reserved). Every
     /// part is a fill item, a comment included: a trailing comment wraps onto the continuation
     /// by itself, and a **leading** run (`prop: /* c */ word`) parts from the first word when
     /// the head does not fit — where prettier, which holds that run in postcss `raws.between`
@@ -576,17 +612,9 @@ impl<'a> Printer<'a> {
             let doc = self.build_comma_fill_doc_from_text(&normalized);
             self.write_arena_doc(doc);
         } else {
-            self.write(": ");
             let parts = value_normalization::split_by_space_preserving_parens(&normalized);
-            let doc = {
-                let d = self.d();
-                // The `;` rides the fill's own last item, as in `build_space_fill_doc`.
-                let fill = d.with_context(
-                    self.build_fill_doc_from_strings(&parts),
-                    DocContext::reserving(1),
-                );
-                d.indent(fill)
-            };
+            let fill = self.build_fill_doc_from_strings(&parts);
+            let doc = self.build_space_value_decl_doc(fill);
             self.write_arena_doc(doc);
         }
         self.write_declaration_end(decl);
@@ -711,56 +739,121 @@ impl<'a> Printer<'a> {
         self.write_declaration_end(decl);
     }
 
-    /// Check if this is a grid property with multiple row string values
-    /// where consecutive values are on different source lines.
+    /// This declaration's one-row-per-line grid layout, or `None` when the value prints
+    /// inline like any other.
     ///
-    /// Matches Prettier's source-position-dependent grid formatting
-    /// (comma-separated-value-group.js lines 421-436): if consecutive values
-    /// are on different source lines, wrap each to its own line.
-    /// Properties: `grid-template-areas`, `grid-template*`, `grid`
-    fn is_grid_multirow_value(&self, decl: &internal::CssDeclaration<'_>) -> bool {
+    /// Prettier's source-position-dependent grid formatting
+    /// (`comma-separated-value-group.js` §"Formatting `grid` property"): on `grid` and
+    /// `grid-template*`, two consecutive value nodes whose source **start lines** differ are
+    /// separated by a hardline, otherwise by a space — the one place CSS formatting reads
+    /// the author's line breaks. A comment is a node there, so it takes part in the
+    /// decision like a row string and rides the row its line puts it on; the run that
+    /// *opens* the value is `raws.between` material instead, hoisted to the colon's line
+    /// and outside the decision (`grid-template-areas: /* c */⏎'a' 'b'` stays inline).
+    ///
+    /// tsv takes the rule for a value whose content members are all **row strings** — the
+    /// `grid-template-areas` shape, and the string form of the `grid` shorthand. A value
+    /// mixing tracks and functions (`grid-template-columns:⏎repeat(2, 1fr)⏎auto`) is not
+    /// routed here and packs inline; prettier breaks it too, and widening the class is a
+    /// separate, corpus-measurable change.
+    ///
+    /// The comment members come from the value parser: the whitespace split makes a
+    /// top-level comment run its own `Identifier` member (`split_top_level`'s
+    /// `comment_is_element`), so the rows are readable from the AST plus source
+    /// positions, and the emitter prints them through the same leaf printers the
+    /// comment-free value uses — no text path, and nothing to keep in step with one.
+    fn grid_multirow_plan<'v>(
+        &self,
+        decl: &'v internal::CssDeclaration<'v>,
+    ) -> Option<GridMultirowPlan<'v>> {
         let prop = decl.property;
-        let is_grid_prop = prop == "grid" || prop.starts_with("grid-template");
-        if !is_grid_prop {
-            return false;
+        if !(prop == "grid" || prop.starts_with("grid-template")) {
+            return None;
         }
-        let values = match &decl.value {
-            CssValue::List { values, .. }
-                if values.len() >= 2
-                    && values.iter().all(|v| matches!(v, CssValue::String { .. })) =>
-            {
-                values
-            }
-            _ => return false,
+        let CssValue::List { values, .. } = &decl.value else {
+            return None;
         };
-        // Check source positions: are consecutive values on different lines?
-        let source_bytes = self.source.as_bytes();
-        for pair in values.windows(2) {
-            let end = pair[0].span().end_usize();
-            let start = pair[1].span().start_usize();
-            if end <= start && source_bytes[end..start].contains(&b'\n') {
-                return true;
-            }
+        // An all-comment value has no content to hoist away from and declines the hoist
+        // (`leading_value_comment_run`), so its comments stay members.
+        let hoist = self.hoistable_leading_run_of(decl, values);
+        let members = hoist.map_or(*values, |(_, members)| members);
+        if members.len() < 2 {
+            return None;
         }
-        false
+        // Every content member a row string. A value of nothing but comments qualifies
+        // too: postcss leaves the run in the value when no word follows it (it is
+        // `raws.between` only ahead of one), so prettier's grid rule reads those
+        // comments as nodes and breaks them one per line like rows.
+        if !members
+            .iter()
+            .all(|m| matches!(m, CssValue::String { .. }) || self.is_value_comment_member(m))
+        {
+            return None;
+        }
+        members
+            .windows(2)
+            .any(|pair| self.grid_row_breaks_before(&pair[0], &pair[1]))
+            .then_some(GridMultirowPlan {
+                hoisted: hoist.map(|(run, _)| run),
+                members,
+            })
     }
 
-    /// Print grid property with multiple row strings, one per line
+    /// Is this space-separated list member a comment run — the `Identifier` the value
+    /// parser makes of a top-level `/* … */` (`split_top_level`'s `comment_is_element`)?
+    fn is_value_comment_member(&self, member: &CssValue<'_>) -> bool {
+        matches!(
+            member,
+            CssValue::Identifier { span }
+                if crate::comments::is_comment_start(self.source.as_bytes(), span.start_usize())
+        )
+    }
+
+    /// Does `next` open a new grid row — do the two members' source lines differ?
     ///
-    /// Format: `property:\n\t'row1'\n\t'row2'\n\t'row3';`
-    fn print_decl_grid_multirow(&mut self, decl: &internal::CssDeclaration<'_>) {
-        self.write(":\n");
-        if let CssValue::List { values, .. } = &decl.value {
-            self.indent_level += 1;
-            for (i, val) in values.iter().enumerate() {
-                self.write_indent();
-                self.print_css_value(val);
-                if i < values.len() - 1 {
+    /// Prettier compares the nodes' `source.start.line`, and the line its value tokenizer
+    /// assigns is what decides: the count advances through a **comment**'s interior but not
+    /// through a **string**'s (an escaped-newline continuation, `'a\⏎b'`), so the question
+    /// is whether a newline sits in the gap between the two, or inside `prev` when `prev`
+    /// is a comment — `'a' /* c⏎d */ 'b'` breaks before `'b'`, `'a\⏎b' 'c'` stays inline.
+    fn grid_row_breaks_before(&self, prev: &CssValue<'_>, next: &CssValue<'_>) -> bool {
+        let from = if self.is_value_comment_member(prev) {
+            prev.span().start_usize()
+        } else {
+            prev.span().end_usize()
+        };
+        let to = next.span().start_usize();
+        from <= to && self.source.as_bytes()[from..to].contains(&b'\n')
+    }
+
+    /// Print a grid property's value one row per line, per the layout `grid_multirow_plan`
+    /// already decided.
+    ///
+    /// Format: `property:⏎\trow1⏎\trow2;` — a hoisted comment run stays on the colon's line
+    /// (`property: /* c */⏎\trow1…`, the shape `print_decl_multiline` gives a comma list). A
+    /// row is a line, not a fill: its members are joined by plain spaces and never wrap,
+    /// whatever its width — prettier's rows do not either.
+    fn print_decl_grid_multirow<'v>(
+        &mut self,
+        decl: &'v internal::CssDeclaration<'v>,
+        plan: GridMultirowPlan<'v>,
+    ) {
+        self.write_broken_value_head(plan.hoisted);
+        self.indent_level += 1;
+        let mut prev: Option<&CssValue<'v>> = None;
+        for member in plan.members {
+            match prev {
+                None => self.write_indent(),
+                Some(prev) if self.grid_row_breaks_before(prev, member) => {
                     self.write("\n");
+                    self.write_indent();
                 }
+                Some(_) => self.write(" "),
             }
-            self.indent_level -= 1;
+            self.print_css_value(member);
+            prev = Some(member);
         }
+        self.indent_level -= 1;
         self.write_declaration_end(decl);
     }
 
@@ -895,21 +988,20 @@ impl<'a> Printer<'a> {
         parts
     }
 
-    /// Build a fill doc for space-separated values
+    /// The declaration doc of a space-separated value given its fill: `: ` + `indent(fill)`.
     ///
-    /// Creates a doc that packs values greedily:
-    /// - In flat mode: `item1 item2 item3`
-    /// - When broken: `item1 item2\n  item3 item4\n  item5`
-    ///
-    /// The whole list is the declaration's value, so what follows it is the `;` — one
-    /// column, reserved so the fill breaks rather than letting the terminator push the
-    /// line to 101.
-    fn build_space_fill_doc(&self, values: &[CssValue<'_>]) -> DocId {
+    /// One shape for the AST fill (`print_decl_value_list`) and the text fill the
+    /// comment-bearing value takes (`print_decl_with_comments`), so the two cannot drift.
+    /// The fill packs greedily — flat `item1 item2 item3`, broken `item1 item2⏎\titem3` —
+    /// and the whole list is the declaration's value, so what follows it is the `;`: one
+    /// column, reserved on the fill's last item so it breaks rather than letting the
+    /// terminator push the line to 101. The `: ` is **inside** the doc: when the fill drops
+    /// an over-wide first item to a fresh line (`prop:⏎\titem`) the renderer trims it there,
+    /// where a `: ` written ahead of the doc survived as a trailing space.
+    fn build_space_value_decl_doc(&self, fill: DocId) -> DocId {
         let d = self.d();
-        let parts = self.build_space_fill_parts(values);
-        let context = DocContext::reserving(1);
-        let fill = d.fill(&parts);
-        d.with_context(fill, context)
+        let fill = d.with_context(fill, DocContext::reserving(1));
+        d.concat(&[d.text(": "), d.indent(fill)])
     }
 
     /// Print function arguments from source, preserving comments
