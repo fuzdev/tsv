@@ -107,7 +107,7 @@ fn admissible_group_state(
 ///
 /// The column advance is a cached-width load, never a scan: under the eager
 /// width policy (the arena's `pooled_text_width`) every doc text carries a real
-/// width or the newline sentinel from build time, so only the newline case walks
+/// width or the newline flag from build time, so only the newline case walks
 /// the bytes. `resolve_text()` is still needed to get the actual string for
 /// output — that is the one thing the width slot cannot answer.
 ///
@@ -134,7 +134,7 @@ fn render_text(
     specialize_short_len!(s.len(), [0, 1, 2, 3, 4, 5, 6, 7, 8], output.push_str(s));
     match text.cached_width() {
         CachedWidth::Width(w) => *pos += w as usize, // Common path: no visual_width call
-        CachedWidth::HasNewline => update_pos_for_text_unicode(pos, s),
+        CachedWidth::HasNewline { .. } => update_pos_for_text_unicode(pos, s),
     }
 }
 

@@ -31,7 +31,8 @@ use super::chain_share::ChainShareStore;
 #[cfg(feature = "swallow_check")]
 use super::swallow::swallow_check_enabled;
 use super::types::{
-    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan, TEXT_WIDTH_HAS_NEWLINE,
+    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan,
+    TEXT_WIDTH_FIRST_LINE_MASK, TEXT_WIDTH_NEWLINE_FLAG,
 };
 
 /// Which **prettier operation** a line-flattening walk is emulating.
@@ -724,16 +725,19 @@ pub(super) const LAYOUT_WIDTH_MAX: u32 = u32::MAX - 3;
 /// | this case routed through `cached_width()` too | +0.070% | 2,895,445 |
 ///
 /// The single-seam shapes are the tidier ones and both cost instructions on the
-/// hottest fill on the board, so the duplicate decode stays — it is one
-/// comparison against the ONE sentinel this type has, and the policy that keeps
-/// it at one is on [`pooled_text_width`].
+/// hottest fill on the board, so the duplicate decode stays — it is one test
+/// of the ONE flag this type has, and the policy that keeps it at one is on
+/// [`pooled_text_width`].
 #[inline]
 fn text_subtree_layout(t: &DocText) -> u32 {
     match t {
-        DocText::VerbatimSpan(_, w) => match *w {
-            TEXT_WIDTH_HAS_NEWLINE => LAYOUT_BREAKS_SOFT,
-            w => u32::from(w),
-        },
+        DocText::VerbatimSpan(_, w) => {
+            if *w & TEXT_WIDTH_NEWLINE_FLAG == 0 {
+                u32::from(*w)
+            } else {
+                LAYOUT_BREAKS_SOFT
+            }
+        }
         // A newline-bearing Text (a line-continuation string) breaks the
         // enclosing group, like `MultilineText` — the width cache flags it via
         // `HasNewline`, and under the eager `pooled_text_width` policy that flag
@@ -741,7 +745,7 @@ fn text_subtree_layout(t: &DocText) -> u32 {
         // approximating it.
         _ => match t.cached_width() {
             CachedWidth::Width(w) => u32::from(w),
-            CachedWidth::HasNewline => LAYOUT_BREAKS_FORCED,
+            CachedWidth::HasNewline { .. } => LAYOUT_BREAKS_FORCED,
         },
     }
 }
@@ -776,28 +780,36 @@ fn soften_forced_break(v: u32) -> u32 {
     }
 }
 
-/// A measured width, clamped below [`TEXT_WIDTH_HAS_NEWLINE`] — the one spelling
-/// of the clamp every width producer goes through.
+/// A measured width, clamped below [`TEXT_WIDTH_NEWLINE_FLAG`] — the one spelling
+/// of the clamp every width producer goes through, for a single-line width and
+/// for the first-line width a newline-bearing text carries under the flag alike.
 ///
 /// Unlike the `u32` flat-width cache above (where aliasing needs a ~4 GB subtree
 /// and is benign anyway), a `u16` alias is **reachable** — a single-line
-/// non-ASCII text of 65,535 columns — and `as u16` alone would be wrong twice
-/// over: 65,535 aliases [`TEXT_WIDTH_HAS_NEWLINE`] (fits would treat the line as
-/// ending inside the text) and 65,536 or more wraps (a huge text cached as narrow
-/// → "always fits").
+/// non-ASCII text of 32,768 columns — and `as u16` alone would be wrong twice
+/// over: 32,768 sets [`TEXT_WIDTH_NEWLINE_FLAG`] (fits would treat the line as
+/// ending inside the text, after charging a first line of zero) and 65,536 or
+/// more wraps (a huge text cached as narrow → "always fits").
 ///
 /// Clamping is verdict-preserving: every fits comparison is against a print width
-/// orders of magnitude below the clamp, so "65,534" and the true width answer
+/// orders of magnitude below the clamp, so "32,767" and the true width answer
 /// identically. The same holds for the other consumer, `render_text`'s column
 /// advance — the column only feeds threshold comparisons (print width,
 /// `first_line_offset`) far below the clamp, and resets at each newline.
 #[inline]
 const fn clamp_text_width(w: usize) -> u16 {
-    if w >= TEXT_WIDTH_HAS_NEWLINE as usize {
-        TEXT_WIDTH_HAS_NEWLINE - 1
+    if w >= TEXT_WIDTH_FIRST_LINE_MASK as usize {
+        TEXT_WIDTH_FIRST_LINE_MASK
     } else {
         w as u16
     }
+}
+
+/// The slot of a newline-bearing text: [`TEXT_WIDTH_NEWLINE_FLAG`] over its
+/// first line's clamped width.
+#[inline]
+const fn newline_text_width(first_line_width: usize) -> u16 {
+    TEXT_WIDTH_NEWLINE_FLAG | clamp_text_width(first_line_width)
 }
 
 /// The eager width-cache policy for doc text, and it has **no exceptions**:
@@ -805,9 +817,11 @@ const fn clamp_text_width(w: usize) -> u16 {
 /// verbatim source slices ([`DocArena::source_span`], identifier names
 /// included), and `text()` statics (amortized through the arena's static cache
 /// — measured once per unique string, not per node) **always** cache a real
-/// width or the newline sentinel at build. So every width query (the fits
+/// width or the flagged first-line width at build. So every width query (the fits
 /// walk, `render_text`'s column advance) answers from the node alone, the fits
-/// path never borrows the pool, and render's per-text byte scan is skipped.
+/// path never borrows the pool, and render's per-text byte scan is skipped. A
+/// newline-bearing text caches its **first** line's width under the flag
+/// ([`newline_text_width`]) — the one thing the fits walk charges of it.
 ///
 /// ⭐ Identifier names look like the obvious exception — high-frequency and
 /// newline-free — and they are the **wrong** one: a name span is ~15% of all
@@ -833,7 +847,7 @@ const fn clamp_text_width(w: usize) -> u16 {
 /// is deleted rather than kept unreached; re-introducing a deferral means
 /// re-introducing the `source` threading it forces on every fits caller.
 ///
-/// The measured width is clamped below the sentinel by
+/// The measured width is clamped below the flag by
 /// [`clamp_text_width`], which carries that argument.
 ///
 /// ⚠️ **This is the SLICE form, and it is now the minority one.** A text that is
@@ -864,9 +878,10 @@ const fn clamp_text_width(w: usize) -> u16 {
 /// Answers identically to probing `contains('\n')` and then
 /// [`crate::printing::visual_width`]: on an all-ASCII slice the width is
 /// `len + tabs * (TAB_WIDTH - 1)`, which is exactly that function's ASCII fast
-/// path; a `\n` anywhere yields the sentinel the `contains` probe would have;
-/// and the first non-ASCII byte hands the **whole** slice to the grapheme walk,
-/// with a `\n` sitting *after* that byte still found first.
+/// path; a `\n` anywhere yields the flag the `contains` probe would have, over
+/// the width of the text before it; and the first non-ASCII byte hands the
+/// **whole** slice to the grapheme walk, with a `\n` sitting *after* that byte
+/// still found first.
 ///
 /// ⚠️ It mirrors that **ASCII fast path**, where a control character counts as
 /// one column — deliberately *not* `printing::ascii_char_width`, which counts it
@@ -979,8 +994,13 @@ fn source_span_width_invalid(span: Span, source: &str) -> u16 {
 /// to run once.
 /// The non-ASCII arm must still answer the newline question first — a `\n` after
 /// the first non-ASCII byte outranks the width — and it hands
-/// `visual_width_mixed` the **whole** slice, since a grapheme cluster can begin on
-/// the ASCII byte before the one that fired.
+/// `visual_width_mixed` the **whole** slice (or, under a newline, the whole first
+/// line), since a grapheme cluster can begin on the ASCII byte before the one
+/// that fired.
+///
+/// A newline found by the `\n` arm has only ASCII and tabs before it (every
+/// non-ASCII byte is width-relevant and would have been reached first), so the
+/// first line's width is its byte count plus the tabs counted so far.
 #[cold]
 #[inline(never)]
 fn pooled_text_width_cold(s: &str, first: usize) -> u16 {
@@ -989,11 +1009,12 @@ fn pooled_text_width_cold(s: &str, first: usize) -> u16 {
     let mut tabs = 0usize;
     loop {
         match bytes[i] {
-            b'\n' => return TEXT_WIDTH_HAS_NEWLINE,
+            b'\n' => return newline_text_width(i + tabs * (TAB_WIDTH - 1)),
             b'\t' => tabs += 1,
             _ => {
-                return if next_lf(bytes, i) != bytes.len() {
-                    TEXT_WIDTH_HAS_NEWLINE
+                let lf = next_lf(bytes, i);
+                return if lf != bytes.len() {
+                    newline_text_width(visual_width_mixed(&s[..lf], TAB_WIDTH))
                 } else {
                     clamp_text_width(visual_width_mixed(s, TAB_WIDTH))
                 };
@@ -2014,6 +2035,22 @@ impl DocArena {
             self.nodes.borrow()[id.index()],
             DocNode::Line(LineKind::Normal | LineKind::Soft)
         )
+    }
+
+    /// Whether `id` is a **multi-line leaf** — a `Text` holding a newline or a
+    /// `MultilineText`: content whose measured width is its FIRST line's and whose
+    /// last line is where the column actually is once it has rendered. The fill
+    /// renderer asks it of an item that did not fit at line start: such a leaf cannot
+    /// break internally and did not wrap, its first line simply overruns, so the item
+    /// after it is placed by the pair check from the leaf's real end rather than by the
+    /// isolating break a wrapped item takes (`space_separated_multiline_comment_first_line_long`).
+    #[inline]
+    pub(crate) fn is_multiline_leaf(&self, id: DocId) -> bool {
+        match &self.nodes.borrow()[id.index()] {
+            DocNode::Text(t) => matches!(t.cached_width(), CachedWidth::HasNewline { .. }),
+            DocNode::MultilineText { .. } => true,
+            _ => false,
+        }
     }
 
     /// The **breakable atom** `id` contributes to a flow-boundary measurement, if it is one — an
@@ -4062,7 +4099,7 @@ mod prelude_tests {
 
 #[cfg(test)]
 mod pooled_text_width_tests {
-    use super::{TEXT_WIDTH_HAS_NEWLINE, pooled_text_width};
+    use super::{TEXT_WIDTH_FIRST_LINE_MASK, TEXT_WIDTH_NEWLINE_FLAG, pooled_text_width};
     use crate::config::TAB_WIDTH;
     use crate::printing::visual_width;
 
@@ -4077,10 +4114,10 @@ mod pooled_text_width_tests {
     /// diff. Verified: a one-column error in the tab arm is invisible to all of
     /// them and caught only here.
     fn reference(s: &str) -> u16 {
-        if s.contains('\n') {
-            TEXT_WIDTH_HAS_NEWLINE
-        } else {
-            visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_HAS_NEWLINE as usize - 1) as u16
+        let clamp = |w: usize| w.min(TEXT_WIDTH_FIRST_LINE_MASK as usize) as u16;
+        match s.split_once('\n') {
+            Some((first, _)) => TEXT_WIDTH_NEWLINE_FLAG | clamp(visual_width(first, TAB_WIDTH)),
+            None => clamp(visual_width(s, TAB_WIDTH)),
         }
     }
 
@@ -4141,20 +4178,25 @@ mod pooled_text_width_tests {
 
     #[test]
     fn agrees_at_the_clamp_boundary() {
-        // A single-line text wider than the u16 sentinels must clamp, not alias
-        // TEXT_WIDTH_HAS_NEWLINE or wrap.
+        // A single-line text wider than the flag must clamp, not set
+        // TEXT_WIDTH_NEWLINE_FLAG or wrap; a first line that wide clamps under
+        // the flag the same way.
         for len in [
-            TEXT_WIDTH_HAS_NEWLINE as usize - 2,
-            TEXT_WIDTH_HAS_NEWLINE as usize - 1,
-            TEXT_WIDTH_HAS_NEWLINE as usize,
-            TEXT_WIDTH_HAS_NEWLINE as usize + 5,
+            TEXT_WIDTH_NEWLINE_FLAG as usize - 2,
+            TEXT_WIDTH_NEWLINE_FLAG as usize - 1,
+            TEXT_WIDTH_NEWLINE_FLAG as usize,
+            TEXT_WIDTH_NEWLINE_FLAG as usize + 5,
+            u16::MAX as usize + 5,
         ] {
             let ascii = "a".repeat(len);
             assert_agrees(&ascii);
-            assert!(pooled_text_width(&ascii) < TEXT_WIDTH_HAS_NEWLINE);
+            assert!(pooled_text_width(&ascii) & TEXT_WIDTH_NEWLINE_FLAG == 0);
             // Tabs multiply the width, so a far shorter run also clamps.
             let tabs = "\t".repeat(len);
             assert_agrees(&tabs);
+            let first_line = format!("{ascii}\nb");
+            assert_agrees(&first_line);
+            assert!(pooled_text_width(&first_line) & TEXT_WIDTH_NEWLINE_FLAG != 0);
         }
     }
 
@@ -4239,7 +4281,7 @@ mod pooled_text_width_tests {
 /// slice form does not have and no corpus can be trusted to cover: the word loop reads
 /// eight bytes of the *document* at every step, so a `\n` sitting one byte past the span
 /// (the single most common neighbour an identifier has) is in the register when the
-/// verdict is taken. Believing it turns a plain name's width into the newline sentinel,
+/// verdict is taken. Believing it turns a plain name's width into a flagged first-line width,
 /// which changes a fits verdict and nothing else — no fixture, no format diff, no wire
 /// diff can see it. So the neighbour is enumerated here rather than sampled: every class
 /// byte at every distance past the span's end, at every alignment of the span's start.

@@ -761,7 +761,8 @@ impl<'a> Printer<'a> {
                                 // no newline after any gap comment, so the run is
                                 // glued through by construction — computed anyway so
                                 // the two can't drift.
-                                pinned: self.comment_run_glued_through(colon_pos + 1, value_start),
+                                glued_through: self
+                                    .comment_run_glued_through(colon_pos + 1, value_start),
                                 boundary: None,
                                 frozen: value_frozen,
                             },

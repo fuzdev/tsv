@@ -255,8 +255,9 @@ impl<'a> Printer<'a> {
         let rhs_comments = self.build_rhs_comments_glued_opt(effective_rhs_start, rhs_comment_end);
         // A run glued through to the value must not hang it even when a multiline
         // member makes its doc break (`= /* x⏎y */ /* c */ v`) — see
-        // `RhsCommentInfo::pinned`.
-        let rhs_pinned = self.comment_run_glued_through(effective_rhs_start, rhs_comment_end);
+        // `RhsCommentInfo::glued_through`.
+        let rhs_glued_through =
+            self.comment_run_glued_through(effective_rhs_start, rhs_comment_end);
         // The `=`→RHS head: an own-line directive there freezes the whole RHS — including a
         // nested assignment, so a chain freezes from the directive down.
         let rhs_frozen = self.value_head_frozen_span(effective_rhs_start, assign.right.span());
@@ -267,7 +268,7 @@ impl<'a> Printer<'a> {
         let rhs_info = || RhsCommentInfo {
             comments: rhs_comments,
             has_line_comment: rhs_has_line_comment,
-            pinned: rhs_pinned,
+            glued_through: rhs_glued_through,
             boundary: Some(assign.span.end),
             frozen: rhs_frozen,
         };

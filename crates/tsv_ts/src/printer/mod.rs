@@ -56,7 +56,7 @@ use analysis::{
 use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,
     HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
-    MemberGap, MemberSeam, OwnedCommentEffect, RunLeadingBlank, ShellLeadingRun, StandaloneGlue,
+    MemberGap, MemberSeam, RunLeadingBlank, ShellLeadingRun, StandaloneGlue,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 use expressions::assignment::{
@@ -1423,11 +1423,12 @@ impl<'a> Printer<'a> {
     /// `(start, end)` has a newline after it (toward the next comment, or `end` for
     /// the last). Line breaks *inside* a preserved multiline block don't count — the
     /// run still delivers the value on its closing line, so a `will_break` on the
-    /// run's doc is the comment's interior, not an own-line separator. The to-emit
-    /// counterpart of `OwnedCommentEffect::Pins`, feeding `RhsCommentInfo::pinned`:
-    /// prettier keeps such a run on the operator's line
+    /// run's doc is the comment's interior, not an own-line separator. Feeds
+    /// `RhsCommentInfo::glued_through`: prettier does not hang such a run
     /// (`= /* c */ /* x⏎y */ v`, `hasLeadingOwnLineComment` false — it keys on this
-    /// same trailing newline), where a bare `will_break` reading hangs the value.
+    /// same trailing newline), where a bare `will_break` reading hangs the value; the
+    /// width-decided layout then places it by the run's first line, as the fits walk
+    /// charges it.
     ///
     /// **on page**: an owned member of the run (`/* x⏎y */` glued to the value) is
     /// part of the glue geometry even though the gap emits nothing for it.

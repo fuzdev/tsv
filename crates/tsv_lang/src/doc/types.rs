@@ -385,11 +385,25 @@ impl DocContext {
     }
 }
 
-/// Sentinel value for cached_width: text contains a newline. The **only**
-/// sentinel — every doc text carries a real width or this one, so the decode in
+/// The newline flag of a cached text width: set, the text contains a newline and
+/// the low fifteen bits ([`TEXT_WIDTH_FIRST_LINE_MASK`]) hold its **first** line's
+/// visual width; clear, the whole slot is the single-line width. The **only**
+/// flag — every doc text carries one of the two encodings, so the decode in
 /// [`DocText::cached_width`] is total and the fits walk never measures a slice.
-/// Used by fits to early-return without resolving the string.
-pub const TEXT_WIDTH_HAS_NEWLINE: u16 = u16::MAX;
+///
+/// The first line rides in the slot because the fits walk needs it and nothing
+/// else: a newline-bearing text ends the line it is measured on, but what it
+/// puts on that line still has to fit — the same reading
+/// [`super::arena::DocNode::MultilineText`] precomputes as its `first_width`. A bare
+/// sentinel had answered "fits" at the text without charging that line, so a
+/// comment whose first line was over-wide stayed on the line before it. Widths
+/// are clamped below the flag by the arena's `clamp_text_width`, which carries
+/// the argument that the clamp is verdict-preserving.
+pub const TEXT_WIDTH_NEWLINE_FLAG: u16 = 0x8000;
+
+/// The width bits of a cached text width — the whole slot when
+/// [`TEXT_WIDTH_NEWLINE_FLAG`] is clear, the first line's width when it is set.
+pub const TEXT_WIDTH_FIRST_LINE_MASK: u16 = TEXT_WIDTH_NEWLINE_FLAG - 1;
 
 /// A slice into the [`super::arena::DocArena`]'s text pool — the arena-owned `String`
 /// holding every dynamically-built text body ([`DocText::Pooled`],
@@ -419,15 +433,15 @@ impl PoolSpan {
 #[derive(Debug, Clone)]
 pub enum DocText {
     /// Static string literal - no allocation, just stores pointer.
-    /// Second field is the precomputed visual width (a real width or
-    /// [`TEXT_WIDTH_HAS_NEWLINE`]) — amortized through the arena's static width
+    /// Second field is the precomputed visual width (a real width, or the
+    /// first line's under [`TEXT_WIDTH_NEWLINE_FLAG`]) — amortized through the arena's static width
     /// cache, measured once per unique string per arena rather than per node.
     Static(&'static str, u16),
     /// Dynamically generated text, stored in the arena's text pool — the
     /// drop-glue-free replacement for a per-node owned `String`. Resolved
     /// against the pool at render time (like `SourceSpan` against `source`).
     /// Second field is the precomputed visual width — **always** computed at
-    /// build (a real width or [`TEXT_WIDTH_HAS_NEWLINE`]), so the fits walk
+    /// build (a real width, or the first line's under [`TEXT_WIDTH_NEWLINE_FLAG`]), so the fits walk
     /// never needs the pool:
     /// width queries answer from the node alone, and only the render loop
     /// (which borrows the pool once per render) reads the bytes. Pooled text
@@ -436,7 +450,7 @@ pub enum DocText {
     Pooled(PoolSpan, u16),
     /// Verbatim source slice, resolved against `source` at print time. Second
     /// field is the precomputed visual width — always computed at build like
-    /// `Pooled` (a real width or [`TEXT_WIDTH_HAS_NEWLINE`]), identifier and
+    /// `Pooled` (a real width, or the first line's under [`TEXT_WIDTH_NEWLINE_FLAG`]), identifier and
     /// element/attribute names included: the eager policy has no exceptions
     /// (rationale, and the measured cost of the deferral names used to take, on
     /// the arena's `pooled_text_width`). Lets a printer emit
@@ -456,7 +470,7 @@ pub enum DocText {
     /// break the enclosing group must honor — prettier's `printIgnored` output
     /// is a plain string doc its willBreak/propagateBreaks never see, and the
     /// enclosing containers lay out as if the slice were flat. `fits()` is
-    /// unaffected (it keys on the width slot, where the newline sentinel still
+    /// unaffected (it keys on the width slot, where the newline flag still
     /// ends the measured line). Built only via `verbatim_source_span`; genuine
     /// multi-line content (line-continuation strings, `<pre>` text) must stay
     /// [`SourceSpan`](DocText::SourceSpan) so it force-breaks.
@@ -466,10 +480,10 @@ pub enum DocText {
 impl DocText {
     /// Get the cached visual width.
     ///
-    /// Decodes the stored `u16` (a real width or the newline sentinel) into
-    /// [`CachedWidth`], so callers can't mistake [`TEXT_WIDTH_HAS_NEWLINE`] for
-    /// an actual width — every consumer must handle the newline case
-    /// explicitly.
+    /// Decodes the stored `u16` (a real width, or a first-line width under
+    /// [`TEXT_WIDTH_NEWLINE_FLAG`]) into [`CachedWidth`], so callers can't
+    /// mistake a flagged slot for an actual width — every consumer must handle
+    /// the newline case explicitly.
     ///
     /// The decode is **total**: the eager width policy has no exceptions (see
     /// the arena's `pooled_text_width`), so there is no "not measured yet"
@@ -481,10 +495,15 @@ impl DocText {
             DocText::Static(_, w)
             | DocText::Pooled(_, w)
             | DocText::SourceSpan(_, w)
-            | DocText::VerbatimSpan(_, w) => match *w {
-                TEXT_WIDTH_HAS_NEWLINE => CachedWidth::HasNewline,
-                w => CachedWidth::Width(w),
-            },
+            | DocText::VerbatimSpan(_, w) => {
+                if *w & TEXT_WIDTH_NEWLINE_FLAG == 0 {
+                    CachedWidth::Width(*w)
+                } else {
+                    CachedWidth::HasNewline {
+                        first_width: *w & TEXT_WIDTH_FIRST_LINE_MASK,
+                    }
+                }
+            }
         }
     }
 }
@@ -495,8 +514,13 @@ pub enum CachedWidth {
     /// Precomputed single-line visual width.
     Width(u16),
     /// The text contains a newline — there is no single-line width; fits
-    /// treats the line as ending inside this text.
-    HasNewline,
+    /// charges `first_width` (the visual width of the text up to its first
+    /// newline, clamped) to the current line and treats the line as ending
+    /// inside this text.
+    HasNewline {
+        /// Visual width of the first line.
+        first_width: u16,
+    },
 }
 
 /// Resolve DocText to a string, against the document source if provided.

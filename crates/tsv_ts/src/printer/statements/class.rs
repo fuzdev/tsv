@@ -656,7 +656,7 @@ impl<'a> Printer<'a> {
                     RhsCommentInfo {
                         comments: rhs_comments,
                         has_line_comment: false,
-                        pinned: self.comment_run_glued_through(eq_pos + 1, value_start),
+                        glued_through: self.comment_run_glued_through(eq_pos + 1, value_start),
                         boundary: None,
                         frozen: value_frozen,
                     },

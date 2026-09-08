@@ -4,11 +4,11 @@ use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
-    CommentFilter, CommentSpacing, CommentVec, ContinuationValue, LeadingGlue, OwnedCommentEffect,
-    ParenContext, analysis, class_expr_has_decorators, conditional_should_break_after_op,
-    is_curried_arrow_chain, is_curried_arrow_chain_that_breaks, is_module_path_fluid_call,
-    is_multiline_string_literal, is_simple_value, is_type_assertion_call, needs_parens,
-    should_break_after_operator, should_inline_logical_expression,
+    CommentFilter, CommentSpacing, CommentVec, ContinuationValue, LeadingGlue, ParenContext,
+    analysis, class_expr_has_decorators, conditional_should_break_after_op, is_curried_arrow_chain,
+    is_curried_arrow_chain_that_breaks, is_module_path_fluid_call, is_multiline_string_literal,
+    is_simple_value, is_type_assertion_call, needs_parens, should_break_after_operator,
+    should_inline_logical_expression,
 };
 use smallvec::smallvec;
 use std::cell::LazyCell;
@@ -317,9 +317,9 @@ impl<'a> Printer<'a> {
         // glued to its first token and travels inside its doc, so the gap probes
         // above cannot see it. It is still on the page and still decides the `=`
         // layout — this declarator builds its own layout rather than routing
-        // through `build_assignment_layout`, so it applies the rule itself. Both
-        // halves come off one lookup; see `owned_leading_comment_effect`.
-        let owned_comment_effect = self.owned_leading_comment_effect(init);
+        // through `build_assignment_layout`, so it applies the rule itself; see
+        // `owned_leading_comment_hangs`.
+        let owned_comment_hangs = self.owned_leading_comment_hangs(init);
 
         // Every value-keyed hang, gated ONCE on layout eligibility: a value whose own line
         // comments expand it takes the never-break arm instead.
@@ -348,15 +348,9 @@ impl<'a> Printer<'a> {
         // pattern and a curried chain alike, and the twin (`build_assignment_layout`)
         // overrides `BreakLhs` and `Fluid` for it; an arm placed after any of those
         // shadows the rule for exactly that shape (`chain_value_glued_multiline_block_comment`,
-        // `binding_layout_glued_multiline_block_comment`).
-        let owned_comment_hangs = owned_comment_effect == Some(OwnedCommentEffect::Hangs);
-
-        // The other half: a *preserved* multi-line comment the initializer owns
-        // ends the `=` line inside itself, so no width-decided break at `=` is
-        // meaningful and the plain `= value` form is the layout
-        // (`const a = /* line1⏎line2 */ x;`). Without this the fluid branches broke
-        // at `=` on the comment's own `literalline`s.
-        let init_pinned_to_eq = owned_comment_effect == Some(OwnedCommentEffect::Pins);
+        // `binding_layout_glued_multiline_block_comment`). A *preserved* multi-line owned
+        // comment takes no arm: the fluid layout below places it by width, its first line
+        // charged to the `=` line (`preserved_multiline_block_comment_long`).
 
         // Breakable LHS (a destructuring pattern, a typed binding whose type arguments can
         // break): use fluid layout so the printer breaks at `=` before expanding the
@@ -368,7 +362,7 @@ impl<'a> Printer<'a> {
         // those go through needs_break_after_operator with their own layout.
         // In Prettier, shouldBreakAfterOperator() handles those before the canBreak fallback.
         let needs_fluid_for_breakable_lhs =
-            is_layout_eligible && !is_break_after_op_rhs && !init_pinned_to_eq && *can_break_left;
+            is_layout_eligible && !is_break_after_op_rhs && *can_break_left;
 
         // Type assertion calls with LHS type annotation need special fluid handling
         // (handled separately below because they need non-wrapping LHS type)
@@ -514,7 +508,7 @@ impl<'a> Printer<'a> {
             parts.push(d.text(" ="));
             let init_doc = make_init_doc(value());
             parts.push(hang_after_operator(d, init_doc));
-        } else if is_layout_eligible && !is_simple_value(init) && !init_pinned_to_eq {
+        } else if is_layout_eligible && !is_simple_value(init) {
             // Fluid layout (default for layout-eligible values)
             //
             // Matches prettier's chooseLayout default: when no special layout

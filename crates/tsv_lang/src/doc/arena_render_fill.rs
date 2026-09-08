@@ -434,17 +434,34 @@ pub(super) fn render_fill_iterative(
                 // even when the glued head overruns printWidth. Head only: every later item is
                 // separated by real whitespace and keeps the ordinary drop.
                 if is_glued_head(context, offset) {
-                    render_pair(
-                        ctx,
-                        content,
-                        separator,
-                        Mode::Break,
-                        Mode::Break,
-                        output,
-                        pos,
-                        indent,
-                        should_remeasure,
-                    );
+                    if arena.is_multiline_leaf(content) {
+                        // The glued head is a multi-line leaf: in place like any glued
+                        // head, and the item after it placed from the leaf's real end
+                        // (the same rule as the two unfit arms below).
+                        render_item_and_separator_by_fit(
+                            ctx,
+                            content,
+                            separator,
+                            next_content,
+                            output,
+                            pos,
+                            indent,
+                            has_line_suffix,
+                            should_remeasure,
+                        );
+                    } else {
+                        render_pair(
+                            ctx,
+                            content,
+                            separator,
+                            Mode::Break,
+                            Mode::Break,
+                            output,
+                            pos,
+                            indent,
+                            should_remeasure,
+                        );
+                    }
                     offset += 2;
                     continue;
                 }
@@ -454,16 +471,7 @@ pub(super) fn render_fill_iterative(
                 write_indentation(output, indent, render, embed);
                 *pos = line_start_pos;
 
-                if content_fits_at_start {
-                    render_single_doc(
-                        ctx,
-                        content,
-                        output,
-                        pos,
-                        indent,
-                        Mode::Flat,
-                        should_remeasure,
-                    );
+                if content_fits_at_start || arena.is_multiline_leaf(content) {
                     // The dropped item fits intact on its fresh line, so it now sits where an
                     // at-line-start item would, and the separator after it takes that arm's rule:
                     // the pair check, re-measured from the real column — the next item hugs when
@@ -482,19 +490,23 @@ pub(super) fn render_fill_iterative(
                     // §Svelte: Inline content block-style, "a text run flows as one fill"), so the
                     // same-line-authored drop converges with the newline-authored one instead of
                     // one flowing and the other isolating (an F1 break).
-                    let sep_mode = Mode::from_fits(next_fits_after_space(
+                    //
+                    // A multi-line leaf (a comment with a newline inside it) whose FIRST line
+                    // overruns even the fresh line takes the same arm: nothing can shorten it,
+                    // and its last line is where the column really is once it renders, so the
+                    // item after it is placed by that same pair check — the reading the
+                    // multi-line comment divergences claim, "measured from where the text
+                    // actually is". Prettier's whole-string measure isolates the tail instead
+                    // (`space_separated_multiline_comment_first_line_long_prettier_divergence`).
+                    render_item_and_separator_by_fit(
                         ctx,
-                        next_content,
-                        *pos,
-                        has_line_suffix,
-                    ));
-                    render_single_doc(
-                        ctx,
+                        content,
                         separator,
+                        next_content,
                         output,
                         pos,
                         indent,
-                        sep_mode,
+                        has_line_suffix,
                         should_remeasure,
                     );
                 } else {
@@ -510,6 +522,21 @@ pub(super) fn render_fill_iterative(
                         should_remeasure,
                     );
                 }
+            } else if arena.is_multiline_leaf(content) {
+                // The at-line-start twin of the mid-line arm above: the leaf's first line
+                // overruns from the line's own start, and the next item is still placed from
+                // the leaf's real end.
+                render_item_and_separator_by_fit(
+                    ctx,
+                    content,
+                    separator,
+                    next_content,
+                    output,
+                    pos,
+                    indent,
+                    has_line_suffix,
+                    should_remeasure,
+                );
             } else {
                 // Content didn't fit flat at line start; render it (it may break
                 // internally) and break the separator so the next item takes its own
@@ -717,6 +744,50 @@ fn boundary_lookahead(
 #[inline]
 fn is_glued_head(context: &DocContext, offset: usize) -> bool {
     context.glued_lead() && offset == 0
+}
+
+/// Render `content` flat, then its separator by the pair check re-asked from the column the
+/// item actually ended at ([`next_fits_after_space`]): the next item hugs that line when it
+/// fits there and takes its own line otherwise. The rule of every item that renders in place
+/// without wrapping — a dropped item that fits intact on its fresh line, and a multi-line
+/// leaf (`DocArena::is_multiline_leaf`) whose first line overruns wherever it stands, at a
+/// fresh line, at line start, or as the glued head — stated once for its four callers.
+#[expect(clippy::too_many_arguments)]
+fn render_item_and_separator_by_fit(
+    ctx: &RenderCtx<'_>,
+    content: DocId,
+    separator: DocId,
+    next_content: DocId,
+    output: &mut String,
+    pos: &mut usize,
+    indent: RenderIndent,
+    has_line_suffix: bool,
+    should_remeasure: &mut bool,
+) {
+    render_single_doc(
+        ctx,
+        content,
+        output,
+        pos,
+        indent,
+        Mode::Flat,
+        should_remeasure,
+    );
+    let sep_mode = Mode::from_fits(next_fits_after_space(
+        ctx,
+        next_content,
+        *pos,
+        has_line_suffix,
+    ));
+    render_single_doc(
+        ctx,
+        separator,
+        output,
+        pos,
+        indent,
+        sep_mode,
+        should_remeasure,
+    );
 }
 
 /// Does the next fill item fit flat after one space at `pos` — the separator's own width plus

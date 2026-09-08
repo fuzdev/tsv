@@ -1,0 +1,230 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 837,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 173,
+				"end": 340,
+				"name": "media",
+				"prelude": "(min-width: 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999px) and\n\t\t(max-width: 2px)",
+				"block": {
+					"type": "Block",
+					"start": 309,
+					"end": 340,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 313,
+								"end": 316,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 313,
+										"end": 316,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 313,
+														"end": 316
+													}
+												],
+												"start": 313,
+												"end": 316
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 317,
+								"end": 337,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 322,
+										"end": 332,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 313,
+							"end": 337
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 342,
+				"end": 492,
+				"name": "supports",
+				"prelude": "(a: 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999) and\n\t\t(b: c)",
+				"block": {
+					"type": "Block",
+					"start": 461,
+					"end": 492,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 465,
+								"end": 468,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 465,
+										"end": 468,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 465,
+														"end": 468
+													}
+												],
+												"start": 465,
+												"end": 468
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 469,
+								"end": 489,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 474,
+										"end": 484,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 465,
+							"end": 489
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 657,
+				"end": 828,
+				"name": "media",
+				"prelude": "(min-width: 1px)  and (max-width: 2px)",
+				"block": {
+					"type": "Block",
+					"start": 797,
+					"end": 828,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 801,
+								"end": 804,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 801,
+										"end": 804,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 801,
+														"end": 804
+													}
+												],
+												"start": 801,
+												"end": 804
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 805,
+								"end": 825,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 810,
+										"end": 820,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 801,
+							"end": 825
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an over-wide FIRST segment of a single query stays on the at-rule's line — nothing separates\n\t   it from the name — and the wrap lands at the `and` after it ",
+				"start": 9,
+				"end": 171
+			},
+			{
+				"type": "CSSComment",
+				"value": " a multi-line comment ending the first segment: the segment stays on the at-rule's line and\n\t   the segment after it is measured from where the comment ends ",
+				"start": 494,
+				"end": 655
+			},
+			{
+				"type": "CSSComment",
+				"value": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\tb ",
+				"start": 681,
+				"end": 775,
+				"position": 17
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 829,
+			"styles": "\n\t/* an over-wide FIRST segment of a single query stays on the at-rule's line — nothing separates\n\t   it from the name — and the wrap lands at the `and` after it */\n\t@media (min-width: 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999px) and\n\t\t(max-width: 2px) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@supports (a: 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999) and\n\t\t(b: c) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t/* a multi-line comment ending the first segment: the segment stays on the at-rule's line and\n\t   the segment after it is measured from where the comment ends */\n\t@media (min-width: 1px) /* aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\tb */ and (max-width: 2px) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 838,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

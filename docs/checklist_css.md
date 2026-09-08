@@ -74,9 +74,15 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
   so a long property moves it, and a part that drops to a fresh line fills on from there — the
   word a multi-line comment's last line could not hold keeps its tail beside it when the pair
   fits (`space_separated_multiline_comment_wrap_long`), as does a first item too wide for the
-  colon's line. Prettier's differences — the `;` overage, the leading run it glues
-  to the first word and overruns with, and a multi-line comment it measures as one run of text —
-  are cataloged in [conformance_prettier_css.md §CSS: Values](conformance_prettier_css.md#css-values)
+  colon's line. A multi-line comment is measured at both ends from where its text actually is:
+  its first line is charged to the line it starts on, so one that reaches column 100 stays
+  and one column more drops it, and the word after it is placed from its last line — even
+  when the first line overruns the fresh line too, where the fill renders the comment in place
+  rather than isolating the tail (`space_separated_multiline_comment_first_line_long`); a
+  leading comment whose first line overruns drops like any wide first item. Prettier's
+  differences — the `;` overage, the leading run it glues to the first word and overruns
+  with, and a multi-line comment it measures as one run of text — are cataloged in
+  [conformance_prettier_css.md §CSS: Values](conformance_prettier_css.md#css-values)
 - Comments in selectors
 - Comments in `:nth-*()` args — in every position: before the An+B term, **inside** it
   (`:nth-child(2n /* c */ + 1)`, either interior gap of the `['+' | '-'] <signless-integer>`
@@ -512,6 +518,12 @@ Specs: `css-color-3`, `css-color-4`, `css-color-5` (Level 5 is widely shipped)
 ### Conditional Rules
 
 - `@media` with boolean logic (`and`, `or`, `not`)
+- `@media` / `@supports` / `@container` single query past the print width — wrapped at its
+  `and`/`or` boundaries, the FIRST segment always on the at-rule's line however wide (a long
+  feature value, a multi-line comment whose first line overruns): the fill's head is glued to
+  the name, so no fresh-line drop can strand the name's space as trailing whitespace
+  (`prelude_first_segment_long_prettier_divergence`; the wrap itself is `media_long` /
+  `supports_long` / `container_long`)
 - `@media` range syntax (`width >= 768px`)
 - `@supports` (feature queries)
 - `@supports selector()`

@@ -125,6 +125,18 @@ impl<'a> ConditionKind<'a> {
     }
 }
 
+/// The render context of an at-rule prelude's `and`/`or` fill (`@media`, `@supports`,
+/// `@container`): the `;`/`{` reserve, and the head marked **glued** — the at-rule's name and
+/// its space are written ahead of the doc, so nothing in the fill separates the first
+/// segment from them, and the fill's fresh-line drop may not land in front of it. Without
+/// the mark an over-wide first segment (a long feature value, a multi-line comment whose
+/// first line overruns) dropped to its own line and left the name's space stranded as
+/// trailing whitespace (`@media ⏎\t\t(min-width: …`). The head renders in place and the
+/// wrap lands at the `and` after it (`prelude_first_segment_long_prettier_divergence`).
+fn prelude_fill_context(suffix_width: usize) -> DocContext {
+    DocContext::reserving(suffix_width).with_glued_lead(true)
+}
+
 impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
     pub(super) fn print_css_atrule(&mut self, atrule: &internal::CssAtrule<'_>) {
@@ -425,7 +437,7 @@ impl<'a> Printer<'a> {
         }
 
         let fill = d.fill(&fill_parts);
-        let fill = d.with_context(fill, DocContext::reserving(suffix_width));
+        let fill = d.with_context(fill, prelude_fill_context(suffix_width));
         d.indent(fill)
     }
 
@@ -783,7 +795,7 @@ impl<'a> Printer<'a> {
         }
 
         let fill = d.fill(&fill_parts);
-        let fill = d.with_context(fill, DocContext::reserving(suffix_width));
+        let fill = d.with_context(fill, prelude_fill_context(suffix_width));
         d.indent(fill)
     }
 
