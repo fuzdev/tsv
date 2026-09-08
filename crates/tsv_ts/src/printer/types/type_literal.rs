@@ -527,12 +527,27 @@ impl<'a> Printer<'a> {
         // shell's own, and a block there declines the hug at the seam
         // (`build_parenthesized_union_doc` hands a glued run into the union); a
         // synthetic shell has no gap, so the union answers from its span.
-        if let TSType::Union(u) = unwrap_parenthesized(ty)
-            && !outermost_paren(ty).map_or_else(
-                || self.union_prints_hugged(u),
-                |p| self.union_seam_hugs(p.span.start + 1, u),
-            )
-        {
+        // Asked of the EFFECTIVE node ([`Printer::unwrap_redundant_parens`]): a
+        // comment-free one-member union is its member (prettier drops the node), so
+        // `keyof (| A)` has no union to expand and the fall-through prints the leaf bare,
+        // as the pipe-less authoring does (`union_single_member_collapse_long`'s `keyof`
+        // cells), while `(| (A | B))` reaches this builder with the real union and the
+        // outermost shell — one pair for every layer the author nested. The one case the
+        // peel stops short of a leaf is a sole member whose OWN shell carries comments
+        // (`(| (// c⏎Q | R))`): that run is the member shell's, glued to a `(` the collapse
+        // strips and to nothing that survives, so it takes its own line — the one-member
+        // union's arm answers that (`single_member_union_shell_line_comment`), where the
+        // required-pair fall-through would glue it to the outer `(`.
+        let inner = unwrap_parenthesized(ty);
+        let ((_, TSType::Union(u)) | (TSType::Union(u), TSType::Parenthesized(_))) =
+            (inner, self.unwrap_redundant_parens(inner))
+        else {
+            return None;
+        };
+        if !outermost_paren(ty).map_or_else(
+            || self.union_prints_hugged(u),
+            |p| self.union_seam_hugs(p.span.start + 1, u),
+        ) {
             // The real paren node, not `None`: with it the builder emits the shell's own
             // two gaps, so a commented shell takes this expanded layout too. Declining on
             // any comment (what this replaced) sent it to the glued-paren fall-through,

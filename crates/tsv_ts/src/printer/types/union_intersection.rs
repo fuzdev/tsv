@@ -1352,7 +1352,15 @@ impl<'a> Printer<'a> {
         let has_comments = self.has_comments_on_page_between(union.span.start, union.span.end);
         // The first member's leading run exists when the in-span window holds anything
         // OR a run was handed in from outside it.
-        let has_leading_run = has_comments || external_run_start.is_some();
+        // An enclosing gap may own this node's whole transparent head region — a ONE-member
+        // union prints as its member, so its leading-`|` gap is that gap's, not this
+        // builder's (see [`Printer::composite_head_region_claimed`]). Every route below —
+        // the hug's leading run, the multiline route, the collapse's own leading emitter —
+        // stands down under it: the seam's emitter prints that run, and a second copy here
+        // is a DOUBLE-PRINT (docs/comments.md hazard 3).
+        let head_region_claimed = self.composite_head_region_claimed(union.span.start, union.types);
+        let has_leading_run =
+            !head_region_claimed && (has_comments || external_run_start.is_some());
 
         // A single-member union collapses to its member — Prettier drops
         // single-element `TSUnionType`/`TSIntersectionType` nodes in postprocess
@@ -1425,12 +1433,6 @@ impl<'a> Printer<'a> {
         // - Inside a member's parens (`A | (// c\n  B)`) — a retained paren keeps the
         //   comment inside; a redundant one leads its member on its own line. Either way
         //   the comment is a line comment, so the multiline layout is required.
-
-        // An enclosing gap may own this node's whole transparent head region — a ONE-member
-        // union prints as its member, so its leading-`|` gap is that gap's, not this
-        // builder's (see [`Printer::composite_head_region_claimed`]). Both the multiline
-        // route below and the collapse's own leading emitter stand down under it.
-        let head_region_claimed = self.composite_head_region_claimed(union.span.start, union.types);
 
         if has_comments && !head_region_claimed {
             let first_type_start = union.types.first().map(|t| t.span().start);
@@ -2472,7 +2474,13 @@ impl<'a> Printer<'a> {
     /// — but the claim is matched by CONTAINMENT rather than equality, and a claim over a
     /// wider region is the residue that argument does not cover.
     fn first_member_shell_run_claimed(&self, first_member: &TSType<'_>) -> bool {
-        self.head_run_claimed(first_member.span().start, first_member)
+        // The region opens at the member's own `(` and ends at its fully-unwrapped inner
+        // — the shell-side twin of `Printer::composite_head_region_claimed`, which opens
+        // at a transparent composite's dropped operator instead.
+        self.shell_leading_run_claimed(
+            first_member.span().start,
+            unwrap_parenthesized(first_member).span().start,
+        )
     }
 
     /// Emit one intersection member→member gap — the comments before the `&`, the `&`

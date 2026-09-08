@@ -454,7 +454,12 @@ The rule is scoped to **value gaps** (head→value: `=`, `:`, `as`, a keyword). 
 *pre*-separator gap (key→`:`, name→`=`) is governed by the trailing-position corollary in
 [§Comment Position Philosophy](#comment-position-philosophy) instead — its unforced breaks
 collapse the same way, because the comment there trails the head rather than leading the
-value. The two shapes outside this rule are outside it there too: a **line** comment takes
+value, and an authored blank line after the comment yields with them
+(`a /* c */⏎⏎: number` → `a /* c */ : number`; prettier keeps that blank at a parameter
+and a binding and drops it at a class property and a type-literal member — pinned at every
+head→`:` site by
+[key_colon_blank_block_comment](../tests/fixtures/typescript/syntax/comments/key_colon_blank_block_comment_prettier_divergence/)).
+The two shapes outside this rule are outside it there too: a **line** comment takes
 the continuation indent, and a **multiline** block the author **broke after** keeps its
 break — the separator + tail drop to the continuation line (the Pre-separator
 multiline-block entry in [§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)) — so the broke-after

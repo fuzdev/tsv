@@ -16,7 +16,10 @@
 //! - a **plain line comment** converges in one pass to the trailing-prefix form the
 //!   paren-hoist path already produces (`type T = // c⏎⇥{ x: 1 } & b;`) — probe-verified
 //!   stable at the alias AND annotation hosts (the own-line form is only stable at the
-//!   alias, so it cannot be the universal target);
+//!   alias, so it cannot be the universal target). A ONE-member intersection is the
+//!   exception: transparent, its leading gap is the host's own, so each host answers as
+//!   it does for the `&`-less authoring — the alias keeps the own-line form, the
+//!   annotation pulls the comment up to its continuation;
 //! - a **directive** (alone on its line) stays own-line and freezes the first member
 //!   (Rule A) — the own-line directive form is the fixed point both hosts keep.
 //!
@@ -100,12 +103,17 @@ fn compound_leading_and_mid_comment() {
     );
 }
 
-/// Single-member collapse: the member's `&` drops, the comment survives.
+/// Single-member collapse: the member's `&` drops, the comment survives — in the
+/// ENCLOSING seam's own form. A one-member intersection is transparent, so its leading
+/// gap is the `=`→value gap, and an own-line `//` there is the alias's own-line
+/// force-break (`type T =⏎// c⏎{ x: 1 }`), exactly what the `&`-less authoring prints —
+/// not the two-member hoist's trailing-prefix form above, which pass 2 (reading the bare
+/// member) would keep only by accident.
 #[test]
 fn single_member_alias_line_comment() {
     assert_one_pass(
         "type T =\n\t&\n\t// c\n\t{x: 1};\n",
-        "type T = // c\n\t{ x: 1 };\n",
+        "type T =\n\t// c\n\t{ x: 1 };\n",
     );
 }
 

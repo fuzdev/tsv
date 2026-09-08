@@ -580,7 +580,11 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let colon_end = annotation.span.start + 1; // After the `:`
-        let type_start = annotation.type_annotation.span().start;
+        // A transparent one-member composite is its member here, the `|` dropped and its
+        // head gap folded into the `:`→type gap ([`Printer::transparent_value`]); every
+        // read below is of the member.
+        let value = self.transparent_value(annotation.type_annotation);
+        let type_start = value.span().start;
 
         // One window search over the whole annotation gates every comment query below.
         // Each of them — the `:`→type gap, the type-name→type-args gap, and the member
@@ -601,9 +605,7 @@ impl<'a> Printer<'a> {
         // probe to the unwrapped inner's start so the outer paren doesn't hide the comment
         // (build_type_annotation_doc strips the shell and hangs the type; without this the
         // wrapping logic below would relocate the comment non-idempotently).
-        let line_comment_probe_end = self
-            .keyword_value_stripped_paren_hang(annotation.type_annotation)
-            .value_start;
+        let line_comment_probe_end = self.keyword_value_stripped_paren_hang(value).value_start;
         if has_comments && self.has_line_comments_between(colon_end, line_comment_probe_end) {
             return self.build_type_annotation_doc_parens(annotation, parens);
         }
@@ -612,18 +614,13 @@ impl<'a> Printer<'a> {
         // checked before the TypeReference-with-args branch below would rebuild a
         // frozen `Foo<...>` from parts (own-line directives are line comments, already
         // delegated above; composites decline and freeze via their own walk).
-        if has_comments && self.single_child_frozen(colon_end, annotation.type_annotation) {
-            return self.build_simple_type_annotation_doc(
-                colon_end,
-                type_start,
-                annotation.type_annotation,
-                true,
-                parens,
-            );
+        if has_comments && self.single_child_frozen(colon_end, value) {
+            return self
+                .build_simple_type_annotation_doc(colon_end, type_start, value, true, parens);
         }
 
         // Handle TypeReference with type arguments - use wrapping version when appropriate
-        if let TSType::TypeReference(r) = annotation.type_annotation
+        if let TSType::TypeReference(r) = value
             && let Some(type_args) = &r.type_arguments
             && (always_wrap || type_args_should_wrap_for_return_type(type_args))
         {
@@ -654,7 +651,7 @@ impl<'a> Printer<'a> {
         // `(A | B)` / `(A & B)` return type or member type gets the same break
         // layout as the bare form (prettier strips them too). Other parenthesized
         // types keep the existing fall-through below.
-        let value_type = self.unwrap_redundant_parens(annotation.type_annotation);
+        let value_type = self.unwrap_redundant_parens(value);
         let value_type_start = value_type.span().start;
 
         // Union types: hug the `:` when the union prints hugged, else hang after it.
@@ -677,7 +674,7 @@ impl<'a> Printer<'a> {
         self.build_simple_type_annotation_doc(
             colon_end,
             type_start,
-            annotation.type_annotation,
+            value,
             has_comments && self.has_comments_to_emit_between(colon_end, type_start),
             parens,
         )

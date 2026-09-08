@@ -472,29 +472,49 @@ impl<'a> Printer<'a> {
         branch_start: u32,
     ) -> DocId {
         let d = self.d();
-        let run = op_pos.and_then(|p| {
-            // A nested-conditional branch levels itself (see the Conditional arm of
-            // the tail), so its soft separator shifts only the first line
-            // (`indent(line)`); every other branch nests its run inside the branch's
-            // structural indent with a bare `line`. Built inside the closure so the
-            // comment-free path allocates nothing.
-            let soft_sep = if conditional_branch_is_nested(branch_type) {
-                d.indent(d.line())
-            } else {
-                d.line()
-            };
-            self.build_branch_comment_run(p + 1, branch_start, soft_sep)
-        });
-        d.concat(&[
-            d.text(op),
-            self.build_conditional_branch_tail_doc(
-                branch_type,
-                branch_doc,
-                false,
-                run,
-                op_pos.map(|p| p + 1),
-            ),
-        ])
+        let tail = match op_pos {
+            Some(p) => {
+                self.build_conditional_arm_tail_doc(branch_type, branch_doc, p + 1, branch_start)
+            }
+            None => {
+                self.build_conditional_branch_tail_doc(branch_type, branch_doc, false, None, None)
+            }
+        };
+        d.concat(&[d.text(op), tail])
+    }
+
+    /// The arm's tail past its operator: the operator→branch gap's block run
+    /// ([`Self::build_branch_comment_run`]) and the branch, the gap handed to the tail so
+    /// a union branch answers from the seam ([`Self::build_conditional_branch_tail_doc`]).
+    ///
+    /// Shared by the non-breaking layout ([`Self::build_conditional_arm_doc`]) and the
+    /// breaking one, for a gap that holds no hanging comment: the breaking layout's own
+    /// gap emitter (`push_conditional_branch_gap_comments`) knows only a space or a
+    /// forced new line, so through it a glued multi-line block hung the union below it,
+    /// a block glued to the operator with the author's break after it compacted, and a
+    /// block ahead of a non-hug union — never handed in — printed AHEAD of the pipe the
+    /// broken union synthesizes (`/* c */ | A`), three answers the width-broken layout
+    /// and prettier give the other way for the identical branch
+    /// (`conditional/branch_union_gap_block_comment_breaking_layout`).
+    fn build_conditional_arm_tail_doc(
+        &self,
+        branch_type: &TSType<'_>,
+        branch_doc: impl FnOnce() -> DocId,
+        op_end: u32,
+        branch_start: u32,
+    ) -> DocId {
+        let d = self.d();
+        // A nested-conditional branch levels itself (see the Conditional arm of the
+        // tail), so its soft separator shifts only the first line (`indent(line)`); every
+        // other branch nests its run inside the branch's structural indent with a bare
+        // `line`.
+        let soft_sep = if conditional_branch_is_nested(branch_type) {
+            d.indent(d.line())
+        } else {
+            d.line()
+        };
+        let run = self.build_branch_comment_run(op_end, branch_start, soft_sep);
+        self.build_conditional_branch_tail_doc(branch_type, branch_doc, false, run, Some(op_end))
     }
 
     /// The branch tail of a conditional arm: the separator after `?`/`:` (and
@@ -711,7 +731,10 @@ impl<'a> Printer<'a> {
         extends_kw_end: u32,
     ) -> DocId {
         let d = self.d();
-        let extends_type_start = c.extends_type.span().start;
+        // A transparent one-member composite is its member here, the `|` dropped and its
+        // head gap folded into the `extends`→type gap ([`Printer::transparent_value`]).
+        let extends_type = self.transparent_value(c.extends_type);
+        let extends_type_start = extends_type.span().start;
 
         // A comment that can't share the `extends` line — a line comment or a
         // multiline block — stays with `extends`, the extends-type hanging on the next
@@ -729,14 +752,11 @@ impl<'a> Printer<'a> {
             // lose the freeze on the second pass). The required-paren rule matches
             // the unfrozen arm (`type_needs_parens_for_conditional_extends`); the
             // head builder carries the multi-line must-break.
-            let value_doc = if self.single_child_frozen(extends_kw_end, c.extends_type) {
-                self.build_frozen_head_doc(
-                    c.extends_type,
-                    type_needs_parens_for_conditional_extends,
-                )
+            let value_doc = if self.single_child_frozen(extends_kw_end, extends_type) {
+                self.build_frozen_head_doc(extends_type, type_needs_parens_for_conditional_extends)
             } else {
                 self.build_type_doc_maybe_parens(
-                    c.extends_type,
+                    extends_type,
                     type_needs_parens_for_conditional_extends,
                 )
             };
@@ -777,7 +797,7 @@ impl<'a> Printer<'a> {
         // mixed/trailing hang below, where every comment stays distinct and on its own
         // line. A licence stops where its argument stops.
         if let Some(relocated_run) = self.extends_relocatable_run(c) {
-            let inner = unwrap_parenthesized(c.extends_type);
+            let inner = unwrap_parenthesized(extends_type);
             let mut parts: DocBuf = smallvec![d.text(" "), comments_after_extends];
             // The strip sheds only the REDUNDANT layers: a required pair is re-added, on
             // the same rule the unfrozen arm below and the general extends path use. A
@@ -805,7 +825,7 @@ impl<'a> Printer<'a> {
         // keyword→value seam (mirroring the prefix-operator site). `value_hang_start !=`
         // the shell start means the wide seam stripped it; pure-line already returned
         // above, so only mixed/trailing reach here.
-        let hang = self.keyword_value_stripped_paren_hang(c.extends_type);
+        let hang = self.keyword_value_stripped_paren_hang(extends_type);
         let (value_hang_start, value_hang_type) = (hang.value_start, hang.value_type);
         if value_hang_start != extends_type_start
             && self.comments_force_own_line_between(extends_kw_end, value_hang_start)
@@ -820,7 +840,7 @@ impl<'a> Printer<'a> {
                         value_hang_type,
                         type_needs_parens_for_conditional_extends,
                     ),
-                    c.extends_type,
+                    extends_type,
                     value_hang_type,
                     TrailingBlock::Inline,
                 )
@@ -838,12 +858,12 @@ impl<'a> Printer<'a> {
         // A redundant, comment-free paren LAYER around the union is stripped by
         // `build_type_doc` anyway, so the bare and layered authorings must reach this arm
         // alike — [`Printer::unwrap_redundant_parens`] is the same strip the `=>` return
-        // site applies for the same reason. Matching `c.extends_type` directly sent the
+        // site applies for the same reason. Matching `extends_type` directly sent the
         // layered form (`extends ((⏎// c⏎C) | D)`) to the general arm below, where the
         // union rendered flush after `extends ` with no break and no indent: one program,
         // two fixed points, and the one an author is most likely to write is the one that
         // lost the layout.
-        if let TSType::Union(union) = self.unwrap_redundant_parens(c.extends_type) {
+        if let TSType::Union(union) = self.unwrap_redundant_parens(extends_type) {
             if union.types.is_empty() {
                 d.text(" ")
             } else {
@@ -891,10 +911,57 @@ impl<'a> Printer<'a> {
                 d.text(" "),
                 comments_after_extends,
                 self.build_type_doc_maybe_parens(
-                    c.extends_type,
+                    extends_type,
                     type_needs_parens_for_conditional_extends,
                 ),
             ])
+        }
+    }
+
+    /// Emit one branch of the breaking layout past its `?` / `:` — the operator→branch gap
+    /// (`gap_start` to `branch_start`, the branch's leading-edge-widened start) and the
+    /// branch, under the branch's shell `claim` — into `parts`.
+    ///
+    /// A gap holding a hanging comment (a `//`, a multi-line block the author broke after)
+    /// takes this layout's own emitter ([`Self::push_conditional_branch_gap_comments`])
+    /// and drops the branch to a fresh line; any other gap is the arm's, answered exactly
+    /// as the non-breaking layout answers it ([`Self::build_conditional_arm_tail_doc`]).
+    ///
+    /// The claim wraps the whole TAIL, not just the branch thunk: the union and
+    /// intersection arms rebuild the branch from parts and never call it, so a wrapper on
+    /// the thunk alone left those two arms printing the shell's own copy beside the gap's
+    /// — a double-print. The `?` and `:` branches share this so they cannot drift.
+    fn push_breaking_conditional_branch(
+        &self,
+        parts: &mut DocBuf,
+        gap_start: u32,
+        branch_type: &TSType<'_>,
+        branch_start: u32,
+        paren_leading: &CommentVec<'_>,
+        claim: Option<Span>,
+    ) {
+        let branch_doc = || self.build_relocated_conditional_branch_doc(branch_type, paren_leading);
+        if self.comments_force_own_line_between(gap_start, branch_start) {
+            let on_new_line =
+                self.push_conditional_branch_gap_comments(parts, gap_start, branch_start);
+            parts.push(self.with_claimed_shell_leading_run(claim, || {
+                self.build_conditional_branch_tail_doc(
+                    branch_type,
+                    branch_doc,
+                    on_new_line,
+                    None,
+                    None,
+                )
+            }));
+        } else {
+            parts.push(self.with_claimed_shell_leading_run(claim, || {
+                self.build_conditional_arm_tail_doc(
+                    branch_type,
+                    branch_doc,
+                    gap_start,
+                    branch_start,
+                )
+            }));
         }
     }
 
@@ -1053,29 +1120,14 @@ impl<'a> Printer<'a> {
             q_parts.push(d.text("?"));
 
             // Comments AFTER the `?` token — emit between `?` and the true branch.
-            let needs_indent_before_true = self.push_conditional_branch_gap_comments(
+            self.push_breaking_conditional_branch(
                 &mut q_parts,
                 after_q_start,
+                c.true_type,
                 true_type_start,
+                &true_paren_leading_line_comments,
+                true_claim,
             );
-            // The claim wraps the whole TAIL, not just the thunk: the union and
-            // intersection arms rebuild the branch from parts and never call it, so a
-            // wrapper on the thunk alone left those two arms printing the shell's own copy
-            // beside the gap's — a double-print.
-            q_parts.push(self.with_claimed_shell_leading_run(true_claim, || {
-                self.build_conditional_branch_tail_doc(
-                    c.true_type,
-                    || {
-                        self.build_relocated_conditional_branch_doc(
-                            c.true_type,
-                            &true_paren_leading_line_comments,
-                        )
-                    },
-                    needs_indent_before_true,
-                    None,
-                    None,
-                )
-            }));
         }
 
         if false_route {
@@ -1114,27 +1166,16 @@ impl<'a> Printer<'a> {
             q_parts.push(d.hardline());
             q_parts.push(d.text(":"));
 
-            // Comments after : only (between : and false_type)
+            // Comments after : only (between : and false_type) — the `?` gap's split.
             let colon_end = colon.map_or(true_type_end, |c| c + 1);
-            let needs_indent_before_false = self.push_conditional_branch_gap_comments(
+            self.push_breaking_conditional_branch(
                 &mut q_parts,
                 colon_end,
+                c.false_type,
                 false_type_start,
+                &false_paren_leading_line_comments,
+                false_claim,
             );
-            q_parts.push(self.with_claimed_shell_leading_run(false_claim, || {
-                self.build_conditional_branch_tail_doc(
-                    c.false_type,
-                    || {
-                        self.build_relocated_conditional_branch_doc(
-                            c.false_type,
-                            &false_paren_leading_line_comments,
-                        )
-                    },
-                    needs_indent_before_false,
-                    None,
-                    None,
-                )
-            }));
         }
 
         // Comments between check_type and `extends` keyword (reuses extends_kw_start from above)
@@ -1259,6 +1300,9 @@ impl<'a> Printer<'a> {
         value: &TSType<'_>,
     ) {
         let d = self.d();
+        // A transparent one-member composite is its member here, the `|` dropped and its
+        // head gap folded into the keyword→value gap ([`Printer::transparent_value`]).
+        let value = self.transparent_value(value);
         let value_start = value.span().start;
         // The keyword's first byte, skipping comments before it, so a matching byte
         // inside a comment (`K /* in */ in T`) isn't read as the keyword.

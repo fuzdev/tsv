@@ -106,7 +106,14 @@ impl<'a> Printer<'a> {
     /// `gap_start` is the byte after the list's `<`: the `<`→argument gap is this seam's,
     /// and a block comment in it declines the union hug at the seam
     /// ([`Self::type_arg_union_prints_hugged`]).
+    ///
+    /// Asked of the **effective** argument ([`Self::unwrap_redundant_parens`]): a
+    /// comment-free one-member union is its member, so `Foo<| A>` inlines exactly as
+    /// `Foo<A>` does — read as a union it failed the brace-member narrowing, took the
+    /// group, and broke inside the `<>` where pass 2 (reading the bare member) breaks
+    /// after the `=` instead (`union_single_member_collapse_long`).
     pub(in crate::printer) fn type_arg_hugs(&self, gap_start: u32, ty: &TSType<'_>) -> bool {
+        let ty = self.unwrap_redundant_parens(ty);
         is_simple_type_arg(ty)
             || is_huggable_type(ty)
             || self.type_arg_union_prints_hugged(gap_start, ty)
