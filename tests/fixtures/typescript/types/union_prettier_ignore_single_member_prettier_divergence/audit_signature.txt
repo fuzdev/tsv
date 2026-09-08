@@ -1,0 +1,63 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// a single-member union collapses (drops its `|`) when reformatted, so a member-only
+	// freeze is non-idempotent — pass 2 would see a bare member no longer routed through the
+	// union. tsv keeps the `|` under the freeze (idempotent); prettier drops it
+	type A =
+		// prettier-ignore
+		{a:1};
+
+	// leaf sole member: same keep-the-pipe rule
+	type B =
+		// prettier-ignore
+		foo;
+
+	// a COMPOSITE sole member is transparent for directive binding: tsv collapses and lets
+	// the inner intersection apply Rule A (freezing its first member), so the tsv-stable form
+	// is the bare `a1 & a2` — the intersection-first-member behavior, no pipe kept
+	type C =
+		// prettier-ignore
+		a1 & a2;
+
+	// a frozen sole-member composite prints as the COMPOSITE (its `|` / `&` kept), so at
+	// every position where a composite needs a pair it keeps one — the pair the two-member
+	// twin gets. Under a prefix operator the shell's run hangs the operand, pair kept
+	type D = keyof // prettier-ignore
+	{a:1};
+
+	type E = keyof // prettier-ignore
+	{a:1};
+
+	// as a later intersection member and as a union member the required pair opens over the
+	// directive, the frozen composite inside it
+	type F = B &
+		// prettier-ignore
+		{a:1};
+
+	type G =
+		| B
+		// prettier-ignore
+		| {a:1};
+
+	// under an array / indexed-access suffix and as an optional tuple element
+	type H =
+		// prettier-ignore
+		{a:1}[];
+
+	type I =
+		// prettier-ignore
+		{a:1}['a'];
+
+	type J = [
+		// prettier-ignore
+		{a:1}?
+	];
+</script>

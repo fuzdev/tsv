@@ -65,7 +65,7 @@
 
 use super::ParenContext;
 use super::Printer;
-use super::types::helpers::{outermost_paren, paren_shell_gaps};
+use super::types::helpers::{TypeParenRule, outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
 use crate::ast::internal::{self, Comment, TSType};
 use smallvec::smallvec;
@@ -1048,7 +1048,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_frozen_member_doc(
         &self,
         t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
     ) -> DocId {
         self.build_frozen_member_doc_at(
             t,
@@ -1062,7 +1062,7 @@ impl<'a> Printer<'a> {
     fn build_frozen_member_doc_at(
         &self,
         t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
         slice: Span,
     ) -> DocId {
         let d = self.d();
@@ -1070,7 +1070,7 @@ impl<'a> Printer<'a> {
         let frozen = self.raw_source_range(slice.start, slice.end);
         // Re-synthesize the parens only for a BARE member that needs them; a
         // source-parenthesized member's slice already covers its own parens.
-        if member_parens(inner) && !matches!(t, TSType::Parenthesized(_)) {
+        if member_parens(self, inner) && !matches!(t, TSType::Parenthesized(_)) {
             d.concat(&[d.text("("), frozen, d.text(")")])
         } else {
             frozen
@@ -1086,13 +1086,9 @@ impl<'a> Printer<'a> {
     ///   paren-stripped inner;
     /// - a kept, source-parenthesized member freezes whole-span (parens included); a
     ///   kept, bare member's slice is its own span (the caller re-synthesizes parens).
-    fn frozen_member_slice_span(
-        &self,
-        t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
-    ) -> Span {
+    fn frozen_member_slice_span(&self, t: &TSType<'_>, member_parens: TypeParenRule) -> Span {
         let inner = unwrap_parenthesized(t);
-        if self.frozen_paren_shell_has_comment(t) || member_parens(inner) {
+        if self.frozen_paren_shell_has_comment(t) || member_parens(self, inner) {
             t.span()
         } else {
             inner.span()
@@ -1103,11 +1099,7 @@ impl<'a> Printer<'a> {
     /// must-break trigger: a `verbatim_source_span` is `will_break`-opaque, so a caller
     /// whose layout is width-decided forces the family broken explicitly when a frozen
     /// member is multi-line (the leading-run analog is `FirstMember.multiline`).
-    fn frozen_member_multiline(
-        &self,
-        t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
-    ) -> bool {
+    fn frozen_member_multiline(&self, t: &TSType<'_>, member_parens: TypeParenRule) -> bool {
         let slice = self.frozen_member_slice_span(t, member_parens);
         !self.is_same_line(slice.start, slice.end)
     }
@@ -1119,7 +1111,7 @@ impl<'a> Printer<'a> {
         &self,
         frozen: bool,
         t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
     ) -> bool {
         frozen && self.frozen_member_multiline(t, member_parens)
     }
@@ -1130,7 +1122,7 @@ impl<'a> Printer<'a> {
     /// The single-child heads take [`Self::build_frozen_single_child_doc`], the same
     /// slice plus their must-break.
     pub(in crate::printer) fn build_frozen_list_member_doc(&self, t: &TSType<'_>) -> DocId {
-        self.build_frozen_member_doc(t, |_| false)
+        self.build_frozen_member_doc(t, |_, _| false)
     }
 
     /// [`Self::frozen_member_multiline`] for the paren-free list positions of
@@ -1140,7 +1132,7 @@ impl<'a> Printer<'a> {
     /// caller forces its broken layout explicitly on a `true` answer (a
     /// `verbatim_source_span` is `will_break`-opaque).
     pub(in crate::printer) fn frozen_list_member_multiline(&self, t: &TSType<'_>) -> bool {
-        self.frozen_member_multiline(t, |_| false)
+        self.frozen_member_multiline(t, |_, _| false)
     }
 
     /// [`Self::build_frozen_member_doc`] plus the single-child heads' must-break
@@ -1153,7 +1145,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_frozen_head_doc(
         &self,
         child: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
     ) -> DocId {
         let slice = self.frozen_member_slice_span(child, member_parens);
         self.with_frozen_must_break(
@@ -1167,7 +1159,7 @@ impl<'a> Printer<'a> {
     /// cast's type, a `=>` return): a source paren there is always redundant, so it
     /// drops under the freeze unless its shell holds a comment.
     pub(in crate::printer) fn build_frozen_single_child_doc(&self, child: &TSType<'_>) -> DocId {
-        self.build_frozen_head_doc(child, |_| false)
+        self.build_frozen_head_doc(child, |_, _| false)
     }
 
     /// The doc for the child of a head whose gap ROUTE has already fired (an
@@ -1213,7 +1205,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_frozen_union_member_offset_doc(
         &self,
         t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
     ) -> DocId {
         let d = self.d();
         let inner = unwrap_parenthesized(t);

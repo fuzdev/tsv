@@ -4,7 +4,7 @@
 // - Type parameter declarations: `<T, U extends V = W>`
 // - Type parameter instantiation (type arguments): `<T, U>`
 
-use super::helpers::{is_simple_type_arg, unwrap_parenthesized};
+use super::helpers::{TypeParenRule, is_simple_type_arg, unwrap_parenthesized};
 use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
 use crate::ast::internal::{
     self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
@@ -464,12 +464,11 @@ impl<'a> Printer<'a> {
         if let Some(keyword_end) = head.gap_start
             && head.frozen
         {
-            let member_parens: fn(&TSType<'_>) -> bool =
-                if group_id == GroupId::TypeParameterConstraint {
-                    |t| matches!(t, TSType::Conditional(_))
-                } else {
-                    |_| false
-                };
+            let member_parens: TypeParenRule = if group_id == GroupId::TypeParameterConstraint {
+                |_, t| matches!(t, TSType::Conditional(_))
+            } else {
+                |_, _| false
+            };
             let frozen_doc = self.build_frozen_head_doc(head.child, member_parens);
             // Under a freeze the head's window already ends at the child's own start.
             self.push_hang_or_inline_value(parts, keyword_end, head.value_start, frozen_doc);

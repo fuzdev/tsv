@@ -185,7 +185,12 @@ more defensible:
   freeze is non-idempotent. tsv keeps the operator for a **leaf / object** sole member
   (`| {a:1}`, `& {a:1}` — idempotent) where prettier drops it (`{a:1}`); a **composite** sole
   member is transparent (tsv collapses and applies Rule A to the inner Union/Intersection, so
-  `| a1&a2` → `a1 & a2`, the opposite family's first-member behavior) —
+  `| a1&a2` → `a1 & a2`, the opposite family's first-member behavior). Because the kept
+  operator makes the frozen slice a **composite** in print, it needs a paren pair wherever a
+  composite does — under a prefix operator (`keyof (⏎// prettier-ignore⏎| {a:1})`, where the
+  pair-less form `keyof | {a:1}` does not reparse), as a later intersection or a union
+  member, under an array / indexed-access suffix, as an optional tuple element — the pair
+  its two-member twin gets; prettier, freezing the bare member, needs none —
   [single member union](../tests/fixtures/typescript/types/union_prettier_ignore_single_member_prettier_divergence/),
   [single member intersection](../tests/fixtures/typescript/types/intersection_prettier_ignore_single_member_prettier_divergence/)
 - Parenthesized **nested-union** member — ◆design_choice ◆comment_preservation — when the

@@ -5,7 +5,7 @@
 // - Width-aware wrapping for type arguments
 // - Return type annotations
 
-use super::helpers::{type_args_should_wrap_for_return_type, unwrap_parenthesized};
+use super::helpers::{TypeParenRule, type_args_should_wrap_for_return_type, unwrap_parenthesized};
 use super::{CommentSpacing, Printer, TrailingBlock, UnionValueDoc};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
@@ -48,7 +48,7 @@ pub(in crate::printer) enum AnnotationParens {
 /// [`Printer::build_required_paren_pair_operand_doc`] takes. Reads through the author's
 /// shell: `(x: T): ((y: T) => T) =>` needs the pair just as the shell-less spelling does,
 /// and the shell is redundant *as a type* — only this position requires it.
-fn arrow_return_needs_parens(ty: &TSType<'_>) -> bool {
+fn arrow_return_needs_parens(_: &Printer<'_>, ty: &TSType<'_>) -> bool {
     matches!(unwrap_parenthesized(ty), TSType::Function(_))
 }
 
@@ -57,7 +57,7 @@ fn arrow_return_needs_parens(ty: &TSType<'_>) -> bool {
 /// takes. A source paren after `:` is redundant *as a type* and drops under the freeze;
 /// this is exactly what [`Printer::build_frozen_single_child_doc`] hardcodes, named here
 /// so the position can select it beside the arrow-return rule.
-fn no_frozen_parens(_ty: &TSType<'_>) -> bool {
+fn no_frozen_parens(_: &Printer<'_>, _ty: &TSType<'_>) -> bool {
     false
 }
 
@@ -68,7 +68,7 @@ fn no_frozen_parens(_ty: &TSType<'_>) -> bool {
 /// A freeze must not unmake a pair the grammar requires: with the ordinary rule,
 /// `: // prettier-ignore⏎((y: T) => T)` froze to `(y: T) => T` and the arrow's own `=>`
 /// bound the reparse the other way.
-fn frozen_annotation_parens(parens: AnnotationParens) -> fn(&TSType<'_>) -> bool {
+fn frozen_annotation_parens(parens: AnnotationParens) -> TypeParenRule {
     match parens {
         AnnotationParens::AsWritten => no_frozen_parens,
         AnnotationParens::ArrowReturn => arrow_return_needs_parens,

@@ -37,8 +37,7 @@
 	) => k;
 
 	// at a tuple element
-	type SingleElement = [
-		// c7
+	type SingleElement = [ // c7
 		a | b
 	];
 

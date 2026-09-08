@@ -1,0 +1,593 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 538,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` after a sole member's authored operator at a tuple element is the tuple's own",
+			"start": 20,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " gap, and takes that gap's answer exactly as the operator-less authoring does: on the",
+			"start": 109,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `[` line it keeps that line (the opening-delimiter rule)",
+			"start": 198,
+			"end": 257,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 270,
+			"end": 275,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 12
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after a comma it trails the comma",
+			"start": 286,
+			"end": 322,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 340,
+			"end": 345,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 5
+				},
+				"end": {
+					"line": 11,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a sole-member composite wrapping a real union: the redundant shell strips and the",
+			"start": 356,
+			"end": 440,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " union prints bare, the comment still on the `[` line",
+			"start": 442,
+			"end": 497,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 510,
+			"end": 515,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 12
+				},
+				"end": {
+					"line": 17,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 537,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 528,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 259,
+					"end": 283,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 264,
+						"end": 265,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 268,
+						"end": 282,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSTypeReference",
+								"start": 278,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 278,
+									"end": 279,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 270,
+										"end": 275
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` after a sole member's authored operator at a tuple element is the tuple's own",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " gap, and takes that gap's answer exactly as the operator-less authoring does: on the",
+							"start": 109,
+							"end": 196
+						},
+						{
+							"type": "Line",
+							"value": " `[` line it keeps that line (the opening-delimiter rule)",
+							"start": 198,
+							"end": 257
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 324,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 329,
+						"end": 330,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 333,
+						"end": 352,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSTypeReference",
+								"start": 337,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 337,
+									"end": 338,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"name": "D"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 340,
+										"end": 345
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 348,
+								"end": 349,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 348,
+									"end": 349,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 3
+										}
+									},
+									"name": "E"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " after a comma it trails the comma",
+							"start": 286,
+							"end": 322
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 499,
+					"end": 527,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 504,
+						"end": 505,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 6
+							},
+							"end": {
+								"line": 17,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 508,
+						"end": 526,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 10
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSUnionType",
+								"start": 518,
+								"end": 523,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 7
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 518,
+										"end": 519,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 3
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 518,
+											"end": 519,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 3
+												}
+											},
+											"name": "G"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 522,
+										"end": 523,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 6
+											},
+											"end": {
+												"line": 18,
+												"column": 7
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 522,
+											"end": 523,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 6
+												},
+												"end": {
+													"line": 18,
+													"column": 7
+												}
+											},
+											"name": "H"
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 510,
+										"end": 515
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a sole-member composite wrapping a real union: the redundant shell strips and the",
+							"start": 356,
+							"end": 440
+						},
+						{
+							"type": "Line",
+							"value": " union prints bare, the comment still on the `[` line",
+							"start": 442,
+							"end": 497
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

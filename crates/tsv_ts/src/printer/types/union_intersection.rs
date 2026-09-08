@@ -6,7 +6,7 @@
 // - Comment handling between type members
 
 use super::helpers::{
-    find_separator_position, intersection_has_expanding_first_type,
+    TypeParenRule, find_separator_position, intersection_has_expanding_first_type,
     intersection_has_huggable_last_type, is_huggable_type, outermost_paren, paren_shell_gaps,
     type_needs_parens_in_union_or_intersection, union_has_brace_member, union_hug_shape,
     unwrap_parenthesized,
@@ -147,9 +147,9 @@ struct IntersectionHeadRun<'c> {
 /// in the union's own position and needs no precedence parens of its own — any required
 /// parens come from the union's parent context, applied one level up. 2+ members use the
 /// normal `|`/`&` precedence rule.
-pub(super) fn union_member_parens(member_count: usize) -> fn(&TSType<'_>) -> bool {
+pub(super) fn union_member_parens(member_count: usize) -> TypeParenRule {
     if member_count == 1 {
-        |_| false
+        |_, _| false
     } else {
         type_needs_parens_in_union_or_intersection
     }
@@ -235,8 +235,11 @@ impl MemberPairLayout {
 /// out ahead of the `| `. The TRAILING side asks a different question and reads
 /// [`Printer::member_seam_trailing_shell`] instead: a trailing run lifts out of a REQUIRED
 /// pair too, so what decides its home is the printed pair's SHAPE, not its redundancy.
-fn redundant_member_shell<'t>(t: &'t TSType<'t>) -> Option<&'t TSParenthesizedType<'t>> {
-    if type_needs_parens_in_union_or_intersection(t) {
+fn redundant_member_shell<'t>(
+    p: &Printer<'_>,
+    t: &'t TSType<'t>,
+) -> Option<&'t TSParenthesizedType<'t>> {
+    if type_needs_parens_in_union_or_intersection(p, t) {
         return None;
     }
     outermost_paren(t)
@@ -277,7 +280,7 @@ impl<'a> Printer<'a> {
     /// pass over the retained form fell into the first case — so the retain rule's own
     /// output was not stable under it. `type_suffix_trailing_comment_union_member`.
     fn stripped_redundant_paren_member_leading_run(&self, t: &TSType<'_>) -> CommentVec<'_> {
-        let Some(shell) = redundant_member_shell(t) else {
+        let Some(shell) = redundant_member_shell(self, t) else {
             return smallvec![];
         };
         if self.paren_shell_retains_for_trailing_run(shell) {
@@ -512,11 +515,7 @@ impl<'a> Printer<'a> {
     /// - object literals (`| { … }`) via `build_union_member_object_literal_doc`,
     /// - object-trailing intersections (`| (A & { … })`) and function /
     ///   constructor / conditional parens (see `is_paren_union_member`).
-    fn build_union_member_offset_doc(
-        &self,
-        t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
-    ) -> DocId {
+    fn build_union_member_offset_doc(&self, t: &TSType<'_>, member_parens: TypeParenRule) -> DocId {
         let d = self.d();
         if let TSType::TypeLiteral(obj) = t {
             return self.build_union_member_object_literal_doc(obj);
@@ -551,7 +550,7 @@ impl<'a> Printer<'a> {
     fn build_union_member_doc(
         &self,
         t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
         has_leading_comments: bool,
     ) -> DocId {
         match self.member_hoisted_trailing_shell(
@@ -681,7 +680,7 @@ impl<'a> Printer<'a> {
     fn member_seam_trailing_shell<'t>(
         &self,
         t: &'t TSType<'t>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
         seam: MemberSeam,
     ) -> Option<&'t TSParenthesizedType<'t>> {
         if self.member_pair_layout(t, member_parens, seam).expands() {
@@ -695,14 +694,14 @@ impl<'a> Printer<'a> {
     fn member_pair_layout(
         &self,
         t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
         seam: MemberSeam,
     ) -> MemberPairLayout {
         // `member_parens` first because `Printer::build_type_doc_maybe_parens_impl` gates
         // its whole paren arm on it: with no required pair to print, even a paren-union
         // member strips like any other. A one-member composite passes `|_| false`
         // ([`union_member_parens`]).
-        if !member_parens(t) {
+        if !member_parens(self, t) {
             return MemberPairLayout::None;
         }
         if is_paren_union_member(t) {
@@ -762,7 +761,7 @@ impl<'a> Printer<'a> {
     fn member_hoisted_trailing_shell<'t>(
         &self,
         t: &'t TSType<'t>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
         seam: MemberSeam,
         has_leading_comments: bool,
     ) -> Option<&'t TSType<'t>> {
@@ -886,6 +885,34 @@ impl<'a> Printer<'a> {
         self.union_gap_inline_run_start(&run) < run.len()
     }
 
+    /// The comment region a LATER intersection member's transparent one-member composite
+    /// owes this seam — its authored `|` / `&` (through the shell around it) to the member
+    /// it prints as — where that region holds a **line** comment (`B & (| // c⏎A)`).
+    ///
+    /// The composite prints as its member, the operator dropped, so the `//` the author
+    /// wrote after it is in the member's LEADING gap once the shell strips, exactly where
+    /// the operator-less shell authoring `B & (// c⏎A)` puts its own: the comment leads the
+    /// member on its own line under the `&`
+    /// ([`Self::intersection_member_shell_leading_run_ends_line`] opens the boundary, and
+    /// the member body emits the run ahead of the member with the region CLAIMED, so the
+    /// composite's own head-gap emitter stands down —
+    /// [`Printer::composite_head_region_claimed`]). Left to the composite, the union laid
+    /// the run out by its own leading-pipe rule (`| // c⏎  A`, which after `&` does not even
+    /// reparse) and the intersection kept an indent shell the reparse read one level
+    /// shallower — two fixed points, or none, for one program
+    /// (`intersection_member_single_member_head_line_comment`).
+    ///
+    /// Only the transparent-composite shape, and only a `//`: a shell's OWN leading run
+    /// has its emitters (the hoist, the strip arm), an edge shell one link inside a
+    /// suffixed member has its required pair, and a block in the head gap already lands
+    /// where the seam would put it. The window is the leading-edge claim's
+    /// ([`Printer::leading_edge_shell_line_comment_claim`]), so the emission and the
+    /// composite's decline name one region.
+    fn later_member_transparent_head_line_comment_claim(&self, t: &TSType<'_>) -> Option<Span> {
+        self.transparent_sole_member(unwrap_parenthesized(t))?;
+        self.leading_edge_shell_line_comment_claim(t)
+    }
+
     /// [`Self::member_hoisted_trailing_shell`] at the INTERSECTION seam, for a member at
     /// any position — the `false` is the seam's answer, not a caller's convenience.
     ///
@@ -901,9 +928,30 @@ impl<'a> Printer<'a> {
     fn intersection_member_hoisted_shell<'t>(
         &self,
         t: &'t TSType<'t>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
     ) -> Option<&'t TSType<'t>> {
         self.member_hoisted_trailing_shell(t, member_parens, MemberSeam::Intersection, false)
+    }
+
+    /// Build a LATER member whose transparent composite's head gap holds a `//`
+    /// ([`Self::later_member_transparent_head_line_comment_claim`]) into `parts`: the run
+    /// first, own-line ahead of the member, then the member with the region claimed so the
+    /// composite's own head-gap emitter — and the shell's, one layer out — stand down
+    /// ([`comments.md`](../../../../docs/comments.md) hazard 3). Both loops build the member
+    /// through this, so the two cannot answer one authoring two ways.
+    fn push_transparent_head_member_doc(
+        &self,
+        parts: &mut DocBuf,
+        member: &TSType<'_>,
+        claim: Span,
+        member_parens: TypeParenRule,
+    ) {
+        // The same emitter the stripped shell would have used for a run of its own, so
+        // separators and author blanks read identically whichever authoring reached it.
+        self.push_paren_shell_leading_run(parts, claim.start, claim.end, ShellLeadingRun::Here);
+        parts.push(self.with_claimed_shell_leading_run(Some(claim), || {
+            self.build_intersection_member_type_doc(member, member_parens)
+        }));
     }
 
     /// Build a HOISTED intersection member into `parts` and hand back the trailing run held
@@ -969,7 +1017,7 @@ impl<'a> Printer<'a> {
     fn intersection_first_hoisted_shell<'t>(
         &self,
         intersection: &'t TSIntersectionType<'t>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
         has_comments: bool,
     ) -> Option<&'t TSType<'t>> {
         if !has_comments {
@@ -1067,6 +1115,14 @@ impl<'a> Printer<'a> {
     /// why the two share it ([`Self::boundary_relocating_shell`]): its run prints between
     /// the author's own parens, so nothing is relocated.
     fn intersection_member_shell_leading_run_ends_line(&self, cur: &TSType<'_>) -> bool {
+        // A `//` in a transparent composite's head gap always ends its line, and the
+        // body emits it ahead of the member ([`Self::later_member_transparent_head_line_comment_claim`]).
+        if self
+            .later_member_transparent_head_line_comment_claim(cur)
+            .is_some()
+        {
+            return true;
+        }
         let Some(shell) = self.boundary_relocating_shell(cur) else {
             return false;
         };
@@ -2437,9 +2493,9 @@ impl<'a> Printer<'a> {
     pub(super) fn paren_union_line_comment_member<'t>(
         &self,
         t: &'t TSType<'t>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
     ) -> Option<(&'t TSParenthesizedType<'t>, &'t TSUnionType<'t>)> {
-        if !member_parens(t) {
+        if !member_parens(self, t) {
             return None;
         }
         let p = outermost_paren(t)?;
@@ -3553,6 +3609,8 @@ impl<'a> Printer<'a> {
             let mut member_held = None;
             if self.list_member_frozen(intersection.span.start, types, i, freeze_first) {
                 unit.push(self.build_frozen_member_doc(cur, member_parens));
+            } else if let Some(claim) = self.later_member_transparent_head_line_comment_claim(cur) {
+                self.push_transparent_head_member_doc(&mut unit, cur, claim, member_parens);
             } else if let Some(inner) = (!is_last)
                 .then(|| self.intersection_member_hoisted_shell(cur, member_parens))
                 .flatten()
@@ -3609,7 +3667,7 @@ impl<'a> Printer<'a> {
     fn build_intersection_line_comment_member_doc(
         &self,
         t: &TSType<'_>,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
     ) -> DocId {
         if let Some((p, inner_union)) = self.paren_union_line_comment_member(t, member_parens)
             && !self.first_member_shell_run_claimed(t)
@@ -3844,7 +3902,7 @@ impl<'a> Printer<'a> {
         i: usize,
         has_comments: bool,
         frozen: bool,
-        member_parens: fn(&TSType<'_>) -> bool,
+        member_parens: TypeParenRule,
     ) -> IntersectionMemberBody {
         let t = &intersection.types[i];
         let type_start = t.span().start;
@@ -3885,6 +3943,8 @@ impl<'a> Printer<'a> {
         let mut held_run = None;
         if frozen {
             parts.push(self.build_frozen_member_doc(t, member_parens));
+        } else if let Some(claim) = self.later_member_transparent_head_line_comment_claim(t) {
+            self.push_transparent_head_member_doc(&mut parts, t, claim, member_parens);
         } else if let Some(inner) = (!is_last)
             .then(|| self.intersection_member_hoisted_shell(t, member_parens))
             .flatten()

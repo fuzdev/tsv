@@ -8,11 +8,11 @@
 	// That expanded form is variant_expanded: a fixed point of BOTH formatters, so tsv does
 	// not pull the comment back up to `${` — the two authorings keep two stable forms on
 	// purpose. Authoring it own-line from the start is template_literal_interp_own_line_comment.
-	type T = `a${// c
+	type T = `a${ // c
 		B
 	}`;
 
-	type U = `a${/* c
+	type U = `a${ /* c
 		d */
 		B
 	}`;

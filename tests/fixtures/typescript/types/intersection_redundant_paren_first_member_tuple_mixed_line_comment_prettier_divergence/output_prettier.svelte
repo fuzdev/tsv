@@ -1,7 +1,6 @@
 <script lang="ts">
 	type T = [
 		/* b */ // c
-		A &
-			B
+		A & B
 	];
 </script>

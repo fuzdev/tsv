@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 68,
+	"end": 66,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,32 +13,32 @@
 		{
 			"type": "Block",
 			"value": " b ",
-			"start": 33,
-			"end": 40,
+			"start": 31,
+			"end": 38,
 			"loc": {
 				"start": {
-					"line": 3,
-					"column": 2
+					"line": 2,
+					"column": 12
 				},
 				"end": {
-					"line": 3,
-					"column": 9
+					"line": 2,
+					"column": 19
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 41,
-			"end": 45,
+			"start": 39,
+			"end": 43,
 			"loc": {
 				"start": {
-					"line": 3,
-					"column": 10
+					"line": 2,
+					"column": 20
 				},
 				"end": {
-					"line": 3,
-					"column": 14
+					"line": 2,
+					"column": 24
 				}
 			}
 		}
@@ -46,19 +46,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 67,
+		"end": 65,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 58,
+			"end": 56,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 6,
+					"line": 5,
 					"column": 9
 				}
 			},
@@ -66,14 +66,14 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 20,
-					"end": 57,
+					"end": 55,
 					"loc": {
 						"start": {
 							"line": 2,
 							"column": 1
 						},
 						"end": {
-							"line": 5,
+							"line": 4,
 							"column": 3
 						}
 					},
@@ -96,58 +96,58 @@
 					"typeAnnotation": {
 						"type": "TSTupleType",
 						"start": 29,
-						"end": 56,
+						"end": 54,
 						"loc": {
 							"start": {
 								"line": 2,
 								"column": 10
 							},
 							"end": {
-								"line": 5,
+								"line": 4,
 								"column": 2
 							}
 						},
 						"elementTypes": [
 							{
 								"type": "TSIntersectionType",
-								"start": 48,
-								"end": 53,
+								"start": 46,
+								"end": 51,
 								"loc": {
 									"start": {
-										"line": 4,
+										"line": 3,
 										"column": 2
 									},
 									"end": {
-										"line": 4,
+										"line": 3,
 										"column": 7
 									}
 								},
 								"types": [
 									{
 										"type": "TSTypeReference",
-										"start": 48,
-										"end": 49,
+										"start": 46,
+										"end": 47,
 										"loc": {
 											"start": {
-												"line": 4,
+												"line": 3,
 												"column": 2
 											},
 											"end": {
-												"line": 4,
+												"line": 3,
 												"column": 3
 											}
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 48,
-											"end": 49,
+											"start": 46,
+											"end": 47,
 											"loc": {
 												"start": {
-													"line": 4,
+													"line": 3,
 													"column": 2
 												},
 												"end": {
-													"line": 4,
+													"line": 3,
 													"column": 3
 												}
 											},
@@ -156,29 +156,29 @@
 									},
 									{
 										"type": "TSTypeReference",
-										"start": 52,
-										"end": 53,
+										"start": 50,
+										"end": 51,
 										"loc": {
 											"start": {
-												"line": 4,
+												"line": 3,
 												"column": 6
 											},
 											"end": {
-												"line": 4,
+												"line": 3,
 												"column": 7
 											}
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 52,
-											"end": 53,
+											"start": 50,
+											"end": 51,
 											"loc": {
 												"start": {
-													"line": 4,
+													"line": 3,
 													"column": 6
 												},
 												"end": {
-													"line": 4,
+													"line": 3,
 													"column": 7
 												}
 											},
@@ -190,14 +190,14 @@
 									{
 										"type": "Block",
 										"value": " b ",
-										"start": 33,
-										"end": 40
+										"start": 31,
+										"end": 38
 									},
 									{
 										"type": "Line",
 										"value": " c",
-										"start": 41,
-										"end": 45
+										"start": 39,
+										"end": 43
 									}
 								]
 							}

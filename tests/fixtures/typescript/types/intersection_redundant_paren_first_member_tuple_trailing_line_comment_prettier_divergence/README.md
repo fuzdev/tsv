@@ -8,21 +8,21 @@ member (`(// c⏎ A /* t */) & B`), now inside a **tuple element** rather than a
 type-alias RHS. The double-nested form behaves the same.
 
 **tsv** strips the shell and normalizes to the tuple element's own fixed point —
-the line comment on its own line inside `[`, the trailing block inline after the
-member, and the intersection inline on the continuation:
+the line comment keeping the `[` line it was written on (the opening-delimiter rule the
+tuple's gap answers for every route into it, the stripped shell's run included —
+[open_bracket_comment](../tuple/open_bracket_comment_prettier_divergence/)), the trailing
+block inline after the member, and the intersection inline on the continuation:
 
 ```
-type T = [
-	// c
+type T = [ // c
 	A /* t */ & B
 ];
 ```
 
-Unlike the type-alias RHS sibling — where prettier breaks after `=` and settles
-on a distinct own-line `variant` — the tuple element is on its own line for both
-formatters, so prettier's stable form **is** this input. Prettier still reaches it
-non-idempotently: its unstable first pass breaks the intersection
-(`A /* t */ &⏎ B`) before converging back to the input, so the shells are
-`unformatted_ours` + `prettier_intermediate` (converges to input).
+Prettier un-glues the `[` line and settles on the own-line form (`output_prettier`), which
+it reaches from the shell authorings non-idempotently — its unstable first pass breaks the
+intersection (`A /* t */ &⏎ B`) before converging — so those chains are pinned by
+`audit_signature_*.txt`. The type-alias RHS sibling differs in kind: there prettier breaks
+after `=` and settles on a distinct own-line `variant`.
 
 See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

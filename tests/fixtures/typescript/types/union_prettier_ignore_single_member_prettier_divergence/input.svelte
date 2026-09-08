@@ -17,4 +17,48 @@
 	type C =
 		// prettier-ignore
 		a1 & a2;
+
+	// a frozen sole-member composite prints as the COMPOSITE (its `|` / `&` kept), so at
+	// every position where a composite needs a pair it keeps one — the pair the two-member
+	// twin gets. Under a prefix operator the shell's run hangs the operand, pair kept
+	type D = keyof
+		// prettier-ignore
+		(| {a:1});
+
+	type E = keyof
+		// prettier-ignore
+		(& {a:1});
+
+	// as a later intersection member and as a union member the required pair opens over the
+	// directive, the frozen composite inside it
+	type F = B &
+		(
+			// prettier-ignore
+			| {a:1}
+		);
+
+	type G =
+		| B
+		| (
+				// prettier-ignore
+				| {a:1}
+		  );
+
+	// under an array / indexed-access suffix and as an optional tuple element
+	type H = (
+		// prettier-ignore
+		| {a:1}
+	)[];
+
+	type I = (
+		// prettier-ignore
+		| {a:1}
+	)['a'];
+
+	type J = [
+		(
+			// prettier-ignore
+			| {a:1}
+		)?
+	];
 </script>

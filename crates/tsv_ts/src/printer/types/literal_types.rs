@@ -102,6 +102,11 @@ impl<'a> Printer<'a> {
         template: &TemplateLiteralType<'_>,
     ) -> bool {
         template.types.iter().enumerate().any(|(i, t)| {
+            // The same peel the builder applies ([`Self::build_template_literal_type_doc`]),
+            // so the two read one `${`→type gap: a transparent composite's head gap is the
+            // interpolation's, and a `//` there hangs the type exactly as one written
+            // after a bare `${` does.
+            let t = self.transparent_value(t);
             self.comments_force_own_line_between(
                 Self::interp_dollar_brace_end(&template.quasis[i]),
                 t.span().start,
@@ -201,7 +206,14 @@ impl<'a> Printer<'a> {
             // byte sum would break a template whose rendered width is well under print width.
             pos += visual_width(quasi.raw(self.source), TAB_WIDTH);
             if i < template.types.len() {
-                let t = &template.types[i];
+                // A transparent one-member composite is its member here, the `|` dropped
+                // and its head gap folded into the `${`→type gap
+                // ([`Self::transparent_value`]): built as the composite, its own
+                // leading-pipe layout kept a pipe the reparse drops (`${| // c⏎  A}`), and
+                // the `&` spelling's indent shell broke the literal after `=` on pass 1
+                // only — two fixed points for one program
+                // (`template_literal_interp_single_member_head_line_comment`).
+                let t = self.transparent_value(&template.types[i]);
                 let dollar_brace_end = Self::interp_dollar_brace_end(quasi);
                 let type_start = t.span().start;
                 let type_end = t.span().end;
@@ -306,8 +318,14 @@ impl<'a> Printer<'a> {
                         d.hardline(),
                         d.text("}"),
                     ]),
+                    // A comment that STAYS on the `${` line is the opening-delimiter question,
+                    // and the gap ahead of it is the printer's one space — the answer every
+                    // other delimiter writes (`fn( // c`, `[ // c`, `Foo< // c`), whatever
+                    // spacing the author left (docs/comments.md §The delimiter-line question).
+                    // The flat layouts below are not that question: a block glued inline
+                    // (`${/* c */ B}`) leads the type and keeps its glue.
                     InterpolationLayout::TrailingComment => d.concat(&[
-                        d.text("${"),
+                        d.text("${ "),
                         d.indent(d.concat(&[comments_doc, type_doc])),
                         d.hardline(),
                         d.text("}"),
