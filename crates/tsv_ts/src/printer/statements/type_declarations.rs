@@ -10,7 +10,7 @@ use crate::printer::types::helpers::{
     type_needs_parens_for_array_element, type_needs_parens_for_indexed_access_object,
     unwrap_parenthesized,
 };
-use crate::printer::types::{ArraySuffixLayout, TrailingBlock};
+use crate::printer::types::{ArraySuffixLayout, TrailingBlock, UnionValueDoc};
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ContinuationValue, HeritageKeyword, LeadingGlue,
     MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam,
@@ -536,14 +536,20 @@ impl<'a> Printer<'a> {
                 // it ahead of the pipe (`/* c */ | A`, a form prettier never emits;
                 // see `build_union_value_doc`). The run then must not also ride
                 // `make_rhs` — exactly one of the two prints it.
-                let (type_doc, run_handed) = self.build_union_value_doc(eq_pos + 1, u);
+                let UnionValueDoc {
+                    doc: type_doc,
+                    run_handed,
+                    hugged,
+                } = self.build_union_value_doc(eq_pos + 1, u);
                 let make_rhs =
                     |rhs: DocId| -> DocId { if run_handed { rhs } else { make_rhs(rhs) } };
-                // `union_prints_hugged`, not the bare syntactic `union_hug_shape`:
-                // this must agree with the layout `build_union_type_doc` just chose. A
-                // comment can make it decline the hug and expand, and then the `=` has
-                // to break like any other non-hugging union.
-                if self.union_prints_hugged(u) {
+                // `hugged` is read off the doc just built, not the bare syntactic
+                // `union_hug_shape` nor even `union_prints_hugged`: this must agree with
+                // the layout `build_union_type_doc` just chose. A comment can make it
+                // decline the hug and expand — a member/gap comment, or the run handed
+                // in above, which prettier binds to the first member — and then the `=`
+                // has to break like any other non-hugging union.
+                if hugged {
                     // Hugged unions (e.g., `{ ... } | null`): the object type handles its own
                     // expansion, so keep `= {` together like other internally-breaking types
                     parts.push(d.text(" "));

@@ -37,6 +37,11 @@ pub use helpers::unwrap_parenthesized;
 // (`statements/type_declarations.rs`) so the emitter and the gate cannot disagree.
 pub(in crate::printer) use composite::ArraySuffixLayout;
 
+// The union value doc an operator seam prints — the alias `=`, the annotation `:`, the
+// function-type `=>` and the mapped value — carrying whether it hugs, so the seam's layout
+// and the union's cannot disagree.
+pub(in crate::printer) use union_intersection::UnionValueDoc;
+
 // The pair an annotation's POSITION requires around its type — read by the hang seam
 // below as well as by the annotation emitters themselves.
 use type_annotation::AnnotationParens;
@@ -346,14 +351,36 @@ impl<'a> Printer<'a> {
                         );
                         // A long union/intersection hangs after `is` (redundant parens
                         // stripped first); everything else stays inline after `is `.
-                        match self.unwrap_redundant_parens(type_ann) {
+                        let value_type = self.unwrap_redundant_parens(type_ann);
+                        match value_type {
                             TSType::Union(u) => {
                                 let type_doc = self.build_union_type_doc(u);
-                                parts.push(d.text(" is"));
-                                parts.push(hang_after_operator(
-                                    d,
-                                    d.concat(&[comments_doc, type_doc]),
-                                ));
+                                // The same hug arm as the annotation `:` seam, the
+                                // predicate's `is` standing in for the `:` — `a is { … }
+                                // | null` hugs exactly as `(): { … } | null` does; every
+                                // other union hangs after `is`. Deliberately NOT the
+                                // value seam's `build_union_value_doc`: prettier binds a
+                                // block glued in the `is`→union gap to the predicate's
+                                // annotation, not to the first member, so the union keeps
+                                // hugging behind it (`a is /* c */ {⏎…⏎} | null`) where
+                                // the `:` and `=>` seams decline — the bare predicate is
+                                // this seam's right ask (`UnionLeadingGap::Other`).
+                                let hugged = self.build_hugged_union_after_operator_doc(
+                                    " is ",
+                                    self.union_prints_hugged(u),
+                                    || Some(comments_doc),
+                                    type_doc,
+                                );
+                                match hugged {
+                                    Some(hugged) => parts.push(hugged),
+                                    None => {
+                                        parts.push(d.text(" is"));
+                                        parts.push(hang_after_operator(
+                                            d,
+                                            d.concat(&[comments_doc, type_doc]),
+                                        ));
+                                    }
+                                }
                             }
                             TSType::Intersection(i) => {
                                 parts.push(d.text(" is "));
