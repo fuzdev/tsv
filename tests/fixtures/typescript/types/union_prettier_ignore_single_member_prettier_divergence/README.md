@@ -15,6 +15,18 @@ through the union and reformats it. tsv resolves this by the sole member's shape
   `type C` shows no output divergence — it documents the transparency that keeps the
   leaf/object arm from whole-freezing every single-member union.
 
+## The kept operator makes the frozen slice a composite in print
+
+Because tsv keeps the `|` / `&`, the frozen sole-member composite is printed **as a
+composite**, and so needs a paren pair wherever a composite does — the pair its two-member
+twin gets (`D`–`J`): under a prefix operator (`keyof⏎// prettier-ignore⏎(| {a:1})`, where
+the pair-less `keyof | {a:1}` does not reparse), as a later intersection member and as a
+union member (the required pair opens over the directive), under an array or indexed-access
+suffix, and as an optional tuple element. The paren predicates read the type **as printed**:
+a sole-member composite peels to its member (prettier drops the node), except a frozen one,
+which is the composite's own verbatim slice. Prettier freezes the bare member and so needs
+no pair; its own output re-lays two of the cases on a second pass (`audit_signature.txt`).
+
 ## Reason
 
 Keeping the `|` on a frozen leaf/object single-member union is the only way to honor the

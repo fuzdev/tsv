@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 764,
+	"end": 766,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -157,28 +157,28 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 704,
-			"end": 708,
+			"start": 705,
+			"end": 709,
 			"loc": {
 				"start": {
 					"line": 11,
-					"column": 14
+					"column": 15
 				},
 				"end": {
 					"line": 11,
-					"column": 18
+					"column": 19
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c\n\td ",
-			"start": 733,
-			"end": 744,
+			"start": 735,
+			"end": 746,
 			"loc": {
 				"start": {
 					"line": 15,
-					"column": 14
+					"column": 15
 				},
 				"end": {
 					"line": 16,
@@ -190,12 +190,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 763,
+		"end": 765,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 754,
+			"end": 756,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -210,7 +210,7 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 691,
-					"end": 717,
+					"end": 718,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -240,7 +240,7 @@
 					"typeAnnotation": {
 						"type": "TSLiteralType",
 						"start": 700,
-						"end": 716,
+						"end": 717,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -254,7 +254,7 @@
 						"literal": {
 							"type": "TemplateLiteral",
 							"start": 700,
-							"end": 716,
+							"end": 717,
 							"loc": {
 								"start": {
 									"line": 11,
@@ -268,8 +268,8 @@
 							"expressions": [
 								{
 									"type": "TSTypeReference",
-									"start": 711,
-									"end": 712,
+									"start": 712,
+									"end": 713,
 									"loc": {
 										"start": {
 											"line": 12,
@@ -282,8 +282,8 @@
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 711,
-										"end": 712,
+										"start": 712,
+										"end": 713,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -300,8 +300,8 @@
 										{
 											"type": "Line",
 											"value": " c",
-											"start": 704,
-											"end": 708
+											"start": 705,
+											"end": 709
 										}
 									]
 								}
@@ -329,8 +329,8 @@
 								},
 								{
 									"type": "TemplateElement",
-									"start": 715,
-									"end": 715,
+									"start": 716,
+									"end": 716,
 									"loc": {
 										"start": {
 											"line": 13,
@@ -409,8 +409,8 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 720,
-					"end": 753,
+					"start": 721,
+					"end": 755,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -423,8 +423,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 725,
-						"end": 726,
+						"start": 726,
+						"end": 727,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -439,8 +439,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSLiteralType",
-						"start": 729,
-						"end": 752,
+						"start": 730,
+						"end": 754,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -453,8 +453,8 @@
 						},
 						"literal": {
 							"type": "TemplateLiteral",
-							"start": 729,
-							"end": 752,
+							"start": 730,
+							"end": 754,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -468,8 +468,8 @@
 							"expressions": [
 								{
 									"type": "TSTypeReference",
-									"start": 747,
-									"end": 748,
+									"start": 749,
+									"end": 750,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -482,8 +482,8 @@
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 747,
-										"end": 748,
+										"start": 749,
+										"end": 750,
 										"loc": {
 											"start": {
 												"line": 17,
@@ -500,8 +500,8 @@
 										{
 											"type": "Block",
 											"value": " c\n\td ",
-											"start": 733,
-											"end": 744
+											"start": 735,
+											"end": 746
 										}
 									]
 								}
@@ -509,8 +509,8 @@
 							"quasis": [
 								{
 									"type": "TemplateElement",
-									"start": 730,
-									"end": 731,
+									"start": 731,
+									"end": 732,
 									"loc": {
 										"start": {
 											"line": 15,
@@ -529,8 +529,8 @@
 								},
 								{
 									"type": "TemplateElement",
-									"start": 751,
-									"end": 751,
+									"start": 753,
+									"end": 753,
 									"loc": {
 										"start": {
 											"line": 18,

@@ -23,7 +23,7 @@ use crate::ast::internal::{
 use crate::printer::LeadingGlue;
 use crate::printer::layout::{bracketed_list_body, hang_after_operator};
 use crate::printer::{CommentVec, ShellLeadingRun};
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Comment;
 use tsv_lang::INDENT;
 use tsv_lang::Span;
@@ -48,6 +48,17 @@ use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_after_posit
 /// than peeling only the top shell here.
 fn tuple_elem_span(ty: &TSType<'_>) -> Span {
     unwrap_parenthesized(ty).span()
+}
+
+/// One tuple element's head, as the forced-multiline tuple builder resolves it ahead of its
+/// loop ([`Printer::build_tuple_type_doc_with_line_comments`]): the Rule A freeze verdict,
+/// the leading-edge claim the element's doc is built under, and its PRINTED start — the
+/// end of the gap the emitter ahead of it owns (`[`-line prefix, comma, or leading run).
+#[derive(Clone, Copy)]
+struct TupleElementHead {
+    frozen: bool,
+    claim: Option<Span>,
+    start: u32,
 }
 
 /// Whether a conditional-type branch renders as a **nested conditional** — the question
@@ -2079,9 +2090,38 @@ impl<'a> Printer<'a> {
         // no elision, so the first element is always present. See
         // conformance_prettier_ts_comments.md §Comment relocation (Tuple type `[`).
         let elem_span_at = |i: usize| tuple_elem_span(&t.element_types[i]);
-        let first_elem_start = elem_span_at(0).start;
+        // Each element's freeze verdict, leading-edge claim and PRINTED start, resolved
+        // ahead of the loop because two of the gap emitters read the NEXT element's start:
+        // the `[`-line prefix reads the first element's, the comma emitter each
+        // successor's. A redundant shell at the element's leading printed EDGE strips, and
+        // a transparent one-member composite drops its operator, so a `//` the author
+        // wrote there is in this element's own gap and the reparse finds it here — on the
+        // `[` line or the comma's line when that is where it sits. Bounding those two
+        // emitters at the element's OWN span instead left the run to the leading emitter,
+        // which gave it a line of its own: `[| // c⏎A]` printed `[⏎// c⏎A⏎]` where the
+        // operator-less `[// c⏎A]` prints `[ // c⏎A⏎]`, two fixed points for one program
+        // (`tuple/element_single_member_head_line_comment`). Rule A: an alone-on-line
+        // directive in the element's gap freezes it; the directive itself is emitted by the
+        // gap's leading run. No must-break question — this layout is already all-hardline.
+        // The shell's own emitter would otherwise print the run at the shell's indent and
+        // force a `flush_break` this list cannot reproduce
+        // ([`Printer::leading_edge_claim_and_start`]).
+        let elem_heads: SmallVec<[TupleElementHead; 8]> = (0..t.element_types.len())
+            .map(|i| {
+                let frozen = self.list_item_frozen(t.span.start + 1, &elem_span_at, i);
+                let (claim, start) = self.leading_edge_claim_and_start(
+                    frozen,
+                    unwrap_parenthesized(&t.element_types[i]),
+                );
+                TupleElementHead {
+                    frozen,
+                    claim,
+                    start,
+                }
+            })
+            .collect();
         let (bracket_line_prefix, delimiter_pull_pos) =
-            self.delimiter_line_comment_prefix(t.span.start, first_elem_start);
+            self.delimiter_line_comment_prefix(t.span.start, elem_heads[0].start);
 
         let mut inner_parts = DocBuf::new();
         let mut prev_end = t.span.start + 1; // After the opening `[`
@@ -2095,15 +2135,11 @@ impl<'a> Printer<'a> {
             // element, drop comments pulled onto the `[` line (emitted as the
             // bracket-line prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
-            // Rule A: an alone-on-line directive in this element's gap freezes
-            // it; the directive itself was just emitted by the leading run above.
-            // No must-break question — this layout is already all-hardline.
-            let frozen = self.list_item_frozen(t.span.start + 1, &elem_span_at, i);
-            // A redundant shell at the element's leading printed EDGE strips, so its `//`
-            // is in this element's own gap and the reparse finds it here; the shell's own
-            // emitter would print it at the shell's indent and force a `flush_break` this
-            // list cannot reproduce ([`Printer::leading_edge_claim_and_start`]).
-            let (claim, gap_end) = self.leading_edge_claim_and_start(frozen, elem);
+            let TupleElementHead {
+                frozen,
+                claim,
+                start: gap_end,
+            } = elem_heads[i];
             let leading = self.build_leading_comments_multiline(prev_end, gap_end, skip_delim);
             let elem_doc = if frozen {
                 self.build_frozen_list_member_doc(elem)
@@ -2113,7 +2149,10 @@ impl<'a> Printer<'a> {
             inner_parts.push(self.build_list_element_group(leading, elem_doc));
 
             if !is_last {
-                let next_start = elem_span_at(i + 1).start;
+                // The next element's PRINTED start, so a `//` in its stripped head region
+                // that shares the comma's line trails the comma here rather than leading
+                // the element from the gap emitter above.
+                let next_start = elem_heads[i + 1].start;
                 // Tuples preserve an author blank line before a member's own-line
                 // leading comment (prettier does; type-param/arg lists do not).
                 prev_end = self.emit_multiline_comma_with_comments(

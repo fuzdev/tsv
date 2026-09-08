@@ -8,12 +8,13 @@ now the intersection sits inside a **tuple element** (`[(…) & B]`) rather than
 type-alias RHS. The double-nested form behaves the same.
 
 **tsv** strips the shell and hangs the run at the tuple element's own fixed point —
-the pair keeping the one line the author wrote it on, and the intersection inline on
-the continuation:
+the pair keeping the one line the author wrote it on, which is the `[` line (the
+opening-delimiter rule the tuple's gap answers for every route into it, the stripped shell's
+run included — [open_bracket_comment](../tuple/open_bracket_comment_prettier_divergence/)),
+and the intersection inline on the continuation:
 
 ```
-type T = [
-	/* b */ // c
+type T = [ /* b */ // c
 	A & B
 ];
 ```
@@ -28,8 +29,9 @@ made the element gap own. The type-alias RHS sibling above reads differently on
 purpose: its keyword→value emitter trails the first comment on the `=` line
 unconditionally, so the pair cannot stay together there.
 
-On the paren shell prettier is non-idempotent: its unstable first pass breaks the
-intersection (`A &⏎ B`) before converging to this input, so the shells are
-`unformatted_ours` + `prettier_intermediate`.
+Prettier un-glues the `[` line (`output_prettier`, the glued pair on a line of its own),
+and from the paren shell reaches it non-idempotently — its unstable first pass breaks the
+intersection (`A &⏎ B`) before converging — so those chains are pinned by
+`audit_signature_*.txt`.
 
 See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

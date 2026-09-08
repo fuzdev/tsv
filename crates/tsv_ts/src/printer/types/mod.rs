@@ -55,6 +55,7 @@ use crate::ast::internal::{TSImportType, TSIntersectionType, TSParenthesizedType
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, ShellLeadingRun};
+use helpers::TypeParenRule;
 use helpers::outermost_paren;
 use helpers::paren_shell_gaps;
 use helpers::type_needs_parens_for_array_element;
@@ -429,7 +430,7 @@ impl<'a> Printer<'a> {
             }
             TSType::Mapped(m) => self.build_mapped_type_doc(m),
             TSType::TypeOperator(o) => {
-                let needs_parens = type_needs_parens_for_prefix_operator(o.type_annotation);
+                let needs_parens = type_needs_parens_for_prefix_operator(self, o.type_annotation);
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
                 // A line comment or multiline block keeps the comment with the operator
@@ -466,12 +467,12 @@ impl<'a> Printer<'a> {
                     // operand inline.
                     let value_doc = self.with_claimed_shell_leading_run(hang.claimed_shell, || {
                         let operand_doc = self.build_type_doc(operand_hang_type);
-                        let value_doc = if type_needs_parens_for_prefix_operator(operand_hang_type)
-                        {
-                            d.parens(operand_doc)
-                        } else {
-                            operand_doc
-                        };
+                        let value_doc =
+                            if type_needs_parens_for_prefix_operator(self, operand_hang_type) {
+                                d.parens(operand_doc)
+                            } else {
+                                operand_doc
+                            };
                         self.with_stripped_paren_trailing(
                             value_doc,
                             o.type_annotation,
@@ -774,16 +775,19 @@ impl<'a> Printer<'a> {
                 d.concat(&parts)
             }
             TSType::Rest(r) => {
-                // Comments between `...` and the type
+                // Comments between `...` and the type. A transparent one-member composite
+                // is its member here, the `|` dropped and its head gap folded into the
+                // `...`→type gap ([`Self::transparent_value`]): built as the composite,
+                // its own leading-pipe layout kept a pipe the reparse drops
+                // (`...| // c⏎  A[]`), and the `&` spelling's indent shell read back one
+                // level shallower — two fixed points for one program
+                // (`tuple/rest_single_member_head_line_comment`).
                 let dots_end = r.span.start + "...".len() as u32;
-                let type_start = r.type_annotation.span().start;
+                let ty = self.transparent_value(r.type_annotation);
+                let type_start = ty.span().start;
                 // Break a line comment so it can't swallow the rest-element type.
                 let comments_doc = self.build_trailing_comments_hang_next(dots_end, type_start);
-                d.concat(&[
-                    d.text("..."),
-                    comments_doc,
-                    self.build_type_doc(r.type_annotation),
-                ])
+                d.concat(&[d.text("..."), comments_doc, self.build_type_doc(ty)])
             }
             TSType::Optional(o) => {
                 // The optional element is the SOLE emitter of its operand shell's leading
@@ -1501,7 +1505,7 @@ impl<'a> Printer<'a> {
     fn required_pair_head_shell(
         &self,
         head: &TSType<'_>,
-        needs_parens: fn(&TSType<'_>) -> bool,
+        needs_parens: TypeParenRule,
         run: EdgeRun,
     ) -> Option<HeadRegion> {
         self.leading_edge_shell(
@@ -2073,10 +2077,10 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_required_paren_pair_operand_doc(
         &self,
         ty: &TSType<'_>,
-        needs_parens: fn(&TSType<'_>) -> bool,
+        needs_parens: TypeParenRule,
     ) -> DocId {
         let d = self.d();
-        if !needs_parens(ty) {
+        if !needs_parens(self, ty) {
             return self.build_type_doc(ty);
         }
         if !self.paren_retains_for_trailing_run(ty)
@@ -2105,7 +2109,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn required_paren_pair_opens(
         &self,
         ty: &TSType<'_>,
-        needs_parens: fn(&TSType<'_>) -> bool,
+        needs_parens: TypeParenRule,
     ) -> bool {
         self.paren_retains_for_trailing_run(ty)
             || self.required_paren_pair_opens_for_leading_run(ty, needs_parens)
@@ -2118,10 +2122,10 @@ impl<'a> Printer<'a> {
     fn required_paren_pair_opens_for_leading_run(
         &self,
         ty: &TSType<'_>,
-        needs_parens: fn(&TSType<'_>) -> bool,
+        needs_parens: TypeParenRule,
     ) -> bool {
         !self.paren_retains_for_trailing_run(ty)
-            && needs_parens(ty)
+            && needs_parens(self, ty)
             && self.required_paren_open_run(ty).is_some()
     }
 

@@ -7,7 +7,7 @@
 //   type / type-argument list) can control breaking
 
 use super::super::CommentVec;
-use super::helpers::{outermost_paren, unwrap_parenthesized};
+use super::helpers::{TypeParenRule, outermost_paren, unwrap_parenthesized};
 use super::union_intersection::union_member_parens;
 use super::{Printer, StandaloneGlue};
 use crate::ast::internal::{
@@ -343,7 +343,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_type_doc_maybe_parens(
         &self,
         ts_type: &TSType<'_>,
-        needs_parens: fn(&TSType<'_>) -> bool,
+        needs_parens: TypeParenRule,
     ) -> DocId {
         self.build_type_doc_maybe_parens_impl(
             ts_type,
@@ -369,7 +369,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_optional_element_type_doc(
         &self,
         ts_type: &TSType<'_>,
-        needs_parens: fn(&TSType<'_>) -> bool,
+        needs_parens: TypeParenRule,
     ) -> DocId {
         self.build_type_doc_maybe_parens_impl(
             ts_type,
@@ -398,7 +398,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_intersection_member_type_doc(
         &self,
         ts_type: &TSType<'_>,
-        needs_parens: fn(&TSType<'_>) -> bool,
+        needs_parens: TypeParenRule,
     ) -> DocId {
         self.build_type_doc_maybe_parens_impl(
             ts_type,
@@ -417,12 +417,12 @@ impl<'a> Printer<'a> {
     fn build_type_doc_maybe_parens_impl(
         &self,
         ts_type: &TSType<'_>,
-        needs_parens: fn(&TSType<'_>) -> bool,
+        needs_parens: TypeParenRule,
         default_paren_indent: DefaultParenIndent,
         shell_leading_run: ShellLeadingRun,
     ) -> DocId {
         let d = self.d();
-        if needs_parens(ts_type) {
+        if needs_parens(self, ts_type) {
             // Special case: intersection with trailing object type — build a custom
             // doc that aligns the trailing object's body + closing `})` with the
             // union member's `| {` offset (`build_aligned_object_literal_doc`'s double

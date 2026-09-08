@@ -20,8 +20,7 @@
 		| G;
 
 	// an optional tuple element
-	type H = [
-		/* c4 */ // d4
+	type H = [ /* c4 */ // d4
 		I?
 	];
 

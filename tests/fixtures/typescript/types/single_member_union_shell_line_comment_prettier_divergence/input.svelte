@@ -20,8 +20,7 @@
 	};
 
 	// a tuple element
-	type M = [
-		// c5
+	type M = [ // c5
 		N | O
 	];
 

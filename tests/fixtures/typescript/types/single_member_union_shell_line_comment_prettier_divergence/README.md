@@ -39,12 +39,14 @@ The union's own leading `|`→member gap is the same transparency one node up: a
 written *there* (`| // c⏎A`) is the enclosing seam's and takes its continuation, the pipe
 dropped — [union_single_member_head_line_comment](../union_single_member_head_line_comment_prettier_divergence/).
 
-The **delimiter-line** question is not this one and is answered from the source: at `M` and
-`P` the author wrote `| (` between the `[` / `(` and the comment, so nothing is glued to the
-delimiter and the run takes its own line (prettier's placement exactly). The bare authoring
-glues, and keeps the delimiter's line — the divergence
-[conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
-catalogs for tuple `[` and the paren shells.
+The **delimiter-line** question is not this one, and the two delimiters answer it
+differently. At `M` the run reaches the tuple's own gap, which answers every route into it
+one way — the `[`-line form the bare authoring `[// c⏎N | O]` takes (the opening-delimiter
+rule; [tuple/element_single_member_head_line_comment](../tuple/element_single_member_head_line_comment_prettier_divergence/)):
+the `| (` the author wrote between the `[` and the comment prints nothing, so it decides
+nothing. At `P` the position REQUIRES a pair, and that pair's own emitter opens over the
+run inside it (`(⏎// c6⏎Q | R⏎)['k']`) — prettier's placement exactly, and the pair's
+answer rather than a delimiter's.
 
 ## Prettier
 

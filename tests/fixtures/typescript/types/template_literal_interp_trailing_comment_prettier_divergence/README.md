@@ -5,7 +5,9 @@ type dropped to the next line and `}` on its own line — a `//` can't swallow t
 multiline block's authored break isn't reflowed. Covers both comment kinds (line, multiline
 block) plus the width case (`V`).
 
-- **tsv** keeps the comment on the `${` line (`` `a${// c⏎⇥B⏎}` ``).
+- **tsv** keeps the comment on the `${` line (`` `a${ // c⏎⇥B⏎}` `` — the gap ahead of it is the
+  printer's one space, as at every other opening delimiter; `unformatted_ours_glued` is the
+  space-less authoring).
 - **Prettier** expands the interpolation, moving the comment down onto its own line
   (`` `a${⏎// c⏎B⏎}` ``).
 
