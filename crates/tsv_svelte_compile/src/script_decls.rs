@@ -77,7 +77,8 @@ pub(crate) fn each_script_declaration<'arena, E>(
 /// `top` distinguishes the script's own statement list from a nested one. Below
 /// the top level only a `var` reaches script scope: `let`/`const` are
 /// block-scoped, and a nested `function`/`class` declaration is block-scoped too
-/// (tsv is strict-mode-only, so Annex B function hoisting does not apply).
+/// (Annex B function hoisting is out of tsv's grammar, and a component's
+/// `<script>` is a module — strict code — where it would not apply anyway).
 ///
 /// `porous` records whether at least one POROUS scope sits between `stmt` and the
 /// script scope, because that changes what the oracle's binding CARRIES — see

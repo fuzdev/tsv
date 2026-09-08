@@ -109,8 +109,11 @@ All content-processing commands support three input methods:
 and `import`/`export`/`import.meta` are errors. For `format` it applies to
 `--content`/`--stdin` only — file paths are always formatted as modules (Svelte and CSS
 have no goal), and a path argument with `--goal` is a usage error (exit 2); `parse`
-honors `--goal` on file paths too. Both
-goals are strict; see [conformance_test262.md §Strict Mode Only, Explicit Goal Axis](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis).
+honors `--goal` on file paths too. The goal does not decide strictness: Module code is
+strict, Script code is strict only once a `"use strict"` directive prologue says so (see
+[CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive); the
+goal axis itself is
+[conformance_test262.md §Strict Mode Only, Explicit Goal Axis](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis)).
 
 `parse` also takes `--no-locations`: it emits the span-only wire — `start`/`end`
 offsets but no per-node `loc` (line/column) object, and for Svelte no `name_loc`

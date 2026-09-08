@@ -187,16 +187,15 @@ fn takes_strict_prefix(module: bool, only_strict: bool) -> bool {
 /// test262/INTERPRETING.md a raw test runs once **in non-strict mode only**;
 /// nearly all exercise mode-INDEPENDENT syntax (hashbang comments, HTML-close
 /// comments, `"use strict"` directive prologues) whose accept/reject is identical
-/// strict or sloppy, so a strict-only parser grades them correctly and they stay
-/// graded. The entries here are the exceptions: their source uses a construct tsv
-/// rejects only because it parses strict-mode-only (`with`, legacy octal), so
-/// grading at strict produces a *spurious* failure. They're out of tsv's scope
-/// exactly as `noStrict` is, and skipped for the same reason.
+/// strict or sloppy, so they grade correctly at their goal and stay graded. The
+/// entries here are the exceptions: their source uses a construct tsv rejects
+/// under every mode, so grading produces a *spurious* failure. They're out of the
+/// graded strict subset exactly as `noStrict` is, and skipped for the same reason.
 ///
 /// Currently one: `hashbang/use-strict.js`, where the leading `#!` makes the
 /// following `"use strict"` a hashbang comment rather than a directive, leaving
-/// the program sloppy so its `with ({}) {}` is legal — which tsv, being
-/// strict-only, correctly rejects.
+/// the program sloppy so its `with ({}) {}` is legal — and `with` is the one
+/// sloppy-mode statement tsv rejects at every goal and every strictness.
 const SLOPPY_ONLY_RAW_TESTS: &[&str] = &["test/language/comments/hashbang/use-strict.js"];
 
 /// Whether a graded path is a `raw` test that needs sloppy-mode semantics tsv
@@ -235,12 +234,12 @@ fn classify(relative_path: &str, content: &str) -> Classification {
     if let Some(feature) = frontmatter.requires_unimplemented_feature() {
         return Classification::Skip(SkipReason::UnimplementedFeature(feature));
     }
-    // Both kinds of sloppy-mode-required test are out of tsv's strict-only scope:
+    // Both kinds of sloppy-mode-required test are out of the graded strict subset:
     // an explicit `noStrict` declaration, and a `raw` test (non-strict mode only
     // per test262/INTERPRETING.md) that is sloppy *by content* — it uses a
-    // construct tsv rejects only because it's strict-only (`with`, legacy octal),
-    // so grading it at strict would be a spurious failure. The remaining raw tests
-    // exercise mode-independent syntax and stay graded at their goal.
+    // construct tsv rejects under every mode (`with`), so grading it would be a
+    // spurious failure. The remaining raw tests exercise mode-independent syntax
+    // and stay graded at their goal.
     if frontmatter.requires_sloppy_mode() || is_sloppy_only_raw(&frontmatter, relative_path) {
         return Classification::Skip(SkipReason::SloppyModeRequired);
     }
@@ -260,10 +259,13 @@ fn classify(relative_path: &str, content: &str) -> Classification {
 
 /// The parse goal for a graded test. A `module`-flagged test is parsed as a
 /// `Module`; everything else tsv grades (the run-both-ways default and
-/// `onlyStrict`) is a strict `Script` — `await` is an ordinary identifier there,
-/// and `import`/`export`/`import.meta` are syntax errors. tsv is strict under both
-/// goals (sloppy `noStrict` tests, and the sloppy-by-content `raw` test, are
-/// skipped above; the remaining `raw` tests are graded).
+/// `onlyStrict`) is a `Script` — `await` is an ordinary identifier there, and
+/// `import`/`export`/`import.meta` are syntax errors. The goal carries no
+/// strictness of its own past `Module`: an `onlyStrict` script is made strict by
+/// the harness prefix [`graded_source`] prepends; a run-both-ways test is graded
+/// once at the bare `Script` and declares its verdict mode-independent; the
+/// sloppy-declaring tests (`noStrict`, and the sloppy-by-content `raw` test) are
+/// skipped above.
 fn goal_for(module: bool) -> tsv_ts::Goal {
     if module {
         tsv_ts::Goal::Module
@@ -326,7 +328,7 @@ pub struct ManifestEntry {
     pub relative_path: String,
     /// Whether the test carries `flags: [module]`. Load-bearing: it selects the
     /// parse goal on both sides of the differential. tsv grades this file at
-    /// `goal_for(module)` (`module` → `Goal::Module`, else strict `Goal::Script`),
+    /// `goal_for(module)` (`module` → `Goal::Module`, else `Goal::Script`),
     /// and the consumer mirrors that goal in the alternative parser — so an
     /// `await`-as-identifier script test lands in `both-accept`, not `both-reject`.
     pub module: bool,
@@ -510,7 +512,7 @@ mod tests {
     /// A `raw` test runs in non-strict mode only, but most exercise
     /// mode-independent syntax tsv grades correctly, so a raw test is GRADED at
     /// its goal — UNLESS it is sloppy by content (in `SLOPPY_ONLY_RAW_TESTS`), in
-    /// which case it's skipped like `noStrict`, out of tsv's strict-only scope.
+    /// which case it's skipped like `noStrict`, out of the graded strict subset.
     #[test]
     fn classify_grades_raw_but_skips_sloppy() {
         // Mode-independent raw test (a hashbang not in the sloppy-only list) — graded.

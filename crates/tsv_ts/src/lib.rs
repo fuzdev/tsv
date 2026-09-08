@@ -186,9 +186,10 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Progr
 ///
 /// [`parse`] is the `Goal::Module` form (the default, correct for Svelte
 /// `<script>` and ~all real TS). Pass `Goal::Script` to parse a standalone
-/// strict script, where `await` is an ordinary identifier and `import`/`export`
+/// script, where `await` is an ordinary identifier and `import`/`export`
 /// declarations, `import.meta`, and top-level `await` expressions are syntax
-/// errors. tsv is strict under both goals.
+/// errors. The goal carries no strictness of its own past `Module`: a script is
+/// sloppy unless its directive prologue holds a `"use strict"`.
 pub fn parse_with_goal<'arena>(
     source: &str,
     goal: Goal,

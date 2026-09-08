@@ -813,27 +813,36 @@ list above.
 
 # Out of Scope
 
-## Strict Mode Only (with an explicit goal axis)
+## Strictness (with an explicit goal axis)
 
-All code in Svelte scripts runs in strict mode (ES modules). tsv parses the
-syntactic grammar; it enforces the *lexical* strict-mode restrictions but not the
-strict-mode *early errors* — those still parse, with enforcement deferred to a
-future diagnostics layer.
+Module code is strict always, so all code in Svelte scripts is (ES modules); Script
+code is strict iff its directive prologue holds a `"use strict"`. tsv parses the
+syntactic grammar; it enforces the strict-mode *production disallowances* but not the
+strict-mode *early errors* — those still parse, with enforcement deferred to a future
+diagnostics layer. See [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive).
 
-Strict and the *goal* (`Module` vs `Script`) are orthogonal — both goals are
-strict. tsv defaults to `Module` (Svelte hard-wires it); a `Script` goal is
+Strictness and the *goal* (`Module` vs `Script`) are orthogonal, coupled only by
+Module ⟹ strict. tsv defaults to `Module` (Svelte hard-wires it); a `Script` goal is
 available (`parse_with_goal`, `--goal script`), where `await` is an ordinary
 identifier and `import`/`export`/`import.meta` are errors. See
 [conformance_test262.md](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis).
 
 Rejected by the parser today:
 
-- `with` statement — SyntaxError
-- Legacy octal literals (`0777`) — SyntaxError (use `0o777`)
+- `with` statement — SyntaxError, under every mode
+- Leading-zero numeric literals (`0777`, `08`) — SyntaxError in **strict** code (use
+  `0o777`); read in a sloppy Script, base 8 for the all-octal form
+- Annex B web-compatibility grammar (HTML-like comments, labelled function
+  declarations, `for (var x = 1 in o)`) — out of scope at both goals, ecma262's own
+  non-browser-host carve-out
 
 Early errors that still parse (not yet enforced):
 
-- Octal escape sequences in strings (`'\07'`)
+- Octal escape sequences in strings (`'\07'`) — accepted under every mode
+- A `"use strict"` directive in a function with a non-simple parameter list
+  (`function f(a = 1) { "use strict"; }`) — tsv honors the directive rather than refusing
+  the function (acorn rejects it); the params themselves are parsed under the *outer* mode
+  on both sides
 - Duplicate parameter names (`function f(a, a) {}`)
 - Reserved words as identifiers — the strict-mode-reserved list of ecma262 §sec-identifiers-static-semantics-early-errors (`var public = 1`, `var let = 1`, `function f(yield) {}`)
 - A reserved word or string as an export specifier's LOCAL name with no `from` clause

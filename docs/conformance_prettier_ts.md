@@ -202,6 +202,32 @@ and is rejected by acorn and tsv. Every other identifier-shaped word after
 `_svelte_divergence` fixtures (acorn has no `using` declarations at all); only
 the cast keywords diverge from tsc, in tsv's favor of the drop-in oracle.
 
+## Sloppy-script literals prettier refuses
+
+A narrower sibling of the section above, keyed on the **parse goal** rather than on a
+construct: at `Goal::Script` with no `"use strict"` directive prologue, tsv parses the
+sloppy-mode productions ECMAScript defines for Script code, and prettier's `typescript`
+parser refuses them because tsc's scanner has no sloppy mode. There is no
+`output_prettier.*` for these; each fixture carries `prettier_rejects.txt`.
+
+- Leading-zero numeric literals — `LegacyOctalIntegerLiteral` (`010`, `0777`, read in base 8)
+  and `NonOctalDecimalIntegerLiteral` (`08`, `089`, `08.5`, read as decimal) — `Octal literals
+  are not allowed. Use the syntax '0o10'.` / `Decimals with leading zeros are not allowed.` —
+  [script_goal/sloppy_legacy_octal_literal](../tests/fixtures/typescript/script_goal/sloppy_legacy_octal_literal_prettier_divergence/)
+
+Both forms are disallowed in strict code by **production** (ecma262
+sec-strict-mode-of-ecmascript), not by an early error, so they are legal exactly where the
+code is sloppy: a Script whose directive prologue holds no `"use strict"`. tsv's Script goal
+is spec-conforming, so it reads them and prints them verbatim. A Svelte `<script>` is always
+a module and every other tsv entry point defaults to `Goal::Module`, so nothing here is
+reachable without asking for the Script goal.
+
+tsc's scanner raises the error with no strictness check at all, which makes tsv's acceptance
+an over-acceptance against tsc in *both* modes as well — the same posture the parser takes
+wherever the drop-in oracle (acorn) and tsc disagree about a construct acorn's own grammar
+defines. acorn agrees with tsv exactly: it accepts every form at `sourceType: 'script'` and
+rejects every one at `'module'`.
+
 ## tsv rejects what prettier formats
 
 The reverse of the section above, and rarer: prettier parses and prints the input,

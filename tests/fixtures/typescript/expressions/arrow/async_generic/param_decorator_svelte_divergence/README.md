@@ -28,7 +28,7 @@ So the rejection tsv keeps here rests on **prettier**, not on tsc's parser: a
 construct prettier cannot parse is one tsv rejects, and TS1206 is an
 *unconditional-local* grammar error — a parameter decorator on an arrow is invalid in
 every context, not in some mode or scope — which is the bucket tsv rejects rather
-than defers to a diagnostics layer (root `CLAUDE.md` §Strict Mode Only). The three
+than defers to a diagnostics layer (root `CLAUDE.md` §Strictness). The three
 non-fixture rows are the ordinary drop-in rejections pinned by the `input_invalid_*`
 cases in
 [typescript_specific/decorators/parameter_arrow](../../../../typescript_specific/decorators/parameter_arrow/).

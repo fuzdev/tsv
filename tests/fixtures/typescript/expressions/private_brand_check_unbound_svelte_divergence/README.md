@@ -17,7 +17,7 @@ enclosing class body **declare** this name" — and the Script rule even carries
 carve-out, `PerformEval` re-running it against the *caller's* private environment. There is
 no reading of it a parser can answer from the production's own context, which is precisely
 the bucket tsv defers to a future diagnostics layer rather than answering in the parser (see
-[CLAUDE.md §Strict Mode Only](../../../../../CLAUDE.md#strict-mode-only)).
+[CLAUDE.md §Strictness](../../../../../CLAUDE.md#strictness-module-strict-script-by-directive)).
 
 The oracles split along that same line, and tsv sides with the two that read the grammar:
 

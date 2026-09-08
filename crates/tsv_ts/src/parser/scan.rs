@@ -435,6 +435,19 @@ pub(crate) fn parse_number_literal(raw: &str) -> Result<f64, std::num::ParseFloa
         }
     }
 
+    // `LegacyOctalIntegerLiteral` (`010`, `0777`, `00`): a leading `0` whose whole
+    // digit run is octal is read in base 8, acorn's `parseInt(str, 8)`. The
+    // `NonOctalDecimalIntegerLiteral` forms (`08`, `089`, `08.5e1`) carry an `8` or
+    // `9`, so they fall through to the decimal parse below and read as written. The
+    // radix prefixes are already handled above (`0x…`'s tail is not all octal digits
+    // anyway), and the leading `0` alone is an ordinary decimal zero.
+    if let Some(digits) = clean.strip_prefix('0')
+        && !digits.is_empty()
+        && digits.bytes().all(|b| b.is_ascii_digit() && b < b'8')
+    {
+        return Ok(parse_radix_f64(digits, 8));
+    }
+
     // Regular decimal (including scientific notation)
     clean.parse::<f64>()
 }

@@ -250,7 +250,7 @@ The oracle's flag is **document-wide**: its parser regexes the raw source for th
 
 Parens are not a hazard: `tsv_ts` parses with `preserve_parens: false` and re-derives them from precedence, exactly as the oracle's printer does — `(x as T).y` erases to `x.y`, and `(a + b as T) * c` keeps the parens it needs.
 
-**The self-check.** `compile`'s output-reparse validation **cannot** catch a missed erase: tsv's parser is TypeScript-permissive (see the root `CLAUDE.md` §Strict Mode Only), so a surviving annotation still parses, flows through the pipeline, and prints verbatim. The eraser is therefore re-run over the *finished* program: by its `None`-means-unchanged contract, reporting no change **proves** no TypeScript-only node survived. Both halves of the erasure — the script `Program` and each template expression — run before it, so **any** survivor is a compiler bug (`CompileError::TypeErasureLeak`, surfaced loudly, never emitted): a missed erase case, or a borrow point that never called the eraser. It is why a missed borrow point cannot silently ship TypeScript.
+**The self-check.** `compile`'s output-reparse validation **cannot** catch a missed erase: tsv's parser is TypeScript-permissive (see the root `CLAUDE.md` §Strictness), so a surviving annotation still parses, flows through the pipeline, and prints verbatim. The eraser is therefore re-run over the *finished* program: by its `None`-means-unchanged contract, reporting no change **proves** no TypeScript-only node survived. Both halves of the erasure — the script `Program` and each template expression — run before it, so **any** survivor is a compiler bug (`CompileError::TypeErasureLeak`, surfaced loudly, never emitted): a missed erase case, or a borrow point that never called the eraser. It is why a missed borrow point cannot silently ship TypeScript.
 
 ### TypeScript — Refused
 
@@ -484,7 +484,7 @@ Each is implemented in phase 2 over the Svelte AST, in Svelte-domain terms:
 The clearest case is `dollar_prefix_invalid`: it is literally
 `node.name.startsWith('$')` on a binding — a **reserved-prefix** rule Svelte owns, not
 a JS one. `let $$slots = 1;` is valid JavaScript, and tsc — [this repo's oracle for
-what is really an error](../CLAUDE.md#strict-mode-only) — accepts it under `--strict`.
+what is really an error](../CLAUDE.md#strictness-module-strict-script-by-directive) — accepts it under `--strict`.
 Nothing in the deferred set (duplicate parameter names, reserved words as identifiers,
 octal escapes, `delete` of a plain name) reaches any of these rules.
 
