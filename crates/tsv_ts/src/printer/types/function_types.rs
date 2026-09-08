@@ -361,8 +361,15 @@ impl<'a> Printer<'a> {
             // union printer gives a hugging union no group of its own, so nothing
             // above the member can break — the hang below is for the non-hugging
             // unions only, where a member/gap comment has made the printer decline.
+            // A handed run that leaves the hug standing — a multi-line block, the sole
+            // member's leading comment — is already inside `type_doc`: `joined` would
+            // print the gap a second time (docs/comments.md hazard 3).
             if hugged {
-                return joined(d.text(arrow_sp), type_doc);
+                return if run_handed {
+                    d.concat(&[d.text(arrow_sp), type_doc])
+                } else {
+                    joined(d.text(arrow_sp), type_doc)
+                };
             }
             // The gap's unclaimed run rides INSIDE the hang through the value-gap
             // leading emitter, as the annotation's hang does

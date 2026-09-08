@@ -35,4 +35,27 @@ broke-after authoring itself, which tsv normalizes to `input.svelte` in one pass
 (prettier keeps it as `output_prettier.svelte`). A short member collapses the
 comment back onto the operator in both formatters (the last case).
 
+**An own-line block after an authored leading pipe** (`: |⏎/* c */⏎{ … } | null`,
+`unformatted_ours_pipe_own_line.svelte`; `: | /* c */⏎{ … }`,
+`unformatted_ours_pipe_glued_own_line.svelte`) is the same case for tsv: a block
+separated from the member by a newline binds to the union whether or not a pipe
+was authored, so both normalize to `input.svelte`. Prettier's union span starts at
+the authored pipe, so the comment sits inside the union and binds to the first
+member instead: it declines the hug and prints the comment own-line after the
+pipe with the member aligned beneath it — a stable form of its own
+(`prettier_variant_pipe_own_line.svelte`, which tsv normalizes back to input):
+
+```ts
+let a:
+	| /* c */
+	  {
+			aaaa: Aaaaaaaaa;
+	  }
+	| null;
+```
+
+A block **glued** to the pipe (`/* c */ | {`, `/* c */ |⏎{`) is not this case:
+both formatters bind it to the member
+([union_hug_gap_block_comment_leading_pipe](../union_hug_gap_block_comment_leading_pipe/)).
+
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
