@@ -66,13 +66,17 @@ impl Frontmatter {
     /// files, no `"use strict"` transform. Per test262/INTERPRETING.md a raw test
     /// runs **once, in non-strict mode only**. Most exercise mode-independent
     /// syntax (hashbang, HTML-close comments, directive prologues) tsv grades
-    /// correctly anyway; the runner skips only the ones whose verdict genuinely
-    /// needs sloppy semantics (see `runner::is_sloppy_only_raw`).
+    /// correctly anyway; the runner skips the ones whose verdict genuinely needs
+    /// sloppy semantics (see `runner::is_sloppy_only_raw`), plus the contradictory
+    /// `raw` + `onlyStrict` shape test262 does not carry.
     pub fn is_raw(&self) -> bool {
         self.flags.iter().any(|f| f == "raw")
     }
 
-    /// Check if this test requires strict mode only.
+    /// Check if this test declares a single strict run (`flags: [onlyStrict]`).
+    /// Such a test never carries `"use strict"` itself — test262-harness inserts
+    /// the directive ahead of the source, and so does the runner
+    /// (`runner::graded_source`).
     pub fn requires_strict_mode(&self) -> bool {
         self.flags.iter().any(|f| f == "onlyStrict")
     }

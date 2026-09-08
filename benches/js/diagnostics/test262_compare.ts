@@ -6,7 +6,8 @@
  * (tsv's graded strict subset — each row carries the test's `expected` verdict
  * and tsv's actual verdict), runs oxc-parser over the same files at the same
  * goal tsv grades each at (`module`-flagged → module, else strict script — tsv
- * supports both goals, always strict), and buckets the agreement so a tsv
+ * supports both goals, always strict) and under the same harness strict-mode
+ * transform (`graded_source`), and buckets the agreement so a tsv
  * failure can be triaged as a real bug vs. a shared limitation. The two starred buckets
  * are the actionable output:
  *   - positives where tsv rejects but oxc accepts → tsv real-bug candidates
@@ -66,12 +67,42 @@ console.error(
 );
 
 /**
+ * The directive test262-harness inserts as the initial character sequence of a
+ * test's source before running it in strict mode (test262/INTERPRETING.md
+ * §Strict Mode). The Rust runner prepends the same string, so the differential
+ * hands oxc exactly the source tsv parsed.
+ */
+const USE_STRICT_PREFIX = '"use strict";\n';
+
+/**
+ * The source to parse for one manifest row — the file's content with the
+ * harness's strict-mode transform applied where the runner applies it.
+ *
+ * The manifest reports `strict` (the test is graded in strict mode by its own
+ * declaration) and `module` (strict by the goal itself), so a row that is strict
+ * at script goal is exactly an `onlyStrict` test, and that is the one the
+ * harness prepends the directive to.
+ */
+function graded_source(source: string, entry: ManifestEntry): string {
+	return entry.strict && !entry.module ? USE_STRICT_PREFIX + source : source;
+}
+
+/**
  * oxc's accept/reject verdict for one source, parsed at the test's goal to
  * mirror tsv: `module`-flagged tests as a module, everything else (the
- * run-both-ways default + `onlyStrict`) as a strict script — the same goal tsv
- * grades it at (`module` comes from the manifest). So an `await`-as-identifier
- * test, valid only in a script, now lands in `both-accept` rather than
- * `both-reject`. A non-empty `errors` array, or a throw, counts as reject.
+ * run-both-ways default + `onlyStrict`) as a script (`module` comes from the
+ * manifest). So an `await`-as-identifier test, valid only in a script, lands in
+ * `both-accept` rather than `both-reject`.
+ *
+ * The goal axis matches; strictness is not carried by the goal here, because
+ * oxc's `'script'` is sloppy while tsv's `Goal::Script` is strict. The source
+ * closes most of that gap: a row the manifest marks `strict` at script goal is
+ * handed over with the harness's `"use strict";` prefix (`graded_source`), which
+ * puts oxc in strict mode too. What remains is a row that is neither `module`
+ * nor `strict` — sloppy for oxc, strict for tsv — the residual caveat
+ * docs/conformance_test262.md §Differential describes.
+ *
+ * A non-empty `errors` array, or a throw, counts as reject.
  */
 function oxc_verdict(filename: string, source: string, module: boolean): Verdict {
 	try {
@@ -112,7 +143,7 @@ for (const t of manifest.tests) {
 		continue;
 	}
 
-	const oxc_v = oxc_verdict(t.relative_path, source, t.module);
+	const oxc_v = oxc_verdict(t.relative_path, graded_source(source, t), t.module);
 	const row: Row = {
 		path: t.relative_path,
 		module: t.module,

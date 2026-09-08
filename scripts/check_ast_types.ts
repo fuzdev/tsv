@@ -46,6 +46,8 @@ interface Sample {
 	source: string;
 	parser: 'typescript' | 'css' | 'svelte';
 	type: 'Program' | 'StyleSheetFile' | 'Root';
+	/** Parse goal for a `typescript` sample; omitted means the `module` default. */
+	goal?: 'script' | 'module';
 }
 
 const samples: Sample[] = [
@@ -242,7 +244,8 @@ async function parse(sample: Sample): Promise<string> {
 			'--content',
 			sample.source,
 			'--parser',
-			sample.parser
+			sample.parser,
+			...(sample.goal ? ['--goal', sample.goal] : [])
 		],
 		stdout: 'piped',
 		stderr: 'piped'

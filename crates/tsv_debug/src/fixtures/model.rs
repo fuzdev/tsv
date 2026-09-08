@@ -3,7 +3,7 @@
 
 use crate::deno::PrettierParser;
 use crate::fixtures::{AUDIT_SIGNATURE_FILENAME, audit_signature_variant_filename};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tsv_cli::cli::input::ParserType;
 use tsv_ts::Goal;
 
@@ -61,8 +61,10 @@ pub const TSV_REJECTS_FILENAME: &str = "tsv_rejects.txt";
 /// strict **Script** (`tsv_ts::Goal::Script`) rather than the default
 /// **Module** — by both tsv and the acorn `expected.json` oracle — so `await`
 /// is an ordinary identifier and `import`/`export`/`import.meta` are syntax
-/// errors. Absent (the common case) means `Goal::Module`. Only meaningful on
-/// `.ts` / `.svelte.ts` fixtures (Svelte `<script>` and CSS have no goal).
+/// errors. Absent (the common case) means `Goal::Module`. Valid on `.ts` /
+/// `.svelte.ts` fixtures only (Svelte `<script>` and CSS have no goal); the
+/// structure validator rejects it anywhere else (rule S23), since nothing there
+/// would read it.
 pub const GOAL_FILENAME: &str = "goal";
 
 /// Type of input file for a fixture
@@ -237,24 +239,13 @@ impl Fixture {
         self.path.join(TSV_REJECTS_FILENAME)
     }
 
-    /// Get the full path to the parse-goal marker file
-    pub fn goal_path(&self) -> PathBuf {
-        self.path.join(GOAL_FILENAME)
-    }
-
     /// The parse goal for this fixture's input, read lazily from the `goal`
     /// marker file. Absent or unreadable → `Goal::Module` (the default); a file
     /// trimming to `script` → `Goal::Script`. Drives both tsv's parse and the
     /// acorn `expected.json` oracle so a standalone-script fixture is graded at
     /// the same goal on both sides.
     pub fn goal(&self) -> Goal {
-        // Lenient: an absent/unreadable/unrecognized marker → the `Module` default
-        // (only a marker trimming to `script`/`module` selects a goal), via the
-        // shared `Goal::from_source_type` vocabulary.
-        std::fs::read_to_string(self.goal_path())
-            .ok()
-            .and_then(|s| Goal::from_source_type(s.trim()))
-            .unwrap_or(Goal::Module)
+        read_goal_marker(&self.path)
     }
 
     /// Check if this fixture matches any of the given filter terms
@@ -267,6 +258,26 @@ impl Fixture {
             .iter()
             .any(|filter| lower_path.contains(&filter.to_lowercase()))
     }
+}
+
+/// The path of a fixture directory's [`GOAL_FILENAME`] marker — the one spelling
+/// of the join, shared by the reader below and `fixture_init`'s writer.
+pub fn goal_marker_path(dir: &Path) -> PathBuf {
+    dir.join(GOAL_FILENAME)
+}
+
+/// The parse goal a fixture directory declares, read from its [`GOAL_FILENAME`]
+/// marker.
+///
+/// Lenient: absent, unreadable, or unrecognized → `Goal::Module` (the default);
+/// only a marker trimming to `script`/`module` selects a goal, through the
+/// shared `Goal::from_source_type` vocabulary. The one reader, so the validator
+/// (via `Fixture::goal`) and `fixture_init` agree on what a directory declares.
+pub fn read_goal_marker(dir: &Path) -> Goal {
+    std::fs::read_to_string(goal_marker_path(dir))
+        .ok()
+        .and_then(|s| Goal::from_source_type(s.trim()))
+        .unwrap_or(Goal::Module)
 }
 
 /// Check if directory name indicates svelte parser divergence

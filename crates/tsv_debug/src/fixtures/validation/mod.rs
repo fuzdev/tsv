@@ -34,7 +34,7 @@ pub use summary::{ValidationSummary, print_validation_results};
 pub const FIXTURES_MIN: usize = 2_899;
 
 use parsed_input::{input_ast_paths, parse_input};
-use structure::{validate_divergence_readme, validate_fixture_structure};
+use structure::{STRUCTURE_RULE_COUNT, validate_divergence_readme, validate_fixture_structure};
 
 use crate::fixtures::{Fixture, FixtureFiles, read_file};
 
@@ -196,7 +196,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         result.add_error(ValidationError::StructureValidationFailed(e));
     }
 
-    result.add_success(ValidationSuccess::StructureValid(16));
+    result.add_success(ValidationSuccess::StructureValid(STRUCTURE_RULE_COUNT));
 
     // Variant counts for summary reporting (the phases below validate them)
     result.unformatted_count = files.unformatted.len();

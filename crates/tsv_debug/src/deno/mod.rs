@@ -364,16 +364,31 @@ pub async fn parse_css(source: &str) -> Result<Value, DenoError> {
 }
 
 /// Parse `content` with the canonical external parser for `parser`
-/// (Svelte / acorn-typescript / parseCss). The single dispatch point, so callers
-/// keyed on `ParserType` or `InputType::parser_type()` don't re-spell the match.
+/// (Svelte / acorn-typescript / parseCss) at the `Module` goal — see
+/// [`parse_by_type_with_goal`] for the goal-taking form. The single dispatch
+/// point, so callers keyed on `ParserType` or `InputType::parser_type()` don't
+/// re-spell the match.
 pub async fn parse_by_type(
     content: &str,
     parser: tsv_cli::cli::input::ParserType,
 ) -> Result<Value, DenoError> {
+    parse_by_type_with_goal(content, parser, tsv_ts::Goal::Module).await
+}
+
+/// Parse `content` with the canonical external parser for `parser` at `goal`.
+///
+/// The goal reaches acorn only (`sourceType`); Svelte `<script>` is hard-wired to
+/// a module and CSS has no goal, so both ignore it — mirroring
+/// `tsv_cli::cli::format_source::format_source_in_with_goal`.
+pub async fn parse_by_type_with_goal(
+    content: &str,
+    parser: tsv_cli::cli::input::ParserType,
+    goal: tsv_ts::Goal,
+) -> Result<Value, DenoError> {
     use tsv_cli::cli::input::ParserType;
     match parser {
         ParserType::Svelte => parse_svelte(content).await,
-        ParserType::TypeScript => parse_typescript(content).await,
+        ParserType::TypeScript => parse_typescript_with_goal(content, goal).await,
         ParserType::Css => parse_css(content).await,
     }
 }

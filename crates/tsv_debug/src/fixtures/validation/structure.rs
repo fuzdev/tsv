@@ -2,10 +2,11 @@
 //! expected-JSON patterns, and divergence-suffix naming.
 
 use crate::fixtures::{
-    AUDIT_SIGNATURE_FILENAME, EXPECTED_SVELTE_ERROR_JSON, Fixture, FixtureFiles,
-    PRETTIER_NONCONVERGENT_FILENAME, PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME,
-    audit_signature_variant_suffix, determine_required_suffix, has_prettier_divergence_suffix,
-    has_svelte_divergence_suffix, read_file, unformatted_ours_filename,
+    AUDIT_SIGNATURE_FILENAME, EXPECTED_SVELTE_ERROR_JSON, Fixture, FixtureFiles, GOAL_FILENAME,
+    InputType, PRETTIER_NONCONVERGENT_FILENAME, PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME,
+    audit_signature_variant_suffix, determine_required_suffix, goal_marker_path,
+    has_prettier_divergence_suffix, has_svelte_divergence_suffix, read_file,
+    unformatted_ours_filename,
 };
 
 /// Validate fixture structure and conventions
@@ -49,10 +50,17 @@ use crate::fixtures::{
 /// S22: no two `prettier_intermediate*_*` files may hold identical content — each
 ///      pins one unstable prettier form, so a byte-copy under a second suffix pins
 ///      nothing its twin does not while reading as a second chain
+/// S23: the `goal` marker is only meaningful on a `.ts` / `.svelte.ts` fixture —
+///      the Svelte and CSS parse arms take no goal, so a marker there is read by
+///      nothing and silently claims a goal the fixture is not graded at
 ///
+/// The count of rules above is `STRUCTURE_RULE_COUNT`, reported on success.
 /// D1 — README.md required for divergences — is deliberately **not** here: it is the
 /// one rule that says nothing about the file set, so it must not short-circuit the
 /// claim phases. See [`validate_divergence_readme`].
+/// The number of S-rules `validate_fixture_structure` checks (S1–S23).
+pub const STRUCTURE_RULE_COUNT: usize = 23;
+
 pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Result<(), String> {
     let fixture_dir = &fixture.path;
 
@@ -67,6 +75,24 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         .unwrap_or("");
     let is_svelte_divergence_dir = has_svelte_divergence_suffix(dir_name);
     let is_prettier_divergence_dir = has_prettier_divergence_suffix(dir_name);
+
+    // S23: only the TypeScript-family parse arms read the goal — Svelte `<script>`
+    // hard-wires Module and CSS has no goal at all — so a marker beside a `.svelte`
+    // or `.css` input is inert. It reads as a claim the fixture is graded at Script,
+    // which nothing enforces, so reject it rather than ignore it.
+    if !matches!(input_type, InputType::TypeScript | InputType::SvelteTs)
+        && goal_marker_path(fixture_dir).exists()
+    {
+        return Err(format!(
+            "{GOAL_FILENAME} marker on a {input_ext} fixture.\n\
+            The parse goal applies to .ts / .svelte.ts inputs only: Svelte <script> is\n\
+            always a module and CSS has no goal, so this marker is read by nothing while\n\
+            reading as a goal claim. Either:\n\
+            - Delete {GOAL_FILENAME}, or\n\
+            - Rebuild the case as a .ts fixture (`fixture_init <dir> --parser typescript\n\
+              --goal script --content '<code>' --force`, then remove the old input file)."
+        ));
+    }
 
     // Check expected.json OR (expected_ours.json + expected_svelte.json) exists
     let expected_path = fixture.expected_path();

@@ -13,8 +13,8 @@ pub use audit_signature::{
 pub use discovery::{find_input_file, walk_fixtures};
 pub use model::{
     EXPECTED_SVELTE_ERROR_JSON, Fixture, GOAL_FILENAME, InputType, PRETTIER_NONCONVERGENT_FILENAME,
-    PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME, determine_required_suffix,
-    has_prettier_divergence_suffix, has_svelte_divergence_suffix,
+    PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME, determine_required_suffix, goal_marker_path,
+    has_prettier_divergence_suffix, has_svelte_divergence_suffix, read_goal_marker,
 };
 pub use variants::{
     FixtureFiles, StableFormMarker, classify_stable_form, unformatted_ours_filename,
