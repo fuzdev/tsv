@@ -1118,7 +1118,7 @@ fn render_doc_core<P: RenderPolicy>(
                     if fits {
                         *should_remeasure = false;
                     }
-                    (if fits { Mode::Flat } else { Mode::Break }, contents)
+                    (Mode::from_fits(fits), contents)
                 };
 
                 policy.record_group_mode(id, chosen_mode);

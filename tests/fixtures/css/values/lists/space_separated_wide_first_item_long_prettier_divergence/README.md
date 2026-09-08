@@ -3,8 +3,10 @@
 A space-separated value whose **first** item does not fit on the colon's line — `prop: '<item>'`
 past 100 columns — with and without a comment in the value.
 
-tsv: the item drops to a fresh continuation line and the rest of the value fills beneath it
-(`prop:⏎\t\t\t'<item>'⏎\t\t\t2px;`); the colon's line ends at the `:`
+tsv: the item drops to a fresh continuation line and the rest of the value fills on from it
+(`prop:⏎\t\t\t'<item>' 2px;`) — the fill packs greedily from the fresh line as from any line
+start, so the tail rides beside the item when it fits and wraps beneath it when it does not; the
+colon's line ends at the `:`
 Prettier: the first item stays on the colon's line, overrunning by as much as the item is wide
 (101 here), and only the tail wraps
 
@@ -26,3 +28,5 @@ See [conformance_prettier_css.md §CSS: Values](../../../../../../docs/conforman
   boundary of the same fill
 - [space_separated_leading_comment_long](../space_separated_leading_comment_long_prettier_divergence/) —
   a leading comment run ahead of an over-long first word
+- [space_separated_multiline_comment_wrap_long](../space_separated_multiline_comment_wrap_long/) —
+  the same fresh-line fill after the drop of a word a multi-line comment's last line could not hold

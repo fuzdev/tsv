@@ -568,3 +568,13 @@ pub enum Mode {
     /// Use line breaks (soft lines become newlines)
     Break,
 }
+
+impl Mode {
+    /// The mode a fit verdict maps to: `Flat` when the measured content fits, `Break` when it
+    /// does not — what every `fits` verdict in the render loop and the fill renderer becomes.
+    #[inline]
+    #[must_use]
+    pub const fn from_fits(fits: bool) -> Self {
+        if fits { Self::Flat } else { Self::Break }
+    }
+}

@@ -71,7 +71,10 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
   `indent(fill)` with every part — comments included — a fill item, and a comma list that did not
   break per element takes the twin's break-after-the-colon group over a greedy element fill, a
   leading comment run staying on the colon's line. The boundary is measured from the real column,
-  so a long property moves it. Prettier's differences — the `;` overage, the leading run it glues
+  so a long property moves it, and a part that drops to a fresh line fills on from there — the
+  word a multi-line comment's last line could not hold keeps its tail beside it when the pair
+  fits (`space_separated_multiline_comment_wrap_long`), as does a first item too wide for the
+  colon's line. Prettier's differences — the `;` overage, the leading run it glues
   to the first word and overruns with, and a multi-line comment it measures as one run of text —
   are cataloged in [conformance_prettier_css.md §CSS: Values](conformance_prettier_css.md#css-values)
 - Comments in selectors
