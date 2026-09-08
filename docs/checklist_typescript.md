@@ -552,11 +552,19 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
   agree: it is the half of `types.some((t) => hasComment(t))` the between-member scan cannot
   reach, and without it the unwrap above would hug the paren'd spelling while the bare twin
   expands
-- ⚠️ **Open divergence** at one placement: a comment immediately *before* the first member
-  (`/* c */ { … } | null`, and the leading-operator `| /* c */ { … } | null`) bails prettier's
-  hug and does not bail tsv's, at every hug position. Paren-independent — tsv hugs the bare
-  spelling and, thanks to the clause above, expands the paren'd one, so this is the one cell
-  where tsv's own answer still depends on the paren
+- A block comment **glued ahead of the first member** (`/* c */ { … } | null`, and the
+  leading-operator `| /* c */ { … } | null`) binds to that member and bails the hug in both
+  formatters, at every enclosing seam — the value seams (`:`, `=`, `=>`, the mapped value),
+  the containers (`<`, a tuple's or indexed access's `[`, a paren shell's `(`, `keyof (`), and
+  the keywords (`as` / `satisfies`, a type parameter's `extends` / `=`, a conditional's
+  `extends` / `?` / `:`, a mapped `in`). The seam hands the run into the union
+  (`Printer::build_union_value_doc`, `UnionLeadingGap::Seam`), so it lands after the pipe
+  the broken layout synthesizes (`| /* c */ {`), and reads its own glue answer off
+  `UnionValueDoc::hugged`. Two parent positions keep hugging behind it, as prettier does
+  (`UnionLeadingGap::Parent`): the type predicate's `is` and a conditional's check type. A
+  block the author *separated* from the member by a newline binds to the union and leaves the
+  hug intact; the seam then hangs it on its own line (`union_hug_gap_block_comment` and its
+  `_container` / `_cast` / `_keyword` siblings, `union_hug_gap_broke_after_block_comment`)
 
 ### Function Types
 

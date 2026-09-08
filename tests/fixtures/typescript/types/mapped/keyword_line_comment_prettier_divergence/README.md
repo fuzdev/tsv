@@ -1,13 +1,16 @@
 # keyword_line_comment_prettier_divergence
 
 A line comment after a mapped type's `in` keyword (`[K in // c⏎T]`) or `as`
-keyword (`[K in T as // c⏎N]`). tsv keeps the comment after the keyword and drops
-the following type to the next line:
+keyword (`[K in T as // c⏎N]`). Both formatters break the `[…]` brackets; tsv
+keeps the comment after the keyword and drops the following type to the next
+line:
 
 ```
 type M = {
-	[K in // c
-	T]: V;
+	[
+		K in // c
+		T
+	]: V;
 };
 ```
 

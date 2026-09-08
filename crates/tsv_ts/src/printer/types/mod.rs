@@ -364,7 +364,7 @@ impl<'a> Printer<'a> {
                                 // annotation, not to the first member, so the union keeps
                                 // hugging behind it (`a is /* c */ {⏎…⏎} | null`) where
                                 // the `:` and `=>` seams decline — the bare predicate is
-                                // this seam's right ask (`UnionLeadingGap::Other`).
+                                // this seam's right ask (`UnionLeadingGap::Parent`).
                                 let hugged = self.build_hugged_union_after_operator_doc(
                                     " is ",
                                     self.union_prints_hugged(u),
@@ -638,17 +638,21 @@ impl<'a> Printer<'a> {
                 // trailing, or glued) collapses the index inline (`A[/* c */ K]`);
                 // prettier relocates the comment out before `[` (`A /* c */[K]`) — see
                 // indexed_access_own_line_block_comment.
-                let index_comments = bracket_open.map(|bp| {
-                    if self.comments_force_own_line_between(bp + 1, index_type_start) {
-                        self.build_trailing_comments_hang_next(bp + 1, index_type_start)
-                    } else {
-                        self.build_comments_between(
-                            bp + 1,
-                            index_type_start,
-                            CommentSpacing::Trailing,
-                        )
-                    }
-                });
+                // Built lazily: the expanding-union arm below carries the gap inside the
+                // union's hang and never emits it here.
+                let index_comments = || {
+                    bracket_open.map(|bp| {
+                        if self.comments_force_own_line_between(bp + 1, index_type_start) {
+                            self.build_trailing_comments_hang_next(bp + 1, index_type_start)
+                        } else {
+                            self.build_comments_between(
+                                bp + 1,
+                                index_type_start,
+                                CommentSpacing::Trailing,
+                            )
+                        }
+                    })
+                };
                 // A comment-free union INDEX expands the bracket when it breaks:
                 // `Foo[⏎\t| A⏎\t| B]` — the `]` hugs the last member (prettier's
                 // `printUnionType` indent branch, `group(indent([softline, printed]))`,
@@ -658,15 +662,35 @@ impl<'a> Printer<'a> {
                 // unwraps the same way). A comment anywhere in the `[`…`]` region keeps
                 // the existing hang layout so comment placement is untouched. See
                 // `type_param_fits_rhs_long`.
+                //
+                // The `[`→index gap is this seam's: a union index routes through
+                // `build_union_value_doc` on it, so a block run glued to its first member
+                // is handed in — declining the hug and landing after the pipe once the
+                // index breaks (`T[⏎| /* c */ {…}⏎| null]`,
+                // `union_hug_gap_block_comment_container`) — and any other run leads the
+                // union inside the expanded bracket. The seam's glue answer decides the
+                // expansion, so a run in the gap never welds `/* c */ | {` onto the `[`.
+                // The union→`]` gap keeps the hang layout below when it holds a comment —
+                // measured from the UNION's end, since a paren shell the arm strips holds
+                // its trailing gap inside `index_type`'s span, where a `]`-gap window
+                // cannot see it (the shell's leading gap rides `prepend_rhs_comments`).
                 let index_inner = unwrap_parenthesized(i.index_type);
-                let index_expands = bracket_open.is_some_and(|bp| {
-                    matches!(index_inner, TSType::Union(u) if !self.union_prints_hugged(u))
-                        && !self.has_comments_to_emit_between(bp + 1, i.span.end)
-                });
-                let index_doc = if index_expands {
-                    d.group(d.indent(d.concat(&[d.softline(), self.build_type_doc(index_inner)])))
-                } else {
-                    self.build_type_doc(i.index_type)
+                let (index_doc, index_comments) = match (index_inner, bracket_open) {
+                    (TSType::Union(u), Some(bp))
+                        if !self.union_seam_hugs(bp + 1, u)
+                            && !self.has_comments_to_emit_between(u.span.end, i.span.end) =>
+                    {
+                        let UnionValueDoc {
+                            doc, run_handed, ..
+                        } = self.build_union_value_doc(bp + 1, u);
+                        let hung = if run_handed {
+                            doc
+                        } else {
+                            self.prepend_rhs_comments(doc, bp + 1, u.span.start)
+                        };
+                        (d.group(d.indent(d.concat(&[d.softline(), hung]))), None)
+                    }
+                    _ => (self.build_type_doc(i.index_type), index_comments()),
                 };
                 let mut parts: DocBuf = smallvec![object_doc];
                 if let Some(c) = object_comments {

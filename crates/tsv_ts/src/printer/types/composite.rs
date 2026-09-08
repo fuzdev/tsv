@@ -20,6 +20,7 @@ use super::{
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
+use crate::printer::LeadingGlue;
 use crate::printer::layout::{bracketed_list_body, hang_after_operator};
 use crate::printer::{CommentVec, ShellLeadingRun};
 use smallvec::smallvec;
@@ -137,8 +138,17 @@ impl<'a> Printer<'a> {
         // same empty comment docs a comment-free `Some` would (the arm builder emits nothing
         // for `None`, and every `needs_breaking` term that consults them scans a comment-free
         // sub-range either way). Paren-leading-line-comment terms below stay independent.
+        //
+        // The window reaches the false branch's FIRST MEMBER, not just its start: a
+        // union branch with an authored leading pipe starts at the `|`, and a block
+        // glued after it (`: | /* c */ {…}`) is the `:` seam's hug question
+        // (`build_conditional_branch_tail_doc`), which needs the `:` position to ask.
+        let false_gate_end = match unwrap_parenthesized(c.false_type) {
+            TSType::Union(u) => u.types.first().map_or(false_type_start, |t| t.span().start),
+            _ => false_type_start,
+        };
         let (question_pos, colon_pos) =
-            if self.has_comments_to_emit_between(extends_type_end, false_type_start) {
+            if self.has_comments_to_emit_between(extends_type_end, false_gate_end) {
                 (
                     self.find_char_outside_comments(extends_type_end, true_type_start, b'?'),
                     self.find_char_outside_comments(true_type_end, false_type_start, b':'),
@@ -477,7 +487,13 @@ impl<'a> Printer<'a> {
         });
         d.concat(&[
             d.text(op),
-            self.build_conditional_branch_tail_doc(branch_type, branch_doc, false, run),
+            self.build_conditional_branch_tail_doc(
+                branch_type,
+                branch_doc,
+                false,
+                run,
+                op_pos.map(|p| p + 1),
+            ),
         ])
     }
 
@@ -510,12 +526,21 @@ impl<'a> Printer<'a> {
     /// `branch_doc` is a THUNK because the union and intersection arms rebuild the
     /// branch from parts and never consult it — building eagerly left a dead subtree in
     /// the arena for every such branch (build-once-reuse).
+    ///
+    /// `gap_start` is the operator's end — the `?`/`:`→branch gap is this seam's, and a
+    /// union branch routes through `build_union_value_doc` on it: a block run glued to
+    /// the first member is handed into the union, declining its hug and landing after
+    /// the pipe (`: | /* c */ {…}⏎| null`, `union_hug_gap_block_comment_keyword`), and
+    /// `run` (which then holds the same comments) is dropped so exactly one of the two
+    /// prints it. `None` in the breaking layout, whose caller emits the gap itself ahead
+    /// of the tail, so the union there answers from its own span.
     fn build_conditional_branch_tail_doc(
         &self,
         branch_type: &TSType<'_>,
         branch_doc: impl FnOnce() -> DocId,
         on_new_line: bool,
         run: Option<DocId>,
+        gap_start: Option<u32>,
     ) -> DocId {
         let d = self.d();
         debug_assert!(
@@ -526,7 +551,7 @@ impl<'a> Printer<'a> {
         // level past the operator (`indent`) — on a fresh line after an
         // operator-line comment (`on_new_line`, first union member then taking its
         // leading `| `), or glued after the operator's space.
-        let hang = |inner: DocId| {
+        let hang = |inner: DocId, run: Option<DocId>| {
             if on_new_line {
                 d.indent_hardline(inner)
             } else {
@@ -572,16 +597,26 @@ impl<'a> Printer<'a> {
             return plain(branch_doc(), false);
         }
         match self.unwrap_redundant_parens(branch_type) {
-            // `union_prints_hugged`, not the bare syntactic `union_hug_shape` — see
+            // The seam's glue answer (or, with no gap on hand, `union_prints_hugged`),
+            // not the bare syntactic `union_hug_shape` — see
             // `build_conditional_check_doc`; here a bare ask left the members one indent
-            // level short of prettier's.
-            TSType::Union(u) if !self.union_prints_hugged(u) => {
-                // `build_union_type_doc` already returns `group(members)` (the bare
-                // `printed`); the branch supplies only one `indent`, so the member
-                // group breaks its continuations one level past the operator.
-                hang(self.build_union_type_doc(u))
-            }
-            TSType::Intersection(i) => hang(self.intersection_hanging_with_indent(i)),
+            // level short of prettier's. A hugging union is the plain arm's: the branch
+            // doc IS the hugged union, glued after the operator.
+            TSType::Union(u) => match gap_start {
+                Some(gap_start) if !self.union_seam_hugs(gap_start, u) => {
+                    // `build_union_value_doc` already returns `group(members)` (the bare
+                    // `printed`); the branch supplies only one `indent`, so the member
+                    // group breaks its continuations one level past the operator. A
+                    // handed run is the union's to print (hazard 3).
+                    let UnionValueDoc {
+                        doc, run_handed, ..
+                    } = self.build_union_value_doc(gap_start, u);
+                    hang(doc, if run_handed { None } else { run })
+                }
+                None if !self.union_prints_hugged(u) => hang(self.build_union_type_doc(u), run),
+                _ => plain(branch_doc(), true),
+            },
+            TSType::Intersection(i) => hang(self.intersection_hanging_with_indent(i), run),
             _ => plain(branch_doc(), true),
         }
     }
@@ -817,16 +852,39 @@ impl<'a> Printer<'a> {
                 // `printed = group(members)` in `group(indent([softline, printed]))`
                 // — break after `extends` onto an indented continuation line where
                 // the member group re-fits before exploding to leading-pipe members
-                // (Prettier 3.9 #18827). `build_union_type_doc` supplies the inner
+                // (Prettier 3.9 #18827). `build_union_value_doc` supplies the inner
                 // `group(members)` (with the per-member offset and member-paren rules
                 // the old hand-rolled loop lacked); the `softline` after the `text(" ")`
                 // keeps a single space when flat (the loop double-spaced `extends  A`).
-                let union_doc = self.build_union_type_doc(union);
-                d.concat(&[
-                    d.text(" "),
-                    comments_after_extends,
-                    d.group(d.indent(d.concat(&[d.softline(), union_doc]))),
-                ])
+                //
+                // The `extends`→union gap is this seam's (`build_union_value_doc`): a
+                // hugging union keeps `extends {` glued and the member owns its
+                // expansion, exactly as a hugging union does at every other operator; a
+                // block run in the gap rides INSIDE the hang — glued to the first member
+                // it is handed into the union (declining the hug, `| /* c */ {` once the
+                // member overflows), otherwise it leads the union through the value-gap
+                // emitter, own-line when the hang breaks. Emitted ahead of the `softline`
+                // instead, a run the author glued to the member came back glued to
+                // `extends` with the union below it, a spelling this seam then read
+                // differently (`union_hug_gap_block_comment_keyword`).
+                let UnionValueDoc {
+                    doc: union_doc,
+                    run_handed,
+                    hugged,
+                } = self.build_union_value_doc(extends_kw_end, union);
+                if hugged {
+                    d.concat(&[d.text(" "), union_doc])
+                } else {
+                    let hung = if run_handed {
+                        union_doc
+                    } else {
+                        self.prepend_rhs_comments(union_doc, extends_kw_end, union.span.start)
+                    };
+                    d.concat(&[
+                        d.text(" "),
+                        d.group(d.indent(d.concat(&[d.softline(), hung]))),
+                    ])
+                }
             }
         } else {
             d.concat(&[
@@ -1015,6 +1073,7 @@ impl<'a> Printer<'a> {
                     },
                     needs_indent_before_true,
                     None,
+                    None,
                 )
             }));
         }
@@ -1072,6 +1131,7 @@ impl<'a> Printer<'a> {
                         )
                     },
                     needs_indent_before_false,
+                    None,
                     None,
                 )
             }));
@@ -1211,14 +1271,27 @@ impl<'a> Printer<'a> {
         let keyword_end = keyword_pos.map_or(head_end, |p| (p + keyword.trim_end().len()) as u32);
         let keyword_pos = keyword_pos.map_or(head_end, |p| p as u32);
         let gap = self.route_pre_keyword_gap(parts, head_end, keyword_pos);
-        let mut tail: DocBuf = smallvec![d.text(if gap.is_some() {
+        let keyword_text = if gap.is_some() {
             keyword
         } else {
             spaced_keyword
-        })];
-        tail.push(self.build_trailing_comments_hang_next(keyword_end, value_start));
-        tail.push(self.build_type_doc(value));
-        let tail = d.concat(&tail);
+        };
+        // A union value hangs after the keyword (prettier's `shouldIndentUnionType`
+        // holds for a mapped constraint), the keyword→union gap riding inside the hang
+        // (`build_union_hanging_indent_doc`: a block glued to the first member is handed
+        // into the union and declines its hug, `K in⏎| /* c */ {…}⏎| null`,
+        // `union_hug_gap_block_comment_keyword`); a hugging union keeps `in {` glued
+        // through the general tail below.
+        let tail = if let Some(hanging) =
+            self.build_union_hanging_indent_doc(keyword_end, self.unwrap_redundant_parens(value))
+        {
+            d.concat(&[d.text(keyword_text.trim_end()), hanging])
+        } else {
+            let mut tail: DocBuf = smallvec![d.text(keyword_text)];
+            tail.push(self.build_trailing_comments_hang_next(keyword_end, value_start));
+            tail.push(self.build_type_doc(value));
+            d.concat(&tail)
+        };
         parts.push(match gap {
             Some((start, end)) => self.build_continuation_indent(start, end, tail),
             None => tail,
@@ -1416,19 +1489,31 @@ impl<'a> Printer<'a> {
                 d.concat(&interior_parts),
             ));
         } else {
-            body_parts.push(d.text("["));
+            // Prettier's bracket group — `group(["[", indent([softline, key, " in ",
+            // constraint, as?]), softline, "]"])`: a binding too wide for its line
+            // breaks inside the brackets, the key one level in and `]` back on its own
+            // line, so a long constraint union hangs after `in` INSIDE the bracket rather
+            // than exploding beside `[K in`. Flat it is the inline `[K in T]`.
+            let mut interior: DocBuf = smallvec![];
             // Same-line block comments before the key stay inline (`[/* c */ K in T]`).
             for comment in &bracket_inner_comments {
-                body_parts.push(self.build_comment_doc(comment));
-                body_parts.push(d.text(" "));
+                interior.push(self.build_comment_doc(comment));
+                interior.push(d.text(" "));
             }
-            body_parts.push(d.concat(&interior_parts));
+            interior.push(d.concat(&interior_parts));
             // A line comment trailing the key constraint (before `]`) drops `]` to its
             // own line (`[K in T // c⏎]`) so emitting `]` inline can't swallow it.
-            if after_key_line {
-                body_parts.push(d.hardline());
-            }
-            body_parts.push(d.text("]"));
+            let close_sep = if after_key_line {
+                d.hardline()
+            } else {
+                d.softline()
+            };
+            body_parts.push(d.group(d.concat(&[
+                d.text("["),
+                d.indent_softline(d.concat(&interior)),
+                close_sep,
+                d.text("]"),
+            ])));
         }
 
         // optional modifier text: `?`, `+?`, or `-?`. Emitted per arm below — the
@@ -1859,21 +1944,49 @@ impl<'a> Printer<'a> {
                 parts.push(d.line());
             }
 
-            // Add inline leading block comments (after previous comma or `[`)
-            let leading =
-                self.build_inline_comments_between_doc_trailing_space(prev_end, elem.span().start);
-            parts.push(leading);
-
             // Rule A: an alone-on-line directive in this element's gap freezes it
-            // (the directive itself was just emitted by the gap emitter above); a
+            // (the directive itself is emitted by the gap emitter below); a
             // multi-line frozen slice forces the broken layout (a verbatim span is
             // `will_break`-opaque, so the forcing is explicit).
             let frozen = self.list_member_frozen(t.span.start + 1, t.element_types, i, false);
+
+            // The `[`/`,`→element gap is this seam's: a block run glued to a union
+            // element's first member is handed into the union
+            // (`build_union_value_doc`), declining its hug and landing after the pipe
+            // once the element breaks (`union_hug_gap_block_comment_container`); the
+            // gap emitter then stops at the claim so exactly one of the two prints it.
+            let handed = (!frozen)
+                .then(|| self.union_seam_run_handoff(prev_end, elem))
+                .flatten();
+
+            // Add inline leading block comments (after previous comma or `[`). A union
+            // element whose run was NOT handed (a block the author broke after,
+            // `[/* c */⏎{ … } | null]`) takes the shared leading-run emitter, whose
+            // separator keeps that break when the tuple breaks (prettier's soft `line`);
+            // glued onto the union, the broke-after block came back as the glued
+            // spelling, which the next pass binds to the first member and declines.
+            if matches!(elem, TSType::Union(_)) && handed.is_none() && !frozen {
+                self.push_leading_comment_run(
+                    &mut parts,
+                    self.comments_to_emit_between(prev_end, elem.span().start),
+                    elem.span().start,
+                    LeadingGlue::Adjacent,
+                );
+            } else {
+                let leading = self.build_inline_comments_between_doc_trailing_space(
+                    prev_end,
+                    handed.unwrap_or_else(|| elem.span().start),
+                );
+                parts.push(leading);
+            }
+
             if frozen {
                 if self.frozen_list_member_multiline(elem) {
                     force_break = true;
                 }
                 parts.push(self.build_frozen_list_member_doc(elem));
+            } else if let TSType::Union(u) = elem {
+                parts.push(self.build_union_value_doc(prev_end, u).doc);
             } else {
                 parts.push(self.build_tuple_element_doc(elem));
             }
