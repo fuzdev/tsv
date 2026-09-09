@@ -72,6 +72,22 @@ pub(super) struct CalleeGap {
     pub(super) start: u32,
     /// How this call spells its `?.` — see [`CallOptional`].
     pub(super) optional: CallOptional,
+    /// The callee→`(` gap's **pre-paren half**, `[start, end)` with `end` the `(`, when
+    /// that half holds a `//` and the gap therefore splits there.
+    ///
+    /// The non-optional sibling of [`CallOptional::Split`], and the same rule: a comment
+    /// belongs to the side of the delimiter the author wrote it on. A `//` before the `(`
+    /// trails the callee and hangs the whole argument list on a continuation line
+    /// (`call // c⏎\t(a)`), which is the shape the EMPTY-argument spelling already takes
+    /// through [`arg_comments::build_empty_args_parens_doc`] — so the two argument
+    /// spellings stop answering one gap differently.
+    ///
+    /// ⚠️ **Line comments only.** A block comment forces nothing and leads the first
+    /// argument in both formatters (`call /* c */(a)` → `call(/* c */ a)`), so splitting on
+    /// one would turn a match into a divergence. The gap stays whole there, which is also
+    /// what keeps `import /* c */ ('m')` intact
+    /// ([`Printer::paren_line_share_anchor`] states the prefix rule this preserves).
+    pub(super) paren_split: Option<(u32, u32)>,
 }
 
 /// The `?.` of a call, as the whole family needs to read it: WHO prints the token, and
@@ -142,9 +158,13 @@ impl CalleeGap {
     /// can't accidentally open the window at the callee and swallow the type arguments'
     /// own comments.
     pub(super) fn paren_open(&self, call: &internal::CallExpression<'_>) -> u32 {
-        call.type_arguments
-            .as_ref()
-            .map_or(self.start, |ta| ta.span.end)
+        // On a split gap the argument side opens AT the `(` — the pre-paren half is the
+        // callee side's ([`Self::paren_split`]), and opening before it would hand these
+        // windows a comment the head has already emitted. Opening *at* the paren rather than
+        // past it is deliberate: everything downstream still finds the `(` where it expects
+        // it, so the after-`(` comments keep the delimiter-line rule unchanged.
+        self.paren_split
+            .map_or_else(|| args_side_start(call, self.start), |(_, paren)| paren)
     }
 }
 
@@ -155,7 +175,9 @@ pub(super) fn callee_gap(printer: &Printer<'_>, call: &internal::CallExpression<
     let trailing_gap = printer.owned_pair_trailing_gap(callee_end, owned_pair);
     let start = Printer::gap_start_after_owned_pair(callee_end, trailing_gap);
     let optional = call_optional(printer, call, start);
+    let paren_open = args_side_start(call, optional.arg_side_start().unwrap_or(start));
     CalleeGap {
+        paren_split: call_paren_split(printer, call, paren_open),
         owned_pair,
         trailing_gap,
         // Past the `?.` when the gap splits: everything below — the type-argument gap, the
@@ -165,6 +187,117 @@ pub(super) fn callee_gap(printer: &Printer<'_>, call: &internal::CallExpression<
         start: optional.arg_side_start().unwrap_or(start),
         optional,
     }
+}
+
+/// Where a callee gap's ARGUMENT side opens before the pre-paren split is taken into account:
+/// past the type-argument list when the call has one, else `start_after_optional` (the callee's
+/// end, or past the `?.` of a split optional gap).
+///
+/// One spelling for the two readers, per the ⚠️ on [`CalleeGap`]: [`callee_gap`] needs it to
+/// derive [`CalleeGap::paren_split`] — which cannot be read off the struct that is still being
+/// built — and [`CalleeGap::paren_open`] is this plus that split. Written out twice, the two
+/// disagreed the moment either grew a clause, which is the failure that struct's doc names.
+fn args_side_start(call: &internal::CallExpression<'_>, start_after_optional: u32) -> u32 {
+    call.type_arguments
+        .as_ref()
+        .map_or(start_after_optional, |ta| ta.span.end)
+}
+
+/// Derive [`CalleeGap::paren_split`] — the pre-paren half of a NON-optional call's
+/// callee→`(` gap, when a `//` written there splits it.
+///
+/// `gap_start` is where the argument side would otherwise open: past the `?.` of a split
+/// optional gap, past the type-argument list when there is one. An optional call is excluded
+/// outright — its gap already splits at the `?.`, one delimiter earlier, and the after-`?.`
+/// half is the argument side's by that split's own rule.
+///
+/// The empty-argument spelling is excluded too, and reaches the same shape by its own route
+/// ([`arg_comments::build_empty_args_parens_doc`]): with no arguments the whole gap is
+/// pre-paren, so there is nothing to split off.
+///
+/// ⚠️ An honored **directive** in the pre-paren half DECLINES the split, for the reason
+/// [`call_optional`] declines there: the freeze window opens at the argument side, so moving
+/// that side past the `(` would leave the directive outside it and pass 2 would silently lose
+/// the freeze, with no gate able to see it. Stated as what the split DESTROYS — a directive
+/// written after the `(` sits in both windows and keeps it.
+fn call_paren_split(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    gap_start: u32,
+) -> Option<(u32, u32)> {
+    if call.optional {
+        return None;
+    }
+    paren_split_for(printer, gap_start, call.arguments)
+}
+
+/// [`call_paren_split`] over any argument list — the `new` expression's head asks it too, its
+/// callee→`(` gap being the same gap under a different keyword.
+///
+/// `gap_start` is where the argument side would otherwise open. Returns the half to hang the
+/// list under, `[gap_start, paren)`, or `None` when the gap does not split: no arguments (the
+/// whole gap is pre-paren and `build_empty_args_parens_doc` owns it), no `(` found, no `//`
+/// in the half, or a directive the split would strand outside the freeze window.
+pub(super) fn paren_split_for(
+    printer: &Printer<'_>,
+    gap_start: u32,
+    arguments: &[internal::Expression<'_>],
+) -> Option<(u32, u32)> {
+    let first_arg_start = arguments.first()?.span().start;
+    let paren = printer.find_char_outside_comments(gap_start, first_arg_start, b'(')?;
+    if !printer.has_line_comments_between(gap_start, paren) {
+        return None;
+    }
+    if split_strands_directive(printer, gap_start, paren, arguments) {
+        return None;
+    }
+    Some((gap_start, paren))
+}
+
+/// Join a construct's HEAD to an argument list hung under the callee→`(` gap's pre-paren
+/// half: the head, then the run, then the list one level in.
+///
+/// ⚠️ **`args` must have been built with an EMPTY head doc.** The head is emitted here
+/// instead, ahead of the run, so the run's `indent(…)` wraps the list alone — an argument
+/// builder that emitted its own head would print it twice, and one that emitted neither drops
+/// the callee outright. Naming the contract here is the point: all three keywords that open an
+/// argument list ([`call_formatting`], [`new_expression`], [`import_expr`]) build their list
+/// through a builder that takes the head as a parameter, so no arm of any of them can forget.
+pub(super) fn hang_args_under_split(
+    printer: &Printer<'_>,
+    head: DocId,
+    split: (u32, u32),
+    args: DocId,
+) -> DocId {
+    let (start, paren) = split;
+    printer
+        .d()
+        .concat(&[head, printer.build_line_split_gap_doc(start, paren, args)])
+}
+
+/// Whether splitting a callee gap would STRAND an honored format-ignore directive: one that
+/// reaches the first argument's freeze window from `gap_start` but no longer would from
+/// `arg_side_start`, where the split leaves that window opening.
+///
+/// Both splits ask it — the `?.` ([`call_optional`]) and the `(` ([`paren_split_for`]) — and
+/// the reason is the same at both, so it is stated once. The stranded run prints ahead of the
+/// token, a placement where a directive is INERT, and pass 2 then silently loses the freeze
+/// ⚠️ with no gate able to see it (the refusal
+/// [`arg_wrapping::multiline_template_hug_applies`] makes, for this reason).
+///
+/// ⚠️ Phrased as what the split DESTROYS, never as "a directive is in the gap": one the author
+/// wrote AFTER the token sits in both windows, is unmoved by the split, and keeps its freeze.
+fn split_strands_directive(
+    printer: &Printer<'_>,
+    gap_start: u32,
+    arg_side_start: u32,
+    arguments: &[internal::Expression<'_>],
+) -> bool {
+    !arguments.is_empty()
+        && printer.args_frozen_span(gap_start, arguments, 0).is_some()
+        && printer
+            .args_frozen_span(arg_side_start, arguments, 0)
+            .is_none()
 }
 
 /// Derive a call's [`CallOptional`] — the family's one answer to who prints the `?.` and
@@ -194,19 +327,13 @@ fn call_optional(
     let Some(question) = printer.find_char_outside_comments(start, end, b'?') else {
         return CallOptional::Unsplit;
     };
-    // An honored directive in the callee-side half DECLINES the split, the same refusal
-    // [`arg_wrapping::multiline_template_hug_applies`] makes for the same reason: the run
-    // would print ahead of the `?.`, a placement where a directive is INERT, and the freeze
-    // window — which opens at [`CalleeGap::start`] — would no longer reach it, so pass 2
-    // silently loses the freeze ⚠️ with no gate able to see it. Stated as what the split
-    // DESTROYS rather than as "a directive is in the gap": one the author wrote AFTER the
-    // `?.` sits in both windows, is unmoved by the split, and keeps it.
-    if !call.arguments.is_empty()
-        && printer.args_frozen_span(start, call.arguments, 0).is_some()
-        && printer
-            .args_frozen_span(question + OPTIONAL_TOKEN_LEN, call.arguments, 0)
-            .is_none()
-    {
+    // An honored directive the split would strand DECLINES it ([`split_strands_directive`]).
+    if split_strands_directive(
+        printer,
+        start,
+        question + OPTIONAL_TOKEN_LEN,
+        call.arguments,
+    ) {
         return CallOptional::Unsplit;
     }
     CallOptional::Split {

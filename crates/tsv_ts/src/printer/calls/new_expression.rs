@@ -157,6 +157,33 @@ impl<'a> Printer<'a> {
         // Build callee with type args: `new Foo<K, V>`
         let callee_with_types = d.concat(&[keyword, callee_with_types_base]);
 
+        // The callee→`(` gap's pre-paren half ([`super::CalleeGap::paren_split`], which the
+        // call family reads off its own derivation): a `//` written there trails the callee
+        // and the whole argument list hangs under it. The list must be its own doc for that,
+        // which is what the head/args split below is for — and on the unsplit path, every
+        // `new` without a comment in that gap, the head is handed straight through.
+        let Some((split_start, paren)) =
+            super::paren_split_for(self, paren_open, new_expr.arguments)
+        else {
+            return self.build_new_args_doc(new_expr, callee_with_types, paren_open);
+        };
+        // The argument side opens AT the `(`, so its scans no longer see the half the head
+        // has taken (`CalleeGap::paren_open` states the same rule for a call).
+        let args = self.build_new_args_doc(new_expr, d.empty(), paren);
+        super::hang_args_under_split(self, callee_with_types, (split_start, paren), args)
+    }
+
+    /// The argument-list half of [`Self::build_new_doc_after_keyword`] — `callee_with_types`
+    /// is the head it hangs off, an empty doc when the callee→`(` gap's pre-paren half has
+    /// taken it so the caller can hang this whole doc under the run.
+    fn build_new_args_doc(
+        &self,
+        new_expr: &internal::NewExpression<'_>,
+        callee_with_types: DocId,
+        paren_open: u32,
+    ) -> DocId {
+        let d = self.d();
+
         // Single template literal argument with embedded newlines on the same line as `(` —
         // hug it. A template on its own line declines and falls through to the layouts
         // below, whose `will_break` guards see the template's own newline.

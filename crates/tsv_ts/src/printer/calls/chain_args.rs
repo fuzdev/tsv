@@ -194,7 +194,7 @@ fn single_arrow_expression_body<'a>(
 /// grammar-required parens are the only thing the two assemble differently.
 fn build_hugged_arrow_arg_doc(
     printer: &Printer<'_>,
-    head: Option<DocId>,
+    head: ChainHead,
     ctx: ChainArgsContext,
     arrow: &internal::ArrowFunctionExpression<'_>,
     body_expr: &Expression<'_>,
@@ -395,6 +395,15 @@ fn build_call_args_doc_for_chain_impl(
         parts.extend(type_args_doc);
         Some(printer.d().concat(&parts))
     };
+    // The pre-paren run, when the callee→`(` gap splits at the `(` — built here, where the
+    // printer is in scope, and closed around whichever layout the arms below pick
+    // ([`with_chain_head`]).
+    let head = ChainHead {
+        doc: head,
+        hang: gap
+            .paren_split
+            .map(|(start, paren)| printer.continuation_indent_prefix(start, paren)),
+    };
 
     let ctx = ChainArgsContext {
         paren_open,
@@ -444,12 +453,38 @@ fn build_call_args_doc_for_chain_impl(
     }
 }
 
+/// What a chain link prints between its callee and its argument list.
+///
+/// Two independent pieces, and they sit on OPPOSITE sides of the list, which is the whole
+/// reason this is a struct rather than one `Option<DocId>`: `doc` goes before it, `hang`
+/// wraps it.
+#[derive(Clone, Copy)]
+pub(super) struct ChainHead {
+    /// An optional call's `?.` half and the type arguments, in that order — `None` on nearly
+    /// every call. Prepended to the list.
+    doc: Option<DocId>,
+    /// The callee→`(` gap's pre-paren run and its separator, when that gap splits at the `(`
+    /// ([`super::CalleeGap::paren_split`]): the whole argument list hangs one level under it
+    /// (`a.b // c⏎\t(e)`). Prebuilt by the caller through
+    /// [`Printer::continuation_indent_prefix`], because the sites that assemble the list hold
+    /// only the arena and this needs the printer.
+    hang: Option<DocId>,
+}
+
 /// Prepend a chain call's head (see `build_call_args_doc_for_chain_impl`) to its argument
-/// layout — the layout alone when there is none, which is nearly every call.
-fn with_chain_head(d: &DocArena, head: Option<DocId>, args: DocId) -> DocId {
-    match head {
+/// layout — the layout alone when there is none, which is nearly every call — and hang the
+/// layout under the pre-paren run when the callee→`(` gap split.
+///
+/// The `hang` closes INSIDE `doc`: the type arguments are written before the comment
+/// (`call<A> // c⏎\t(c)`), so they stay on the callee's line and only the list moves.
+fn with_chain_head(d: &DocArena, head: ChainHead, args: DocId) -> DocId {
+    let args = match head.hang {
         None => args,
-        Some(head) => d.concat(&[head, args]),
+        Some(hang) => d.indent(d.concat(&[hang, args])),
+    };
+    match head.doc {
+        None => args,
+        Some(doc) => d.concat(&[doc, args]),
     }
 }
 
@@ -459,7 +494,7 @@ fn build_chain_args_empty(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
     ctx: ChainArgsContext,
-    head: Option<DocId>,
+    head: ChainHead,
 ) -> DocId {
     let ChainArgsContext {
         paren_open, prefix, ..
@@ -478,7 +513,7 @@ fn build_chain_args_force_expand(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
     ctx: ChainArgsContext,
-    head: Option<DocId>,
+    head: ChainHead,
 ) -> DocId {
     let d = printer.d();
     let ChainArgsContext {
@@ -763,7 +798,7 @@ fn build_chain_args_single(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
     ctx: ChainArgsContext,
-    head: Option<DocId>,
+    head: ChainHead,
 ) -> DocId {
     let d = printer.d();
     let ChainArgsContext {
@@ -1184,7 +1219,7 @@ fn build_chain_args_multi(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
     ctx: ChainArgsContext,
-    head: Option<DocId>,
+    head: ChainHead,
 ) -> DocId {
     let d = printer.d();
     let ChainArgsContext {

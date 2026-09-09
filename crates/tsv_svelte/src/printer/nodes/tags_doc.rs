@@ -98,8 +98,11 @@ impl<'a> Printer<'a> {
         // outside it, so only there must a run-final `//`'s break be emitted one level out.
         // The other two arms leave the init on the tag's own column, where the comment's own
         // `hardline` is already the break the `}` needs.
+        // To the init's PRINTED start ([`Printer::head_gap_end`]): a comment in a stripped
+        // left-spine shell (`{@const y = ( // c⏎a).b}`) is hoisted ahead of the init and hangs
+        // the value exactly as one written before it does.
         let break_after_op = Self::const_should_break_after_op(init)
-            || self.gap_comment_hangs_value(binding_end, init.span().start);
+            || self.gap_comment_hangs_value(binding_end, self.head_gap_end(init));
 
         // Build init with LayoutMode::Standalone so a ROOT binary init is NOT forced onto
         // ContinuationIndent by the embedded-root question. The init is an assignment

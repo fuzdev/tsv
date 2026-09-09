@@ -290,6 +290,36 @@ pub(super) fn build_import_expression_doc(
     // comment on either side of it (`import /* c */ ('m')`, `import(/* @vite-ignore */ m)`).
     // Own-line comments force the parens to break; `leading_forces_break` drives that below.
     let (head, leading_scan_start) = build_import_head_doc(printer, import_expr);
+
+    // The head→`(` gap's pre-paren half ([`super::CalleeGap::paren_split`]) — a `//` written
+    // there trails the head and the whole argument list hangs under it, exactly as at a call
+    // and a `new`. This is where `import()` STOPS matching prettier: prettier attaches such a
+    // comment to the following node — `import` has no preceding node for it to trail — and
+    // relocates it inside the parens. tsv answers the gap by POSITION at all three keywords
+    // instead, which is the point (`docs/conformance_prettier_ts_comments.md` §Comment
+    // relocation, the callee→`(` entries).
+    if let Some((split_start, paren)) = super::paren_split_for(
+        printer,
+        leading_scan_start,
+        std::slice::from_ref(import_expr.source),
+    ) {
+        // The argument side opens AT the `(`, so its scans no longer see the half the head
+        // has taken.
+        let args = build_import_args_doc(printer, import_expr, d.empty(), paren);
+        return super::hang_args_under_split(printer, head, (split_start, paren), args);
+    }
+    build_import_args_doc(printer, import_expr, head, leading_scan_start)
+}
+
+/// The argument half of [`build_import_expression_doc`] — `head` is what it hangs off, an
+/// empty doc when the head→`(` gap's pre-paren half has taken it.
+fn build_import_args_doc(
+    printer: &Printer<'_>,
+    import_expr: &internal::ImportExpression<'_>,
+    head: DocId,
+    leading_scan_start: u32,
+) -> DocId {
+    let d = printer.d();
     let source_start = import_expr.source.span().start;
 
     // Single multiline-template specifier on the `(` line — hug it, through the same

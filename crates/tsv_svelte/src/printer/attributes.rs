@@ -634,8 +634,7 @@ impl<'a> Printer<'a> {
         // The head's CONTENT only — the prefix and the `}` are the assembler's
         // (`Printer::build_prefixed_head_doc`), which is what lets one shape serve both
         // verdicts.
-        let head =
-            self.assemble_head_expr(value_doc, comment_start, expr.span(), span_end - 1, frozen);
+        let head = self.assemble_head_expr(value_doc, comment_start, expr, span_end - 1, frozen);
         self.build_prefixed_head_doc(prefix, head, self.d().text("}"))
     }
 
@@ -984,7 +983,9 @@ impl<'a> Printer<'a> {
         // block-wrapping ones by their own structure, the hugging ones by paying
         // `owes_continuation_indent` — so the closer's answer is the same either way, and it
         // is taken here, above the run.
-        let layout = self.head_layout(gap_start, value_start, frozen);
+        // Reads to the PRINTED start ([`Printer::head_gap_end`]) — a hoisted left-spine shell
+        // run lands in this gap too. The two scans above keep `value_start`: they emit.
+        let layout = self.head_layout(gap_start, self.head_gap_end(expr), frozen);
         let (trailing_comments, ends_with_line_comment) = self.trailing_comment_docs(
             expr.span().end,
             span.end - 1,

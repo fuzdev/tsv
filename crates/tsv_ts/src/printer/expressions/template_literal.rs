@@ -41,8 +41,15 @@ impl<'a> Printer<'a> {
         // Sound because every interpolation's leading/trailing comment sub-range
         // lies within the template span, so no comment anywhere in the window means
         // every per-interpolation collect is empty. Templates are comment-sparse.
+        //
+        // ⚠️ **ON-PAGE**, not to-emit, because it guards a LAYOUT question as well as the
+        // collects (`interpolation_has_comment_on_page` below). An emit-keyed gate blinds
+        // every layout gate under it (`docs/comments.md` §The three axes): a glued block
+        // comment is OWNED — printed by the value's own doc — so the emit axis skips it
+        // while it still occupies the interpolation. On-page ⊇ to-emit, so widening the gate
+        // can only run the collects where they would have been empty, never skip a comment.
         let template_has_comments =
-            self.has_comments_to_emit_between(template.span.start, template.span.end);
+            self.has_comments_on_page_between(template.span.start, template.span.end);
 
         let mut previous_quasi_indent_size: usize = 0;
 
@@ -117,7 +124,18 @@ impl<'a> Printer<'a> {
                         expr.span().start,
                     );
 
-                let has_comments = !leading_comments.is_empty() || !trailing_comments.is_empty();
+                // The LAYOUT question, asked on the **on-page** axis rather than read off the
+                // collects above — those are the emit axis, and they print. A glued block
+                // comment is OWNED, so the emit axis skips it while it still occupies the
+                // interpolation; keying the layout to the collects let
+                // `is_template_softline_expression` fall through to prettier's
+                // qualifying-type list — which decides this layout only for an interpolation
+                // holding NO comment — and collapse a `${…}` the comment had already broken,
+                // at every kind outside that list (`${/* c⏎d */ a!}`, `${/* c⏎d */ f()}`).
+                let interpolation_has_comment_on_page = template_has_comments
+                    && (self.has_comments_on_page_between(quasi.span.end, expr.span().start)
+                        || self
+                            .has_comments_on_page_between(expr.span().end, next_quasi.span.start));
                 let has_trailing_line_comment = trailing_comments.iter().any(|c| !c.is_block);
 
                 // Prettier's `interpolationHasNewline` gate (template-literal.js
@@ -149,7 +167,10 @@ impl<'a> Printer<'a> {
                     // Non-qualifying types keep the expression doc as-is (no ${/}
                     // softlines) so ${ hugs while the expression breaks internally.
                     let use_softline_wrap = has_trailing_line_comment
-                        || Self::is_template_softline_expression(expr, has_comments);
+                        || Self::is_template_softline_expression(
+                            expr,
+                            interpolation_has_comment_on_page,
+                        );
                     if use_softline_wrap {
                         // The interpolation's CLOSING edge, through the shared obligation
                         // seam ([`Printer::obligated_break`], which carries the rule): a
@@ -296,8 +317,13 @@ impl<'a> Printer<'a> {
     /// Non-qualifying types (CallExpression, ArrowFunctionExpression,
     /// TemplateLiteral, etc.): have internal break points or their own
     /// visual formatting. `${}` hugs while the expression breaks internally.
-    fn is_template_softline_expression(expr: &Expression<'_>, has_comments: bool) -> bool {
-        if has_comments {
+    ///
+    /// ⚠️ `has_comment_on_page` is named for its **axis**, not for a collect: the kind list
+    /// below decides this layout only for an interpolation holding NO comment, so the
+    /// question is whether one OCCUPIES the page here — an owned (glued) comment included,
+    /// which no emitter's collect reports. See `docs/comments.md` §The three axes.
+    fn is_template_softline_expression(expr: &Expression<'_>, has_comment_on_page: bool) -> bool {
+        if has_comment_on_page {
             return true;
         }
         // Matches Prettier's qualifying types (template-literal.js:230-238):
