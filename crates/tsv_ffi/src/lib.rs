@@ -204,8 +204,20 @@ unsafe fn error_result(message: &str, out_len: *mut usize, out_status: *mut u32)
     unsafe { bytes_to_ptr(json, TSV_STATUS_ERROR, out_len, out_status) }
 }
 
-/// Map the C-ABI source-type code to `tsv_ts::Goal` (`0` = Module, `1` = Script),
-/// or to **no** source type (`2`, format exports only).
+/// The C-ABI source-type codes, the one spelling of the `u32` every entry point
+/// takes (`benches/js/lib/ffi.ts` restates them by hand — there is no header).
+/// `SOURCE_TYPE_MODULE` parses a module; `SOURCE_TYPE_SCRIPT` a standalone script,
+/// TypeScript only; `SOURCE_TYPE_UNSPECIFIED` names none — accepted by the format
+/// exports alone, where it is the module-then-script fallback.
+pub const SOURCE_TYPE_MODULE: u32 = 0;
+/// See [`SOURCE_TYPE_MODULE`].
+pub const SOURCE_TYPE_SCRIPT: u32 = 1;
+/// See [`SOURCE_TYPE_MODULE`].
+pub const SOURCE_TYPE_UNSPECIFIED: u32 = 2;
+
+/// Map the C-ABI source-type code to `tsv_ts::Goal` ([`SOURCE_TYPE_MODULE`],
+/// [`SOURCE_TYPE_SCRIPT`]), or to **no** source type ([`SOURCE_TYPE_UNSPECIFIED`],
+/// format exports only).
 ///
 /// `allowed` is the language's goal axis ([`goal_allowed!`]). Code `1` against a
 /// language that has none is an **error**, not a silent Module: Svelte
@@ -226,14 +238,14 @@ fn ffi_source_type(
     unspecified: bool,
 ) -> Result<Option<tsv_ts::Goal>, String> {
     match source_type {
-        0 => Ok(Some(tsv_ts::Goal::Module)),
-        1 if allowed => Ok(Some(tsv_ts::Goal::Script)),
-        1 => Err(
+        SOURCE_TYPE_MODULE => Ok(Some(tsv_ts::Goal::Module)),
+        SOURCE_TYPE_SCRIPT if allowed => Ok(Some(tsv_ts::Goal::Script)),
+        SOURCE_TYPE_SCRIPT => Err(
             "source type code 1 (script) is only supported for TypeScript (expected 0 = module)"
                 .to_string(),
         ),
-        2 if unspecified => Ok(None),
-        2 => Err(
+        SOURCE_TYPE_UNSPECIFIED if unspecified => Ok(None),
+        SOURCE_TYPE_UNSPECIFIED => Err(
             "source type code 2 (unspecified) is only supported for format (expected 0 = module)"
                 .to_string(),
         ),
@@ -494,11 +506,11 @@ mod tests {
     /// The uniform signature of every return-pointer FFI entry point.
     type FfiFn = unsafe extern "C" fn(*const u8, usize, u32, *mut usize, *mut u32) -> *mut u8;
 
-    const MODULE: u32 = 0;
-    const SCRIPT: u32 = 1;
-    const UNSPECIFIED: u32 = 2;
+    const MODULE: u32 = SOURCE_TYPE_MODULE;
+    const SCRIPT: u32 = SOURCE_TYPE_SCRIPT;
+    const UNSPECIFIED: u32 = SOURCE_TYPE_UNSPECIFIED;
     /// Not a code at all — the "unknown" probe, kept one past the last real one.
-    const UNKNOWN: u32 = 3;
+    const UNKNOWN: u32 = SOURCE_TYPE_UNSPECIFIED + 1;
 
     /// Drive an FFI entry point end to end at `goal`: pass the bytes, read the
     /// returned buffer back into a `String`, then free it via `tsv_free`,

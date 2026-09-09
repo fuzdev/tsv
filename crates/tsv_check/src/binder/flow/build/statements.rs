@@ -80,11 +80,10 @@ impl<'a> FlowBuilder<'a> {
             Statement::SwitchStatement(s) => self.bind_switch_statement(id, s),
             Statement::TryStatement(s) => self.bind_try_statement(s),
             Statement::LabeledStatement(s) => self.bind_labeled_statement(s),
-            // `with` shapes no flow: tsc's binder has no `bindWithStatement`, so the
-            // statement falls to `bindEachChild` there and to the linear descent here.
-            Statement::WithStatement(_) => self.descend_children_generic(stmt),
-            // Everything else (declarations, blocks, exports, modules) threads
-            // flow linearly through its children.
+            // Everything else (declarations, blocks, exports, modules, and `with` —
+            // which shapes no flow: tsc's binder has no `bindWithStatement`, so the
+            // statement falls to `bindEachChild` there) threads flow linearly through
+            // its children.
             _ => self.descend_children_generic(stmt),
         }
     }

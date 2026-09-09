@@ -23,7 +23,7 @@ pub use variants::{
 
 use std::fs;
 use std::path::Path;
-use tsv_cli::cli::format_source::format_source_with_goal;
+use tsv_cli::cli::format_source::format_source_with_source_type;
 
 /// Recursively remove location/span fields from JSON for AST comparison
 pub fn remove_locations(mut value: serde_json::Value) -> serde_json::Value {
@@ -118,6 +118,6 @@ pub fn format_with_our_formatter_with_goal(
     let Some(input_type) = InputType::from_filepath(filepath) else {
         return Err(format!("Unsupported file type for formatting: {filepath}"));
     };
-    format_source_with_goal(content, input_type.parser_type(), goal)
+    format_source_with_source_type(content, input_type.parser_type(), Some(goal))
         .map_err(|e| format!("Format error (parse): {e}"))
 }

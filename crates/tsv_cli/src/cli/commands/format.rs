@@ -1,6 +1,6 @@
 use crate::cli::commands::parse::{check_source_type_language, parse_source_type_arg};
 use crate::cli::discover::{Diagnostics, FileSink, discover_files, discover_into, path_sort_key};
-use crate::cli::format_source::{format_source_in, format_source_with_goal_option};
+use crate::cli::format_source::{format_source_in, format_source_with_source_type};
 use crate::cli::input::{InputArgs, ParserType};
 use crate::cli::stack::{clamp_worker_count, sized_thread};
 use argh::FromArgs;
@@ -119,7 +119,7 @@ impl FormatCommand {
             eprintln!("Error: {e}");
             process::exit(2);
         }
-        match format_source_with_goal_option(input.content(), parser_type, goal) {
+        match format_source_with_source_type(input.content(), parser_type, goal) {
             Ok(formatted) => {
                 if self.check {
                     if formatted != input.content() {

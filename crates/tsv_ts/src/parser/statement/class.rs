@@ -5,7 +5,7 @@ use crate::ast::internal::{
     Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
     Expression, FunctionExpression, Identifier, Literal, LiteralValue, MethodDefinition,
     MethodKind, PropertyDefinition, PropertyModifier, Statement, StaticBlock, TSIndexSignature,
-    TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    TSInterfaceHeritage, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
@@ -59,6 +59,18 @@ pub(in crate::parser) enum DecoratedClassExport {
     /// `@dec export default class {}` — the class name is optional, and `declare`
     /// is not a legal modifier here (tsc raises TS1005; acorn rejects).
     BetweenDefault,
+}
+
+/// A class's head and body — everything between `class` and its closing brace —
+/// as `Parser::parse_class_head_and_body` hands it back, for the declaration and
+/// expression nodes to wrap. The fields are the two nodes' shared ones, by name.
+struct ClassHead<'arena> {
+    id: Option<Identifier<'arena>>,
+    type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    super_class: Option<&'arena Expression<'arena>>,
+    super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
+    implements: &'arena [TSInterfaceHeritage<'arena>],
+    body: ClassBody<'arena>,
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -429,39 +441,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        // Every part of a class is strict code (ecma262 sec-class-definitions), and
-        // the scope opens at the `class` keyword — ahead of the heritage clause, so
-        // `class C extends (010) {}` is an error even in a sloppy script.
-        let (id, type_parameters, super_class, super_type_parameters, implements, body) = self
-            .with_strict_class_scope(|p| {
-                // Parse optional class name (`implements` excluded — it begins the
-                // heritage clause of an anonymous class; see `take_class_name`).
-                let id = p.take_class_name()?;
-
-                // Parse type parameters (TypeScript generics): class Foo<T>
-                let type_parameters = p.parse_optional_type_parameters()?;
-
-                // Parse optional `extends` clause
-                let (super_class, super_type_parameters) = p.parse_optional_extends_clause()?;
-
-                // Parse optional `implements` clause
-                let implements: &'arena [_] = if p.eat_contextual_keyword("implements") {
-                    p.parse_interface_heritage_list()?.into_bump_slice()
-                } else {
-                    &[]
-                };
-
-                // Parse class body
-                let body = p.parse_class_body()?;
-                Ok((
-                    id,
-                    type_parameters,
-                    super_class,
-                    super_type_parameters,
-                    implements,
-                    body,
-                ))
-            })?;
+        // The name is always optional on an expression (`implements` excluded — it
+        // begins the heritage clause of an anonymous class; see `take_class_name`).
+        let ClassHead {
+            id,
+            type_parameters,
+            super_class,
+            super_type_parameters,
+            implements,
+            body,
+        } = self.parse_class_head_and_body(false)?;
         let end = body.span.end;
 
         Ok(ParsedExpr::from_expr(
@@ -478,6 +467,51 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(start as u32, end),
             })),
         ))
+    }
+
+    /// Everything a class carries between its `class` keyword and its closing
+    /// brace: the head (name, type parameters, heritage) and the body. What the
+    /// declaration and expression builders share; each wraps it in its own node.
+    fn parse_class_head_and_body(
+        &mut self,
+        name_required: bool,
+    ) -> Result<ClassHead<'arena>, ParseError> {
+        // Every part of a class is strict code (ecma262 sec-strict-mode-code), and
+        // the scope opens at the `class` keyword (or earlier, at a decorator list —
+        // `parse_decorators`) — ahead of the heritage clause, so
+        // `class C extends (010) {}` is an error even in a sloppy script. Static
+        // blocks and field initializers are inside the body, so they inherit it.
+        self.with_strict_class_scope(|p| {
+            let id = p.take_class_name()?;
+            if name_required && id.is_none() {
+                return Err(p.error_expected_after("class name", "class"));
+            }
+
+            // Parse type parameters (TypeScript generics): class Foo<T>
+            let type_parameters = p.parse_optional_type_parameters()?;
+
+            // Parse optional `extends` clause
+            let (super_class, super_type_parameters) = p.parse_optional_extends_clause()?;
+
+            // Parse optional `implements` clause
+            let implements: &'arena [_] = if p.eat_contextual_keyword("implements") {
+                p.parse_interface_heritage_list()?.into_bump_slice()
+            } else {
+                &[]
+            };
+
+            // Parse class body (ambient members share the concrete grammar; see
+            // `parse_class_body`)
+            let body = p.parse_class_body()?;
+            Ok(ClassHead {
+                id,
+                type_parameters,
+                super_class,
+                super_type_parameters,
+                implements,
+                body,
+            })
+        })
     }
 
     /// Inner function that returns the ClassDeclaration directly
@@ -518,46 +552,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         self.advance()?;
 
-        // Parse class name (required for declarations, optional for export default; see
+        // Class name required for declarations, optional for export default (see
         // `take_class_name`). `export default class implements Foo {}` (spec-valid, name
         // optional) parses where acorn-typescript rejects it (`implements` reserved); a
         // `name_required` declaration (`class implements Foo {}` / no name) still errors.
-        // Every part of a class is strict code (ecma262 sec-class-definitions), and
-        // the scope opens at the `class` keyword — ahead of the heritage clause, so
-        // `class C extends (010) {}` is an error even in a sloppy script. Static
-        // blocks and field initializers are inside the body, so they inherit it.
-        let (id, type_parameters, super_class, super_type_parameters, implements, body) = self
-            .with_strict_class_scope(|p| {
-                let id = p.take_class_name()?;
-                if name_required && id.is_none() {
-                    return Err(p.error_expected_after("class name", "class"));
-                }
-
-                // Parse type parameters (TypeScript generics): class Foo<T>()
-                let type_parameters = p.parse_optional_type_parameters()?;
-
-                // Parse optional `extends` clause
-                let (super_class, super_type_parameters) = p.parse_optional_extends_clause()?;
-
-                // Parse optional `implements` clause
-                let implements: &'arena [_] = if p.eat_contextual_keyword("implements") {
-                    p.parse_interface_heritage_list()?.into_bump_slice()
-                } else {
-                    &[]
-                };
-
-                // Parse class body (ambient members share the concrete grammar; see
-                // `parse_class_body`)
-                let body = p.parse_class_body()?;
-                Ok((
-                    id,
-                    type_parameters,
-                    super_class,
-                    super_type_parameters,
-                    implements,
-                    body,
-                ))
-            })?;
+        let ClassHead {
+            id,
+            type_parameters,
+            super_class,
+            super_type_parameters,
+            implements,
+            body,
+        } = self.parse_class_head_and_body(name_required)?;
         let end = body.span.end;
 
         Ok(ClassDeclaration {
