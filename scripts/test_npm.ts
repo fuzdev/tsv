@@ -337,7 +337,8 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// A module-valid source is never reinterpreted (the retry only runs on failure).
 		assert.equal(node_entry.format_typescript('export const   x=1'), 'export const x = 1;\n');
 		// Broken under BOTH grammars: `with` fails the module parse, the `import`
-		// declaration fails the script retry, and the MODULE error is the reported one.
+		// declaration fails the script retry, and the further-reaching error is the reported
+		// one — here the module's (line 2; the script retry died at line 1).
 		assert.throws(
 			() => node_entry.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n"),
 			/The 'with' statement is not allowed in strict mode/

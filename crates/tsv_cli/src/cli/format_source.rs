@@ -13,7 +13,8 @@
 //! [`format_source`] — parses at `Module` and retries at `Script` only if that
 //! *fails* (`tsv_ts::parse_with_goal_or_fallback`), so a legacy sloppy script formats
 //! without anyone naming a grammar, and a module-valid source is never reinterpreted.
-//! When both attempts fail the module error is the reported one.
+//! When both attempts fail the error that reached further into the source is the reported
+//! one, the module's on a tie (`tsv_ts::parse_with_goal_or_fallback`).
 //!
 //! `tsv format <path>` is the one caller that names a goal without being told one:
 //! it reads the path's extension (`tsv_ts::Goal::from_extension`), which settles the

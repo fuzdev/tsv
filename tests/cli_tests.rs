@@ -1999,7 +1999,9 @@ fn test_format_path_falls_back_to_script() {
 #[test]
 fn test_format_path_both_goals_fail_reports_the_module_error() {
     // Broken under both grammars: `with` fails the module parse, the `import`
-    // declaration fails the script retry. The MODULE error is the reported one.
+    // declaration fails the script retry. The error that reached FURTHER is the reported
+    // one — here the module's, at line 2 (`tests/format_fallback_error_attribution.rs`
+    // pins the rule; this pins the CLI's rendering of it).
     let dir = temp_dir("format_path_both_fail");
     let file = dir.join("broken.js");
     fs::write(&file, "import x from 'y';\nwith (a) {\n\tb;\n}\n").expect("write temp file");
@@ -2014,11 +2016,11 @@ fn test_format_path_both_goals_fail_reports_the_module_error() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("The 'with' statement is not allowed in strict mode"),
-        "should report the module parse error: {stderr}"
+        "should report the further-reaching (module) parse error: {stderr}"
     );
     assert!(
         !stderr.contains("'import' is only allowed in a module"),
-        "should not report the script retry's error: {stderr}"
+        "should not report the script retry's earlier error: {stderr}"
     );
     let _ = fs::remove_dir_all(&dir);
 }

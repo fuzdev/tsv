@@ -211,9 +211,16 @@ pub fn parse_with_goal<'arena>(
 /// module grammar is tried first and the script grammar only if it *fails* — so a
 /// legacy sloppy script (a `with` statement, a leading-zero literal, `await` as a
 /// name) formats from a bare path while a module-valid source is never reinterpreted.
-/// When both attempts fail the **module** error is the reported one: it is the goal
-/// ~all real TypeScript is written against, so it is the diagnosis a reader wants
-/// (prettier reports the first attempt's error the same way).
+/// When both attempts fail, the reported error is the one that reached **furthest into
+/// the source**, the module attempt's on a tie. The attempt that got further is the one
+/// whose grammar the file was written against, so its error is the file's own: a broken
+/// module's script attempt dies early at its first `import` / `export` / `import.meta` /
+/// top-level `await`, and a broken sloppy script's module attempt dies early at its first
+/// `with` / legacy literal / `await` name — the very construct the retry exists to admit,
+/// so reporting *that* would point a legacy script's author away from their typo. prettier
+/// reads the same way in practice: its babel parser tolerates the strict-mode production
+/// disallowances at the module goal (`allowedReasonCodes`), so the error it shows on such a
+/// file is the typo. Pinned by `tests/format_fallback_error_attribution.rs`.
 ///
 /// [`parse`] and [`parse_with_goal`] have no fallback: a parse hands back an AST
 /// whose `sourceType` is a claim about which grammar produced it, and a retry would
@@ -231,7 +238,15 @@ pub fn parse_with_goal_or_fallback<'arena>(
         return parse_with_goal(source, goal, arena);
     }
     parse_with_goal(source, Goal::Module, arena).or_else(|module_error| {
-        parse_with_goal(source, Goal::Script, arena).map_err(|_| module_error)
+        parse_with_goal(source, Goal::Script, arena).map_err(|script_error| {
+            // The further error is the file's own; a tie (or a positionless error, which
+            // both attempts share) keeps the module's.
+            if script_error.position() > module_error.position() {
+                script_error
+            } else {
+                module_error
+            }
+        })
     })
 }
 

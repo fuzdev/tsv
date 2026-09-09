@@ -1457,7 +1457,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> ParseError {
         let kind = &self.current.kind;
         ParseError::invalid_syntax(
-            format!("Expected '{separator}' or '{terminator}' after list element, found {kind}"),
+            // `TokenKind`'s `Display` already quotes a punctuator, so no quotes here.
+            format!("Expected {separator} or {terminator} after list element, found {kind}"),
             self.current_pos().0,
         )
     }
