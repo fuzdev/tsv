@@ -114,7 +114,7 @@ impl<'a> Printer<'a> {
     /// Also where the embed's other build-time field lands: a host that cannot hang a
     /// leading cast (`EmbedContext::jsdoc_cast_cannot_hang` — a Svelte braced head) has
     /// the root's left-spine cast marked here, before any doc is built, so its
-    /// comment→`(` break reflows in every authoring (`build_jsdoc_cast_doc`). Both root
+    /// comment→`(` break reflows in every authoring (`build_jsdoc_cast_lead_doc`). Both root
     /// entries — this doc builder and `print_expression`'s string path — pass through
     /// here, so the flag cannot behave differently per entry.
     ///
@@ -443,6 +443,82 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// The cast's owned comment plus the separator it owes its own `(`.
+    ///
+    /// A cast's comment is `owned_by_node`, so every gap emitter and layout predicate
+    /// skips it and this is the one place it is printed — which makes this method
+    /// prettier's `printLeadingComment` for it, the same three-way rule
+    /// [`Printer::push_leading_comment_run`] applies to every other leading comment:
+    ///
+    /// - **hardline** when the author isolated the comment on a line of its own
+    ///   ([`jsdoc_cast_comment_is_own_line`]). That predicate also drives the enclosing
+    ///   assignment to hang, so the `(` lands indented under it — the two must agree.
+    /// - **space** when something follows the `*/` on its line
+    ///   ([`Printer::comment_hugs_next`]) — the `(` itself, or a comment before it.
+    /// - **soft `line`** otherwise: the author broke after the `*/`, and whether that
+    ///   break survives is the enclosing group's to decide. A call argument that fits
+    ///   pulls the `(` back up (matching prettier); a STATEMENT, whose list keeps lines,
+    ///   keeps the break.
+    ///
+    /// That last arm is what a bare space could not express, and it is why a plain glued
+    /// run (`/* c1 */ /* c2 */⏎b;`) and a bundler annotation both kept the author's break
+    /// at statement position while a cast — alone among owned comments — collapsed it.
+    ///
+    /// Two gap categories override the default with a **rule**, via span-keyed printer
+    /// cells the gap sets before the value is built. Both are read HERE rather than by
+    /// the caller, and the caller must therefore invoke this before it builds the inner
+    /// (see [`Printer::build_jsdoc_cast_doc`]):
+    ///
+    /// - a **value gap** is not one of the soft `line`'s gaps: there the break is answered
+    ///   by rule, not by width ([`Printer::jsdoc_cast_value_gap_target`]), so it reflows to
+    ///   the space and both authorings reach the one fixed point every wide cast already
+    ///   takes. Deciding it by width instead broke the gap without hanging the value,
+    ///   landing the `(` at the statement's own indent.
+    /// - a **cannot-hang** gap (a Svelte braced head,
+    ///   [`Printer::jsdoc_cast_cannot_hang_target`]) outranks even the hardline arm: the
+    ///   host has no operator line to end, so the hardline the own-line authoring earns
+    ///   everywhere else would strand the `(` at the head's own column — pass 1 forces the
+    ///   head open, pass 2 reads the comment as mid-line and collapses it, no fixed point.
+    ///   The reflow lands both authorings on the one-line form the glued authoring already
+    ///   reaches. See docs/conformance_prettier_svelte.md §Svelte: Own-line JSDoc cast at
+    ///   a braced head.
+    ///
+    /// ⚠️ The two arms that KEEP the author's break also keep the author's **blank** below
+    /// it, through the same [`Printer::push_blank_preserving_separator`] every other
+    /// leading comment's separator goes through. Ownership is why that has to be said at
+    /// all — no gap emitter measures this gap, so the blank has no other claimant — but
+    /// ownership decides who PRINTS the comment, never whether the gap below it is
+    /// authoring, and prettier's `printLeadingComment` appends its blank hardline after
+    /// all three separators alike. The two REFLOW arms are the exception by construction:
+    /// a reflow says the break was layout rather than authoring, so the blank inside it
+    /// goes with it. Pinned by `typescript/syntax/comments/jsdoc_type_cast_leading_run_blank`.
+    fn build_jsdoc_cast_lead_doc(&self, cast: &crate::ast::internal::JsdocCast<'_>) -> DocId {
+        let d = self.d();
+        let open = cast.span.start; // the `(`
+        let comment_end = cast.comment.span.end;
+        // The cast scan accepts only ASCII whitespace back from the `(`
+        // (`source_scan::block_comment_end_before` with `CommentGlue::AnyLine`), so this
+        // gap can hold no comment for a blank scan to cross: the strict question is the
+        // whole answer here, with no `blank_scan_end` ceiling to take.
+        debug_assert!(
+            self.comments_in_source_between(comment_end, open)
+                .next()
+                .is_none(),
+            "a JSDoc cast's comment→`(` gap is whitespace-only by construction"
+        );
+        let mut parts: DocBuf = smallvec![self.build_comment_doc(&cast.comment)];
+        if self.jsdoc_cast_in_cannot_hang_gap(cast) {
+            parts.push(d.text(" "));
+        } else if jsdoc_cast_comment_is_own_line(cast, self.source) {
+            self.push_blank_preserving_separator(&mut parts, comment_end, open, d.hardline());
+        } else if self.comment_hugs_next(&cast.comment) || self.jsdoc_cast_in_value_gap(cast) {
+            parts.push(d.text(" "));
+        } else {
+            self.push_blank_preserving_separator(&mut parts, comment_end, open, d.line());
+        }
+        d.concat(&parts)
+    }
+
     /// Build a Doc for a JSDoc type cast: `/** @type {T} */ (inner)`.
     ///
     /// The cast **owns** its leading `@type`/`@satisfies` comment (the parser sets
@@ -470,14 +546,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let open = cast.span.start; // the `(`
         let inner_start = cast.inner.span().start;
-        // Read BEFORE the inner is built. The mark names one node, and the inner may hold
-        // value gaps of its own (an object property, an arrow body) whose own mark
-        // overwrites it — so an answer taken after the recursion below is the innermost
-        // gap's, not this cast's, and every cast wrapping such a value lost its reflow.
-        let in_value_gap = self.jsdoc_cast_in_value_gap(cast);
-        // The cannot-hang mark is entry-set and never overwritten, but read it up here
-        // beside its sibling so the two categories are decided at one time.
-        let in_cannot_hang_gap = self.jsdoc_cast_in_cannot_hang_gap(cast);
+        // Built BEFORE the inner, and that ordering is the reason it is a call and not a
+        // block down where its doc is used: the gap marks it reads name ONE node, and the
+        // inner may hold value gaps of its own (an object property, an arrow body) whose
+        // own mark overwrites them — so an answer taken after the recursion below is the
+        // innermost gap's, not this cast's, and every cast wrapping such a value lost its
+        // reflow.
+        let lead = self.build_jsdoc_cast_lead_doc(cast);
         // Rule A inside the cast's own parens: a directive alone on its line in the
         // `(`→inner gap freezes the INNER verbatim, with the cast's comment and parens
         // printing around the frozen slice. Freezing the paren-stripped inner rather than
@@ -494,51 +569,6 @@ impl<'a> Printer<'a> {
             |frozen| self.build_frozen_expression_doc(cast.inner, frozen),
         );
 
-        // The owned comment, glued to the `(` — the cast is the last comment of whatever
-        // leading run precedes it, so its separator is prettier's `printLeadingComment`,
-        // the same three-way rule [`Printer::push_leading_comment_run`] applies to every
-        // other leading comment:
-        //
-        // - **hardline** when the author isolated the comment on a line of its own
-        //   (`jsdoc_cast_comment_is_own_line`). That predicate also drives the enclosing
-        //   assignment to hang, so the `(` lands indented under it — the two must agree.
-        // - **space** when something follows the `*/` on its line
-        //   ([`Printer::comment_hugs_next`]) — the `(` itself, or a comment before it.
-        // - **soft `line`** otherwise: the author broke after the `*/`, and whether that
-        //   break survives is the enclosing group's to decide. A call argument that fits
-        //   pulls the `(` back up (matching prettier); a STATEMENT, whose list keeps lines,
-        //   keeps the break.
-        //
-        // That last arm is what a bare space could not express, and it is why a plain
-        // glued run (`/* c1 */ /* c2 */⏎b;`) and a bundler annotation both kept the
-        // author's break at statement position while a cast — alone among owned comments —
-        // collapsed it.
-        //
-        // ⚠️ A **value gap** is not one of the soft `line`'s gaps: there the break is
-        // answered by rule, not by width ([`Printer::jsdoc_cast_value_gap_target`]), so it
-        // reflows to the space and both authorings reach the one fixed point every wide
-        // cast already takes. Deciding it by width instead broke the gap without hanging
-        // the value, landing the `(` at the statement's own indent.
-        //
-        // ⚠️ A **cannot-hang** gap (a Svelte braced head,
-        // [`Printer::jsdoc_cast_cannot_hang_target`]) outranks even the hardline arm: the
-        // host has no operator line to end, so the hardline the own-line authoring earns
-        // everywhere else would strand the `(` at the head's own column — pass 1 forces
-        // the head open, pass 2 reads the comment as mid-line and collapses it, no fixed
-        // point. The reflow lands both authorings on the one-line form the glued authoring
-        // already reaches. See docs/conformance_prettier_svelte.md §Svelte: Own-line JSDoc
-        // cast at a braced head.
-        let comment_doc = self.build_comment_doc(&cast.comment);
-        let comment_gap = if in_cannot_hang_gap {
-            d.text(" ")
-        } else if jsdoc_cast_comment_is_own_line(cast, self.source) {
-            d.hardline()
-        } else if self.comment_hugs_next(&cast.comment) || in_value_gap {
-            d.text(" ")
-        } else {
-            d.line()
-        };
-        let lead = d.concat(&[comment_doc, comment_gap]);
         let with_lead = |paren_doc: DocId| d.concat(&[lead, paren_doc]);
 
         // The cast synthesizes its own `(`…`)`, so the gap between the inner expression
