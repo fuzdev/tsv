@@ -81,9 +81,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // 4. Variable declaration for-in/of (for (let x of ...))
         // 5. Expression pattern for-in/of (for (x of ...))
 
-        if self.eat(TokenKind::Semicolon) {
-            // Empty init: for (;...)
-            return self.parse_for_standard(start, await_at, None);
+        if self.check(&TokenKind::Semicolon) {
+            // Empty init: `for (;;)`. The for-await bar is read at each of the three
+            // non-of grammar exits, always before the exit's own `;` — see
+            // `reject_for_await_without_of`.
+            self.reject_for_await_without_of(await_at)?;
+            self.advance()?;
+            return self.parse_for_standard(start, None);
         }
 
         // Check if it starts with a variable declaration. `const` and `var` are
@@ -164,9 +168,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 );
             }
 
-            // Standard for loop with var decl init
-            self.expect(&TokenKind::Semicolon)?;
-            return self.parse_for_standard(
+            // Standard for loop with var decl init.
+            return self.parse_c_style_for(
                 start,
                 await_at,
                 Some(self.arena.alloc(ForInit::VariableDeclaration(var_decl))),
@@ -244,9 +247,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             );
         }
 
-        // Standard for loop with expression init
-        self.expect(&TokenKind::Semicolon)?;
-        self.parse_for_standard(
+        // Standard for loop with expression init.
+        self.parse_c_style_for(
             start,
             await_at,
             Some(self.arena.alloc(ForInit::Expression(expr))),
@@ -255,10 +257,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// `for await` heads exactly one production: `ForInOfStatement`'s
     /// `for await ( … of AssignmentExpression ) Statement` and its two binding
-    /// spellings. There is no for-await-in head and no for-await C-style head, so the
-    /// two builders that are not a for-of — `parse_for_standard` and `parse_for_in` —
-    /// each reject at entry, which is what makes every head that fails to reach a
-    /// for-of reject, whatever exit of the head parse brought it there.
+    /// spellings. There is no for-await-in head and no for-await C-style head, so every
+    /// head that fails to reach a for-of rejects — and the head parse has exactly three
+    /// such exits, each of which asks here **before** consuming anything of its own: the
+    /// empty init (`for (;;)`), the C-style separator ([`Self::parse_c_style_for`], both
+    /// spellings of the init), and the for-in head ([`Self::parse_for_in`], whose entry
+    /// *is* its exit).
+    ///
+    /// "Before" is the load-bearing word, and it is a **diagnostic** requirement rather
+    /// than a grammatical one: a malformed head (`for await (a b)`) dies on the separator
+    /// first, and that error would report at the stray token instead of on the `await`
+    /// keyword acorn puts it on. Pinned by `tests/for_await_rejection.rs`.
     ///
     /// The rejection is a **content** obligation as much as a grammar one: `await` is
     /// printed off the `ForOfStatement`'s own flag, and a `ForInStatement` /
@@ -273,17 +282,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(())
     }
 
-    /// Parse standard for loop: `for (init; test; update) body`. `await_at` is the
-    /// head's `await` keyword if it had one — rejected here, since this is not a for-of
-    /// (`reject_for_await_without_of`).
-    fn parse_for_standard(
+    /// The C-style exit shared by both init spellings: reject a `for await` head, then
+    /// take the separator the exit owes and build. Split out so the two callers cannot
+    /// disagree about that order — the rejection has to precede the `expect`, per
+    /// [`Self::reject_for_await_without_of`].
+    fn parse_c_style_for(
         &mut self,
         start: usize,
         await_at: Option<usize>,
         init: Option<&'arena ForInit<'arena>>,
     ) -> Result<Statement<'arena>, ParseError> {
         self.reject_for_await_without_of(await_at)?;
+        self.expect(&TokenKind::Semicolon)?;
+        self.parse_for_standard(start, init)
+    }
 
+    /// Parse standard for loop: `for (init; test; update) body`. Carries no `await_at`:
+    /// a `for await` head is barred at each of the three exits that reach a non-for-of
+    /// builder, all of them before this is called
+    /// ([`Self::reject_for_await_without_of`]).
+    fn parse_for_standard(
+        &mut self,
+        start: usize,
+        init: Option<&'arena ForInit<'arena>>,
+    ) -> Result<Statement<'arena>, ParseError> {
         // Parse test (optional)
         let test = if self.check(&TokenKind::Semicolon) {
             None

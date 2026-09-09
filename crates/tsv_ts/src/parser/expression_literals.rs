@@ -179,14 +179,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // valid only with a `:` value — never a bare shorthand (`{ '' }`, `{ 0 }`).
                 TokenKind::String => {
                     // String literal key: {"prop-name": value}
-                    let (key_start, key_end) = self.current_pos();
-                    let cooked = self.extract_string_cooked()?;
-                    self.advance()?;
                     (
-                        Expression::Literal(Literal {
-                            value: LiteralValue::String(cooked),
-                            span: Span::new(key_start as u32, key_end as u32),
-                        }),
+                        Expression::Literal(self.parse_string_literal()?),
                         false,
                         true,
                     )

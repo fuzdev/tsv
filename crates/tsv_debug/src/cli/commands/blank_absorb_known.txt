@@ -35,7 +35,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 528
+# shapes: 529
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -407,6 +407,7 @@
 (TSDeclareFunction, id→params)
 (TSDeclareFunction, id→returnType)
 (TSDeclareFunction, id→typeParameters)
+(TSDeclareFunction, params→params)
 (TSDeclareFunction, params→returnType)
 (TSDeclareFunction, returnType→$)
 (TSDeclareFunction, typeParameters→params)

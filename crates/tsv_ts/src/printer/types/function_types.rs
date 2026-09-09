@@ -869,7 +869,8 @@ impl<'a> Printer<'a> {
         // empty/false — skip them on the common comment-free signature. The blank-line
         // check is a source blank-line test independent of comments and stays outside
         // the gate. Mirrors `build_params_doc_with_comments`'s fast gate.
-        let window_start = paren_pos.map_or_else(|| params[0].span().start, |p| p + 1);
+        let window_start =
+            paren_pos.map_or_else(|| self.param_start_with_decorators(&params[0]), |p| p + 1);
         let comments_present = self.has_comments_on_page_between(window_start, end_boundary);
         // A line comment trailing `(` (`(// c\n p`), or an own-line block comment in
         // the `(`→first-param gap, forces multiline (else the inline path below lets a
@@ -906,9 +907,20 @@ impl<'a> Printer<'a> {
         // it, made by tsv at the one list in the family that wasn't on the shared seam; the
         // value-params and function-type paths were both already correct.
         let mut param_parts = DocBuf::new();
-        let mut prev_end = paren_pos.map_or_else(|| params[0].span().start, |p| p + 1);
+        let mut prev_end =
+            paren_pos.map_or_else(|| self.param_start_with_decorators(&params[0]), |p| p + 1);
 
         for (i, param) in params.iter().enumerate() {
+            // Every comment boundary below is the param's RENDERED start — its first
+            // decorator, not its binding ([`Printer::param_start_with_decorators`]). This
+            // builder serves two hosts: the type-side signatures, whose params carry no
+            // decorators and for which the anchor is the span start anyway, and a bodyless
+            // FUNCTION signature (`TSDeclareFunction` — an ambient `declare function` or an
+            // overload), whose params can. Anchoring on the binding there put the
+            // decorators inside this gap while the param's own doc printed them too, and
+            // the comment between them came out TWICE (`docs/comments.md` §The five
+            // hazards, hazard 3).
+            let param_start = self.param_start_with_decorators(param);
             // Where this param's leading run opens: past the previous param's claimed
             // trailing run, and past the STRANDED after-comma blocks that trail the comma
             // instead of leading this param — the same two-sided split the
@@ -917,12 +929,10 @@ impl<'a> Printer<'a> {
             if i > 0 {
                 param_parts.push(d.text(","));
                 if comments_present {
-                    let comma = self.find_list_comma(prev_end, param.span().start);
-                    if let Some(end) = self.push_stranded_after_comma_blocks(
-                        &mut param_parts,
-                        comma,
-                        param.span().start,
-                    ) {
+                    let comma = self.find_list_comma(prev_end, param_start);
+                    if let Some(end) =
+                        self.push_stranded_after_comma_blocks(&mut param_parts, comma, param_start)
+                    {
                         leading_start = end;
                     }
                 }
@@ -937,7 +947,7 @@ impl<'a> Printer<'a> {
             if comments_present {
                 param_parts.extend(self.build_leading_comments_multiline(
                     leading_start,
-                    param.span().start,
+                    param_start,
                     None,
                 ));
             }
@@ -950,7 +960,7 @@ impl<'a> Printer<'a> {
                     prev_end = self.push_item_trailing_run(
                         &mut param_parts,
                         param_end,
-                        params[i + 1].span().start,
+                        self.param_start_with_decorators(&params[i + 1]),
                     );
                 } else {
                     // Last param → `)`: no comma is emitted (trailingComma 'none'), so the
@@ -1272,11 +1282,20 @@ impl<'a> Printer<'a> {
         // and object/array/block open-delimiter family.
         let (paren_prefix, paren_pull_pos) = paren_pos.map_or_else(
             || (None, None),
-            |open| self.delimiter_line_comment_prefix(open, params[0].span().start),
+            |open| {
+                self.delimiter_line_comment_prefix(
+                    open,
+                    self.param_start_with_decorators(&params[0]),
+                )
+            },
         );
 
         for (i, p) in params.iter().enumerate() {
-            let param_start = p.span().start;
+            // The param's RENDERED start — its first decorator when it has any. Same
+            // reason as `build_signature_params_doc`'s: this emitter serves a bodyless
+            // function signature too, whose params can be decorated, and a gap reaching
+            // past the `@` double-prints the comment inside it.
+            let param_start = self.param_start_with_decorators(p);
             let param_end = p.span().end;
             let is_last = i == params.len() - 1;
 
@@ -1292,7 +1311,7 @@ impl<'a> Printer<'a> {
             inner_parts.push(self.build_function_type_param_item_doc(paren_pos, params, i));
 
             if !is_last {
-                let next_start = params[i + 1].span().start;
+                let next_start = self.param_start_with_decorators(&params[i + 1]);
                 prev_end = self.emit_multiline_comma_with_comments(
                     &mut inner_parts,
                     param_end,

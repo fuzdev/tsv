@@ -5,6 +5,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
+use super::DecoratorListKind;
 use super::class::DecoratedClassExport;
 
 /// The parsed pieces of a module specifier that begins with the contextual
@@ -244,7 +245,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // through expression arm of `parse_export_default_declaration`).
             TokenKind::At => {
                 let deco_start = self.current_pos().0;
-                let decorators = self.parse_decorators()?;
+                let decorators = self.parse_decorators(DecoratorListKind::Class)?;
                 // Optional `declare`/`abstract` + `class`, decorators attached and the
                 // span extended over them — shared with `parse_decorated_class`. The
                 // `export` here *precedes* the decorators, so they stay the declaration

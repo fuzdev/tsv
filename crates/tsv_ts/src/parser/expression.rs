@@ -1618,16 +1618,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 ))
             }
             TokenKind::String => {
-                let (start, end) = self.current_pos();
-                let cooked = self.extract_string_cooked()?;
-                self.advance()?;
+                let literal = self.parse_string_literal()?;
+                let (start, end) = (literal.span.start, literal.span.end as usize);
                 Ok(ParsedExpr::with_start_end(
                     self.arena,
-                    Expression::Literal(Literal {
-                        value: LiteralValue::String(cooked),
-                        span: Span::new(start as u32, end as u32),
-                    }),
-                    start as u32,
+                    Expression::Literal(literal),
+                    start,
                     end,
                 ))
             }

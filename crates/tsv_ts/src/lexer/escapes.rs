@@ -196,7 +196,20 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
 /// whole escape at a time, so an escaped backslash (`\\7`) opens no escape and a
 /// multi-byte escaped character cannot be mistaken for one (a UTF-8 continuation byte is
 /// never `\`).
-pub(crate) fn find_legacy_escape(raw: &str) -> Option<usize> {
+/// Which legacy string escape [`find_legacy_escape`] found — the two carry different
+/// messages, so the finder names the form rather than leaving the caller to re-read the
+/// digit at an offset only this function could have produced. Mirrors the numeric axis's
+/// `LeadingZeroLiteral` (`parser/scan.rs`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LegacyEscape {
+    /// `LegacyOctalEscapeSequence` — `\7`, `\101`, and `\0` followed by a decimal
+    /// digit, read in base 8.
+    LegacyOctal,
+    /// `NonOctalDecimalEscapeSequence` — `\8` / `\9`, standing for the digit itself.
+    NonOctalDecimal,
+}
+
+pub(crate) fn find_legacy_escape(raw: &str) -> Option<(usize, LegacyEscape)> {
     let bytes = raw.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
@@ -205,8 +218,11 @@ pub(crate) fn find_legacy_escape(raw: &str) -> Option<usize> {
             continue;
         }
         match bytes.get(i + 1) {
-            Some(b'0') if bytes.get(i + 2).is_some_and(u8::is_ascii_digit) => return Some(i),
-            Some(b'1'..=b'9') => return Some(i),
+            Some(b'0') if bytes.get(i + 2).is_some_and(u8::is_ascii_digit) => {
+                return Some((i, LegacyEscape::LegacyOctal));
+            }
+            Some(b'8' | b'9') => return Some((i, LegacyEscape::NonOctalDecimal)),
+            Some(b'1'..=b'7') => return Some((i, LegacyEscape::LegacyOctal)),
             _ => {}
         }
         // Step over the backslash and the character it escapes; no escape body holds
@@ -214,13 +230,6 @@ pub(crate) fn find_legacy_escape(raw: &str) -> Option<usize> {
         i += 2;
     }
     None
-}
-
-/// Whether the escape `find_legacy_escape` found at `offset` in `raw` is a
-/// `NonOctalDecimalEscapeSequence` (`\8` / `\9`) rather than a `LegacyOctalEscapeSequence`
-/// — the two carry different messages, and the digit after the backslash is the whole test.
-pub(crate) fn legacy_escape_is_nonoctal_decimal(raw: &str, offset: usize) -> bool {
-    matches!(raw.as_bytes().get(offset + 1), Some(b'8' | b'9'))
 }
 
 /// Read exactly N hex digits from the iterator, accumulating their value directly
@@ -437,22 +446,22 @@ mod tests {
     #[test]
     fn test_find_legacy_escape() {
         // LegacyOctalEscapeSequence, at the offset of its backslash.
-        assert_eq!(find_legacy_escape("\\7"), Some(0));
-        assert_eq!(find_legacy_escape("a\\101b"), Some(1));
-        assert_eq!(find_legacy_escape("\\00"), Some(0));
+        let octal = |i| Some((i, LegacyEscape::LegacyOctal));
+        let decimal = |i| Some((i, LegacyEscape::NonOctalDecimal));
+        assert_eq!(find_legacy_escape("\\7"), octal(0));
+        assert_eq!(find_legacy_escape("a\\101b"), octal(1));
+        assert_eq!(find_legacy_escape("\\00"), octal(0));
         // `\0` is the NUL escape unless a DECIMAL digit follows it — `8` and `9` count.
         assert_eq!(find_legacy_escape("\\0"), None);
         assert_eq!(find_legacy_escape("\\0x"), None);
-        assert_eq!(find_legacy_escape("\\08"), Some(0));
-        assert_eq!(find_legacy_escape("\\09"), Some(0));
+        assert_eq!(find_legacy_escape("\\08"), octal(0));
+        assert_eq!(find_legacy_escape("\\09"), octal(0));
         // NonOctalDecimalEscapeSequence.
-        assert_eq!(find_legacy_escape("\\8"), Some(0));
-        assert_eq!(find_legacy_escape("\\9"), Some(0));
-        assert!(legacy_escape_is_nonoctal_decimal("\\8", 0));
-        assert!(!legacy_escape_is_nonoctal_decimal("\\7", 0));
+        assert_eq!(find_legacy_escape("\\8"), decimal(0));
+        assert_eq!(find_legacy_escape("\\9"), decimal(0));
         // An escaped backslash opens no escape, so the digit after it is ordinary text.
         assert_eq!(find_legacy_escape("\\\\7"), None);
-        assert_eq!(find_legacy_escape("\\\\\\7"), Some(2));
+        assert_eq!(find_legacy_escape("\\\\\\7"), octal(2));
         // Escapes with no legacy form, including a multi-byte escaped character.
         assert_eq!(find_legacy_escape("\\n\\t\\x41\\u0041"), None);
         assert_eq!(find_legacy_escape("\\é7"), None);

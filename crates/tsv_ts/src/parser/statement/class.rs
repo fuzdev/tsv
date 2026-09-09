@@ -13,6 +13,23 @@ use tsv_lang::{ParseError, Span};
 use super::super::Parser;
 use super::super::expression::ParsedExpr;
 
+/// Whose `DecoratorList` is being parsed — the axis that decides whether the run
+/// opens a class's strict scope. Named at every call site rather than inferred,
+/// because the two lists reach one parser from opposite sides: `parse_decorators`
+/// is called both from the class parsers and from the **generic** parameter-list
+/// parser, which plain functions and object-literal methods share with class
+/// methods. See [`Parser::parse_decorators`] for the rule and its oracle.
+#[derive(Clone, Copy)]
+pub(in crate::parser) enum DecoratorListKind {
+    /// A class's own list (`@dec class C {}`) or one of its members' — strict code,
+    /// so the run opens the class's strictness scope. On a member the scope is
+    /// already open and the wrap is a no-op; naming it `Class` still states the fact.
+    Class,
+    /// A parameter's list (`f(@dec x)`) — part of the enclosing function's parameter
+    /// list, which parses under the outer mode, so the run opens nothing.
+    Parameter,
+}
+
 /// Everything parsed off the front of a class member before its body — the
 /// modifier set, the (possibly computed) key, and the optional/type-param
 /// markers. `parse_class_member` builds this, then dispatches to
@@ -110,7 +127,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
 
         // Parse one or more decorators
-        let decorators = self.parse_decorators()?;
+        let decorators = self.parse_decorators(DecoratorListKind::Class)?;
 
         // Check for `export` before class
         let is_export = *self.current_kind() == TokenKind::Keyword(KeywordKind::Export);
@@ -255,11 +272,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 false,
             )?
         };
-        class.decorators = if decorators.is_empty() {
-            None
-        } else {
-            Some(decorators.into_bump_slice())
-        };
+        // Always a `Some`: both callers dispatch on `TokenKind::At`, so the run is
+        // non-empty. `None` and `Some(&[])` are different wire shapes — the field is
+        // omitted for the first and emitted as `[]` for the second — so folding an empty
+        // run to `None` here would be a claim about a case that cannot arrive; see
+        // `parse_class_expression_from`, which states the same rule for its own entry.
+        debug_assert!(
+            !decorators.is_empty(),
+            "a decorated class is only reached at a `@`"
+        );
+        class.decorators = Some(decorators.into_bump_slice());
         // The class span covers its decorators — except for an ambient class behind an
         // intervening `export`, where acorn anchors the declaration at its own
         // `declare` and leaves the decorators outside the span (`@dec export declare
@@ -284,7 +306,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<ParsedExpr<'arena>, ParseError> {
         let start = self.current_pos().0;
 
-        let decorators = self.parse_decorators()?;
+        let decorators = self.parse_decorators(DecoratorListKind::Class)?;
 
         if *self.current_kind() != TokenKind::Keyword(KeywordKind::Class) {
             return Err(self.error_expected_after("'class'", "decorator"));
@@ -297,26 +319,45 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a list of decorators: `@dec1 @dec2 ...`
     ///
-    /// A decorator list is part of the class it decorates — the decorators proposal
-    /// puts `DecoratorList` inside `ClassDeclaration` / `ClassExpression`, and every
-    /// part of a class is strict mode code (ecma262 sec-strict-mode-code) — so the
-    /// class's strictness scope opens here, at the first `@`, and not only at the
+    /// Whose list it is decides its **strictness**, which is why every caller names it
+    /// ([`DecoratorListKind`]). A *class's* `DecoratorList` is part of the class — the
+    /// decorators proposal puts it inside `ClassDeclaration` / `ClassExpression`, and
+    /// every part of a class is strict mode code (ecma262 sec-strict-mode-code) — so
+    /// the class's strictness scope opens here, at the first `@`, and not only at the
     /// `class` keyword: `@dec(010) class C {}` is an error in a sloppy script, as
     /// `class C extends (010) {}` is. (acorn-typescript grades the list under the
-    /// enclosing mode — a cataloged divergence.) The parameter-decorator caller is
-    /// already inside a class body, where the wrap is a no-op.
+    /// enclosing mode — a cataloged divergence.)
+    ///
+    /// A *parameter's* list is not part of a class. It belongs to the parameter list of
+    /// whatever function encloses it, and a parameter list parses under the outer mode
+    /// — the same rule a parameter *default* follows — so `function f(@dec(010) x) {}`
+    /// is legal in a sloppy script and `class C { m(@dec(010) x) {} }` is not, the
+    /// strictness coming from the class either way and never from the `@`. acorn agrees
+    /// on both. Pinned by
+    /// `tests/fixtures/typescript/script_goal/param_decorator_outer_mode_prettier_divergence`.
     pub(in crate::parser) fn parse_decorators(
         &mut self,
+        kind: DecoratorListKind,
     ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, ParseError> {
-        self.with_strict_class_scope(|p| {
-            let mut decorators = p.bvec();
+        match kind {
+            DecoratorListKind::Class => self.with_strict_class_scope(Self::parse_decorator_run),
+            DecoratorListKind::Parameter => self.parse_decorator_run(),
+        }
+    }
 
-            while *p.current_kind() == TokenKind::At {
-                decorators.push(p.parse_decorator()?);
-            }
+    /// The run itself: `@dec` until the `@`s stop. Split out so
+    /// [`parse_decorators`](Self::parse_decorators) can hand it to the strict-scope
+    /// combinator or call it bare, one spelling either way.
+    fn parse_decorator_run(
+        &mut self,
+    ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, ParseError> {
+        let mut decorators = self.bvec();
 
-            Ok(decorators)
-        })
+        while *self.current_kind() == TokenKind::At {
+            decorators.push(self.parse_decorator()?);
+        }
+
+        Ok(decorators)
     }
 
     /// Parse a single decorator: `@expression`, where the expression follows the
@@ -677,7 +718,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // decorators too — acorn accepts them and prettier formats the body form; the
         // TS1206 ("Decorators are not valid here") ambient early-error is deferred to
         // the diagnostics layer.
-        let decorators = self.parse_decorators()?.into_bump_slice();
+        let decorators = self
+            .parse_decorators(DecoratorListKind::Class)?
+            .into_bump_slice();
 
         // Handle 'declare' contextual keyword - only if followed by a class member name or another modifier
         // Otherwise `declare` itself is the property name: `declare = 1;`
@@ -885,7 +928,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // String literal key: `'a-b'() {}`, `'a' = 1;`. A string-keyed
                 // `'constructor'` IS the constructor (kind detection reads the name),
                 // unlike a computed `['constructor']`. The check goes through the
-                // decoded value, so `'constructor'` is recognized too.
+                // decoded value, so `'constructor'` is recognized too — which is why
+                // this one site reads `extract_string_cooked` directly instead of
+                // `Parser::parse_string_literal` like the other string-key positions:
+                // it needs the cooked value in hand, and the reader's `Literal` would
+                // only have to be destructured back apart to get it.
                 let (key_start, key_end) = self.current_pos();
                 let span = Span::new(key_start as u32, key_end as u32);
                 let cooked = self.extract_string_cooked()?;

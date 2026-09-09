@@ -2,7 +2,7 @@
 
 use crate::Goal;
 use crate::ast::internal::*;
-use crate::lexer::escapes::{find_legacy_escape, legacy_escape_is_nonoctal_decimal};
+use crate::lexer::escapes::{LegacyEscape, find_legacy_escape};
 use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
@@ -272,12 +272,24 @@ pub struct Parser<'a, 'arena> {
     /// inward, so its scopes save-and-restore rather than replace
     /// ([`Parser::with_strict_scope`]).
     ///
-    /// It gates the constructs strict code disallows *by production* — today the
-    /// leading-zero numeric literals (`010`, `08`), read by
-    /// `parse_number_or_bigint_literal` at the moment the token becomes a node.
-    /// Strict-mode **early errors** (duplicate parameters, reserved words as
-    /// binding names, an assignment to `eval`) are a separate, deferred question:
-    /// they parse under every mode and belong to the diagnostics layer.
+    /// It gates the three constructs strict code disallows *by production*, and this
+    /// is where that list is kept — every other mention names this field rather than
+    /// re-spelling it:
+    ///
+    /// - the **leading-zero numeric literals** (`010`, `08`), read by
+    ///   `parse_number_or_bigint_literal` at the moment the token becomes a node;
+    /// - the **legacy string escapes** (`'\7'`, `'\08'`, `'\8'`), read by
+    ///   `Parser::extract_string_cooked` — the one seam every string literal is
+    ///   consumed through — and re-read over a body's earlier prologue literals when a
+    ///   `"use strict"` directive turns it strict (`Parser::note_directive`);
+    /// - the **`with` statement**, read at its keyword by the statement dispatch.
+    ///   `with` stays a `ReservedWord` in every mode, so only the statement moves.
+    ///
+    /// Each is read at consumption, so the lexer stays mode-free and a peeked token is
+    /// never graded under the wrong mode. Strict-mode **early errors** (duplicate
+    /// parameters, reserved words as binding names, an assignment to `eval`) are a
+    /// separate, deferred question: they parse under every mode and belong to the
+    /// diagnostics layer.
     strict: bool,
     /// The `[Yield]` grammar context. `true` (`[+Yield]`) inside a generator
     /// function's params **and** body; reset to `false` (`[~Yield]`) on entering
@@ -1368,11 +1380,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `raw` is a string literal's inner source with its quotes excluded, and `raw_start`
     /// that slice's position in the document the error is rendered against.
     fn legacy_escape_error(&self, raw: &str, raw_start: usize) -> Option<ParseError> {
-        let offset = find_legacy_escape(raw)?;
-        let message = if legacy_escape_is_nonoctal_decimal(raw, offset) {
-            "The '\\8' and '\\9' escape sequences are not allowed in strict mode."
-        } else {
-            "Octal escape sequences are not allowed in strict mode. Use '\\x' or '\\u'."
+        let (offset, form) = find_legacy_escape(raw)?;
+        let message = match form {
+            LegacyEscape::NonOctalDecimal => {
+                "The '\\8' and '\\9' escape sequences are not allowed in strict mode."
+            }
+            LegacyEscape::LegacyOctal => {
+                "Octal escape sequences are not allowed in strict mode. Use '\\x' or '\\u'."
+            }
         };
         Some(self.error_msg_at(message, raw_start + offset))
     }

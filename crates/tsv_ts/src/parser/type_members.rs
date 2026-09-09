@@ -204,16 +204,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             )
         } else if self.check(&TokenKind::String) {
             // String literal key: {'multi-word': number}
-            let (key_start, key_end) = self.current_pos();
-            let cooked = self.extract_string_cooked()?;
-            self.advance()?;
-            (
-                false,
-                Expression::Literal(Literal {
-                    value: LiteralValue::String(cooked),
-                    span: Span::new(key_start as u32, key_end as u32),
-                }),
-            )
+            (false, Expression::Literal(self.parse_string_literal()?))
         } else if self.check(&TokenKind::Number) {
             // Number literal key: {0: string, 1: number}. Routed through the one
             // numeric-literal reader so this key reads its radix prefixes, separators

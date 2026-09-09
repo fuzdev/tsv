@@ -3,6 +3,7 @@
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
+use crate::parser::statement::DecoratorListKind;
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
@@ -294,7 +295,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // expression — so `@dec [a, b]` reads as a decorator on `dec`
                     // plus an array-pattern parameter, not the computed member
                     // `dec[a, b]` (matching acorn).
-                    let decorators = self.parse_decorators()?;
+                    let decorators = self.parse_decorators(DecoratorListKind::Parameter)?;
                     // Decorators are not valid on a rest parameter (acorn rejects `@d ...a`).
                     if self.check(&TokenKind::DotDotDot) {
                         return Err(self.error_msg("Decorators are not valid on a rest parameter"));

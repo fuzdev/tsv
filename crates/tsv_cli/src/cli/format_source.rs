@@ -7,14 +7,18 @@
 //!
 //! # The source type is optional here
 //!
-//! Every entry point resolves to [`format_source_in_with_source_type`], whose
-//! TypeScript goal is an `Option`. A named one is exact. An unnamed one — `tsv
-//! format <path>`, an unset `--source-type` on `--content`/`--stdin`, every
-//! `tsv_debug` audit that calls [`format_source`] — parses at `Module` and retries
-//! at `Script` only if that *fails* (`tsv_ts::parse_with_goal_or_fallback`), so a
-//! legacy sloppy script formats without anyone naming a grammar, and a module-valid
-//! source is never reinterpreted. When both attempts fail the module error is the
-//! reported one.
+//! Every entry point resolves to [`format_source_in`], whose
+//! TypeScript goal is an `Option`. A named one is exact. An unnamed one — an unset
+//! `--source-type` on `--content`/`--stdin`, every `tsv_debug` audit that calls
+//! [`format_source`] — parses at `Module` and retries at `Script` only if that
+//! *fails* (`tsv_ts::parse_with_goal_or_fallback`), so a legacy sloppy script formats
+//! without anyone naming a grammar, and a module-valid source is never reinterpreted.
+//! When both attempts fail the module error is the reported one.
+//!
+//! `tsv format <path>` is the one caller that names a goal without being told one:
+//! it reads the path's extension (`tsv_ts::Goal::from_extension`), which settles the
+//! goal for `.mjs`/`.mts` and nothing else. A file that is an ES module by name has
+//! no legacy sloppy script to fall back to.
 
 use crate::cli::input::ParserType;
 
@@ -46,10 +50,12 @@ pub fn format_source_with_source_type(
     // to the source so the parse pays one chunk alloc, not a doubling tail.
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(source);
-    format_source_in_with_source_type(source, parser_type, goal, &arena, &doc_arena)
+    format_source_in(source, parser_type, goal, &arena, &doc_arena)
 }
 
-/// Parse and format `source` into caller-provided arenas.
+/// Parse and format `source` into caller-provided arenas, against a TypeScript
+/// source type that may be named. The shared implementation of every entry point in
+/// this module.
 ///
 /// The internal AST is bump-allocated into `arena` and the doc IR into
 /// `doc_arena`, but nothing borrowed from either escapes — `format` returns an
@@ -58,20 +64,10 @@ pub fn format_source_with_source_type(
 /// `tsv format <dir>` keep one AST `Bump` and one `DocArena` per worker thread
 /// (each retaining the largest chunk across files) instead of allocating fresh
 /// arenas per file.
-pub fn format_source_in(
-    source: &str,
-    parser_type: ParserType,
-    arena: &bumpalo::Bump,
-    doc_arena: &tsv_lang::doc::arena::DocArena,
-) -> Result<String, String> {
-    format_source_in_with_source_type(source, parser_type, None, arena, doc_arena)
-}
-
-/// [`format_source_in`] against a TypeScript source type that may be named. The
-/// shared implementation of every entry point in this module; `format_source_in` is
-/// the `None` form. Crate-private: every caller outside reaches it through one of
-/// the three entry points above.
-pub(crate) fn format_source_in_with_source_type(
+///
+/// Crate-private: every caller outside reaches it through one of the two entry
+/// points above.
+pub(crate) fn format_source_in(
     source: &str,
     parser_type: ParserType,
     goal: Option<tsv_ts::Goal>,
