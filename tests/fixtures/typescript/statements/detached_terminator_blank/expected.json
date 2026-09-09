@@ -1,0 +1,4408 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2591,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A blank line a statement's own terminator sits below belongs to the statement,",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " so it survives the `;` moving back up to the content it terminates.",
+			"start": 103,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Every kind measured from its content end rather than its full end.",
+			"start": 191,
+			"end": 260,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A header kind is measured through its body, so the rule reaches the body's own",
+			"start": 437,
+			"end": 518,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " terminator.",
+			"start": 520,
+			"end": 534,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A kind the table does not list is measured from its full end, so a blank above",
+			"start": 947,
+			"end": 1028,
+			"loc": {
+				"start": {
+					"line": 76,
+					"column": 1
+				},
+				"end": {
+					"line": 76,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " its terminator stays inside the statement and never reaches the gap.",
+			"start": 1030,
+			"end": 1101,
+			"loc": {
+				"start": {
+					"line": 77,
+					"column": 1
+				},
+				"end": {
+					"line": 77,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A header whose body IS the terminator is measured through that empty statement,",
+			"start": 1126,
+			"end": 1208,
+			"loc": {
+				"start": {
+					"line": 81,
+					"column": 1
+				},
+				"end": {
+					"line": 81,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " which the table does not list either.",
+			"start": 1210,
+			"end": 1250,
+			"loc": {
+				"start": {
+					"line": 82,
+					"column": 1
+				},
+				"end": {
+					"line": 82,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A terminator on the next line with no blank above it gains none.",
+			"start": 1304,
+			"end": 1371,
+			"loc": {
+				"start": {
+					"line": 89,
+					"column": 1
+				},
+				"end": {
+					"line": 89,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment the author trailed on the content's own line is skipped the way",
+			"start": 1390,
+			"end": 1466,
+			"loc": {
+				"start": {
+					"line": 93,
+					"column": 1
+				},
+				"end": {
+					"line": 93,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier's own scan skips it, so the blank below it still reaches the gap.",
+			"start": 1468,
+			"end": 1545,
+			"loc": {
+				"start": {
+					"line": 94,
+					"column": 1
+				},
+				"end": {
+					"line": 94,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 1554,
+			"end": 1559,
+			"loc": {
+				"start": {
+					"line": 95,
+					"column": 8
+				},
+				"end": {
+					"line": 95,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 1569,
+			"end": 1577,
+			"loc": {
+				"start": {
+					"line": 97,
+					"column": 8
+				},
+				"end": {
+					"line": 97,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment sitting BELOW the blank owns that blank itself, and a comment between",
+			"start": 1589,
+			"end": 1671,
+			"loc": {
+				"start": {
+					"line": 101,
+					"column": 1
+				},
+				"end": {
+					"line": 101,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the content and its terminator leaves the question to the terminator's own end.",
+			"start": 1673,
+			"end": 1755,
+			"loc": {
+				"start": {
+					"line": 102,
+					"column": 1
+				},
+				"end": {
+					"line": 102,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 1766,
+			"end": 1771,
+			"loc": {
+				"start": {
+					"line": 105,
+					"column": 1
+				},
+				"end": {
+					"line": 105,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 1780,
+			"end": 1788,
+			"loc": {
+				"start": {
+					"line": 106,
+					"column": 8
+				},
+				"end": {
+					"line": 106,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block body, switch consequent and namespace body take the same rule.",
+			"start": 1800,
+			"end": 1871,
+			"loc": {
+				"start": {
+					"line": 110,
+					"column": 1
+				},
+				"end": {
+					"line": 110,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A case LABEL gap is measured from the SwitchCase, a kind the table does not list, so a",
+			"start": 1990,
+			"end": 2079,
+			"loc": {
+				"start": {
+					"line": 130,
+					"column": 1
+				},
+				"end": {
+					"line": 130,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank above a detached terminator stays inside the consequent and never reaches it.",
+			"start": 2081,
+			"end": 2167,
+			"loc": {
+				"start": {
+					"line": 131,
+					"column": 1
+				},
+				"end": {
+					"line": 131,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The null control for that gap: a blank the author wrote BELOW the terminator is the",
+			"start": 2230,
+			"end": 2316,
+			"loc": {
+				"start": {
+					"line": 139,
+					"column": 1
+				},
+				"end": {
+					"line": 139,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " gap's own and is kept.",
+			"start": 2318,
+			"end": 2343,
+			"loc": {
+				"start": {
+					"line": 140,
+					"column": 1
+				},
+				"end": {
+					"line": 140,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A frozen statement's terminator belongs to the printer too, so the blank below its",
+			"start": 2407,
+			"end": 2492,
+			"loc": {
+				"start": {
+					"line": 149,
+					"column": 1
+				},
+				"end": {
+					"line": 149,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " content reaches the gap by this same rule.",
+			"start": 2494,
+			"end": 2539,
+			"loc": {
+				"start": {
+					"line": 150,
+					"column": 1
+				},
+				"end": {
+					"line": 150,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 2541,
+			"end": 2559,
+			"loc": {
+				"start": {
+					"line": 151,
+					"column": 1
+				},
+				"end": {
+					"line": 151,
+					"column": 19
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2590,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 2581,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 155,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 175,
+					"end": 180,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 175,
+						"end": 179,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 175,
+							"end": 177,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 3
+								}
+							},
+							"name": "a1"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank line a statement's own terminator sits below belongs to the statement,",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " so it survives the `;` moving back up to the content it terminates.",
+							"start": 103,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 183,
+					"end": 188,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 183,
+						"end": 187,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 183,
+							"end": 185,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"name": "b1"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 262,
+					"end": 283,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 22
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 269,
+							"end": 271,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 8
+								},
+								"end": {
+									"line": 9,
+									"column": 10
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 269,
+								"end": 271,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 8
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								},
+								"name": "c1"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 277,
+						"end": 282,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 16
+							},
+							"end": {
+								"line": 9,
+								"column": 21
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Every kind measured from its content end rather than its full end.",
+							"start": 191,
+							"end": 260
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 286,
+					"end": 316,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 31
+						}
+					},
+					"importKind": "type",
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 300,
+							"end": 302,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 15
+								},
+								"end": {
+									"line": 11,
+									"column": 17
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 300,
+								"end": 302,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 15
+									},
+									"end": {
+										"line": 11,
+										"column": 17
+									}
+								},
+								"name": "C2"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 300,
+								"end": 302,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 15
+									},
+									"end": {
+										"line": 11,
+										"column": 17
+									}
+								},
+								"name": "C2"
+							},
+							"importKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 310,
+						"end": 315,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 25
+							},
+							"end": {
+								"line": 11,
+								"column": 30
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 319,
+					"end": 339,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 21
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "VariableDeclaration",
+						"start": 326,
+						"end": 339,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 8
+							},
+							"end": {
+								"line": 13,
+								"column": 21
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 332,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 14
+									},
+									"end": {
+										"line": 13,
+										"column": 20
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 332,
+									"end": 334,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 14
+										},
+										"end": {
+											"line": 13,
+											"column": 16
+										}
+									},
+									"name": "d1"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 337,
+									"end": 338,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 19
+										},
+										"end": {
+											"line": 13,
+											"column": 20
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						],
+						"kind": "const"
+					},
+					"specifiers": [],
+					"source": null
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 342,
+					"end": 362,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 21
+						}
+					},
+					"exportKind": "value",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 356,
+						"end": 361,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 15
+							},
+							"end": {
+								"line": 15,
+								"column": 20
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 365,
+					"end": 386,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 369,
+							"end": 375,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 5
+								},
+								"end": {
+									"line": 17,
+									"column": 11
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 369,
+								"end": 371,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 5
+									},
+									"end": {
+										"line": 17,
+										"column": 7
+									}
+								},
+								"name": "e1"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 374,
+								"end": 375,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 10
+									},
+									"end": {
+										"line": 17,
+										"column": 11
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						{
+							"type": "VariableDeclarator",
+							"start": 379,
+							"end": 385,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 2
+								},
+								"end": {
+									"line": 18,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 379,
+								"end": 381,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 4
+									}
+								},
+								"name": "e2"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 384,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"kind": "var"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 389,
+					"end": 414,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 26
+						}
+					},
+					"declare": true,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 403,
+							"end": 413,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 15
+								},
+								"end": {
+									"line": 20,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 403,
+								"end": 413,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 15
+									},
+									"end": {
+										"line": 20,
+										"column": 25
+									}
+								},
+								"name": "e3",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 405,
+									"end": 413,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 17
+										},
+										"end": {
+											"line": 20,
+											"column": 25
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 407,
+										"end": 413,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 19
+											},
+											"end": {
+												"line": 20,
+												"column": 25
+											}
+										}
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "DebuggerStatement",
+					"start": 417,
+					"end": 426,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 10
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 429,
+					"end": 434,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 429,
+						"end": 433,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 1
+							},
+							"end": {
+								"line": 24,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 429,
+							"end": 431,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 1
+								},
+								"end": {
+									"line": 24,
+									"column": 3
+								}
+							},
+							"name": "b2"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 536,
+					"end": 545,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 10
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 540,
+						"end": 545,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 5
+							},
+							"end": {
+								"line": 28,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 540,
+							"end": 544,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 5
+								},
+								"end": {
+									"line": 28,
+									"column": 9
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 540,
+								"end": 542,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 5
+									},
+									"end": {
+										"line": 28,
+										"column": 7
+									}
+								},
+								"name": "a2"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 536,
+						"end": 538,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 3
+							}
+						},
+						"name": "l1"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A header kind is measured through its body, so the rule reaches the body's own",
+							"start": 437,
+							"end": 518
+						},
+						{
+							"type": "Line",
+							"value": " terminator.",
+							"start": 520,
+							"end": 534
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 548,
+					"end": 563,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 16
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 552,
+						"end": 556,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 5
+							},
+							"end": {
+								"line": 30,
+								"column": 9
+							}
+						},
+						"name": "cond"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 558,
+						"end": 563,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 11
+							},
+							"end": {
+								"line": 30,
+								"column": 16
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 558,
+							"end": 562,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 11
+								},
+								"end": {
+									"line": 30,
+									"column": 15
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 558,
+								"end": 560,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 11
+									},
+									"end": {
+										"line": 30,
+										"column": 13
+									}
+								},
+								"name": "a3"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 566,
+					"end": 593,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 11
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 570,
+						"end": 574,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 5
+							},
+							"end": {
+								"line": 32,
+								"column": 9
+							}
+						},
+						"name": "cond"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 576,
+						"end": 581,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 11
+							},
+							"end": {
+								"line": 32,
+								"column": 16
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 576,
+							"end": 580,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 11
+								},
+								"end": {
+									"line": 32,
+									"column": 15
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 576,
+								"end": 578,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 11
+									},
+									"end": {
+										"line": 32,
+										"column": 13
+									}
+								},
+								"name": "a4"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 588,
+						"end": 593,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 6
+							},
+							"end": {
+								"line": 33,
+								"column": 11
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 588,
+							"end": 592,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 6
+								},
+								"end": {
+									"line": 33,
+									"column": 10
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 588,
+								"end": 590,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 6
+									},
+									"end": {
+										"line": 33,
+										"column": 8
+									}
+								},
+								"name": "a5"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 596,
+					"end": 610,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 15
+						}
+					},
+					"init": null,
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 605,
+						"end": 610,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 10
+							},
+							"end": {
+								"line": 35,
+								"column": 15
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 605,
+							"end": 609,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 10
+								},
+								"end": {
+									"line": 35,
+									"column": 14
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 605,
+								"end": 607,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 10
+									},
+									"end": {
+										"line": 35,
+										"column": 12
+									}
+								},
+								"name": "a6"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ForInStatement",
+					"start": 613,
+					"end": 640,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 28
+						}
+					},
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 618,
+						"end": 626,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 6
+							},
+							"end": {
+								"line": 37,
+								"column": 14
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 624,
+								"end": 626,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 12
+									},
+									"end": {
+										"line": 37,
+										"column": 14
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 624,
+									"end": 626,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 12
+										},
+										"end": {
+											"line": 37,
+											"column": 14
+										}
+									},
+									"name": "f1"
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 630,
+						"end": 633,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 18
+							},
+							"end": {
+								"line": 37,
+								"column": 21
+							}
+						},
+						"name": "obj"
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 635,
+						"end": 640,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 23
+							},
+							"end": {
+								"line": 37,
+								"column": 28
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 635,
+							"end": 639,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 23
+								},
+								"end": {
+									"line": 37,
+									"column": 27
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 635,
+								"end": 637,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 23
+									},
+									"end": {
+										"line": 37,
+										"column": 25
+									}
+								},
+								"name": "a7"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 643,
+					"end": 670,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 28
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 648,
+						"end": 656,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 6
+							},
+							"end": {
+								"line": 39,
+								"column": 14
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 654,
+								"end": 656,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 12
+									},
+									"end": {
+										"line": 39,
+										"column": 14
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 654,
+									"end": 656,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 12
+										},
+										"end": {
+											"line": 39,
+											"column": 14
+										}
+									},
+									"name": "f2"
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 660,
+						"end": 663,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 18
+							},
+							"end": {
+								"line": 39,
+								"column": 21
+							}
+						},
+						"name": "arr"
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 665,
+						"end": 670,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 23
+							},
+							"end": {
+								"line": 39,
+								"column": 28
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 665,
+							"end": 669,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 23
+								},
+								"end": {
+									"line": 39,
+									"column": 27
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 665,
+								"end": 667,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 23
+									},
+									"end": {
+										"line": 39,
+										"column": 25
+									}
+								},
+								"name": "a8"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "WhileStatement",
+					"start": 673,
+					"end": 691,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 19
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 680,
+						"end": 684,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 8
+							},
+							"end": {
+								"line": 41,
+								"column": 12
+							}
+						},
+						"name": "cond"
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 686,
+						"end": 691,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 14
+							},
+							"end": {
+								"line": 41,
+								"column": 19
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 686,
+							"end": 690,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 14
+								},
+								"end": {
+									"line": 41,
+									"column": 18
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 686,
+								"end": 688,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 14
+									},
+									"end": {
+										"line": 41,
+										"column": 16
+									}
+								},
+								"name": "a9"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 694,
+					"end": 717,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 24
+						}
+					},
+					"body": {
+						"type": "WhileStatement",
+						"start": 698,
+						"end": 717,
+						"loc": {
+							"start": {
+								"line": 43,
+								"column": 5
+							},
+							"end": {
+								"line": 43,
+								"column": 24
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 705,
+							"end": 709,
+							"loc": {
+								"start": {
+									"line": 43,
+									"column": 12
+								},
+								"end": {
+									"line": 43,
+									"column": 16
+								}
+							},
+							"name": "cond"
+						},
+						"body": {
+							"type": "ExpressionStatement",
+							"start": 711,
+							"end": 717,
+							"loc": {
+								"start": {
+									"line": 43,
+									"column": 18
+								},
+								"end": {
+									"line": 43,
+									"column": 24
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 711,
+								"end": 716,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 18
+									},
+									"end": {
+										"line": 43,
+										"column": 23
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 711,
+									"end": 714,
+									"loc": {
+										"start": {
+											"line": 43,
+											"column": 18
+										},
+										"end": {
+											"line": 43,
+											"column": 21
+										}
+									},
+									"name": "a10"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 694,
+						"end": 696,
+						"loc": {
+							"start": {
+								"line": 43,
+								"column": 1
+							},
+							"end": {
+								"line": 43,
+								"column": 3
+							}
+						},
+						"name": "l2"
+					}
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 720,
+					"end": 744,
+					"loc": {
+						"start": {
+							"line": 45,
+							"column": 1
+						},
+						"end": {
+							"line": 46,
+							"column": 14
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 723,
+						"end": 729,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 4
+							},
+							"end": {
+								"line": 45,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 723,
+							"end": 728,
+							"loc": {
+								"start": {
+									"line": 45,
+									"column": 4
+								},
+								"end": {
+									"line": 45,
+									"column": 9
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 723,
+								"end": 726,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 4
+									},
+									"end": {
+										"line": 45,
+										"column": 7
+									}
+								},
+								"name": "a11"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 738,
+						"end": 742,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 8
+							},
+							"end": {
+								"line": 46,
+								"column": 12
+							}
+						},
+						"name": "cond"
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 747,
+					"end": 752,
+					"loc": {
+						"start": {
+							"line": 48,
+							"column": 1
+						},
+						"end": {
+							"line": 48,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 747,
+						"end": 751,
+						"loc": {
+							"start": {
+								"line": 48,
+								"column": 1
+							},
+							"end": {
+								"line": 48,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 747,
+							"end": 749,
+							"loc": {
+								"start": {
+									"line": 48,
+									"column": 1
+								},
+								"end": {
+									"line": 48,
+									"column": 3
+								}
+							},
+							"name": "b3"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 755,
+					"end": 814,
+					"loc": {
+						"start": {
+							"line": 50,
+							"column": 1
+						},
+						"end": {
+							"line": 56,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 764,
+						"end": 767,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 10
+							},
+							"end": {
+								"line": 50,
+								"column": 13
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 770,
+						"end": 814,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 16
+							},
+							"end": {
+								"line": 56,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 774,
+								"end": 787,
+								"loc": {
+									"start": {
+										"line": 51,
+										"column": 2
+									},
+									"end": {
+										"line": 51,
+										"column": 15
+									}
+								},
+								"expression": {
+									"type": "Literal",
+									"start": 774,
+									"end": 786,
+									"loc": {
+										"start": {
+											"line": 51,
+											"column": 2
+										},
+										"end": {
+											"line": 51,
+											"column": 14
+										}
+									},
+									"value": "use strict",
+									"raw": "'use strict'"
+								},
+								"directive": "use strict"
+							},
+							{
+								"type": "ReturnStatement",
+								"start": 791,
+								"end": 802,
+								"loc": {
+									"start": {
+										"line": 53,
+										"column": 2
+									},
+									"end": {
+										"line": 53,
+										"column": 13
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 798,
+									"end": 801,
+									"loc": {
+										"start": {
+											"line": 53,
+											"column": 9
+										},
+										"end": {
+											"line": 53,
+											"column": 12
+										}
+									},
+									"name": "a12"
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 806,
+								"end": 811,
+								"loc": {
+									"start": {
+										"line": 55,
+										"column": 2
+									},
+									"end": {
+										"line": 55,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 806,
+									"end": 810,
+									"loc": {
+										"start": {
+											"line": 55,
+											"column": 2
+										},
+										"end": {
+											"line": 55,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 806,
+										"end": 808,
+										"loc": {
+											"start": {
+												"line": 55,
+												"column": 2
+											},
+											"end": {
+												"line": 55,
+												"column": 4
+											}
+										},
+										"name": "b4"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 817,
+					"end": 858,
+					"loc": {
+						"start": {
+							"line": 58,
+							"column": 1
+						},
+						"end": {
+							"line": 62,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 826,
+						"end": 829,
+						"loc": {
+							"start": {
+								"line": 58,
+								"column": 10
+							},
+							"end": {
+								"line": 58,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 832,
+						"end": 858,
+						"loc": {
+							"start": {
+								"line": 58,
+								"column": 16
+							},
+							"end": {
+								"line": 62,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ThrowStatement",
+								"start": 836,
+								"end": 846,
+								"loc": {
+									"start": {
+										"line": 59,
+										"column": 2
+									},
+									"end": {
+										"line": 59,
+										"column": 12
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 842,
+									"end": 845,
+									"loc": {
+										"start": {
+											"line": 59,
+											"column": 8
+										},
+										"end": {
+											"line": 59,
+											"column": 11
+										}
+									},
+									"name": "a13"
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 850,
+								"end": 855,
+								"loc": {
+									"start": {
+										"line": 61,
+										"column": 2
+									},
+									"end": {
+										"line": 61,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 850,
+									"end": 854,
+									"loc": {
+										"start": {
+											"line": 61,
+											"column": 2
+										},
+										"end": {
+											"line": 61,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 850,
+										"end": 852,
+										"loc": {
+											"start": {
+												"line": 61,
+												"column": 2
+											},
+											"end": {
+												"line": 61,
+												"column": 4
+											}
+										},
+										"name": "b5"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "WhileStatement",
+					"start": 861,
+					"end": 896,
+					"loc": {
+						"start": {
+							"line": 64,
+							"column": 1
+						},
+						"end": {
+							"line": 68,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 868,
+						"end": 872,
+						"loc": {
+							"start": {
+								"line": 64,
+								"column": 8
+							},
+							"end": {
+								"line": 64,
+								"column": 12
+							}
+						},
+						"name": "cond"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 874,
+						"end": 896,
+						"loc": {
+							"start": {
+								"line": 64,
+								"column": 14
+							},
+							"end": {
+								"line": 68,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "BreakStatement",
+								"start": 878,
+								"end": 884,
+								"loc": {
+									"start": {
+										"line": 65,
+										"column": 2
+									},
+									"end": {
+										"line": 65,
+										"column": 8
+									}
+								},
+								"label": null
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 888,
+								"end": 893,
+								"loc": {
+									"start": {
+										"line": 67,
+										"column": 2
+									},
+									"end": {
+										"line": 67,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 888,
+									"end": 892,
+									"loc": {
+										"start": {
+											"line": 67,
+											"column": 2
+										},
+										"end": {
+											"line": 67,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 888,
+										"end": 890,
+										"loc": {
+											"start": {
+												"line": 67,
+												"column": 2
+											},
+											"end": {
+												"line": 67,
+												"column": 4
+											}
+										},
+										"name": "b6"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 899,
+					"end": 944,
+					"loc": {
+						"start": {
+							"line": 70,
+							"column": 1
+						},
+						"end": {
+							"line": 74,
+							"column": 2
+						}
+					},
+					"body": {
+						"type": "WhileStatement",
+						"start": 903,
+						"end": 944,
+						"loc": {
+							"start": {
+								"line": 70,
+								"column": 5
+							},
+							"end": {
+								"line": 74,
+								"column": 2
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 910,
+							"end": 914,
+							"loc": {
+								"start": {
+									"line": 70,
+									"column": 12
+								},
+								"end": {
+									"line": 70,
+									"column": 16
+								}
+							},
+							"name": "cond"
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 916,
+							"end": 944,
+							"loc": {
+								"start": {
+									"line": 70,
+									"column": 18
+								},
+								"end": {
+									"line": 74,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ContinueStatement",
+									"start": 920,
+									"end": 932,
+									"loc": {
+										"start": {
+											"line": 71,
+											"column": 2
+										},
+										"end": {
+											"line": 71,
+											"column": 14
+										}
+									},
+									"label": {
+										"type": "Identifier",
+										"start": 929,
+										"end": 931,
+										"loc": {
+											"start": {
+												"line": 71,
+												"column": 11
+											},
+											"end": {
+												"line": 71,
+												"column": 13
+											}
+										},
+										"name": "l3"
+									}
+								},
+								{
+									"type": "ExpressionStatement",
+									"start": 936,
+									"end": 941,
+									"loc": {
+										"start": {
+											"line": 73,
+											"column": 2
+										},
+										"end": {
+											"line": 73,
+											"column": 7
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 936,
+										"end": 940,
+										"loc": {
+											"start": {
+												"line": 73,
+												"column": 2
+											},
+											"end": {
+												"line": 73,
+												"column": 6
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 936,
+											"end": 938,
+											"loc": {
+												"start": {
+													"line": 73,
+													"column": 2
+												},
+												"end": {
+													"line": 73,
+													"column": 4
+												}
+											},
+											"name": "b7"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							]
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 899,
+						"end": 901,
+						"loc": {
+							"start": {
+								"line": 70,
+								"column": 1
+							},
+							"end": {
+								"line": 70,
+								"column": 3
+							}
+						},
+						"name": "l3"
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1103,
+					"end": 1116,
+					"loc": {
+						"start": {
+							"line": 78,
+							"column": 1
+						},
+						"end": {
+							"line": 78,
+							"column": 14
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1108,
+						"end": 1110,
+						"loc": {
+							"start": {
+								"line": 78,
+								"column": 6
+							},
+							"end": {
+								"line": 78,
+								"column": 8
+							}
+						},
+						"name": "A1"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 1113,
+						"end": 1115,
+						"loc": {
+							"start": {
+								"line": 78,
+								"column": 11
+							},
+							"end": {
+								"line": 78,
+								"column": 13
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 1113,
+							"end": 1115,
+							"loc": {
+								"start": {
+									"line": 78,
+									"column": 11
+								},
+								"end": {
+									"line": 78,
+									"column": 13
+								}
+							},
+							"name": "B1"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A kind the table does not list is measured from its full end, so a blank above",
+							"start": 947,
+							"end": 1028
+						},
+						{
+							"type": "Line",
+							"value": " its terminator stays inside the statement and never reaches the gap.",
+							"start": 1030,
+							"end": 1101
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1118,
+					"end": 1123,
+					"loc": {
+						"start": {
+							"line": 79,
+							"column": 1
+						},
+						"end": {
+							"line": 79,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1118,
+						"end": 1122,
+						"loc": {
+							"start": {
+								"line": 79,
+								"column": 1
+							},
+							"end": {
+								"line": 79,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1118,
+							"end": 1120,
+							"loc": {
+								"start": {
+									"line": 79,
+									"column": 1
+								},
+								"end": {
+									"line": 79,
+									"column": 3
+								}
+							},
+							"name": "b8"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 1252,
+					"end": 1261,
+					"loc": {
+						"start": {
+							"line": 83,
+							"column": 1
+						},
+						"end": {
+							"line": 83,
+							"column": 10
+						}
+					},
+					"init": null,
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "EmptyStatement",
+						"start": 1260,
+						"end": 1261,
+						"loc": {
+							"start": {
+								"line": 83,
+								"column": 9
+							},
+							"end": {
+								"line": 83,
+								"column": 10
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A header whose body IS the terminator is measured through that empty statement,",
+							"start": 1126,
+							"end": 1208
+						},
+						{
+							"type": "Line",
+							"value": " which the table does not list either.",
+							"start": 1210,
+							"end": 1250
+						}
+					]
+				},
+				{
+					"type": "WhileStatement",
+					"start": 1263,
+					"end": 1276,
+					"loc": {
+						"start": {
+							"line": 84,
+							"column": 1
+						},
+						"end": {
+							"line": 84,
+							"column": 14
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 1270,
+						"end": 1274,
+						"loc": {
+							"start": {
+								"line": 84,
+								"column": 8
+							},
+							"end": {
+								"line": 84,
+								"column": 12
+							}
+						},
+						"name": "cond"
+					},
+					"body": {
+						"type": "EmptyStatement",
+						"start": 1275,
+						"end": 1276,
+						"loc": {
+							"start": {
+								"line": 84,
+								"column": 13
+							},
+							"end": {
+								"line": 84,
+								"column": 14
+							}
+						}
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 1278,
+					"end": 1282,
+					"loc": {
+						"start": {
+							"line": 85,
+							"column": 1
+						},
+						"end": {
+							"line": 85,
+							"column": 5
+						}
+					},
+					"body": {
+						"type": "EmptyStatement",
+						"start": 1281,
+						"end": 1282,
+						"loc": {
+							"start": {
+								"line": 85,
+								"column": 4
+							},
+							"end": {
+								"line": 85,
+								"column": 5
+							}
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 1278,
+						"end": 1280,
+						"loc": {
+							"start": {
+								"line": 85,
+								"column": 1
+							},
+							"end": {
+								"line": 85,
+								"column": 3
+							}
+						},
+						"name": "l4"
+					}
+				},
+				{
+					"type": "IfStatement",
+					"start": 1284,
+					"end": 1294,
+					"loc": {
+						"start": {
+							"line": 86,
+							"column": 1
+						},
+						"end": {
+							"line": 86,
+							"column": 11
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 1288,
+						"end": 1292,
+						"loc": {
+							"start": {
+								"line": 86,
+								"column": 5
+							},
+							"end": {
+								"line": 86,
+								"column": 9
+							}
+						},
+						"name": "cond"
+					},
+					"consequent": {
+						"type": "EmptyStatement",
+						"start": 1293,
+						"end": 1294,
+						"loc": {
+							"start": {
+								"line": 86,
+								"column": 10
+							},
+							"end": {
+								"line": 86,
+								"column": 11
+							}
+						}
+					},
+					"alternate": null
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1296,
+					"end": 1301,
+					"loc": {
+						"start": {
+							"line": 87,
+							"column": 1
+						},
+						"end": {
+							"line": 87,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1296,
+						"end": 1300,
+						"loc": {
+							"start": {
+								"line": 87,
+								"column": 1
+							},
+							"end": {
+								"line": 87,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1296,
+							"end": 1298,
+							"loc": {
+								"start": {
+									"line": 87,
+									"column": 1
+								},
+								"end": {
+									"line": 87,
+									"column": 3
+								}
+							},
+							"name": "b9"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1373,
+					"end": 1379,
+					"loc": {
+						"start": {
+							"line": 90,
+							"column": 1
+						},
+						"end": {
+							"line": 90,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1373,
+						"end": 1378,
+						"loc": {
+							"start": {
+								"line": 90,
+								"column": 1
+							},
+							"end": {
+								"line": 90,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1373,
+							"end": 1376,
+							"loc": {
+								"start": {
+									"line": 90,
+									"column": 1
+								},
+								"end": {
+									"line": 90,
+									"column": 4
+								}
+							},
+							"name": "a14"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A terminator on the next line with no blank above it gains none.",
+							"start": 1304,
+							"end": 1371
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1381,
+					"end": 1387,
+					"loc": {
+						"start": {
+							"line": 91,
+							"column": 1
+						},
+						"end": {
+							"line": 91,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1381,
+						"end": 1386,
+						"loc": {
+							"start": {
+								"line": 91,
+								"column": 1
+							},
+							"end": {
+								"line": 91,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1381,
+							"end": 1384,
+							"loc": {
+								"start": {
+									"line": 91,
+									"column": 1
+								},
+								"end": {
+									"line": 91,
+									"column": 4
+								}
+							},
+							"name": "b10"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1547,
+					"end": 1553,
+					"loc": {
+						"start": {
+							"line": 95,
+							"column": 1
+						},
+						"end": {
+							"line": 95,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1547,
+						"end": 1552,
+						"loc": {
+							"start": {
+								"line": 95,
+								"column": 1
+							},
+							"end": {
+								"line": 95,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1547,
+							"end": 1550,
+							"loc": {
+								"start": {
+									"line": 95,
+									"column": 1
+								},
+								"end": {
+									"line": 95,
+									"column": 4
+								}
+							},
+							"name": "a18"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment the author trailed on the content's own line is skipped the way",
+							"start": 1390,
+							"end": 1466
+						},
+						{
+							"type": "Line",
+							"value": " prettier's own scan skips it, so the blank below it still reaches the gap.",
+							"start": 1468,
+							"end": 1545
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 1554,
+							"end": 1559
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1562,
+					"end": 1568,
+					"loc": {
+						"start": {
+							"line": 97,
+							"column": 1
+						},
+						"end": {
+							"line": 97,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1562,
+						"end": 1567,
+						"loc": {
+							"start": {
+								"line": 97,
+								"column": 1
+							},
+							"end": {
+								"line": 97,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1562,
+							"end": 1565,
+							"loc": {
+								"start": {
+									"line": 97,
+									"column": 1
+								},
+								"end": {
+									"line": 97,
+									"column": 4
+								}
+							},
+							"name": "a19"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 1569,
+							"end": 1577
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1580,
+					"end": 1586,
+					"loc": {
+						"start": {
+							"line": 99,
+							"column": 1
+						},
+						"end": {
+							"line": 99,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1580,
+						"end": 1585,
+						"loc": {
+							"start": {
+								"line": 99,
+								"column": 1
+							},
+							"end": {
+								"line": 99,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1580,
+							"end": 1583,
+							"loc": {
+								"start": {
+									"line": 99,
+									"column": 1
+								},
+								"end": {
+									"line": 99,
+									"column": 4
+								}
+							},
+							"name": "b14"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1757,
+					"end": 1763,
+					"loc": {
+						"start": {
+							"line": 103,
+							"column": 1
+						},
+						"end": {
+							"line": 103,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1757,
+						"end": 1762,
+						"loc": {
+							"start": {
+								"line": 103,
+								"column": 1
+							},
+							"end": {
+								"line": 103,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1757,
+							"end": 1760,
+							"loc": {
+								"start": {
+									"line": 103,
+									"column": 1
+								},
+								"end": {
+									"line": 103,
+									"column": 4
+								}
+							},
+							"name": "a20"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment sitting BELOW the blank owns that blank itself, and a comment between",
+							"start": 1589,
+							"end": 1671
+						},
+						{
+							"type": "Line",
+							"value": " the content and its terminator leaves the question to the terminator's own end.",
+							"start": 1673,
+							"end": 1755
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1773,
+					"end": 1779,
+					"loc": {
+						"start": {
+							"line": 106,
+							"column": 1
+						},
+						"end": {
+							"line": 106,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1773,
+						"end": 1778,
+						"loc": {
+							"start": {
+								"line": 106,
+								"column": 1
+							},
+							"end": {
+								"line": 106,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1773,
+							"end": 1776,
+							"loc": {
+								"start": {
+									"line": 106,
+									"column": 1
+								},
+								"end": {
+									"line": 106,
+									"column": 4
+								}
+							},
+							"name": "a21"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 1766,
+							"end": 1771
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c4 ",
+							"start": 1780,
+							"end": 1788
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1791,
+					"end": 1797,
+					"loc": {
+						"start": {
+							"line": 108,
+							"column": 1
+						},
+						"end": {
+							"line": 108,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1791,
+						"end": 1796,
+						"loc": {
+							"start": {
+								"line": 108,
+								"column": 1
+							},
+							"end": {
+								"line": 108,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1791,
+							"end": 1794,
+							"loc": {
+								"start": {
+									"line": 108,
+									"column": 1
+								},
+								"end": {
+									"line": 108,
+									"column": 4
+								}
+							},
+							"name": "b15"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "BlockStatement",
+					"start": 1873,
+					"end": 1896,
+					"loc": {
+						"start": {
+							"line": 111,
+							"column": 1
+						},
+						"end": {
+							"line": 115,
+							"column": 2
+						}
+					},
+					"body": [
+						{
+							"type": "ExpressionStatement",
+							"start": 1877,
+							"end": 1883,
+							"loc": {
+								"start": {
+									"line": 112,
+									"column": 2
+								},
+								"end": {
+									"line": 112,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 1877,
+								"end": 1882,
+								"loc": {
+									"start": {
+										"line": 112,
+										"column": 2
+									},
+									"end": {
+										"line": 112,
+										"column": 7
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 1877,
+									"end": 1880,
+									"loc": {
+										"start": {
+											"line": 112,
+											"column": 2
+										},
+										"end": {
+											"line": 112,
+											"column": 5
+										}
+									},
+									"name": "a15"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						},
+						{
+							"type": "ExpressionStatement",
+							"start": 1887,
+							"end": 1893,
+							"loc": {
+								"start": {
+									"line": 114,
+									"column": 2
+								},
+								"end": {
+									"line": 114,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "CallExpression",
+								"start": 1887,
+								"end": 1892,
+								"loc": {
+									"start": {
+										"line": 114,
+										"column": 2
+									},
+									"end": {
+										"line": 114,
+										"column": 7
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 1887,
+									"end": 1890,
+									"loc": {
+										"start": {
+											"line": 114,
+											"column": 2
+										},
+										"end": {
+											"line": 114,
+											"column": 5
+										}
+									},
+									"name": "b11"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block body, switch consequent and namespace body take the same rule.",
+							"start": 1800,
+							"end": 1871
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 1899,
+					"end": 1948,
+					"loc": {
+						"start": {
+							"line": 117,
+							"column": 1
+						},
+						"end": {
+							"line": 122,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 1907,
+						"end": 1911,
+						"loc": {
+							"start": {
+								"line": 117,
+								"column": 9
+							},
+							"end": {
+								"line": 117,
+								"column": 13
+							}
+						},
+						"name": "cond"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 1917,
+							"end": 1945,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 2
+								},
+								"end": {
+									"line": 121,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 1928,
+									"end": 1934,
+									"loc": {
+										"start": {
+											"line": 119,
+											"column": 3
+										},
+										"end": {
+											"line": 119,
+											"column": 9
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 1928,
+										"end": 1933,
+										"loc": {
+											"start": {
+												"line": 119,
+												"column": 3
+											},
+											"end": {
+												"line": 119,
+												"column": 8
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 1928,
+											"end": 1931,
+											"loc": {
+												"start": {
+													"line": 119,
+													"column": 3
+												},
+												"end": {
+													"line": 119,
+													"column": 6
+												}
+											},
+											"name": "a16"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								},
+								{
+									"type": "ExpressionStatement",
+									"start": 1939,
+									"end": 1945,
+									"loc": {
+										"start": {
+											"line": 121,
+											"column": 3
+										},
+										"end": {
+											"line": 121,
+											"column": 9
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 1939,
+										"end": 1944,
+										"loc": {
+											"start": {
+												"line": 121,
+												"column": 3
+											},
+											"end": {
+												"line": 121,
+												"column": 8
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 1939,
+											"end": 1942,
+											"loc": {
+												"start": {
+													"line": 121,
+													"column": 3
+												},
+												"end": {
+													"line": 121,
+													"column": 6
+												}
+											},
+											"name": "b12"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 1922,
+								"end": 1923,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 7
+									},
+									"end": {
+										"line": 118,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 1951,
+					"end": 1987,
+					"loc": {
+						"start": {
+							"line": 124,
+							"column": 1
+						},
+						"end": {
+							"line": 128,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1961,
+						"end": 1963,
+						"loc": {
+							"start": {
+								"line": 124,
+								"column": 11
+							},
+							"end": {
+								"line": 124,
+								"column": 13
+							}
+						},
+						"name": "N1"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 1964,
+						"end": 1987,
+						"loc": {
+							"start": {
+								"line": 124,
+								"column": 14
+							},
+							"end": {
+								"line": 128,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 1968,
+								"end": 1974,
+								"loc": {
+									"start": {
+										"line": 125,
+										"column": 2
+									},
+									"end": {
+										"line": 125,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 1968,
+									"end": 1973,
+									"loc": {
+										"start": {
+											"line": 125,
+											"column": 2
+										},
+										"end": {
+											"line": 125,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 1968,
+										"end": 1971,
+										"loc": {
+											"start": {
+												"line": 125,
+												"column": 2
+											},
+											"end": {
+												"line": 125,
+												"column": 5
+											}
+										},
+										"name": "a17"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 1978,
+								"end": 1984,
+								"loc": {
+									"start": {
+										"line": 127,
+										"column": 2
+									},
+									"end": {
+										"line": 127,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 1978,
+									"end": 1983,
+									"loc": {
+										"start": {
+											"line": 127,
+											"column": 2
+										},
+										"end": {
+											"line": 127,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 1978,
+										"end": 1981,
+										"loc": {
+											"start": {
+												"line": 127,
+												"column": 2
+											},
+											"end": {
+												"line": 127,
+												"column": 5
+											}
+										},
+										"name": "b13"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 2169,
+					"end": 2227,
+					"loc": {
+						"start": {
+							"line": 132,
+							"column": 1
+						},
+						"end": {
+							"line": 137,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 2177,
+						"end": 2181,
+						"loc": {
+							"start": {
+								"line": 132,
+								"column": 9
+							},
+							"end": {
+								"line": 132,
+								"column": 13
+							}
+						},
+						"name": "cond"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 2187,
+							"end": 2204,
+							"loc": {
+								"start": {
+									"line": 133,
+									"column": 2
+								},
+								"end": {
+									"line": 134,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 2198,
+									"end": 2204,
+									"loc": {
+										"start": {
+											"line": 134,
+											"column": 3
+										},
+										"end": {
+											"line": 134,
+											"column": 9
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 2198,
+										"end": 2203,
+										"loc": {
+											"start": {
+												"line": 134,
+												"column": 3
+											},
+											"end": {
+												"line": 134,
+												"column": 8
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 2198,
+											"end": 2201,
+											"loc": {
+												"start": {
+													"line": 134,
+													"column": 3
+												},
+												"end": {
+													"line": 134,
+													"column": 6
+												}
+											},
+											"name": "a23"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 2192,
+								"end": 2193,
+								"loc": {
+									"start": {
+										"line": 133,
+										"column": 7
+									},
+									"end": {
+										"line": 133,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 2207,
+							"end": 2224,
+							"loc": {
+								"start": {
+									"line": 135,
+									"column": 2
+								},
+								"end": {
+									"line": 136,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 2218,
+									"end": 2224,
+									"loc": {
+										"start": {
+											"line": 136,
+											"column": 3
+										},
+										"end": {
+											"line": 136,
+											"column": 9
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 2218,
+										"end": 2223,
+										"loc": {
+											"start": {
+												"line": 136,
+												"column": 3
+											},
+											"end": {
+												"line": 136,
+												"column": 8
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 2218,
+											"end": 2221,
+											"loc": {
+												"start": {
+													"line": 136,
+													"column": 3
+												},
+												"end": {
+													"line": 136,
+													"column": 6
+												}
+											},
+											"name": "b17"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 2212,
+								"end": 2213,
+								"loc": {
+									"start": {
+										"line": 135,
+										"column": 7
+									},
+									"end": {
+										"line": 135,
+										"column": 8
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A case LABEL gap is measured from the SwitchCase, a kind the table does not list, so a",
+							"start": 1990,
+							"end": 2079
+						},
+						{
+							"type": "Line",
+							"value": " blank above a detached terminator stays inside the consequent and never reaches it.",
+							"start": 2081,
+							"end": 2167
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 2345,
+					"end": 2404,
+					"loc": {
+						"start": {
+							"line": 141,
+							"column": 1
+						},
+						"end": {
+							"line": 147,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 2353,
+						"end": 2357,
+						"loc": {
+							"start": {
+								"line": 141,
+								"column": 9
+							},
+							"end": {
+								"line": 141,
+								"column": 13
+							}
+						},
+						"name": "cond"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 2363,
+							"end": 2380,
+							"loc": {
+								"start": {
+									"line": 142,
+									"column": 2
+								},
+								"end": {
+									"line": 143,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 2374,
+									"end": 2380,
+									"loc": {
+										"start": {
+											"line": 143,
+											"column": 3
+										},
+										"end": {
+											"line": 143,
+											"column": 9
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 2374,
+										"end": 2379,
+										"loc": {
+											"start": {
+												"line": 143,
+												"column": 3
+											},
+											"end": {
+												"line": 143,
+												"column": 8
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 2374,
+											"end": 2377,
+											"loc": {
+												"start": {
+													"line": 143,
+													"column": 3
+												},
+												"end": {
+													"line": 143,
+													"column": 6
+												}
+											},
+											"name": "a24"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 2368,
+								"end": 2369,
+								"loc": {
+									"start": {
+										"line": 142,
+										"column": 7
+									},
+									"end": {
+										"line": 142,
+										"column": 8
+									}
+								},
+								"value": 3,
+								"raw": "3"
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 2384,
+							"end": 2401,
+							"loc": {
+								"start": {
+									"line": 145,
+									"column": 2
+								},
+								"end": {
+									"line": 146,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "ExpressionStatement",
+									"start": 2395,
+									"end": 2401,
+									"loc": {
+										"start": {
+											"line": 146,
+											"column": 3
+										},
+										"end": {
+											"line": 146,
+											"column": 9
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 2395,
+										"end": 2400,
+										"loc": {
+											"start": {
+												"line": 146,
+												"column": 3
+											},
+											"end": {
+												"line": 146,
+												"column": 8
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 2395,
+											"end": 2398,
+											"loc": {
+												"start": {
+													"line": 146,
+													"column": 3
+												},
+												"end": {
+													"line": 146,
+													"column": 6
+												}
+											},
+											"name": "b18"
+										},
+										"arguments": [],
+										"optional": false
+									}
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 2389,
+								"end": 2390,
+								"loc": {
+									"start": {
+										"line": 145,
+										"column": 7
+									},
+									"end": {
+										"line": 145,
+										"column": 8
+									}
+								},
+								"value": 4,
+								"raw": "4"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The null control for that gap: a blank the author wrote BELOW the terminator is the",
+							"start": 2230,
+							"end": 2316
+						},
+						{
+							"type": "Line",
+							"value": " gap's own and is kept.",
+							"start": 2318,
+							"end": 2343
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2561,
+					"end": 2571,
+					"loc": {
+						"start": {
+							"line": 152,
+							"column": 1
+						},
+						"end": {
+							"line": 152,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 2561,
+						"end": 2570,
+						"loc": {
+							"start": {
+								"line": 152,
+								"column": 1
+							},
+							"end": {
+								"line": 152,
+								"column": 10
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 2561,
+							"end": 2564,
+							"loc": {
+								"start": {
+									"line": 152,
+									"column": 1
+								},
+								"end": {
+									"line": 152,
+									"column": 4
+								}
+							},
+							"name": "a25"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen statement's terminator belongs to the printer too, so the blank below its",
+							"start": 2407,
+							"end": 2492
+						},
+						{
+							"type": "Line",
+							"value": " content reaches the gap by this same rule.",
+							"start": 2494,
+							"end": 2539
+						},
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 2541,
+							"end": 2559
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2574,
+					"end": 2580,
+					"loc": {
+						"start": {
+							"line": 154,
+							"column": 1
+						},
+						"end": {
+							"line": 154,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 2574,
+						"end": 2579,
+						"loc": {
+							"start": {
+								"line": 154,
+								"column": 1
+							},
+							"end": {
+								"line": 154,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 2574,
+							"end": 2577,
+							"loc": {
+								"start": {
+									"line": 154,
+									"column": 1
+								},
+								"end": {
+									"line": 154,
+									"column": 4
+								}
+							},
+							"name": "b19"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

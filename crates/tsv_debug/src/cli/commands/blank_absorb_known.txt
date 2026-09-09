@@ -35,7 +35,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 529
+# shapes: 531
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -88,6 +88,7 @@
 (BlockStatement, ^→$)
 (BlockStatement, ^→body)
 (BlockStatement, body→$)
+(BlockStatement, body→body)
 (BreakStatement, ^→$)
 (BreakStatement, label→$)
 (CallExpression, ^→callee)
@@ -487,6 +488,7 @@
 (TSModuleBlock, ^→$)
 (TSModuleBlock, ^→body)
 (TSModuleBlock, body→$)
+(TSModuleBlock, body→body)
 (TSModuleDeclaration, id→$)
 (TSModuleDeclaration, id→body)
 (TSNamedTupleMember, label→elementType)
