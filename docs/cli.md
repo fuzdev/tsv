@@ -104,13 +104,15 @@ All content-processing commands support three input methods:
 - **Content**: `command --content <string> --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 - **Stdin**: `command --stdin --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 
-`parse` and `format` also take `--source-type script|module` (TypeScript only; default
-`module`) — ESTree's own spelling, and the value the wire's `Program.sourceType`
+`parse` and `format` also take `--source-type script|module` (TypeScript only) —
+ESTree's own spelling, and the value the wire's `Program.sourceType`
 carries. It selects the parse goal: at `script`, `await` is an ordinary identifier
-and `import`/`export`/`import.meta` are errors. For `format` it applies to
-`--content`/`--stdin` only — file paths are always formatted as modules (Svelte and CSS
-have no goal), and a path argument with `--source-type` is a usage error (exit 2);
-`parse` honors `--source-type` on file paths too. The goal does not decide strictness:
+and `import`/`export`/`import.meta` are errors. Unset, `parse` uses `module`, while
+`format` uses `module` **retried as `script`** if that parse fails (see
+[§Multi-File Formatting](#multi-file-formatting)). For `format` the flag applies to
+`--content`/`--stdin` only — a path argument with `--source-type` is a usage error
+(exit 2), since path mode resolves the source type per file and Svelte and CSS have
+no goal at all; `parse` honors `--source-type` on file paths too. The goal does not decide strictness:
 Module code is strict, Script code is strict only once a `"use strict"` directive
 prologue says so (see
 [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive); the
@@ -327,6 +329,7 @@ run formats normally — on the sequential path and in every pool worker alike. 
   - **Unreadable ignore files**: a `.gitignore`/`.formatignore`/`.prettierignore` that is present but can't be read (invalid UTF-8 — reading is strict UTF-8 on both the native and WASM CLIs — or a permission error) is **not** silently treated as absent: tsv emits a non-fatal stderr warning and drops that file's rules (so an unreadable `.gitignore` also leaves the build-output heuristic *on* for its subtree). A file that genuinely isn't there, or is deleted between the directory listing and the read, stays silent. This is also a `--check` reproducibility hazard — surfacing it is the point.
   - **`--check` reproducibility** assumes the ignore files are **committed**: a local/uncommitted `.formatignore` or `.prettierignore` (or git's unread `.git/info/exclude` / `core.excludesFile`) makes a clean CI checkout disagree.
   - **Shared by construction**: the matcher is the `tsv_ignore` crate's `IgnoreStack`; the per-directory prune/descend policy (heuristic, safety nets, the shadow warning) is the `tsv_discover` crate's verdict. The WASM CLI, the native npm package, and editors call into the same two crates, so every surface agrees rather than hand-mirroring the logic. See `cli/discover.rs`.
+- **Source type: module, retried as a script.** Path mode names no source type — a directory can hold Svelte and CSS beside JS/TS, and there is no one grammar to declare for the run — so each JS/TS file is parsed as a **module**, and only if that parse *fails* is it retried as a **script**. That is what lets a legacy sloppy script (a `with` statement, a leading-zero literal or escape, `await` as an ordinary name) format from a bare path. The retry runs on the error path only, so nothing the module grammar already accepts is ever reinterpreted, and the printer never reads the goal — no formatted output changes for any module-valid file. When **both** grammars reject the file, the **module** error is the reported one: it is the goal ~all real TypeScript is written against, so it is the diagnosis a reader wants. An explicit `--source-type` is **exact** — `--source-type module` refuses a script-only source rather than retrying — which is why it is a usage error in path mode rather than a per-run override. `parse` has no fallback at either surface: its wire's `Program.sourceType` is a claim about which grammar produced the AST, and one settled goal has to produce it. The same rule reaches every format surface that takes no source type from its caller: the JS CLI's path mode, an editor's `format_typescript(source)`, and the `format_*` exports of all three bindings called with no `sourceType`.
 - **Fail-fast args, isolated traversal**: path args that don't resolve to a file or directory fail the whole run before anything is written (every bad arg reported); traversal errors below a valid root (e.g. an unreadable subdirectory) report to stderr and discovery continues.
 - **No per-file options**: formatting style is fixed (see [CLAUDE.md §Configuration](../CLAUDE.md#configuration)). In particular `<svelte:options preserveWhitespace />` is not detected — whitespace handling is uniform, with only `<pre>`/`<textarea>` content whitespace-sensitive; see [conformance_svelte.md §Template Whitespace](./conformance_svelte.md#template-whitespace-clean_nodes).
 - **Deduplication**: with multiple path args, overlapping spellings of the same file (`src` vs `./src`, absolute vs relative, symlink aliases) dedupe by canonical path, keeping the first spelling in sorted order. A single root can't produce duplicates, so the canonicalization cost is skipped.

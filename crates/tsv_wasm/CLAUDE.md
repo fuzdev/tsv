@@ -28,9 +28,11 @@ mirror and its tests in the same edit.
 `locations` (default `true`) selects the wire: the loc-bearing drop-in
 contract, or the span-only variant (see below); it is accepted everywhere and
 inert where nothing reads it (CSS emits no `loc`; `parse_internal_*` emits no
-wire). `sourceType` (`'script'` / `'module'`, default `'module'`) is TypeScript-only
+wire). `sourceType` (`'script'` / `'module'`) is TypeScript-only
 — Svelte hard-wires `Module`, CSS has no goal — so the other languages reject
-the key. Unknown keys always error, whatever their value (a typo like
+the key. Unset, it means `'module'` **for a parse** (the wire's `Program.sourceType`
+is a claim one settled grammar has to produce); the format exports read the same
+absence differently — see [Format Options](#format-options). Unknown keys always error, whatever their value (a typo like
 `{locatons: false}` — or `{locatons: undefined}` — silently succeeding would
 hand back the full wire while the caller believes they opted out); a supported
 key explicitly set to `undefined` means that key's default — including the
@@ -125,6 +127,18 @@ non-configurable. Everything else is the parse semantics verbatim: unknown keys 
 whatever their value, a supported key set to `undefined` means its default
 (including the TS-only `sourceType` on a language that rejects it), and a non-object
 argument errors, arrays included.
+
+**An unset `sourceType` is the one key whose default differs between the two
+families.** `read_options` decodes it to `None` rather than `Module`, and the format
+exports hand that to `parse_ast_for_format!` → `tsv_ts::parse_with_goal_or_fallback`:
+the module grammar, retried as a script only if that parse *fails*, reporting the
+module error when both do. That is what lets `format_typescript(source)` with no bag
+— an editor's whole call, and `npm/cli.js`'s path mode — format a legacy sloppy
+script (`with`, a leading-zero literal or escape, `await` as a name). A **set** value
+is exact, so `{sourceType: 'module'}` still refuses one; nothing the module grammar
+accepts is ever reinterpreted, and the printer reads no goal, so no output moves. The
+parse exports unwrap the same `None` to `Module` (see
+[../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)).
 
 **`locations` is rejected here, not accepted-and-inert.** It selects a *wire*,
 and format emits none — an inert spelling would let a caller believe they had

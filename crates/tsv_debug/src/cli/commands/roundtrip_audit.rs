@@ -534,10 +534,15 @@ fn tsv_self_roundtrip(path: &Path, render: bool, verbose: bool, reparse_only: bo
 
 /// Whether tsv's own parser accepts `source` (parse only — no wire-JSON
 /// convert). The gate fast path's reparseability test.
+///
+/// The reader is [`format_source`]'s: no source type named, so the module grammar
+/// with a script retry. The question this audit asks is whether the FORMATTER can
+/// read back what it just wrote, so a stricter re-read would fail every sloppy
+/// script the formatter legitimately handles.
 fn tsv_reparses(source: &str, parser: ParserType) -> bool {
     let arena = bumpalo::Bump::new();
     match parser {
-        ParserType::TypeScript => tsv_ts::parse(source, &arena).is_ok(),
+        ParserType::TypeScript => tsv_ts::parse_with_goal_or_fallback(source, None, &arena).is_ok(),
         ParserType::Svelte => tsv_svelte::parse(source, &arena).is_ok(),
         ParserType::Css => tsv_css::parse(source, &arena).is_ok(),
     }

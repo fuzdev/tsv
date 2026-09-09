@@ -33,35 +33,48 @@ use napi::bindgen_prelude::{Either, Undefined};
 // native bindings — see its module docs for the reuse rationale + soundness).
 // The goal-axis macros come from the same crate, so the three bindings share ONE
 // definition of which languages have a goal rather than three hand-synced copies.
+#[cfg(feature = "format")]
+use tsv_arena::parse_ast_for_format;
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::{goal_allowed, parse_ast};
 
-/// Decode the optional `sourceType` argument (`"script"` / `"module"`; omitted
-/// or `undefined` means `"module"`).
+/// Decode the optional `sourceType` argument (`"script"` / `"module"`); omitted
+/// or `undefined` stays **unset**.
 ///
 /// `allowed` is the language's goal axis ([`goal_allowed!`]). A source type
 /// against a language that has none is an **error**, not a silent Module: Svelte
 /// hard-wires `Module` and CSS has no goal, so a caller passing one asked for
 /// something that cannot be honored and must be told — the same stance
 /// `tsv_wasm`'s `read_options` takes when it rejects the `sourceType` key outright.
+///
+/// What an unset one means is the caller's: the parse exports read it as `Module`
+/// (their wire's `Program.sourceType` is a claim one settled grammar has to
+/// produce), the format exports as "none named", which
+/// `tsv_ts::parse_with_goal_or_fallback` answers with the module grammar retried as
+/// a script.
 #[cfg(any(feature = "parse", feature = "format"))]
-fn napi_source_type(source_type: Option<String>, allowed: bool) -> napi::Result<tsv_ts::Goal> {
+fn napi_source_type(
+    source_type: Option<String>,
+    allowed: bool,
+) -> napi::Result<Option<tsv_ts::Goal>> {
     let Some(source_type) = source_type else {
-        return Ok(tsv_ts::Goal::Module);
+        return Ok(None);
     };
     if !allowed {
         return Err(napi::Error::from_reason(
             "option 'sourceType' is only supported for TypeScript".to_string(),
         ));
     }
-    tsv_ts::Goal::from_source_type(&source_type).ok_or_else(|| {
-        napi::Error::from_reason(format!(
-            "invalid sourceType '{source_type}' (expected 'script' or 'module')"
-        ))
-    })
+    tsv_ts::Goal::from_source_type(&source_type)
+        .map(Some)
+        .ok_or_else(|| {
+            napi::Error::from_reason(format!(
+                "invalid sourceType '{source_type}' (expected 'script' or 'module')"
+            ))
+        })
 }
 
 // Per-language compound-op helpers: parse the source into a per-thread AST arena
@@ -100,7 +113,7 @@ macro_rules! parse_format {
         let folded = tsv_lang::printing::normalize_carriage_returns($source);
         let source = folded.text();
         with_ast_arena(|arena| {
-            let ast = parse_ast!($goalness, $lang, source, $goal, arena)
+            let ast = parse_ast_for_format!($goalness, $lang, source, $goal, arena)
                 .map_err(|e| napi::Error::from_reason(e.to_string()))?;
             Ok(with_doc_arena(|doc_arena| {
                 $lang::format_folded_in(&ast, &folded, doc_arena)
@@ -141,7 +154,8 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_js, catch_unwind)]
         pub fn $parse_fn(source: String, source_type: Option<String>) -> napi::Result<String> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness))?;
+            let goal = napi_source_type(source_type, goal_allowed!($goalness))?
+                .unwrap_or(tsv_ts::Goal::Module);
             parse_convert!($goalness, $lang, convert_ast_json_string, &source, goal)
         }
 
@@ -153,7 +167,8 @@ macro_rules! lang_bindings {
             source: String,
             source_type: Option<String>,
         ) -> napi::Result<String> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness))?;
+            let goal = napi_source_type(source_type, goal_allowed!($goalness))?
+                .unwrap_or(tsv_ts::Goal::Module);
             parse_convert!(
                 $goalness,
                 $lang,
@@ -169,12 +184,14 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_internal_js, catch_unwind)]
         pub fn $parse_internal_fn(source: String, source_type: Option<String>) -> napi::Result<()> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness))?;
+            let goal = napi_source_type(source_type, goal_allowed!($goalness))?
+                .unwrap_or(tsv_ts::Goal::Module);
             parse_internal!($goalness, $lang, &source, goal)
         }
 
         /// Format source code and return the formatted string. The source type
         /// shapes only the parse the formatter runs; formatting is non-configurable.
+        /// Omitted, it means none was named: the module grammar, retried as a script.
         #[cfg(feature = "format")]
         #[napi(js_name = $format_js, catch_unwind)]
         pub fn $format_fn(source: String, source_type: Option<String>) -> napi::Result<String> {

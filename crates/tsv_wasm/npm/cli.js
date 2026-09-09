@@ -235,7 +235,7 @@ Options:
   --content <s>     content to format, printed to stdout (requires --parser)
   --stdin           read from stdin, print to stdout (requires --parser)
   --parser <p>      parser type: svelte | typescript | css (--content/--stdin only)
-  --source-type <t> TypeScript parse goal: script | module (default: module; --content/--stdin only)
+  --source-type <t> TypeScript parse goal: script | module (default: module, retried as a script; --content/--stdin only)
   --check           check instead of writing/printing: exit 1 if any input would change
   --list            list the discovered in-scope files (one per line) without formatting; path mode only
   --jobs <n>        worker thread count (default: scaled to this machine and engine; explicit values capped at 4x logical)
@@ -463,9 +463,13 @@ async function format_paths(values, positionals) {
 		eprint('Error: --parser applies to --content/--stdin; file paths use extension detection\n');
 		process.exit(2);
 	}
+	// Path mode resolves the source type per file instead of taking one for the
+	// whole run: a Svelte or CSS file on the same command line has no source type to
+	// honor, and every JS/TS file already formats under whichever grammar accepts it
+	// (`format_one` names none). Mirrors the native CLI's refusal, word for word.
 	if (values['source-type'] !== undefined) {
 		eprint(
-			'Error: --source-type applies to --content/--stdin; file paths are formatted as modules\n'
+			'Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script\n'
 		);
 		process.exit(2);
 	}

@@ -27,6 +27,8 @@ use wasm_bindgen::prelude::*;
 // (see `tsv_arena`'s §Abort safety — this is the target that made it necessary).
 // The goal-axis macros come from the same crate, so the three bindings share ONE
 // definition of which languages have a goal rather than three hand-synced copies.
+#[cfg(feature = "format")]
+use tsv_arena::parse_ast_for_format;
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
@@ -411,7 +413,14 @@ export interface TypeScriptFormatOptions {
 	 * **sloppy** unless its own `"use strict"` directive prologue makes it
 	 * strict, so `with` and the legacy octal literals/escapes parse there; a
 	 * module is always strict.
-	 * @default 'module'
+	 *
+	 * Omitted, the source is formatted as a **module, retried as a script** if
+	 * that parse fails — so a legacy sloppy script formats without naming a
+	 * grammar, while anything the module grammar accepts is never reinterpreted
+	 * (the printer does not read the goal, so no output changes). A set value is
+	 * exact: `'module'` refuses a script-only source rather than retrying.
+	 * `parse_typescript` has no such fallback — its wire's `Program.sourceType`
+	 * is a claim, and omitting the key there means `'module'`.
 	 */
 	sourceType?: 'script' | 'module' | undefined;
 }
@@ -482,17 +491,24 @@ impl OptionsSpec {
 /// `convert_ast_json_string_no_locations`). It is accepted by every parse
 /// export and inert where nothing reads it (CSS emits no `loc`;
 /// `parse_internal_*` emits no wire), and rides the `parse` feature — the
-/// format-only build has no wire for it to shape. `sourceType` (default `module`) is
+/// format-only build has no wire for it to shape. `sourceType` is
 /// TypeScript-only — Svelte hard-wires `Module` and CSS has no goal — so the
 /// other languages reject the key rather than silently ignoring a semantic
 /// axis. Unknown keys are an error: a typo like `{locatons: false}` silently
 /// succeeding would hand back the full wire while the caller believes they
 /// opted out.
+///
+/// An **unset** `sourceType` is `None` rather than `Module`, because the two
+/// families answer it differently: a parse reads it as `module` (its wire's
+/// `Program.sourceType` is a claim one settled grammar has to produce), while a
+/// format reads it as "no source type named" and parses at `Module` with a `Script`
+/// retry — which is what lets an editor's bare `format_typescript(source)` format a
+/// legacy sloppy script. A SET value is exact on both.
 #[cfg(any(feature = "parse", feature = "format"))]
 struct Options {
     #[cfg(feature = "parse")]
     locations: bool,
-    source_type: tsv_ts::Goal,
+    source_type: Option<tsv_ts::Goal>,
 }
 
 /// Read an `Options` off the raw `options` argument against `spec`
@@ -507,7 +523,7 @@ fn read_options(options: &JsValue, spec: OptionsSpec) -> Result<Options, JsError
     let mut parsed = Options {
         #[cfg(feature = "parse")]
         locations: true,
-        source_type: tsv_ts::Goal::Module,
+        source_type: None,
     };
     if options.is_undefined() || options.is_null() {
         return Ok(parsed);
@@ -566,7 +582,7 @@ fn read_options(options: &JsValue, spec: OptionsSpec) -> Result<Options, JsError
                         spec.noun
                     ))
                 })?;
-                parsed.source_type = source_type_from_str(&source_type)?;
+                parsed.source_type = Some(source_type_from_str(&source_type)?);
             }
             other => {
                 let noun = spec.noun;
@@ -629,8 +645,14 @@ macro_rules! lang_bindings {
         pub fn $parse_json_fn(source: &str, options: JsValue) -> Result<String, JsError> {
             let opts = read_options(&options, OptionsSpec::parse(goal_allowed!($goalness)))?;
             with_ast_arena(|arena| {
-                let ast =
-                    parse_ast!($goalness, $lang, source, opts.source_type, arena).map_err(err)?;
+                let ast = parse_ast!(
+                    $goalness,
+                    $lang,
+                    source,
+                    opts.source_type.unwrap_or(tsv_ts::Goal::Module),
+                    arena
+                )
+                .map_err(err)?;
                 Ok(if opts.locations {
                     $lang::convert_ast_json_string(&ast, source)
                 } else {
@@ -646,8 +668,14 @@ macro_rules! lang_bindings {
         pub fn $parse_internal_fn(source: &str, options: JsValue) -> Result<(), JsError> {
             let opts = read_options(&options, OptionsSpec::parse(goal_allowed!($goalness)))?;
             with_ast_arena(|arena| {
-                let ast =
-                    parse_ast!($goalness, $lang, source, opts.source_type, arena).map_err(err)?;
+                let ast = parse_ast!(
+                    $goalness,
+                    $lang,
+                    source,
+                    opts.source_type.unwrap_or(tsv_ts::Goal::Module),
+                    arena
+                )
+                .map_err(err)?;
                 std::hint::black_box(&ast);
                 Ok(())
             })
@@ -666,8 +694,8 @@ macro_rules! lang_bindings {
             let folded = tsv_lang::printing::normalize_carriage_returns(source);
             let source = folded.text();
             with_ast_arena(|arena| {
-                let ast =
-                    parse_ast!($goalness, $lang, source, opts.source_type, arena).map_err(err)?;
+                let ast = parse_ast_for_format!($goalness, $lang, source, opts.source_type, arena)
+                    .map_err(err)?;
                 Ok(with_doc_arena(|doc_arena| {
                     $lang::format_folded_in(&ast, &folded, doc_arena)
                 }))

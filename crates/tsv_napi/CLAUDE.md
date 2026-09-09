@@ -36,8 +36,15 @@ The `lang_bindings!` macro generates four `#[napi]` functions per language (svel
 - `format_<lang>(source, sourceType?) -> string` — formatted source
 
 Every one takes the parse goal as a **trailing optional argument**
-(`"script"` / `"module"`; omitted or `undefined` = module) — one export per
-(language, operation), with no goalless twin to pick between. **Svelte and CSS
+(`"script"` / `"module"`) — one export per (language, operation), with no goalless
+twin to pick between. Omitted or `undefined` means **none named**, which the two
+families answer differently: a parse reads it as `module` (its wire's
+`Program.sourceType` is a claim one settled grammar has to produce), a format as the
+module grammar retried as a script (`tsv_ts::parse_with_goal_or_fallback`, via
+`tsv_arena`'s `parse_ast_for_format!`) — so a legacy sloppy script formats through
+`format_typescript(source)` with no argument at all, while anything the module
+grammar accepts is never reinterpreted. A set value is exact on both. See
+[../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting). **Svelte and CSS
 REJECT a set source type** rather than ignoring it: Svelte hard-wires `Module`
 and CSS has no goal axis, so a caller passing one asked for something that cannot
 be honored and is told — the same stance `tsv_wasm`'s `read_options` takes when it
@@ -213,7 +220,7 @@ Three properties a Node/Bun host inherits from this crate, none of them visible 
 
 ## Files
 
-- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `napi_source_type` decoding the optional `sourceType` string), the three `lang_bindings!` invocations, the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `napi_source_type` decoding the optional `sourceType` string, and `parse_ast_for_format!` carrying the format path's unset one), the three `lang_bindings!` invocations, the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
 - `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written, mirroring the wasm packages' surface minus `init`/`init_sync`/`wasm_module`/`reinstantiate`, and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The Span-Only Wire), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper and `cli.js` fallback (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not `allow` — `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` (an inner `allow` overrides `deny`), so the macro output compiles while any hand-written `unsafe` stays a compile error; deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` + `tsv_lang` (`normalize_carriage_returns`) behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two

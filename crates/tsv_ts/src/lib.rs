@@ -201,6 +201,39 @@ pub fn parse_with_goal<'arena>(
     parser::parse_typescript_with_goal(source, goal, arena).map_err(|e| e.with_context(source))
 }
 
+/// Parse TypeScript against `goal`, or — when the goal is unset — at `Module`
+/// with a `Script` retry.
+///
+/// The **format** path's parse. `Some(goal)` is exact, the same parse
+/// [`parse_with_goal`] runs. `None` means the caller never named a source type
+/// (`tsv format <path>`, an editor's `format_typescript(source)`), and there the
+/// module grammar is tried first and the script grammar only if it *fails* — so a
+/// legacy sloppy script (a `with` statement, a leading-zero literal, `await` as a
+/// name) formats from a bare path while a module-valid source is never reinterpreted.
+/// When both attempts fail the **module** error is the reported one: it is the goal
+/// ~all real TypeScript is written against, so it is the diagnosis a reader wants
+/// (prettier reports the first attempt's error the same way).
+///
+/// [`parse`] and [`parse_with_goal`] have no fallback: a parse hands back an AST
+/// whose `sourceType` is a claim about which grammar produced it, and a retry would
+/// make that claim depend on the input. Formatting exposes neither the AST nor the
+/// source type, and the printer never reads the goal, so the retry changes no output
+/// for anything the module grammar already accepts. The retry parses into the same
+/// arena with no reset between the two attempts, so a script's arena high-water is the
+/// failed module attempt plus the script parse — an error-path cost only.
+pub fn parse_with_goal_or_fallback<'arena>(
+    source: &str,
+    goal: Option<Goal>,
+    arena: &'arena bumpalo::Bump,
+) -> Result<Program<'arena>> {
+    if let Some(goal) = goal {
+        return parse_with_goal(source, goal, arena);
+    }
+    parse_with_goal(source, Goal::Module, arena).or_else(|module_error| {
+        parse_with_goal(source, Goal::Script, arena).map_err(|_| module_error)
+    })
+}
+
 /// Parse standalone TypeScript with grouping parens preserved.
 ///
 /// Like [`parse`] but keeps `(expr)` as a `ParenthesizedExpression` node (acorn's
@@ -251,13 +284,17 @@ pub fn format(program: &Program<'_>, source: &str) -> String {
     format_in(program, source, &arena)
 }
 
-/// Parse (`Goal::Module`) and format `source` in one call.
+/// Parse and format `source` in one call, with no source type named.
 ///
 /// The fully-fused one-shot convenience for callers that just want the
 /// formatted string and never touch the AST (the primitive/convenience split
 /// `format`/`format_in` already applies to the `DocArena`, extended here to the
 /// parse). Batch drivers that reuse arenas across files thread the primitives
-/// ([`parse`] + [`format_in`]) instead.
+/// ([`parse_with_goal_or_fallback`] + [`format_in`]) instead.
+///
+/// The parse is [`parse_with_goal_or_fallback`]'s unset form — `Module`, retried
+/// at `Script` only if that fails — which is what every format surface that takes
+/// no source type from its caller runs.
 pub fn format_str(source: &str) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse — see
     // `tsv_lang::printing::normalize_carriage_returns` for why it belongs here and not on
@@ -265,7 +302,7 @@ pub fn format_str(source: &str) -> Result<String> {
     // drop-in contract over the author's own bytes.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let program = parse(folded.text(), &arena)?;
+    let program = parse_with_goal_or_fallback(folded.text(), None, &arena)?;
     let doc_arena = DocArena::for_source(folded.text());
     Ok(format_folded_in(&program, &folded, &doc_arena))
 }

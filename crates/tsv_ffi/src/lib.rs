@@ -9,9 +9,13 @@
 //! `(source_ptr, source_len, source_type, out_len, out_status)` — and returns one
 //! `*mut u8`. One shape per language and operation: there is no goalless twin of
 //! a goal-aware export, and no arity that varies by language. `source_type` is the
-//! parse goal (`0` = module, `1` = script); a language with no goal axis (Svelte, CSS)
-//! *rejects* a non-zero code rather than ignoring it, so a caller cannot believe
-//! it selected a source type that was silently dropped. The source buffer is decoded
+//! parse goal (`0` = module, `1` = script, `2` = unspecified); a language with no
+//! goal axis (Svelte, CSS) *rejects* code `1` rather than ignoring it, so a caller
+//! cannot believe it selected a source type that was silently dropped. Code `2` is
+//! **format-only**: it says the caller named no source type, which a formatter
+//! answers with the module grammar retried as a script and a parser has no answer
+//! for (its wire's `Program.sourceType` is a claim one grammar has to produce), so
+//! a parse export refuses it. The source buffer is decoded
 //! first, so a call that is wrong in both ways reports the buffer, not the source type —
 //! there is one error per call and the earlier failure wins.
 //!
@@ -50,6 +54,8 @@ use std::slice;
 // `catch_unwind`-caught panic). The goal-axis macros come from the same crate,
 // so the three bindings share ONE definition of which languages have a goal
 // rather than three hand-synced copies.
+#[cfg(feature = "format")]
+use tsv_arena::parse_ast_for_format;
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
@@ -198,31 +204,46 @@ unsafe fn error_result(message: &str, out_len: *mut usize, out_status: *mut u32)
     unsafe { bytes_to_ptr(json, TSV_STATUS_ERROR, out_len, out_status) }
 }
 
-/// Map the C-ABI source-type code to `tsv_ts::Goal` (`0` = Module, `1` = Script).
+/// Map the C-ABI source-type code to `tsv_ts::Goal` (`0` = Module, `1` = Script),
+/// or to **no** source type (`2`, format exports only).
 ///
-/// `allowed` is the language's goal axis ([`goal_allowed!`]). A non-zero code
-/// against a language that has none is an **error**, not a silent Module: Svelte
+/// `allowed` is the language's goal axis ([`goal_allowed!`]). Code `1` against a
+/// language that has none is an **error**, not a silent Module: Svelte
 /// hard-wires `Module` and CSS has no goal, so a caller passing `1` there asked
 /// for something that cannot be honored and must be told — the same stance
 /// `tsv_wasm`'s `read_options` takes when it rejects the `sourceType` key outright.
-/// Any unrecognized code is an error whatever the language, and the expectation it
-/// names is that language's own — a goalless one is never told that `1` would
-/// have worked, which is the code the arm above it refuses.
+/// Code `2` — the caller named none — is accepted on **every** language but only on
+/// the format exports (`unspecified`): a formatter answers it with the
+/// module-then-script fallback, and one with no goal axis has nothing to answer at
+/// all, while a parse export's wire carries a `Program.sourceType` that one settled
+/// grammar has to produce. Any unrecognized code is an error whatever the language,
+/// and the expectation it names is that call's own — a goalless or parse-side caller
+/// is never told that a code the arm above it refuses would have worked.
 #[cfg(any(feature = "parse", feature = "format"))]
-fn ffi_source_type(source_type: u32, allowed: bool) -> Result<tsv_ts::Goal, String> {
+fn ffi_source_type(
+    source_type: u32,
+    allowed: bool,
+    unspecified: bool,
+) -> Result<Option<tsv_ts::Goal>, String> {
     match source_type {
-        0 => Ok(tsv_ts::Goal::Module),
-        1 if allowed => Ok(tsv_ts::Goal::Script),
+        0 => Ok(Some(tsv_ts::Goal::Module)),
+        1 if allowed => Ok(Some(tsv_ts::Goal::Script)),
         1 => Err(
             "source type code 1 (script) is only supported for TypeScript (expected 0 = module)"
                 .to_string(),
         ),
+        2 if unspecified => Ok(None),
+        2 => Err(
+            "source type code 2 (unspecified) is only supported for format (expected 0 = module)"
+                .to_string(),
+        ),
         other => Err(format!(
             "invalid source type code {other} (expected {})",
-            if allowed {
-                "0 = module or 1 = script"
-            } else {
-                "0 = module"
+            match (allowed, unspecified) {
+                (true, true) => "0 = module, 1 = script or 2 = unspecified",
+                (true, false) => "0 = module or 1 = script",
+                (false, true) => "0 = module or 2 = unspecified",
+                (false, false) => "0 = module",
             }
         )),
     }
@@ -271,8 +292,8 @@ macro_rules! parse_format {
         let folded = tsv_lang::printing::normalize_carriage_returns($source);
         let source = folded.text();
         with_ast_arena(|arena| {
-            let ast =
-                parse_ast!($goalness, $lang, source, $goal, arena).map_err(|e| e.to_string())?;
+            let ast = parse_ast_for_format!($goalness, $lang, source, $goal, arena)
+                .map_err(|e| e.to_string())?;
             Ok(with_doc_arena(|doc_arena| {
                 $lang::format_folded_in(&ast, &folded, doc_arena)
             }))
@@ -328,7 +349,12 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    let goal = ffi_source_type(source_type, goal_allowed!($goalness))?;
+                    // `false`: a parse export refuses the unspecified code — the wire's
+                    // `Program.sourceType` is a claim one settled grammar must produce —
+                    // so the `Option` is always `Some` here and the `unwrap_or` only
+                    // names the default the decoder already applied.
+                    let goal = ffi_source_type(source_type, goal_allowed!($goalness), false)?
+                        .unwrap_or(tsv_ts::Goal::Module);
                     parse_convert!($goalness, $lang, convert_ast_json_bytes, source, goal)
                 })
             }
@@ -352,7 +378,9 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    let goal = ffi_source_type(source_type, goal_allowed!($goalness))?;
+                    // parse export: the unspecified code is refused (see the first arm)
+                    let goal = ffi_source_type(source_type, goal_allowed!($goalness), false)?
+                        .unwrap_or(tsv_ts::Goal::Module);
                     parse_convert!(
                         $goalness,
                         $lang,
@@ -380,7 +408,9 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    let goal = ffi_source_type(source_type, goal_allowed!($goalness))?;
+                    // parse export: the unspecified code is refused (see the first arm)
+                    let goal = ffi_source_type(source_type, goal_allowed!($goalness), false)?
+                        .unwrap_or(tsv_ts::Goal::Module);
                     parse_internal!($goalness, $lang, source, goal)
                 })
             }
@@ -402,7 +432,9 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    let goal = ffi_source_type(source_type, goal_allowed!($goalness))?;
+                    // `true`: only a formatter can answer the unspecified code, with the
+                    // module grammar retried as a script.
+                    let goal = ffi_source_type(source_type, goal_allowed!($goalness), true)?;
                     parse_format!($goalness, $lang, source, goal)
                 })
             }
@@ -464,6 +496,9 @@ mod tests {
 
     const MODULE: u32 = 0;
     const SCRIPT: u32 = 1;
+    const UNSPECIFIED: u32 = 2;
+    /// Not a code at all — the "unknown" probe, kept one past the last real one.
+    const UNKNOWN: u32 = 3;
 
     /// Drive an FFI entry point end to end at `goal`: pass the bytes, read the
     /// returned buffer back into a `String`, then free it via `tsv_free`,
@@ -724,32 +759,42 @@ mod tests {
         // CODE's, not the language's, so a goalless language owes it too (its own
         // `only supported for TypeScript` message covers code 1 alone).
         //
-        // The EXPECTATION the message names is the language's own, which is the
-        // half a shared string would get wrong: a goalless language must not be
-        // told `1 = script` would have worked, since that is exactly the code the
-        // arm above refuses.
-        let ts: [FfiFn; 4] = [
-            tsv_parse_typescript,
-            tsv_parse_typescript_no_locations,
-            tsv_parse_internal_typescript,
-            tsv_format_typescript,
+        // The EXPECTATION the message names is the CALL's own, which is the half a
+        // shared string would get wrong twice over: a goalless language must not be
+        // told `1 = script` would have worked, and a parse export must not be told
+        // `2 = unspecified` would have — each is exactly the code its own arm above
+        // refuses.
+        let ts: [(&str, FfiFn); 3] = [
+            ("parse", tsv_parse_typescript),
+            ("parse_no_locations", tsv_parse_typescript_no_locations),
+            ("parse_internal", tsv_parse_internal_typescript),
         ];
-        for f in ts {
-            let msg = call_err_goal(f, "var x = 1;\n", 2);
-            assert!(msg.contains("invalid source type code 2"), "{msg}");
+        for (op, f) in ts {
+            let msg = call_err_goal(f, "var x = 1;\n", UNKNOWN);
+            assert!(msg.contains("invalid source type code 3"), "{op}: {msg}");
             assert!(
                 msg.contains("1 = script"),
-                "TypeScript may take a script goal: {msg}"
+                "{op}: TypeScript may take a script goal: {msg}"
+            );
+            assert!(
+                !msg.contains("unspecified"),
+                "{op}: a parse export must not be offered the unspecified code: {msg}"
             );
         }
+        let msg = call_err_goal(tsv_format_typescript, "var x = 1;\n", UNKNOWN);
+        assert!(msg.contains("invalid source type code 3"), "{msg}");
+        assert!(
+            msg.contains("1 = script") && msg.contains("2 = unspecified"),
+            "a TypeScript format export takes every code: {msg}"
+        );
         for (language, src) in [
             ("svelte", "<div>x</div>\n"),
             ("css", "a {\n\tcolor: red;\n}\n"),
         ] {
             for (op, f) in goalless_exports(language) {
-                let msg = call_err_goal(f, src, 2);
+                let msg = call_err_goal(f, src, UNKNOWN);
                 assert!(
-                    msg.contains("invalid source type code 2"),
+                    msg.contains("invalid source type code 3"),
                     "{language} {op}: {msg}"
                 );
                 assert!(
@@ -757,6 +802,51 @@ mod tests {
                     "{language} {op}: a goalless language must not be offered a script goal: {msg}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn the_unspecified_code_is_format_only_and_falls_back() {
+        // Code 2 says the caller named no source type. Only a formatter has an
+        // answer for that — the module grammar, retried as a script — so the parse
+        // exports refuse it while every format export takes it, goal axis or not.
+        let parse_exports: [(&str, FfiFn); 3] = [
+            ("parse", tsv_parse_typescript),
+            ("parse_no_locations", tsv_parse_typescript_no_locations),
+            ("parse_internal", tsv_parse_internal_typescript),
+        ];
+        for (op, f) in parse_exports {
+            let msg = call_err_goal(f, "var x = 1;\n", UNSPECIFIED);
+            assert!(msg.contains("only supported for format"), "{op}: {msg}");
+        }
+        // The fallback itself: script-only source, no source type named.
+        assert_eq!(
+            call_goal(tsv_format_typescript, "var   await=1", UNSPECIFIED),
+            "var await = 1;\n"
+        );
+        // A module-valid source is never reinterpreted — same output as code 0.
+        assert_eq!(
+            call_goal(tsv_format_typescript, "export const   x=1", UNSPECIFIED),
+            call_goal(tsv_format_typescript, "export const   x=1", MODULE)
+        );
+        // Named exactly, the module grammar still refuses the script-only source.
+        let msg = call_err_goal(tsv_format_typescript, "var   await=1", MODULE);
+        assert!(
+            msg.contains("await"),
+            "an exact source type has no retry: {msg}"
+        );
+        // A goalless language has no fallback to run, but "none named" is still a
+        // thing a caller can say to it.
+        for (language, src) in [
+            ("svelte", "<div>x</div>\n"),
+            ("css", "a {\n\tcolor: red;\n}\n"),
+        ] {
+            let (_, f) = goalless_exports(language)[3];
+            assert_eq!(
+                call_goal(f, src, UNSPECIFIED),
+                call_goal(f, src, MODULE),
+                "{language} format: the unspecified code is inert without a goal axis"
+            );
         }
     }
 

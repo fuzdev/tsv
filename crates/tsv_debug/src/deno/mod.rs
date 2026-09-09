@@ -379,7 +379,7 @@ pub async fn parse_by_type(
 ///
 /// The goal reaches acorn only (`sourceType`); Svelte `<script>` is hard-wired to
 /// a module and CSS has no goal, so both ignore it — mirroring
-/// `tsv_cli::cli::format_source::format_source_in_with_goal`.
+/// `tsv_cli::cli::format_source::format_source_in_with_goal_option`.
 pub async fn parse_by_type_with_goal(
     content: &str,
     parser: tsv_cli::cli::input::ParserType,

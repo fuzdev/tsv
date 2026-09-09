@@ -490,7 +490,7 @@ fn test_format_source_type_invalid_value() {
 #[test]
 fn test_format_source_type_rejected_in_path_mode() {
     // `--source-type` is content/stdin-only; with a path argument it's a usage error
-    // (file paths are always formatted as modules).
+    // (path mode resolves the source type per file — see the fallback test above).
     let dir = temp_dir("format_source_type_path");
     let file = dir.join("a.ts");
     fs::write(&file, "const x = 1;\n").expect("write temp file");
@@ -1954,4 +1954,96 @@ fn test_deeply_nested_input_survives_a_1mib_main_stack() {
         let out = Command::new("sh").args(&argv).output().unwrap();
         assert_reached_a_verdict(&format!("{label} @ 1 MiB"), &out);
     }
+}
+
+#[test]
+fn test_format_path_falls_back_to_script() {
+    // Path mode leaves the source type unset, so a file the module grammar rejects is
+    // retried as a script: `with` and a `var await` binding are sloppy-script-only.
+    let dir = temp_dir("format_path_script_fallback");
+    let file = dir.join("legacy.js");
+    fs::write(&file, "var   await=1;\nwith (a) {\n\tb;\n}\n").expect("write temp file");
+    let path = file.to_str().expect("utf8 path");
+
+    let output = tsv(&["format", path]);
+    assert!(
+        output.status.success(),
+        "a script-only file must format through the fallback: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let formatted = fs::read_to_string(&file).expect("read formatted file");
+    assert!(
+        formatted.contains("var await = 1;"),
+        "should format the script-only binding: {formatted}"
+    );
+    assert!(
+        formatted.contains("with (a) {"),
+        "should keep the with statement: {formatted}"
+    );
+
+    // Second pass: the formatted file is its own fixed point, so nothing changes.
+    let again = tsv(&["format", path]);
+    assert!(again.status.success(), "second pass should succeed");
+    assert_eq!(
+        fs::read_to_string(&file).expect("read twice-formatted file"),
+        formatted,
+        "the fallback's output must be byte-stable"
+    );
+    assert!(
+        String::from_utf8_lossy(&again.stdout).trim().is_empty(),
+        "an unchanged file prints no path"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_format_path_both_goals_fail_reports_the_module_error() {
+    // Broken under both grammars: `with` fails the module parse, the `import`
+    // declaration fails the script retry. The MODULE error is the reported one.
+    let dir = temp_dir("format_path_both_fail");
+    let file = dir.join("broken.js");
+    fs::write(&file, "import x from 'y';\nwith (a) {\n\tb;\n}\n").expect("write temp file");
+
+    let output = tsv(&["format", file.to_str().expect("utf8 path")]);
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "a file invalid under both source types is an error"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("The 'with' statement is not allowed in strict mode"),
+        "should report the module parse error: {stderr}"
+    );
+    assert!(
+        !stderr.contains("'import' is only allowed in a module"),
+        "should not report the script retry's error: {stderr}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_format_source_type_module_rejects_script_only_content() {
+    // A SET source type is exact — no fallback. `with` stays a strict-mode error.
+    let output = tsv(&[
+        "format",
+        "--content",
+        "with (a) { b; }",
+        "--parser",
+        "typescript",
+        "--source-type",
+        "module",
+    ]);
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "an explicit module source type must not fall back"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("The 'with' statement is not allowed in strict mode"),
+        "should report the strict-mode error: {stderr}"
+    );
 }

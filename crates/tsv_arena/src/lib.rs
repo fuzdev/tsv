@@ -169,6 +169,36 @@ macro_rules! parse_ast {
     }};
 }
 
+/// [`parse_ast!`]'s **format-path** twin: the goal arrives as an `Option`, and an
+/// unset one means "no source type named" rather than `Module`.
+///
+/// Every binding's format export reads its source type the same way — a caller
+/// that names one gets exactly that grammar, a caller that names none gets
+/// `tsv_ts::parse_with_goal_or_fallback`'s module-then-script retry, which is what
+/// lets `tsv format <path>` and an editor's bare `format_typescript(source)` format
+/// a legacy sloppy script. The parse exports keep [`parse_ast!`], whose goal is a
+/// settled `Goal`: their product is a wire carrying `Program.sourceType`, a claim
+/// no retry may make depend on the input.
+///
+/// `nogoal` ignores the option exactly as [`parse_ast!`] ignores the goal — Svelte
+/// hard-wires `Module` and CSS has no goal axis, so neither has a fallback to run.
+///
+/// ```ignore
+/// let ast = parse_ast_for_format!(goal, tsv_ts, source, source_type, arena)?;
+/// ```
+#[macro_export]
+macro_rules! parse_ast_for_format {
+    (goal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {
+        $lang::parse_with_goal_or_fallback($source, $goal, $arena)
+    };
+    (nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {{
+        // Consume the (always-unset) goal so the binding stays used in every
+        // expansion.
+        let _ = $goal;
+        $lang::parse($source, $arena)
+    }};
+}
+
 /// Whether the binding's goal decoder accepts a set goal for this language —
 /// the same `$goalness` tag [`parse_ast!`] reads, so the two can never disagree
 /// about which languages have a goal axis.
@@ -338,6 +368,16 @@ mod tests {
         pub fn parse_with_goal(source: &str, goal: &str, arena: &str) -> String {
             format!("parse_with_goal({source}, {goal}, {arena})")
         }
+        pub fn parse_with_goal_or_fallback(
+            source: &str,
+            goal: Option<&str>,
+            arena: &str,
+        ) -> String {
+            match goal {
+                Some(goal) => format!("exact({source}, {goal}, {arena})"),
+                None => format!("fallback({source}, {arena})"),
+            }
+        }
     }
 
     #[test]
@@ -351,6 +391,25 @@ mod tests {
             parse_ast!(nogoal, fake_lang, "src", "script", "arena"),
             "parse(src, arena)",
             "`nogoal` must drop the goal and take the goalless entry point"
+        );
+    }
+
+    #[test]
+    fn parse_ast_for_format_dispatches_on_the_goalness_tag() {
+        assert_eq!(
+            parse_ast_for_format!(goal, fake_lang, "src", Some("script"), "arena"),
+            "exact(src, script, arena)",
+            "a NAMED source type must be exact — the same grammar `parse_ast!` runs"
+        );
+        assert_eq!(
+            parse_ast_for_format!(goal, fake_lang, "src", None, "arena"),
+            "fallback(src, arena)",
+            "an unset source type must take the module-then-script fallback"
+        );
+        assert_eq!(
+            parse_ast_for_format!(nogoal, fake_lang, "src", None::<&str>, "arena"),
+            "parse(src, arena)",
+            "`nogoal` must drop the option and take the goalless entry point"
         );
     }
 

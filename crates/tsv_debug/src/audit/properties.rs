@@ -105,11 +105,20 @@ pub(crate) fn source_has_ignore_directive(source: &str) -> bool {
 /// `roundtrip_audit` / `fuzz` round-trips and the gap audit's Svelte region walk
 /// ([`sites::code_regions`](crate::audit::sites)) all reduce a source string to
 /// this `Value`.
+///
+/// TypeScript is read **exactly as [`format_source`] reads it** — no source type
+/// named, so the module grammar with a script retry
+/// (`tsv_ts::parse_with_goal_or_fallback`). Every caller here is an audit that
+/// paired this with a `format_source` call, and a re-read stricter than the
+/// formatter's own would report a sloppy script's perfectly good output as
+/// unreparseable. This is the audit substrate's reader, not the `parse` command's:
+/// the wire it builds is compared against another wire from the same reader, never
+/// published as a `Program.sourceType` claim.
 pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Value> {
     let arena = bumpalo::Bump::new();
     match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(source, &arena).ok()?;
+            let ast = tsv_ts::parse_with_goal_or_fallback(source, None, &arena).ok()?;
             Some(crate::json::wire_value(&tsv_ts::convert_ast_json_bytes(
                 &ast, source,
             )))

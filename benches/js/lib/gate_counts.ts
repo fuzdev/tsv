@@ -415,7 +415,24 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// through its `babel` route — its `typescript` parser rejects both, the rejection that
 	// `typescript/script_goal/sloppy_legacy_octal_escape_prettier_divergence`'s
 	// `prettier_rejects.txt` pins.
-	typescript: 5151,
+	//
+	// 5151 → 5157: `format` gained the module-then-script fallback for an unset source
+	// type (docs/cli.md §Multi-File Formatting), which this view exercises — its native
+	// format row names no source type, the shipped default. TWELVE prettier-suite files
+	// leave `errors` for the compared set, every one of them module-invalid and
+	// script-valid (`errors` 153 → 141): six to `match` — `js/with/indent.js`,
+	// `js/empty-statement/body.js`, `js/non-strict/octal-number.js`,
+	// `js/numeric-separators/number.js`, `js/quotes/strings.js` (the file the escape
+	// gate had just pushed out, back at last) and `js/identifier/parentheses/let.js`;
+	// four to `known` (`known` 119 → 123), all `comment_position` —
+	// `js/comments/while-like/with.js` and the three
+	// `js/comments/between-head-and-body/*.js`; and two to `unknown` (87 → 89), named
+	// on `CORPUS_FORMAT_UNKNOWN_PIN`. `js/strings/non-octal-eight-and-nine.js` stays an
+	// `error`, rejected at BOTH goals as the step above says. Nothing else in any
+	// bucket moves and nothing already compared changes: the retry runs on the module
+	// parse's ERROR path only, so no module-valid file is reinterpreted, and the
+	// printer reads no goal.
+	typescript: 5157,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -667,7 +684,26 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// hug declining a DECORATED parameter (prettier's `hasNotParameterDecorator`) rides in
 	// corpus-neutral: an already-prettier-formatted corpus carries no decorated parameter the
 	// old gate would have hugged.
-	typescript: 87,
+	//
+	// 87 → 89: two files ARRIVE, both of them newly compared rather than newly
+	// divergent — `format`'s module-then-script fallback (see
+	// `CORPUS_FORMAT_MATCH_MIN`) made them reachable, and each hunk is a
+	// pre-existing behaviour the Module-only view could not see.
+	//   `js/no-semi/with-statement.js` — a `// prettier-ignore` freezes a statement
+	//     whose ASI terminator is a `;` on a LATER line (`with (1) foo ( )⏎⏎;[]`).
+	//     tsv's freeze ends at the last token before the blank and prints the `;` as
+	//     its own empty statement on the next line; prettier's ends at the statement
+	//     node, so the `;` rides the frozen text. Not `with`-specific — the same
+	//     source with a plain call in place of the `with` diverges identically, so
+	//     the class is the freeze scope, not the statement.
+	//   `typescript/satisfies-operators/expression-statement.ts` — tsv strips the
+	//     redundant parens on `(using|yield|await) satisfies unknown;` where prettier
+	//     retains all three (prettier keeps them on every `needsParens` head; tsv
+	//     already agrees on `(let)` / `(interface)` / `(module)`). tsv reparses its
+	//     own output at both goals, so this is a paren-retention disagreement, not a
+	//     round-trip break. Only reachable at Script goal: `(await) satisfies …`
+	//     rejects at Module, which is why the whole file used to be an `error`.
+	typescript: 89,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.

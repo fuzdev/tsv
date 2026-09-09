@@ -81,7 +81,14 @@ export interface TypeScriptFormatOptions {
 	 * **sloppy** unless its own `"use strict"` directive prologue makes it
 	 * strict, so `with` and the legacy octal literals/escapes parse there; a
 	 * module is always strict.
-	 * @default 'module'
+	 *
+	 * Omitted, the source is formatted as a **module, retried as a script** if
+	 * that parse fails — so a legacy sloppy script formats without naming a
+	 * grammar, while anything the module grammar accepts is never reinterpreted
+	 * (the printer does not read the goal, so no output changes). A set value is
+	 * exact: `'module'` refuses a script-only source rather than retrying.
+	 * `parse_typescript` has no such fallback — its wire's `Program.sourceType`
+	 * is a claim, and omitting the key there means `'module'`.
 	 */
 	sourceType?: 'script' | 'module' | undefined;
 }

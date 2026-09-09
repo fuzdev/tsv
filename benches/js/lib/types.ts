@@ -73,6 +73,11 @@ export type ParseGoal = 'script' | 'module';
  * to drift into asking a different one. Only test262 files carry a goal at all
  * and those are TS, so this never fires in practice — it is here so the three
  * wrappers cannot come to disagree about a question they all ask.
+ *
+ * It answers for the PARSE rows only. The format rows name no source type at all
+ * — the shipped default, which each binding reads as the module grammar retried as
+ * a script (`tsv_ffi`'s unspecified code `2`, an omitted `sourceType` key on the
+ * other two).
  */
 export const goal_for = (language: Language, goal?: ParseGoal): ParseGoal | undefined =>
 	language === 'typescript' ? goal : undefined;

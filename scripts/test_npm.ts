@@ -329,9 +329,19 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			node_entry.format_typescript('await => 1;', { sourceType: 'script' }),
 			'(await) => 1;\n'
 		);
-		// module goal (default and explicit) reserves `await`
-		assert.throws(() => node_entry.format_typescript('await => 1;'));
+		// An EXPLICIT module goal reserves `await` — a set source type is exact.
 		assert.throws(() => node_entry.format_typescript('await => 1;', { sourceType: 'module' }));
+		// Unset, the module parse fails and the script retry formats it: a legacy
+		// sloppy script formats without the caller naming a grammar.
+		assert.equal(node_entry.format_typescript('await => 1;'), '(await) => 1;\n');
+		// A module-valid source is never reinterpreted (the retry only runs on failure).
+		assert.equal(node_entry.format_typescript('export const   x=1'), 'export const x = 1;\n');
+		// Broken under BOTH grammars: `with` fails the module parse, the `import`
+		// declaration fails the script retry, and the MODULE error is the reported one.
+		assert.throws(
+			() => node_entry.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n"),
+			/The 'with' statement is not allowed in strict mode/
+		);
 		assert.throws(
 			() => node_entry.format_typescript('x;', { sourceType: 'bogus' }),
 			/invalid sourceType/
