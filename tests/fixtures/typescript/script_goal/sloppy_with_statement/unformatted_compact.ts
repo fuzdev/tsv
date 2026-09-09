@@ -67,3 +67,8 @@ with(condA&&condB&&condC&&condD&&condE&&condF&&condG&&condH&&condIIIIIIIIIIIIIII
 
 // 101 chars for the head alone - the head wraps
 with(condA&&condB&&condC&&condD&&condE&&condF&&condG&&condH&&condIIIIIIIIIIIIIIIIII)a;
+
+// a head chain too wide for one line breaks per operand, and the operands take a
+// continuation indent: the `with` head is not in prettier's `isInsideParenthesis` list,
+// so the chain groups itself instead of the paren group driving the break
+with(condAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&&condBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB&&condC){fn();}

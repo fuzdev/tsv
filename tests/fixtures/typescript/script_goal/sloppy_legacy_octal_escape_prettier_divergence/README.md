@@ -26,6 +26,11 @@ gate is stated once and these positions are what prove it.
   is `\40` then a literal `0` and `'\412'` is `\41` then a literal `2`. `expected.json`
   carries the decoded values, so these two lines are the pin on the escape decoder's digit
   count as much as on the parse.
+- **A function body's directive is its own strictness scope, restored on the way out.**
+  `function fn()` declares `'use strict'`, and the `'\7'` on either side of it is legal —
+  the one *inside* such a body is the rejection
+  `input_invalid_retroactive_function_prologue.ts` pins. Were the flag not restored, the
+  line after the function would be the first to fail.
 
 `unformatted_ours_double_quotes.ts` writes the whole file with double quotes. It normalizes to
 `input.ts` under tsv alone (prettier throws on the file), and it pins that quote normalization
