@@ -184,9 +184,12 @@ and package READMEs for the full API and CLI flags:
   - up-to-date with web specs (roughly aiming for late-stage TC39 proposals and up)
   - strictness follows the spec: a module is strict, a script is strict once its
     directive prologue holds a `"use strict"`. The parse goal defaults to Module,
-    with an opt-in Script goal (`--source-type script`), and since Svelte and TypeScript
-    are inherently strict modules the sloppy reading only ever affects standalone
-    JS scripts. The `with` statement, the leading-zero numeric literals
+    with an opt-in Script goal (`--source-type script`); formatting a path, or a
+    string with no source type named, parses as a module and retries as a script
+    only if that fails, so a legacy sloppy script formats from a bare `tsv format`
+    while nothing a module grammar accepts is ever reinterpreted. Since Svelte and
+    TypeScript are inherently strict modules the sloppy reading only ever affects
+    standalone JS scripts. The `with` statement, the leading-zero numeric literals
     (`010`, `08`) and the legacy string escapes (`"\7"`, `"\8"`) are the three
     rules that move with strictness — sloppy Script code accepts them, strict code
     rejects them; the Annex B web-compatibility grammar is out of scope at both
