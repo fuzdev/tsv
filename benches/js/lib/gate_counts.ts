@@ -442,7 +442,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 5159 → 5171: twelve files arrive from `unknown` (88 → 76) — the statement-gap blank
 	// question gains prettier's `isNextLineEmpty` CONTENT-END arm, which is what sees the blank
 	// in `a()⏎⏎;`. Reasoning and the twelve-mover byte A/B on `CORPUS_FORMAT_UNKNOWN_PIN`.
-	typescript: 5171,
+	//
+	// 5171 → 5172: `prettier/tests/format/js/comments-closure-typecast/no-semi/not-on-same-line.js`
+	// arrives from `unknown` (76 → 75, which names the change and carries its measurement) — the
+	// author blank between an OWNED JSDoc-cast comment and the `(` it casts.
+	typescript: 5172,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -757,8 +761,27 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//
 	// The neighbouring `js/comments-closure-typecast/no-semi/not-on-same-line.js` is NOT this
 	// class and does not move: its two missing blanks sit between a JSDoc block comment and the
-	// statement below it, which is the leading-comment emitter's gap, not a statement's tail.
-	typescript: 76,
+	// `(` it casts, which is the cast's own gap, not a statement's tail.
+	//
+	// 76 → 75: that file leaves for `match` (`match` 5171 → 5172), and those two blanks were its
+	// whole divergence. A cast OWNS its comment, so the comment→`(` gap is not a gap any gap
+	// emitter measures — the cast's own emitter answers it, and the two arms that keep the
+	// author's break now keep the author's BLANK with it, through the same blank-preserving
+	// separator every other leading comment's gap already ran. Ownership decides who PRINTS a
+	// comment, never whether the gap below it is authoring. The two REFLOW arms are deliberately
+	// unchanged: a value gap and a cannot-hang head answer the break by rule rather than by
+	// authoring, so the blank inside a break they collapse goes with it.
+	//
+	// Measured by a baseline-vs-tip byte A/B over the 11,491 `find`-enumerated
+	// `../corpora/collections` + `../prettier/tests/format` files named EXPLICITLY (`--list`
+	// honors `.prettierignore` and hides ~800 suite files), stdout, stderr and exit code `cmp`'d
+	// per file: this file is the ONLY mover, ZERO in real code. The 950 files tsv rejects were
+	// re-run with `--source-type script` FORCED and are byte-identical there too, so nothing
+	// hides behind a rejection both binaries share. The `--all --json` bucket lists
+	// set-diffed across a pre-change and a tip `--profile corpus` FFI build confirm the scope —
+	// `unknown` loses exactly this file, and `partial` / `safety` / `errors` / `expected_errors`
+	// and every `svelte` and `css` bucket are identical file-for-file.
+	typescript: 75,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.

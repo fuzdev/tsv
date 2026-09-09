@@ -323,7 +323,7 @@ pub struct Printer<'a> {
     pub(crate) flat_chain_target: Cell<Option<Span>>,
     /// Span of a JSDoc cast sitting directly in a **value gap**, whose comment→`(`
     /// separator therefore reflows to a space instead of taking the soft `line`
-    /// ([`Printer::build_jsdoc_cast_doc`]).
+    /// ([`Printer::build_jsdoc_cast_lead_doc`]).
     ///
     /// The gap the cast's comment sits in is a value gap or it isn't, and only the
     /// enclosing printer knows which — the byte before the comment cannot tell an object
@@ -340,7 +340,7 @@ pub struct Printer<'a> {
     /// braced-head category (`EmbedContext::jsdoc_cast_cannot_hang`): the comment→`(`
     /// separator reflows to a space in **every** authoring, the own-line hardline arm
     /// included, because the host has no operator line to end and the hardline would
-    /// strand the `(` at the head's own column ([`Printer::build_jsdoc_cast_doc`]).
+    /// strand the `(` at the head's own column ([`Printer::build_jsdoc_cast_lead_doc`]).
     ///
     /// Set once per expression entry (`tsv_ts::build_expression_doc` →
     /// [`Printer::mark_jsdoc_cast_cannot_hang_gap`]) on the value's **left-spine** cast —

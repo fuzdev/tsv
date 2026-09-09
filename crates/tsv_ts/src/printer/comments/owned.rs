@@ -159,7 +159,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether this cast is the one a cannot-hang gap recorded — asked where the
-    /// separator is chosen ([`Printer::build_jsdoc_cast_doc`]), ahead of the own-line
+    /// separator is chosen ([`Printer::build_jsdoc_cast_lead_doc`]), ahead of the own-line
     /// arm. The complement of [`Printer::jsdoc_cast_in_value_gap`], which reflows only
     /// the soft-`line` arm (its gaps CAN hang, so their own-line authoring keeps the
     /// hardline and the enclosing gap supplies the hang).
@@ -268,7 +268,7 @@ impl<'a> Printer<'a> {
             return doc;
         }
         // A JSDoc cast holds its own copy of its comment and prints it against its own
-        // `(` — see `build_jsdoc_cast_doc`. Claiming it here would print it twice.
+        // `(` — see `build_jsdoc_cast_lead_doc`. Claiming it here would print it twice.
         if matches!(expr, Expression::JsdocCast(_)) {
             return doc;
         }
@@ -343,7 +343,7 @@ impl<'a> Printer<'a> {
         // The separator is the author's: a general owned comment is glued on the token's
         // own line, so it is always the space — but a JSDoc cast may own its comment from
         // the line ABOVE its `(`, and collapsing that onto one line is a relocation the
-        // unfrozen path does not make (`build_jsdoc_cast_doc` keeps the break on exactly
+        // unfrozen path does not make (`build_jsdoc_cast_lead_doc` keeps the break on exactly
         // `jsdoc_cast_comment_is_own_line`'s shape, and so does prettier). Reading it off
         // the source keeps the two producers answering with one rule rather than the
         // claim having to know which bound the comment.
@@ -443,7 +443,7 @@ impl<'a> Printer<'a> {
         if !self.has_owned_comments {
             return None;
         }
-        // A JSDoc cast carries its own copy and always prints it (`build_jsdoc_cast_doc`), so
+        // A JSDoc cast carries its own copy and always prints it (`build_jsdoc_cast_lead_doc`), so
         // it is the one node that answers from the node rather than the position lookup.
         // It must: `JsdocCast::span` covers the `(`…`)` only — the comment sits *outside* it —
         // so the lookup below can only ever find the cast's comment when the cast is `expr`'s
