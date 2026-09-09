@@ -223,6 +223,21 @@ impl ParseError {
         })
     }
 
+    /// The byte offset the error is reported at, in the coordinates the error was
+    /// built in (host coordinates for a parser error; see [`ParseError::shift_position`]
+    /// for the lexer case). `None` for the one positionless kind, a source over the
+    /// `u32` cap. A caller holding two errors for one source reads this to say which got
+    /// further — the format fallback's module-vs-script choice.
+    pub fn position(&self) -> Option<usize> {
+        match &*self.0 {
+            ParseErrorKind::UnexpectedToken { position, .. }
+            | ParseErrorKind::UnexpectedEof { position, .. }
+            | ParseErrorKind::InvalidSyntax { position, .. }
+            | ParseErrorKind::InvalidExpression { position, .. } => Some(*position),
+            ParseErrorKind::FileTooLarge { .. } => None,
+        }
+    }
+
     /// Source exceeds the 4 GB cap the `u32` span offsets assume.
     fn file_too_large(size: usize, max: usize) -> Self {
         ParseError::new(ParseErrorKind::FileTooLarge { size, max })

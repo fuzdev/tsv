@@ -132,7 +132,7 @@ argument errors, arrays included.
 families.** `read_options` decodes it to `None` rather than `Module`, and the format
 exports hand that to `parse_ast_for_format!` → `tsv_ts::parse_with_goal_or_fallback`:
 the module grammar, retried as a script only if that parse *fails*, reporting the
-module error when both do. That is what lets `format_typescript(source)` with no bag
+further-reaching error when both do (the module's on a tie). That is what lets `format_typescript(source)` with no bag
 — an editor's whole call, and `npm/cli.js`'s path mode — format a legacy sloppy
 script (`with`, a leading-zero literal or escape, `await` as a name). A **set** value
 is exact, so `{sourceType: 'module'}` still refuses one; nothing the module grammar

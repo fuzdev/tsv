@@ -264,7 +264,8 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.throws(() => api.format_typescript('var   await=1', { sourceType: 'module' }));
 		assert.equal(api.format_typescript('var   await=1'), 'var await = 1;\n');
 		assert.equal(api.format_typescript('export const   x=1'), 'export const x = 1;\n');
-		// Broken under BOTH grammars: the MODULE error is the reported one.
+		// Broken under BOTH grammars: the further-reaching error is the reported one — here
+		// the module's (`with` at line 2; the script retry died at line 1's `import`).
 		throws_with(
 			() => api.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n"),
 			"The 'with' statement is not allowed in strict mode"
