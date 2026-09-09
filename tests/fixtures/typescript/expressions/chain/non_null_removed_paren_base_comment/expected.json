@@ -1,0 +1,1582 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1111,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A redundant paren shell around a chain's BASE is stripped, and the run the author",
+			"start": 20,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " wrote inside it leads the chain. The answer is the same whether or not a `!` seals",
+			"start": 106,
+			"end": 191,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the chain's tail — but the sealed spelling reaches the chain through its own entry",
+			"start": 193,
+			"end": 278,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " point, which has to claim the base's removed-paren run exactly as the member and",
+			"start": 280,
+			"end": 363,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " call entries do.",
+			"start": 365,
+			"end": 384,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 398,
+			"end": 403,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block run takes the same claim — the rule is not `//`-only.",
+			"start": 416,
+			"end": 480,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 492,
+			"end": 500,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 11
+				},
+				"end": {
+					"line": 12,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Statement and call-argument positions answer the same way.",
+			"start": 511,
+			"end": 572,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 574,
+			"end": 579,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 596,
+			"end": 601,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A base whose pair the chain REQUIRES answers the same: the pair stays and the run",
+			"start": 617,
+			"end": 701,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " still leads the chain.",
+			"start": 703,
+			"end": 728,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 730,
+			"end": 735,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The three controls the sealed spelling has to agree with — the same shell with no",
+			"start": 754,
+			"end": 838,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `!` at all, with the `!` continued past, and with the `!` called past. In each the",
+			"start": 840,
+			"end": 925,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " chain's outermost node is a member or a call, so a different entry point claims.",
+			"start": 927,
+			"end": 1010,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 1024,
+			"end": 1029,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 1052,
+			"end": 1057,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 2
+				},
+				"end": {
+					"line": 34,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 1083,
+			"end": 1088,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1110,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1101,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 386,
+					"end": 413,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 392,
+							"end": 412,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 392,
+								"end": 393,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSNonNullExpression",
+								"start": 406,
+								"end": 412,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 406,
+									"end": 411,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 406,
+										"end": 409,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 5
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 406,
+											"end": 407,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 2
+												},
+												"end": {
+													"line": 9,
+													"column": 3
+												}
+											},
+											"name": "e"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 408,
+											"end": 409,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 4
+												},
+												"end": {
+													"line": 9,
+													"column": 5
+												}
+											},
+											"name": "m"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 398,
+										"end": 403
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A redundant paren shell around a chain's BASE is stripped, and the run the author",
+							"start": 20,
+							"end": 104
+						},
+						{
+							"type": "Line",
+							"value": " wrote inside it leads the chain. The answer is the same whether or not a `!` seals",
+							"start": 106,
+							"end": 191
+						},
+						{
+							"type": "Line",
+							"value": " the chain's tail — but the sealed spelling reaches the chain through its own entry",
+							"start": 193,
+							"end": 278
+						},
+						{
+							"type": "Line",
+							"value": " point, which has to claim the base's removed-paren run exactly as the member and",
+							"start": 280,
+							"end": 363
+						},
+						{
+							"type": "Line",
+							"value": " call entries do.",
+							"start": 365,
+							"end": 384
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 482,
+					"end": 508,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 488,
+							"end": 507,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 488,
+								"end": 489,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TSNonNullExpression",
+								"start": 501,
+								"end": 507,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 20
+									},
+									"end": {
+										"line": 12,
+										"column": 26
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 501,
+									"end": 506,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 20
+										},
+										"end": {
+											"line": 12,
+											"column": 25
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 501,
+										"end": 504,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 20
+											},
+											"end": {
+												"line": 12,
+												"column": 23
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 501,
+											"end": 502,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 20
+												},
+												"end": {
+													"line": 12,
+													"column": 21
+												}
+											},
+											"name": "e"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 503,
+											"end": 504,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 22
+												},
+												"end": {
+													"line": 12,
+													"column": 23
+												}
+											},
+											"name": "m"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 492,
+										"end": 500
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block run takes the same claim — the rule is not `//`-only.",
+							"start": 416,
+							"end": 480
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 581,
+					"end": 588,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 581,
+						"end": 587,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 7
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 581,
+							"end": 586,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 1
+								},
+								"end": {
+									"line": 16,
+									"column": 6
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 581,
+								"end": 584,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 1
+									},
+									"end": {
+										"line": 16,
+										"column": 4
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 581,
+									"end": 582,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 1
+										},
+										"end": {
+											"line": 16,
+											"column": 2
+										}
+									},
+									"name": "e"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 583,
+									"end": 584,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 3
+										},
+										"end": {
+											"line": 16,
+											"column": 4
+										}
+									},
+									"name": "m"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Statement and call-argument positions answer the same way.",
+							"start": 511,
+							"end": 572
+						},
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 574,
+							"end": 579
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 590,
+					"end": 614,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 590,
+						"end": 613,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 590,
+							"end": 592,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 17,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "TSNonNullExpression",
+								"start": 604,
+								"end": 610,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 604,
+									"end": 609,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 604,
+										"end": 607,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 5
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 604,
+											"end": 605,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 2
+												},
+												"end": {
+													"line": 19,
+													"column": 3
+												}
+											},
+											"name": "e"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 606,
+											"end": 607,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 4
+												},
+												"end": {
+													"line": 19,
+													"column": 5
+												}
+											},
+											"name": "m"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 596,
+										"end": 601
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 737,
+					"end": 751,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 737,
+						"end": 750,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 1
+							},
+							"end": {
+								"line": 25,
+								"column": 14
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 737,
+							"end": 749,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 1
+								},
+								"end": {
+									"line": 25,
+									"column": 13
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 737,
+								"end": 747,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 1
+									},
+									"end": {
+										"line": 25,
+										"column": 11
+									}
+								},
+								"object": {
+									"type": "TSAsExpression",
+									"start": 738,
+									"end": 744,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 8
+										}
+									},
+									"expression": {
+										"type": "Identifier",
+										"start": 738,
+										"end": 739,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 2
+											},
+											"end": {
+												"line": 25,
+												"column": 3
+											}
+										},
+										"name": "e"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 743,
+										"end": 744,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 7
+											},
+											"end": {
+												"line": 25,
+												"column": 8
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 743,
+											"end": 744,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 7
+												},
+												"end": {
+													"line": 25,
+													"column": 8
+												}
+											},
+											"name": "E"
+										}
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 746,
+									"end": 747,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 10
+										},
+										"end": {
+											"line": 25,
+											"column": 11
+										}
+									},
+									"name": "m"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A base whose pair the chain REQUIRES answers the same: the pair stays and the run",
+							"start": 617,
+							"end": 701
+						},
+						{
+							"type": "Line",
+							"value": " still leads the chain.",
+							"start": 703,
+							"end": 728
+						},
+						{
+							"type": "Line",
+							"value": " c5",
+							"start": 730,
+							"end": 735
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1012,
+					"end": 1038,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1018,
+							"end": 1037,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1018,
+								"end": 1019,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1032,
+								"end": 1037,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 7
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1032,
+									"end": 1035,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 2
+										},
+										"end": {
+											"line": 32,
+											"column": 5
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 1032,
+										"end": 1033,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 2
+											},
+											"end": {
+												"line": 32,
+												"column": 3
+											}
+										},
+										"name": "e"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1034,
+										"end": 1035,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 4
+											},
+											"end": {
+												"line": 32,
+												"column": 5
+											}
+										},
+										"name": "m"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c6",
+										"start": 1024,
+										"end": 1029
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The three controls the sealed spelling has to agree with — the same shell with no",
+							"start": 754,
+							"end": 838
+						},
+						{
+							"type": "Line",
+							"value": " `!` at all, with the `!` continued past, and with the `!` called past. In each the",
+							"start": 840,
+							"end": 925
+						},
+						{
+							"type": "Line",
+							"value": " chain's outermost node is a member or a call, so a different entry point claims.",
+							"start": 927,
+							"end": 1010
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1040,
+					"end": 1069,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1046,
+							"end": 1068,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 7
+								},
+								"end": {
+									"line": 35,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1046,
+								"end": 1047,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 7
+									},
+									"end": {
+										"line": 33,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 1060,
+								"end": 1068,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 2
+									},
+									"end": {
+										"line": 35,
+										"column": 10
+									}
+								},
+								"object": {
+									"type": "TSNonNullExpression",
+									"start": 1060,
+									"end": 1066,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 2
+										},
+										"end": {
+											"line": 35,
+											"column": 8
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 1060,
+										"end": 1065,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 2
+											},
+											"end": {
+												"line": 35,
+												"column": 7
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1060,
+											"end": 1063,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 2
+												},
+												"end": {
+													"line": 35,
+													"column": 5
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 1060,
+												"end": 1061,
+												"loc": {
+													"start": {
+														"line": 35,
+														"column": 2
+													},
+													"end": {
+														"line": 35,
+														"column": 3
+													}
+												},
+												"name": "e"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1062,
+												"end": 1063,
+												"loc": {
+													"start": {
+														"line": 35,
+														"column": 4
+													},
+													"end": {
+														"line": 35,
+														"column": 5
+													}
+												},
+												"name": "m"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1067,
+									"end": 1068,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 9
+										},
+										"end": {
+											"line": 35,
+											"column": 10
+										}
+									},
+									"name": "n"
+								},
+								"computed": false,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c7",
+										"start": 1052,
+										"end": 1057
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1071,
+					"end": 1100,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1077,
+							"end": 1099,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 7
+								},
+								"end": {
+									"line": 38,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1077,
+								"end": 1078,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 7
+									},
+									"end": {
+										"line": 36,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1091,
+								"end": 1099,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 10
+									}
+								},
+								"callee": {
+									"type": "TSNonNullExpression",
+									"start": 1091,
+									"end": 1097,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 38,
+											"column": 8
+										}
+									},
+									"expression": {
+										"type": "CallExpression",
+										"start": 1091,
+										"end": 1096,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 2
+											},
+											"end": {
+												"line": 38,
+												"column": 7
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 1091,
+											"end": 1094,
+											"loc": {
+												"start": {
+													"line": 38,
+													"column": 2
+												},
+												"end": {
+													"line": 38,
+													"column": 5
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 1091,
+												"end": 1092,
+												"loc": {
+													"start": {
+														"line": 38,
+														"column": 2
+													},
+													"end": {
+														"line": 38,
+														"column": 3
+													}
+												},
+												"name": "e"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1093,
+												"end": 1094,
+												"loc": {
+													"start": {
+														"line": 38,
+														"column": 4
+													},
+													"end": {
+														"line": 38,
+														"column": 5
+													}
+												},
+												"name": "m"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									}
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c8",
+										"start": 1083,
+										"end": 1088
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

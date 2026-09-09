@@ -1383,8 +1383,24 @@ impl<'a> Printer<'a> {
                 self.linearize_input(),
                 &mut nodes,
             );
-            let groups = chain::group_chain_nodes(&nodes, self);
-            chain::build_chain_doc(&groups, non_null_expr.span, self)
+            // The third chain ENTRY POINT, and the seam is what carries the head claim
+            // every one of them owes ([`chain::build_linearized_chain_doc`]): the base's
+            // stripped grouping parens are erased here and the run the author wrote inside
+            // them has no other emitter. Reassembled by hand this arm omitted the claim and
+            // DROPPED the whole run, and only for a `!` at the chain's OUTERMOST position —
+            // every other spelling routes through the member or call door.
+            //
+            // The window opens at the OPERAND's start, not the non-null's: the region
+            // between the two is `leading`'s above (the extra shell of `(( // c⏎a).b())!`),
+            // so the two claims partition the head rather than both taking it
+            // (`docs/comments.md` hazard 3).
+            chain::build_linearized_chain_doc(
+                &nodes,
+                non_null_expr.expression,
+                argument_start,
+                non_null_expr.span,
+                self,
+            )
         } else {
             let inner_doc = self.build_expression_doc(non_null_expr.expression);
             d.concat(&[inner_doc, d.text("!")])

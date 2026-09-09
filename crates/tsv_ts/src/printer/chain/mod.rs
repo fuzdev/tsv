@@ -45,12 +45,16 @@ mod printing;
 mod types;
 
 // Re-export public API
+// `group_chain_nodes` and `build_chain_doc` are deliberately NOT re-exported: they are two
+// of the four steps `build_linearized_chain_doc` performs, and handing them out separately
+// is what let a caller assemble three of the four and drop the head claim.
 pub use analysis::{
-    LinearizeInput, chain_paren_leading_gap, group_chain_nodes, linearize_chain_from_call_into,
-    linearize_chain_from_member_into, linearize_chain_from_non_null_into,
+    LinearizeInput, build_linearized_chain_doc, chain_paren_leading_gap,
+    linearize_chain_from_call_into, linearize_chain_from_member_into,
+    linearize_chain_from_non_null_into,
 };
 pub(crate) use analysis::{call_callee_paren_leading_start, tag_paren_leading_start};
-pub use builder::{build_chain_doc, call_prints_as_member_chain};
+pub use builder::call_prints_as_member_chain;
 pub(crate) use printing::find_bracket_position;
 #[cfg(feature = "buffer_stats")]
 pub use types::ChainGroupVec;
