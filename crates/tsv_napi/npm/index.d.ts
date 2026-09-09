@@ -19,9 +19,9 @@ export type * from './tsv_ast.js';
 /**
  * Options accepted by `parse_svelte` / `parse_css` (and their `_json`
  * siblings). The parse goal is TypeScript's alone, so it is declared here as
- * `undefined`-only rather than omitted: a set `goal` throws, but spelling the
- * inapplicable goal `undefined` forwards one bag to whichever parser, exactly
- * as the runtime does.
+ * `undefined`-only rather than omitted: a set `sourceType` throws, but spelling
+ * the inapplicable source type `undefined` forwards one bag to whichever parser,
+ * exactly as the runtime does.
  */
 export interface ParseOptions {
 	/**
@@ -36,12 +36,12 @@ export interface ParseOptions {
 	locations?: boolean | undefined;
 	/**
 	 * Not accepted here — Svelte's `<script>` is always a module and CSS has no
-	 * goal, so a set `goal` throws. See `TypeScriptParseOptions`.
+	 * goal, so a set `sourceType` throws. See `TypeScriptParseOptions`.
 	 */
-	goal?: undefined;
+	sourceType?: undefined;
 }
 
-/** The TypeScript parsers' bag: the same keys, with `goal` settable. */
+/** The TypeScript parsers' bag: the same keys, with `sourceType` settable. */
 export interface TypeScriptParseOptions {
 	/** As `ParseOptions.locations`. @default true */
 	locations?: boolean | undefined;
@@ -53,7 +53,7 @@ export interface TypeScriptParseOptions {
 	 * module is always strict.
 	 * @default 'module'
 	 */
-	goal?: 'script' | 'module' | undefined;
+	sourceType?: 'script' | 'module' | undefined;
 }
 
 /**
@@ -65,12 +65,12 @@ export interface TypeScriptParseOptions {
 export interface FormatOptions {
 	/**
 	 * Not accepted here — Svelte's `<script>` is always a module and CSS has no
-	 * goal, so a set `goal` throws. Declared (as `undefined`) rather than
+	 * goal, so a set `sourceType` throws. Declared (as `undefined`) rather than
 	 * omitted so one bag still forwards to whichever formatter: spell the
-	 * inapplicable goal `undefined` and this type accepts it, exactly as the
-	 * runtime does.
+	 * inapplicable source type `undefined` and this type accepts it, exactly as
+	 * the runtime does.
 	 */
-	goal?: undefined;
+	sourceType?: undefined;
 }
 
 /** The TypeScript formatter's bag: the same key, settable. */
@@ -83,7 +83,7 @@ export interface TypeScriptFormatOptions {
 	 * module is always strict.
 	 * @default 'module'
 	 */
-	goal?: 'script' | 'module' | undefined;
+	sourceType?: 'script' | 'module' | undefined;
 }
 
 export function parse_svelte(source: string, options: ParseOptions & { locations: false }): any;

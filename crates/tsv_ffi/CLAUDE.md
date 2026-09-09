@@ -36,22 +36,23 @@ Every return-pointer function has the same shape:
 
 ```c
 uint8_t *tsv_<op>_<lang>(const uint8_t *source_ptr, size_t source_len,
-                         uint32_t goal, size_t *out_len, uint32_t *out_status);
+                         uint32_t source_type, size_t *out_len,
+                         uint32_t *out_status);
 ```
 
 One export per (language, operation): there is no goalless twin of a goal-aware
 export, and no arity that varies by language. A host writes one call shape and
 one symbol table.
 
-`goal` is the parse goal — `0` = Module, `1` = Script; any other code is an
+`source_type` is the parse goal — `0` = Module, `1` = Script; any other code is an
 error, never a silent default. At Script goal `await` is an ordinary identifier
 and `import`/`export`/`import.meta` are syntax errors. **Svelte and CSS REJECT a
 non-zero code** rather than ignoring it: Svelte hard-wires `Module` and CSS has
 no goal axis, so a caller passing `1` there asked for something that cannot be
 honored and is told — the same stance `tsv_wasm`'s `read_options` takes when it
-rejects the `goal` key outright (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md)
-§Format Options). `tsv_napi` spells the axis as a trailing optional goal string;
-each binding has its own `lang_bindings!`, but all three read the **same**
+rejects the `sourceType` key outright (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md)
+§Format Options). `tsv_napi` spells the axis as a trailing optional `sourceType`
+string; each binding has its own `lang_bindings!`, but all three read the **same**
 `parse_ast!` / `goal_allowed!` pair out of [`tsv_arena`](../tsv_arena/), so which
 languages have a goal axis is one fact in one place and coverage is identical by
 construction.
@@ -66,7 +67,7 @@ construction.
 
 ## Files
 
-- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `ffi_goal` decoding the `u32` code), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `ffi_source_type` decoding the `u32` code), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it); deps include `tsv_arena` (`format` → `tsv_arena/format`)
 
 The in-crate test module drives every entry point in-process (real

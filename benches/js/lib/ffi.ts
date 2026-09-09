@@ -32,7 +32,7 @@ import { assert_binding_reports_rejection } from './reject_probe.ts';
 // defense-in-depth, and the corpus compare independently self-verifies any
 // SAFETY finding by re-running the native format (see
 // `corpus_compare_format.ts`).
-// Every entry point has the same C signature — `(source_ptr, source_len, goal,
+// Every entry point has the same C signature — `(source_ptr, source_len, source_type,
 // out_len, out_status) -> payload_ptr` — so the table is one shape per name,
 // with no goal-aware variants to keep in step. `goal` is 0 = Module, 1 = Script;
 // Svelte and CSS reject a non-zero code rather than ignoring it.
@@ -75,7 +75,7 @@ const STATUS_OK = 0;
  */
 const STATUS_UNWRITTEN = 0xffffffff;
 
-/** The C-ABI goal codes (`tsv_ffi`'s `ffi_goal`). */
+/** The C-ABI source-type codes (`tsv_ffi`'s `ffi_source_type`). */
 const GOAL_MODULE = 0;
 const GOAL_SCRIPT = 1;
 
@@ -321,7 +321,7 @@ export class NativeImplementation extends BaseImplementation {
 	}
 
 	// `goal_for` withholds the goal for svelte/css, which REJECT a script code
-	// rather than ignoring it (`tsv_ffi`'s `ffi_goal`). One shared helper for all
+	// rather than ignoring it (`tsv_ffi`'s `ffi_source_type`). One shared helper for all
 	// three wrappers — see its doc in `lib/types.ts`.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		return JSON.parse(this.call_ffi(this.tables.parse[language], source, goal_for(language, goal)));

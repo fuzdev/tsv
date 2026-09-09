@@ -250,16 +250,19 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.deepEqual(api.loc_of(spans.body[1], source), spans.body[1].loc);
 	});
 
-	it('the TypeScript goal axis reaches parse AND format', () => {
+	it('the TypeScript sourceType axis reaches parse AND format', () => {
 		const script_only = 'var await = 1;\n';
-		assert.equal(api.parse_typescript(script_only, { goal: 'script' }).type, 'Program');
-		assert.throws(() => api.parse_typescript(script_only, { goal: 'module' }));
+		assert.equal(api.parse_typescript(script_only, { sourceType: 'script' }).type, 'Program');
+		assert.throws(() => api.parse_typescript(script_only, { sourceType: 'module' }));
 		assert.throws(() => api.parse_typescript(script_only));
-		assert.equal(api.format_typescript('var   await=1', { goal: 'script' }), 'var await = 1;\n');
+		assert.equal(
+			api.format_typescript('var   await=1', { sourceType: 'script' }),
+			'var await = 1;\n'
+		);
 		assert.throws(() => api.format_typescript('var   await=1'));
 		throws_with(
-			() => api.parse_typescript('const x = 1;', { goal: 'sloppy' }),
-			"invalid goal 'sloppy' (expected 'script' or 'module')"
+			() => api.parse_typescript('const x = 1;', { sourceType: 'sloppy' }),
+			"invalid sourceType 'sloppy' (expected 'script' or 'module')"
 		);
 	});
 
@@ -267,26 +270,26 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		// Unknown keys error whatever their value — undefined included.
 		throws_with(
 			() => api.parse_typescript('const x = 1;', { locatons: false }),
-			"unknown parse option 'locatons' (expected 'locations' or 'goal')"
+			"unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
 		);
 		throws_with(
 			() => api.parse_typescript('const x = 1;', { locatons: undefined }),
 			"unknown parse option 'locatons'"
 		);
-		// The TS-only goal on other languages: a SET goal throws, undefined forwards.
+		// The TS-only sourceType on other languages: a SET value throws, undefined forwards.
 		throws_with(
-			() => api.parse_svelte('<div>x</div>', { goal: 'script' }),
-			"parse option 'goal' is only supported for TypeScript"
+			() => api.parse_svelte('<div>x</div>', { sourceType: 'script' }),
+			"parse option 'sourceType' is only supported for TypeScript"
 		);
-		assert.equal(api.parse_svelte('<div>x</div>', { goal: undefined }).type, 'Root');
+		assert.equal(api.parse_svelte('<div>x</div>', { sourceType: undefined }).type, 'Root');
 		throws_with(
-			() => api.format_css('a{}', { goal: 'script' }),
-			"format option 'goal' is only supported for TypeScript"
+			() => api.format_css('a{}', { sourceType: 'script' }),
+			"format option 'sourceType' is only supported for TypeScript"
 		);
 		// `locations` shapes a parse wire; format emits none — unknown key there.
 		throws_with(
 			() => api.format_typescript('const x = 1;', { locations: false }),
-			"unknown format option 'locations' (expected 'goal')"
+			"unknown format option 'locations' (expected 'sourceType')"
 		);
 		throws_with(
 			() => api.format_css('a{}', { locations: false }),

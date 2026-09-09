@@ -322,78 +322,85 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.ok(healthy());
 	});
 
-	it('format options: goal switches the TypeScript parse goal', { skip: !has_format }, () => {
+	it('format options: sourceType switches the TypeScript parse goal', { skip: !has_format }, () => {
 		// at the script goal `await` is an ordinary identifier, so it parses as an
 		// arrow parameter (and prints parenthesized)
 		assert.equal(
-			node_entry.format_typescript('await => 1;', { goal: 'script' }),
+			node_entry.format_typescript('await => 1;', { sourceType: 'script' }),
 			'(await) => 1;\n'
 		);
 		// module goal (default and explicit) reserves `await`
 		assert.throws(() => node_entry.format_typescript('await => 1;'));
-		assert.throws(() => node_entry.format_typescript('await => 1;', { goal: 'module' }));
-		assert.throws(() => node_entry.format_typescript('x;', { goal: 'bogus' }), /invalid goal/);
+		assert.throws(() => node_entry.format_typescript('await => 1;', { sourceType: 'module' }));
 		assert.throws(
-			() => node_entry.format_typescript('x;', { goal: 42 }),
-			/'goal' must be 'script' or 'module'/
+			() => node_entry.format_typescript('x;', { sourceType: 'bogus' }),
+			/invalid sourceType/
+		);
+		assert.throws(
+			() => node_entry.format_typescript('x;', { sourceType: 42 }),
+			/'sourceType' must be 'script' or 'module'/
 		);
 	});
 
-	it('format options: unknown keys and misapplied goal error', { skip: !has_format }, () => {
-		assert.throws(
-			() => node_entry.format_typescript('x;', { gaol: 'script' }),
-			/unknown format option 'gaol'/
-		);
-		// `locations` shapes the parse WIRE and format emits none, so it is an
-		// unknown key here rather than an accepted-and-inert one — an inert
-		// spelling would let a caller believe they had asked a formatter for the
-		// narrower product
-		assert.throws(
-			() => node_entry.format_typescript('x;', { locations: false }),
-			/unknown format option 'locations'/
-		);
-		// svelte/css formatting is non-configurable and the goal is TypeScript's
-		// alone, so their bags carry no key at all
-		assert.throws(
-			() => node_entry.format_svelte('<div>x</div>', { goal: 'script' }),
-			/only supported for TypeScript/
-		);
-		assert.throws(
-			() => node_entry.format_svelte('<div>x</div>', { locations: false }),
-			/takes no options/
-		);
-		// a supported key explicitly set to `undefined` means that key's default
-		// (omitted-key convention) — including the TS-only key on a language that
-		// REJECTS it, which is what lets `npm/cli.js` hand one bag to whichever
-		// formatter instead of branching the call
-		assert.equal(
-			node_entry.format_typescript('const   x=1', { goal: undefined }),
-			'const x = 1;\n'
-		);
-		assert.equal(
-			node_entry.format_svelte('<div   >x</div   >', { goal: undefined }),
-			'<div>x</div>\n'
-		);
-		assert.equal(
-			node_entry.format_css('a{color:red}', { goal: undefined }),
-			'a {\n\tcolor: red;\n}\n'
-		);
-		// an UNKNOWN key throws even at `undefined` — the typo guard has no
-		// undefined-valued hole
-		assert.throws(
-			() => node_entry.format_typescript('x;', { gaol: undefined }),
-			/unknown format option 'gaol'/
-		);
-		// a non-object options argument is an error, arrays included
-		assert.throws(() => node_entry.format_typescript('x;', 'script'), /must be an object/);
-		assert.throws(() => node_entry.format_typescript('x;', ['script']), /must be an object/);
-		// `null` and `undefined` both mean all-defaults — `null` is the arm that
-		// would otherwise fall through to the non-object error, since it is
-		// `typeof 'object'` — and so does `{}`, the zero-key object path
-		assert.equal(node_entry.format_typescript('const   x=1', null), 'const x = 1;\n');
-		assert.equal(node_entry.format_typescript('const   x=1', undefined), 'const x = 1;\n');
-		assert.equal(node_entry.format_typescript('const   x=1', {}), 'const x = 1;\n');
-	});
+	it(
+		'format options: unknown keys and a misapplied sourceType error',
+		{ skip: !has_format },
+		() => {
+			assert.throws(
+				() => node_entry.format_typescript('x;', { sourceTpye: 'script' }),
+				/unknown format option 'sourceTpye'/
+			);
+			// `locations` shapes the parse WIRE and format emits none, so it is an
+			// unknown key here rather than an accepted-and-inert one — an inert
+			// spelling would let a caller believe they had asked a formatter for the
+			// narrower product
+			assert.throws(
+				() => node_entry.format_typescript('x;', { locations: false }),
+				/unknown format option 'locations'/
+			);
+			// svelte/css formatting is non-configurable and the source type is
+			// TypeScript's alone, so their bags carry no key at all
+			assert.throws(
+				() => node_entry.format_svelte('<div>x</div>', { sourceType: 'script' }),
+				/only supported for TypeScript/
+			);
+			assert.throws(
+				() => node_entry.format_svelte('<div>x</div>', { locations: false }),
+				/takes no options/
+			);
+			// a supported key explicitly set to `undefined` means that key's default
+			// (omitted-key convention) — including the TS-only key on a language that
+			// REJECTS it, which is what lets `npm/cli.js` hand one bag to whichever
+			// formatter instead of branching the call
+			assert.equal(
+				node_entry.format_typescript('const   x=1', { sourceType: undefined }),
+				'const x = 1;\n'
+			);
+			assert.equal(
+				node_entry.format_svelte('<div   >x</div   >', { sourceType: undefined }),
+				'<div>x</div>\n'
+			);
+			assert.equal(
+				node_entry.format_css('a{color:red}', { sourceType: undefined }),
+				'a {\n\tcolor: red;\n}\n'
+			);
+			// an UNKNOWN key throws even at `undefined` — the typo guard has no
+			// undefined-valued hole
+			assert.throws(
+				() => node_entry.format_typescript('x;', { sourceTpye: undefined }),
+				/unknown format option 'sourceTpye'/
+			);
+			// a non-object options argument is an error, arrays included
+			assert.throws(() => node_entry.format_typescript('x;', 'script'), /must be an object/);
+			assert.throws(() => node_entry.format_typescript('x;', ['script']), /must be an object/);
+			// `null` and `undefined` both mean all-defaults — `null` is the arm that
+			// would otherwise fall through to the non-object error, since it is
+			// `typeof 'object'` — and so does `{}`, the zero-key object path
+			assert.equal(node_entry.format_typescript('const   x=1', null), 'const x = 1;\n');
+			assert.equal(node_entry.format_typescript('const   x=1', undefined), 'const x = 1;\n');
+			assert.equal(node_entry.format_typescript('const   x=1', {}), 'const x = 1;\n');
+		}
+	);
 
 	it('format_* absent from the parse-only build', { skip: has_format }, () => {
 		assert.equal(node_entry.format_typescript, undefined);
@@ -459,29 +466,33 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		);
 	});
 
-	it('parse options: goal switches the TypeScript parse goal', { skip: !has_parse }, () => {
-		const program = node_entry.parse_typescript('var await = 1;', { goal: 'script' });
+	it('parse options: sourceType switches the TypeScript parse goal', { skip: !has_parse }, () => {
+		const program = node_entry.parse_typescript('var await = 1;', { sourceType: 'script' });
 		assert.equal(program.sourceType, 'script');
 		// module goal (default and explicit) reserves `await`
 		assert.throws(() => node_entry.parse_typescript('var await = 1;'));
-		assert.throws(() => node_entry.parse_typescript('var await = 1;', { goal: 'module' }));
-		assert.throws(() => node_entry.parse_typescript('x;', { goal: 'bogus' }), /invalid goal/);
-		// goal composes with locations (goal drives the parser, locations the writer)
+		assert.throws(() => node_entry.parse_typescript('var await = 1;', { sourceType: 'module' }));
+		assert.throws(
+			() => node_entry.parse_typescript('x;', { sourceType: 'bogus' }),
+			/invalid sourceType/
+		);
+		// sourceType composes with locations (it drives the parser, locations the
+		// writer)
 		const composed = node_entry.parse_typescript('var await = 1;', {
-			goal: 'script',
+			sourceType: 'script',
 			locations: false
 		});
 		assert.equal(composed.sourceType, 'script');
 		assert.equal('loc' in composed, false);
 	});
 
-	it('parse options: unknown keys and misapplied goal error', { skip: !has_parse }, () => {
+	it('parse options: unknown keys and a misapplied sourceType error', { skip: !has_parse }, () => {
 		assert.throws(
 			() => node_entry.parse_typescript('x;', { locatons: false }),
 			/unknown parse option 'locatons'/
 		);
 		assert.throws(
-			() => node_entry.parse_svelte('<div>x</div>', { goal: 'script' }),
+			() => node_entry.parse_svelte('<div>x</div>', { sourceType: 'script' }),
 			/only supported for TypeScript/
 		);
 		assert.throws(
@@ -490,15 +501,18 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		);
 		// a supported key explicitly set to undefined means that key's default
 		// (omitted-key convention)
-		assert.ok(node_entry.parse_typescript('x;', { locations: undefined, goal: undefined }).loc);
+		assert.ok(
+			node_entry.parse_typescript('x;', { locations: undefined, sourceType: undefined }).loc
+		);
 		// ...including the TS-only key on a language that REJECTS it. Load-bearing:
 		// `npm/cli.js` forwards one options bag to whichever parser and spells the
-		// inapplicable goal as `undefined` rather than branching the call. The goal
-		// arm must read `undefined` before its language rejection, or this breaks
-		// with `check` still green. `ParseOptions` declares `goal?: undefined` so
+		// inapplicable source type as `undefined` rather than branching the call. The
+		// `sourceType` arm must read `undefined` before its language rejection, or
+		// this breaks with `check` still green. `ParseOptions` declares
+		// `sourceType?: undefined` so
 		// the same bag type-checks; see ../crates/tsv_wasm/CLAUDE.md.
-		assert.ok(node_entry.parse_svelte('<div>x</div>', { goal: undefined }));
-		assert.ok(node_entry.parse_css('a { color: red }', { goal: undefined }));
+		assert.ok(node_entry.parse_svelte('<div>x</div>', { sourceType: undefined }));
+		assert.ok(node_entry.parse_css('a { color: red }', { sourceType: undefined }));
 		// an UNKNOWN key throws even at `undefined` — the typo guard has no
 		// undefined-valued hole; only supported keys read `undefined` as absent
 		assert.throws(
@@ -759,7 +773,7 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	// silently dropping every later argument in the browser entry only.
 	it('the init guard forwards extra args (parse options)', { skip: !has_parse }, () => {
 		const program = browser.parse_typescript('var await = 1;', {
-			goal: 'script',
+			sourceType: 'script',
 			locations: false
 		});
 		assert.equal(program.sourceType, 'script');
@@ -767,7 +781,10 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	});
 
 	it('the init guard forwards extra args (format options)', { skip: !has_format }, () => {
-		assert.equal(browser.format_typescript('await => 1;', { goal: 'script' }), '(await) => 1;\n');
+		assert.equal(
+			browser.format_typescript('await => 1;', { sourceType: 'script' }),
+			'(await) => 1;\n'
+		);
 	});
 
 	it('init is idempotent after init_sync', async () => {
@@ -884,14 +901,14 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
-	it('parse --goal script accepts `await` as an identifier; module/default reject it', () => {
+	it('parse --source-type script accepts `await` as an identifier; module/default reject it', () => {
 		const script = run_cli([
 			'parse',
 			'--content',
 			'var await = 1;',
 			'--parser',
 			'ts',
-			'--goal',
+			'--source-type',
 			'script'
 		]);
 		assert.equal(script.status, 0, script.stderr);
@@ -904,7 +921,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			'var await = 1;',
 			'--parser',
 			'ts',
-			'--goal',
+			'--source-type',
 			'module'
 		]);
 		assert.equal(mod.status, 1);
@@ -912,7 +929,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.equal(dflt.status, 1);
 	});
 
-	it('parse --no-locations omits per-node loc and composes with --goal', () => {
+	it('parse --no-locations omits per-node loc and composes with --source-type', () => {
 		const bare = run_cli([
 			'parse',
 			'--no-locations',
@@ -926,7 +943,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		const composed = run_cli([
 			'parse',
 			'--no-locations',
-			'--goal',
+			'--source-type',
 			'script',
 			'--content',
 			'var await = 1;',
@@ -958,36 +975,36 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.equal(css.status, 0, css.stderr);
 	});
 
-	it('format --goal script formats an `await` arrow param', () => {
+	it('format --source-type script formats an `await` arrow param', () => {
 		const result = run_cli([
 			'format',
 			'--content',
 			'await => 1;',
 			'--parser',
 			'ts',
-			'--goal',
+			'--source-type',
 			'script'
 		]);
 		assert.equal(result.status, 0, result.stderr);
 		assert.equal(result.stdout, '(await) => 1;\n');
 	});
 
-	it('an invalid --goal value exits 1 for parse, 2 for format (arg-error parity)', () => {
-		const p = run_cli(['parse', '--content', 'x;', '--parser', 'ts', '--goal', 'bogus']);
+	it('an invalid --source-type value exits 1 for parse, 2 for format (arg-error parity)', () => {
+		const p = run_cli(['parse', '--content', 'x;', '--parser', 'ts', '--source-type', 'bogus']);
 		assert.equal(p.status, 1);
-		assert.match(p.stderr, /invalid --goal/);
-		const f = run_cli(['format', '--content', 'x;', '--parser', 'ts', '--goal', 'bogus']);
+		assert.match(p.stderr, /invalid --source-type/);
+		const f = run_cli(['format', '--content', 'x;', '--parser', 'ts', '--source-type', 'bogus']);
 		assert.equal(f.status, 2);
-		assert.match(f.stderr, /invalid --goal/);
+		assert.match(f.stderr, /invalid --source-type/);
 	});
 
-	it('format --goal with a path argument is a usage error (exit 2)', () => {
+	it('format --source-type with a path argument is a usage error (exit 2)', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
 			writeFileSync(join(dir, 'a.ts'), 'const x = 1;\n');
-			const result = run_cli(['format', '--goal', 'script', join(dir, 'a.ts')]);
+			const result = run_cli(['format', '--source-type', 'script', join(dir, 'a.ts')]);
 			assert.equal(result.status, 2);
-			assert.match(result.stderr, /--goal applies to --content\/--stdin/);
+			assert.match(result.stderr, /--source-type applies to --content\/--stdin/);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}

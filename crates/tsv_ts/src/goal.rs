@@ -58,7 +58,7 @@ impl Goal {
     /// Parse a goal from its [`source_type`](Goal::source_type) string
     /// (`"module"` / `"script"`), the inverse of `source_type`. Returns `None`
     /// for any other string. The single source of truth for the goal vocabulary,
-    /// shared by the CLI `--goal` flag (`tsv_cli`), the WASM bindings (`tsv_wasm`),
+    /// shared by the CLI `--source-type` flag (`tsv_cli`), the WASM bindings (`tsv_wasm`),
     /// and the fixture goal-marker reader (`tsv_debug`); callers layer their own
     /// default and error formatting on top.
     pub fn from_source_type(s: &str) -> Option<Goal> {

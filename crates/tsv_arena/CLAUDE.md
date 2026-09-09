@@ -22,7 +22,7 @@ Both `reset()` at the *start* of each call; `f` must return an owned value (a fo
 Plus the goal-axis pair, `#[macro_export]`ed and feature-independent (they generate no code of their own):
 
 - `parse_ast!($goalness, $lang, $source, $goal, $arena)` — the per-language parse call. `goal` (TypeScript) threads the decoded goal into `$lang::parse_with_goal`; `nogoal` (Svelte, CSS) drops it and calls `$lang::parse`. `$lang` resolves in the *caller's* scope, so this crate depends on no language crate.
-- `goal_allowed!($goalness)` — `true` / `false`, read by each binding's own goal decoder (`ffi_goal`, `napi_goal`, `read_options`).
+- `goal_allowed!($goalness)` — `true` / `false`, read by each binding's own goal decoder (`ffi_source_type`, `napi_source_type`, `read_options`).
 
 The load-bearing property is that **one `$goalness` tag drives both**: a language with no axis *rejects* a set goal rather than ignoring it, and the macro that picks the parse call and the macro that licenses the refusal can't come to disagree about which languages those are. Each binding still owns its own `lang_bindings!` (three different export signatures) and its own refusal wording.
 

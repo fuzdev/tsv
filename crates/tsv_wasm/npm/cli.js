@@ -30,7 +30,7 @@
  *
  * Exit codes: `format` — 0 clean, 1 would-change (`--check`), 2 errors;
  * `parse` — 0 ok, 1 error. Flag-parsing errors exit 1 (both commands); `format`'s
- * post-parse usage/validation errors (an invalid `--goal`, conflicting inputs) exit 2.
+ * post-parse usage/validation errors (an invalid `--source-type`, conflicting inputs) exit 2.
  */
 
 import {
@@ -219,7 +219,7 @@ Commands:
 Run \`tsv <command> --help\` for command flags.
 `;
 
-const FORMAT_HELP = `Usage: tsv format [<paths...>] [--check] [--list] [--content <s> | --stdin] [--parser <p>] [--goal <g>]
+const FORMAT_HELP = `Usage: tsv format [<paths...>] [--check] [--list] [--content <s> | --stdin] [--parser <p>] [--source-type <t>]
 
 Format source code in place (near-Prettier output).
 
@@ -235,7 +235,7 @@ Options:
   --content <s>     content to format, printed to stdout (requires --parser)
   --stdin           read from stdin, print to stdout (requires --parser)
   --parser <p>      parser type: svelte | typescript | css (--content/--stdin only)
-  --goal <g>        TypeScript parse goal: script | module (default: module; --content/--stdin only)
+  --source-type <t> TypeScript parse goal: script | module (default: module; --content/--stdin only)
   --check           check instead of writing/printing: exit 1 if any input would change
   --list            list the discovered in-scope files (one per line) without formatting; path mode only
   --jobs <n>        worker thread count (default: scaled to this machine and engine; explicit values capped at 4x logical)
@@ -243,7 +243,7 @@ Options:
 Exit codes: 0 clean, 1 would change (--check), 2 errors.
 `;
 
-const PARSE_HELP = `Usage: tsv parse [<file>] [--pretty] [--content <s> | --stdin] [--parser <p>] [--goal <g>] [--no-locations]
+const PARSE_HELP = `Usage: tsv parse [<file>] [--pretty] [--content <s> | --stdin] [--parser <p>] [--source-type <t>] [--no-locations]
 
 Parse source code into AST JSON.
 
@@ -252,7 +252,7 @@ Options:
   --content <s>     content to parse (requires --parser)
   --stdin           read from stdin (requires --parser)
   --parser <p>      parser type: svelte | typescript | css
-  --goal <g>        TypeScript parse goal: script | module (default: module)
+  --source-type <t> TypeScript parse goal: script | module (default: module)
   --no-locations    omit per-node loc (span-only wire; svelte also omits name_loc; no-op for css)
 `;
 
@@ -348,24 +348,27 @@ function resolve_parser(name) {
 	return resolved;
 }
 
-/** Validate a `--goal` value (the TypeScript goal axis), or exit `code` — the
- * native CLI validates it at the argument layer (`parse_goal_arg`), so a bad
- * value is an argument error (`parse` exits 1, `format` exits 2). Absent → `undefined`
- * (the `module` default); the goal only affects the TypeScript parser. */
-function resolve_goal(goal, code) {
-	if (goal === undefined || goal === 'module' || goal === 'script') return goal;
-	eprint(`Error: invalid --goal '${goal}' (expected 'script' or 'module')\n`);
+/** Validate a `--source-type` value (the TypeScript goal axis), or exit `code` —
+ * the native CLI validates it at the argument layer (`parse_source_type_arg`), so
+ * a bad value is an argument error (`parse` exits 1, `format` exits 2). Absent →
+ * `undefined` (the `module` default); the source type only affects the TypeScript
+ * parser. */
+function resolve_source_type(source_type, code) {
+	if (source_type === undefined || source_type === 'module' || source_type === 'script') {
+		return source_type;
+	}
+	eprint(`Error: invalid --source-type '${source_type}' (expected 'script' or 'module')\n`);
 	process.exit(code);
 }
 
-/** The WASM `goal` option for `parser`. The option is TypeScript-only in the
- * WASM API (svelte's `<script>` is always a module, css has no goal), so a
- * validated-but-inert `--goal` on the other languages is spelled `undefined`
- * rather than passed — a supported key set to `undefined` reads as its default,
- * which is what lets one bag serve whichever parser or formatter (native-CLI
- * parity, since there too the goal only reaches TypeScript). */
-function goal_option(parser, goal) {
-	return parser === 'typescript' ? goal : undefined;
+/** The WASM `sourceType` option for `parser`. The option is TypeScript-only in
+ * the WASM API (svelte's `<script>` is always a module, css has no goal), so a
+ * validated-but-inert `--source-type` on the other languages is spelled
+ * `undefined` rather than passed — a supported key set to `undefined` reads as
+ * its default, which is what lets one bag serve whichever parser or formatter
+ * (native-CLI parity, since there too the source type only reaches TypeScript). */
+function source_type_option(parser, source_type) {
+	return parser === 'typescript' ? source_type : undefined;
 }
 
 /** Extension-based parser detection, mirroring the native `ParserType::from_extension`. */
@@ -382,7 +385,7 @@ async function run_format(args) {
 			content: { type: 'string' },
 			stdin: { type: 'boolean' },
 			parser: { type: 'string' },
-			goal: { type: 'string' },
+			'source-type': { type: 'string' },
 			check: { type: 'boolean' },
 			list: { type: 'boolean' },
 			jobs: { type: 'string' },
@@ -401,17 +404,18 @@ async function run_format(args) {
 		process.exit(1);
 	}
 	if (values.content !== undefined || values.stdin) {
-		// --goal is content/stdin-only and TypeScript-only; a bad value is a usage
-		// error (exit 2, format parity). Path mode rejects --goal in format_paths.
-		const goal = resolve_goal(values.goal, 2);
-		format_single(values, positionals, parser, goal);
+		// --source-type is content/stdin-only and TypeScript-only; a bad value is a
+		// usage error (exit 2, format parity). Path mode rejects --source-type in
+		// format_paths.
+		const source_type = resolve_source_type(values['source-type'], 2);
+		format_single(values, positionals, parser, source_type);
 	} else {
 		await format_paths(values, positionals);
 	}
 }
 
 /** `--content`/`--stdin` mode — format one input to stdout (or `--check` it). */
-function format_single(values, positionals, parser, goal) {
+function format_single(values, positionals, parser, source_type) {
 	if (positionals.length > 0) {
 		eprint('Error: --content/--stdin cannot be combined with file paths\n');
 		process.exit(2);
@@ -433,7 +437,7 @@ function format_single(values, positionals, parser, goal) {
 	let formatted;
 	try {
 		// one bag, handed to whichever formatter
-		formatted = FORMATTERS[parser](input, { goal: goal_option(parser, goal) });
+		formatted = FORMATTERS[parser](input, { sourceType: source_type_option(parser, source_type) });
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);
 		process.exit(2);
@@ -459,8 +463,10 @@ async function format_paths(values, positionals) {
 		eprint('Error: --parser applies to --content/--stdin; file paths use extension detection\n');
 		process.exit(2);
 	}
-	if (values.goal !== undefined) {
-		eprint('Error: --goal applies to --content/--stdin; file paths are formatted as modules\n');
+	if (values['source-type'] !== undefined) {
+		eprint(
+			'Error: --source-type applies to --content/--stdin; file paths are formatted as modules\n'
+		);
 		process.exit(2);
 	}
 	if (values.list && values.check) {
@@ -840,7 +846,7 @@ function run_parse(args) {
 			content: { type: 'string' },
 			stdin: { type: 'boolean' },
 			parser: { type: 'string' },
-			goal: { type: 'string' },
+			'source-type': { type: 'string' },
 			'no-locations': { type: 'boolean' },
 			help: { type: 'boolean' }
 		},
@@ -849,9 +855,9 @@ function run_parse(args) {
 
 	// validated before mode dispatch — a bad value exits 1 in every mode (argh parity)
 	const flag_parser = values.parser === undefined ? undefined : resolve_parser(values.parser);
-	// --goal is validated upfront (exit 1) like the native CLI; it only affects the
-	// TypeScript parser (svelte is always a module, css has no goal).
-	const goal = resolve_goal(values.goal, 1);
+	// --source-type is validated upfront (exit 1) like the native CLI; it only
+	// affects the TypeScript parser (svelte is always a module, css has no goal).
+	const source_type = resolve_source_type(values['source-type'], 1);
 	if (positionals.length > 1) {
 		eprint(`Unrecognized argument: ${positionals[1]}\n`);
 		process.exit(1);
@@ -889,15 +895,15 @@ function run_parse(args) {
 	}
 
 	// --no-locations drops per-node `loc` (span-only wire; svelte also `name_loc`,
-	// a no-op for css); orthogonal to --goal (goal drives the TS parser,
-	// no-locations the writer), so they compose. `locations` is a parse-only
+	// a no-op for css); orthogonal to --source-type (the source type drives the TS
+	// parser, no-locations the writer), so they compose. `locations` is a parse-only
 	// option — format emits no wire and rejects the key.
 	const no_locations = values['no-locations'] === true;
 	let json;
 	try {
 		json = PARSERS[parser](input, {
 			locations: !no_locations,
-			goal: goal_option(parser, goal)
+			sourceType: source_type_option(parser, source_type)
 		});
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);

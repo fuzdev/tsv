@@ -47,7 +47,7 @@ interface Sample {
 	parser: 'typescript' | 'css' | 'svelte';
 	type: 'Program' | 'StyleSheetFile' | 'Root';
 	/** Parse goal for a `typescript` sample; omitted means the `module` default. */
-	goal?: 'script' | 'module';
+	source_type?: 'script' | 'module';
 }
 
 const samples: Sample[] = [
@@ -93,11 +93,11 @@ const samples: Sample[] = [
 		type: 'Program'
 	},
 	{
-		// `with` is sloppy-mode Script code only, so this sample needs the goal.
+		// `with` is sloppy-mode Script code only, so this sample needs the source type.
 		name: 'ts_with_statement',
 		source: 'with (a) b;',
 		parser: 'typescript',
-		goal: 'script',
+		source_type: 'script',
 		type: 'Program'
 	},
 	{
@@ -253,7 +253,7 @@ async function parse(sample: Sample): Promise<string> {
 			sample.source,
 			'--parser',
 			sample.parser,
-			...(sample.goal ? ['--goal', sample.goal] : [])
+			...(sample.source_type ? ['--source-type', sample.source_type] : [])
 		],
 		stdout: 'piped',
 		stderr: 'piped'

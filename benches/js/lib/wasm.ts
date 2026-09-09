@@ -18,17 +18,17 @@ import { wasm_bundle_dir } from './tsv_artifacts.ts';
 import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
 
-/** The `{locations?, goal?}` options bag the parse exports take (`goal` is
- * TypeScript-only — the other languages reject the key). */
+/** The `{locations?, sourceType?}` options bag the parse exports take
+ * (`sourceType` is TypeScript-only — the other languages reject the key). */
 interface WasmParseOptions {
 	locations?: boolean;
-	goal?: ParseGoal;
+	sourceType?: ParseGoal;
 }
 
-/** The `{goal?}` bag the format exports take — format emits no wire, so
- * `locations` is an unknown key there, and `goal` stays TypeScript-only. */
+/** The `{sourceType?}` bag the format exports take — format emits no wire, so
+ * `locations` is an unknown key there, and `sourceType` stays TypeScript-only. */
 interface WasmFormatOptions {
-	goal?: ParseGoal;
+	sourceType?: ParseGoal;
 }
 
 /** WASM module function signatures */
@@ -161,8 +161,8 @@ export class WasmImplementation extends BaseImplementation {
 		assert_binding_reports_rejection('tsv (WASM)', this);
 	}
 
-	// `goal_for` withholds the goal for svelte/css, which reject a SET goal — not
-	// the key itself: `crates/tsv_wasm/src/lib.rs` declares `goal?: undefined` on
+	// `goal_for` withholds the goal for svelte/css, which reject a SET value — not
+	// the key itself: `crates/tsv_wasm/src/lib.rs` declares `sourceType?: undefined` on
 	// `ParseOptions` precisely so one options bag can be forwarded to whichever
 	// export (the documented forwarding idiom `npm/cli.js` uses). So spelling the
 	// key `undefined` is legal here, and `parse_no_locations` — which builds a bag
@@ -176,18 +176,18 @@ export class WasmImplementation extends BaseImplementation {
 	// have one and take it whenever `goal_for` withholds the goal.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		const resolved = goal_for(language, goal);
-		return this.tables.parse[language](source, resolved ? { goal: resolved } : undefined);
+		return this.tables.parse[language](source, resolved ? { sourceType: resolved } : undefined);
 	}
 
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
 		const resolved = goal_for(language, goal);
-		this.tables.parse_internal[language](source, resolved ? { goal: resolved } : undefined);
+		this.tables.parse_internal[language](source, resolved ? { sourceType: resolved } : undefined);
 	}
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
 		return this.tables.parse[language](source, {
 			locations: false,
-			goal: goal_for(language, goal)
+			sourceType: goal_for(language, goal)
 		});
 	}
 
