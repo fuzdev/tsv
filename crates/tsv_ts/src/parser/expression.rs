@@ -18,7 +18,9 @@ use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
 use super::Parser;
 use super::expression_lookahead::{ArrowHead, matching_angle_close};
-use super::scan::{parse_number_literal, skip_whitespace_and_comments};
+use super::scan::{
+    LeadingZeroLiteral, classify_leading_zero, parse_number_literal, skip_whitespace_and_comments,
+};
 
 //
 // Binding Power Constants for Pratt Parser
@@ -1560,15 +1562,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(crate) fn parse_number_or_bigint_literal(&self) -> Result<Literal<'arena>, ParseError> {
         let (start, end) = self.current_pos();
         let raw = self.current_value();
-        let bytes = raw.as_bytes();
         if self.strict
-            && bytes.first() == Some(&b'0')
-            && bytes.get(1).is_some_and(u8::is_ascii_digit)
+            && let Some(form) = classify_leading_zero(raw)
         {
-            return Err(self.error_msg_at(
-                "Leading-zero literals are not allowed in strict mode. Use '0o' for octal.",
-                start,
-            ));
+            let message = match form {
+                LeadingZeroLiteral::LegacyOctal => {
+                    "Legacy octal literals are not allowed in strict mode. Use '0o' for octal."
+                }
+                LeadingZeroLiteral::NonOctalDecimal => {
+                    "Decimals with leading zeros are not allowed in strict mode."
+                }
+            };
+            return Err(self.error_msg_at(message, start));
         }
         if raw.ends_with('n') {
             // BigInt — no stored payload; digits via `Literal::bigint_digits(source)`.

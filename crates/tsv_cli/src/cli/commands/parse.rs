@@ -26,7 +26,8 @@ pub struct ParseCommand {
     /// parse goal for TypeScript: script | module (default: module). `script`
     /// parses a standalone script — `await` is an ordinary identifier and
     /// `import`/`export`/`import.meta` are errors; the script is sloppy unless a
-    /// `"use strict"` directive prologue says otherwise. Ignored for svelte/css.
+    /// `"use strict"` directive prologue says otherwise. TypeScript only — an error
+    /// with svelte/css.
     #[argh(option)]
     source_type: Option<String>,
 
@@ -68,6 +69,10 @@ impl ParseCommand {
                 process::exit(1);
             }
         };
+        if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
+            eprintln!("Error: {e}");
+            process::exit(1);
+        }
 
         match parse_to_json(
             input.content(),
@@ -114,6 +119,26 @@ pub(crate) fn parse_source_type_arg(
             .map(Some)
             .ok_or_else(|| format!("invalid --source-type '{s}' (expected 'script' or 'module')")),
     }
+}
+
+/// Refuse a `--source-type` on a language that has no goal axis. Svelte hard-wires
+/// `Module` and CSS has no goal, so a caller naming one there asked for something
+/// that cannot be honored and must be told — the stance every binding takes
+/// (`tsv_wasm`'s `read_options`, `tsv_ffi`'s `ffi_source_type`, `tsv_napi`), so the
+/// CLI is not the one surface where the flag is silently dropped. Shared by `parse`
+/// and `format`; the flag's *value* is validated ahead of this by
+/// `parse_source_type_arg`, so this only asks whether it was named at all.
+pub(crate) fn check_source_type_language(
+    source_type: Option<&str>,
+    parser_type: ParserType,
+) -> Result<(), String> {
+    if source_type.is_some() && parser_type != ParserType::TypeScript {
+        return Err(format!(
+            "--source-type is only supported for typescript (the {} parser has no source type)",
+            parser_type.name()
+        ));
+    }
+    Ok(())
 }
 
 fn parse_to_json(

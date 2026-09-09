@@ -543,6 +543,15 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 - **An exported `global` augmentation** — `export global { }` and `export declare global { }`. **tsc parses both** (empty `parseDiagnostics`) and prettier formats both, byte-identically to tsv; acorn rejects both with `'export declare' must be followed by an ambient declaration.` The gate is acorn's `tokenIsTSDeclarationStart`, which backs its `shouldParseExportStatement` and enumerates every sibling ambient head — `abstract`, `declare`, `enum`, `module`, `namespace`, `interface`, `type` — omitting exactly one, `global`, while acorn's own statement path parses `global { }` happily and it accepts `export declare namespace N {}` / `export declare module 'a' {}`, the same production one name over. A verdict reached for every sibling and not for this one is an oracle slip rather than a judgement, the same call made for the ambient `async` signature above, so tsv follows tsc's acceptance. The **bodyless** spellings are rejected by all three and ride as `input_invalid_*` files in the same fixture — with no body the augmentation is not a declaration under tsc's `isDeclaration` and `export` is left with nothing to attach to. One check states it (`Parser::require_exported_global_body`) at both export arms, because tsv accepted `export declare global { }` while rejecting `export global { }`, a split neither oracle makes — [namespace/global_export](../tests/fixtures/typescript/declarations/namespace/global_export_svelte_divergence/). Without `export`, the bodyless `declare global;` is accepted by tsv and acorn and diverges from prettier instead, catalogued in [conformance_prettier_ts.md §TypeScript](./conformance_prettier_ts.md#typescript)
 - **A cast target with a default, in a no-declaration `for`-in/of head** — `for ([(c as T) = 1] of arr)`. The inner `=` converts under *assignment* rules (a cast target is legal there, and its assertion node survives), then the for-head converts the whole pattern again under *binding* rules, where acorn raises "Unexpected type cast in parameter position". tsc accepts with no diagnostic and prettier formats it, so tsv converts the inner `=` under assignment rules in a for-head too. The **bare** cast target in the same position is a different case tsv rejects as acorn does (`for ((x as T) of arr)`) — [cast_target_destructure_default_for_head](../tests/fixtures/typescript/expressions/assignment/cast_target_destructure_default_for_head_svelte_divergence/)
 - **A TypeScript import-equals at `Goal::Script`** — `import x = A.B`, `import x = require('y')`, `import await = foo.await`. Not an ES `ImportDeclaration` and so not a `ModuleItem`: it predates ES modules and is how a script or namespace aliases, which is why tsv's goal gate fires at the two `ImportDeclaration` construction sites rather than on the `import` keyword. tsc asserts the shape in `conformance/externalModules/topLevelAwait.2.ts` (commented *"await allowed in import=namespace when not a module"*, no `.errors.txt`). acorn's rejection is base acorn's ES-grammar check firing before the TS plugin sees the statement — a slip, not a judgement. Every genuine ES import shape still rejects at that goal — [import_equals](../tests/fixtures/typescript/script_goal/import_equals_svelte_divergence/)
+- A **`"use strict"` directive in a function with a non-simple parameter list** —
+  `function fn(a = 010) { 'use strict'; }`, and the arrow and method spellings. ecma262
+  makes the directive a Syntax Error there (sec-function-definitions-static-semantics-early-errors),
+  a deferred early error in tsv like the rest of the strict-mode list; acorn enforces it.
+  The parameters parse under the *outer* mode on both sides, which is what the fixture
+  pins at `Goal::Script`: the default's legacy octal is legal while the same literal in
+  the body is not. prettier rejects the octal outright (tsc's scanner), so the fixture
+  is a prettier divergence too —
+  [script_goal/nonsimple_params_directive](../tests/fixtures/typescript/script_goal/nonsimple_params_directive_svelte_prettier_divergence/)
 - A **non-simple assignment target** — a call (`foo() = bar`, `foo() += 1`), a literal (`1 >>= 2`), or `this` (`this = x`). The production is `LeftHandSideExpression = AssignmentExpression`; the "is it assignable?" refinement (`AssignmentTargetType`) is an early error layered on top, which tsv defers, so all four parse and prettier formats all four. acorn enforces it (`Assigning to rvalue`). The deferral does **not** reach a no-declaration `for`-in/of head — that is a `LeftHandSideExpression` position but not an assignment context, so a non-simple target there stays a parse error in tsv as in prettier — [nonsimple_target](../tests/fixtures/typescript/expressions/assignment/nonsimple_target_svelte_divergence/)
 - A **shorthand property carrying an initializer** in an object *literal* — `({ a = 1 })`. `PropertyDefinition : CoverInitializedName` is a real production, present so `ObjectLiteral` can cover `ObjectAssignmentPattern`; the rejection is the early error layered on top ("It is a Syntax Error if any source text is matched by this production", [§13.2.5.1](https://tc39.es/ecma262/#sec-object-initializer-static-semantics-early-errors)), which tsv defers, so it parses as a `shorthand` `Property` whose `value` is an `AssignmentExpression`. acorn enforces it (`Shorthand property assignments are valid only in destructuring patterns`). Every *valid* spelling is refined to an `ObjectPattern` before it is printed, so the literal shape is reachable only here — which is why the property's comment seam had never been asked about it — [shorthand_initializer_name_comment](../tests/fixtures/typescript/expressions/objects/shorthand_initializer_name_comment_svelte_divergence/)
 
@@ -940,6 +949,27 @@ This is deliberate tsc-over-acorn strictness, the same reverse direction as the
 legacy import-assertions and reserved-keyword-qualified-head entries above.
 **Upstream candidate**: acorn-typescript — `parseMaybeConditional` folds a
 ternary onto an unparenthesized arrow above the `parseExprOps` arrow guard.
+
+**Strict code acorn grades as sloppy (rejected)**: two places where acorn's strictness
+flag lags the spec's, so a `LegacyOctalIntegerLiteral` acorn accepts at
+`sourceType: 'script'` is strict-mode code and tsv rejects it. A `"use strict"`
+prologue behind a **hashbang** — acorn's `strictDirective` is a raw-source regex
+pre-scan that steps over whitespace and ordinary comments but not the `#!` line, so
+the directive goes unseen; a `HashbangComment` is trivia like any comment (ecma262
+sec-hashbang) and the prologue is still the first statements, which is how V8 reads it too
+(`SyntaxError: Octal literals are not allowed in strict mode` on a real `#!` file).
+And a class's **decorator list** — acorn turns `strict` on inside `parseClass`, after
+the enclosing scope has parsed the decorators, while *all parts* of a class are strict
+code (sec-strict-mode-code) and the decorators proposal puts `DecoratorList` inside
+`ClassDeclaration`, beside the heritage clause both parsers already grade strict. tsc
+rejects both, its scanner refusing the literal in every mode; prettier with it. Pinned
+by the
+[script_goal/hashbang_directive_octal](../tests/fixtures/typescript/script_goal/hashbang_directive_octal_svelte_divergence/)
+and
+[script_goal/class_decorator_octal](../tests/fixtures/typescript/script_goal/class_decorator_octal_svelte_divergence/)
+`tsv_rejects.txt` fixtures. **Upstream candidate**: acorn — `strictDirective` could
+skip a leading hashbang the way `skipSpace` does; acorn-typescript — open the class's
+strict scope ahead of `parseDecorators`.
 
 **Return type of a parenthesized arrow in a conditional's consequent**
 ([return_type_ternary_consequent](../tests/fixtures/typescript/expressions/arrow/return_type_ternary_consequent/)):

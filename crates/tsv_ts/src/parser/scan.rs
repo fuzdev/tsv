@@ -404,6 +404,41 @@ pub(super) fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
     pos
 }
 
+/// The two leading-zero numeric literals the sloppy grammar admits and strict code
+/// disallows by production (ecma262 sec-strict-mode-of-ecmascript).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LeadingZeroLiteral {
+    /// `LegacyOctalIntegerLiteral` — `0` followed by octal digits only (`010`,
+    /// `0777`, `00`), read in base 8. Takes no fraction, exponent or BigInt suffix.
+    LegacyOctal,
+    /// `NonOctalDecimalIntegerLiteral` — `0` followed by a digit run holding an `8`
+    /// or `9` (`08`, `089`), read as decimal; a fraction and an exponent may follow.
+    NonOctalDecimal,
+}
+
+/// Classify a numeric literal's raw text as one of the two leading-zero forms, or
+/// `None` for every other literal — a lone `0`, a `0.5`, and the radix-prefixed
+/// `0x` / `0b` / `0o` spellings (whose second byte is not a digit).
+///
+/// One spelling of the question for its two askers: the parser's strict-mode gate
+/// (`Parser::parse_number_or_bigint_literal`, which names the form in its error) and
+/// the value decoder (`parse_number_literal`, which reads the octal form in base 8).
+/// The lexer scans the run rather than asking this — it is deciding where the token
+/// ends — but applies the same rule (an all-octal run closes the literal; an `8`/`9`
+/// demotes it to decimal).
+pub(crate) fn classify_leading_zero(raw: &str) -> Option<LeadingZeroLiteral> {
+    let bytes = raw.as_bytes();
+    if bytes.first() != Some(&b'0') || !bytes.get(1).is_some_and(u8::is_ascii_digit) {
+        return None;
+    }
+    let mut run = bytes[1..].iter().take_while(|b| b.is_ascii_digit());
+    if run.all(|&b| b < b'8') {
+        Some(LeadingZeroLiteral::LegacyOctal)
+    } else {
+        Some(LeadingZeroLiteral::NonOctalDecimal)
+    }
+}
+
 /// Parse a JS number literal (hex, binary, octal, scientific, BigInt)
 /// Returns f64 (BigInt suffix 'n' is ignored for value, preserved in raw)
 ///
@@ -435,17 +470,12 @@ pub(crate) fn parse_number_literal(raw: &str) -> Result<f64, std::num::ParseFloa
         }
     }
 
-    // `LegacyOctalIntegerLiteral` (`010`, `0777`, `00`): a leading `0` whose whole
-    // digit run is octal is read in base 8, acorn's `parseInt(str, 8)`. The
-    // `NonOctalDecimalIntegerLiteral` forms (`08`, `089`, `08.5e1`) carry an `8` or
-    // `9`, so they fall through to the decimal parse below and read as written. The
-    // radix prefixes are already handled above (`0x…`'s tail is not all octal digits
-    // anyway), and the leading `0` alone is an ordinary decimal zero.
-    if let Some(digits) = clean.strip_prefix('0')
-        && !digits.is_empty()
-        && digits.bytes().all(|b| b.is_ascii_digit() && b < b'8')
-    {
-        return Ok(parse_radix_f64(digits, 8));
+    // `LegacyOctalIntegerLiteral` (`010`, `0777`, `00`) is read in base 8, acorn's
+    // `parseInt(str, 8)`; the production admits no fraction or exponent, so the digit
+    // run is the whole literal. The `NonOctalDecimalIntegerLiteral` forms (`08`,
+    // `089`, `08.5e1`) fall through to the decimal parse below and read as written.
+    if let Some(LeadingZeroLiteral::LegacyOctal) = classify_leading_zero(clean) {
+        return Ok(parse_radix_f64(&clean[1..], 8));
     }
 
     // Regular decimal (including scientific notation)

@@ -1,4 +1,4 @@
-use crate::cli::commands::parse::parse_source_type_arg;
+use crate::cli::commands::parse::{check_source_type_language, parse_source_type_arg};
 use crate::cli::discover::{Diagnostics, FileSink, discover_files, discover_into, path_sort_key};
 use crate::cli::format_source::{format_source_in, format_source_with_goal_option};
 use crate::cli::input::{InputArgs, ParserType};
@@ -38,8 +38,8 @@ pub struct FormatCommand {
     #[argh(option)]
     parser: Option<ParserType>,
 
-    /// parse goal for TypeScript: script | module (default: module, retried as a script).
-    /// `--content`/`--stdin` only.
+    /// parse goal for TypeScript: script | module. Unset: parsed as a module, retried
+    /// as a script if that fails. `--content`/`--stdin` only; an error with svelte/css.
     #[argh(option)]
     source_type: Option<String>,
 
@@ -115,6 +115,10 @@ impl FormatCommand {
                 process::exit(2);
             }
         };
+        if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
+            eprintln!("Error: {e}");
+            process::exit(2);
+        }
         match format_source_with_goal_option(input.content(), parser_type, goal) {
             Ok(formatted) => {
                 if self.check {

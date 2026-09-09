@@ -9,6 +9,10 @@ use crate::fixtures::{
     unformatted_ours_filename,
 };
 
+/// The number of S-rules [`validate_fixture_structure`] checks (S1–S23), reported on
+/// success.
+pub const STRUCTURE_RULE_COUNT: usize = 23;
+
 /// Validate fixture structure and conventions
 ///
 /// Checks:
@@ -52,15 +56,14 @@ use crate::fixtures::{
 ///      nothing its twin does not while reading as a second chain
 /// S23: the `goal` marker is only meaningful on a `.ts` / `.svelte.ts` fixture —
 ///      the Svelte and CSS parse arms take no goal, so a marker there is read by
-///      nothing and silently claims a goal the fixture is not graded at
+///      nothing and silently claims a goal the fixture is not graded at; and its
+///      content must be `script` or `module`, since the lenient reader grades any
+///      other spelling at Module
 ///
 /// The count of rules above is `STRUCTURE_RULE_COUNT`, reported on success.
 /// D1 — README.md required for divergences — is deliberately **not** here: it is the
 /// one rule that says nothing about the file set, so it must not short-circuit the
 /// claim phases. See [`validate_divergence_readme`].
-/// The number of S-rules `validate_fixture_structure` checks (S1–S23).
-pub const STRUCTURE_RULE_COUNT: usize = 23;
-
 pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Result<(), String> {
     let fixture_dir = &fixture.path;
 
@@ -91,6 +94,21 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             - Delete {GOAL_FILENAME}, or\n\
             - Rebuild the case as a .ts fixture (`fixture_init <dir> --parser typescript\n\
               --goal script --content '<code>' --force`, then remove the old input file)."
+        ));
+    }
+    // S23, the content half: `read_goal_marker` is lenient by design (absent means
+    // Module, so every goal-less fixture needs no file), which makes a typo'd marker
+    // (`Script`, `scrip`, an empty file) a silent Module regrade — self-catching only
+    // where the parse actually differs by goal. Refuse any spelling but the two.
+    if let Ok(content) = read_file(&goal_marker_path(fixture_dir))
+        && tsv_ts::Goal::from_source_type(content.trim()).is_none()
+    {
+        return Err(format!(
+            "{GOAL_FILENAME} marker holds {:?}, which names no parse goal.
+            The marker selects the acorn `sourceType` the fixture is graded at and must
+            read exactly `script` or `module` (the reader is lenient, so anything else
+            grades the fixture at Module without saying so).",
+            content.trim()
         ));
     }
 

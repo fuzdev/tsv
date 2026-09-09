@@ -60,12 +60,40 @@ pub enum SkipReason {
     /// Test requires a syntactic proposal tsv does not implement (the named
     /// `features:` entry); see `frontmatter::UNIMPLEMENTED_FEATURES`.
     UnimplementedFeature(&'static str),
-    /// Test carries both `raw` and `onlyStrict`, which contradict each other:
-    /// `raw` forbids any modification of the source, `onlyStrict` is graded
-    /// through the harness's prepended `"use strict"` directive. No such test
-    /// exists in test262 — the bucket is what makes that a checked fact rather
-    /// than an assumption `graded_source` rests on.
-    RawStrictConflict,
+    /// The harness's prepended `"use strict"` directive cannot be applied to this
+    /// test honestly, for the named reason. No such test exists in test262 — the
+    /// bucket is what makes that a checked fact rather than an assumption
+    /// [`strict_source`] rests on.
+    StrictPrefixConflict(StrictPrefixConflict),
+}
+
+/// Why a test's strict run cannot be graded through [`USE_STRICT_PREFIX`] — the
+/// three ways the prefix's own preconditions fail, each a shape test262 does not
+/// carry today and this bucket keeps checked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StrictPrefixConflict {
+    /// `raw` forbids any modification of the source, `onlyStrict` is graded only
+    /// through the prepended directive.
+    RawFlag,
+    /// `onlyStrict` and `noStrict` name opposite single runs; the harness's own
+    /// rule is that they are mutually exclusive.
+    NoStrictFlag,
+    /// A hashbang or a BOM at byte 0, on a test one of whose runs is prefixed: the
+    /// prefix moves it off byte 0, where it is no longer a hashbang or a BOM, so
+    /// the strict run would grade a different program (and a positive would fail
+    /// the gate with a message blaming tsv's strictness model).
+    ByteZero,
+}
+
+impl StrictPrefixConflict {
+    /// The conflict's name for the run summary.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::RawFlag => "raw + onlyStrict",
+            Self::NoStrictFlag => "onlyStrict + noStrict",
+            Self::ByteZero => "hashbang/BOM under a strict prefix",
+        }
+    }
 }
 
 /// Summary of test results.
@@ -80,7 +108,7 @@ pub struct TestSummary {
     pub skipped_no_frontmatter: usize,
     pub skipped_annex_b: usize,
     pub skipped_unimplemented_feature: usize,
-    pub skipped_raw_strict_conflict: usize,
+    pub skipped_strict_prefix_conflict: usize,
     pub skipped_filtered: usize,
     pub failures: Vec<(String, FailureReason)>,
 }
@@ -93,7 +121,7 @@ impl TestSummary {
             + self.skipped_no_frontmatter
             + self.skipped_annex_b
             + self.skipped_unimplemented_feature
-            + self.skipped_raw_strict_conflict
+            + self.skipped_strict_prefix_conflict
     }
 }
 
@@ -122,7 +150,7 @@ impl TestSummary {
                 SkipReason::NoFrontmatter => self.skipped_no_frontmatter += 1,
                 SkipReason::AnnexB => self.skipped_annex_b += 1,
                 SkipReason::UnimplementedFeature(_) => self.skipped_unimplemented_feature += 1,
-                SkipReason::RawStrictConflict => self.skipped_raw_strict_conflict += 1,
+                SkipReason::StrictPrefixConflict(_) => self.skipped_strict_prefix_conflict += 1,
             },
         }
     }
@@ -300,17 +328,44 @@ fn classify(relative_path: &str, content: &str) -> Classification {
     if frontmatter.is_no_strict() && is_annex_b_path(relative_path) {
         return Classification::Skip(SkipReason::AnnexB);
     }
-    // `raw` and `onlyStrict` are contradictory — the first forbids modifying the
-    // source, the second is graded through the harness's prepended directive — so
-    // there is no source to grade honestly. test262 carries no such test; refusing
-    // it here is what lets `graded_source` prepend on `onlyStrict` alone.
-    if frontmatter.is_raw() && frontmatter.is_only_strict() {
-        return Classification::Skip(SkipReason::RawStrictConflict);
+    // The strict prefix's preconditions, refused rather than assumed: `raw` +
+    // `onlyStrict` (the first forbids modifying the source, the second is graded
+    // only through the prepended directive), `onlyStrict` + `noStrict` (opposite
+    // single runs — `graded_runs` would silently pick one), and a byte-0 hashbang
+    // or BOM on a test that takes the prefix (the prefix moves it off byte 0, where
+    // it is a different program). test262 carries none of these; refusing them here
+    // is what lets `strict_source` prepend unconditionally.
+    if frontmatter.is_only_strict() && frontmatter.is_raw() {
+        return Classification::Skip(SkipReason::StrictPrefixConflict(
+            StrictPrefixConflict::RawFlag,
+        ));
+    }
+    if frontmatter.is_only_strict() && frontmatter.is_no_strict() {
+        return Classification::Skip(SkipReason::StrictPrefixConflict(
+            StrictPrefixConflict::NoStrictFlag,
+        ));
+    }
+    let runs = graded_runs(&frontmatter);
+    if has_strict_run(runs) && starts_at_byte_zero(content) {
+        return Classification::Skip(SkipReason::StrictPrefixConflict(
+            StrictPrefixConflict::ByteZero,
+        ));
     }
     Classification::Grade {
         is_negative_parse: frontmatter.is_negative_parse(),
-        runs: graded_runs(&frontmatter),
+        runs,
     }
+}
+
+/// Whether any of a test's runs is graded behind [`USE_STRICT_PREFIX`].
+fn has_strict_run(runs: GradedRuns) -> bool {
+    matches!(runs, GradedRuns::StrictScript | GradedRuns::BothScripts)
+}
+
+/// Whether the source opens with something that is only itself at byte 0 — a
+/// hashbang comment or a byte-order mark — and so cannot take a prefix.
+fn starts_at_byte_zero(content: &str) -> bool {
+    content.starts_with("#!") || content.starts_with('\u{feff}')
 }
 
 /// The parse goal for a graded test. A `module`-flagged test is parsed as a
@@ -777,7 +832,9 @@ mod tests {
         let conflict = "/*---\nflags: [raw, onlyStrict]\n---*/\nvar x = 1;\n";
         assert!(matches!(
             classify("test/x.js", conflict),
-            Classification::Skip(SkipReason::RawStrictConflict)
+            Classification::Skip(SkipReason::StrictPrefixConflict(
+                StrictPrefixConflict::RawFlag
+            ))
         ));
 
         // Either flag alone still grades.
@@ -785,6 +842,59 @@ mod tests {
         assert!(matches!(
             classify("test/x.js", raw_only),
             Classification::Grade { .. }
+        ));
+    }
+
+    /// `onlyStrict` and `noStrict` name opposite single runs; refused rather than
+    /// silently resolved to one of them.
+    #[test]
+    fn classify_skips_only_strict_with_no_strict() {
+        let conflict = "/*---\nflags: [onlyStrict, noStrict]\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", conflict),
+            Classification::Skip(SkipReason::StrictPrefixConflict(
+                StrictPrefixConflict::NoStrictFlag
+            ))
+        ));
+    }
+
+    /// A byte-0 hashbang or BOM is only itself at byte 0, so a test that takes the
+    /// strict prefix on any run is refused; one graded on its own bytes alone is not.
+    #[test]
+    fn classify_skips_byte_zero_content_under_a_strict_prefix() {
+        // Unflagged = both runs, one of them prefixed.
+        let hashbang = "#!/usr/bin/env node\n/*---\ndescription: x\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", hashbang),
+            Classification::Skip(SkipReason::StrictPrefixConflict(
+                StrictPrefixConflict::ByteZero
+            ))
+        ));
+        let bom = "\u{feff}/*---\nflags: [onlyStrict]\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", bom),
+            Classification::Skip(SkipReason::StrictPrefixConflict(
+                StrictPrefixConflict::ByteZero
+            ))
+        ));
+
+        // `raw` (own bytes, sloppy) and `module` take no prefix, so both grade —
+        // which is how test262's eight hashbang tests are actually flagged.
+        let raw = "#!/usr/bin/env node\n/*---\nflags: [raw]\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", raw),
+            Classification::Grade {
+                runs: GradedRuns::SloppyScript,
+                ..
+            }
+        ));
+        let module = "#!/usr/bin/env node\n/*---\nflags: [module, raw]\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", module),
+            Classification::Grade {
+                runs: GradedRuns::Module,
+                ..
+            }
         ));
     }
 
