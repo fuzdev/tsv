@@ -438,7 +438,11 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// ONE — 5158 at the baseline, 5159 at the tip; the committed floor was already a unit slack
 	// from an earlier landing this change did not measure, and the re-pin absorbs it, since a
 	// floor is only worth having tight.
-	typescript: 5159,
+	//
+	// 5159 → 5171: twelve files arrive from `unknown` (88 → 76) — the statement-gap blank
+	// question gains prettier's `isNextLineEmpty` CONTENT-END arm, which is what sees the blank
+	// in `a()⏎⏎;`. Reasoning and the twelve-mover byte A/B on `CORPUS_FORMAT_UNKNOWN_PIN`.
+	typescript: 5171,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -730,7 +734,31 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// Those ten stay `unknown` on a REMAINING hunk of the same shape one seam over: prettier's
 	// `isNextLineEmpty` is a DISJUNCTION over the content end OR the full end, so `a()⏎⏎;` keeps
 	// a blank line tsv drops. Same `locEnd` table, a different reader, and its own change.
-	typescript: 88,
+	//
+	// 88 → 76: that reader landed (`match` 5159 → 5171), and it is the whole step — twelve files
+	// leave for `match`, eleven of them the `js/no-semi/*.js` set the note above named as owed,
+	// `js/no-semi/with-statement.js` included. The statement list's blank question now asks the
+	// disjunction: the full-end scan it always ran, OR the author blank inside the statement's own
+	// tail, between its content end and the `;` the printer re-emits glued. The twelfth is
+	// `js/comments-closure-typecast/no-semi/comments.js`, whose last two hunks were that blank
+	// (its JSDoc-cast parens already matched this view's oracle).
+	//
+	// ⚠️ The arm DECLINES a tail that holds a comment past the ones the author trailed on the
+	// content's own line — prettier's own `skipInlineComment` / `skipTrailingComment` step. A
+	// comment in that tail already owns the blank around itself, and answering here too emits a
+	// SECOND one below it (`a()⏎⏎// c⏎;`, where prettier's separator emits a single break).
+	//
+	// Measured by a baseline-vs-tip byte A/B over the same 11,491 `find`-enumerated files (stdout,
+	// stderr and exit code `cmp`'d per file): exactly those 12 movers, ALL in the prettier suites,
+	// ZERO in real code, every one improving. The `--all` bucket diff confirms the scope —
+	// `typescript` `match` / `unknown` are the only cells that move in any language, `known` /
+	// `partial` / `safety` / `errors` / `expected_errors` and every `svelte` and `css` bucket
+	// identical.
+	//
+	// The neighbouring `js/comments-closure-typecast/no-semi/not-on-same-line.js` is NOT this
+	// class and does not move: its two missing blanks sit between a JSDoc block comment and the
+	// statement below it, which is the leading-comment emitter's gap, not a statement's tail.
+	typescript: 76,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.

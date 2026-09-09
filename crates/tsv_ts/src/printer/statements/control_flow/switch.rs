@@ -472,7 +472,7 @@ impl<'a> Printer<'a> {
                 if leading_comments.is_empty() {
                     blanks.skipped_semi(self, stmt.span().start);
                 } else {
-                    blanks.printed(search_end);
+                    blanks.printed(search_end, false);
                 }
                 continue;
             }
@@ -607,12 +607,10 @@ impl<'a> Printer<'a> {
                 if prev_stmt_end.is_some() && !prev_deferred_line_comment {
                     // Anchored and bounded exactly as the block list's twin — a dropped
                     // `;` neither moves the start nor is scanned past.
-                    let check_end = blanks.bound(
-                        leading_comments
-                            .first()
-                            .map_or(stmt_start, |c| c.span.start),
-                    );
-                    if self.has_blank_line_between(blanks.anchor(), check_end) {
+                    let check_end = leading_comments
+                        .first()
+                        .map_or(stmt_start, |c| c.span.start);
+                    if blanks.blank_before(self, check_end) {
                         stmt_parts.push(d.hardline());
                     }
                 }
@@ -651,7 +649,7 @@ impl<'a> Printer<'a> {
                 self.find_end_with_trailing_comments(stmt_end)
                     .min(claim_end)
             };
-            blanks.printed(prev_end);
+            blanks.printed(prev_end, self.statement_content_tail_blank(stmt));
             prev_stmt_end = Some(stmt_end);
             prev_deferred_line_comment = this_defers_line_comment;
         }

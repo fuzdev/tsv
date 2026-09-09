@@ -842,8 +842,44 @@ impl<'a> Printer<'a> {
         doc
     }
 
-    /// The verbatim extent of a frozen statement, and whether a `;` follows it — prettier's
-    /// `locEnd` overrides (`src/language-js/location/overrides.js`) and its
+    /// Where a statement's own CONTENT ends — prettier's `locEnd` overrides
+    /// (`src/language-js/location/overrides.js`), read as a position.
+    ///
+    /// It is the statement's full end for every kind that owns no terminator
+    /// ([`FrozenTerminator::Never`]) and for every ASI spelling; otherwise it is the end of
+    /// the content the trailing `;` terminates, so the whitespace the author left between
+    /// the two is outside it.
+    ///
+    /// **Two readers, one table.** [`Self::frozen_statement_slice`] asks it for the extent a
+    /// freeze copies verbatim — a terminator belongs to the printer, not to the slice. The
+    /// statement-list walk asks it for the second anchor prettier's `isNextLineEmpty`
+    /// measures a blank line from ([`Printer::statement_content_tail_blank`]). Keeping them
+    /// on one reading is the point: the kinds are a table transcribed from prettier, and a
+    /// second hand-rolled copy is how the two would come to disagree about where `a()⏎⏎;`
+    /// ends.
+    ///
+    /// The whitespace class is ECMAScript's `WhiteSpace ∪ LineTerminator` — what JS
+    /// `trimEnd` trims, which is neither Rust's `char::is_whitespace` (omits `<ZWNBSP>`,
+    /// admits `<NEL>`) nor ASCII.
+    ///
+    /// ⚠️ The trim is over WHITESPACE ONLY — **a comment is content** here, where prettier
+    /// measures its comment-STRIPPED text. The two readers absorb that difference the same
+    /// way and for the same reason, each stated at its own site.
+    pub(in crate::printer) fn statement_content_end(&self, stmt: &internal::Statement<'_>) -> u32 {
+        let span = stmt.span();
+        if Self::frozen_statement_terminator(stmt) == FrozenTerminator::Never {
+            return span.end;
+        }
+        let Some(content) = span.extract(self.source).strip_suffix(';') else {
+            // ASI supplied the terminator: there is no authored `;` for content to end before.
+            return span.end;
+        };
+        let content = content.trim_end_matches(|c| is_es_whitespace(c) || is_es_line_terminator(c));
+        span.start + content.len() as u32
+    }
+
+    /// The verbatim extent of a frozen statement, and whether a `;` follows it — the
+    /// [`Self::statement_content_end`] table plus prettier's
     /// `shouldIgnoredNodePrintSemicolon`, which are one walk read twice.
     ///
     /// Only a kind that OWNS a terminator ([`FrozenTerminator`]) trims one, which is what
@@ -852,11 +888,11 @@ impl<'a> Printer<'a> {
     /// prettier's table does not list (`type A  =  B⏎;`). Both stay frozen exactly as
     /// authored, on both formatters.
     ///
-    /// ⚠️ The trim is over WHITESPACE ONLY — **a comment is content** and stays inside the
-    /// slice. Prettier trims its comment-STRIPPED text, so `fn(  a  ) /* c */ ;` is
-    /// `fn(  a  ); /* c */` there and `fn(  a  ) /* c */;` here — the reading the directive's
-    /// own promise asks for, and a cataloged divergence (see
-    /// `docs/conformance_prettier_ignore.md` §Format-ignore directive).
+    /// ⚠️ A comment stays inside the slice, where prettier's comment-stripped measure ejects
+    /// it past the terminator: `fn(  a  ) /* c */ ;` is `fn(  a  ); /* c */` there and
+    /// `fn(  a  ) /* c */;` here — the reading the directive's own promise asks for, and a
+    /// cataloged divergence (see `docs/conformance_prettier_ignore.md` §Format-ignore
+    /// directive).
     ///
     /// ⚠️ **A `//` owns the rest of its line, so it ends the trim outright**
     /// ([`Self::frozen_slice_ends_in_line_comment`]): pulling the terminator up onto a line
@@ -864,23 +900,18 @@ impl<'a> Printer<'a> {
     /// following statement needs — `const a = x // c⏎;` + `(y) => 1;` welds to
     /// `const a  =  x // c;`, which no longer parses at all. There the whole node freezes as
     /// authored, terminator included, which is both lossless and the only reparsable answer.
-    ///
-    /// The whitespace class is ECMAScript's `WhiteSpace ∪ LineTerminator` — what JS
-    /// `trimEnd` trims, which is neither Rust's `char::is_whitespace` (omits `<ZWNBSP>`,
-    /// admits `<NEL>`) nor ASCII.
     fn frozen_statement_slice(&self, stmt: &internal::Statement<'_>) -> (Span, bool) {
         let span = stmt.span();
         let terminator = Self::frozen_statement_terminator(stmt);
         if terminator == FrozenTerminator::Never {
             return (span, false);
         }
-        let Some(content) = span.extract(self.source).strip_suffix(';') else {
+        let content_end = self.statement_content_end(stmt);
+        if content_end == span.end {
             // ASI supplied the terminator: nothing to trim, and only a kind that always
             // carries one gets it printed back.
             return (span, terminator == FrozenTerminator::Always);
-        };
-        let content = content.trim_end_matches(|c| is_es_whitespace(c) || is_es_line_terminator(c));
-        let content_end = span.start + content.len() as u32;
+        }
         if self.frozen_slice_ends_in_line_comment(span.start, content_end) {
             return (span, false);
         }

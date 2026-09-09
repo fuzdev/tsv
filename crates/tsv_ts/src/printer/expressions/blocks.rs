@@ -38,6 +38,11 @@ pub(in crate::printer) struct StatementBlankScan {
     /// The first dropped `;` since the anchor last moved; `u32::MAX` when none is in the way,
     /// so an ordinary gap keeps whatever bound its own comment scan picks.
     bound: u32,
+    /// The CONTENT-END arm's answer for the statement the anchor belongs to
+    /// ([`Printer::statement_content_tail_blank`]), carried because it is a fact about that
+    /// statement's own tail rather than about the gap that follows it — no upper bound the
+    /// asking gap picks can reach inside a span the walk has already left behind.
+    content_tail_blank: bool,
 }
 
 impl StatementBlankScan {
@@ -45,6 +50,7 @@ impl StatementBlankScan {
         Self {
             anchor: start,
             bound: u32::MAX,
+            content_tail_blank: false,
         }
     }
 
@@ -58,11 +64,31 @@ impl StatementBlankScan {
         check_end.min(self.bound)
     }
 
+    /// Does an author blank line separate the last printed statement from what comes next —
+    /// prettier's `isNextLineEmpty` (`src/language-js/utilities/is-next-line-empty.js`), which
+    /// is a **disjunction over two ends of one statement**: its content end OR its full end.
+    ///
+    /// The full-end arm is the gap scan every statement list has always run. The content-end
+    /// arm is what sees the blank in `a()⏎⏎;`, where the terminator the printer re-glues sits
+    /// two lines below the content it terminates: measured from the full end that blank is
+    /// *behind* the cursor, and dropping it is the whole `js/no-semi` family. Asking one
+    /// predicate rather than two at each of the two walks is what keeps them from drifting —
+    /// the reason this type exists.
+    pub(in crate::printer) fn blank_before(&self, printer: &Printer<'_>, check_end: u32) -> bool {
+        self.content_tail_blank
+            || printer.has_blank_line_between(self.anchor, self.bound(check_end))
+    }
+
     /// Content reached the output (a statement, or a dropped `;`'s orphan comment run), so
     /// the two cursors rejoin and nothing is in the way any more.
-    pub(in crate::printer) fn printed(&mut self, end: u32) {
+    ///
+    /// `content_tail_blank` is the new anchor's own [`Self::blank_before`] arm — `false` for
+    /// an orphan comment run, which is not a statement and so has no terminator to be
+    /// separated from.
+    pub(in crate::printer) fn printed(&mut self, end: u32, content_tail_blank: bool) {
         self.anchor = end;
         self.bound = u32::MAX;
+        self.content_tail_blank = content_tail_blank;
     }
 
     /// A dropped `;` that printed nothing: it leaves the anchor alone and becomes the bound.
@@ -99,6 +125,54 @@ pub(in crate::printer) struct StatementListTail {
 }
 
 impl<'a> Printer<'a> {
+    /// The **content-end** arm of [`StatementBlankScan::blank_before`]: did the author leave
+    /// a blank line inside the statement's own tail — between where its content ends
+    /// ([`Self::statement_content_end`], prettier's `locEnd` table) and the `;` the printer
+    /// re-emits glued?
+    ///
+    /// `a()⏎⏎;` is the whole shape. The terminator moves back up to the content, so the blank
+    /// the author wrote below `a()` has nowhere to go but the gap after the statement — which is
+    /// prettier's answer, and the last hunk on every `js/no-semi` file. Every kind the table
+    /// lists carries it, `debugger` and `break`/`continue` included (their content ends at the
+    /// keyword, so the `;` may be a whole blank line below it), and every header kind reaches it
+    /// through the body the table recurses into. A kind the table does not list has no split at
+    /// all, which is why `type A = B⏎⏎;` and the empty-statement bodies (`for (;;)⏎⏎;`,
+    /// `while (a)⏎⏎;`, `l:⏎⏎;` — there the `;` IS the body, not a terminator) keep dropping the
+    /// blank on both formatters.
+    ///
+    /// **The comment question answers itself, and that is why there is no comment code here.**
+    /// [`Self::statement_content_end`] counts a comment as CONTENT (⚠️ where prettier measures
+    /// its comment-STRIPPED text), so the tail this measures is whitespace and nothing else —
+    /// the `debug_assert!` states it. Two consequences fall out rather than being coded for: a
+    /// blank the author wrote ABOVE a comment in the tail is outside the measured range, so the
+    /// comment's own emitter keeps owning it and no second blank is fabricated below it
+    /// (`a()⏎⏎// c⏎;`, where prettier's separator emits a single break); and a scan can never
+    /// cross a comment's own interior newlines (docs/comments.md §The five hazards, hazard 5),
+    /// which is what an explicit `blank_scan_end` ceiling would otherwise be here to buy.
+    /// Guarding it a second time reads as a live rule and is dead code.
+    ///
+    /// The scan is the line-break TABLE, like the full-end arm beside it and unlike
+    /// [`Self::is_next_line_empty`]'s byte walk: prettier's own `skipNewline` counts
+    /// `<LS>` / `<PS>`, so the table is the closer reading, and it is the form
+    /// [`Self::set_canonical`] erases — a canonical reprint must not resurrect an author
+    /// blank from raw source.
+    pub(in crate::printer) fn statement_content_tail_blank(
+        &self,
+        stmt: &internal::Statement<'_>,
+    ) -> bool {
+        let full_end = stmt.span().end;
+        let content_end = self.statement_content_end(stmt);
+        if content_end == full_end {
+            return false;
+        }
+        debug_assert_eq!(
+            self.blank_scan_end(content_end, full_end),
+            full_end,
+            "a statement's content end is past its last comment, so its tail holds none"
+        );
+        self.has_blank_line_between(content_end, full_end)
+    }
+
     /// Build a Doc for a block statement. Its body is a genuine `BlockStatement`
     /// (a function/method/catch body, or a plain block reached through the
     /// non-static-block callers below), so bare string statements inside it are
@@ -409,7 +483,7 @@ impl<'a> Printer<'a> {
                 if leading_comments.is_empty() {
                     blanks.skipped_semi(self, stmt.span().start);
                 } else {
-                    blanks.printed(search_end);
+                    blanks.printed(search_end, false);
                 }
                 continue;
             }
@@ -467,8 +541,7 @@ impl<'a> Printer<'a> {
                 // line-break TABLE as the oracle, which is what sees U+2028 / U+2029 as
                 // line terminators — the byte scan does not, and
                 // `syntax/whitespace/line_terminators` is the fixture that says so.
-                if self.has_blank_line_between(blanks.anchor(), blanks.bound(blank_line_check_end))
-                {
+                if blanks.blank_before(self, blank_line_check_end) {
                     body_parts.push(d.literalline());
                 }
                 body_parts.push(d.hardline());
@@ -519,7 +592,7 @@ impl<'a> Printer<'a> {
             } else {
                 prev_end = stmt_end;
             }
-            blanks.printed(prev_end);
+            blanks.printed(prev_end, self.statement_content_tail_blank(stmt));
             prev_stmt_end = Some(stmt_end);
         }
 

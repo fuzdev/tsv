@@ -386,6 +386,36 @@ line_terminators`). Capping the table-based count keeps the wider terminator cla
 which is the mirror of the trailing-run separator above, where matching prettier's
 byte-scanning helper is the whole point.
 
+⚠️ **`isNextLineEmpty` is a DISJUNCTION over TWO ends of one statement**, and the anchor
+above answers only half of it. Prettier's `locEnd` deliberately measures a statement from
+its CONTENT end (`src/language-js/location/overrides.js`), excluding the `;` the kind
+owns, and asks the blank question at that end **or** at the full end. A terminator the
+author detached (`a()⏎⏎;`, the semicolon-free style's `;[…]` idiom) puts the blank
+*inside* the statement, where the full-end anchor cannot reach it — so `StatementBlankScan`
+carries the content-end arm's answer beside its anchor (`Printer::statement_content_tail_blank`,
+over the same table `Printer::statement_content_end` hands the freeze emitter). It is a fact
+about that statement's own tail rather than about the gap, so no bound the asking gap picks
+applies: the region is inside a span the walk has already left behind. A kind prettier's
+table does not list has no split at all, which is why `type A = B⏎⏎;` and the
+empty-statement bodies (`for (;;)⏎⏎;`, `while (a)⏎⏎;`, `l:⏎⏎;` — there the `;` IS the body,
+not a terminator) keep dropping the blank on both formatters.
+
+⚠️ **The comment question answers itself here, which is why that arm carries no comment
+code.** `statement_content_end` counts a comment as CONTENT — where prettier measures its
+comment-STRIPPED text — so the tail it measures holds whitespace and nothing else, and the
+arm asserts exactly that. Two things fall out rather than being coded for. A blank the
+author wrote ABOVE a comment in the tail sits *outside* the measured range, so the comment's
+own emitter keeps owning it and no second blank is fabricated below it (`a()⏎⏎// c⏎;`, where
+prettier's separator emits a single break); and the scan can never cross a comment's own
+interior newlines, which is hazard 5 and what an explicit `blank_scan_end` ceiling would
+otherwise be here to buy. ⚠️ Guarding either a second time is dead code that reads as a live
+rule — both guards were written, and neither could fire. Pinned by
+[statements/detached_terminator_blank](../tests/fixtures/typescript/statements/detached_terminator_blank/):
+every kind the table lists, the unlisted controls, both comment directions, the
+`SwitchCase` label gap that is measured from a kind with no split at all (with its
+author-blank null control), and the frozen spelling, whose terminator is the printer's for
+the same reason.
+
 The split decides only the one-line authoring, where the forced statement-per-line
 break must put the comment somewhere; both two-line authorings are dual-stable and
 untouched — a comment that ends its line trails (`a(); /* c */⏎let b = 1;`), one on
