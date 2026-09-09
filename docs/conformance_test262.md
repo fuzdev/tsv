@@ -488,7 +488,7 @@ grades them in the mode the test declares.
 coupling: a parse runs against either `Goal::Module` or `Goal::Script`; Module code is
 strict by definition, while Script code carries whatever strictness its own source text
 declares. tsv exposes the goal as `tsv_ts::parse_with_goal` (and
-`tsv parse|format --goal script|module`), defaulting to **`Module`** — correct for
+`tsv parse|format --source-type script|module`), defaulting to **`Module`** — correct for
 Svelte `<script>` and ~all real TS. The goal toggles only the four goal-specific
 constructs:
 

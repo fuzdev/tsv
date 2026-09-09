@@ -67,11 +67,11 @@ try {
  * an error a caller matches on. Unknown keys error whatever their value (a
  * typo like `{locatons: false}` must not silently opt out); a supported key
  * explicitly set to `undefined` means its default, including the TS-only
- * `goal` on a language that rejects it, which lets one bag forward to
+ * `sourceType` on a language that rejects it, which lets one bag forward to
  * whichever parser or formatter.
  */
-const read_options = (options, noun, has_locations, has_goal) => {
-	const parsed = { locations: true, goal: 'module' };
+const read_options = (options, noun, has_locations, has_source_type) => {
+	const parsed = { locations: true, source_type: 'module' };
 	if (options === undefined || options === null) return parsed;
 	// An array is `typeof 'object'` and yields no keys — without this test a
 	// positional-style call would read as all-defaults.
@@ -86,26 +86,26 @@ const read_options = (options, noun, has_locations, has_goal) => {
 				throw new Error(`${noun} option 'locations' must be a boolean`);
 			}
 			parsed.locations = value;
-		} else if (name === 'goal') {
+		} else if (name === 'sourceType') {
 			if (value === undefined) continue;
-			if (!has_goal) {
-				throw new Error(`${noun} option 'goal' is only supported for TypeScript`);
+			if (!has_source_type) {
+				throw new Error(`${noun} option 'sourceType' is only supported for TypeScript`);
 			}
 			if (typeof value !== 'string') {
-				throw new Error(`${noun} option 'goal' must be 'script' or 'module'`);
+				throw new Error(`${noun} option 'sourceType' must be 'script' or 'module'`);
 			}
 			if (value !== 'script' && value !== 'module') {
-				throw new Error(`invalid goal '${value}' (expected 'script' or 'module')`);
+				throw new Error(`invalid sourceType '${value}' (expected 'script' or 'module')`);
 			}
-			parsed.goal = value;
+			parsed.source_type = value;
 		} else {
 			const detail =
-				has_locations && has_goal
-					? "expected 'locations' or 'goal'"
+				has_locations && has_source_type
+					? "expected 'locations' or 'sourceType'"
 					: has_locations
 						? "expected 'locations'"
-						: has_goal
-							? "expected 'goal'"
+						: has_source_type
+							? "expected 'sourceType'"
 							: 'this export takes no options';
 			throw new Error(`unknown ${noun} option '${name}' (${detail})`);
 		}
@@ -114,12 +114,12 @@ const read_options = (options, noun, has_locations, has_goal) => {
 };
 
 // The TS parse wire against the resolved options. The addon has one export per
-// (language, operation), each taking the goal as a trailing optional argument —
-// there is no goalless twin to pick between.
+// (language, operation), each taking the source type as a trailing optional
+// argument — there is no goalless twin to pick between.
 const ts_parse_json = (source, opts) =>
 	opts.locations
-		? addon.parse_typescript(source, opts.goal)
-		: addon.parse_typescript_no_locations(source, opts.goal);
+		? addon.parse_typescript(source, opts.source_type)
+		: addon.parse_typescript_no_locations(source, opts.source_type);
 
 const svelte_parse_json = (source, opts) =>
 	opts.locations ? addon.parse_svelte(source) : addon.parse_svelte_no_locations(source);
@@ -150,7 +150,7 @@ export const format_svelte = (source, options) => {
 	return addon.format_svelte(source);
 };
 export const format_typescript = (source, options) =>
-	addon.format_typescript(source, read_options(options, 'format', false, true).goal);
+	addon.format_typescript(source, read_options(options, 'format', false, true).source_type);
 export const format_css = (source, options) => {
 	read_options(options, 'format', false, false);
 	return addon.format_css(source);

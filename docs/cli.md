@@ -104,13 +104,15 @@ All content-processing commands support three input methods:
 - **Content**: `command --content <string> --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 - **Stdin**: `command --stdin --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 
-`parse` and `format` also take `--goal script|module` (TypeScript only; default
-`module`). It selects the parse goal: at `script`, `await` is an ordinary identifier
+`parse` and `format` also take `--source-type script|module` (TypeScript only; default
+`module`) — ESTree's own spelling, and the value the wire's `Program.sourceType`
+carries. It selects the parse goal: at `script`, `await` is an ordinary identifier
 and `import`/`export`/`import.meta` are errors. For `format` it applies to
 `--content`/`--stdin` only — file paths are always formatted as modules (Svelte and CSS
-have no goal), and a path argument with `--goal` is a usage error (exit 2); `parse`
-honors `--goal` on file paths too. The goal does not decide strictness: Module code is
-strict, Script code is strict only once a `"use strict"` directive prologue says so (see
+have no goal), and a path argument with `--source-type` is a usage error (exit 2);
+`parse` honors `--source-type` on file paths too. The goal does not decide strictness:
+Module code is strict, Script code is strict only once a `"use strict"` directive
+prologue says so (see
 [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive); the
 goal axis itself is
 [conformance_test262.md §Module Strict, Script by Directive](./conformance_test262.md#design-decision-module-strict-script-by-directive-annex-b-out)).
@@ -118,12 +120,25 @@ Two constructs follow strictness rather than the goal: a `with` statement and a
 leading-zero numeric literal (`010`, `08`) parse in a sloppy script and are syntax
 errors in strict code.
 
+### `--source-type` is a grammar input, not a style setting
+
+tsv is non-configurable by design — "no config files, CLI flags, or runtime options"
+([CLAUDE.md §Configuration](../CLAUDE.md#configuration)) — and `--source-type` is not an
+exception to that contract, because the contract governs **style**. What this flag
+selects is which grammar symbol the parse starts from: ecma262 gives `ParseScript` and
+`ParseModule` as two separate entry points over the same text, and a source that is a
+script is not a module with a setting flipped. The flag shapes only the parse the
+formatter runs; formatting itself is non-configurable, so no `--source-type` value
+changes how anything is printed. The same axis appears on the bindings as the
+`sourceType` option (`tsv_wasm`, `@fuzdev/tsv`) and as the C-ABI source-type code
+(`tsv_ffi`); there is no style knob on any of them either.
+
 `parse` also takes `--no-locations`: it emits the span-only wire — `start`/`end`
 offsets but no per-node `loc` (line/column) object, and for Svelte no `name_loc`
 either. `loc` is derivable from the offsets plus source, so nothing is lost for a
 consumer that has the source; it mirrors acorn's `locations: false`. No-op for CSS
-(`parseCss` emits no `loc`). Orthogonal to `--goal` (goal drives the parser,
-`--no-locations` the writer), so the two compose.
+(`parseCss` emits no `loc`). Orthogonal to `--source-type` (the source type drives the
+parser, `--no-locations` the writer), so the two compose.
 
 Implemented in `tsv_cli/src/cli/input.rs`
 

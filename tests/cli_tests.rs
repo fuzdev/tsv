@@ -280,8 +280,8 @@ fn test_parse_no_locations_css_is_noop() {
 }
 
 #[test]
-fn test_parse_no_locations_composes_with_goal_script() {
-    // `--goal` drives the parser, `--no-locations` the writer — orthogonal, so the
+fn test_parse_no_locations_composes_with_source_type_script() {
+    // `--source-type` drives the parser, `--no-locations` the writer — orthogonal, so the
     // two combine (the `sourceType` still follows the goal; no loc is emitted).
     let output = tsv(&[
         "parse",
@@ -289,13 +289,13 @@ fn test_parse_no_locations_composes_with_goal_script() {
         "var await = 1;",
         "--parser",
         "typescript",
-        "--goal",
+        "--source-type",
         "script",
         "--no-locations",
     ]);
     assert!(
         output.status.success(),
-        "goal + no-locations should succeed"
+        "source type + no-locations should succeed"
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -356,7 +356,7 @@ fn test_format_command_css() {
 }
 
 #[test]
-fn test_parse_goal_script_accepts_await_identifier() {
+fn test_parse_source_type_script_accepts_await_identifier() {
     // At Script goal, `await` is an ordinary identifier (`var await = 1`), and the
     // public AST's `sourceType` follows the goal.
     let output = tsv(&[
@@ -365,7 +365,7 @@ fn test_parse_goal_script_accepts_await_identifier() {
         "var await = 1;",
         "--parser",
         "typescript",
-        "--goal",
+        "--source-type",
         "script",
     ]);
 
@@ -378,7 +378,7 @@ fn test_parse_goal_script_accepts_await_identifier() {
 }
 
 #[test]
-fn test_parse_goal_module_rejects_await_identifier() {
+fn test_parse_source_type_module_rejects_await_identifier() {
     // The same source is rejected at Module goal — `await` is reserved there.
     let output = tsv(&[
         "parse",
@@ -386,7 +386,7 @@ fn test_parse_goal_module_rejects_await_identifier() {
         "var await = 1;",
         "--parser",
         "typescript",
-        "--goal",
+        "--source-type",
         "module",
     ]);
 
@@ -398,8 +398,8 @@ fn test_parse_goal_module_rejects_await_identifier() {
 }
 
 #[test]
-fn test_parse_goal_defaults_to_module() {
-    // No `--goal` flag → Module (rejects `var await`), matching the explicit case.
+fn test_parse_source_type_defaults_to_module() {
+    // No `--source-type` flag → Module (rejects `var await`), matching the explicit case.
     let output = tsv(&[
         "parse",
         "--content",
@@ -416,14 +416,14 @@ fn test_parse_goal_defaults_to_module() {
 }
 
 #[test]
-fn test_parse_goal_invalid_value() {
+fn test_parse_source_type_invalid_value() {
     let output = tsv(&[
         "parse",
         "--content",
         "x;",
         "--parser",
         "typescript",
-        "--goal",
+        "--source-type",
         "bogus",
     ]);
 
@@ -432,17 +432,17 @@ fn test_parse_goal_invalid_value() {
     assert_eq!(
         output.status.code(),
         Some(1),
-        "Invalid --goal should exit 1 for parse"
+        "Invalid --source-type should exit 1 for parse"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("invalid --goal"),
-        "Should report invalid --goal: {stderr}"
+        stderr.contains("invalid --source-type"),
+        "Should report invalid --source-type: {stderr}"
     );
 }
 
 #[test]
-fn test_format_goal_script() {
+fn test_format_source_type_script() {
     // `await => 1` is a single-param arrow at Script goal; formats with arrowParens.
     let output = tsv(&[
         "format",
@@ -450,7 +450,7 @@ fn test_format_goal_script() {
         "await => 1;",
         "--parser",
         "typescript",
-        "--goal",
+        "--source-type",
         "script",
     ]);
 
@@ -463,14 +463,14 @@ fn test_format_goal_script() {
 }
 
 #[test]
-fn test_format_goal_invalid_value() {
+fn test_format_source_type_invalid_value() {
     let output = tsv(&[
         "format",
         "--content",
         "x;",
         "--parser",
         "typescript",
-        "--goal",
+        "--source-type",
         "bogus",
     ]);
 
@@ -478,26 +478,26 @@ fn test_format_goal_invalid_value() {
     assert_eq!(
         output.status.code(),
         Some(2),
-        "Invalid --goal should exit 2 for format"
+        "Invalid --source-type should exit 2 for format"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("invalid --goal"),
-        "Should report invalid --goal: {stderr}"
+        stderr.contains("invalid --source-type"),
+        "Should report invalid --source-type: {stderr}"
     );
 }
 
 #[test]
-fn test_format_goal_rejected_in_path_mode() {
-    // `--goal` is content/stdin-only; with a path argument it's a usage error
+fn test_format_source_type_rejected_in_path_mode() {
+    // `--source-type` is content/stdin-only; with a path argument it's a usage error
     // (file paths are always formatted as modules).
-    let dir = temp_dir("format_goal_path");
+    let dir = temp_dir("format_source_type_path");
     let file = dir.join("a.ts");
     fs::write(&file, "const x = 1;\n").expect("write temp file");
 
     let output = tsv(&[
         "format",
-        "--goal",
+        "--source-type",
         "script",
         file.to_str().expect("utf8 path"),
     ]);
@@ -505,11 +505,11 @@ fn test_format_goal_rejected_in_path_mode() {
     assert_eq!(
         output.status.code(),
         Some(2),
-        "`--goal` with a path should be a usage error"
+        "`--source-type` with a path should be a usage error"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("--goal applies to --content/--stdin"),
+        stderr.contains("--source-type applies to --content/--stdin"),
         "Should explain the path-mode restriction: {stderr}"
     );
     let _ = fs::remove_dir_all(&dir);

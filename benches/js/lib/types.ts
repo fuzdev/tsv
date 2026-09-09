@@ -63,7 +63,7 @@ export type ParseGoal = 'script' | 'module';
  * The goal to hand a tsv binding for `language`, or `undefined` to withhold it.
  *
  * The goal is TypeScript's alone: all three tsv bindings REJECT a set goal on a
- * language that has none (`tsv_ffi`'s `ffi_goal`, `tsv_napi`'s `napi_goal`,
+ * language that has none (`tsv_ffi`'s `ffi_source_type`, `tsv_napi`'s `napi_source_type`,
  * `tsv_wasm`'s `read_options`), rather than ignoring it — a caller must not be
  * able to believe it selected a goal that was silently dropped. So each wrapper
  * withholds it for svelte/css.

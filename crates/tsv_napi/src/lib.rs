@@ -39,27 +39,27 @@ use tsv_arena::with_doc_arena;
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::{goal_allowed, parse_ast};
 
-/// Decode the optional goal argument (`"script"` / `"module"`; omitted or
-/// `undefined` means `"module"`).
+/// Decode the optional `sourceType` argument (`"script"` / `"module"`; omitted
+/// or `undefined` means `"module"`).
 ///
-/// `allowed` is the language's goal axis ([`goal_allowed!`]). A goal against a
-/// language that has none is an **error**, not a silent Module: Svelte hard-wires
-/// `Module` and CSS has no goal, so a caller passing one asked for something that
-/// cannot be honored and must be told — the same stance `tsv_wasm`'s
-/// `read_options` takes when it rejects the `goal` key outright.
+/// `allowed` is the language's goal axis ([`goal_allowed!`]). A source type
+/// against a language that has none is an **error**, not a silent Module: Svelte
+/// hard-wires `Module` and CSS has no goal, so a caller passing one asked for
+/// something that cannot be honored and must be told — the same stance
+/// `tsv_wasm`'s `read_options` takes when it rejects the `sourceType` key outright.
 #[cfg(any(feature = "parse", feature = "format"))]
-fn napi_goal(goal: Option<String>, allowed: bool) -> napi::Result<tsv_ts::Goal> {
-    let Some(goal) = goal else {
+fn napi_source_type(source_type: Option<String>, allowed: bool) -> napi::Result<tsv_ts::Goal> {
+    let Some(source_type) = source_type else {
         return Ok(tsv_ts::Goal::Module);
     };
     if !allowed {
         return Err(napi::Error::from_reason(
-            "option 'goal' is only supported for TypeScript".to_string(),
+            "option 'sourceType' is only supported for TypeScript".to_string(),
         ));
     }
-    tsv_ts::Goal::from_source_type(&goal).ok_or_else(|| {
+    tsv_ts::Goal::from_source_type(&source_type).ok_or_else(|| {
         napi::Error::from_reason(format!(
-            "invalid goal '{goal}' (expected 'script' or 'module')"
+            "invalid sourceType '{source_type}' (expected 'script' or 'module')"
         ))
     })
 }
@@ -113,17 +113,18 @@ macro_rules! parse_format {
 /// `parse_internal_<lang>` / `format_<lang>` N-API functions for one language
 /// module. The `js_name` literals keep the JS export names snake_case for parity
 /// with `tsv_wasm` (napi-rs would otherwise camelCase them).
-// One export per (language, operation), each taking the same `(source, goal?)`
-// arguments. The `$goalness` axis decides only whether a goal ARGUMENT is
-// accepted, never the arity: there is no goalless twin of a goal-aware export to
-// drift from it, and the `@fuzdev/tsv` loader hands every export the same bag.
+// One export per (language, operation), each taking the same
+// `(source, sourceType?)` arguments. The `$goalness` axis decides only whether a
+// `sourceType` ARGUMENT is accepted, never the arity: there is no goalless twin
+// of a goal-aware export to drift from it, and the `@fuzdev/tsv` loader hands
+// every export the same bag.
 //
 // At Script goal `await` is an ordinary identifier and `import`/`export`/
-// `import.meta` are syntax errors. See `tsv parse --goal` and
+// `import.meta` are syntax errors. See `tsv parse --source-type` and
 // `tsv_ts::parse_with_goal`.
 //
-// `tsv_ffi` spells the same axis as a `u32` goal code and `tsv_wasm` as one key
-// of a per-call options bag (`format_typescript(src, {goal})`); each binding's
+// `tsv_ffi` spells the same axis as a `u32` source-type code and `tsv_wasm` as
+// one key of a per-call options bag (`format_typescript(src, {sourceType})`); each binding's
 // own `lang_bindings!` reads the SAME `parse_ast!` / `goal_allowed!` pair out of
 // `tsv_arena`, so which languages have a goal axis is one fact in one place
 // rather than three that agree today.
@@ -139,8 +140,8 @@ macro_rules! lang_bindings {
         /// Parse source code and return its public JSON AST as a string.
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_js, catch_unwind)]
-        pub fn $parse_fn(source: String, goal: Option<String>) -> napi::Result<String> {
-            let goal = napi_goal(goal, goal_allowed!($goalness))?;
+        pub fn $parse_fn(source: String, source_type: Option<String>) -> napi::Result<String> {
+            let goal = napi_source_type(source_type, goal_allowed!($goalness))?;
             parse_convert!($goalness, $lang, convert_ast_json_string, &source, goal)
         }
 
@@ -148,8 +149,11 @@ macro_rules! lang_bindings {
         /// (the span-only `no-locations` wire). CSS is identical to `$parse_fn`.
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_no_loc_js, catch_unwind)]
-        pub fn $parse_no_loc_fn(source: String, goal: Option<String>) -> napi::Result<String> {
-            let goal = napi_goal(goal, goal_allowed!($goalness))?;
+        pub fn $parse_no_loc_fn(
+            source: String,
+            source_type: Option<String>,
+        ) -> napi::Result<String> {
+            let goal = napi_source_type(source_type, goal_allowed!($goalness))?;
             parse_convert!(
                 $goalness,
                 $lang,
@@ -164,17 +168,17 @@ macro_rules! lang_bindings {
         /// parse can't be optimized away.
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_internal_js, catch_unwind)]
-        pub fn $parse_internal_fn(source: String, goal: Option<String>) -> napi::Result<()> {
-            let goal = napi_goal(goal, goal_allowed!($goalness))?;
+        pub fn $parse_internal_fn(source: String, source_type: Option<String>) -> napi::Result<()> {
+            let goal = napi_source_type(source_type, goal_allowed!($goalness))?;
             parse_internal!($goalness, $lang, &source, goal)
         }
 
-        /// Format source code and return the formatted string. The goal shapes
-        /// only the parse the formatter runs; formatting is non-configurable.
+        /// Format source code and return the formatted string. The source type
+        /// shapes only the parse the formatter runs; formatting is non-configurable.
         #[cfg(feature = "format")]
         #[napi(js_name = $format_js, catch_unwind)]
-        pub fn $format_fn(source: String, goal: Option<String>) -> napi::Result<String> {
-            let goal = napi_goal(goal, goal_allowed!($goalness))?;
+        pub fn $format_fn(source: String, source_type: Option<String>) -> napi::Result<String> {
+            let goal = napi_source_type(source_type, goal_allowed!($goalness))?;
             parse_format!($goalness, $lang, &source, goal)
         }
     };
@@ -447,7 +451,7 @@ mod tests {
     /// Signature shared by every `parse_internal_<lang>` entry point.
     type UnitFn = fn(String, Option<String>) -> napi::Result<()>;
 
-    /// Call at the default (Module) goal, i.e. with the goal argument omitted —
+    /// Call at the default (Module) goal, i.e. with the `source_type` argument omitted —
     /// the shape every non-TypeScript caller uses.
     fn at_default(f: StringFn, source: &str) -> napi::Result<String> {
         f(source.to_owned(), None)
@@ -531,20 +535,20 @@ mod tests {
             "script-goal format"
         );
         assert!(at_goal(format_typescript, src, "module").is_err());
-        // An invalid goal string is a thrown error, not a silent module fallback.
+        // An invalid `sourceType` string is a thrown error, not a silent module fallback.
         assert!(at_goal(parse_typescript, src, "sloppy").is_err());
         assert!(at_goal(format_typescript, src, "sloppy").is_err());
     }
 
     #[test]
     fn goalless_languages_reject_a_goal_argument() {
-        // Svelte hard-wires Module and CSS has no goal, so a goal argument asks
+        // Svelte hard-wires Module and CSS has no goal, so a `sourceType` argument asks
         // for something that cannot be honored — the caller is told rather than
         // silently served a Module parse. The same stance `tsv_wasm`'s
         // `read_options` takes when it rejects the key outright.
         //
         // Every string-returning export, not one per language: each is a
-        // separately generated entry point that calls `napi_goal` on its own
+        // separately generated entry point that calls `napi_source_type` on its own
         // line, so a refusal can be lost on exactly one of them.
         // `parse_internal_*` returns `()` and is driven separately below.
         let cases: [(&str, StringFn, &str); 6] = [

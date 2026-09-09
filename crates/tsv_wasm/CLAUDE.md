@@ -16,7 +16,7 @@ is deferred.
 ## Parse Options & Typed Returns
 
 Every parse export shares one uniform signature — `(source, options?)` with an
-acorn-style `{locations?, goal?}` bag, read in Rust (`read_options` in
+acorn-style `{locations?, sourceType?}` bag, read in Rust (`read_options` in
 `src/lib.rs`, via `js_sys` `Object.keys` + `Reflect::get`; the same reader
 serves the format exports, so the two families can't drift — see
 [Format Options](#format-options)). ⚠️ A **third copy** of these semantics
@@ -28,13 +28,13 @@ mirror and its tests in the same edit.
 `locations` (default `true`) selects the wire: the loc-bearing drop-in
 contract, or the span-only variant (see below); it is accepted everywhere and
 inert where nothing reads it (CSS emits no `loc`; `parse_internal_*` emits no
-wire). `goal` (`'script'` / `'module'`, default `'module'`) is TypeScript-only
+wire). `sourceType` (`'script'` / `'module'`, default `'module'`) is TypeScript-only
 — Svelte hard-wires `Module`, CSS has no goal — so the other languages reject
 the key. Unknown keys always error, whatever their value (a typo like
 `{locatons: false}` — or `{locatons: undefined}` — silently succeeding would
 hand back the full wire while the caller believes they opted out); a supported
 key explicitly set to `undefined` means that key's default — including the
-TS-only `goal` on a language that rejects it, which is what lets a caller
+TS-only `sourceType` on a language that rejects it, which is what lets a caller
 forward one bag to whichever parser (`npm/cli.js` does). A non-object argument
 errors, arrays included.
 
@@ -117,24 +117,24 @@ forward the wire format (disk, network, another tool) without paying
 
 The format exports take the **same bag** — `format_<lang>(source, options?)`,
 read by the same `read_options` — so one package never teaches two calling
-conventions: a caller holding a `{goal}` bag hands it to a parser or a
+conventions: a caller holding a `{sourceType}` bag hands it to a parser or a
 formatter without branching (`npm/cli.js` does exactly that on both paths).
-Format's bag carries **one** key, the TypeScript-only `goal` (Svelte
+Format's bag carries **one** key, the TypeScript-only `sourceType` (Svelte
 `<script>` is always a module; CSS has no goal), because formatting itself is
 non-configurable. Everything else is the parse semantics verbatim: unknown keys error
 whatever their value, a supported key set to `undefined` means its default
-(including the TS-only `goal` on a language that rejects it), and a non-object
+(including the TS-only `sourceType` on a language that rejects it), and a non-object
 argument errors, arrays included.
 
 **`locations` is rejected here, not accepted-and-inert.** It selects a *wire*,
 and format emits none — an inert spelling would let a caller believe they had
 asked a formatter for the narrower product. The forwarding argument that makes
-`goal` lenient doesn't reach it: nothing hands a *parse* bag to a format
+`sourceType` lenient doesn't reach it: nothing hands a *parse* bag to a format
 export (`npm/cli.js` builds each bag at its own call site), so the key is
 simply unknown. On `format_svelte`/`format_css`, where no key is settable, the
 unknown-key error says so — `unknown format option 'locations' (this export
-takes no options)`. `goal` is the exception on those two: it matches its own
-arm first and reports `format option 'goal' is only supported for TypeScript`,
+takes no options)`. `sourceType` is the exception on those two: it matches its own
+arm first and reports `format option 'sourceType' is only supported for TypeScript`,
 which is the more useful message and the reason the key stays leniently
 `undefined`-tolerant there.
 
@@ -159,7 +159,7 @@ name through the npm facade (checked against `tsv_ast.d.ts` and
 ## The Four Option Interfaces
 
 The non-TypeScript bags — `FormatOptions` (`format_svelte`/`format_css`) and
-`ParseOptions` (`parse_svelte`/`parse_css`) — both declare **`goal?: undefined`**.
+`ParseOptions` (`parse_svelte`/`parse_css`) — both declare **`sourceType?: undefined`**.
 Neither may be `{}`, and neither may omit the key. Two independent reasons —
 the first bites `FormatOptions` alone, the second both:
 
@@ -171,27 +171,27 @@ the first bites `FormatOptions` alone, the second both:
   than the runtime rather than stricter. One declared key restores both checks.
   (`ParseOptions` was never empty — it has `locations`.)
 - **Omitting the key breaks forwarding.** `npm/cli.js` builds
-  `{goal: <maybe undefined>}` and hands it to whichever export rather than
-  branching the call, and the runtime reads a `goal` set to `undefined` as its
-  default even on a language that rejects a *set* goal. A bag with a
-  `goal: undefined` key must therefore type-check on those exports —
-  which an omitted key rejects (excess property) and `goal?: never` rejects
+  `{sourceType: <maybe undefined>}` and hands it to whichever export rather than
+  branching the call, and the runtime reads a `sourceType` set to `undefined` as
+  its default even on a language that rejects a *set* value. A bag with a
+  `sourceType: undefined` key must therefore type-check on those exports —
+  which an omitted key rejects (excess property) and `sourceType?: never` rejects
   under `exactOptionalPropertyTypes`. `undefined` is the spelling that works.
 
 The TypeScript bags — `TypeScriptFormatOptions` / `TypeScriptParseOptions` —
-are standalone interfaces, **not** `extends` of their base: a settable `goal`
+are standalone interfaces, **not** `extends` of their base: a settable `sourceType`
 is incompatible with the undefined-only one. The assignability that `extends`
 would buy (handing a `TypeScriptParseOptions`-typed variable to `parse_svelte`)
-is unsound anyway, since it throws the moment `goal` is actually set; the only
-bag that forwards at runtime is one whose `goal` is `undefined`, which is
+is unsound anyway, since it throws the moment `sourceType` is actually set; the
+only bag that forwards at runtime is one whose `sourceType` is `undefined`, which is
 exactly what these shapes accept. The cost is one duplicated `locations?` line
 in `TypeScriptParseOptions`.
 
 **Every key spells `| undefined` on top of `?`** — `locations?: boolean |
-undefined`, `goal?: 'script' | 'module' | undefined`. Same reason as above,
+undefined`, `sourceType?: 'script' | 'module' | undefined`. Same reason as above,
 applied to the settable keys: without it,
-`format_typescript(src, {goal: undefined})` — precisely what `npm/cli.js`
-builds when no `--goal` was passed — fails to type-check under
+`format_typescript(src, {sourceType: undefined})` — precisely what `npm/cli.js`
+builds when no `--source-type` was passed — fails to type-check under
 `exactOptionalPropertyTypes` while working at runtime.
 
 The residual looseness is the usual TypeScript one: excess-property checking
@@ -199,7 +199,7 @@ fires on fresh object literals, so a **non-literal** bag with an unknown key
 still forwards past the compiler and lands on the runtime's unknown-key error.
 That is the intended division of labor, not a gap.
 
-`npm/cli.js` routes `tsv format --goal` and `tsv parse --goal` through the same
+`npm/cli.js` routes `tsv format --source-type` and `tsv parse --source-type` through the same
 option; see [../../docs/cli.md §Input Handling](../../docs/cli.md).
 
 ## The Span-Only Wire (`locations: false`)
@@ -208,7 +208,7 @@ The opt-in **span-only** parse wire — the same AST minus the per-node `loc`
 (Svelte also minus `name_loc`) — is the `{locations: false}` option on every
 parse export, uniform in `lang_bindings!` (for CSS it's accepted and inert —
 `parseCss` emits no `loc`). Goal and locations compose (goal drives the
-parser, locations the writer), mirroring `tsv_cli`'s `--goal` +
+parser, locations the writer), mirroring `tsv_cli`'s `--source-type` +
 `--no-locations`, which `npm/cli.js` routes through the same options. A
 `{locations: false}` object call materializes in Rust via `js_sys::JSON::parse`
 exactly as the loc-bearing call does, keeping benchmarks of the two

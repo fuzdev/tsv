@@ -5,7 +5,6 @@ use crate::fixtures::{self, GOAL_FILENAME, InputType, find_input_file};
 use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use std::path::Path;
-use tsv_cli::cli::commands::parse::parse_goal_arg;
 use tsv_lang::printing::visual_width;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 use tsv_ts::Goal;
@@ -71,10 +70,15 @@ impl FixtureInitCommand {
                     );
                     return Err(CliError::Failed);
                 }
-                match parse_goal_arg(Some(goal_arg)) {
-                    Ok(goal) => Some(goal),
-                    Err(e) => {
-                        eprintln!("Error: {e}");
+                // This flag keeps the marker file's own word, `goal`, rather
+                // than the shipped CLIs' `--source-type`, so it states the
+                // expectation itself instead of borrowing their message.
+                match Goal::from_source_type(goal_arg) {
+                    Some(goal) => Some(goal),
+                    None => {
+                        eprintln!(
+                            "Error: invalid --goal '{goal_arg}' (expected 'script' or 'module')"
+                        );
                         return Err(CliError::Failed);
                     }
                 }

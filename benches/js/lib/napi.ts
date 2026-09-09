@@ -139,7 +139,7 @@ export class NapiImplementation extends BaseImplementation {
 	}
 
 	// `goal_for` withholds the goal for svelte/css, which REJECT a set goal rather
-	// than ignoring it (`tsv_napi`'s `napi_goal`). One shared helper for all three
+	// than ignoring it (`tsv_napi`'s `napi_source_type`). One shared helper for all three
 	// wrappers — see its doc in `lib/types.ts`.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		// `parse_<lang>` returns a JSON string (the engine throws on parse error);

@@ -823,7 +823,7 @@ diagnostics layer. See [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-s
 
 Strictness and the *goal* (`Module` vs `Script`) are orthogonal, coupled only by
 Module ⟹ strict. tsv defaults to `Module` (Svelte hard-wires it); a `Script` goal is
-available (`parse_with_goal`, `--goal script`), where `await` is an ordinary
+available (`parse_with_goal`, `--source-type script`), where `await` is an ordinary
 identifier and `import`/`export`/`import.meta` are errors. See
 [conformance_test262.md](./conformance_test262.md#design-decision-module-strict-script-by-directive-annex-b-out).
 

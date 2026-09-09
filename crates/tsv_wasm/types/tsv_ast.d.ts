@@ -132,7 +132,8 @@ export interface Program extends AcornCommentAttachment {
 	end: number;
 	loc: SourceLocation;
 	body: Statement[];
-	sourceType: string;
+	/** The parse goal the program was read at — the writer emits no other value. */
+	sourceType: 'script' | 'module';
 }
 
 //

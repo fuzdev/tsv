@@ -28,7 +28,7 @@ pub struct ParseCommand {
     /// `import`/`export`/`import.meta` are errors; the script is sloppy unless a
     /// `"use strict"` directive prologue says otherwise. Ignored for svelte/css.
     #[argh(option)]
-    goal: Option<String>,
+    source_type: Option<String>,
 
     /// omit per-node `loc` (line/column). Emits `start`/`end` offsets only — the
     /// opt-in span-only wire (mirrors acorn's `locations: false`). `loc` is
@@ -44,7 +44,7 @@ pub struct ParseCommand {
 
 impl ParseCommand {
     pub fn run(self) {
-        let goal = match parse_goal_arg(self.goal.as_deref()) {
+        let goal = match parse_source_type_arg(self.source_type.as_deref()) {
             Ok(g) => g,
             Err(e) => {
                 eprintln!("Error: {e}");
@@ -96,13 +96,14 @@ impl ParseCommand {
     }
 }
 
-/// Parse the `--goal` argument into a [`tsv_ts::Goal`]. Absent → `Module` (the
-/// default); `module`/`script` map to the goals. Shared by `parse` and `format`.
-pub fn parse_goal_arg(goal: Option<&str>) -> Result<tsv_ts::Goal, String> {
-    match goal {
+/// Parse the `--source-type` argument into a [`tsv_ts::Goal`]. Absent → `Module`
+/// (the default); `module`/`script` map to the goals. Shared by `parse` and
+/// `format`.
+pub(crate) fn parse_source_type_arg(source_type: Option<&str>) -> Result<tsv_ts::Goal, String> {
+    match source_type {
         None => Ok(tsv_ts::Goal::Module),
         Some(s) => tsv_ts::Goal::from_source_type(s)
-            .ok_or_else(|| format!("invalid --goal '{s}' (expected 'script' or 'module')")),
+            .ok_or_else(|| format!("invalid --source-type '{s}' (expected 'script' or 'module')")),
     }
 }
 

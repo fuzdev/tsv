@@ -6,13 +6,13 @@
 //! # The uniform signature
 //!
 //! Every export takes the same five arguments —
-//! `(source_ptr, source_len, goal, out_len, out_status)` — and returns one
+//! `(source_ptr, source_len, source_type, out_len, out_status)` — and returns one
 //! `*mut u8`. One shape per language and operation: there is no goalless twin of
-//! a goal-aware export, and no arity that varies by language. `goal` is the parse
-//! goal (`0` = module, `1` = script); a language with no goal axis (Svelte, CSS)
+//! a goal-aware export, and no arity that varies by language. `source_type` is the
+//! parse goal (`0` = module, `1` = script); a language with no goal axis (Svelte, CSS)
 //! *rejects* a non-zero code rather than ignoring it, so a caller cannot believe
-//! it selected a goal that was silently dropped. The source buffer is decoded
-//! first, so a call that is wrong in both ways reports the buffer, not the goal —
+//! it selected a source type that was silently dropped. The source buffer is decoded
+//! first, so a call that is wrong in both ways reports the buffer, not the source type —
 //! there is one error per call and the earlier failure wins.
 //!
 //! # Errors: the status word, not the payload
@@ -198,27 +198,27 @@ unsafe fn error_result(message: &str, out_len: *mut usize, out_status: *mut u32)
     unsafe { bytes_to_ptr(json, TSV_STATUS_ERROR, out_len, out_status) }
 }
 
-/// Map the C-ABI goal code to `tsv_ts::Goal` (`0` = Module, `1` = Script).
+/// Map the C-ABI source-type code to `tsv_ts::Goal` (`0` = Module, `1` = Script).
 ///
 /// `allowed` is the language's goal axis ([`goal_allowed!`]). A non-zero code
 /// against a language that has none is an **error**, not a silent Module: Svelte
 /// hard-wires `Module` and CSS has no goal, so a caller passing `1` there asked
 /// for something that cannot be honored and must be told — the same stance
-/// `tsv_wasm`'s `read_options` takes when it rejects the `goal` key outright. Any
-/// unrecognized code is an error whatever the language, and the expectation it
+/// `tsv_wasm`'s `read_options` takes when it rejects the `sourceType` key outright.
+/// Any unrecognized code is an error whatever the language, and the expectation it
 /// names is that language's own — a goalless one is never told that `1` would
 /// have worked, which is the code the arm above it refuses.
 #[cfg(any(feature = "parse", feature = "format"))]
-fn ffi_goal(goal: u32, allowed: bool) -> Result<tsv_ts::Goal, String> {
-    match goal {
+fn ffi_source_type(source_type: u32, allowed: bool) -> Result<tsv_ts::Goal, String> {
+    match source_type {
         0 => Ok(tsv_ts::Goal::Module),
         1 if allowed => Ok(tsv_ts::Goal::Script),
         1 => Err(
-            "goal code 1 (script) is only supported for TypeScript (expected 0 = module)"
+            "source type code 1 (script) is only supported for TypeScript (expected 0 = module)"
                 .to_string(),
         ),
         other => Err(format!(
-            "invalid goal code {other} (expected {})",
+            "invalid source type code {other} (expected {})",
             if allowed {
                 "0 = module or 1 = script"
             } else {
@@ -290,16 +290,16 @@ macro_rules! parse_format {
 /// - `out_status` must point to a valid `u32` for writing the status
 /// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
 // One export per (language, operation) — every one taking the same five
-// arguments. The `$goalness` axis decides only whether a non-Module goal CODE is
+// arguments. The `$goalness` axis decides only whether a non-Module source-type CODE is
 // accepted, never the arity: an FFI host writes one call shape and one symbol
 // table, and there is no goalless twin to drift from its goal-aware sibling.
 //
 // At Script goal `await` is an ordinary identifier and `import`/`export`/
-// `import.meta` are syntax errors. See `tsv parse --goal` / `tsv format --goal`
-// and `tsv_ts::parse_with_goal`.
+// `import.meta` are syntax errors. See `tsv parse --source-type` /
+// `tsv format --source-type` and `tsv_ts::parse_with_goal`.
 //
 // `tsv_wasm` spells the same axis as one key of a per-call options bag
-// (`format_typescript(src, {goal})`) and `tsv_napi` as a trailing optional goal
+// (`format_typescript(src, {sourceType})`) and `tsv_napi` as a trailing optional
 // string; each binding's own `lang_bindings!` reads the SAME `parse_ast!` /
 // `goal_allowed!` pair out of `tsv_arena`, so which languages have a goal axis
 // is one fact in one place rather than three that agree today. See
@@ -322,13 +322,13 @@ macro_rules! lang_bindings {
         pub unsafe extern "C" fn $parse_fn(
             source_ptr: *const u8,
             source_len: usize,
-            goal: u32,
+            source_type: u32,
             out_len: *mut usize,
             out_status: *mut u32,
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    let goal = ffi_goal(goal, goal_allowed!($goalness))?;
+                    let goal = ffi_source_type(source_type, goal_allowed!($goalness))?;
                     parse_convert!($goalness, $lang, convert_ast_json_bytes, source, goal)
                 })
             }
@@ -346,13 +346,13 @@ macro_rules! lang_bindings {
         pub unsafe extern "C" fn $parse_no_loc_fn(
             source_ptr: *const u8,
             source_len: usize,
-            goal: u32,
+            source_type: u32,
             out_len: *mut usize,
             out_status: *mut u32,
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    let goal = ffi_goal(goal, goal_allowed!($goalness))?;
+                    let goal = ffi_source_type(source_type, goal_allowed!($goalness))?;
                     parse_convert!(
                         $goalness,
                         $lang,
@@ -374,19 +374,19 @@ macro_rules! lang_bindings {
         pub unsafe extern "C" fn $parse_internal_fn(
             source_ptr: *const u8,
             source_len: usize,
-            goal: u32,
+            source_type: u32,
             out_len: *mut usize,
             out_status: *mut u32,
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    let goal = ffi_goal(goal, goal_allowed!($goalness))?;
+                    let goal = ffi_source_type(source_type, goal_allowed!($goalness))?;
                     parse_internal!($goalness, $lang, source, goal)
                 })
             }
         }
 
-        /// Format source code. The goal shapes only the parse the formatter runs;
+        /// Format source code. The source type shapes only the parse the formatter runs;
         /// formatting itself is non-configurable.
         ///
         /// # Safety
@@ -396,13 +396,13 @@ macro_rules! lang_bindings {
         pub unsafe extern "C" fn $format_fn(
             source_ptr: *const u8,
             source_len: usize,
-            goal: u32,
+            source_type: u32,
             out_len: *mut usize,
             out_status: *mut u32,
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
-                    let goal = ffi_goal(goal, goal_allowed!($goalness))?;
+                    let goal = ffi_source_type(source_type, goal_allowed!($goalness))?;
                     parse_format!($goalness, $lang, source, goal)
                 })
             }
@@ -736,7 +736,7 @@ mod tests {
         ];
         for f in ts {
             let msg = call_err_goal(f, "var x = 1;\n", 2);
-            assert!(msg.contains("invalid goal code 2"), "{msg}");
+            assert!(msg.contains("invalid source type code 2"), "{msg}");
             assert!(
                 msg.contains("1 = script"),
                 "TypeScript may take a script goal: {msg}"
@@ -749,7 +749,7 @@ mod tests {
             for (op, f) in goalless_exports(language) {
                 let msg = call_err_goal(f, src, 2);
                 assert!(
-                    msg.contains("invalid goal code 2"),
+                    msg.contains("invalid source type code 2"),
                     "{language} {op}: {msg}"
                 );
                 assert!(
@@ -767,7 +767,7 @@ mod tests {
         // a Module parse. The same stance `tsv_wasm`'s `read_options` takes.
         //
         // Every export, not one per language: each is a separately generated
-        // entry point that calls `ffi_goal` on its own line, so a refusal can be
+        // entry point that calls `ffi_source_type` on its own line, so a refusal can be
         // lost on exactly one of them.
         for (language, src) in [
             ("svelte", "<div>x</div>\n"),
