@@ -158,6 +158,13 @@ impl<'a> SymbolBinder<'a> {
                 self.visit_statement(s.body, DeclMods::default(), false);
                 self.visit_expression(s.test);
             }
+            // No `with` object scope: tsc refuses `with` in a TypeScript file outright
+            // (TS2410), so there is no object environment to push and the two children
+            // bind in the enclosing scope.
+            Statement::WithStatement(s) => {
+                self.visit_expression(s.object);
+                self.visit_statement(s.body, DeclMods::default(), false);
+            }
             Statement::SwitchStatement(s) => self.bind_switch_statement(s),
             Statement::TryStatement(s) => self.bind_try_statement(s),
             Statement::LabeledStatement(s) => {

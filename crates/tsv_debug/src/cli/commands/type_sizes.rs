@@ -310,6 +310,7 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::VariableDeclarationKind,
             ts::VariableDeclarator<'static>,
             ts::WhileStatement<'static>,
+            ts::WithStatement<'static>,
         ]
     );
 

@@ -2,7 +2,7 @@
 //
 // Switch head, case labels, and case-body layout with comment handling.
 
-use super::OpenParenLineBlockComment;
+use super::{HeadChainGrouping, OpenParenLineBlockComment};
 use crate::ast::internal::{self, Statement};
 use crate::printer::expressions::blocks::StatementBlankScan;
 use crate::printer::statements::StatementContext;
@@ -49,6 +49,7 @@ impl<'a> Printer<'a> {
             open_paren,
             close_paren,
             OpenParenLineBlockComment::JoinsRun,
+            HeadChainGrouping::ParenGroupDrives,
         );
 
         // Build cases - they handle their own internal indentation

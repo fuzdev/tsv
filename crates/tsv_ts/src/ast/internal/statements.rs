@@ -68,6 +68,7 @@ pub enum Statement<'arena> {
     ForOfStatement(ForOfStatement<'arena>),
     WhileStatement(WhileStatement<'arena>),
     DoWhileStatement(DoWhileStatement<'arena>),
+    WithStatement(WithStatement<'arena>),
     SwitchStatement(SwitchStatement<'arena>),
     TryStatement(TryStatement<'arena>),
     ThrowStatement(ThrowStatement<'arena>),
@@ -106,6 +107,7 @@ impl<'arena> Statement<'arena> {
             Statement::ForOfStatement(stmt) => stmt.span,
             Statement::WhileStatement(stmt) => stmt.span,
             Statement::DoWhileStatement(stmt) => stmt.span,
+            Statement::WithStatement(stmt) => stmt.span,
             Statement::SwitchStatement(stmt) => stmt.span,
             Statement::TryStatement(stmt) => stmt.span,
             Statement::ThrowStatement(stmt) => stmt.span,
@@ -259,6 +261,14 @@ pub struct WhileStatement<'arena> {
 pub struct DoWhileStatement<'arena> {
     pub body: &'arena Statement<'arena>,
     pub test: &'arena Expression<'arena>,
+    pub span: Span,
+}
+
+/// With statement: `with (object) body` — sloppy-mode Script code only.
+#[derive(Debug, Clone)]
+pub struct WithStatement<'arena> {
+    pub object: &'arena Expression<'arena>,
+    pub body: &'arena Statement<'arena>,
     pub span: Span,
 }
 

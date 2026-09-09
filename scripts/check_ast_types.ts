@@ -93,6 +93,14 @@ const samples: Sample[] = [
 		type: 'Program'
 	},
 	{
+		// `with` is sloppy-mode Script code only, so this sample needs the goal.
+		name: 'ts_with_statement',
+		source: 'with (a) b;',
+		parser: 'typescript',
+		goal: 'script',
+		type: 'Program'
+	},
+	{
 		// `export default interface` — the TSInterfaceDeclaration member of the
 		// ExportDefaultValue union.
 		name: 'ts_export_default_interface',

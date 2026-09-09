@@ -1,6 +1,6 @@
 // try/catch/finally, throw, break/continue, and labeled statement printing
 
-use super::OpenParenLineBlockComment;
+use super::{HeadChainGrouping, OpenParenLineBlockComment};
 use crate::ast::internal::{self, Statement};
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
@@ -101,6 +101,7 @@ impl<'a> Printer<'a> {
                     open,
                     close,
                     OpenParenLineBlockComment::JoinsRun,
+                    HeadChainGrouping::ParenGroupDrives,
                 ));
             } else {
                 parts.push(self.build_expression_doc(param));

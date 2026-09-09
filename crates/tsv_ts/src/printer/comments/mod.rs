@@ -1151,7 +1151,7 @@ impl<'a> Printer<'a> {
     /// untouched, since it already renders inline inside the construct.
     ///
     /// The retained type paren shells were the first callers and a **statement header's**
-    /// `(` the last — `if` / `while` / do-while / `switch` / `catch` and all three `for`
+    /// `(` the last — `if` / `while` / do-while / `with` / `switch` / `catch` and all three `for`
     /// spellings, which followed prettier here long after every other delimiter in the
     /// printer had stopped. Prettier is no coherent oracle for the position: it un-glues at
     /// `if`-like heads and the C-style `for`, **glues** at for-in / for-of (emitting the

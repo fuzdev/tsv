@@ -24,8 +24,9 @@ pub struct ParseCommand {
     parser: Option<ParserType>,
 
     /// parse goal for TypeScript: script | module (default: module). `script`
-    /// parses a standalone strict script — `await` is an ordinary identifier and
-    /// `import`/`export`/`import.meta` are errors. Ignored for svelte/css.
+    /// parses a standalone script — `await` is an ordinary identifier and
+    /// `import`/`export`/`import.meta` are errors; the script is sloppy unless a
+    /// `"use strict"` directive prologue says otherwise. Ignored for svelte/css.
     #[argh(option)]
     goal: Option<String>,
 

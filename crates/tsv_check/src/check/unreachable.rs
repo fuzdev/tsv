@@ -514,6 +514,10 @@ impl CandidateWalk<'_> {
                 self.visit_list(std::slice::from_ref(s.body));
                 self.visit_expr(s.test);
             }
+            S::WithStatement(s) => {
+                self.visit_expr(s.object);
+                self.visit_list(std::slice::from_ref(s.body));
+            }
             S::SwitchStatement(s) => {
                 self.visit_expr(s.discriminant);
                 for case in s.cases {

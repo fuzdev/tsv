@@ -762,6 +762,23 @@ impl<'arena> Eraser<'arena, '_> {
                     },
                 ))
             }
+            // Unreachable in practice: a Svelte `<script>` is Module code, so it is
+            // strict and the parser refuses `with` there. The arm is a walk all the
+            // same, so the variant is never silently dropped.
+            Statement::WithStatement(stmt) => {
+                let object = self.expr_ref(stmt.object)?;
+                let body = self.statement_ref(stmt.body)?;
+                if object.is_none() && body.is_none() {
+                    return Ok(StmtOut::Keep);
+                }
+                StmtOut::Replace(Statement::WithStatement(
+                    tsv_ts::ast::internal::WithStatement {
+                        object: object.unwrap_or(stmt.object),
+                        body: body.unwrap_or(stmt.body),
+                        span: stmt.span,
+                    },
+                ))
+            }
             Statement::DoWhileStatement(stmt) => {
                 let body = self.statement_ref(stmt.body)?;
                 let test = self.expr_ref(stmt.test)?;

@@ -112,6 +112,20 @@ pub(super) fn write_while_statement(
     close_node(w, "WhileStatement", while_stmt.span, ctx);
 }
 
+/// Emits a `WithStatement` node. Field order: `object`, `body`.
+pub(super) fn write_with_statement(
+    w: &mut JsonWriter,
+    with_stmt: &internal::WithStatement<'_>,
+    ctx: &Ctx<'_>,
+) {
+    node_header(w, "WithStatement", with_stmt.span, ctx);
+    w.raw(",\"object\":");
+    write_expression(w, with_stmt.object, ctx);
+    w.raw(",\"body\":");
+    write_statement(w, with_stmt.body, ctx);
+    close_node(w, "WithStatement", with_stmt.span, ctx);
+}
+
 /// Emits a `DoWhileStatement` node. Field order: `body`, `test`.
 pub(super) fn write_do_while_statement(
     w: &mut JsonWriter,

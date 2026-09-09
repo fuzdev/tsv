@@ -3,6 +3,7 @@
 // Entry point (`build_if_statement_doc`) plus the wrapping and
 // comment-handling variants, and else-clause layout helpers.
 
+use super::HeadChainGrouping;
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use crate::printer::statements::StatementContext;
@@ -264,8 +265,12 @@ impl<'a> Printer<'a> {
         stmt: &internal::IfStatement<'_>,
         ctx: StatementContext,
     ) -> DocBuf {
-        let (mut parts, paren_end) =
-            self.build_paren_condition_head("if", stmt.span.start, stmt.test);
+        let (mut parts, paren_end) = self.build_paren_condition_head(
+            "if",
+            stmt.span.start,
+            stmt.test,
+            HeadChainGrouping::ParenGroupDrives,
+        );
         // The consequent is always one `adjustClause` indent in, and an `else`
         // CONTINUES on the line its tail flushes at (a block consequent ignores this).
         let body_ctx = ctx.clause_body(stmt.alternate.is_some(), true);

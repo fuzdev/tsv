@@ -3,7 +3,10 @@
 //! counterpart of `build/statements.rs`.
 
 use super::super::*;
-use super::{build, build_with_bound, condition_of, flow_of_node, ident, nodes_of_kind};
+use super::{
+    build, build_with_bound, build_with_bound_script, condition_of, flow_of_node, ident,
+    nodes_of_kind,
+};
 use crate::binder::NodeKind;
 
 // --- F1b branching topology (hand-traced graphs) ----------------------
@@ -166,6 +169,43 @@ fn unlabeled_break_targets_post_loop() {
     // The loop label kept only the entry edge (the back edge was unreachable).
     let l1 = flow_of_node(&product, x);
     assert_eq!(product.graph.antecedents(l1).len(), 1);
+}
+
+#[test]
+fn with_statement_captures_entry_flow_and_threads_linearly() {
+    // `with (o) a;` — no flow shaping (tsc has no `bindWithStatement`), but the
+    // statement is inside `[FirstStatement, LastStatement]`, so it captures the
+    // entry flow and both children thread that same flow.
+    let src = "function f() { with (o) a; }";
+    let (product, bound) = build_with_bound_script(src);
+    let with_stmt = nodes_of_kind(&bound, NodeKind::WithStatement)[0];
+    let f0 = flow_of_node(&product, with_stmt);
+    assert!(product.graph.flags(f0).contains(FlowFlags::START));
+    assert_eq!(flow_of_node(&product, ident(&bound, src, "o")), f0);
+    assert_eq!(flow_of_node(&product, ident(&bound, src, "a")), f0);
+
+    let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+    assert_eq!(product.end_flow_of(f), Some(f0));
+}
+
+#[test]
+fn with_statement_after_return_is_stamped_unreachable() {
+    // `return; with (o) a;` — a `with` is inside `[FirstStatement,
+    // LastStatement]`, so like any other statement in dead code it takes a nil
+    // entry flow and the Unreachable bit (tsc's `isPotentiallyExecutableNode`).
+    let src = "function f() { return; with (o) a; }";
+    let (product, bound) = build_with_bound_script(src);
+    let with_stmt = nodes_of_kind(&bound, NodeKind::WithStatement)[0];
+    assert_eq!(product.flow_of_node[with_stmt.index()], None);
+    assert_ne!(
+        product.node_flags[with_stmt.index()] & crate::binder::NODE_FLAGS_UNREACHABLE,
+        0
+    );
+    // The dead leaf identifiers keep Some(unreachable).
+    assert_eq!(
+        product.flow_of_node[ident(&bound, src, "a").index()],
+        Some(FlowNodeId::UNREACHABLE)
+    );
 }
 
 // --- F2a switch topology (hand-traced graphs) -------------------------

@@ -40,9 +40,8 @@ pub enum Goal {
     /// `[~Await]`); `import`/`export` declarations, `import.meta`, and top-level
     /// `await` expressions are syntax errors. Script code is **sloppy** unless its
     /// directive prologue holds a `"use strict"`, so a leading-zero numeric
-    /// literal (`010`, `08`) parses where a module rejects it. `with` is rejected
-    /// under every mode, and the Annex B web-compatibility grammar is out of scope
-    /// at both goals.
+    /// literal (`010`, `08`) and a `with` statement parse where a module rejects
+    /// them. The Annex B web-compatibility grammar is out of scope at both goals.
     Script,
 }
 

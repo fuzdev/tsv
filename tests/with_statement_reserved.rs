@@ -1,14 +1,16 @@
 //! `with` is a `ReservedWord`, not a contextual keyword — it can never be a name.
 //!
-//! tsv is **strict mode only**, and the `with` statement is one of the two lexically
-//! sloppy-mode constructs it rejects outright (the other is the legacy octal literal).
-//! But the rejection has to come from the *word*, not from a downstream parse accident:
-//! with `with` left as a plain `Identifier`, `with (a);` reads as a CALL to a function
-//! named `with` and formats to `with(a);`, so a sloppy-mode program is silently
-//! reinterpreted rather than refused, and `var with = 1` / `x = with` / `function
-//! f(with) {}` all parse. `Identifier : IdentifierName but not ReservedWord` excludes
-//! the word at the *production* level — this is not a deferrable early error, and acorn
-//! rejects every name use below.
+//! The `with` STATEMENT is sloppy-mode Script code: strict code disallows it by an early
+//! error keyed on `IsStrict`, so tsv parses it at `Goal::Script` unless a `"use strict"`
+//! prologue is in force, and rejects it under `Goal::Module` (always strict). That is a
+//! verdict about the statement, not about the word: `with` is barred from every NAME
+//! position in every mode, and the bar has to come from the *word* rather than from a
+//! downstream parse accident. With `with` left as a plain `Identifier`, `with (a);` reads
+//! as a CALL to a function named `with` and formats to `with(a);`, so a sloppy-mode
+//! program is silently reinterpreted rather than parsed, and `var with = 1` / `x = with` /
+//! `function f(with) {}` all parse. `Identifier : IdentifierName but not ReservedWord`
+//! excludes the word at the *production* level — not a deferrable early error, and acorn
+//! rejects every name use below at both goals.
 //!
 //! The word survives in the positions where the grammar spells it out or where any
 //! `IdentifierName` is allowed: the import-attributes clause (`with { type: 'json' }`),
@@ -21,10 +23,15 @@ fn accepts(source: &str) -> bool {
     tsv_ts::parse(source, &arena).is_ok()
 }
 
-fn check(cases: &[(&str, bool)]) {
+fn accepts_script(source: &str) -> bool {
+    let arena = bumpalo::Bump::new();
+    tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena).is_ok()
+}
+
+fn check_with(accept: fn(&str) -> bool, cases: &[(&str, bool)]) {
     let mut failures = Vec::new();
     for (source, want) in cases {
-        let got = accepts(source);
+        let got = accept(source);
         if got != *want {
             let verb = if *want {
                 "should ACCEPT"
@@ -43,10 +50,19 @@ fn check(cases: &[(&str, bool)]) {
     );
 }
 
+fn check(cases: &[(&str, bool)]) {
+    check_with(accepts, cases);
+}
+
+fn check_script(cases: &[(&str, bool)]) {
+    check_with(accepts_script, cases);
+}
+
 /// The statement itself, in every body shape — including the degenerate empty body,
-/// which is the one that currently slips through as a call expression.
+/// which is the one that would otherwise slip through as a call expression. Module code
+/// is strict by definition, so every shape rejects at the default goal.
 #[test]
-fn with_statement_is_rejected() {
+fn with_statement_is_rejected_at_module_goal() {
     check(&[
         ("with (a);", false),
         ("with (a) b;", false),
@@ -57,10 +73,35 @@ fn with_statement_is_rejected() {
     ]);
 }
 
-/// Every name channel: a reserved word is barred by a production, so all three reject.
+/// The same shapes at `Goal::Script` with no directive: sloppy code, so every one parses.
+/// A `"use strict"` prologue — at the Program or in the enclosing function body — turns
+/// the verdict back over, and a class body is strict without any directive at all.
+#[test]
+fn with_statement_is_accepted_in_sloppy_script() {
+    check_script(&[
+        ("with (a);", true),
+        ("with (a) b;", true),
+        ("with (a) { b; }", true),
+        ("with (a.b) {}", true),
+        ("if (c) with (a) {}", true),
+        ("function f() { with (a) {} }", true),
+        ("with (a) with (b) c;", true),
+        ("l: with (a) b;", true),
+        // strict again, by directive or by class
+        ("\"use strict\"; with (a) {}", false),
+        ("'use strict'; with (a) {}", false),
+        ("function f() { \"use strict\"; with (a) {} }", false),
+        ("class C { m() { with (a) {} } }", false),
+        ("class C { static { with (a) {} } }", false),
+    ]);
+}
+
+/// Every name channel: a reserved word is barred by a production, so all three reject —
+/// under every mode, which is why the sloppy-Script half is asserted beside the Module one
+/// at the end of this test.
 #[test]
 fn with_is_not_a_name() {
-    check(&[
+    let cases: &[(&str, bool)] = &[
         // BindingIdentifier
         ("var with = 1;", false),
         ("let with = 1;", false),
@@ -77,7 +118,9 @@ fn with_is_not_a_name() {
         ("const o = { with };", false),
         // LabelIdentifier
         ("with: for (;;) break with;", false),
-    ]);
+    ];
+    check(cases);
+    check_script(cases);
 }
 
 /// The contextual positions the word must keep — an `IdentifierName` slot, or the

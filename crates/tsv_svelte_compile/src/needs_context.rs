@@ -1245,6 +1245,12 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             walk_stmt(s.body, nc, true);
             walk_expr(s.test, nc);
         }
+        // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
+        // and the parser refuses `with` there.
+        Statement::WithStatement(s) => {
+            walk_expr(s.object, nc);
+            walk_stmt(s.body, nc, true);
+        }
         Statement::SwitchStatement(s) => {
             walk_expr(s.discriminant, nc);
             // The oracle gives a `switch` ONE block scope shared by ALL its cases

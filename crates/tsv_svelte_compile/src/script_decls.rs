@@ -241,6 +241,9 @@ fn script_declarations_of<'arena, E>(
         }
         Statement::WhileStatement(stmt) => nested!(stmt.body),
         Statement::DoWhileStatement(stmt) => nested!(stmt.body),
+        // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
+        // and the parser refuses `with` there.
+        Statement::WithStatement(stmt) => nested!(stmt.body),
         Statement::LabeledStatement(stmt) => nested!(stmt.body),
         Statement::SwitchStatement(stmt) => {
             for case in stmt.cases {

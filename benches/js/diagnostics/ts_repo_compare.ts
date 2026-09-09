@@ -229,19 +229,10 @@ const BEYOND_ACORN_SANCTIONS: BeyondAcornSanction[] = [
 			'`for ((g satisfies T) of …)` — a bare cast target in a for-of head (the assignment / pattern spellings in the same file parse)'
 	},
 	{
-		pattern: 'elidedEmbeddedStatementsReplacedWithSemicolon.ts',
-		category: 'grammar',
-		reason: '`with` statement — no strict-mode production (CLAUDE.md §Strictness)'
-	},
-	{
-		pattern: 'withStatementInternalComments.ts',
-		category: 'grammar',
-		reason: '`with` statement — no strict-mode production (CLAUDE.md §Strictness)'
-	},
-	{
 		pattern: 'topLevelVarHoistingCommonJS.ts',
 		category: 'grammar',
-		reason: '`with` statement — no strict-mode production (CLAUDE.md §Strictness)'
+		reason:
+			'`with` statement in a file that is an ES MODULE (it carries an `export { … }`), so the Script retry never runs and Module code is strict (CLAUDE.md §Strictness)'
 	},
 	// PrivateIdentifier has exactly three productions: a ClassElementName, a member
 	// access, and the left operand of `in`. tsc's parser reads it as any property

@@ -3,6 +3,7 @@
 // for-loop header layout (init/test/update clauses with comment placement),
 // for-in/for-of left/right printing.
 
+use super::super::HeadChainGrouping;
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::StatementContext;
@@ -635,7 +636,7 @@ impl<'a> Printer<'a> {
             // Without this, logical operators break with the for-header group (too wide)
             // instead of their own condition width.
             inner_parts.push(test_frozen.map_or_else(
-                || d.group(self.build_condition_doc(test)),
+                || d.group(self.build_condition_doc(test, HeadChainGrouping::ParenGroupDrives)),
                 // The clarity parens an assignment test prints (`for (; (a = b); )`) are
                 // the printer's, not the author's, so they wrap the frozen slice instead
                 // of riding inside it — the same `StatementTest` shell, and the same

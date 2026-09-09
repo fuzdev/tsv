@@ -41,6 +41,17 @@ fn build_with_bound(source: &str) -> (FlowProduct, BoundFile) {
     (product, bound)
 }
 
+/// `build_with_bound` at `Goal::Script`, for a snippet whose syntax the module
+/// goal rejects (`with`).
+fn build_with_bound_script(source: &str) -> (FlowProduct, BoundFile) {
+    let arena = Bump::new();
+    let program = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
+        .expect("parse at script goal");
+    let bound = bind_file(&program, source, FileId::ROOT);
+    let product = build_flow(&program, source, &bound);
+    (product, bound)
+}
+
 /// The flow node stamped on a node (panics if unattached).
 fn flow_of_node(product: &FlowProduct, id: NodeId) -> FlowNodeId {
     product.flow_of_node[id.index()].expect("flow attachment")

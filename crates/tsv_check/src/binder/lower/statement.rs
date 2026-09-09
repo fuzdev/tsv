@@ -144,6 +144,13 @@ impl SoaWalk {
                 self.visit_statement(s.body, id);
                 self.visit_expression(s.test, id);
             }
+            // The `with` object environment is a checker gap — tsc refuses `with` in a
+            // TypeScript file outright (TS2410), so there is no name resolution to model
+            // and a plain walk of the two children is the honest shape.
+            Statement::WithStatement(s) => {
+                self.visit_expression(s.object, id);
+                self.visit_statement(s.body, id);
+            }
             Statement::SwitchStatement(s) => {
                 self.visit_expression(s.discriminant, id);
                 for case in s.cases {

@@ -195,13 +195,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 KeywordKind::Break => self.parse_break_statement(),
                 KeywordKind::Continue => self.parse_continue_statement(),
                 KeywordKind::Debugger => self.parse_debugger_statement(),
-                // The `with` statement is sloppy-mode only and tsv rejects it under
-                // every mode, so it is refused at its keyword rather than by an
-                // accident further along.
-                // (Lexing it as an identifier would make `with (a);` read as a CALL
-                // and reprint as `with(a);` — a sloppy-mode program silently
-                // reinterpreted instead of rejected.)
-                KeywordKind::With => Err(self.error_with_statement()),
+                // The `with` statement is sloppy-mode only: strict code disallows it
+                // by an early error keyed on `IsStrict`, so the verdict is read here,
+                // at the keyword, from the enclosing code's settled strictness.
+                // (`with` stays a reserved word in every mode — lexing it as an
+                // identifier would make `with (a);` read as a CALL and reprint as
+                // `with(a);`, a sloppy-mode program silently reinterpreted rather
+                // than parsed or rejected.)
+                KeywordKind::With => {
+                    if self.strict {
+                        Err(self.error_with_statement())
+                    } else {
+                        self.parse_with_statement()
+                    }
+                }
                 // Continuation keywords - these appear mid-statement, not at start
                 KeywordKind::Else
                 | KeywordKind::Case

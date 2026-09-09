@@ -829,7 +829,8 @@ identifier and `import`/`export`/`import.meta` are errors. See
 
 Rejected by the parser today:
 
-- `with` statement — SyntaxError, under every mode
+- `with` statement — SyntaxError in **strict** code; parsed in a sloppy Script. The
+  word stays a `ReservedWord` in every mode, so only the statement moves
 - Leading-zero numeric literals (`0777`, `08`) — SyntaxError in **strict** code (use
   `0o777`); read in a sloppy Script, base 8 for the all-octal form
 - Annex B web-compatibility grammar (HTML-like comments, labelled function

@@ -99,9 +99,8 @@ function graded_source(source: string, entry: ManifestEntry): string {
  * what makes a row strict on both: a row the manifest marks `strict` at script
  * goal is handed over with the harness's `"use strict";` prefix
  * (`graded_source`). What remains is a row that is neither `module` nor `strict`
- * — sloppy on both sides, but tsv refuses `with` and the Annex B grammar under
- * every mode — the residual caveat docs/conformance_test262.md §Differential
- * describes.
+ * — sloppy on both sides, but tsv refuses the Annex B grammar under every mode —
+ * the residual caveat docs/conformance_test262.md §Differential describes.
  *
  * A non-empty `errors` array, or a throw, counts as reject.
  */

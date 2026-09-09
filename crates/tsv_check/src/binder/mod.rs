@@ -115,6 +115,7 @@ pub enum NodeKind {
     ForOfStatement,
     WhileStatement,
     DoWhileStatement,
+    WithStatement,
     SwitchStatement,
     TryStatement,
     ThrowStatement,
@@ -417,6 +418,9 @@ fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
         S::DoWhileStatement(s) => {
             expr_contains_import_meta(s.test) || stmt_contains_import_meta(s.body)
         }
+        S::WithStatement(s) => {
+            expr_contains_import_meta(s.object) || stmt_contains_import_meta(s.body)
+        }
         S::SwitchStatement(s) => {
             expr_contains_import_meta(s.discriminant)
                 || s.cases.iter().any(|c| {
@@ -616,6 +620,7 @@ pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
         Statement::ForOfStatement(_) => NodeKind::ForOfStatement,
         Statement::WhileStatement(_) => NodeKind::WhileStatement,
         Statement::DoWhileStatement(_) => NodeKind::DoWhileStatement,
+        Statement::WithStatement(_) => NodeKind::WithStatement,
         Statement::SwitchStatement(_) => NodeKind::SwitchStatement,
         Statement::TryStatement(_) => NodeKind::TryStatement,
         Statement::ThrowStatement(_) => NodeKind::ThrowStatement,

@@ -5,7 +5,7 @@ use super::control_flow::{
     write_break_statement, write_continue_statement, write_do_while_statement,
     write_for_in_statement, write_for_of_statement, write_for_statement, write_if_statement,
     write_labeled_statement, write_switch_statement, write_throw_statement, write_try_statement,
-    write_while_statement,
+    write_while_statement, write_with_statement,
 };
 use super::declarations::{
     write_class_declaration, write_function_declaration, write_type_alias_declaration,
@@ -244,6 +244,9 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
         }
         internal::Statement::DoWhileStatement(do_while) => {
             write_do_while_statement(w, do_while, ctx);
+        }
+        internal::Statement::WithStatement(with_stmt) => {
+            write_with_statement(w, with_stmt, ctx);
         }
         internal::Statement::SwitchStatement(switch_stmt) => {
             write_switch_statement(w, switch_stmt, ctx);

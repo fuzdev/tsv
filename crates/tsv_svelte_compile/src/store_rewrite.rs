@@ -424,6 +424,21 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     }))
                 }
             }
+            // Unreachable in practice: a Svelte `<script>` is Module code, so it is
+            // strict and the parser refuses `with` there.
+            Statement::WithStatement(s) => {
+                let object = self.expr_ref(s.object)?;
+                let body = self.statement_ref(s.body)?;
+                if object.is_none() && body.is_none() {
+                    None
+                } else {
+                    Some(Statement::WithStatement(ast::WithStatement {
+                        object: object.unwrap_or(s.object),
+                        body: body.unwrap_or(s.body),
+                        span: s.span,
+                    }))
+                }
+            }
             Statement::DoWhileStatement(s) => {
                 let body = self.statement_ref(s.body)?;
                 let test = self.expr_ref(s.test)?;

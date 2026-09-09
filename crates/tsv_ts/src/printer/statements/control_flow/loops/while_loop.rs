@@ -1,14 +1,37 @@
-// while and do-while statement printing
+// while, with and do-while statement printing
 //
-// Condition-group layout and body handling for while/do-while, including the
+// Condition-group layout and body handling for while/with/do-while, including the
 // do-while comment-preservation divergence from Prettier.
 
-use super::super::OpenParenLineBlockComment;
+use super::super::{HeadChainGrouping, OpenParenLineBlockComment};
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use crate::printer::statements::StatementContext;
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
+
+/// What parts `with` from `while` in the layout they otherwise share: the keyword, whether
+/// an empty block body collapses (prettier's parent allowlist in `print/block.js`), and how
+/// a logical head chain groups (prettier's `isInsideParenthesis`, [`HeadChainGrouping`]).
+#[derive(Clone, Copy)]
+struct ParenHeadKind {
+    keyword: &'static str,
+    collapses_empty_block: bool,
+    grouping: HeadChainGrouping,
+}
+
+impl ParenHeadKind {
+    const WHILE: Self = Self {
+        keyword: "while",
+        collapses_empty_block: true,
+        grouping: HeadChainGrouping::ParenGroupDrives,
+    };
+    const WITH: Self = Self {
+        keyword: "with",
+        collapses_empty_block: false,
+        grouping: HeadChainGrouping::ChainGroupsItself,
+    };
+}
 
 impl<'a> Printer<'a> {
     /// Build a doc for a while statement with proper line-width wrapping
@@ -20,36 +43,88 @@ impl<'a> Printer<'a> {
         stmt: &internal::WhileStatement<'_>,
         ctx: StatementContext,
     ) -> DocId {
+        self.build_paren_head_statement_doc(
+            ParenHeadKind::WHILE,
+            stmt.span.start,
+            stmt.test,
+            stmt.body,
+            ctx,
+        )
+    }
+
+    /// Build a doc for a `with` statement — `while`'s layout, which is also how prettier
+    /// prints it: one printer serves both, keying the keyword on the node type
+    /// (`print/while-statement.js`).
+    ///
+    /// Two axes part them, both carried by [`ParenHeadKind`]:
+    ///
+    /// - the EMPTY BLOCK body — prettier's block printer collapses `{}` only for a listed
+    ///   set of parents, and `WithStatement` is not in it, so `with (o) {}` prints
+    ///   `with (o) {⏎}` where `while (c) {}` stays collapsed (`print/block.js`);
+    /// - the HEAD CHAIN grouping — `WithStatement` is not on prettier's
+    ///   `isInsideParenthesis` parent list, so a logical head chain groups itself instead
+    ///   of handing its breaking to the head's paren group ([`HeadChainGrouping`],
+    ///   `print/binaryish.js`).
+    pub(in crate::printer::statements) fn build_with_statement_doc(
+        &self,
+        stmt: &internal::WithStatement<'_>,
+        ctx: StatementContext,
+    ) -> DocId {
+        self.build_paren_head_statement_doc(
+            ParenHeadKind::WITH,
+            stmt.span.start,
+            stmt.object,
+            stmt.body,
+            ctx,
+        )
+    }
+
+    /// The layout `while` and `with` share: a `keyword (head)` group, then the body in
+    /// one of three arms (block / empty statement / `adjustClause`).
+    ///
+    /// [`ParenHeadKind`] carries the three facts the two constructs part on.
+    fn build_paren_head_statement_doc(
+        &self,
+        kind: ParenHeadKind,
+        stmt_start: u32,
+        head: &internal::Expression<'_>,
+        body: &Statement<'_>,
+        ctx: StatementContext,
+    ) -> DocId {
         let d = self.d();
         // The head every arm below shares, built once — the same one the `if` printer
-        // takes, so the two paren-headed statements cannot drift apart.
+        // takes, so the paren-headed statements cannot drift apart.
         let (mut parts, paren_end) =
-            self.build_paren_condition_head("while", stmt.span.start, stmt.test);
+            self.build_paren_condition_head(kind.keyword, stmt_start, head, kind.grouping);
 
-        if let Statement::BlockStatement(block) = stmt.body {
+        if let Statement::BlockStatement(block) = body {
             // Block body: while (cond) { ... }
             // Uses append_close_paren_with_comments for consistency with if/for-in/for-of:
             // block comments stay inline, line comments become trailing.
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
-            parts.push(self.build_statement_head_doc(paren_end, stmt.body, || {
-                self.build_block_statement_doc(block)
+            parts.push(self.build_statement_head_doc(paren_end, body, || {
+                if kind.collapses_empty_block {
+                    self.build_block_statement_doc(block)
+                } else {
+                    self.build_block_statement_expand_empty_doc(block)
+                }
             }));
             d.group(d.concat(&parts))
-        } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
+        } else if matches!(body, Statement::EmptyStatement(_)) {
             // Empty statement: `while (cond);` or `while (cond) /* comment */ ;`
-            let empty_start = stmt.body.span().start;
+            let empty_start = body.span().start;
             self.append_close_paren_empty_stmt_with_comments(&mut parts, paren_end, empty_start);
             d.group(d.concat(&parts))
         } else {
             // Non-block body: use adjustClause equivalent
             // - When flat: line becomes space -> `while (cond) a;`
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
-            let body_start = stmt.body.span().start;
-            let body_doc = self.build_statement_head_doc(paren_end, stmt.body, || {
+            let body_start = body.span().start;
+            let body_doc = self.build_statement_head_doc(paren_end, body, || {
                 // `adjustClause` wraps the body in one indent in every arm; nothing
                 // continues on the tail's line, so the tail falls through to whatever
-                // flushes the while's own position.
-                self.build_statement_doc(stmt.body, ctx.clause_body(false, true))
+                // flushes the statement's own position.
+                self.build_statement_doc(body, ctx.clause_body(false, true))
             });
             self.build_adjust_clause_with_comments(&parts, paren_end, body_start, body_doc)
         }
@@ -159,6 +234,7 @@ impl<'a> Printer<'a> {
             open_paren,
             close_paren,
             OpenParenLineBlockComment::Preserve,
+            HeadChainGrouping::ParenGroupDrives,
         ));
 
         // Comments between the condition's `)` and the do-while's terminating `;`,

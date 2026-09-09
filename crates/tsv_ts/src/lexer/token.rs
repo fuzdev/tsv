@@ -70,7 +70,8 @@ pub enum KeywordKind {
     Yield = 48,
     // Debugger
     Debugger = 51,
-    // Sloppy-mode-only statement, reserved everywhere (see `KEYWORDS`)
+    // Heads a statement only sloppy code admits, but is a `ReservedWord` everywhere
+    // (see `KEYWORDS`)
     With = 52,
 }
 
@@ -579,7 +580,10 @@ static KEYWORDS: &[(&str, KeywordKind)] = &[
     ("yield", KeywordKind::Yield),
     // Debugger
     ("debugger", KeywordKind::Debugger),
-    // Sloppy-mode-only statement — a `ReservedWord`, so it can never be a name
+    // A `ReservedWord`, so it can never be a name — in either mode, even though the
+    // STATEMENT it heads is admitted only by sloppy code. Left as an identifier it
+    // would read `with (a);` as a call to a function named `with` and reprint it as
+    // `with(a);`, silently reinterpreting a sloppy program instead of parsing it.
     ("with", KeywordKind::With),
     // Deliberately NOT listed: the contextual keywords (`interface`, `type`, `namespace`,
     // `declare`, `abstract`, `async`, …) lex as plain identifiers and the parser

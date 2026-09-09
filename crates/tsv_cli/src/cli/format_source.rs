@@ -20,9 +20,11 @@ pub fn format_source(source: &str, parser_type: ParserType) -> Result<String, St
 /// [`format_source`] against an explicit TypeScript parse [`Goal`](tsv_ts::Goal).
 ///
 /// `Goal::Module` (via [`format_source`]) is correct for Svelte and ~all real
-/// TS; `Goal::Script` parses a standalone strict script. The goal is consulted
-/// only for the `ParserType::TypeScript` arm (Svelte is always a module, CSS
-/// has no goal).
+/// TS; `Goal::Script` parses a standalone script, which is sloppy unless a
+/// `"use strict"` directive prologue says otherwise — so a `with` statement and a
+/// leading-zero numeric literal format only through that goal. The goal is consulted
+/// only for the `ParserType::TypeScript` arm (Svelte is always a module, CSS has no
+/// goal).
 pub fn format_source_with_goal(
     source: &str,
     parser_type: ParserType,

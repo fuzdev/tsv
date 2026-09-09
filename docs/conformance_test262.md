@@ -33,7 +33,7 @@ design, not parser bugs.
 snapshot.** It moves with deliberate permissiveness as much as with bugs: widening
 `let` / `yield` / `await` as names — the single largest deferred family, described
 below — has moved it by hundreds across releases with every positive still green,
-and refusing the `with` statement moved it the other way. A negative shift is a
+and refusing a construct in strict code moves it the other way. A negative shift is a
 *finding* only when the construct is one tsv claims to reject; the positive side is
 what the release gate holds.
 
@@ -232,9 +232,9 @@ entity name (`A.B.C`): a string/number/empty reference (`import x = 'foo'`,
   A `flags: [raw]` test (verbatim source, no harness) also runs in non-strict mode only
   per test262/INTERPRETING.md, but nearly all exercise mode-independent syntax
   (hashbang, HTML-close comments, `"use strict"` directive prologues) tsv grades
-  correctly at their goal, so those stay graded. Only a raw test whose verdict genuinely
-  needs the sloppy run — it uses a construct tsv rejects under every mode, such as
-  `with` — is skipped, like `noStrict`. That list (`SLOPPY_ONLY_RAW_TESTS` in
+  correctly at their goal, so those stay graded. Only a raw test that is sloppy *by
+  content* — its verdict belongs to the sloppy run, so the strict subset is not the
+  place to grade it — is skipped, like `noStrict`. That list (`SLOPPY_ONLY_RAW_TESTS` in
   `crates/tsv_debug/src/test262/runner.rs`) is currently the single
   `language/comments/hashbang/use-strict.js`
 - `flags: [raw]` together with `flags: [onlyStrict]` - contradictory metadata (a raw
@@ -421,8 +421,9 @@ only per test262/INTERPRETING.md, but nearly all exercise mode-independent synta
 (hashbang, HTML-close comments, directive prologues) whose verdict is the same either
 way, so those stay graded at their goal. The lone raw test that is sloppy *by content*
 — `hashbang/use-strict.js`, whose `#!` turns `"use strict"` into a comment, leaving a
-`with` statement tsv rejects under every mode — is out of scope for the same reason
-`noStrict` is, so it is skipped (sloppy-mode bucket), not graded as a failure.
+`with` statement that only sloppy code admits — is skipped for the same reason
+`noStrict` is: it is a sloppy-mode run, and the sloppy-mode bucket is out of scope
+here. The source itself parses at a sloppy `Script`.
 
 **A `flags: [onlyStrict]` test is graded through the harness's own transform.** Such a
 test declares a single run, the strict one, and test262-harness produces it by inserting
@@ -500,13 +501,13 @@ manifest marks `strict` at script goal is handed over with the harness's
 by the goal on either side: oxc's `'script'` is **sloppy** and so is tsv's
 `Goal::Script`, and the prefix is what makes both strict on the rows that carry it.
 The residual caveat is the rows that are neither `module` nor `strict` — sloppy on
-both sides, but tsv refuses `with` and the Annex B web-compatibility grammar under
-every mode, so a script using one would show up as a positive "tsv rejects, oxc
-accepts" candidate even though it's a sanctioned divergence, not a bug. The one
-known such test
+both sides, but tsv refuses the Annex B web-compatibility grammar under every mode,
+so a script using it would show up as a positive "tsv rejects, oxc accepts"
+candidate even though it's a sanctioned divergence, not a bug. The one
+known sloppy-by-content test
 (`hashbang/use-strict.js` — see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
-is skipped before grading, so it never enters the manifest; any future sloppy-by-content
-script would surface here and want the same treatment. The two
+is skipped before grading, so it never enters the manifest; any future one
+would surface here and want the same treatment. The two
 actionable buckets:
 
 - **positives where tsv rejects but oxc accepts** → tsv real-bug candidates (modulo

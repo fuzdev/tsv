@@ -164,6 +164,7 @@ export type Statement = (
 	| ForOfStatement
 	| WhileStatement
 	| DoWhileStatement
+	| WithStatement
 	| SwitchStatement
 	| TryStatement
 	| ThrowStatement
@@ -278,6 +279,16 @@ export interface DoWhileStatement {
 	loc: SourceLocation;
 	body: Statement;
 	test: Expression;
+}
+
+/** Sloppy-mode Script code only — strict code disallows `with` by an early error. */
+export interface WithStatement {
+	type: 'WithStatement';
+	start: number;
+	end: number;
+	loc: SourceLocation;
+	object: Expression;
+	body: Statement;
 }
 
 export interface SwitchStatement {
