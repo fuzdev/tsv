@@ -189,7 +189,13 @@ a newline). And three **positional grammar** rules: a for-in/of head binds exact
 one declarator (`for (let a, b of x)` rejected), a labeled statement's body is a
 `Statement` or `FunctionDeclaration` and never a lexical/class declaration
 (`a: class C {}`, `a: let x = 1`, `a: function f(){}` rejected; `a: var x = 1`,
-`a: enum E {}` and ordinary statements accepted), and `import`/`export`
+`a: enum E {}` and ordinary statements accepted) — a labelled item is the one
+single-statement position tsv enforces that at, the others still parsing the
+declaration as a deferred early error (`if (a) const x = 1;`), while what every
+such position does settle is the reading of `let`: the `IdentifierReference`
+(`a: let ⏎ x = 1;` is two statements, as `for (let in o)` is an expression head),
+with `let [` left no reading at all (`if (a) let [a] = b;` rejected), and
+`import`/`export`
 declarations appear only at the module top level or inside a TS
 `namespace`/`module` body (`{ import x from 'y' }`, `function () { export … }`,
 `if (c) import …` rejected, while `import(…)` / `import.meta` expressions stay

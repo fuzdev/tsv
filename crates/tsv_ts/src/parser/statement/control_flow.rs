@@ -27,13 +27,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse consequent (can be any statement, including block)
-        let consequent = arena.alloc(self.parse_statement()?);
+        let consequent = arena.alloc(self.parse_nested_statement()?);
 
         // Check for optional else clause
         let (alternate, end) =
             if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Else)) {
                 self.advance()?; // consume 'else'
-                let alt = self.parse_statement()?;
+                let alt = self.parse_nested_statement()?;
                 let alt_end = alt.span().end;
                 (Some(&*arena.alloc(alt)), alt_end)
             } else {
@@ -62,6 +62,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for 'await' keyword: `for await (...)`
         let is_await = matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await));
+        // the keyword's own position: where a non-of head reports its rejection
+        let await_at = if is_await {
+            Some(self.current_pos().0)
+        } else {
+            None
+        };
         if is_await {
             self.advance()?;
         }
@@ -77,14 +83,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         if self.eat(TokenKind::Semicolon) {
             // Empty init: for (;...)
+            self.reject_for_await_without_of(await_at)?;
             return self.parse_for_standard(start, None);
         }
 
-        // Check if it starts with a variable declaration
+        // Check if it starts with a variable declaration. `const` and `var` are
+        // declaration keywords outright; `let` is one only when a binding follows it
+        // (`Parser::at_let_declaration`) — `for (let in o)`, `for (let; ;)`,
+        // `for (let = 3; ;)` and `for (let.x in o)` are expression heads whose leftmost
+        // token happens to be the `IdentifierReference` `let`.
+        let starts_with_let = matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Let));
         let is_var_decl = matches!(
             self.current_kind(),
-            TokenKind::Keyword(KeywordKind::Const | KeywordKind::Let | KeywordKind::Var)
-        );
+            TokenKind::Keyword(KeywordKind::Const | KeywordKind::Var)
+        ) || (starts_with_let && self.at_let_declaration());
 
         // Check for a `using` / `await using` head (Explicit Resource Management),
         // `for (using resource of resources)` / `for await (await using resource of
@@ -137,6 +149,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             if is_for_in {
+                self.reject_for_await_without_of(await_at)?;
                 self.advance()?;
                 return self.parse_for_in(
                     start,
@@ -153,6 +166,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // Standard for loop with var decl init
+            self.reject_for_await_without_of(await_at)?;
             self.expect(&TokenKind::Semicolon)?;
             return self.parse_for_standard(
                 start,
@@ -198,11 +212,27 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `ArrayExpression` → `ArrayPattern`), and any other LHS must have a
         // valid (non-`invalid`) assignment-target type.
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
+            self.reject_for_await_without_of(await_at)?;
             self.advance()?;
             let left = self.to_assignable(expr, AssignableContext::ForHead)?;
             return self.parse_for_in(start, self.arena.alloc(ForInOfLeft::Pattern(left)));
         }
         if self.current_value() == "of" {
+            // `ForInOfStatement`'s of-forms carry `[lookahead ∉ { let, async of }]` (and
+            // `[lookahead ≠ let]` for the for-await form), a restriction on the head's
+            // leftmost TOKEN whatever shape follows it: `for (let of x)`,
+            // `for (let.x of y)` and `for (let[0] of a)` are all syntax errors, and only
+            // `for ((let) … of x)` says what they mean. The in-form restricts only
+            // `let [` (`[lookahead ≠ let []`), so `for (let in o)` and `for (let.x in o)`
+            // are legal there while `for (let[0] in o)` is not. acorn spells this the
+            // same way, off the token it recorded before parsing the head. Of the three
+            // of-heads only `let.x` reaches this check — `let of` reads as a declaration
+            // of `of` and dies at the missing `;`, `let[0]` as an invalid binding pattern.
+            if starts_with_let {
+                return Err(
+                    self.error_msg("The left-hand side of a for-of loop may not start with 'let'")
+                );
+            }
             self.advance()?;
             let left = self.to_assignable(expr, AssignableContext::ForHead)?;
             return self.parse_for_of(
@@ -213,8 +243,27 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // Standard for loop with expression init
+        self.reject_for_await_without_of(await_at)?;
         self.expect(&TokenKind::Semicolon)?;
         self.parse_for_standard(start, Some(self.arena.alloc(ForInit::Expression(expr))))
+    }
+
+    /// `for await` heads exactly one production: `ForInOfStatement`'s
+    /// `for await ( … of AssignmentExpression ) Statement` and its two binding
+    /// spellings. There is no for-await-in head and no for-await C-style head, so every
+    /// path that does not reach a for-of must reject here rather than fall through.
+    ///
+    /// The rejection is a **content** obligation as much as a grammar one: `await` is
+    /// printed off the `ForOfStatement`'s own flag, and a `ForInStatement` /
+    /// `ForStatement` carries no such field, so a head accepted here would format to
+    /// `for (x in o)` with the keyword simply gone. acorn spells the same bar as an
+    /// `unexpected(awaitAt)` at each of those exits, and the error lands on the `await`
+    /// keyword here too.
+    fn reject_for_await_without_of(&self, await_at: Option<usize>) -> Result<(), ParseError> {
+        if let Some(at) = await_at {
+            return Err(self.error_msg_at("'for await' can only be used in for-of loops", at));
+        }
+        Ok(())
     }
 
     /// Parse standard for loop: `for (init; test; update) body`
@@ -240,7 +289,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
-        let body = self.arena.alloc(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
         Ok(Statement::ForStatement(ForStatement {
@@ -261,7 +310,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let right = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
-        let body = self.arena.alloc(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
         Ok(Statement::ForInStatement(ForInStatement {
@@ -297,7 +346,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let right = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
-        let body = self.arena.alloc(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
         Ok(Statement::ForOfStatement(ForOfStatement {
@@ -351,7 +400,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
-        let body = self.arena.alloc(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
         Ok((head, body, Span::new(start as u32, end)))
@@ -369,7 +418,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Parse body
-        let body = self.arena.alloc(self.parse_statement()?);
+        let body = self.arena.alloc(self.parse_nested_statement()?);
 
         // Expect 'while'
         if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::While)) {
@@ -736,14 +785,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::Colon)?;
 
         // Parse the labeled statement
-        let body_stmt = self.parse_statement()?;
+        let body_stmt = self.parse_nested_statement()?;
 
         // `LabelledItem : Statement | FunctionDeclaration`. A lexical declaration
-        // (`let`/`const`), a class declaration, or — in strict/module code, which
-        // tsv always is — a function declaration is not a labelable statement
-        // (acorn reports an unexpected token). A `var` statement and ordinary
-        // statements are fine; TS declarations (`enum`/`interface`/`type`/
-        // `namespace`) acorn-typescript accepts, so they pass through.
+        // (`let`/`const`) and a class declaration are not labelable statements, and
+        // neither is a function declaration: the `FunctionDeclaration` arm carries the
+        // "It is a Syntax Error if any source text is matched by this production"
+        // early error, and the relaxation that lifts it is Annex B §B.3.2 (Labelled
+        // Function Declarations) — normative but optional for a non-browser host, and
+        // out of tsv's grammar at both goals. So the rejection holds in strict code by
+        // the core early error and in sloppy code for want of the carve-out (acorn
+        // reports an unexpected token). A `var` statement and ordinary statements are
+        // fine; TS declarations (`enum`/`interface`/`type`/`namespace`)
+        // acorn-typescript accepts, so they pass through.
         let label_target_invalid = match &body_stmt {
             Statement::ClassDeclaration(_) | Statement::FunctionDeclaration(_) => true,
             Statement::VariableDeclaration(decl) => {

@@ -1661,10 +1661,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.error_msg(&format!("{head} name must be on the same line"))
     }
 
-    /// Whether a statement-initial `let` heads a `LexicalDeclaration` rather than an
-    /// `ExpressionStatement` — tsc's `isLetDeclaration`
-    /// (`nextTokenIsBindingIdentifierOrStartOfDestructuring`): a binding name, `{`,
-    /// or `[` follows.
+    /// Whether a `let` in a `StatementListItem` or a for-head heads a
+    /// `LexicalDeclaration` rather than an expression — acorn's `isLet` with no
+    /// context: a binding name, `{`, or `[` follows.
     ///
     /// `let` is the one word that is neither a `ReservedWord` nor purely contextual:
     /// `Identifier : IdentifierName but not ReservedWord` admits it, so `let` is a
@@ -1676,10 +1675,36 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// **not** an indexed assignment but a declaration with an invalid array binding
     /// pattern, and stays a syntax error (tsc TS1181) even though `let.x = 1` parses.
     ///
-    /// ⚠️ A **for-head** deliberately does NOT ask this: `for (let …)` commits to a
-    /// declaration on the keyword alone, which is exactly what tsc does
-    /// (`parseForOrForInOrForOfStatement` tests `token() === LetKeyword` with no
-    /// lookahead), so `for (let[0] of a)` and `for (let.x of a)` both stay rejected.
+    /// A **for-head** asks the same question, and each head reads it off its own
+    /// production: `ForStatement`'s init carries that same `[lookahead ∉ { let [ }]`,
+    /// so `for (let; ;)` and `for (let = 3; ;)` are expression inits, and the for-in
+    /// production carries `[lookahead ≠ let []` on its `LeftHandSideExpression`, so
+    /// `for (let in o)` and `for (let.x in o)` are expression lefts. (tsc instead
+    /// commits `for (let` to a declaration on the keyword alone,
+    /// `parseForOrForInOrForOfStatement` testing `token() === LetKeyword` with no
+    /// lookahead; the drop-in oracle and the grammar agree against it.) A for-of head's
+    /// own `[lookahead ∉ { let }]` is a separate, wider bar, enforced where the head is
+    /// read — see `Parser::parse_for_statement`.
+    ///
+    /// ⚠️ A **single-statement position** (an `if` arm, a loop or `with` body, a
+    /// labelled item) does NOT ask this: no declaration is admissible there at all, so
+    /// only `let [` — barred from the expression reading by the lookahead above — is a
+    /// declaration, and it is a syntax error rather than a second reading. That fork is
+    /// `Parser::parse_nested_statement`.
+    ///
+    /// Two of acorn's `isLet` arms are absent here because tokenization already
+    /// answers them: `in` / `instanceof` never reach the binding-name set (acorn
+    /// re-reads the raw word to exclude them), and an identifier written with a
+    /// unicode escape (`let \u0061 = 1`) is an ordinary `Identifier` token, so this
+    /// reads the declaration acorn reads. acorn's raw scan cannot decode an escape,
+    /// so it takes a following `\` as a declaration in **every** position — the
+    /// single-statement one included, where no declaration is admissible — and
+    /// over-rejects the escaped spelling alone: `L: let ⏎ \u0061 = 1;` is a syntax
+    /// error there while the unescaped `L: let ⏎ a = 1;` parses, as it does here.
+    /// ASI licenses this reading for both spellings — `let a` is underivable in a
+    /// `LabelledItem : Statement` position, so the identifier is an offending token
+    /// preceded by a `LineTerminator` and rule 1 of
+    /// §sec-rules-of-automatic-semicolon-insertion inserts the semicolon.
     pub(super) fn at_let_declaration(&mut self) -> bool {
         let kind = self.peek_kind();
         kind.is_binding_name_word()
