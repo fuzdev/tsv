@@ -24,10 +24,17 @@ Each `## Unreleased` section must be non-empty and carry a
 - **breaking** chore: every package requires Node >=22
   ([#725](https://github.com/fuzdev/tsv/pull/725))
 - **breaking** feat: every WASM parse/format export now takes an optional acorn-style
-  options object — `parse_*(source, {locations?, goal?})` and `format_*(source, {goal?})`,
-  replacing the flat `*_no_locations` / `*_with_goal` names; unknown keys throw, `goal` is
-  TypeScript-only ([#645](https://github.com/fuzdev/tsv/pull/645),
+  options object — `parse_*(source, {locations?, sourceType?})` and
+  `format_*(source, {sourceType?})`, replacing the flat `*_no_locations` / `*_with_goal`
+  names; unknown keys throw, `sourceType` is TypeScript-only
+  ([#645](https://github.com/fuzdev/tsv/pull/645),
   [#713](https://github.com/fuzdev/tsv/pull/713))
+- **breaking** feat: strictness follows the spec — `sourceType: 'script'` parses a sloppy
+  script (strict only under its own `"use strict"` prologue, so `with` and legacy octal
+  literals and escapes parse there), a module is always strict (legacy string escapes now
+  reject in one), and `format` with no `sourceType` parses as a module and retries as a
+  script only if that fails, so legacy scripts format from a bare `tsv format`
+  (`.mjs`/`.mts` excepted)
 - **breaking** fix: parse output tracks its canonical oracles — CSS roots gain
   `comments: CSSComment[]` and `::part()`/`::slotted()` gain an `args: SelectorList`
   ([#766](https://github.com/fuzdev/tsv/pull/766)), Svelte components without `lang="ts"`
