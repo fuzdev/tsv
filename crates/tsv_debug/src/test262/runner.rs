@@ -418,12 +418,7 @@ pub fn run_test(test: &TestFile) -> (TestResult, Option<bool>) {
 /// differs between the runs.
 fn grade_runs(content: &str, is_negative_parse: bool, runs: GradedRuns) -> TestResult {
     if runs != GradedRuns::BothScripts {
-        return run_parse_test(
-            &graded_source(content, runs),
-            is_negative_parse,
-            goal_for(runs),
-            takes_strict_prefix(runs),
-        );
+        return run_parse_test(content, is_negative_parse, runs);
     }
 
     let sloppy = parse_run(content, tsv_ts::Goal::Script);
@@ -577,35 +572,49 @@ pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
         Some(_) => Verdict::Reject,
     };
 
+    let (module, strict) = manifest_mode(runs);
     Some(ManifestEntry {
         relative_path: test.relative_path.clone(),
-        module: runs == GradedRuns::Module,
-        strict: matches!(runs, GradedRuns::Module | GradedRuns::StrictScript),
+        module,
+        strict,
         expected,
         tsv,
     })
 }
 
-/// Run a parse test and return the result.
+/// A manifest row's `(module, strict)` pair for a test's runs — the contract the
+/// differential consumer (`benches/js/diagnostics/test262_compare.ts`) keys its
+/// own strict prefix on: it prepends exactly when `strict && !module`, so
+/// `strict` must name the graded source's mode, not the test's flag.
+fn manifest_mode(runs: GradedRuns) -> (bool, bool) {
+    (
+        runs == GradedRuns::Module,
+        matches!(runs, GradedRuns::Module | GradedRuns::StrictScript),
+    )
+}
+
+/// Run a single-run parse test over the file's own `content` and return the
+/// result.
 ///
-/// `strict_prefixed` says whether `content` carries the harness's
-/// [`USE_STRICT_PREFIX`]. Every position the rendered parse error carries — the
-/// byte `position` and the `line_number` in its context — counts from the start
-/// of that source rather than the file's, so the failure message names both
-/// shifts.
-fn run_parse_test(
-    content: &str,
-    is_negative_parse: bool,
-    goal: tsv_ts::Goal,
-    strict_prefixed: bool,
-) -> TestResult {
-    match (parse_run(content, goal), is_negative_parse) {
+/// The source graded and the goal it is graded at both follow from `runs`
+/// (`graded_source`, `goal_for`), and so does whether the rendered parse error
+/// counts from a prefixed source: when it does, every position it carries — the
+/// byte `position` and the `line_number` in its context — is shifted from the
+/// file's, so the failure message names both shifts.
+fn run_parse_test(content: &str, is_negative_parse: bool, runs: GradedRuns) -> TestResult {
+    debug_assert_ne!(
+        runs,
+        GradedRuns::BothScripts,
+        "a two-run test is graded by grade_runs"
+    );
+    let source = graded_source(content, runs);
+    match (parse_run(&source, goal_for(runs)), is_negative_parse) {
         // Positive test passed: parsed successfully as expected
         (None, false) => TestResult::Passed,
 
         // Positive test failed: should have parsed but didn't
         (Some(error), false) => {
-            let note = if strict_prefixed {
+            let note = if takes_strict_prefix(runs) {
                 Cow::Owned(strict_prefix_note())
             } else {
                 Cow::Borrowed("")
@@ -916,5 +925,17 @@ mod tests {
         assert_eq!(graded_source(content, GradedRuns::SloppyScript), content);
         assert_eq!(graded_source(content, GradedRuns::BothScripts), content);
         assert_eq!(graded_source(content, GradedRuns::Module), content);
+    }
+
+    /// The manifest's `(module, strict)` pair is what `test262_compare.ts` keys its
+    /// prefix on (`strict && !module`), so the mapping is pinned per run shape: a
+    /// two-run test contributes its SLOPPY run, and only the prefixed single run
+    /// reads `strict` without `module`.
+    #[test]
+    fn manifest_mode_names_the_graded_source() {
+        assert_eq!(manifest_mode(GradedRuns::Module), (true, true));
+        assert_eq!(manifest_mode(GradedRuns::StrictScript), (false, true));
+        assert_eq!(manifest_mode(GradedRuns::SloppyScript), (false, false));
+        assert_eq!(manifest_mode(GradedRuns::BothScripts), (false, false));
     }
 }

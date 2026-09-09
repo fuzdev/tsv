@@ -1,9 +1,12 @@
-// while, with and do-while statement printing
+// The paren-head statement family: while, with and do-while
 //
-// Condition-group layout and body handling for while/with/do-while, including the
-// do-while comment-preservation divergence from Prettier.
+// The statements printed off one `(head)` + body pair — `while` and `with` share the
+// layout outright (`ParenHeadKind` names what differs), and do-while is the same pair
+// inverted. Condition-group layout and body handling, including the do-while
+// comment-preservation divergence from Prettier. `with` is not a loop, which is why
+// this file sits beside `loops/` rather than in it.
 
-use super::super::{HeadChainGrouping, OpenParenLineBlockComment};
+use super::{HeadChainGrouping, OpenParenLineBlockComment};
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use crate::printer::statements::StatementContext;

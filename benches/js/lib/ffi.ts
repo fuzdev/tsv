@@ -75,7 +75,7 @@ const STATUS_OK = 0;
  */
 const STATUS_UNWRITTEN = 0xffffffff;
 
-/** The C-ABI source-type codes (`tsv_ffi`'s `ffi_source_type`). `UNSPECIFIED` says
+/** The C-ABI source-type codes (`tsv_ffi`'s `SOURCE_TYPE_*` consts, restated here — there is no header). `UNSPECIFIED` says
  * the caller named no source type — accepted by the FORMAT exports alone, which
  * answer it with the module grammar retried as a script. */
 const GOAL_MODULE = 0;

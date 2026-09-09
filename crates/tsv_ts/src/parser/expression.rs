@@ -321,6 +321,17 @@ fn infix_operator_info(kind: &TokenKind) -> Option<(u8, u8, BinaryOperator)> {
     }
 }
 
+/// Whether a `{ … }` body opens with a directive prologue (ecma262
+/// sec-directive-prologues-and-the-use-strict-directive). A function body does — a
+/// `"use strict"` heading it turns the body strict — while a plain nested block does not,
+/// so the same string statement there is an ordinary expression. The axis
+/// `Parser::parse_block_body` is keyed on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DirectivePrologue {
+    Present,
+    Absent,
+}
+
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse an expression using Pratt parsing for operator precedence
     ///
@@ -2792,7 +2803,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a block statement: `{ stmt1; stmt2; }`
     ///
-    /// Parses the statements inside a block body (used for function bodies).
     /// Parse a function/arrow block body, marking its directive prologue.
     ///
     /// Function bodies (unlike arbitrary blocks) carry a directive prologue per
@@ -2804,7 +2814,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// is a deferred early error.
     pub(super) fn parse_function_body(&mut self) -> Result<BlockStatement<'arena>, ParseError> {
         self.with_strict_scope(|p| {
-            let (body, span) = p.parse_block_body(true)?;
+            let (body, span) = p.parse_block_body(DirectivePrologue::Present)?;
             Ok(BlockStatement {
                 body: body.into_bump_slice(),
                 span,
@@ -2813,7 +2823,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     pub(super) fn parse_block_statement(&mut self) -> Result<BlockStatement<'arena>, ParseError> {
-        let (body, span) = self.parse_block_body(false)?;
+        let (body, span) = self.parse_block_body(DirectivePrologue::Absent)?;
         Ok(BlockStatement {
             body: body.into_bump_slice(),
             span,
@@ -2822,12 +2832,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a `{ … }` block's statements into an arena buffer plus the block's
     /// span. Shared by `parse_block_statement` and `parse_function_body`;
-    /// `directives` is what tells the two apart — only a function body carries a
+    /// `prologue` is what tells the two apart — only a function body carries a
     /// directive prologue, so a `"use strict"` heading a plain nested block is an
     /// ordinary expression statement that turns nothing on.
     fn parse_block_body(
         &mut self,
-        directives: bool,
+        prologue: DirectivePrologue,
     ) -> Result<(bumpalo::collections::Vec<'arena, Statement<'arena>>, Span), ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
@@ -2835,7 +2845,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut body = self.bvec();
 
         // Parse statements until we hit '}'
-        let mut in_prologue = directives;
+        let mut in_prologue = prologue == DirectivePrologue::Present;
         while !self.check(&TokenKind::BraceClose) {
             if self.check(&TokenKind::Eof) {
                 return Err(self.error_msg("Unexpected end of file in block"));

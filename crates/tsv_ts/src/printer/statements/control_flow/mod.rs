@@ -5,12 +5,14 @@
 // condition-group builders used across the statement families).
 //
 // - if_else.rs: if/else statements and else-clause layout
-// - loops/: for / for-in / for-of headers and bodies (for_loop.rs), while, do-while (while_loop.rs)
+// - loops/: for / for-in / for-of headers and bodies (for_loop.rs)
+// - paren_head.rs: the `(head)` + body family — while, with, and do-while (its inverse)
 // - switch.rs: switch statements and case bodies
 // - try_jump.rs: try/catch/finally, throw, break/continue, labeled statements
 
 mod if_else;
 mod loops;
+mod paren_head;
 mod switch;
 mod try_jump;
 

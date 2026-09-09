@@ -54,7 +54,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 `typescript/script_goal/*` inputs are therefore ordinary seeds — before the retry
 existed they failed the module parse and every one of these audits silently skipped
 them. Fixture *validation* is the exception: it formats at each fixture's own `goal`
-marker (`fixtures/mod.rs` → `format_source_with_goal`), so the F-rules keep grading the
+marker (`fixtures/mod.rs` → `format_source_with_source_type` with the goal named), so the F-rules keep grading the
 exact claim the fixture makes.
 
 ⚠️ **Editing whitespace in a fixture is never local to that fixture.** The three

@@ -7,13 +7,14 @@
 //!
 //! # The source type is optional here
 //!
-//! Every entry point resolves to [`format_source_in_with_goal_option`], whose goal
-//! is an `Option`. A named one is exact. An unnamed one — `tsv format <path>`, an
-//! unset `--source-type` on `--content`/`--stdin`, every `tsv_debug` audit that
-//! calls [`format_source`] — parses at `Module` and retries at `Script` only if
-//! that *fails* (`tsv_ts::parse_with_goal_or_fallback`), so a legacy sloppy script
-//! formats without anyone naming a grammar, and a module-valid source is never
-//! reinterpreted. When both attempts fail the module error is the reported one.
+//! Every entry point resolves to [`format_source_in_with_source_type`], whose
+//! TypeScript goal is an `Option`. A named one is exact. An unnamed one — `tsv
+//! format <path>`, an unset `--source-type` on `--content`/`--stdin`, every
+//! `tsv_debug` audit that calls [`format_source`] — parses at `Module` and retries
+//! at `Script` only if that *fails* (`tsv_ts::parse_with_goal_or_fallback`), so a
+//! legacy sloppy script formats without anyone naming a grammar, and a module-valid
+//! source is never reinterpreted. When both attempts fail the module error is the
+//! reported one.
 
 use crate::cli::input::ParserType;
 
@@ -24,27 +25,18 @@ use crate::cli::input::ParserType;
 /// driver that formats many sources should reuse both across them via
 /// [`format_source_in`] (see the `format` command's worker loop).
 pub fn format_source(source: &str, parser_type: ParserType) -> Result<String, String> {
-    format_source_with_goal_option(source, parser_type, None)
+    format_source_with_source_type(source, parser_type, None)
 }
 
-/// [`format_source`] against an explicit TypeScript parse [`Goal`](tsv_ts::Goal).
+/// [`format_source`] against a TypeScript source type that may be named.
 ///
-/// `Goal::Module` is correct for Svelte and ~all real TS; `Goal::Script` parses a
-/// standalone script, which is sloppy unless a `"use strict"` directive prologue
-/// says otherwise — so a `with` statement and a leading-zero numeric literal format
-/// only through that goal. The goal is consulted only for the
+/// `Some(goal)` is exact: `Goal::Module` is correct for Svelte and ~all real TS;
+/// `Goal::Script` parses a standalone script, which is sloppy unless a `"use strict"`
+/// directive prologue says otherwise — so a `with` statement and a leading-zero
+/// numeric literal format only through that goal. `None` is the unnamed source type
+/// that takes the module-then-script fallback. The goal is consulted only for the
 /// `ParserType::TypeScript` arm (Svelte is always a module, CSS has no goal).
-pub fn format_source_with_goal(
-    source: &str,
-    parser_type: ParserType,
-    goal: tsv_ts::Goal,
-) -> Result<String, String> {
-    format_source_with_goal_option(source, parser_type, Some(goal))
-}
-
-/// The shared implementation of the two above: `Some(goal)` is exact, `None` is
-/// the unnamed source type that takes the module-then-script fallback.
-pub fn format_source_with_goal_option(
+pub fn format_source_with_source_type(
     source: &str,
     parser_type: ParserType,
     goal: Option<tsv_ts::Goal>,
@@ -54,7 +46,7 @@ pub fn format_source_with_goal_option(
     // to the source so the parse pays one chunk alloc, not a doubling tail.
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(source);
-    format_source_in_with_goal_option(source, parser_type, goal, &arena, &doc_arena)
+    format_source_in_with_source_type(source, parser_type, goal, &arena, &doc_arena)
 }
 
 /// Parse and format `source` into caller-provided arenas.
@@ -72,13 +64,14 @@ pub fn format_source_in(
     arena: &bumpalo::Bump,
     doc_arena: &tsv_lang::doc::arena::DocArena,
 ) -> Result<String, String> {
-    format_source_in_with_goal_option(source, parser_type, None, arena, doc_arena)
+    format_source_in_with_source_type(source, parser_type, None, arena, doc_arena)
 }
 
-/// [`format_source_in`] against a TypeScript parse [`Goal`](tsv_ts::Goal) that may
-/// be left unnamed. The shared implementation of every entry point in this module;
-/// `format_source_in` is the `None` form.
-pub fn format_source_in_with_goal_option(
+/// [`format_source_in`] against a TypeScript source type that may be named. The
+/// shared implementation of every entry point in this module; `format_source_in` is
+/// the `None` form. Crate-private: every caller outside reaches it through one of
+/// the three entry points above.
+pub(crate) fn format_source_in_with_source_type(
     source: &str,
     parser_type: ParserType,
     goal: Option<tsv_ts::Goal>,
