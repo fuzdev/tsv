@@ -31,7 +31,6 @@ use self::operators::{OperatorBuf, SeqLayout};
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::ShareTag;
 use crate::printer::comments::{CommentFilter, CommentSpacing, KeywordOperandGap};
-use crate::printer::decorators::DecoratorHost;
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
 use crate::printer::{
@@ -340,19 +339,16 @@ impl<'a> Printer<'a> {
                 obj.decorators,
                 self.build_object_pattern_doc(obj),
                 obj.span.start,
-                DecoratorHost::Plain,
             ),
             Expression::ArrayPattern(arr) => self.with_param_decorators(
                 arr.decorators,
                 self.build_array_pattern_doc(arr),
                 arr.span.start,
-                DecoratorHost::Plain,
             ),
             Expression::AssignmentPattern(pattern) => self.with_param_decorators(
                 pattern.decorators,
                 self.build_assignment_pattern_doc(pattern),
                 pattern.span.start,
-                DecoratorHost::Plain,
             ),
             Expression::RestElement(rest) => self.build_rest_element_doc(rest),
             Expression::TSTypeAssertion(type_assert) => {
@@ -618,7 +614,6 @@ impl<'a> Printer<'a> {
                 obj.decorators,
                 self.build_object_pattern_doc_with_context(obj, PatternContext::FunctionParameter),
                 obj.span.start,
-                DecoratorHost::Plain,
             ),
             // For other expressions, use normal doc building
             _ => self.build_expression_doc(expr),
@@ -1753,13 +1748,6 @@ impl<'a> Printer<'a> {
         // `param_prop.span.start` is the first modifier (decorators render before it
         // but sit earlier in source) — the boundary for a `@dec /* c */ readonly x`
         // comment between the decorator and the modifier.
-        self.with_param_decorators(
-            decorators,
-            self.d().concat(&parts),
-            param_prop.span.start,
-            // A parameter property IS `isPropertyLikeNode`, so a comment run after one
-            // of its decorators trails that decorator and keeps the author's blank.
-            DecoratorHost::PropertyLike,
-        )
+        self.with_param_decorators(decorators, self.d().concat(&parts), param_prop.span.start)
     }
 }

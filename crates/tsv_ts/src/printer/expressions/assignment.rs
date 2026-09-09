@@ -18,6 +18,7 @@ use crate::printer::ArrowChainContext;
 use crate::printer::Printer;
 use crate::printer::calls::chain_has_calls;
 use crate::printer::chain::chain_paren_leading_gap;
+use crate::printer::class_expr_has_decorators;
 use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
@@ -312,18 +313,6 @@ pub fn choose_layout(
 
     // Default → fluid layout
     AssignmentLayout::Fluid
-}
-
-/// Whether a class expression carries decorators (`@dec class {}`).
-///
-/// A decorated class expression breaks after the assignment operator (each
-/// decorator on its own line); an undecorated one stays on the operator's line
-/// and expands its body in place. Prettier ref: shouldBreakAfterOperator
-/// (assignment.js:228) `case "ClassExpression": isNonEmptyArray(decorators)`;
-/// the never-break ClassExpression case (assignment.js:189) only applies once
-/// that has ruled out a decorated class.
-pub fn class_expr_has_decorators(c: &internal::ClassExpression<'_>) -> bool {
-    c.decorators.is_some_and(|d| !d.is_empty())
 }
 
 /// Check if a binary expression is a logical expression with an inlinable RHS.

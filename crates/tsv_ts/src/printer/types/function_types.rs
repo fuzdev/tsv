@@ -159,8 +159,7 @@ impl<'a> Printer<'a> {
     ///
     /// `None` when the parameter is any other shape (the caller hugs its ordinary doc): a
     /// pattern, a mapped-type annotation (prettier's mapped-type printer always keeps its
-    /// group), a default, a `this` parameter — or a **decorated** identifier, whose
-    /// decorators only the ordinary builder prints. Also `None` when the annotation's
+    /// group), a default, a `this` parameter. Also `None` when the annotation's
     /// redundant paren shell holds a comment AFTER the literal
     /// ([`Self::paren_shell_trailing_gap_empty`]): this arm prints the UNWRAPPED literal
     /// and has no emitter for that gap, so the ordinary doc, which prints the shell and its
@@ -176,9 +175,17 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         let d = self.d();
         let (id, type_ann, type_literal) = get_type_literal_from_identifier(param)?;
-        if id.decorators().is_some()
-            || !self.paren_shell_trailing_gap_empty(type_ann, type_literal.span)
-        {
+        // A decorated parameter never reaches here — the shared gate declines the hug for
+        // one outright — but this arm has no emitter for a decorator, so a caller that ever
+        // did reach it would DROP one rather than lay it out differently. Asked through
+        // that same gate, so the two cannot drift: assert the invariant in tests, fall back
+        // to the ordinary builder, which prints them, in release.
+        let decorated = self.param_has_decorators(param);
+        debug_assert!(
+            !decorated,
+            "a decorated parameter must not reach the group-less hug arm"
+        );
+        if decorated || !self.paren_shell_trailing_gap_empty(type_ann, type_literal.span) {
             return None;
         }
         let mut parts = DocBuf::new();

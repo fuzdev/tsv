@@ -10,7 +10,6 @@
 
 use crate::ast::internal::{self, LiteralValue};
 use crate::printer::Printer;
-use crate::printer::decorators::DecoratorHost;
 use smallvec::{SmallVec, smallvec};
 use std::borrow::Cow;
 use tsv_lang::Span;
@@ -447,13 +446,12 @@ impl<'a> Printer<'a> {
         // `concat` short-circuits a single part (just the name) to that part.
         let inner = d.concat(&parts);
 
-        // Prefix parameter decorators (own-line in source → each on its own line and
-        // the parameter list expands; inline → a single space), preserving any
-        // comment authored between a decorator and the binding (`@dec /* c */ x`).
-        // `id.span.start` is the name — the boundary for that after-decorator scan,
-        // since acorn stores the decorators before it.
+        // Prefix parameter decorators (one group joined by `line`s, forced open by an
+        // author newline after any of them), preserving any comment authored between a
+        // decorator and the binding (`@dec /* c */ x`). `id.span.start` is the name — the
+        // boundary for that after-decorator scan, since acorn stores the decorators before it.
         if render_decorators && let Some(decorators) = id.decorators() {
-            self.with_param_decorators(Some(decorators), inner, id.span.start, DecoratorHost::Plain)
+            self.with_param_decorators(Some(decorators), inner, id.span.start)
         } else {
             inner
         }
