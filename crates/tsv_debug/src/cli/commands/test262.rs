@@ -41,9 +41,10 @@ pub struct Test262Command {
     #[argh(switch)]
     gate: bool,
 
-    /// emit a JSON manifest of the graded strict subset (relative path, module
-    /// flag, expected verdict, tsv verdict) to this file and exit — the input
-    /// to `benches/js/diagnostics/test262_compare.ts` (tsv vs oxc-parser)
+    /// emit a JSON manifest of the graded subset — module, onlyStrict, sloppy
+    /// and run-both-ways tests alike, one row each (relative path, module flag,
+    /// strict flag, expected verdict, tsv verdict) — to this file and exit; the
+    /// input to `benches/js/diagnostics/test262_compare.ts` (tsv vs oxc-parser)
     #[argh(option)]
     emit_manifest: Option<PathBuf>,
 
@@ -59,20 +60,20 @@ pub struct Test262Command {
 /// `benches/js/lib/gate_counts.ts`.
 const DISCOVERED_PIN: usize = 49_136;
 
-/// REGRESSION PIN (exact): graded strict-subset size for an unfiltered
+/// REGRESSION PIN (exact): graded-subset size for an unfiltered
 /// `--emit-manifest` run — a frontmatter/feature-filter change moving the
 /// graded set silently shifts the differential and the bench corpus.
-/// Measured 2026-07-06, ../test262 at 7153986f.
-const GRADED_MANIFEST_PIN: usize = 46_544;
+/// Measured 2026-09-08, ../test262 at 7153986f.
+const GRADED_MANIFEST_PIN: usize = 48_274;
 
 /// REGRESSION PIN (exact): positive-parse pass count on an unfiltered `--gate`
 /// run — the drop-in property the release gate enforces (tsv rejects no valid
 /// syntax; every graded positive parses). Exact like `DISCOVERED_PIN`: a drop is
 /// a regression or a positive silently reclassified as skipped, a rise is a
 /// test262 pull or a grading change — both re-pinned deliberately. Measured
-/// 2026-07-12, ../test262 at 7153986f. Mirrors `TEST262_POSITIVES_PIN` in
+/// 2026-09-08, ../test262 at 7153986f. Mirrors `TEST262_POSITIVES_PIN` in
 /// benches/js/lib/gate_counts.ts (the harvest's positive-file count).
-const POSITIVE_PASSED_PIN: usize = 42_113;
+const POSITIVE_PASSED_PIN: usize = 43_739;
 
 impl Test262Command {
     pub(crate) fn run(self) -> Result<(), CliError> {
@@ -141,9 +142,10 @@ impl Test262Command {
         }
         println!();
 
-        // Manifest mode: grade the strict subset, write JSON, and exit — the
-        // input to the tsv-vs-oxc differential consumer. Runs `tsv_ts::parse`
-        // on every graded test, so it's about as costly as a normal run.
+        // Manifest mode: grade the same subset `run_test` grades, write JSON,
+        // and exit — the input to the tsv-vs-oxc differential consumer. Runs
+        // `tsv_ts::parse` on every graded test, so it's about as costly as a
+        // normal run.
         if let Some(manifest_path) = self.emit_manifest.as_ref() {
             eprintln!("Grading {} tests for manifest…", filtered_tests.len());
             let manifest =
@@ -263,7 +265,7 @@ impl Test262Command {
             // to the total; a reason that never fired is dropped rather than
             // printed as a zero, so the line names only what actually happened.
             let reasons: Vec<String> = [
-                ("sloppy mode", summary.skipped_sloppy_mode),
+                ("Annex B", summary.skipped_annex_b),
                 (
                     "unimplemented feature",
                     summary.skipped_unimplemented_feature,

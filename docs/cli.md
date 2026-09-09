@@ -113,7 +113,7 @@ honors `--goal` on file paths too. The goal does not decide strictness: Module c
 strict, Script code is strict only once a `"use strict"` directive prologue says so (see
 [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive); the
 goal axis itself is
-[conformance_test262.md §Strict Mode Only, Explicit Goal Axis](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis)).
+[conformance_test262.md §Module Strict, Script by Directive](./conformance_test262.md#design-decision-module-strict-script-by-directive-annex-b-out)).
 Two constructs follow strictness rather than the goal: a `with` statement and a
 leading-zero numeric literal (`010`, `08`) parse in a sloppy script and are syntax
 errors in strict code.

@@ -3,13 +3,15 @@
  *
  * Consumes the manifest emitted by
  *   cargo run -p tsv_debug test262 --emit-manifest <file>
- * (tsv's graded strict subset — each row carries the test's `expected` verdict
- * and tsv's actual verdict), runs oxc-parser over the same files at the same
- * goal tsv grades each at (`module`-flagged → module, else script, made strict
- * by the harness prefix) and under the same harness strict-mode transform
- * (`graded_source`), and buckets the agreement so a tsv failure can be triaged
- * as a real bug vs. a shared limitation. The two starred buckets are the
- * actionable output:
+ * (tsv's graded subset, one row per test — each row carries the test's
+ * `expected` verdict and tsv's actual verdict), runs oxc-parser over the same
+ * files at the same goal tsv grades each at (`module`-flagged → module, else
+ * script) and under the same harness strict-mode transform (`graded_source`,
+ * applied on the rows the manifest marks `strict`), and buckets the agreement so
+ * a tsv failure can be triaged as a real bug vs. a shared limitation. A
+ * mode-unflagged test is graded twice by the Rust runner but carries one row
+ * here — its sloppy run — so both parsers see exactly one real run of it. The
+ * two starred buckets are the actionable output:
  *   - positives where tsv rejects but oxc accepts → tsv real-bug candidates
  *   - negatives where oxc rejects but tsv accepts → tsv early-error gaps
  *
@@ -90,8 +92,8 @@ function graded_source(source: string, entry: ManifestEntry): string {
 /**
  * oxc's accept/reject verdict for one source, parsed at the test's goal to
  * mirror tsv: `module`-flagged tests as a module, everything else (the
- * run-both-ways default + `onlyStrict`) as a script (`module` comes from the
- * manifest). So an `await`-as-identifier test, valid only in a script, lands in
+ * run-both-ways default, `onlyStrict`, `noStrict` and `raw`) as a script (`module`
+ * comes from the manifest). So an `await`-as-identifier test, valid only in a script, lands in
  * `both-accept` rather than `both-reject`.
  *
  * The goal axis matches, and strictness is not carried by the goal on either
@@ -200,7 +202,11 @@ function summarize(label: string, rows: Row[], total: number, star = false): str
 	)}%)${mark}`;
 }
 
-console.error(`\ntest262 differential: tsv vs oxc-parser (oxc parsed as module)`);
+console.error(`\ntest262 differential: tsv vs oxc-parser`);
+console.error(
+	`oxc parsed at each row's declared goal: module rows as module, the rest as script, ` +
+		`rows the manifest marks strict behind the harness's "use strict" prefix`
+);
 console.error(`graded subset: ${graded} tests  (${positives} positive, ${negatives} negative)`);
 if (read_errors) console.error(`(${read_errors} files unreadable, skipped)`);
 console.error(

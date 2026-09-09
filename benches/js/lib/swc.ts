@@ -35,6 +35,16 @@
  * a module-goal failure (the same trap documented for the other parsers in
  * docs/benchmarks.md §Fairness caveats).
  *
+ * **The `with` statement is refused at every `isModule` setting.** swc is always
+ * driven at `syntax: 'typescript'` (see `_options`), and its TypeScript grammar
+ * rejects `with` outright — "The 'with' statement is not supported" — including at
+ * the sloppy script goal, where the statement is legal ECMAScript. That is a
+ * property of swc's grammar, not a misconfiguration: no `isModule` setting reaches
+ * it. Nothing on the perf corpus writes one, but the conformance surface's
+ * harvested `script` entries are sloppy scripts, so the `with` tests there are a
+ * real coverage cost for this row rather than a harness artifact; the coverage
+ * report carries the count.
+ *
  * The real-corpus files it rejects are catalogued in `lib/perf_omit.ts`; all are
  * `.d.ts` files already tolerated there for other tools.
  */

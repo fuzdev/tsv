@@ -111,7 +111,7 @@ or an over-rejection — the over-acceptance and reject-parity rows cannot occur
   ordinary name (`var f = (await) => {}`, `async function await()`). The gate retries
   at `Goal::Script` **only when tsc read the file as a script**, so a module-goal
   refusal of a file tsc calls a module still falls through to the acorn split.
-  The goal axis itself: [conformance_test262.md §Strict Mode Only](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis).
+  The goal axis itself: [conformance_test262.md §Module Strict, Script by Directive](./conformance_test262.md#design-decision-module-strict-script-by-directive-annex-b-out).
 - `tsc_parser_rejects`: the baseline is silent because the harness compiled
   something other than the bytes on disk — a UTF-16 file the harness decoded and every
   tool here reads as UTF-8 (tsc's TS1490), a shebang the harness's directive-strip
