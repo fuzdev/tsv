@@ -444,7 +444,7 @@ The `parse_expression_bp(min_bp)` loop handles multiple phases in precedence ord
 - **Generics vs comparison**: Check for type parameter markers after `<`, scan to closing `>`
 - **Type assertions**: `<T>expr` vs `a < b` — lookahead for type-like content between angles
 
-Parser state flags manage context sensitivity: `allow_in` (disables `in` operator in for-loop headers), `top_level_as_is_assertion` (Svelte `#each` binding context, where a top-level `as` is the block's separator rather than TypeScript's operator), `grouping_depth` (parenthesis nesting), `in_ambient_context` (`declare` blocks).
+Parser state flags manage context sensitivity: `allow_in` (disables `in` operator in for-loop headers), `top_level_as_is_assertion` (Svelte `#each` binding context, where a top-level `as` is the block's separator rather than TypeScript's operator), `grouping_depth` (parenthesis nesting), `in_ambient_context` (`declare` blocks), `in_await` / `in_yield` (the `[Await]` / `[Yield]` grammar parameters, seeded from the goal and swapped at every function-like scope), and `strict` (seeded `Module ⟹ strict`, turned on — never off — by a `"use strict"` directive prologue or a class, and gating the three strict-mode production disallowances at the point a token becomes a node; see [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)). Every flag is saved and restored by its own combinator, never assigned bare, which is what lets `Parser::checkpoint` carry none of them.
 
 ### CSS (`tsv_css/src/parser/`)
 
