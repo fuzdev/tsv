@@ -68,6 +68,7 @@ use super::Printer;
 use super::types::helpers::{TypeParenRule, outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
 use crate::ast::internal::{self, Comment, TSType};
+use crate::lexer::{is_es_line_terminator, is_es_whitespace};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -91,6 +92,25 @@ impl LeadingRunFreeze {
     pub(in crate::printer) fn first_member_flags(freeze: Option<Self>) -> (bool, bool) {
         freeze.map_or((false, false), |f| (true, f.multiline))
     }
+}
+
+/// Which terminator a statement kind owns, and therefore what a freeze over it must NOT
+/// copy — prettier's `shouldIgnoredNodePrintSemicolon`, read as the three answers it gives.
+///
+/// The distinction that matters is `Never` vs. the other two: a `;` a kind does not own is
+/// the statement's own content (an empty-statement body's `;`), so it stays inside the
+/// frozen slice; a `;` a kind owns is the printer's and is re-emitted rather than frozen.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FrozenTerminator {
+    /// The kind ends in a `;` however it was authored — ASI supplies one where the author
+    /// did not. `VariableDeclaration`, `break` / `continue` / `debugger`.
+    Always,
+    /// The kind ends in a `;` only where the author wrote one; ASI spellings get none.
+    /// `ExpressionStatement` (a directive prologue entry included), `return` / `throw` /
+    /// do-while and the module declarations.
+    IfAuthored,
+    /// The kind owns no terminator, so a trailing `;` is content and freezes with it.
+    Never,
 }
 
 /// Whether `child` is a freeze TARGET — the composite-transparency arm of
@@ -794,55 +814,111 @@ impl<'a> Printer<'a> {
 
     /// [`Self::build_frozen_node_doc`] for a frozen STATEMENT — a list member, a header's
     /// body ([`Self::build_statement_head_doc`]), a labeled statement's body, or an
-    /// `export`ed declaration — plus the one terminator rule the span alone can't carry: a
-    /// frozen statement whose kind always takes a `;` — and whose author relied on ASI, so
-    /// the slice doesn't end with one — emits the `;` prettier emits. Prettier's slice for
-    /// these kinds ends BEFORE any authored `;` (its `locEnd` override stops at the last
-    /// declarator / the keyword / the label) and `shouldIgnoredNodePrintSemicolon`
-    /// unconditionally re-appends it; tsv's slice keeps an authored `;`, so the append
-    /// fires only when it is missing. Without it the freeze swallows the terminator ASI
-    /// supplied, and the NEXT statement's printed form can fabricate a leading `(` that
-    /// re-binds the pair into one broken statement (`const a = x` + `y => 1` →
-    /// `x(y) => 1`) — output that does not reparse. Pinned by the
-    /// `typescript/syntax/asi/prettier_ignore_semicolon*` family (list, case-consequent,
-    /// header-body and `export`-head spellings).
+    /// `export`ed declaration — plus the one rule a raw span cannot carry: **a statement's
+    /// terminator belongs to the printer, not to the author.** The slice ends at the
+    /// statement's own content ([`Self::frozen_statement_slice`]) and the `;` is emitted
+    /// here rather than copied.
     ///
-    /// The kind set is prettier's exactly: `VariableDeclaration`, `break` / `continue` /
-    /// `debugger`, and an `if` / loop / label whose TAIL statement is one of those
-    /// ([`Self::frozen_statement_kind_takes_semicolon`]). The content-end family
-    /// (`ExpressionStatement`, the whole-`export` list positions, `return` / `throw` /
-    /// do-while) is deliberately not in it: prettier re-appends there only when the source
-    /// carried a `;` — which tsv's slice already keeps — and gives the ASI spellings no
-    /// `;` at all.
-    // TODO: the ASI `ExpressionStatement` and list-position `export` spellings still
-    // freeze terminator-less on both sides, and prettier's own output does not reparse
-    // there — that half wants a deliberate divergence rule + fixture of its own.
+    /// tsv has to own the terminator at the ASI end regardless: a frozen
+    /// `VariableDeclaration` whose author relied on ASI must get the `;` restored, or the
+    /// NEXT statement's printed form can fabricate a leading `(` that re-binds the pair into
+    /// one broken statement (`const a = x` + `y => 1` → `x(y) => 1`) — output that does not
+    /// reparse. Owning it at *both* ends is what makes that one rule instead of two: an
+    /// authored `;` the author left separated from its statement (`const a = x⏎;`, the
+    /// semicolon-free style's `;[…]` idiom) is re-emitted glued rather than frozen where it
+    /// sat, which is prettier's answer too. Pinned by the
+    /// `typescript/syntax/asi/prettier_ignore_semicolon*` family (list, case-consequent,
+    /// header-body, `export`-head and detached-terminator spellings).
     pub(in crate::printer) fn build_frozen_statement_doc(
         &self,
         stmt: &internal::Statement<'_>,
     ) -> DocId {
-        let frozen = stmt.span();
+        let (frozen, terminated) = self.frozen_statement_slice(stmt);
         let doc = self.build_frozen_node_doc(frozen);
-        if Self::frozen_statement_kind_takes_semicolon(stmt)
-            && !frozen.extract(self.source).ends_with(';')
-        {
+        if terminated {
             let d = self.d();
             return d.concat(&[doc, d.text(";")]);
         }
         doc
     }
 
-    /// Whether a frozen statement's kind unconditionally ends in a `;` — prettier's
-    /// `shouldIgnoredNodePrintSemicolon`, minus its content-end arm (see
-    /// [`Self::build_frozen_statement_doc`]). A header kind resolves through its TAIL
-    /// statement the way prettier does: the statement's terminator is its tail's.
-    fn frozen_statement_kind_takes_semicolon(mut stmt: &internal::Statement<'_>) -> bool {
+    /// The verbatim extent of a frozen statement, and whether a `;` follows it — prettier's
+    /// `locEnd` overrides (`src/language-js/location/overrides.js`) and its
+    /// `shouldIgnoredNodePrintSemicolon`, which are one walk read twice.
+    ///
+    /// Only a kind that OWNS a terminator ([`FrozenTerminator`]) trims one, which is what
+    /// leaves the `;` of an empty-statement body inside the slice (`for (  ;;  )⏎;`,
+    /// `while (  a  )⏎;`, `l:⏎;` — there the `;` IS the body) and likewise the `;` of a kind
+    /// prettier's table does not list (`type A  =  B⏎;`). Both stay frozen exactly as
+    /// authored, on both formatters.
+    ///
+    /// ⚠️ The trim is over WHITESPACE ONLY — **a comment is content** and stays inside the
+    /// slice. Prettier trims its comment-STRIPPED text, so `fn(  a  ) /* c */ ;` is
+    /// `fn(  a  ); /* c */` there and `fn(  a  ) /* c */;` here — the reading the directive's
+    /// own promise asks for, and a cataloged divergence (see
+    /// `docs/conformance_prettier_ignore.md` §Format-ignore directive).
+    ///
+    /// ⚠️ **A `//` owns the rest of its line, so it ends the trim outright**
+    /// ([`Self::frozen_slice_ends_in_line_comment`]): pulling the terminator up onto a line
+    /// comment's line does not move it, it SWALLOWS it, and the statement loses the `;` the
+    /// following statement needs — `const a = x // c⏎;` + `(y) => 1;` welds to
+    /// `const a  =  x // c;`, which no longer parses at all. There the whole node freezes as
+    /// authored, terminator included, which is both lossless and the only reparsable answer.
+    ///
+    /// The whitespace class is ECMAScript's `WhiteSpace ∪ LineTerminator` — what JS
+    /// `trimEnd` trims, which is neither Rust's `char::is_whitespace` (omits `<ZWNBSP>`,
+    /// admits `<NEL>`) nor ASCII.
+    fn frozen_statement_slice(&self, stmt: &internal::Statement<'_>) -> (Span, bool) {
+        let span = stmt.span();
+        let terminator = Self::frozen_statement_terminator(stmt);
+        if terminator == FrozenTerminator::Never {
+            return (span, false);
+        }
+        let Some(content) = span.extract(self.source).strip_suffix(';') else {
+            // ASI supplied the terminator: nothing to trim, and only a kind that always
+            // carries one gets it printed back.
+            return (span, terminator == FrozenTerminator::Always);
+        };
+        let content = content.trim_end_matches(|c| is_es_whitespace(c) || is_es_line_terminator(c));
+        let content_end = span.start + content.len() as u32;
+        if self.frozen_slice_ends_in_line_comment(span.start, content_end) {
+            return (span, false);
+        }
+        (Span::new(span.start, content_end), true)
+    }
+
+    /// Whether the last thing inside a frozen statement's trimmed slice is a `//` comment —
+    /// the one shape a printed terminator cannot follow on the same line.
+    ///
+    /// **In-source axis** ([`Printer::comments_in_source_between`]): the question is which
+    /// bytes are physically there, not which comments this emitter owes, and a frozen slice
+    /// prints every comment inside it verbatim either way.
+    fn frozen_slice_ends_in_line_comment(&self, start: u32, content_end: u32) -> bool {
+        self.comments_in_source_between(start, content_end)
+            .last()
+            .is_some_and(|c| !c.is_block && c.span.end == content_end)
+    }
+
+    /// Which terminator rule a frozen statement's kind follows — prettier's
+    /// `shouldIgnoredNodePrintSemicolon`. A header kind resolves through its TAIL statement
+    /// the way prettier does: a statement's terminator is its tail's.
+    fn frozen_statement_terminator(mut stmt: &internal::Statement<'_>) -> FrozenTerminator {
         loop {
             stmt = match stmt {
                 internal::Statement::VariableDeclaration(_)
                 | internal::Statement::BreakStatement(_)
                 | internal::Statement::ContinueStatement(_)
-                | internal::Statement::DebuggerStatement(_) => return true,
+                | internal::Statement::DebuggerStatement(_) => return FrozenTerminator::Always,
+                internal::Statement::ExpressionStatement(_)
+                | internal::Statement::ReturnStatement(_)
+                | internal::Statement::ThrowStatement(_)
+                | internal::Statement::DoWhileStatement(_)
+                | internal::Statement::ImportDeclaration(_)
+                | internal::Statement::ExportNamedDeclaration(_)
+                | internal::Statement::ExportDefaultDeclaration(_)
+                | internal::Statement::ExportAllDeclaration(_) => {
+                    return FrozenTerminator::IfAuthored;
+                }
                 internal::Statement::IfStatement(s) => s.alternate.unwrap_or(s.consequent),
                 internal::Statement::ForStatement(s) => s.body,
                 internal::Statement::ForInStatement(s) => s.body,
@@ -850,7 +926,7 @@ impl<'a> Printer<'a> {
                 internal::Statement::WhileStatement(s) => s.body,
                 internal::Statement::WithStatement(s) => s.body,
                 internal::Statement::LabeledStatement(s) => s.body,
-                _ => return false,
+                _ => return FrozenTerminator::Never,
             };
         }
     }
