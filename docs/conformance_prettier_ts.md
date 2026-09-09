@@ -233,7 +233,11 @@ parser refuses them because tsc's scanner has no sloppy mode. There is no
 - Leading-zero numeric literals — `LegacyOctalIntegerLiteral` (`010`, `0777`, read in base 8)
   and `NonOctalDecimalIntegerLiteral` (`08`, `089`, `08.5`, read as decimal) — `Octal literals
   are not allowed. Use the syntax '0o10'.` / `Decimals with leading zeros are not allowed.` —
-  [script_goal/sloppy_legacy_octal_literal](../tests/fixtures/typescript/script_goal/sloppy_legacy_octal_literal_prettier_divergence/)
+  [script_goal/sloppy_legacy_octal_literal](../tests/fixtures/typescript/script_goal/sloppy_legacy_octal_literal_prettier_divergence/);
+  the same literal as a parameter **default** of a function whose body then declares
+  `"use strict"` — the parameters parse under the outer mode, so it is legal there —
+  [script_goal/nonsimple_params_directive](../tests/fixtures/typescript/script_goal/nonsimple_params_directive_svelte_prettier_divergence/)
+  (also an acorn divergence: acorn refuses the directive itself, an early error tsv defers)
 - Legacy string escapes — `LegacyOctalEscapeSequence` (`'\7'`, `'\101'`, and `'\0'` followed
   by a decimal digit, read in base 8) and `NonOctalDecimalEscapeSequence` (`'\8'`, `'\9'`,
   standing for the digit itself) — `Octal escape sequences are not allowed. Use the syntax

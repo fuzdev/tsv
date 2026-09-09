@@ -33,3 +33,13 @@ let k: { "\7": string };
 let m: import("\101").Foo;
 
 const l = obj["\7"] + "\9";
+
+// a function body's directive turns strict mode on for that body alone, and the mode
+// is restored on the way out — so the legacy escape ahead of it and the one after it
+// are both legal, and only a `'\7'` INSIDE the body would be rejected
+const n = "\7";
+function fn() {
+	"use strict";
+	return 1;
+}
+const o = "\7";
