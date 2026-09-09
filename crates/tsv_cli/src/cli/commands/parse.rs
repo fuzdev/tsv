@@ -125,8 +125,10 @@ pub(crate) fn parse_source_type_arg(
 /// `Module` and CSS has no goal, so a caller naming one there asked for something
 /// that cannot be honored and must be told — the stance every binding takes
 /// (`tsv_wasm`'s `read_options`, `tsv_ffi`'s `ffi_source_type`, `tsv_napi`), so the
-/// CLI is not the one surface where the flag is silently dropped. Shared by `parse`
-/// and `format`; the flag's *value* is validated ahead of this by
+/// CLI is not the one surface where the flag is silently dropped — the JS mirror
+/// (`crates/tsv_wasm/npm/cli.js`, the bin of both npm CLIs) carries the same
+/// refusal word for word, so the two shipped `tsv` bins cannot drift. Shared by
+/// `parse` and `format`; the flag's *value* is validated ahead of this by
 /// `parse_source_type_arg`, so this only asks whether it was named at all.
 pub(crate) fn check_source_type_language(
     source_type: Option<&str>,

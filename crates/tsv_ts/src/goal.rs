@@ -39,9 +39,10 @@ pub enum Goal {
     /// `ParseScript` — `await` is an ordinary identifier (the top level is
     /// `[~Await]`); `import`/`export` declarations, `import.meta`, and top-level
     /// `await` expressions are syntax errors. Script code is **sloppy** unless its
-    /// directive prologue holds a `"use strict"`, so a leading-zero numeric
-    /// literal (`010`, `08`) and a `with` statement parse where a module rejects
-    /// them. The Annex B web-compatibility grammar is out of scope at both goals.
+    /// directive prologue holds a `"use strict"`, so the strict-mode production
+    /// disallowances parse where a module rejects them — enumerated once on the flag
+    /// that gates them (`Parser::strict`), never re-listed here. The Annex B
+    /// web-compatibility grammar is out of scope at both goals.
     Script,
 }
 
@@ -68,6 +69,34 @@ impl Goal {
             _ => None,
         }
     }
+
+    /// The goal a file's **extension** settles, or `None` when it settles nothing.
+    ///
+    /// Two of the six extensions tsv formats carry a goal in the name rather than in
+    /// the file: `.mjs` and `.mts` are ES modules whatever any config says — Node
+    /// loads a `.mjs` as ESM unconditionally, and TypeScript maps `.mts`/`.mjs` to
+    /// `ModuleKind.ESNext` with the extension overriding `module`
+    /// (`src/compiler/program.ts`'s implied-format switch). Their `.c*` counterparts
+    /// are the CommonJS half of that same switch, but CommonJS is not the `Script`
+    /// goal in any useful sense here — a `.cjs` is script *code* yet nothing in tsv's
+    /// output turns on it — so they stay unsettled with `.js`/`.ts`.
+    ///
+    /// A caller that formats a path reads this instead of naming nothing at all: the
+    /// module-then-script fallback exists to reach a **legacy sloppy script**, and a
+    /// file whose own extension forbids being one has nothing to fall back to. Every
+    /// source the module grammar accepts formats identically either way — the retry
+    /// fires only on a module parse *failure* — so this narrows the fallback to the
+    /// files it was written for and never changes an output.
+    ///
+    /// `None` for every other extension (including a Svelte or CSS path, whose parser
+    /// has no goal axis at all), leaving the caller's own default in force.
+    pub fn from_extension(path: &str) -> Option<Goal> {
+        if path.ends_with(".mjs") || path.ends_with(".mts") {
+            Some(Goal::Module)
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -91,5 +120,25 @@ mod tests {
     #[test]
     fn default_is_module() {
         assert_eq!(Goal::default(), Goal::Module);
+    }
+
+    #[test]
+    fn only_the_module_only_extensions_settle_a_goal() {
+        for path in ["a.mjs", "a.mts", "deep/dir/a.mjs", "a.config.mjs"] {
+            assert_eq!(
+                Goal::from_extension(path),
+                Some(Goal::Module),
+                "{path} is an ES module by its own extension"
+            );
+        }
+        for path in [
+            "a.js", "a.mjsx", "a.ts", "a.cjs", "a.cts", "a.svelte", "a.css", "amjs", "a", "",
+        ] {
+            assert_eq!(
+                Goal::from_extension(path),
+                None,
+                "{path} settles no goal — the caller's default stands"
+            );
+        }
     }
 }

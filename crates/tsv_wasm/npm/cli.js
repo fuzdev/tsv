@@ -235,7 +235,7 @@ Options:
   --content <s>     content to format, printed to stdout (requires --parser)
   --stdin           read from stdin, print to stdout (requires --parser)
   --parser <p>      parser type: svelte | typescript | css (--content/--stdin only)
-  --source-type <t> TypeScript parse goal: script | module (default: module, retried as a script; --content/--stdin only)
+  --source-type <t> TypeScript parse goal: script | module (default: module, retried as a script; --content/--stdin only; an error with svelte/css)
   --check           check instead of writing/printing: exit 1 if any input would change
   --list            list the discovered in-scope files (one per line) without formatting; path mode only
   --jobs <n>        worker thread count (default: scaled to this machine and engine; explicit values capped at 4x logical)
@@ -252,7 +252,7 @@ Options:
   --content <s>     content to parse (requires --parser)
   --stdin           read from stdin (requires --parser)
   --parser <p>      parser type: svelte | typescript | css
-  --source-type <t> TypeScript parse goal: script | module (default: module)
+  --source-type <t> TypeScript parse goal: script | module (default: module; an error with svelte/css)
   --no-locations    omit per-node loc (span-only wire; svelte also omits name_loc; no-op for css)
 `;
 
@@ -361,14 +361,21 @@ function resolve_source_type(source_type, code) {
 	process.exit(code);
 }
 
-/** The WASM `sourceType` option for `parser`. The option is TypeScript-only in
- * the WASM API (svelte's `<script>` is always a module, css has no goal), so a
- * validated-but-inert `--source-type` on the other languages is spelled
- * `undefined` rather than passed — a supported key set to `undefined` reads as
- * its default, which is what lets one bag serve whichever parser or formatter
- * (native-CLI parity, since there too the source type only reaches TypeScript). */
-function source_type_option(parser, source_type) {
-	return parser === 'typescript' ? source_type : undefined;
+/** Refuse a `--source-type` on a language that has no goal axis, or exit `code` —
+ * the native CLI's `check_source_type_language`, word for word. Svelte hard-wires
+ * `Module` and css has no goal, so a caller naming one there asked for something
+ * that cannot be honored and must be told; every binding takes that stance
+ * (`tsv_wasm`'s `read_options` throws on a set key), so this bin is not the one
+ * surface that drops the flag silently. Called once the parser is resolved and
+ * before the parse/format call, so `source_type` is thereafter `undefined` on
+ * every goalless language and one options bag still serves whichever engine. */
+function refuse_source_type_language(parser, source_type, code) {
+	if (source_type !== undefined && parser !== 'typescript') {
+		eprint(
+			`Error: --source-type is only supported for typescript (the ${parser} parser has no source type)\n`
+		);
+		process.exit(code);
+	}
 }
 
 /** Extension-based parser detection, mirroring the native `ParserType::from_extension`. */
@@ -376,6 +383,21 @@ function parser_from_extension(path) {
 	if (path.endsWith('.svelte')) return 'svelte';
 	if (path.endsWith('.css')) return 'css';
 	return 'typescript';
+}
+
+/**
+ * The source type a path's own EXTENSION settles, or `undefined` when it settles
+ * none — restated by hand from the native `tsv_ts::Goal::from_extension` (as
+ * `clamp_worker_count` is), so both `tsv` bins format a path under the same grammar.
+ *
+ * `.mjs` and `.mts` are ES modules whatever any config says, so the module-then-script
+ * fallback has nothing to fall back to there: it exists to reach a legacy sloppy
+ * script, which a file that is a module by name cannot be. Every other extension stays
+ * `undefined` and takes the fallback. No source the module grammar accepts is affected
+ * — the retry fires only on a module parse failure.
+ */
+function source_type_from_extension(path) {
+	return path.endsWith('.mjs') || path.endsWith('.mts') ? 'module' : undefined;
 }
 
 async function run_format(args) {
@@ -433,11 +455,13 @@ function format_single(values, positionals, parser, source_type) {
 		eprint(`Error: ${flag} requires --parser <svelte|typescript|css>\n`);
 		process.exit(2);
 	}
+	refuse_source_type_language(parser, source_type, 2);
 	const input = values.content !== undefined ? values.content : read_stdin(2);
 	let formatted;
 	try {
-		// one bag, handed to whichever formatter
-		formatted = FORMATTERS[parser](input, { sourceType: source_type_option(parser, source_type) });
+		// one bag, handed to whichever formatter — the refusal above leaves
+		// `source_type` undefined on the goalless languages, which reads as the default
+		formatted = FORMATTERS[parser](input, { sourceType: source_type });
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);
 		process.exit(2);
@@ -465,8 +489,9 @@ async function format_paths(values, positionals) {
 	}
 	// Path mode resolves the source type per file instead of taking one for the
 	// whole run: a Svelte or CSS file on the same command line has no source type to
-	// honor, and every JS/TS file already formats under whichever grammar accepts it
-	// (`format_one` names none). Mirrors the native CLI's refusal, word for word.
+	// honor, and every JS/TS file formats under whichever grammar accepts it unless
+	// its own extension settles one (`source_type_from_extension`). Mirrors the
+	// native CLI's refusal, word for word.
 	if (values['source-type'] !== undefined) {
 		eprint(
 			'Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script\n'
@@ -561,8 +586,13 @@ function format_one(path, check) {
 		return { kind: 'error', message: `read failed: ${error.message}` };
 	}
 	let formatted;
+	const parser = parser_from_extension(path);
 	try {
-		formatted = FORMATTERS[parser_from_extension(path)](source);
+		formatted = FORMATTERS[parser](source, {
+			// TypeScript only; the other two formatters reject a SET key, and the
+			// goalless extensions resolve to `undefined`, which reads as the default
+			sourceType: parser === 'typescript' ? source_type_from_extension(path) : undefined
+		});
 	} catch (error) {
 		// A trap (`WebAssembly.RuntimeError` — a parse error is a plain `Error`)
 		// is not a per-file failure: a stack overflow (input nested past ~1,600
@@ -898,6 +928,8 @@ function run_parse(args) {
 		process.exit(1);
 	}
 
+	refuse_source_type_language(parser, source_type, 1);
+
 	// --no-locations drops per-node `loc` (span-only wire; svelte also `name_loc`,
 	// a no-op for css); orthogonal to --source-type (the source type drives the TS
 	// parser, no-locations the writer), so they compose. `locations` is a parse-only
@@ -907,7 +939,7 @@ function run_parse(args) {
 	try {
 		json = PARSERS[parser](input, {
 			locations: !no_locations,
-			sourceType: source_type_option(parser, source_type)
+			sourceType: source_type
 		});
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);

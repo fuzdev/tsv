@@ -189,9 +189,10 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Progr
 /// script, where `await` is an ordinary identifier and `import`/`export`
 /// declarations, `import.meta`, and top-level `await` expressions are syntax
 /// errors. The goal carries no strictness of its own past `Module`: a script is
-/// sloppy unless its directive prologue holds a `"use strict"`, so the two
-/// strictness-keyed constructs — a `with` statement and a leading-zero numeric
-/// literal (`010`, `08`) — parse only under a directive-free `Script`.
+/// sloppy unless its directive prologue holds a `"use strict"`, so the strict-mode
+/// production disallowances parse only under a directive-free `Script`. Which
+/// constructs those are is enumerated once, on the flag that gates them
+/// (`Parser::strict`).
 pub fn parse_with_goal<'arena>(
     source: &str,
     goal: Goal,

@@ -330,16 +330,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
             }
             // String literal types: `"hello"`, `'world'`
-            TokenKind::String => {
-                let (start, end) = self.current_pos();
-                let cooked = self.extract_string_cooked()?;
-                self.advance()?;
-
-                Ok(TSType::Literal(TSLiteralType::String(Literal {
-                    value: LiteralValue::String(cooked),
-                    span: Span::new(start as u32, end as u32),
-                })))
-            }
+            TokenKind::String => Ok(TSType::Literal(TSLiteralType::String(
+                self.parse_string_literal()?,
+            ))),
             // Negative number literal types: `-1`, `-42n`
             TokenKind::Minus => {
                 let start = self.current_pos().0;
@@ -644,14 +637,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_expected("string literal in import type"));
         }
 
-        let (arg_start, arg_end) = self.current_pos();
-        let cooked = self.extract_string_cooked()?;
-        self.advance()?;
-
-        let argument = Literal {
-            value: LiteralValue::String(cooked),
-            span: Span::new(arg_start as u32, arg_end as u32),
-        };
+        let argument = self.parse_string_literal()?;
 
         // Optional options object: `import('module', {with: {type: 'json'}})`
         let options: Option<&'arena Expression<'arena>> = if self.eat(TokenKind::Comma) {

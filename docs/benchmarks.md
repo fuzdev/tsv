@@ -162,8 +162,9 @@ Things the published numbers measure that aren't quite what they look like.
   (coverage flag unset) times the all-tools-pass intersection — an adversarial
   corpus's "easy" subset (`BENCH_MODE=union` audits what it hides). test262 files
   are parsed at the goal test262 **declares** (`SourceFile.goal`, from the
-  harvest's per-file `module` flag → `module`, else strict `script`): tsv routes
-  through its bindings' goal axis (FFI a `u32` code, N-API a trailing source-type
+  harvest's per-file `module` flag → `module`, else **sloppy** `script` — strict only
+  via the file's own `"use strict"` prologue): tsv routes through its bindings' goal
+  axis (FFI a `u32` code, N-API a trailing source-type
   string, WASM the `sourceType` parse option), acorn takes `sourceType: goal`, oxc an
   explicit `sourceType` — so a script-goal `await`-identifier test is scored valid
   against every tool rather than counted as a module-goal failure. (Before this,

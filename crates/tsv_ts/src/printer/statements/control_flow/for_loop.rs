@@ -3,7 +3,7 @@
 // for-loop header layout (init/test/update clauses with comment placement),
 // for-in/for-of left/right printing.
 
-use super::super::HeadChainGrouping;
+use super::HeadChainGrouping;
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::StatementContext;

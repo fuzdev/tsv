@@ -15,6 +15,13 @@ mod modules;
 mod type_declarations;
 mod variable;
 
+/// The canonical spelling of the decorator-list axis, since `parse_decorators` is
+/// reached from two sides — the class parsers in this module and the generic
+/// parameter-list parser in `crate::parser::parameters`, which cannot see `class`
+/// directly. Every caller imports it from here, including the ones next door, so
+/// there is one path to it rather than two.
+pub(in crate::parser) use class::DecoratorListKind;
+
 /// Which statement position a parse is in — the axis ecma262 draws between
 /// `StatementListItem` (a declaration is admissible) and the single `Statement` an
 /// `if` arm, a loop body, a `with` body or a labelled item takes (it is not).
@@ -112,9 +119,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // must stay here (it debug-asserts this predicate for that reason).
         //
         // ⚠️ This widens who may be labelled, never WHAT may be labelled:
-        // `LabelledItem : Statement | FunctionDeclaration`, so `label: let x = 1`
-        // still rejects — the body goes through `parse_statement`, which parses a
-        // lexical declaration and is then rejected by the labelled-item check.
+        // `LabelledItem : Statement | FunctionDeclaration`, so `label: const x = 1`
+        // still rejects — the body goes through `parse_nested_statement`, which builds
+        // the declaration and is then rejected by the labelled-item check. `label: let`
+        // never reaches that check at all: a labelled item is a `StatementPosition::Single`
+        // position, where `let` reads as an `IdentifierReference` (see
+        // [`StatementPosition`]), so `label: let x = 1` dies at the missing `;` instead.
         if self.at_reference_name() && self.peek_kind() == TokenKind::Colon {
             return self.parse_labeled_statement();
         }

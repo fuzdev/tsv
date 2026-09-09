@@ -1008,6 +1008,64 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(f.stderr, /invalid --source-type/);
 	});
 
+	it('--source-type on a goalless language is refused (parse 1, format 2)', () => {
+		// the native CLI's `check_source_type_language`, mirrored word for word — svelte
+		// hard-wires Module and css has no goal, so naming one must be told, not dropped
+		const p = run_cli([
+			'parse',
+			'--content',
+			'<div />',
+			'--parser',
+			'svelte',
+			'--source-type',
+			'script'
+		]);
+		assert.equal(p.status, 1);
+		assert.match(p.stderr, /--source-type is only supported for typescript/);
+		const f = run_cli([
+			'format',
+			'--content',
+			'a {}',
+			'--parser',
+			'css',
+			'--source-type',
+			'module'
+		]);
+		assert.equal(f.status, 2);
+		assert.match(f.stderr, /--source-type is only supported for typescript/);
+	});
+
+	it('a module-only extension takes no script retry in path mode', () => {
+		// `tsv_ts::Goal::from_extension`, restated in cli.js — `.mjs`/`.mts` are ES
+		// modules by name, so the module-then-script fallback has nothing to reach
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			const sloppy = 'with (a) {\n\tb;\n}\n';
+			for (const name of ['a.mjs', 'a.mts']) {
+				writeFileSync(join(dir, name), sloppy);
+				const result = run_cli(['format', join(dir, name)]);
+				assert.equal(result.status, 2, `${name} is a module by extension`);
+				assert.match(result.stderr, /'with' statement is not allowed in strict mode/);
+				assert.equal(readFileSync(join(dir, name), 'utf-8'), sloppy, `${name} untouched`);
+			}
+			for (const name of ['a.js', 'a.ts', 'a.cjs', 'a.cts']) {
+				writeFileSync(join(dir, name), sloppy);
+				const result = run_cli(['format', join(dir, name)]);
+				assert.equal(result.status, 0, `${name} settles no goal, so the retry reaches it`);
+			}
+			// the narrowing touches only what the module grammar rejects
+			writeFileSync(join(dir, 'ok.mjs'), "import x from 'y';\nconst   z=1\n");
+			const valid = run_cli(['format', join(dir, 'ok.mjs')]);
+			assert.equal(valid.status, 0);
+			assert.equal(
+				readFileSync(join(dir, 'ok.mjs'), 'utf-8'),
+				"import x from 'y';\nconst z = 1;\n"
+			);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	it('format --source-type with a path argument is a usage error (exit 2)', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {

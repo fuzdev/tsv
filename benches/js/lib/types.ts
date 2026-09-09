@@ -50,10 +50,11 @@ export const CANONICAL_FORMATTER_ROW = 'prettier';
 /**
  * The TypeScript/JS parse goal (`sourceType`). Only test262 fixtures carry a
  * non-default goal — a `flags: [module]` test is `module`, everything else is a
- * strict `script` (where `await` is an ordinary identifier and top-level
- * `import`/`export` are errors). Every other corpus is module (Svelte `<script>`
- * and real TS), so `SourceFile.goal` is left undefined there and treated as
- * `module`. Threaded ONLY through the conformance-coverage preflight so that
+ * SLOPPY `script`: `await` is an ordinary identifier, top-level `import`/`export`
+ * are errors, and `with` / legacy octal literals / legacy string escapes parse
+ * (strict only via the file's own `"use strict"` prologue). Every other corpus is
+ * module (Svelte `<script>` and real TS), so `SourceFile.goal` is left undefined
+ * there and treated as `module`. Threaded ONLY through the conformance-coverage preflight so that
  * corpus scores each tool on the goal test262 declares — see
  * `docs/benchmarks.md` §Fairness caveats (Conformance-surface semantics).
  */

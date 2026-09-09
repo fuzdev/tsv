@@ -151,9 +151,11 @@ impl FormatCommand {
         }
         // Path mode resolves the source type per file instead of taking one for the
         // whole run: a Svelte or CSS file on the same command line has no source
-        // type to honor, and every JS/TS file already formats under whichever
-        // grammar accepts it (`format_source_in`). So a set `--source-type` here
-        // asks for something no answer fits, and is refused rather than ignored.
+        // type to honor, and every JS/TS file formats under whichever grammar
+        // accepts it unless its own extension settles one
+        // (`tsv_ts::Goal::from_extension`, read per file in `format_file`). So a set
+        // `--source-type` here asks for something no answer fits, and is refused
+        // rather than ignored.
         if self.source_type.is_some() {
             eprintln!(
                 "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script"
@@ -688,11 +690,17 @@ fn format_file(
         Ok(source) => source,
         Err(e) => return FileOutcome::Error(format!("read failed: {e}")),
     };
-    let parser_type = ParserType::from_extension(&path.to_string_lossy());
+    let name = path.to_string_lossy();
+    let parser_type = ParserType::from_extension(&name);
+    // A path's own extension can settle the goal (`.mjs`/`.mts` are ES modules by
+    // name), and where it does the module-then-script fallback has nothing to fall
+    // back to — see `tsv_ts::Goal::from_extension`. Everything else stays unnamed and
+    // takes the fallback, which is what reaches a legacy sloppy script.
+    let goal = tsv_ts::Goal::from_extension(&name);
     // catch_unwind isolates formatter bugs to the file; release builds use
     // panic=abort so this only pays off in dev/corpus profiles
     let result = panic::catch_unwind(AssertUnwindSafe(|| {
-        format_source_in(&source, parser_type, arena, doc_arena)
+        format_source_in(&source, parser_type, goal, arena, doc_arena)
     }));
     let formatted = match result {
         Ok(Ok(formatted)) => formatted,

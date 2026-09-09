@@ -2024,6 +2024,70 @@ fn test_format_path_both_goals_fail_reports_the_module_error() {
 }
 
 #[test]
+fn test_format_path_module_only_extension_takes_no_script_retry() {
+    // `.mjs` and `.mts` are ES modules by their own name (Node loads a `.mjs` as ESM
+    // unconditionally; tsc maps both to `ModuleKind.ESNext`), so the module-then-script
+    // fallback has nothing to fall back to — `tsv_ts::Goal::from_extension`. The same
+    // bytes in a `.js` still format, which is what makes this the extension's doing and
+    // not a parser change.
+    let dir = temp_dir("format_path_module_only_ext");
+    let sloppy = "with (a) {\n\tb;\n}\n";
+
+    for name in ["a.mjs", "a.mts"] {
+        let file = dir.join(name);
+        fs::write(&file, sloppy).expect("write temp file");
+        let output = tsv(&["format", file.to_str().expect("utf8 path")]);
+        assert_eq!(
+            output.status.code(),
+            Some(2),
+            "{name} is a module by extension, so a sloppy-script body is an error"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("The 'with' statement is not allowed in strict mode"),
+            "{name} should report the module parse error: {stderr}"
+        );
+        assert_eq!(
+            fs::read_to_string(&file).expect("read back"),
+            sloppy,
+            "{name} must be left untouched"
+        );
+    }
+
+    for name in ["a.js", "a.ts", "a.cjs", "a.cts"] {
+        let file = dir.join(name);
+        fs::write(&file, sloppy).expect("write temp file");
+        let output = tsv(&["format", file.to_str().expect("utf8 path")]);
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "{name} settles no goal, so the script retry still reaches it"
+        );
+    }
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_format_path_module_only_extension_still_formats_valid_module() {
+    // The narrowing touches only sources the MODULE grammar rejects: a `.mjs` that is
+    // a module formats exactly as before.
+    let dir = temp_dir("format_path_module_only_ext_valid");
+    let file = dir.join("a.mjs");
+    fs::write(&file, "import x from 'y';\nconst   z=1\n").expect("write temp file");
+
+    let output = tsv(&["format", file.to_str().expect("utf8 path")]);
+
+    assert_eq!(output.status.code(), Some(0), "a valid module must format");
+    assert_eq!(
+        fs::read_to_string(&file).expect("read back"),
+        "import x from 'y';\nconst z = 1;\n",
+        "the file must be formatted in place"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn test_format_source_type_module_rejects_script_only_content() {
     // A SET source type is exact — no fallback. `with` stays a strict-mode error.
     let output = tsv(&[

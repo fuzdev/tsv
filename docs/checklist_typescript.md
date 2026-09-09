@@ -827,7 +827,8 @@ available (`parse_with_goal`, `--source-type script`), where `await` is an ordin
 identifier and `import`/`export`/`import.meta` are errors. See
 [conformance_test262.md](./conformance_test262.md#design-decision-module-strict-script-by-directive-annex-b-out).
 
-Rejected by the parser today:
+Rejected by the parser today — the first three only where the code is **strict**,
+Annex B at both goals:
 
 - `with` statement — SyntaxError in **strict** code; parsed in a sloppy Script. The
   word stays a `ReservedWord` in every mode, so only the statement moves
