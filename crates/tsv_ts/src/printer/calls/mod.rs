@@ -479,11 +479,7 @@ impl<'a> Printer<'a> {
             // Use chain wrapping for chains (nested calls) or memberish callees
             let mut nodes = chain::ChainNodeVec::new();
             chain::linearize_chain_from_call_into(call, self.linearize_input(), &mut nodes);
-            let (head_start, head_end) =
-                chain_head_comment_window(&nodes, call.callee, call.span.start);
-            let groups = chain::group_chain_nodes(&nodes, self);
-            let chain_doc = chain::build_chain_doc(&groups, call.span, self);
-            self.prepend_removed_paren_comments(head_start, head_end, chain_doc)
+            chain::build_linearized_chain_doc(&nodes, call.callee, call.span.start, call.span, self)
         } else {
             // Simple call (non-memberish callee) - wrap args directly
             self.build_call_doc_with_wrapping(call)
@@ -509,14 +505,13 @@ impl<'a> Printer<'a> {
         // Use chain-based implementation
         let mut nodes = chain::ChainNodeVec::new();
         chain::linearize_chain_from_member_into(member, self.linearize_input(), &mut nodes);
-        let (head_start, head_end) =
-            chain_head_comment_window(&nodes, member.object, member.span.start);
-        let groups = chain::group_chain_nodes(&nodes, self);
-        let chain_doc = chain::build_chain_doc(&groups, member.span, self);
-
-        // Prepend comments from removed parentheses at the chain base — the share the
-        // chain's own widened nodes did not claim ([`chain_head_comment_window`]).
-        self.prepend_removed_paren_comments(head_start, head_end, chain_doc)
+        chain::build_linearized_chain_doc(
+            &nodes,
+            member.object,
+            member.span.start,
+            member.span,
+            self,
+        )
     }
 
     /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
@@ -552,82 +547,5 @@ impl<'a> Printer<'a> {
         facts: ChainCall,
     ) -> DocId {
         chain_args::build_call_args_doc_for_chain_expanded(self, call, facts)
-    }
-}
-
-/// The window `prepend_removed_paren_comments` claims at a chain's head: the leading
-/// region the chain's own nodes do NOT claim.
-///
-/// The whole region is `[chain start, base start)` — the stripped grouping parens the
-/// author wrapped the chain in, and any comment among them. It is claimed by two
-/// emitters and they must PARTITION it (`docs/comments.md` hazard 3):
-///
-/// - A member whose gap linearization widened back over a stripped `(` claims that
-///   paren's own prefix, `[member start, its object's start)` — prettier relocates a
-///   comment written just inside such a `(` to just before that member.
-/// - The head takes the REST, which is everything from the innermost widened paren's
-///   object inward.
-///
-/// So the window's `start` is the innermost widened claim's END (the largest
-/// [`chain::ChainNode::paren_gap_skip`] start, since the parens nest), not the chain's own
-/// start — reading it as the chain's start hands the head a region a member already
-/// claimed, and stopping the head at the widened claim's START (what this returned
-/// before, as a single bound) handed it NOTHING while the member skipped the same
-/// region: `((⟨⟩a).b).c(x)` had no emitter at all and DROPPED every comment there.
-///
-/// Only call chains widen at all — prettier places comments mid-chain only when the
-/// chain has calls — so a member-only chain keeps the whole region at the head.
-fn chain_head_comment_window(
-    nodes: &[chain::ChainNode<'_>],
-    expr: &internal::Expression<'_>,
-    chain_start: u32,
-) -> (u32, u32) {
-    // A base that OWNS its leading gap (a sealed optional chain, an IIFE callee —
-    // `ChainNode::Base::paren_leading_start`) emits it INSIDE the pair it prints, so
-    // the claim stops at that `(` and this prepend has nothing left to take. Claiming
-    // it here would hoist the run out in front of a pair that survives.
-    if let Some(chain::ChainNode::Base {
-        paren_leading_start: Some(start),
-        ..
-    }) = nodes.first()
-    {
-        return (chain_start, *start);
-    }
-    // The linearizer has already walked to the innermost base: it is `nodes[0]`, and its
-    // span starts where the walk over member / call / non-null spans would stop (each of
-    // those spans opens at its leftmost child). Reading it there spares one dispatch per
-    // chain level; the walk stays as the debug oracle.
-    let base_start = match nodes.first() {
-        Some(chain::ChainNode::Base { expr: base, .. }) => base.span().start,
-        _ => get_chain_base_start(expr),
-    };
-    debug_assert_eq!(base_start, get_chain_base_start(expr));
-    // The innermost widened claim's end. `paren_gap_skip` is `Some` exactly on a node
-    // linearization widened, and its start is that node's object's own span start —
-    // never past the base, since the object contains it — so the max is a position in
-    // `[chain_start, base_start]` and the window can't invert.
-    let start = nodes
-        .iter()
-        .filter_map(chain::ChainNode::paren_gap_skip)
-        .map(|skip| skip.start)
-        .max()
-        .unwrap_or(chain_start);
-    (start, base_start)
-}
-
-/// Get the start position of the innermost base expression in a chain.
-///
-/// [`chain_head_comment_window`] reads this off the linearized base node instead and
-/// keeps the walk as its debug oracle (and the fallback for a node list without one).
-fn get_chain_base_start(expr: &internal::Expression<'_>) -> u32 {
-    match expr {
-        internal::Expression::MemberExpression(member) => get_chain_base_start(member.object),
-        internal::Expression::CallExpression(call) => get_chain_base_start(call.callee),
-        internal::Expression::TSNonNullExpression(non_null) => {
-            get_chain_base_start(non_null.expression)
-        }
-        // Note: TaggedTemplateExpression is NOT traversed here because its own
-        // build_tagged_template_doc handles comments from removed parentheses
-        _ => expr.span().start,
     }
 }

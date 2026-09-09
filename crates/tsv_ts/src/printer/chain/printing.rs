@@ -756,7 +756,7 @@ pub(crate) fn node_comment_gap(node: &ChainNode<'_>, printer: &Printer<'_>) -> O
 /// ⚠️ **The hole is the object subtree's whole span, and every comment in it is printed by
 /// something else**: an inner chain node's own gap, a call's arguments, a computed lookup's
 /// brackets, and — past the innermost widened claim — the chain HEAD's share
-/// (`calls::chain_head_comment_window`). A predicate that reads the widened
+/// (`chain::analysis`'s `chain_head_comment_window`). A predicate that reads the widened
 /// range whole therefore answers about comments this gap cannot see, and the answer is a
 /// layout the same document does not get when the author writes one paren fewer: a `//`
 /// above `((⟨⟩a).b).c(x)` force-expanded the chain, where `(⟨⟩a).b.c(x)` — one stripped
