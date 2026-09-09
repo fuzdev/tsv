@@ -1541,6 +1541,7 @@ impl<'a> Printer<'a> {
                 "[",
                 bracket_pos,
                 param_name_start,
+                after_key_line,
                 d.concat(&interior_parts),
             ));
         } else {
@@ -1879,9 +1880,39 @@ impl<'a> Printer<'a> {
     // same first-member-hoist over-indent (a latent non-idempotency, near-zero real-code
     // frequency). Each needs the same own-line routing (plus, for the conditional branch,
     // the separate un-glue fix) as part of the intersection-printer convergence.
-    fn build_tuple_element_doc(&self, elem: &TSType<'_>) -> DocId {
+    ///
+    /// `multi_element` is the tuple's own `element_types.len() > 1`, and it gates the ONE
+    /// thing a tuple element adds to an ordinary type: a **UNION** member of a multi-element
+    /// tuple takes disambiguating parens when it breaks. Prettier's `printUnionType`
+    /// (`print/union-type.js`, the `key === "elementTypes" && isTupleType(parent) &&
+    /// parent.elementTypes.length > 1` branch) — `group([indent([ifBreak(["(", softline]),
+    /// printed]), softline, ifBreak(")")])`. It is a readability rule and nothing more: a
+    /// broken union's last line is `| b,` , which alone does not show where the element ends.
+    ///
+    /// The three neighbours it deliberately excludes stay excluded, and each is a control in
+    /// the fixture: a **one**-element tuple (nothing to disambiguate from), a **named**
+    /// member (its key is `elementType` of the `TSNamedTupleMember`, not `elementTypes`, and
+    /// the label already marks the boundary), and an **intersection** (`printIntersectionType`
+    /// has no such branch). The parens are `ifBreak`, so a union that fits inside an expanded
+    /// tuple takes none either.
+    ///
+    /// The union test reads the element through [`unwrap_parenthesized`] — a redundant shell
+    /// is stripped, so the parens this rule adds are the ONLY ones the element can carry, and
+    /// asking the raw node would make tsv's own output authoring-dependent: `[(A | B), d]`
+    /// would print bare where `[A | B, d]` printed the pair, two fixed points for one program.
+    fn build_tuple_element_doc(&self, elem: &TSType<'_>, multi_element: bool) -> DocId {
         match elem {
             TSType::Intersection(i) => self.build_intersection_type_doc(i, true, true),
+            _ if multi_element && matches!(unwrap_parenthesized(elem), TSType::Union(_)) => {
+                let d = self.d();
+                let printed = self.build_type_doc(elem);
+                let open = d.if_break(d.concat(&[d.text("("), d.softline()]), d.empty());
+                d.group(d.concat(&[
+                    d.indent(d.concat(&[open, printed])),
+                    d.softline(),
+                    d.if_break(d.text(")"), d.empty()),
+                ]))
+            }
             _ => self.build_type_doc(elem),
         }
     }
@@ -1902,6 +1933,8 @@ impl<'a> Printer<'a> {
         if t.element_types.is_empty() {
             return self.build_empty_brackets_inline_with_comments_doc(t.span);
         }
+        // The union-element paren rule's own term ([`Self::build_tuple_element_doc`]).
+        let multi_element = t.element_types.len() > 1;
 
         // Zero-comment fast gate (see `build_params_doc_with_comments`): every
         // comment sub-query below is bounded within the tuple's span, so with no
@@ -1919,7 +1952,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(","));
                     parts.push(d.line());
                 }
-                parts.push(self.build_tuple_element_doc(elem));
+                parts.push(self.build_tuple_element_doc(elem, multi_element));
             }
             return d.group(bracketed_list_body(
                 d,
@@ -2043,7 +2076,7 @@ impl<'a> Printer<'a> {
             } else if let TSType::Union(u) = elem {
                 parts.push(self.build_union_value_doc(prev_end, u).doc);
             } else {
-                parts.push(self.build_tuple_element_doc(elem));
+                parts.push(self.build_tuple_element_doc(elem, multi_element));
             }
 
             let elem_end = elem.span().end;
@@ -2083,6 +2116,8 @@ impl<'a> Printer<'a> {
     /// reach here.
     fn build_tuple_type_doc_with_line_comments(&self, t: &TSTupleType<'_>) -> DocId {
         let d = self.d();
+        // The union-element paren rule's own term ([`Self::build_tuple_element_doc`]).
+        let multi_element = t.element_types.len() > 1;
         // A comment trailing the opening `[` on its own line is kept on the `[`
         // line when the tuple expands (divergence from prettier, which relocates
         // it to its own line as the first element's leading comment). A
@@ -2144,7 +2179,9 @@ impl<'a> Printer<'a> {
             let elem_doc = if frozen {
                 self.build_frozen_list_member_doc(elem)
             } else {
-                self.with_claimed_shell_leading_run(claim, || self.build_tuple_element_doc(elem))
+                self.with_claimed_shell_leading_run(claim, || {
+                    self.build_tuple_element_doc(elem, multi_element)
+                })
             };
             inner_parts.push(self.build_list_element_group(leading, elem_doc));
 

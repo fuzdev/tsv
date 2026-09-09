@@ -24,6 +24,12 @@ one answer across both outer-composite kinds. `A4` is the control: a comment
 BETWEEN inner members forces the one-member-per-line layout in both formatters
 (it cannot render inline), so only the trailing position re-collapses.
 
+`A5` is the **two-comment** run in that same trailing position. tsv keeps both comments
+inside the parens, where the author wrote them; prettier splits the run across the `)` —
+`// c1` stays on the last inner member and `// c2` lands outside the parens after the `&`,
+leading the next intersection member. A run written in one place is one authorship unit,
+and the `)` is a boundary it was written inside, so tsv does not divide it.
+
 `unformatted_ours_flat.svelte` carries the flat authorings, including the
 trailing comment written inside a redundant shell on the last inner member
 (`a & (b | (c // c⏎)) & d` — the shell strips, its deferred comment flushing

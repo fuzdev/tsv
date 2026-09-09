@@ -5,7 +5,7 @@
 //! (`docs/comments.md` §Trailing and dangling runs). A `//` reaches end-of-line, so a
 //! suffix landing behind one is welded into it (`x; // c1 // c2` reparses as a single
 //! comment whose text happens to contain the second): [`push_run_separator`] breaks
-//! first, at the indent of the break the flush is happening at.
+//! first, at the indent the suffix was queued at.
 //!
 //! The `//` case is deliberately the separator's WHOLE scope. A follower gluing onto a
 //! member that merely BROKE (an own-line block's payload) is lossless, and whether the
@@ -22,30 +22,29 @@
 //! token. Whether two deferred comments share an output line is a layout fact only this
 //! module has.
 
-use super::arena::{ArenaCommand, DocId, DocNode, LineSuffixBuf, RenderIndent};
+use super::arena::{ArenaCommand, DocId, DocNode, LineSuffixBuf};
 use super::arena_render::{RenderCtx, render_line_break, render_single_doc_inner};
 use super::types::{LineKind, Mode, resolve_text};
 
-/// Flush pending line suffix content, in the order it was queued, at `run_indent` — the
-/// indent of the break this flush is happening at (the caller's line node), which a
-/// separator taken by [`push_run_separator`] uses in place of the suffix's own.
+/// Flush pending line suffix content, in the order it was queued. A separator taken by
+/// [`push_run_separator`] breaks at the **suffix's own queued indent** — the indent the
+/// comment was captured at, which is where a reformat then reads it.
 ///
-/// ⚠️ **That choice is EMPIRICAL, not a law, and the difference is idempotency.** A suffix
-/// carries the indent it was *queued* at, deep inside a construct that has since closed, so
-/// a separator taken there lands a comment where a reformat does not put it: over the gap
-/// audit's SWALLOW examples the queued indent left 6 of 31 non-idempotent and this one
-/// leaves 1 of 31. It is not that the flush indent is *right* — it is that it agrees with
-/// the builder at every container tail measured (block, method, object, a switch case
-/// followed by a sibling case) and the queued one does not. The known counterexample is a
-/// switch's LAST case, where the next break is the switch's `}`, a level out from where a
-/// dangling comment in a case settles; the settled value there is neither indent, and no
-/// renderer-visible value equals it — which is why that shape is answered on the BUILDER
-/// side (the case's last-statement `;`-line comments defer own-line, dedented to the
-/// case's level — `tsv_ts` `statements/control_flow/switch.rs`) and no longer meets this
-/// separator. Prettier's nearest construction picks the other way —
+/// ⚠️ **The alternative — the indent of the break the flush is happening at — is what this
+/// used to do, and the difference is IDEMPOTENCY.** That break belongs to whatever construct
+/// is closing (a `)`, a `}`, a `>`), which can sit a level out from where the comment lives,
+/// so the second comment of a run landed at an indent the next pass moved. Re-measured over
+/// 2,520 targeted two-suffix runs (a gap comment inside a construct plus a statement
+/// trailer, across twelve statement hosts — block, method, object property, arrow body,
+/// `if` / `for` / `try` bodies, both switch-case positions — and eight type hosts): the
+/// closing-break indent leaves **22** non-idempotent, the queued indent **2**, and the
+/// queued indent regresses none of them. The switch's LAST case, once this rule's known
+/// counterexample, is among the shapes it now settles; the builder-side answer that was
+/// added for it (the case's last-statement `;`-line comments defer own-line, dedented to the
+/// case's level — `tsv_ts` `statements/control_flow/switch.rs`) stands on its own and still
+/// keeps that shape away from this separator. Prettier's nearest construction agrees:
 /// `printTrailingComment`'s own-line arm is `lineSuffix([hardline, …])`, breaking at the
-/// queued indent — but that break is chosen by the *builder*, which meant the indent it
-/// captured. Cataloged in
+/// queued indent — chosen by the *builder*, which meant the indent it captured. Cataloged in
 /// `tests/fixtures/typescript/syntax/comments/deferred_comment_run_separator_prettier_divergence`.
 ///
 /// Prettier flushes by re-pushing the buffer onto its command *stack*
@@ -65,7 +64,6 @@ pub(super) fn flush_line_suffix(
     output: &mut String,
     pos: &mut usize,
     should_remeasure: &mut bool,
-    run_indent: RenderIndent,
 ) {
     if line_suffix.is_empty() {
         return;
@@ -78,8 +76,7 @@ pub(super) fn flush_line_suffix(
     let queued = line_suffix.len();
     let mut pending_line_comment = false;
     for (i, suffix_cmd) in std::mem::take(line_suffix).into_iter().enumerate() {
-        let separated =
-            pending_line_comment && push_run_separator(ctx, suffix_cmd, run_indent, output, pos);
+        let separated = pending_line_comment && push_run_separator(ctx, suffix_cmd, output, pos);
         let content_start = output.len();
         render_single_doc_inner(
             ctx,
@@ -107,6 +104,10 @@ pub(super) fn flush_line_suffix(
 /// line, unless the suffix already opens its own line (`build_trailing_comment_doc_own_line`
 /// carries the break *inside* the suffix, and a second one would fabricate a blank).
 ///
+/// The break takes the **suffix's own** indent, not the flush's: the comment is being placed
+/// where it was queued, inside whatever construct captured it, and that is the indent a
+/// reformat reads it back at ([`flush_line_suffix`] carries the measurement).
+///
 /// Deliberately not a `render_line_node` call (private to `arena_render`): the pending
 /// buffer was taken by the flush loop, so there is nothing left to flush, and this break is
 /// emitted mid-run rather than ending the construct — `should_remeasure` is the enclosing
@@ -114,7 +115,6 @@ pub(super) fn flush_line_suffix(
 fn push_run_separator(
     ctx: &RenderCtx<'_>,
     suffix_cmd: ArenaCommand,
-    run_indent: RenderIndent,
     output: &mut String,
     pos: &mut usize,
 ) -> bool {
@@ -126,7 +126,7 @@ fn push_run_separator(
     render_line_break(
         LineKind::Hard,
         suffix_cmd.mode(),
-        run_indent,
+        suffix_cmd.indent(),
         output,
         pos,
         ctx.render,

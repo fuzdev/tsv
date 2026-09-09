@@ -286,7 +286,13 @@ const KNOWN_PARTIAL: Record<string, string> = {
 	// between them, so neither carries both halves of the one relocation. The single-comment
 	// case in the same fixture IS claimed, since there the hoist and the labeled statement
 	// land in one hunk.
-	'typescript/statements/labeled/comment_prettier_divergence': '2 hunks'
+	'typescript/statements/labeled/comment_prettier_divergence': '2 hunks',
+	// the same shearing as the label hoist, at the retained paren's `)`: on the TWO-comment
+	// case prettier splits the run across the closer, and the comment it moves (`// c2`) is
+	// unchanged text at that point in the diff, so it lands as CONTEXT between the union's
+	// reflow hunk and the closer's. union_paren_member_inline claims the reflow; the closer
+	// hunk carries only `) &`, with no local witness of the relocation that moved it.
+	'typescript/types/union_intersection_retained_paren_line_comment_prettier_divergence': '2 hunks'
 };
 
 /**

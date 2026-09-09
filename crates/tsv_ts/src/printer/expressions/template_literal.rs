@@ -151,10 +151,14 @@ impl<'a> Printer<'a> {
                     let use_softline_wrap = has_trailing_line_comment
                         || Self::is_template_softline_expression(expr, has_comments);
                     if use_softline_wrap {
-                        d.concat(&[
-                            d.indent(d.concat(&[d.softline(), full_expr_doc])),
-                            d.softline(),
-                        ])
+                        // The interpolation's CLOSING edge, through the shared obligation
+                        // seam ([`Printer::obligated_break`], which carries the rule): a
+                        // `//` deferred inside needs this separator to end its line, or a
+                        // flattening welds `}` onto it (`` `${a // c}` ``, unparseable).
+                        // The opening edge asks nothing — a leading run reaches this group
+                        // as a real hardline of its own.
+                        let close = self.obligated_break(has_trailing_line_comment);
+                        d.concat(&[d.indent(d.concat(&[d.softline(), full_expr_doc])), close])
                     } else {
                         full_expr_doc
                     }

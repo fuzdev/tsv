@@ -363,7 +363,13 @@ impl<'a> Printer<'a> {
             // hardline and `DocArena::will_break`: an own-line comment, a `//`, a
             // multiline block. Those reach the group as a forced break instead of as a
             // pre-empted layout, which is the whole difference.
-            let mut parts: DocBuf = smallvec![d.softline()];
+            // The shell's OPENING edge, through the shared obligation seam
+            // ([`Printer::obligated_break`], which carries the rule): a `//` anywhere in
+            // the operator→operand gap makes this break required rather than chosen, and
+            // one range covers both its placements — the glued comment `paren_glued` took
+            // is still physically in the gap it left.
+            let leading_line_comment = self.has_line_comments_between(operator_end, argument_start);
+            let mut parts: DocBuf = smallvec![self.obligated_break(leading_line_comment)];
             if let Some(leading) = leading_comments_opt {
                 parts.push(leading);
             }
@@ -390,12 +396,16 @@ impl<'a> Printer<'a> {
             // comment reaches the group as a real hardline: an own-line trailing comment
             // through `push_trailing_run_separator`, a `//` or own-line block in the
             // LEADING run through `push_leading_comment_run`'s third separator.
+            let trailing_line_comment =
+                self.has_line_comments_between(argument_end, unary.span.end);
             let mut shell_parts: DocBuf = smallvec![d.text("(")];
             // The glued `//` rides on the `(`'s own line, ahead of the `indent` — no break
             // precedes it, so the indent would have nothing to act on anyway.
             shell_parts.extend(paren_glued);
             shell_parts.push(d.indent(d.concat(&parts)));
-            shell_parts.push(d.softline());
+            // The shell's CLOSING edge, the same seam: a deferred `//` needs this
+            // separator to end its line, or a flattening lets the run escape past the `)`.
+            shell_parts.push(self.obligated_break(trailing_line_comment));
             shell_parts.push(d.text(")"));
             let shell = d.concat(&shell_parts);
             // The second break the group cannot see for itself. A `//` in the leading run
@@ -405,8 +415,7 @@ impl<'a> Printer<'a> {
             // Claiming the delimiter's line is therefore a break obligation, not just a
             // placement: the shell rendered the same way before, the comment merely sat one
             // line lower.
-            if paren_glued.is_some() || self.has_line_comments_between(argument_end, unary.span.end)
-            {
+            if paren_glued.is_some() || trailing_line_comment {
                 d.group_break(shell)
             } else {
                 d.group(shell)
