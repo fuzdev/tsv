@@ -1,0 +1,5 @@
+function f() {
+	"use strict";
+	with (a) {
+	}
+}

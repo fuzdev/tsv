@@ -165,6 +165,7 @@ impl<'a> Printer<'a> {
             Statement::ForOfStatement(stmt) => self.build_for_of_statement_doc(stmt, ctx),
             Statement::WhileStatement(stmt) => self.build_while_statement_doc(stmt, ctx),
             Statement::DoWhileStatement(stmt) => self.build_do_while_statement_doc(stmt, ctx),
+            Statement::WithStatement(stmt) => self.build_with_statement_doc(stmt, ctx),
             Statement::SwitchStatement(stmt) => self.build_switch_statement_doc(stmt),
             Statement::TryStatement(stmt) => self.build_try_statement_doc(stmt),
             Statement::ThrowStatement(stmt) => {

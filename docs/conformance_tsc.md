@@ -140,9 +140,10 @@ nothing fails the gate, so a fixed gap must leave its ledger the day it is fixed
     or a finished proposal's): a spelling the grammar has no production for. tsc's
     parser reads past it for recovery and its checker reports; the spec governs.
     A for-in/of head with a call, `new`, `this`, update, literal, or bare-cast target;
-    `with`; a `#name` outside the three PrivateIdentifier productions; a rest element
-    that is not last; `new.targt`; a non-string import-attribute value; a default or
-    named clause behind `import defer`.
+    a `#name` outside the three PrivateIdentifier productions; a rest element that is
+    not last, or one carrying a property name (`{ ...a: b }`); `new.targt`; a
+    non-string import-attribute value; a default or named clause behind
+    `import defer`.
   - `tsc_recovery` — a TypeScript-only position where tsc's parser is deliberately
     **looser than the published grammar** so the checker can say something useful: an
     expression where a heritage type reference belongs (`implements A?.B`), any

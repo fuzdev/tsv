@@ -380,6 +380,12 @@ fn block_min_stmt(stmt: &Statement<'_>, min: &mut Option<u32>) {
             block_min_stmt(s.body, min);
             block_min_expr(s.test, min);
         }
+        // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
+        // and the parser refuses `with` there.
+        Statement::WithStatement(s) => {
+            block_min_expr(s.object, min);
+            block_min_stmt(s.body, min);
+        }
         Statement::SwitchStatement(s) => {
             block_min_expr(s.discriminant, min);
             for case in s.cases {

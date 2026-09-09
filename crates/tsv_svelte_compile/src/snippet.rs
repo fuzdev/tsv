@@ -799,6 +799,12 @@ impl<'s> Collector<'s> {
                 self.stmt(s.body);
                 self.expr(s.test);
             }
+            // Unreachable in practice: a Svelte `<script>` is Module code, so it is
+            // strict and the parser refuses `with` there.
+            Statement::WithStatement(s) => {
+                self.expr(s.object);
+                self.stmt(s.body);
+            }
             Statement::SwitchStatement(s) => {
                 self.expr(s.discriminant);
                 for case in s.cases {

@@ -705,6 +705,12 @@ fn walk_statement(
             walk_statement(s.body, ctx, depth + 1)?;
             walk_expression(s.test, ctx)
         }
+        // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
+        // and the parser refuses `with` there.
+        Statement::WithStatement(s) => {
+            walk_expression(s.object, ctx)?;
+            walk_statement(s.body, ctx, depth + 1)
+        }
         Statement::SwitchStatement(s) => {
             walk_expression(s.discriminant, ctx)?;
             for case in s.cases {

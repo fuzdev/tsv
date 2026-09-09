@@ -1,0 +1,4 @@
+<script>
+	with (a) {
+	}
+</script>

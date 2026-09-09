@@ -207,6 +207,21 @@ enum OpenParenLineBlockComment {
     Preserve,
 }
 
+/// Whether a paren-headed statement's head expression sits in prettier's
+/// `isInsideParenthesis` position — the parent-type list in `print/binaryish.js` that
+/// makes a logical chain hand its breaking to the head's own paren group.
+///
+/// `if`, `while`, do-while and `switch` are on that list; **`with` is not**, so a `with`
+/// object keeps the ordinary chain layout (its own group, continuation indent) and stays
+/// on one indented line where the four others break per operand.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer::statements) enum HeadChainGrouping {
+    /// The head's paren group drives the chain (`if` / `while` / do-while / `switch`).
+    ParenGroupDrives,
+    /// The chain groups itself, as an expression anywhere else would (`with`).
+    ChainGroupsItself,
+}
+
 impl<'a> Printer<'a> {
     /// Build a control-flow *body* whose empty block form collapses (`do {} while (cond)`,
     /// C-style `for (…) {}`). The generic `build_statement_doc` dispatch EXPANDS a
@@ -523,6 +538,7 @@ impl<'a> Printer<'a> {
         keyword: &'static str,
         stmt_start: u32,
         test: &Expression<'_>,
+        grouping: HeadChainGrouping,
     ) -> (DocBuf, u32) {
         let open_paren = self.find_open_paren_after(stmt_start);
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
@@ -537,6 +553,7 @@ impl<'a> Printer<'a> {
             open_paren,
             close_paren,
             OpenParenLineBlockComment::JoinsRun,
+            grouping,
         );
 
         let mut parts = DocBuf::new();
@@ -1148,6 +1165,7 @@ impl<'a> Printer<'a> {
         open_paren: Option<u32>,
         close_paren: Option<u32>,
         open_paren_line: OpenParenLineBlockComment,
+        grouping: HeadChainGrouping,
     ) -> DocId {
         if self.condition_should_inline_negation(test) {
             let no_comments = match (open_paren, close_paren) {
@@ -1155,10 +1173,16 @@ impl<'a> Printer<'a> {
                 _ => true,
             };
             if no_comments {
-                return self.build_condition_doc(test);
+                return self.build_condition_doc(test, grouping);
             }
         }
-        self.build_condition_group_for_parens(test, open_paren, close_paren, open_paren_line)
+        self.build_condition_group_for_parens(
+            test,
+            open_paren,
+            close_paren,
+            open_paren_line,
+            grouping,
+        )
     }
 
     /// The condition group for a paren-headed head: the comment-aware builder where both
@@ -1177,12 +1201,17 @@ impl<'a> Printer<'a> {
         open_paren: Option<u32>,
         close_paren: Option<u32>,
         open_paren_line: OpenParenLineBlockComment,
+        grouping: HeadChainGrouping,
     ) -> DocId {
         match (open_paren, close_paren) {
-            (Some(open), Some(close)) => {
-                self.build_condition_group_with_comments(test, open, close, open_paren_line)
-            }
-            _ => self.build_condition_group(test),
+            (Some(open), Some(close)) => self.build_condition_group_with_comments(
+                test,
+                open,
+                close,
+                open_paren_line,
+                grouping,
+            ),
+            _ => self.build_condition_group(test, grouping),
         }
     }
 
@@ -1195,9 +1224,13 @@ impl<'a> Printer<'a> {
     ///
     /// This group decides whether the condition breaks (operators go to new lines).
     /// Binary expressions use ungrouped version so this parent group controls their breaking.
-    fn build_condition_group(&self, test_expr: &Expression<'_>) -> DocId {
+    fn build_condition_group(
+        &self,
+        test_expr: &Expression<'_>,
+        grouping: HeadChainGrouping,
+    ) -> DocId {
         let d = self.d();
-        let test_doc = self.build_condition_doc(test_expr);
+        let test_doc = self.build_condition_doc(test_expr, grouping);
         d.group(d.concat(&[d.indent_softline(test_doc), d.softline()]))
     }
 
@@ -1365,6 +1398,7 @@ impl<'a> Printer<'a> {
         open_paren_pos: u32,
         close_paren_pos: u32,
         open_paren_line: OpenParenLineBlockComment,
+        grouping: HeadChainGrouping,
     ) -> DocId {
         let d = self.d();
         let test_start = test_expr.span().start;
@@ -1372,7 +1406,7 @@ impl<'a> Printer<'a> {
 
         if !self.header_parens_hold_comments(open_paren_pos, close_paren_pos, test_expr) {
             // No comments - use the standard condition group
-            return self.build_condition_group(test_expr);
+            return self.build_condition_group(test_expr, grouping);
         }
 
         // Build with comments.
@@ -1387,7 +1421,7 @@ impl<'a> Printer<'a> {
             Some(frozen) => {
                 self.build_frozen_value_doc(test_expr, frozen, super::ParenContext::StatementTest)
             }
-            None => self.build_condition_doc(test_expr),
+            None => self.build_condition_doc(test_expr, grouping),
         };
         let mut inner_parts = DocBuf::new();
 
@@ -1520,9 +1554,11 @@ impl<'a> Printer<'a> {
     /// Non-logical operators (`<`, `===`, etc.) keep a sub-group for independent evaluation
     /// (e.g., `for (i = 0; i < len; i++)` — the `i < len` stays flat).
     /// Assignment expressions get double-parens for clarity: `while ((x = y))`
-    fn build_condition_doc(&self, expr: &Expression<'_>) -> DocId {
+    fn build_condition_doc(&self, expr: &Expression<'_>, grouping: HeadChainGrouping) -> DocId {
         let inner = match expr {
-            Expression::BinaryExpression(binary) => {
+            Expression::BinaryExpression(binary)
+                if grouping == HeadChainGrouping::ParenGroupDrives =>
+            {
                 self.build_binary_chain_doc_ungrouped_condition(binary)
             }
             _ => self.build_expression_doc(expr),

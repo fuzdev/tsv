@@ -188,19 +188,22 @@ fn takes_strict_prefix(module: bool, only_strict: bool) -> bool {
 /// nearly all exercise mode-INDEPENDENT syntax (hashbang comments, HTML-close
 /// comments, `"use strict"` directive prologues) whose accept/reject is identical
 /// strict or sloppy, so they grade correctly at their goal and stay graded. The
-/// entries here are the exceptions: their source uses a construct tsv rejects
-/// under every mode, so grading produces a *spurious* failure. They're out of the
-/// graded strict subset exactly as `noStrict` is, and skipped for the same reason.
+/// entries here are the exceptions: they are sloppy *by content*, so their verdict
+/// belongs to the sloppy run — which is outside the graded strict subset, exactly
+/// as `noStrict` is, and skipped for the same reason. The skip is one of scope,
+/// not capability: the sloppy `Script` goal parses these fine, and the graded
+/// subset simply does not admit the sloppy run yet.
 ///
 /// Currently one: `hashbang/use-strict.js`, where the leading `#!` makes the
 /// following `"use strict"` a hashbang comment rather than a directive, leaving
-/// the program sloppy so its `with ({}) {}` is legal — and `with` is the one
-/// sloppy-mode statement tsv rejects at every goal and every strictness.
+/// the program sloppy so its `with ({}) {}` is legal — a verdict only the sloppy
+/// run can give.
 const SLOPPY_ONLY_RAW_TESTS: &[&str] = &["test/language/comments/hashbang/use-strict.js"];
 
-/// Whether a graded path is a `raw` test that needs sloppy-mode semantics tsv
-/// can't grade (see `SLOPPY_ONLY_RAW_TESTS`). Gated on the `raw` flag so a future
-/// non-raw test reusing one of these paths wouldn't be silently skipped.
+/// Whether a graded path is a `raw` test whose verdict needs the sloppy run the
+/// strict subset doesn't cover (see `SLOPPY_ONLY_RAW_TESTS`). Gated on the `raw`
+/// flag so a future non-raw test reusing one of these paths wouldn't be silently
+/// skipped.
 fn is_sloppy_only_raw(frontmatter: &frontmatter::Frontmatter, relative_path: &str) -> bool {
     frontmatter.is_raw() && {
         let normalized = relative_path.replace('\\', "/");
@@ -210,7 +213,7 @@ fn is_sloppy_only_raw(frontmatter: &frontmatter::Frontmatter, relative_path: &st
 
 /// Read a test's frontmatter and decide skip-vs-grade.
 ///
-/// tsv is strict-mode only, so sloppy (`noStrict`) tests are skipped, as are
+/// The graded subset is the strict one, so sloppy (`noStrict`) tests are skipped, as are
 /// runtime/resolution negatives (we only test parsing), tests requiring an
 /// unimplemented syntactic proposal, and files with no frontmatter. `relative_path`
 /// is the test262-root-relative path, needed only for the sloppy-by-content `raw`
@@ -237,8 +240,8 @@ fn classify(relative_path: &str, content: &str) -> Classification {
     // Both kinds of sloppy-mode-required test are out of the graded strict subset:
     // an explicit `noStrict` declaration, and a `raw` test (non-strict mode only
     // per test262/INTERPRETING.md) that is sloppy *by content* — it uses a
-    // construct tsv rejects under every mode (`with`), so grading it would be a
-    // spurious failure. The remaining raw tests exercise mode-independent syntax
+    // construct only sloppy code admits (`with`), which the strict subset is not
+    // the place to grade. The remaining raw tests exercise mode-independent syntax
     // and stay graded at their goal.
     if frontmatter.requires_sloppy_mode() || is_sloppy_only_raw(&frontmatter, relative_path) {
         return Classification::Skip(SkipReason::SloppyModeRequired);

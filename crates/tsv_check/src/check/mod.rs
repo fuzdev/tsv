@@ -157,6 +157,10 @@ impl<'a> CheckWalk<'a> {
                 self.visit_statement(s.body);
                 self.visit_expression(s.test);
             }
+            Statement::WithStatement(s) => {
+                self.visit_expression(s.object);
+                self.visit_statement(s.body);
+            }
             Statement::SwitchStatement(s) => {
                 self.visit_expression(s.discriminant);
                 for case in s.cases {

@@ -311,29 +311,50 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse while statement: `while (test) body`
     pub(super) fn parse_while_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+        let (test, body, span) = self.parse_paren_head_statement(KeywordKind::While)?;
+        Ok(Statement::WhileStatement(WhileStatement {
+            test,
+            body,
+            span,
+        }))
+    }
+
+    /// Parse with statement: `with (object) body`
+    ///
+    /// Sloppy-mode Script code only — the caller reads `Parser::strict` and rejects
+    /// ahead of this. Its shape is `while`'s exactly, which is also how prettier
+    /// prints it (one printer keyed on the node type).
+    pub(super) fn parse_with_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+        let (object, body, span) = self.parse_paren_head_statement(KeywordKind::With)?;
+        Ok(Statement::WithStatement(WithStatement {
+            object,
+            body,
+            span,
+        }))
+    }
+
+    /// Parse the `keyword (expression) body` shape shared by `while` and `with` — the
+    /// two statements whose head is one parenthesized expression and whose body is a
+    /// single statement. Returns the head expression, the body, and the whole span.
+    fn parse_paren_head_statement(
+        &mut self,
+        keyword: KeywordKind,
+    ) -> Result<(&'arena Expression<'arena>, &'arena Statement<'arena>, Span), ParseError> {
         let (start, _) = self.current_pos();
 
-        // Consume 'while' keyword
-        debug_assert!(matches!(
-            self.current_kind(),
-            TokenKind::Keyword(KeywordKind::While)
-        ));
+        debug_assert_eq!(self.current_kind(), &TokenKind::Keyword(keyword));
         self.advance()?;
 
-        // Parse condition: (test)
+        // Parse the head: (expression)
         self.expect(&TokenKind::ParenOpen)?;
-        let test = self.parse_expression_ref()?;
+        let head = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
         let body = self.arena.alloc(self.parse_statement()?);
         let end = body.span().end;
 
-        Ok(Statement::WhileStatement(WhileStatement {
-            test,
-            body,
-            span: Span::new(start as u32, end),
-        }))
+        Ok((head, body, Span::new(start as u32, end)))
     }
 
     /// Parse do-while statement: `do body while (test);`

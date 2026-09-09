@@ -848,6 +848,7 @@ impl<'a> Printer<'a> {
                 internal::Statement::ForInStatement(s) => s.body,
                 internal::Statement::ForOfStatement(s) => s.body,
                 internal::Statement::WhileStatement(s) => s.body,
+                internal::Statement::WithStatement(s) => s.body,
                 internal::Statement::LabeledStatement(s) => s.body,
                 _ => return false,
             };

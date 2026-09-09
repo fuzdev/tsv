@@ -79,6 +79,7 @@ pub use statements::{
     ForOfStatement, ForStatement, FunctionDeclaration, IfStatement, LabeledStatement,
     ReturnStatement, Statement, SwitchCase, SwitchStatement, ThrowStatement, TryStatement,
     VariableDeclaration, VariableDeclarationKind, VariableDeclarator, WhileStatement,
+    WithStatement,
 };
 
 // Expressions
@@ -124,7 +125,8 @@ pub use expressions::{
 // `Property` (an object literal's `key: value`, and a destructuring pattern's),
 // `VariableDeclarator`, and every `Expression`-holding `Statement` head
 // (`ExpressionStatement` 24 B, `IfStatement` / `SwitchStatement` / `SwitchCase` 32,
-// `WhileStatement` / `DoWhileStatement` 24, `ReturnStatement` / `ThrowStatement` 16)
+// `WhileStatement` / `DoWhileStatement` / `WithStatement` 24,
+// `ReturnStatement` / `ThrowStatement` 16)
 // — instead hold those slots by reference, which is not the same trade: the parser's
 // expression spine (`ParsedExpr`) already returns an arena-allocated `&Expression`,
 // so an inline slot is a COPY OUT of the arena rather than a place the node lives.
