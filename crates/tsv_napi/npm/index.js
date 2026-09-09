@@ -69,9 +69,15 @@ try {
  * explicitly set to `undefined` means its default, including the TS-only
  * `sourceType` on a language that rejects it, which lets one bag forward to
  * whichever parser or formatter.
+ *
+ * An unset `sourceType` stays `undefined` rather than becoming `'module'`,
+ * because the addon's two families answer it differently: a parse reads it as
+ * `module` (its wire's `Program.sourceType` is a claim one settled grammar has to
+ * produce), a format as "none named" — the module grammar retried as a script, so
+ * a legacy sloppy script formats without naming one.
  */
 const read_options = (options, noun, has_locations, has_source_type) => {
-	const parsed = { locations: true, source_type: 'module' };
+	const parsed = { locations: true, source_type: undefined };
 	if (options === undefined || options === null) return parsed;
 	// An array is `typeof 'object'` and yields no keys — without this test a
 	// positional-style call would read as all-defaults.

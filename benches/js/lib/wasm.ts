@@ -191,6 +191,8 @@ export class WasmImplementation extends BaseImplementation {
 		});
 	}
 
+	// No `sourceType` key: the shipped default on every surface, and the one that
+	// reaches the module-then-script fallback (`tsv_ts::parse_with_goal_or_fallback`).
 	format(source: string, language: Language): string {
 		return this.tables.format[language](source);
 	}

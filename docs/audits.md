@@ -47,6 +47,16 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
 | [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `deno task check` (`cargo test --test fixtures_tests`); freshness in `deno task conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
 
+**What the fixture-tree audits format each seed AS.** Every audit that drives
+`tsv_cli::cli::format_source` names no source type, so a TypeScript seed is parsed as a
+**module and retried as a script** if that fails
+([cli.md §Multi-File Formatting](./cli.md#multi-file-formatting)). The
+`typescript/script_goal/*` inputs are therefore ordinary seeds — before the retry
+existed they failed the module parse and every one of these audits silently skipped
+them. Fixture *validation* is the exception: it formats at each fixture's own `goal`
+marker (`fixtures/mod.rs` → `format_source_with_goal`), so the F-rules keep grading the
+exact claim the fixture makes.
+
 ⚠️ **Editing whitespace in a fixture is never local to that fixture.** The three
 injection ratchets — [gaps](#gap-injection-audit-gapsaudit),
 [blanks](#blank-line-injection-audit-blanksaudit),

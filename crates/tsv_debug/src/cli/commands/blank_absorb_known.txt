@@ -35,7 +35,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 526
+# shapes: 528
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -560,5 +560,7 @@
 (VariableDeclarator, init→$)
 (WhileStatement, ^→test)
 (WhileStatement, test→body)
+(WithStatement, ^→object)
+(WithStatement, object→body)
 (YieldExpression, ^→argument)
 (YieldExpression, argument→$)

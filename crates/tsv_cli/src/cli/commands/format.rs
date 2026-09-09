@@ -1,6 +1,6 @@
 use crate::cli::commands::parse::parse_source_type_arg;
 use crate::cli::discover::{Diagnostics, FileSink, discover_files, discover_into, path_sort_key};
-use crate::cli::format_source::{format_source_in, format_source_with_goal};
+use crate::cli::format_source::{format_source_in, format_source_with_goal_option};
 use crate::cli::input::{InputArgs, ParserType};
 use crate::cli::stack::{clamp_worker_count, sized_thread};
 use argh::FromArgs;
@@ -38,8 +38,8 @@ pub struct FormatCommand {
     #[argh(option)]
     parser: Option<ParserType>,
 
-    /// parse goal for TypeScript: script | module (default: module).
-    /// `--content`/`--stdin` only — file paths are formatted as modules.
+    /// parse goal for TypeScript: script | module (default: module, retried as a script).
+    /// `--content`/`--stdin` only.
     #[argh(option)]
     source_type: Option<String>,
 
@@ -115,7 +115,7 @@ impl FormatCommand {
                 process::exit(2);
             }
         };
-        match format_source_with_goal(input.content(), parser_type, goal) {
+        match format_source_with_goal_option(input.content(), parser_type, goal) {
             Ok(formatted) => {
                 if self.check {
                     if formatted != input.content() {
@@ -145,9 +145,14 @@ impl FormatCommand {
             );
             process::exit(2);
         }
+        // Path mode resolves the source type per file instead of taking one for the
+        // whole run: a Svelte or CSS file on the same command line has no source
+        // type to honor, and every JS/TS file already formats under whichever
+        // grammar accepts it (`format_source_in`). So a set `--source-type` here
+        // asks for something no answer fits, and is refused rather than ignored.
         if self.source_type.is_some() {
             eprintln!(
-                "Error: --source-type applies to --content/--stdin; file paths are formatted as modules"
+                "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script"
             );
             process::exit(2);
         }

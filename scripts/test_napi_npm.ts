@@ -259,7 +259,16 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			api.format_typescript('var   await=1', { sourceType: 'script' }),
 			'var await = 1;\n'
 		);
-		assert.throws(() => api.format_typescript('var   await=1'));
+		// A set source type is exact; an unset one takes the module-then-script
+		// fallback, so the same script-only source formats with no bag at all.
+		assert.throws(() => api.format_typescript('var   await=1', { sourceType: 'module' }));
+		assert.equal(api.format_typescript('var   await=1'), 'var await = 1;\n');
+		assert.equal(api.format_typescript('export const   x=1'), 'export const x = 1;\n');
+		// Broken under BOTH grammars: the MODULE error is the reported one.
+		throws_with(
+			() => api.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n"),
+			"The 'with' statement is not allowed in strict mode"
+		);
 		throws_with(
 			() => api.parse_typescript('const x = 1;', { sourceType: 'sloppy' }),
 			"invalid sourceType 'sloppy' (expected 'script' or 'module')"

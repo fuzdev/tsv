@@ -158,6 +158,8 @@ export class NapiImplementation extends BaseImplementation {
 		return JSON.parse(fn(source, goal_for(language, goal)));
 	}
 
+	// No `sourceType` key: the shipped default on every surface, and the one that
+	// reaches the module-then-script fallback (`tsv_ts::parse_with_goal_or_fallback`).
 	format(source: string, language: Language): string {
 		return this.tables.format[language](source);
 	}

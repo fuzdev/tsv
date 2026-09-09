@@ -75,9 +75,17 @@ const STATUS_OK = 0;
  */
 const STATUS_UNWRITTEN = 0xffffffff;
 
-/** The C-ABI source-type codes (`tsv_ffi`'s `ffi_source_type`). */
+/** The C-ABI source-type codes (`tsv_ffi`'s `ffi_source_type`). `UNSPECIFIED` says
+ * the caller named no source type — accepted by the FORMAT exports alone, which
+ * answer it with the module grammar retried as a script. */
 const GOAL_MODULE = 0;
 const GOAL_SCRIPT = 1;
+const GOAL_UNSPECIFIED = 2;
+
+/** The parse exports' code for `goal`: they refuse `UNSPECIFIED`, so an unset goal
+ * is the module default the AST's `sourceType` would claim anyway. */
+const parse_source_type_code = (goal: ParseGoal | undefined): number =>
+	goal === 'script' ? GOAL_SCRIPT : GOAL_MODULE;
 
 type FfiFn = (
 	source: Deno.PointerValue,
@@ -243,7 +251,7 @@ export class NativeImplementation extends BaseImplementation {
 	 * i.e. a correctness dependency on a STYLE setting, over a channel that carries
 	 * arbitrary formatted source (`lib/reject_probe.ts`).
 	 */
-	private call_ffi(fn: FfiFn, source: string, goal: ParseGoal = 'module'): string {
+	private call_ffi(fn: FfiFn, source: string, source_type_code: number): string {
 		const m = this._marshal;
 		if (!m) throw new Error('Native library not initialized');
 
@@ -263,13 +271,7 @@ export class NativeImplementation extends BaseImplementation {
 		}
 
 		m.out_status_buffer[0] = STATUS_UNWRITTEN;
-		const result_ptr = fn(
-			m.source_ptr,
-			written,
-			goal === 'script' ? GOAL_SCRIPT : GOAL_MODULE,
-			m.out_len_ptr,
-			m.out_status_ptr
-		);
+		const result_ptr = fn(m.source_ptr, written, source_type_code, m.out_len_ptr, m.out_status_ptr);
 
 		if (result_ptr === null) {
 			throw new Error('FFI function returned null pointer');
@@ -324,21 +326,36 @@ export class NativeImplementation extends BaseImplementation {
 	// rather than ignoring it (`tsv_ffi`'s `ffi_source_type`). One shared helper for all
 	// three wrappers — see its doc in `lib/types.ts`.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		return JSON.parse(this.call_ffi(this.tables.parse[language], source, goal_for(language, goal)));
+		return JSON.parse(
+			this.call_ffi(
+				this.tables.parse[language],
+				source,
+				parse_source_type_code(goal_for(language, goal))
+			)
+		);
 	}
 
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		this.call_ffi(this.tables.parse_internal[language], source, goal_for(language, goal));
+		this.call_ffi(
+			this.tables.parse_internal[language],
+			source,
+			parse_source_type_code(goal_for(language, goal))
+		);
 	}
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
 		const fn = this.tables.parse_no_locations[language];
 		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
-		return JSON.parse(this.call_ffi(fn, source, goal_for(language, goal)));
+		return JSON.parse(this.call_ffi(fn, source, parse_source_type_code(goal_for(language, goal))));
 	}
 
+	// The format rows name NO source type — the shipped default on every surface
+	// (`tsv format <path>`, an editor's bare `format_typescript`), and the only code
+	// that reaches the module-then-script fallback. Every corpus the perf surface
+	// measures is module-valid, so the retry never runs there; the format-conformance
+	// corpus is where it earns its keep.
 	format(source: string, language: Language): string {
-		return this.call_ffi(this.tables.format[language], source);
+		return this.call_ffi(this.tables.format[language], source, GOAL_UNSPECIFIED);
 	}
 
 	dispose(): void {

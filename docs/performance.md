@@ -2999,7 +2999,7 @@ by construction); cycles **−0.554% pooled over a twelve-binary layout group on
   is exactly "drop one pass": 8.5 instructions a word saved (17 → 8.5) over 1.52 M words =
   13 M instructions = 0.60% of a 2.15 G CLI run, which is the number the A/B read.
 - ⭐⭐⭐ **Inlined into the CLI's format function the loop cost 0.07 points.** The first rung
-  let LLVM inline the pass into `format_source_in_with_goal` (a 456-byte frame): 19
+  let LLVM inline the pass into `format_source_in_with_goal_option` (a 456-byte frame): 19
   instructions per sixteen bytes, three more than the standalone loop, from the caller's
   register pressure. `#[inline(never)]` — the shape L87 chose for the verdict pass — reads
   17 per sixteen and −0.603% against −0.534% (cssbig −0.686 against −0.617), and `.text` gives

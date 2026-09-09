@@ -22,6 +22,7 @@ Both `reset()` at the *start* of each call; `f` must return an owned value (a fo
 Plus the goal-axis pair, `#[macro_export]`ed and feature-independent (they generate no code of their own):
 
 - `parse_ast!($goalness, $lang, $source, $goal, $arena)` — the per-language parse call. `goal` (TypeScript) threads the decoded goal into `$lang::parse_with_goal`; `nogoal` (Svelte, CSS) drops it and calls `$lang::parse`. `$lang` resolves in the *caller's* scope, so this crate depends on no language crate.
+- `parse_ast_for_format!($goalness, $lang, $source, $goal, $arena)` — the format path's twin, whose `$goal` is an `Option`: `goal` calls `$lang::parse_with_goal_or_fallback`, so a named source type is exact and an unnamed one takes the module-then-script fallback (see [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)); `nogoal` drops it as above. The parse exports keep `parse_ast!`, whose goal is settled: their product is a wire carrying `Program.sourceType`, a claim no retry may make depend on the input.
 - `goal_allowed!($goalness)` — `true` / `false`, read by each binding's own goal decoder (`ffi_source_type`, `napi_source_type`, `read_options`).
 
 The load-bearing property is that **one `$goalness` tag drives both**: a language with no axis *rejects* a set goal rather than ignoring it, and the macro that picks the parse call and the macro that licenses the refusal can't come to disagree about which languages those are. Each binding still owns its own `lang_bindings!` (three different export signatures) and its own refusal wording.
@@ -43,6 +44,6 @@ The **workspace dependency entry is `default-features = false`**, so a binding g
 
 ## Consumers
 
-`tsv_ffi`, `tsv_napi`, and `tsv_wasm`. Each maps its `format` feature to `tsv_arena/format`, calls the two arena helpers from its `lang_bindings!` macro, and expands the same `parse_ast!` / `goal_allowed!` pair inside it.
+`tsv_ffi`, `tsv_napi`, and `tsv_wasm`. Each maps its `format` feature to `tsv_arena/format`, calls the two arena helpers from its `lang_bindings!` macro, and expands the same `parse_ast!` / `parse_ast_for_format!` / `goal_allowed!` set inside it.
 
 For the two **native** bindings the win is heap-churn through the host FFI/N-API layer. For **`tsv_wasm`** it's the per-call `Bump`/`DocArena` allocation in the sandbox (the documented WASM-format allocation-count lever) — measured at a **byte-identical ~2% warm format speedup** (svelte ~3%) on the zzz corpus via `benches/js/diagnostics/wasm_format_probe.ts`, with a negligible cold single-shot cost (one un-pre-sized first allocation; even `npm/cli.js` is warm after its first file) and +0.08% bundle size. Before this, `tsv_wasm` was the lone binding still allocating fresh arenas per call.

@@ -44,10 +44,16 @@ One export per (language, operation): there is no goalless twin of a goal-aware
 export, and no arity that varies by language. A host writes one call shape and
 one symbol table.
 
-`source_type` is the parse goal — `0` = Module, `1` = Script; any other code is an
-error, never a silent default. At Script goal `await` is an ordinary identifier
-and `import`/`export`/`import.meta` are syntax errors. **Svelte and CSS REJECT a
-non-zero code** rather than ignoring it: Svelte hard-wires `Module` and CSS has
+`source_type` is the parse goal — `0` = Module, `1` = Script, `2` = unspecified;
+any other code is an error, never a silent default. At Script goal `await` is an
+ordinary identifier and `import`/`export`/`import.meta` are syntax errors. Code `2`
+says the caller named **no** source type, and is accepted by the **format exports
+only**, on every language: a formatter answers it with the module grammar retried as
+a script (`tsv_ts::parse_with_goal_or_fallback` — see
+[../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)),
+and a goalless one has nothing to answer at all, while a parse export's wire carries
+a `Program.sourceType` that one settled grammar has to produce. **Svelte and CSS
+REJECT code `1`** rather than ignoring it: Svelte hard-wires `Module` and CSS has
 no goal axis, so a caller passing `1` there asked for something that cannot be
 honored and is told — the same stance `tsv_wasm`'s `read_options` takes when it
 rejects the `sourceType` key outright (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md)
@@ -67,13 +73,14 @@ construction.
 
 ## Files
 
-- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `ffi_source_type` decoding the `u32` code), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `ffi_source_type` decoding the `u32` code, and `parse_ast_for_format!` carrying the format path's `Option<Goal>`), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it); deps include `tsv_arena` (`format` → `tsv_arena/format`)
 
 The in-crate test module drives every entry point in-process (real
 alloc → write `out_len`/`out_status` → `tsv_free` round-trip), covering the happy
-path per language, the error status on invalid syntax, the goal axis and its two
-refusals (an unknown code; a goal on a goalless language), the invalid-UTF-8 path,
+path per language, the error status on invalid syntax, the goal axis and its three
+refusals (an unknown code; a script goal on a goalless language; the unspecified
+code on a parse export) beside the fallback that code answers, the invalid-UTF-8 path,
 empty input, and `tsv_free` null/zero no-ops. Its `call_raw` helper pins the one
 direction of status↔payload agreement that is a contract — an error status must
 carry an `{"error": …}` payload — and deliberately leaves the converse unasserted,

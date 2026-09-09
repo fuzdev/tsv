@@ -44,8 +44,12 @@ pub struct ParseCommand {
 
 impl ParseCommand {
     pub fn run(self) {
+        // An unnamed source type is `Module` here: the wire carries
+        // `Program.sourceType`, a claim about which grammar produced the AST, so
+        // one settled goal has to produce it (`format`, which exposes neither the
+        // AST nor the source type, reads the same absence as its fallback).
         let goal = match parse_source_type_arg(self.source_type.as_deref()) {
-            Ok(g) => g,
+            Ok(g) => g.unwrap_or(tsv_ts::Goal::Module),
             Err(e) => {
                 eprintln!("Error: {e}");
                 process::exit(1);
@@ -96,13 +100,18 @@ impl ParseCommand {
     }
 }
 
-/// Parse the `--source-type` argument into a [`tsv_ts::Goal`]. Absent → `Module`
-/// (the default); `module`/`script` map to the goals. Shared by `parse` and
-/// `format`.
-pub(crate) fn parse_source_type_arg(source_type: Option<&str>) -> Result<tsv_ts::Goal, String> {
+/// Parse the `--source-type` argument into a [`tsv_ts::Goal`]. Absent stays
+/// **absent** — `module`/`script` map to the goals, and what an unnamed source
+/// type means is the caller's to decide: `parse` reads it as `Module` (the wire's
+/// `Program.sourceType` is a claim, so one grammar produces it), `format` as the
+/// module-then-script fallback. Shared by both.
+pub(crate) fn parse_source_type_arg(
+    source_type: Option<&str>,
+) -> Result<Option<tsv_ts::Goal>, String> {
     match source_type {
-        None => Ok(tsv_ts::Goal::Module),
+        None => Ok(None),
         Some(s) => tsv_ts::Goal::from_source_type(s)
+            .map(Some)
             .ok_or_else(|| format!("invalid --source-type '{s}' (expected 'script' or 'module')")),
     }
 }
