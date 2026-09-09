@@ -112,6 +112,25 @@ pub(in crate::printer) enum SeqLayout {
     Hanging,
 }
 
+/// The sequence's OPERAND RUN — `[first operand start, last operand end)`.
+///
+/// The window every comment question in this family is measured against, and **neither end is
+/// `seq.span`'s**. Ahead of the run sits the grouping `(` the parser stripped from the first
+/// operand, whose comments some *other* emitter owns in every paren mode
+/// ([`Printer::build_sequence_doc_inner`] carries that argument); past it, in the value
+/// positions, sits a trailing gap that runs beyond `seq.span.end` to the caller's
+/// `trailing_end`, because the grouping parens are not part of the node.
+///
+/// Both ends were re-derived at three sites apiece, in two parallel builders and their shared
+/// envelope. That is the shape such a pair drifts through, so the ends are named here once.
+fn sequence_operand_run(seq: &internal::SequenceExpression<'_>) -> (u32, u32) {
+    let operands = &seq.expressions;
+    (
+        operands[0].span().start,
+        operands[operands.len() - 1].span().end,
+    )
+}
+
 /// Operator position in source, used for comment splitting
 #[derive(Clone, Copy)]
 struct OperatorPosition {
@@ -1715,12 +1734,9 @@ impl<'a> Printer<'a> {
             return body;
         }
         let d = self.d();
+        let (run_start, run_end) = sequence_operand_run(seq);
         let mut parts = DocBuf::with_capacity(4);
-        self.append_floated_leading_comments(
-            &mut parts,
-            seq.span.start,
-            seq.expressions[0].span().start,
-        );
+        self.append_floated_leading_comments(&mut parts, seq.span.start, run_start);
         parts.push(d.text("("));
         parts.push(body);
         parts.push(d.text(")"));
@@ -1729,8 +1745,7 @@ impl<'a> Printer<'a> {
             // comments defer via `line_suffix` (`append_trailing_paren_comments`) so they
             // land past the enclosing comma/semicolon — where they re-parse to, keeping the
             // float idempotent.
-            let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
-            self.append_trailing_paren_comments(&mut parts, last_end, seq.span.end);
+            self.append_trailing_paren_comments(&mut parts, run_end, seq.span.end);
         }
         d.concat(&parts)
     }
@@ -1754,7 +1769,7 @@ impl<'a> Printer<'a> {
         // `(⏎// c⏎a), b;` floated the comment out and still broke the operands, which the
         // reparse — the comment now ahead of the statement — printed flat (F1);
         // `return (⏎// c⏎a), b` settles on `a, b` the same way.
-        let interior_start = seq.expressions[0].span().start;
+        let (interior_start, last_operand_end) = sequence_operand_run(seq);
         // Line comments anywhere up to `trailing_end` (incl. the last operand's
         // trailing comment, which lives outside `seq.span` in value positions) need
         // break handling so the comment isn't swallowed by the following comma/operand
@@ -1833,10 +1848,12 @@ impl<'a> Printer<'a> {
             // comment lives between the last operand and the grouping `)`
             // (`trailing_end`), outside `seq.span`. Inside `inner`, so a hanging layout's
             // closing softline lands after it rather than between operand and comment.
-            let last_end = seq.expressions[n - 1].span().end;
-            for comment in self.comments_to_emit_between(last_end, trailing_end) {
-                inner.push(d.text(" "));
-                inner.push(self.build_comment_doc(comment));
+            // Same emitter as the line-comment builder's arm, not a second spelling of it:
+            // [`Printer::build_trailing_comment_doc`]'s block branch IS the `" "` + comment
+            // pair this used to hand-roll, and a hand-rolled copy is how the two arms of one
+            // rule come to disagree.
+            for comment in self.comments_to_emit_between(last_operand_end, trailing_end) {
+                inner.push(self.build_trailing_comment_doc(comment));
             }
         }
 
@@ -1931,10 +1948,39 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let n = seq.expressions.len();
 
-        // Build per-operand docs (own-line leading + core + same-line trailing),
-        // joined by `,` + line inside a group forced to break. `first_end` is where the
-        // first operand's docs end, for the layout's continuation indent.
-        let mut inner: DocBuf = smallvec![d.break_parent()];
+        // Where the run's own break is an OBLIGATION and where it is only the enclosing
+        // construct's. A `//` in an operand GAP has to force the operands apart — it flushes
+        // at that gap's comma, and welding the next operand onto its line would swallow it.
+        // A `//` in the LAST operand's trailing gap has no such claim: it runs to
+        // end-of-line, so no layout puts it between two operands, and every line it can
+        // render on lies past the `)`. Splitting the run for it is a break the reparse cannot
+        // reproduce (the comment is gone from the parens by then), which is exactly the
+        // `format ∘ format ≠ format` the flush-scoped break exists to avoid — so that case
+        // states its break as [`DocArena::flush_break`] below, forcing only the group that
+        // owns the next line opportunity AFTER the comment. An enclosing construct that must
+        // break still does (a call argument keeps the comment on its own last line, a
+        // `Hanging` closer takes it inside the parens); the operand run, with no line left
+        // before the `)`, stays flat and reaches the shared fixed point in ONE pass.
+        // Prettier splits here iff its comment ATTACHMENT lands inside the sequence — on the
+        // last operand where the pair is the statement's own, on the sequence where a token
+        // of the enclosing expression follows the `)` — a distinction the detached model has
+        // no read on, so the one answer costs a first-pass match on the bare spelling
+        // (`conformance_prettier_ts.md` §TypeScript, Sequence trailing line-comment
+        // convergence). The separators stay `line`s either way, so width still breaks the run.
+        let (run_start, run_end) = sequence_operand_run(seq);
+        let trailing_run_only = keep_trailing_inside
+            && !self.has_line_comments_between(run_start, run_end)
+            && self.has_line_comments_between(run_end, trailing_end);
+
+        // Build per-operand docs (own-line leading + core + same-line trailing), joined by
+        // `,` + line inside a group — forced to break by the flag here, or, in the
+        // trailing-run-only case, left to the flush below and to width. `first_end` is where
+        // the first operand's docs end, for the layout's continuation indent.
+        let mut inner: DocBuf = if trailing_run_only {
+            smallvec![]
+        } else {
+            smallvec![d.break_parent()]
+        };
         let mut first_end = 0;
         for (i, expr) in seq.expressions.iter().enumerate() {
             let is_last = i + 1 == n;
@@ -1983,6 +2029,13 @@ impl<'a> Printer<'a> {
                 for comment in self.comments_to_emit_between(expr_end, trailing_end) {
                     od.push(self.build_trailing_comment_doc(comment));
                 }
+                // The run's flush-scoped break, standing where the `break_parent` above would
+                // have (see the gate). It sits AFTER the run so the operand separators are
+                // measured before it is armed — that ordering is the whole rule: those lines
+                // stay flat, and only a line opportunity past the comment is forced.
+                if trailing_run_only {
+                    od.push(d.flush_break());
+                }
             }
 
             if let Some((prev_end, own_line_start)) = prev_gap {
@@ -1993,7 +2046,7 @@ impl<'a> Printer<'a> {
                 // The separator is where the previous operand's deferred trailing run
                 // FLUSHES, so a `//` in that run makes this break an obligation rather than
                 // a break point ([`Printer::obligated_break`], which carries the rule). The
-                // `break_parent` above states the run's geometry as a group FLAG, and
+                // `break_parent` above states this run's geometry as a group FLAG, and
                 // `remove_lines` drops it — leaving the deferred `//` to ride past every
                 // remaining operand, the `)`, and the whitespace-sensitive element the head
                 // sits in (`{#each (a // c⏎, b) as x}` inside a `<pre>`, where the comment

@@ -1179,6 +1179,16 @@ impl<'a> Printer<'a> {
     /// element's deferred trailing run flushes at this break, so flattening it carries that
     /// run past every remaining element and out of the construct
     /// (`{#each (a // c⏎, b) as x}` → the `//` landing after `</pre>`, where it is page text).
+    ///
+    /// ⚠️ **The LAST trailing gap of a construct is a different question, and this is the
+    /// wrong instrument for it.** Every asker above has content on both sides of the break;
+    /// a `//` written before the construct's own closer has none, can never render inside it,
+    /// and so needs no break *here* — forcing one produces a layout the next pass will not
+    /// reproduce, the comment having left the construct by then. What may still be owed is
+    /// the ENCLOSING construct's break, so the suffix flushes inside it instead of escaping,
+    /// and that is [`tsv_lang::doc::arena::DocArena::flush_break`]: emitted after the run, it
+    /// arms only a line opportunity reached past it, leaving this construct's own lines to
+    /// width. See [`comments.md`](../../../../docs/comments.md) §A STATIC FLATTENER.
     #[inline]
     pub(crate) fn obligated_break(&self, obligated: bool, ordinary: DocId) -> DocId {
         if obligated {
