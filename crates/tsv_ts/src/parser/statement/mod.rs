@@ -360,31 +360,68 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// one whose string literal is the exact code point sequence `use strict` with
     /// no escapes and no line continuations, so `"use\u0020strict"` is an ordinary
     /// directive that does not turn strict mode on.
-    pub(super) fn note_directive(&mut self, stmt: &mut Statement<'arena>) -> bool {
+    ///
+    /// `prologue` is the directives this body has already collected — every statement
+    /// ahead of `stmt`, since the loop stops calling this at the first one that is not a
+    /// directive. Turning strict mode on re-grades them: a legacy string escape in an
+    /// *earlier* prologue literal is retroactively a syntax error, so
+    /// `function f() { '\7'; 'use strict'; }` is rejected (ecma262
+    /// sec-literals-string-literals: implementations must enforce the strict rules for
+    /// such literals). Only a sloppy body that turns strict walks the buffer, and a
+    /// directive prologue is a handful of short literals.
+    pub(super) fn note_directive(
+        &mut self,
+        stmt: &mut Statement<'arena>,
+        prologue: &[Statement<'arena>],
+    ) -> Result<bool, ParseError> {
         let Statement::ExpressionStatement(expr_stmt) = stmt else {
-            return false;
+            return Ok(false);
         };
         let Expression::Literal(lit) = &expr_stmt.expression else {
-            return false;
+            return Ok(false);
         };
         if !matches!(lit.value, LiteralValue::String(_)) {
-            return false;
+            return Ok(false);
         }
         // Reject parenthesized strings: the statement must open with a quote.
         let local_start = (expr_stmt.span.start as usize).saturating_sub(self.base_offset);
         let Some(rest @ [b'"' | b'\'', ..]) = self.source.as_bytes().get(local_start..) else {
-            return false;
+            return Ok(false);
         };
         expr_stmt.is_directive = true;
         if rest.starts_with(USE_STRICT_DOUBLE) || rest.starts_with(USE_STRICT_SINGLE) {
+            let was_strict = self.strict;
             self.strict = true;
-            // TODO: a legacy octal string escape (`"\7"`) in an *earlier* prologue
-            // literal is retroactively a syntax error once this fires (ecma262
-            // sec-string-literals: implementations must enforce the strict rules for
-            // such literals). The re-check over the statements already in this body's
-            // buffer belongs here, once the escape gate exists to run.
+            // Already-strict code graded each earlier literal at consumption, so
+            // only the false→true flip has anything to re-read.
+            if !was_strict {
+                for earlier in prologue {
+                    if let Some(err) = self.directive_legacy_escape_error(earlier) {
+                        return Err(err);
+                    }
+                }
+            }
         }
-        true
+        Ok(true)
+    }
+
+    /// The retroactive half of the legacy-escape gate: the error a prologue directive
+    /// carries now that the body has turned strict, if it carries one. The literal's token
+    /// is long gone, so the question is asked of its raw source — the same walk the
+    /// string-literal seam runs (`Parser::legacy_escape_error`).
+    fn directive_legacy_escape_error(&self, stmt: &Statement<'arena>) -> Option<ParseError> {
+        let Statement::ExpressionStatement(expr_stmt) = stmt else {
+            return None;
+        };
+        let Expression::Literal(lit) = &expr_stmt.expression else {
+            return None;
+        };
+        // The literal's own span, not the statement's: the two differ by the trailing
+        // semicolon, and a directive is never parenthesized.
+        let start = (lit.span.start as usize).saturating_sub(self.base_offset);
+        let end = (lit.span.end as usize).saturating_sub(self.base_offset);
+        let inner = self.source.get(start + 1..end.saturating_sub(1))?;
+        self.legacy_escape_error(inner, start + 1 + self.base_offset)
     }
 }
 

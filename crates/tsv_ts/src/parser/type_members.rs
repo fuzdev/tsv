@@ -205,7 +205,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else if self.check(&TokenKind::String) {
             // String literal key: {'multi-word': number}
             let (key_start, key_end) = self.current_pos();
-            let cooked = self.extract_string_cooked();
+            let cooked = self.extract_string_cooked()?;
             self.advance()?;
             (
                 false,

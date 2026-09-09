@@ -30,9 +30,15 @@ use tsv_lang::ParseError;
 ///   point, in either spelling and in any combination (`\uD83D\uDE00`,
 ///   `\u{D83D}\u{DE00}`, and the two mixed forms all decode to `😀`). An UNPAIRED
 ///   half becomes U+FFFD — a UTF-8 `String` cannot hold it
-/// - Octal escapes: `\0` (null), legacy octals (`\101` → 'A')
+/// - Octal escapes: `\0` (null), legacy octals (`\101` → 'A'; a three-digit run only
+///   for a leading `0`–`3`, so `\400` is `\40` + `0`). The decode is mode-free; the
+///   legacy forms are disallowed in strict code, which the parser gates over the raw
+///   slice (`find_legacy_escape`). The same decoder cooks template literals, so the
+///   digit-run rule reaches a template's `cooked` value too (where the untagged form is
+///   a deferred `NotEscapeSequence` early error)
 /// - Line continuations: `\<newline>` → empty string
-/// - Invalid escapes: `\z` → 'z' (backslash ignored per spec)
+/// - Invalid escapes: `\z` → 'z' (backslash ignored per spec) — including `\8` / `\9`,
+///   the `NonOctalDecimalEscapeSequence`, which stands for the digit itself
 ///
 /// # Examples:
 /// ```ignore
@@ -120,12 +126,18 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
                     }
                 }
 
-                // Octal escapes (legacy, strict mode errors on non-zero octals)
-                // For now, we support them for compatibility
+                // `LegacyOctalEscapeSequence` — legal only in sloppy code. The decode is
+                // mode-free; strict code rejects the form at the parser's string-literal
+                // seam (`find_legacy_escape` below). The digit count is NOT "up to
+                // three": a third digit only when the first is `0`-`3`, so `\400` is
+                // `\40` followed by a literal `0`, and `\412` is `\41` followed by a
+                // literal `2` (ecma262 sec-literals-string-literals: `ZeroToThree
+                // OctalDigit OctalDigit` is the only three-digit production, and
+                // `FourToSeven OctalDigit` admits no third).
                 Some(ch @ '0'..='7') => {
                     let mut code = ch as u32 - '0' as u32;
-                    // Read up to 2 more octal digits
-                    for _ in 0..2 {
+                    let max_extra = if ch <= '3' { 2 } else { 1 };
+                    for _ in 0..max_extra {
                         match chars.peek() {
                             Some(&next_ch @ '0'..='7') => {
                                 chars.next();
@@ -134,7 +146,7 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
                             _ => break,
                         }
                     }
-                    // 1–3 octal digits → 0..=0o777 (511), always a valid scalar.
+                    // The productions cap the value at 0o377 (255), always a valid scalar.
                     if let Some(ch) = char::from_u32(code) {
                         result.push(ch);
                     }
@@ -166,6 +178,49 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
     let mut out = String::new();
     decode_string_escapes_into(s, &mut out)?;
     Ok(out)
+}
+
+/// The offset within `raw` — a string literal's inner source, quotes excluded — of the
+/// backslash opening the first escape strict code disallows, if there is one.
+///
+/// The two productions, which ecma262 sec-literals-string-literals states as one early
+/// error ("It is a Syntax Error if IsStrict(this production) is true"): a
+/// `LegacyOctalEscapeSequence` (`\7`, `\101`, and `\0` followed by a decimal digit) and a
+/// `NonOctalDecimalEscapeSequence` (`\8`, `\9`). A bare `\0` is **not** one of them — the
+/// production is `\0 [lookahead ∉ DecimalDigit]`, the NUL escape, legal in every mode.
+///
+/// Scanning the raw slice rather than recording the fact during the decode keeps one
+/// spelling of the question for the parser's two askers: the string-literal seam, which
+/// asks as it turns the token into a node, and the retroactive prologue re-check, which
+/// asks about literals whose tokens are long gone. The walk is byte-wise and steps over a
+/// whole escape at a time, so an escaped backslash (`\\7`) opens no escape and a
+/// multi-byte escaped character cannot be mistaken for one (a UTF-8 continuation byte is
+/// never `\`).
+pub(crate) fn find_legacy_escape(raw: &str) -> Option<usize> {
+    let bytes = raw.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'\\' {
+            i += 1;
+            continue;
+        }
+        match bytes.get(i + 1) {
+            Some(b'0') if bytes.get(i + 2).is_some_and(u8::is_ascii_digit) => return Some(i),
+            Some(b'1'..=b'9') => return Some(i),
+            _ => {}
+        }
+        // Step over the backslash and the character it escapes; no escape body holds
+        // another backslash, so the next one this finds opens a real escape.
+        i += 2;
+    }
+    None
+}
+
+/// Whether the escape `find_legacy_escape` found at `offset` in `raw` is a
+/// `NonOctalDecimalEscapeSequence` (`\8` / `\9`) rather than a `LegacyOctalEscapeSequence`
+/// — the two carry different messages, and the digit after the backslash is the whole test.
+pub(crate) fn legacy_escape_is_nonoctal_decimal(raw: &str, offset: usize) -> bool {
+    matches!(raw.as_bytes().get(offset + 1), Some(b'8' | b'9'))
 }
 
 /// Read exactly N hex digits from the iterator, accumulating their value directly
@@ -371,6 +426,37 @@ mod tests {
         assert_eq!(decode_string_escapes("\\141").unwrap(), "a"); // 0o141 = 97
         // `\0` followed by a digit is an octal escape, not the null shortcut.
         assert_eq!(decode_string_escapes("\\012").unwrap(), "\n"); // 0o12 = 10
+        // A third digit only after a first of `0`-`3`: `\400` is `\40` then a literal `0`,
+        // `\412` is `\41` then a literal `2`, `\777` is `\77` then a literal `7`.
+        assert_eq!(decode_string_escapes("\\400").unwrap(), " 0");
+        assert_eq!(decode_string_escapes("\\412").unwrap(), "!2");
+        assert_eq!(decode_string_escapes("\\777").unwrap(), "?7");
+        assert_eq!(decode_string_escapes("\\377").unwrap(), "\u{ff}");
+    }
+
+    #[test]
+    fn test_find_legacy_escape() {
+        // LegacyOctalEscapeSequence, at the offset of its backslash.
+        assert_eq!(find_legacy_escape("\\7"), Some(0));
+        assert_eq!(find_legacy_escape("a\\101b"), Some(1));
+        assert_eq!(find_legacy_escape("\\00"), Some(0));
+        // `\0` is the NUL escape unless a DECIMAL digit follows it — `8` and `9` count.
+        assert_eq!(find_legacy_escape("\\0"), None);
+        assert_eq!(find_legacy_escape("\\0x"), None);
+        assert_eq!(find_legacy_escape("\\08"), Some(0));
+        assert_eq!(find_legacy_escape("\\09"), Some(0));
+        // NonOctalDecimalEscapeSequence.
+        assert_eq!(find_legacy_escape("\\8"), Some(0));
+        assert_eq!(find_legacy_escape("\\9"), Some(0));
+        assert!(legacy_escape_is_nonoctal_decimal("\\8", 0));
+        assert!(!legacy_escape_is_nonoctal_decimal("\\7", 0));
+        // An escaped backslash opens no escape, so the digit after it is ordinary text.
+        assert_eq!(find_legacy_escape("\\\\7"), None);
+        assert_eq!(find_legacy_escape("\\\\\\7"), Some(2));
+        // Escapes with no legacy form, including a multi-byte escaped character.
+        assert_eq!(find_legacy_escape("\\n\\t\\x41\\u0041"), None);
+        assert_eq!(find_legacy_escape("\\é7"), None);
+        assert_eq!(find_legacy_escape("no escapes at all"), None);
     }
 
     #[test]

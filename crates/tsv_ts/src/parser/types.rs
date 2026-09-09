@@ -332,7 +332,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // String literal types: `"hello"`, `'world'`
             TokenKind::String => {
                 let (start, end) = self.current_pos();
-                let cooked = self.extract_string_cooked();
+                let cooked = self.extract_string_cooked()?;
                 self.advance()?;
 
                 Ok(TSType::Literal(TSLiteralType::String(Literal {
@@ -645,7 +645,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let (arg_start, arg_end) = self.current_pos();
-        let cooked = self.extract_string_cooked();
+        let cooked = self.extract_string_cooked()?;
         self.advance()?;
 
         let argument = Literal {

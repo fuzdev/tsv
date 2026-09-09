@@ -369,10 +369,10 @@ Processing: 49136/49136
 
 Results:
   Positive tests: 42113 passed, 0 failed
-  Negative tests: 1864 passed, 2567 failed
+  Negative tests: 1872 passed, 2559 failed
   Skipped:        2592 (sloppy mode: 2520, runtime: 38, resolution: 34)
 
-Pass rate: 43977/46544 (94.5%)
+Pass rate: 43985/46544 (94.5%)
 ```
 
 ### Verbose (Failures)

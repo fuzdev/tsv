@@ -871,7 +871,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // decoded value, so `'constructor'` is recognized too.
                 let (key_start, key_end) = self.current_pos();
                 let span = Span::new(key_start as u32, key_end as u32);
-                let cooked = self.extract_string_cooked();
+                let cooked = self.extract_string_cooked()?;
                 self.advance()?;
                 let name_is_constructor = self.resolve_cooked(&cooked, span) == "constructor";
                 (

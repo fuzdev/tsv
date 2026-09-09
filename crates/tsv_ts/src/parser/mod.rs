@@ -2,6 +2,7 @@
 
 use crate::Goal;
 use crate::ast::internal::*;
+use crate::lexer::escapes::{find_legacy_escape, legacy_escape_is_nonoctal_decimal};
 use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
@@ -1321,11 +1322,57 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// source)`). `Decoded` (escapes present) arena-copies the lexer's decoded
     /// value (one copy). The quote char is no longer stored — recover it via
     /// `Literal::string_quote(source)`.
-    pub(super) fn extract_string_cooked(&self) -> StringCooked<'arena> {
+    ///
+    /// Every string literal in the grammar is consumed here — an expression, an object or
+    /// class key, a type-literal member key, a literal type, an import type's specifier,
+    /// a module specifier — which is why the strict-mode legacy-escape gate
+    /// ([`Parser::legacy_escape_error`]) is stated here and nowhere else.
+    pub(super) fn extract_string_cooked(&self) -> Result<StringCooked<'arena>, ParseError> {
         match self.current_decoded {
-            Some(decoded) => StringCooked::Decoded(decoded),
-            None => StringCooked::Verbatim,
+            Some(decoded) => {
+                if self.strict
+                    && let Some(err) = self.legacy_escape_error_in_current_string()
+                {
+                    return Err(err);
+                }
+                Ok(StringCooked::Decoded(decoded))
+            }
+            None => Ok(StringCooked::Verbatim),
         }
+    }
+
+    /// The strict-mode legacy-escape check over the current `TokenKind::String` token,
+    /// reached from [`Parser::extract_string_cooked`] only on the escape arm — a literal
+    /// the lexer decoded. A literal with no escapes carries no backslash and so cannot
+    /// hold one of these forms, which is what keeps the walk off the common path.
+    fn legacy_escape_error_in_current_string(&self) -> Option<ParseError> {
+        let start = self.current.start as usize;
+        let end = self.current.end as usize;
+        // Quotes excluded. `get` rather than an index: the token is a well-formed string
+        // literal at every caller, and a malformed one should read as "no legacy escape"
+        // rather than panic (the `fuzz` gate reaches this seam).
+        let inner = self.source.get(start + 1..end.saturating_sub(1))?;
+        self.legacy_escape_error(inner, start + 1 + self.base_offset)
+    }
+
+    /// The one gate on the **legacy string escapes** — `LegacyOctalEscapeSequence` (`\7`,
+    /// `\101`, `\0` followed by a decimal digit) and `NonOctalDecimalEscapeSequence`
+    /// (`\8`, `\9`). Strict code disallows both by early error over the *production*
+    /// (ecma262 sec-literals-string-literals, restated in Annex C), so the lexer decodes
+    /// them under every mode and the rejection belongs here, where the token becomes a
+    /// node and the enclosing code's strictness is settled — the same shape as the
+    /// leading-zero numeric gate in [`Parser::parse_number_or_bigint_literal`].
+    ///
+    /// `raw` is a string literal's inner source with its quotes excluded, and `raw_start`
+    /// that slice's position in the document the error is rendered against.
+    fn legacy_escape_error(&self, raw: &str, raw_start: usize) -> Option<ParseError> {
+        let offset = find_legacy_escape(raw)?;
+        let message = if legacy_escape_is_nonoctal_decimal(raw, offset) {
+            "The '\\8' and '\\9' escape sequences are not allowed in strict mode."
+        } else {
+            "Octal escape sequences are not allowed in strict mode. Use '\\x' or '\\u'."
+        };
+        Some(self.error_msg_at(message, raw_start + offset))
     }
 
     // Error construction helpers - reduce boilerplate for common error patterns
@@ -2244,7 +2291,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             while p.current.kind != TokenKind::Eof {
                 let mut item = p.parse_module_item()?;
                 if in_prologue {
-                    in_prologue = p.note_directive(&mut item);
+                    in_prologue = p.note_directive(&mut item, &body)?;
                 }
                 body.push(item);
             }
@@ -2377,7 +2424,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let (start, end) = self.current_pos();
-        let cooked = self.extract_string_cooked();
+        let cooked = self.extract_string_cooked()?;
         self.advance()?;
 
         Ok(Literal {

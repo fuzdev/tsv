@@ -404,7 +404,18 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 5144 → 5150: six files arrive from `unknown` — the member-chain / assignment
 	// break-priority cluster, named with their causes and the seven-mover byte-diff on
 	// `CORPUS_FORMAT_UNKNOWN_PIN`'s `95 → 89` step.
-	typescript: 5150,
+	//
+	// 5150 → 5151: the floor re-taken at the measured count (5153 carried three files of
+	// slack) as two prettier-suite files LEAVE `match` for `errors`: both carry a legacy
+	// string escape, which strict code disallows, and this view measures the Module goal.
+	// `js/quotes/strings.js` spells `"\1"…"\7"` (script-valid);
+	// `js/strings/non-octal-eight-and-nine.js` opens with a bare top-level `"\8", "\9";`
+	// (rejected at Module) and spells the same after a `"use strict"` in an arrow body
+	// (rejected at Script too), so acorn rejects it at BOTH goals. prettier prints them only
+	// through its `babel` route — its `typescript` parser rejects both, the rejection that
+	// `typescript/script_goal/sloppy_legacy_octal_escape_prettier_divergence`'s
+	// `prettier_rejects.txt` pins.
+	typescript: 5151,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
