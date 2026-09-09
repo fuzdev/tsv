@@ -284,16 +284,27 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a list of decorators: `@dec1 @dec2 ...`
+    ///
+    /// A decorator list is part of the class it decorates — the decorators proposal
+    /// puts `DecoratorList` inside `ClassDeclaration` / `ClassExpression`, and every
+    /// part of a class is strict mode code (ecma262 sec-strict-mode-code) — so the
+    /// class's strictness scope opens here, at the first `@`, and not only at the
+    /// `class` keyword: `@dec(010) class C {}` is an error in a sloppy script, as
+    /// `class C extends (010) {}` is. (acorn-typescript grades the list under the
+    /// enclosing mode — a cataloged divergence.) The parameter-decorator caller is
+    /// already inside a class body, where the wrap is a no-op.
     pub(in crate::parser) fn parse_decorators(
         &mut self,
     ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, ParseError> {
-        let mut decorators = self.bvec();
+        self.with_strict_class_scope(|p| {
+            let mut decorators = p.bvec();
 
-        while *self.current_kind() == TokenKind::At {
-            decorators.push(self.parse_decorator()?);
-        }
+            while *p.current_kind() == TokenKind::At {
+                decorators.push(p.parse_decorator()?);
+            }
 
-        Ok(decorators)
+            Ok(decorators)
+        })
     }
 
     /// Parse a single decorator: `@expression`, where the expression follows the

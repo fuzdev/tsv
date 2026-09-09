@@ -2047,3 +2047,90 @@ fn test_format_source_type_module_rejects_script_only_content() {
         "should report the strict-mode error: {stderr}"
     );
 }
+
+#[test]
+fn test_format_content_unset_source_type_falls_back_to_script() {
+    // The `--content` arm is a different call site from path mode
+    // (`format_source_with_goal_option`, not `format_source_in`), so the fallback is
+    // pinned there too: an UNSET source type formats a script-only source.
+    let output = tsv(&[
+        "format",
+        "--content",
+        "with (a) { b }",
+        "--parser",
+        "typescript",
+    ]);
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "an unset source type must retry as a script: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "with (a) {\n\tb;\n}\n"
+    );
+}
+
+#[test]
+fn test_source_type_refused_on_a_goalless_language() {
+    // Svelte hard-wires `Module` and CSS has no goal, so a `--source-type` there is
+    // a request that cannot be honored — an error on both commands, as on every
+    // binding, never a silent drop. The exit code is each command's own usage code.
+    let parse = tsv(&[
+        "parse",
+        "--content",
+        "<div />",
+        "--parser",
+        "svelte",
+        "--source-type",
+        "script",
+    ]);
+    assert_eq!(
+        parse.status.code(),
+        Some(1),
+        "parse: --source-type on svelte is an error"
+    );
+    let stderr = String::from_utf8_lossy(&parse.stderr);
+    assert!(
+        stderr.contains("--source-type is only supported for typescript"),
+        "parse: should name the restriction: {stderr}"
+    );
+
+    let format = tsv(&[
+        "format",
+        "--content",
+        "a {}",
+        "--parser",
+        "css",
+        "--source-type",
+        "module",
+    ]);
+    assert_eq!(
+        format.status.code(),
+        Some(2),
+        "format: --source-type on css is an error"
+    );
+    let stderr = String::from_utf8_lossy(&format.stderr);
+    assert!(
+        stderr.contains("--source-type is only supported for typescript"),
+        "format: should name the restriction: {stderr}"
+    );
+
+    // The value is still validated first, whatever the language.
+    let bad = tsv(&[
+        "parse",
+        "--content",
+        "a {}",
+        "--parser",
+        "css",
+        "--source-type",
+        "commonjs",
+    ]);
+    assert_eq!(bad.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&bad.stderr).contains("invalid --source-type"),
+        "an invalid value is reported as such"
+    );
+}

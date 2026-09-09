@@ -273,7 +273,10 @@ impl Test262Command {
                 ("runtime", summary.skipped_runtime),
                 ("resolution", summary.skipped_resolution),
                 ("no frontmatter", summary.skipped_no_frontmatter),
-                ("raw + onlyStrict", summary.skipped_raw_strict_conflict),
+                (
+                    "strict-prefix conflict",
+                    summary.skipped_strict_prefix_conflict,
+                ),
             ]
             .into_iter()
             .filter(|&(_, count)| count > 0)
@@ -285,14 +288,17 @@ impl Test262Command {
                 reasons.join(", ")
             );
         }
-        // Contradictory `raw` + `onlyStrict` metadata: no test262 test carries it,
-        // so this is silent unless the suite changes shape under us. The count also
+        // A strict-prefix conflict (`raw` + `onlyStrict`, `onlyStrict` + `noStrict`, a
+        // byte-0 hashbang/BOM under a prefixed run): no test262 test carries one, so
+        // this is silent unless the suite changes shape under us. The count also
         // rides the `Skipped:` parenthetical above so that line sums; this one is the
         // loud signal, deliberately repeated.
-        if summary.skipped_raw_strict_conflict > 0 {
+        if summary.skipped_strict_prefix_conflict > 0 {
             println!(
-                "  ⚠ {} test(s) skipped for contradictory `raw` + `onlyStrict` flags",
-                summary.skipped_raw_strict_conflict
+                "  ⚠ {} test(s) skipped because the harness's `\"use strict\"` prefix cannot \
+                 be applied honestly (`raw` + `onlyStrict`, `onlyStrict` + `noStrict`, or a \
+                 byte-0 hashbang/BOM under a prefixed run)",
+                summary.skipped_strict_prefix_conflict
             );
         }
         println!();

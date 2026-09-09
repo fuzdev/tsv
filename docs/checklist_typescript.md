@@ -832,7 +832,11 @@ Rejected by the parser today:
 - `with` statement — SyntaxError in **strict** code; parsed in a sloppy Script. The
   word stays a `ReservedWord` in every mode, so only the statement moves
 - Leading-zero numeric literals (`0777`, `08`) — SyntaxError in **strict** code (use
-  `0o777`); read in a sloppy Script, base 8 for the all-octal form
+  `0o777`); read in a sloppy Script, base 8 for the all-octal form. Strict code is read
+  where the spec puts it and acorn's flag lags: a class's decorator list is part of the
+  class (`@dec(010) class C {}` rejects), and a `"use strict"` prologue behind a hashbang
+  still counts — both cataloged acorn divergences
+  ([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections))
 - Legacy string escapes (`'\7'`, `'\101'`, `'\08'`, `'\8'`, `'\9'`) — SyntaxError in
   **strict** code (use `\x` or `\u`); read in a sloppy Script, base 8 for the octal form
   and the digit itself for `\8`/`\9`. A bare `'\0'` is the NUL escape and stays legal. A
@@ -847,7 +851,8 @@ Early errors that still parse (not yet enforced):
 - A `"use strict"` directive in a function with a non-simple parameter list
   (`function f(a = 1) { "use strict"; }`) — tsv honors the directive rather than refusing
   the function (acorn rejects it); the params themselves are parsed under the *outer* mode
-  on both sides
+  on both sides, pinned at Script goal by
+  [script_goal/nonsimple_params_directive](../tests/fixtures/typescript/script_goal/nonsimple_params_directive_svelte_prettier_divergence/)
 - Duplicate parameter names (`function f(a, a) {}`)
 - Reserved words as identifiers — the strict-mode-reserved list of ecma262 §sec-identifiers-static-semantics-early-errors (`var public = 1`, `var let = 1`, `function f(yield) {}`)
 - `let` as an `IdentifierReference` (`let = 1`, `for (let in o)`, `L: let ⏎ x = 1;`) — the same bullet; the lookahead that separates it from a `LexicalDeclaration` is a grammar rule and is enforced (`let[0] = 1`, `for (let of x)` reject)

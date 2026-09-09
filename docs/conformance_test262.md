@@ -435,8 +435,14 @@ That is the whole model, and the flags map onto it directly
 they are read in precedence order: `module` outranks every other flag (a
 `[module, raw]` test — `test/language/comments/hashbang/module.js` is one — is a
 single Module parse of the file's own bytes, so `raw` is honored by construction),
-`onlyStrict` outranks `noStrict` (a contradiction the suite does not carry), and
-`raw` together with `onlyStrict` is refused rather than graded:
+and the three shapes on which the strict prefix cannot be applied honestly are
+**refused** rather than graded — `onlyStrict` together with `noStrict` (opposite single
+runs), `raw` together with `onlyStrict` (a source that may not be modified, graded only
+through a modification), and a byte-0 hashbang or BOM on a test with a prefixed run (the
+prefix moves it off byte 0, where it is a different program; the suite's eight hashbang
+tests are all `raw` or `module`, so none is prefixed). The suite carries none of the
+three today; a counted `strict-prefix conflict` skip bucket is what keeps that a checked
+fact rather than an assumption:
 
 | `flags` | run(s) tsv grades | source | goal |
 | --- | --- | --- | --- |

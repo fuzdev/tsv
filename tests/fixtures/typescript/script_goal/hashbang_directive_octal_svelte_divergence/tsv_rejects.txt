@@ -1,0 +1,1 @@
+Legacy octal literals are not allowed in strict mode

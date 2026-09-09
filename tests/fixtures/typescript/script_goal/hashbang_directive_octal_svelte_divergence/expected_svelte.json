@@ -1,0 +1,117 @@
+{
+	"type": "Program",
+	"start": 0,
+	"end": 49,
+	"loc": {
+		"start": {
+			"line": 1,
+			"column": 0
+		},
+		"end": {
+			"line": 4,
+			"column": 0
+		}
+	},
+	"body": [
+		{
+			"type": "ExpressionStatement",
+			"start": 20,
+			"end": 33,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 0
+				},
+				"end": {
+					"line": 2,
+					"column": 13
+				}
+			},
+			"expression": {
+				"type": "Literal",
+				"start": 20,
+				"end": 32,
+				"loc": {
+					"start": {
+						"line": 2,
+						"column": 0
+					},
+					"end": {
+						"line": 2,
+						"column": 12
+					}
+				},
+				"value": "use strict",
+				"raw": "'use strict'"
+			},
+			"directive": "use strict"
+		},
+		{
+			"type": "VariableDeclaration",
+			"start": 34,
+			"end": 48,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 14
+				}
+			},
+			"declarations": [
+				{
+					"type": "VariableDeclarator",
+					"start": 40,
+					"end": 47,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 6
+						},
+						"end": {
+							"line": 3,
+							"column": 13
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 40,
+						"end": 41,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "a"
+					},
+					"init": {
+						"type": "Literal",
+						"start": 44,
+						"end": 47,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 13
+							}
+						},
+						"value": 8,
+						"raw": "010"
+					}
+				}
+			],
+			"kind": "const"
+		}
+	],
+	"sourceType": "script"
+}
