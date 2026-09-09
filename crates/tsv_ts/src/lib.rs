@@ -871,6 +871,34 @@ pub fn build_expression_doc(
     })
 }
 
+/// Where `expression`'s doc STARTS PRINTING — its span start advanced past every grouping
+/// paren on its left spine that this crate's printer strips.
+///
+/// The start twin of [`Expression::printed_end`], for a host whose own syntax opens a gap
+/// **before** the expression and must decide a layout from what that gap holds. A comment the
+/// author wrote inside a stripped shell (`{#if ( // c⏎a).b}`) sits *inside* the expression's
+/// span, yet the printer hoists it ahead of the node and prints it exactly where a comment in
+/// the host's gap would land — so a host that bounds its scan at `span().start` cannot see it
+/// and answers one layout question two ways by authoring. Bound it here instead.
+///
+/// Unlike `printed_end` this cannot be a pure AST query: whether a pair is stripped or
+/// RETAINED depends on the parenthesization rules and on what the pair holds, which is why it
+/// takes the printer's inputs. A retained pair prints its own parens and keeps its comments
+/// inside them, and this returns the span start unchanged there — correctly, since such a run
+/// never reaches the host's gap.
+///
+/// ⚠️ **Layout questions only.** The hoisted run is printed by the expression's own doc, so a
+/// host that also widened its *emitter* scan to here would print it twice.
+pub fn expression_printed_start(
+    arena: &DocArena,
+    expression: &Expression<'_>,
+    inputs: &PrinterInputs<'_>,
+) -> u32 {
+    with_doc_printer(arena, inputs, EmbedContext::default(), |printer| {
+        printer.left_spine_printed_start(expression)
+    })
+}
+
 /// Build a DocId for an expression the host is printing as an **assignment value**, in
 /// the caller's arena — `build_expression_doc` plus the position mark
 /// (`Printer::mark_assignment_value`).

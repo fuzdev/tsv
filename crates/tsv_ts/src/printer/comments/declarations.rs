@@ -405,16 +405,26 @@ impl<'a> Printer<'a> {
     /// pass.
     pub(crate) fn build_continuation_indent(&self, start: u32, end: u32, tail: DocId) -> DocId {
         let d = self.d();
+        d.indent(d.concat(&[self.continuation_indent_prefix(start, end), tail]))
+    }
+
+    /// [`Self::build_continuation_indent`] minus its tail and its `indent` — the separator
+    /// and the hanging run alone.
+    ///
+    /// For a caller that cannot hand the tail over because it does not have one yet: the
+    /// member-chain argument printer assembles its list at ~two dozen sites that hold only
+    /// the arena, so the prefix is built once where the printer IS in scope and the wrap
+    /// closed at the single join those sites share (`with_chain_head`).
+    /// Same two pieces, one definition — a second spelling of the separator rule is how the
+    /// hang and the indent would come to disagree.
+    pub(crate) fn continuation_indent_prefix(&self, start: u32, end: u32) -> DocId {
+        let d = self.d();
         let lead = if self.leading_comment_is_honored_directive(start, end) {
             d.hardline()
         } else {
             d.text(" ")
         };
-        d.indent(d.concat(&[
-            lead,
-            self.build_trailing_comments_hang_next(start, end),
-            tail,
-        ]))
+        d.concat(&[lead, self.build_trailing_comments_hang_next(start, end)])
     }
 
     /// [`Self::build_continuation_indent`] for a caller sitting in a **value slot** —

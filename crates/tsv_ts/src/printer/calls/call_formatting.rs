@@ -60,10 +60,41 @@ use tsv_lang::doc::arena::DocId;
 ///     [1, 2],
 /// )
 /// ```
+///
+/// Built as a HEAD and an argument LIST, joined here, because the callee→`(` gap's pre-paren
+/// half ([`super::CalleeGap::paren_split`]) hangs the whole list under its run — an
+/// `indent(…)` has to wrap the list, so the list must exist as a doc of its own. (The `?.`
+/// split needs no such thing: its tail is one token the head simply concatenates.) On the
+/// unsplit path — every call with no `//` in that gap — the head is handed straight through
+/// and the shape is unchanged.
 pub(super) fn build_call_doc_with_wrapping(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
 ) -> DocId {
+    let d = printer.d();
+    let head = build_call_head(printer, call);
+    let Some((split_start, paren)) = head.gap.paren_split else {
+        return build_call_args_doc(printer, call, head.doc, &head);
+    };
+    let args = build_call_args_doc(printer, call, d.empty(), &head);
+    super::hang_args_under_split(printer, head.doc, (split_start, paren), args)
+}
+
+/// A call's **head**: everything printed before the argument list's `(` — the callee's own
+/// doc, the required pair it may print, the `?.` a split gap puts behind it, and the type
+/// arguments — plus the two decisions the argument side re-reads.
+struct CallHead {
+    /// The head's doc.
+    doc: DocId,
+    /// The one [`super::CalleeGap`] derivation both halves read.
+    gap: CalleeGap,
+    /// The test-call flat layout applies — asked ONCE (see below) and re-read by the layout.
+    test_call_flat: bool,
+    /// The argument list opens with `?.(` because the `?.` fused into it.
+    fuse_optional: bool,
+}
+
+fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -> CallHead {
     let d = printer.d();
 
     // Test function calls (`it`, `test.only`, `describe`, …) stay on one line even past
@@ -98,6 +129,7 @@ pub(super) fn build_call_doc_with_wrapping(
         trailing_gap,
         start: callee_gap_start,
         optional,
+        paren_split: _,
     } = gap;
 
     // The flat callee is a break-free doc built straight from the chain parts, so a long
@@ -163,6 +195,38 @@ pub(super) fn build_call_doc_with_wrapping(
         callee_gap_start,
         call.type_arguments.as_ref(),
     );
+
+    CallHead {
+        doc: callee,
+        gap,
+        test_call_flat,
+        fuse_optional,
+    }
+}
+
+/// The argument-list half of [`build_call_doc_with_wrapping`], `callee` being the head it
+/// hangs off — the real head on the unsplit path, an empty doc when the pre-paren half of
+/// the callee→`(` gap has taken it, so the wrapper can hang this whole doc under the run.
+///
+/// `callee` is a parameter rather than read off `head`, and every arm below takes it from
+/// here: that is what makes the empty-head contract unforgettable — an arm assembling its own
+/// callee would print it twice on the split path, or drop it on the unsplit one. `head` is
+/// still passed for the two decisions the argument side re-reads (`gap`, the flat-layout and
+/// `?.`-fusion verdicts), never for its doc.
+fn build_call_args_doc(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    callee: DocId,
+    head: &CallHead,
+) -> DocId {
+    let d = printer.d();
+    let &CallHead {
+        gap,
+        test_call_flat,
+        fuse_optional,
+        ..
+    } = head;
+    let callee_gap_start = gap.start;
 
     // Empty args: just `fn()` or `fn<T>()`, preserving dangling comments
     if call.arguments.is_empty() {

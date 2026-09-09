@@ -272,6 +272,12 @@ const KNOWN_PARTIAL: Record<string, string> = {
 	// the braced-family sweep: forced_continuation_indent claims the tag/attribute heads,
 	// the rest are the block heads' `}` dangle + clause reflow, which is §Svelte: Blocks
 	'svelte/syntax/comments/expr_leading_line_prettier_divergence': '7 hunks',
+	// forced_continuation_indent claims the indent-only arms; the two left are the ones where
+	// prettier RELOCATES rather than re-indents — the `import` arm, which it attaches to the
+	// following node and moves inside the parens, and the stacked run, which it splits across
+	// the `(`. Both are position divergences the callee→`(` clause deliberately cannot claim:
+	// its witness is a pure re-indent (the comment unmoved), which is exactly what those are not.
+	'typescript/expressions/calls/callee_line_comment_args_prettier_divergence': '2 hunks',
 	// comment_position claims the comment hunk, not the reflow tail it sits in
 	'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence': '2 hunks',
 	// member_chain_hug_convergence claims each case's reflow hunk; the diff pairs one

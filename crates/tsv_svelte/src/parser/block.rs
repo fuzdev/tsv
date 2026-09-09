@@ -549,7 +549,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             && self.continuation_keyword_at(self.current_end) == "else"
         {
             let else_tag_start = self.current_end;
-            let (_, else_content_start) = self.scan_block_tag_content(else_tag_start)?; // consume "else}"
+            let (else_tag_content, else_content_start) =
+                self.scan_block_tag_content(else_tag_start)?; // consume "else}"
+            // The same gate the `{#if}` continuation applies to its own `{:else}`
+            // (`parse_if_block_inner`): only whitespace may follow `else` before the `}`.
+            // `continuation_keyword_at` cannot answer it — its run stops at the first byte
+            // that is neither alphabetic nor `is_svelte_ws`, so `{:else!}` and `{:else<NEL>}`
+            // both reduce to `else`, pass the `== "else"` test above, and the trailing bytes
+            // were then dropped from the output rather than rejected.
+            let after_else = &else_tag_content["else".len()..];
+            self.reject_trailing_tag_content(after_else, else_tag_start + "else".len())?;
             let fallback_content = self.parse_block_children(&["each"], else_content_start)?;
             self.reject_duplicate_else()?;
             Some(fallback_content)

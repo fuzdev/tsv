@@ -663,7 +663,7 @@ impl<'a> Printer<'a> {
         let value_doc = self.build_head_value_doc(expr, frozen, &self.head_embed(5));
         let value_doc = self.wrap_value_clarity_parens(expr, value_doc);
 
-        self.assemble_head_expr(value_doc, span_start, expr.span(), span_end, frozen)
+        self.assemble_head_expr(value_doc, span_start, expr, span_end, frozen)
     }
 
     /// Build expression doc for block expressions (if, each, await, key).
@@ -737,7 +737,7 @@ impl<'a> Printer<'a> {
             d.remove_lines(expr_doc)
         };
 
-        self.assemble_head_expr(expr_doc, span_start, expr.span(), span_end, frozen)
+        self.assemble_head_expr(expr_doc, span_start, expr, span_end, frozen)
     }
 
     /// Build a block head's expression doc, deriving both the comment-scan start offset

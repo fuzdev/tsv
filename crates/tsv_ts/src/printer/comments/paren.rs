@@ -258,6 +258,33 @@ impl<'a> Printer<'a> {
         false
     }
 
+    /// Where this expression's doc STARTS PRINTING: past every stripped grouping paren on
+    /// its left spine, which is the leftmost leaf [`Self::hoisted_left_side_child`] reaches.
+    ///
+    /// The start twin of [`internal::Expression::printed_end`], and the same difference read
+    /// from the other end — a region holding nothing but the `(`s the printer erases,
+    /// whitespace, and any comment inside them. Unlike `printed_end` it is not a pure AST
+    /// question: whether a pair is stripped or RETAINED depends on `needs_parens` and on what
+    /// the pair holds, so it is the walk that answers it, never a paren scan. A retained pair
+    /// prints its own parens and keeps its run inside them, so the walk stops there and the
+    /// printed start is the node's own span start.
+    ///
+    /// This is what an ENCLOSING gap must read as its far end. A comment in a stripped shell
+    /// sits *inside* the expression's span, yet the hoist prints it ahead of the node — in
+    /// exactly the position a comment in the gap *before* the span would land. A seam that
+    /// bounds its scan at `span().start` is therefore blind to it and answers one question two
+    /// ways by authoring (`docs/comments.md` §The left-spine shell run: the seam above the node
+    /// must know the run is coming). ⚠️ For the **layout** half of that question only — an
+    /// emitter must keep bounding its scan at `span().start`, since the node's own doc prints
+    /// the hoisted run and claiming it again DOUBLE-PRINTS it.
+    pub(crate) fn left_spine_printed_start(&self, expr: &internal::Expression<'_>) -> u32 {
+        let mut node = expr;
+        while let Some(child) = self.hoisted_left_side_child(node) {
+            node = child;
+        }
+        node.span().start
+    }
+
     pub(crate) fn build_paren_leading_value_doc(
         &self,
         open_paren_end: u32,

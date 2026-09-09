@@ -346,6 +346,19 @@ its tail:
   its own `}`, an `{#each}` key's its `)`, and a value that always block-wraps (`bind:`,
   and any directive whose expression does not self-expand) reaches the same shape through
   the block's own `indent`.
+  ⚠️ **The gap the gate reads ends at the value's PRINTED start, not its span start.** A
+  comment written inside a redundant grouping paren on the value's **left spine**
+  (`{#if ( // c⏎a).b}`) sits *inside* the expression's span, and the expression's printer
+  hoists it ahead of the node ([comments.md §The left-spine shell
+  run](./comments.md#the-left-spine-shell-run-hoisted-outside-the-enclosing-group-and-one-definition-of-left-side))
+  — so it lands in the same position the plain gap's run lands in and owes the same indent.
+  Reading the span start instead left every braced head answering one question two ways by
+  authoring: flush for the shell spelling, indented for the paren-free one, with the
+  unprefixed `{` additionally welding its comment to the delimiter (`{// c`). A shell whose
+  pair is **retained** hoists nothing and is correctly outside the gap — its comment stays
+  inside the parens, which supply their own indent
+  ([expr_leading_line_paren_shell](../tests/fixtures/svelte/syntax/comments/expr_leading_line_paren_shell_prettier_divergence/),
+  the shell sweep across all three of the family's resolving seams).
 
 **Two gaps are outside this rule, and the grammar is what excludes them**: an
 `as`/`satisfies` cast's operand→keyword gap and a postfix `++`/`--`'s

@@ -683,6 +683,27 @@ impl<'a> Printer<'a> {
     /// context indent by design (the interior stays as authored), so its continuation is the
     /// comment's own line and there is nothing to indent. A gap holding only blocks is
     /// `Inline`.
+    /// The far end of a braced head's leading-comment gap: the value's **printed** start
+    /// ([`tsv_ts::expression_printed_start`]), which is its span start advanced past every
+    /// grouping paren the TS printer strips off its left spine.
+    ///
+    /// The one spelling of that end, because three seams read this gap and a shell run reaches
+    /// each of them: [`Self::head_layout`]'s two callers and the `{@const}` init's
+    /// `gap_comment_hangs_value`. A comment inside a stripped shell (`{#if ( // c⏎a).b}`) is
+    /// *inside* the value's span, but the TS printer hoists it ahead of the node and prints it
+    /// exactly where a comment in this gap lands — so bounding the scan at `span().start`
+    /// makes the shell authoring and the paren-free one disagree about one layout
+    /// (`docs/comments.md` §The left-spine shell run; the catalog entry is
+    /// conformance_prettier.md §Uniform Forced-Continuation Indent, **Svelte braced heads**).
+    ///
+    /// ⚠️ **Layout gates only** — the run is printed by the value's own doc, so
+    /// [`Self::leading_comment_docs`] must keep scanning to `span().start` or it prints the
+    /// comment a second time. The two axes are the point: this asks what occupies the page,
+    /// the emitter asks what it must print.
+    pub(in crate::printer) fn head_gap_end(&self, value: &Expression<'_>) -> u32 {
+        tsv_ts::expression_printed_start(self.d(), value, &self.ts_inputs())
+    }
+
     pub(in crate::printer) fn head_layout(
         &self,
         gap_start: u32,
@@ -806,14 +827,17 @@ impl<'a> Printer<'a> {
         &self,
         value_doc: DocId,
         gap_start: u32,
-        value: Span,
+        value: &Expression<'_>,
         content_end: u32,
         frozen: bool,
     ) -> HeadExpr {
-        let layout = self.head_layout(gap_start, value.start, frozen);
-        let leading_docs = self.leading_comment_docs(gap_start, value.start);
+        let span = value.span();
+        // The layout gate reads to the PRINTED start ([`Self::head_gap_end`]); the emitter
+        // stops at the span start, since the value's own doc prints a hoisted shell run.
+        let layout = self.head_layout(gap_start, self.head_gap_end(value), frozen);
+        let leading_docs = self.leading_comment_docs(gap_start, span.start);
         let (trailing_docs, ends_with_line_comment) =
-            self.trailing_comment_docs(value.end, content_end, layout.indents_content());
+            self.trailing_comment_docs(span.end, content_end, layout.indents_content());
         let body = self.concat_with_surrounding_comments(leading_docs, value_doc, trailing_docs);
         HeadExpr {
             doc: self.indent_head_content(body, layout),

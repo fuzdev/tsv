@@ -2273,6 +2273,15 @@ function forced_continuation_site(
 		return 'Svelte braced head';
 	}
 
+	// Callee→`(` gap — a `//` between a callee and its argument list trails the callee
+	// and the whole list drops a level, at every keyword that opens one (a plain callee,
+	// `new`, a member callee, `import`) and at BOTH argument spellings: the empty list
+	// reaches it through `build_empty_args_parens_doc`, and a non-empty one because the
+	// gap splits at the `(`. The continuation LEADING with `(` is the discriminator — the
+	// same shape the key→`:` clause uses, and for the same reason: a bare trailing comment
+	// above an indented line would otherwise match almost anything.
+	if (/\/\//.test(prev_ours) && /^[ \t]*\(/.test(first_added)) return 'callee→`(` gap';
+
 	// No clause for an OWN-LINE comment leading the continuation: where the author
 	// wrote the comment on its own line, prettier relocates the comment itself, so
 	// the hunk carries that relocation and is not a pure re-indent at all —
@@ -2283,11 +2292,12 @@ function forced_continuation_site(
 const forced_continuation_indent: DivergencePattern = {
 	id: 'forced_continuation_indent',
 	description:
-		'tsv indents a comment-forced continuation one level (annotation, declaration/module header, prefix type operator, key→`:` gap, Svelte braced head); prettier keeps it flush',
+		'tsv indents a comment-forced continuation one level (annotation, declaration/module header, prefix type operator, key→`:` gap, callee→`(` gap, Svelte braced head); prettier keeps it flush',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['Uniform Forced-Continuation Indent', 'Comment Position Philosophy'],
 	fixtures: [
 		'typescript/types/comments/annotation_continuation_indent_prettier_divergence',
+		'typescript/expressions/calls/callee_line_comment_args_prettier_divergence',
 		'typescript/modules/imports/source_line_comment_prettier_divergence',
 		'typescript/modules/exports/source_line_comment_prettier_divergence',
 		'typescript/modules/exports/empty_no_from_line_comment_prettier_divergence',
