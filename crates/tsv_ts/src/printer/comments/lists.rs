@@ -1120,23 +1120,34 @@ impl<'a> Printer<'a> {
     /// source position of the `[` glyph (the scan/pull anchor), decoupled from `open` for
     /// the `?.[` form (`bracket_char + 1` is the first inside-bracket position). Shared by
     /// the computed-key, computed-member-access, and mapped-type break paths.
+    ///
+    /// Both edges take the shared obligation seam ([`Printer::obligated_break`], which
+    /// carries the rule). The opening one this shell asks itself, over the whole
+    /// delimiter→body gap — which covers a `//` the pull moved onto the `[`'s line as well,
+    /// since a pulled comment is still physically in that gap. The closing one it cannot:
+    /// `body` arrives pre-built, so `body_trailing_line_comment` is the caller's own
+    /// body→`]` verdict, the one term not derivable here (and one each caller already holds,
+    /// since it is half of the gate that routes to this shell at all).
     pub(in crate::printer) fn build_bracket_line_comment_break(
         &self,
         open: &'static str,
         bracket_char: u32,
         body_start: u32,
+        body_trailing_line_comment: bool,
         body: DocId,
     ) -> DocId {
         let d = self.d();
         let (line_prefix, pull_pos) = self.delimiter_line_comment_prefix(bracket_char, body_start);
-        let mut inner =
-            self.build_leading_comments_multiline(bracket_char + 1, body_start, pull_pos);
+        let leading_line_comment = self.has_line_comments_between(bracket_char + 1, body_start);
+        let mut inner = DocBuf::new();
+        inner.push(self.obligated_break(leading_line_comment));
+        inner.extend(self.build_leading_comments_multiline(bracket_char + 1, body_start, pull_pos));
         inner.push(body);
         d.group_break(self.build_delimited_doc(
             d.text(open),
             line_prefix,
-            d.indent_softline(d.concat(&inner)),
-            d.softline(),
+            d.indent(d.concat(&inner)),
+            self.obligated_break(body_trailing_line_comment),
             d.text("]"),
         ))
     }

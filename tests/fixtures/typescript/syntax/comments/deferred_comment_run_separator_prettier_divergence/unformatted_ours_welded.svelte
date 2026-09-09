@@ -22,4 +22,16 @@
 		fn() // c7
 		; // c8
 	}
+
+	// a sequence's keep-inside gap, where the run's separator is the flush's alone
+	function fn3() {
+		return (a, b // c9
+		// c10
+		);
+	}
+
+	// a bracketed type list's closer, where the run separates inside the brackets
+	type G = Foo<A, (a | b // c
+	) // inj
+	>;
 </script>

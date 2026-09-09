@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 442,
+	"end": 715,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -201,24 +201,120 @@
 					"column": 7
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a sequence's keep-inside gap, where the run's separator is the flush's alone",
+			"start": 434,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 554,
+			"end": 559,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 5
+				},
+				"end": {
+					"line": 26,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 563,
+			"end": 569,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 3
+				},
+				"end": {
+					"line": 27,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a bracketed type list's closer, where the run separates inside the brackets",
+			"start": 580,
+			"end": 658,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 687,
+			"end": 691,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 8
+				},
+				"end": {
+					"line": 34,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inj",
+			"start": 694,
+			"end": 700,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 8
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 441,
+		"end": 714,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 432,
+			"end": 705,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 21,
+					"line": 37,
 					"column": 9
 				}
 			},
@@ -841,6 +937,359 @@
 							"value": " a block tail: the run separates at the body's own indent",
 							"start": 329,
 							"end": 388
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 515,
+					"end": 577,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 524,
+						"end": 527,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 10
+							},
+							"end": {
+								"line": 23,
+								"column": 13
+							}
+						},
+						"name": "fn3"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 530,
+						"end": 577,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 16
+							},
+							"end": {
+								"line": 29,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 534,
+								"end": 574,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 4
+									}
+								},
+								"argument": {
+									"type": "SequenceExpression",
+									"start": 546,
+									"end": 553,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 3
+										},
+										"end": {
+											"line": 26,
+											"column": 4
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 546,
+											"end": 547,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 3
+												},
+												"end": {
+													"line": 25,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 552,
+											"end": 553,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 3
+												},
+												"end": {
+													"line": 26,
+													"column": 4
+												}
+											},
+											"name": "b"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c9",
+											"start": 554,
+											"end": 559
+										}
+									]
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c10",
+										"start": 563,
+										"end": 569
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a sequence's keep-inside gap, where the run's separator is the flush's alone",
+							"start": 434,
+							"end": 513
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 660,
+					"end": 704,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 665,
+						"end": 666,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 6
+							},
+							"end": {
+								"line": 32,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 669,
+						"end": 703,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 10
+							},
+							"end": {
+								"line": 36,
+								"column": 2
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 669,
+							"end": 672,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 10
+								},
+								"end": {
+									"line": 32,
+									"column": 13
+								}
+							},
+							"name": "Foo"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 672,
+							"end": 703,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 13
+								},
+								"end": {
+									"line": 36,
+									"column": 2
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 676,
+									"end": 677,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 2
+										},
+										"end": {
+											"line": 33,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 676,
+										"end": 677,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 2
+											},
+											"end": {
+												"line": 33,
+												"column": 3
+											}
+										},
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSUnionType",
+									"start": 681,
+									"end": 686,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 2
+										},
+										"end": {
+											"line": 34,
+											"column": 7
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 681,
+											"end": 682,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 2
+												},
+												"end": {
+													"line": 34,
+													"column": 3
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 681,
+												"end": 682,
+												"loc": {
+													"start": {
+														"line": 34,
+														"column": 2
+													},
+													"end": {
+														"line": 34,
+														"column": 3
+													}
+												},
+												"name": "a"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 685,
+											"end": 686,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 6
+												},
+												"end": {
+													"line": 34,
+													"column": 7
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 685,
+												"end": 686,
+												"loc": {
+													"start": {
+														"line": 34,
+														"column": 6
+													},
+													"end": {
+														"line": 34,
+														"column": 7
+													}
+												},
+												"name": "b"
+											}
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 687,
+											"end": 691
+										}
+									]
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a bracketed type list's closer, where the run separates inside the brackets",
+							"start": 580,
+							"end": 658
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " inj",
+							"start": 694,
+							"end": 700
 						}
 					]
 				}

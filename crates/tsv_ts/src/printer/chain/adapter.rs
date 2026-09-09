@@ -68,8 +68,8 @@ impl<'a> Printer<'a> {
         let inside_start = bracket.inside;
         // Only the break path — a line comment before the index or after it (before
         // `]`). A block-only or comment-free bracket falls through to the caller.
-        if !self.has_line_comments_between(inside_start, prop_start)
-            && !self.has_line_comments_between(prop_end, bracket_end)
+        let body_trailing_line_comment = self.has_line_comments_between(prop_end, bracket_end);
+        if !self.has_line_comments_between(inside_start, prop_start) && !body_trailing_line_comment
         {
             return None;
         }
@@ -95,6 +95,7 @@ impl<'a> Printer<'a> {
             open,
             bracket.bracket_pos(),
             prop_start,
+            body_trailing_line_comment,
             d.concat(&body_parts),
         ))
     }

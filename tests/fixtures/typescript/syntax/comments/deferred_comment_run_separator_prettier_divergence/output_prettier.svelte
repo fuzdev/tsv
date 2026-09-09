@@ -24,8 +24,8 @@
 		return (
 			a,
 			b // c9
-			// c10
 		);
+		// c10
 	}
 
 	// a bracketed type list's closer, where the run separates inside the brackets

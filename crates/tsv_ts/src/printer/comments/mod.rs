@@ -1169,6 +1169,46 @@ impl<'a> Printer<'a> {
     /// The author blank BELOW the pulled comment rides with it, for every caller — see
     /// [`Self::push_delimiter_glued_blank`], which this pushes and the list / call families
     /// push for their own pull.
+    /// The separator a comment-bearing shell owes at one of its own edges: a `hardline`
+    /// when a `//` makes that break an OBLIGATION, a `softline` when it is an ordinary
+    /// break point.
+    ///
+    /// **One question, one emitter** — the shells that ask it (the unary comment-holder's
+    /// `(`…`)`, the computed/mapped bracket's `[`…`]`, a template interpolation's `${`…`}`)
+    /// all sit inside a `group_break`, so the two spellings render identically *here* and
+    /// the difference only shows under a caller that statically flattens the doc:
+    /// [`tsv_lang::doc::arena::DocArena::remove_lines`], which the Svelte
+    /// whitespace-sensitive block head applies so a `<pre>` head cannot width-wrap. That
+    /// transform keeps hard lines but flattens soft ones **inside a group whose break flag
+    /// is already set** — the flag survives with nothing left to break at, and the shell
+    /// renders welded. So a break the content REQUIRES has to be a break *point*, never a
+    /// group flag.
+    ///
+    /// Both edges ask it, for reasons that mirror each other, and so do both PLACEMENTS of
+    /// the comment:
+    ///
+    /// - the OPENING edge, for a `//` in the delimiter→body gap. Glued to the delimiter the
+    ///   comment rides its line and this break is what ENDS that line — without it the body
+    ///   welds onto the comment (`{#if typeof ( // cast) === 'o'}`, `{#if a[b // c]}`:
+    ///   output tsv's own parser rejects). Left OWN-LINE above the body it is what KEEPS the
+    ///   comment's line — flattened, the run slides onto the delimiter, which the next pass
+    ///   reads as glued and re-spaces, a two-pass document. Own-line-ness is a SOURCE
+    ///   question ([`comments.md`](../../../../docs/comments.md)), so that collapse is a
+    ///   relocation rather than a layout choice. One range covers both, since a glued
+    ///   comment is still physically in the gap it left.
+    /// - the CLOSING edge, for a `//` in the body→closer gap. That run is deferred through a
+    ///   `line_suffix`, so flattened it carries past the closer entirely — the run escaping
+    ///   the construct it was written in, which is content loss rather than a layout choice.
+    #[inline]
+    pub(crate) fn obligated_break(&self, obligated: bool) -> DocId {
+        let d = self.d();
+        if obligated {
+            d.hardline()
+        } else {
+            d.softline()
+        }
+    }
+
     pub(crate) fn split_open_delimiter_glued_run(
         &self,
         start: u32,

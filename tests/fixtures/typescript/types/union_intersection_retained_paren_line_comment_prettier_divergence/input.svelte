@@ -30,4 +30,12 @@
 			| c
 		) &
 		d;
+
+	// a TWO-comment run in the same trailing position: both comments stay inside the
+	// retained parens, where the author wrote them
+	type A5 = (
+		a | b // c1
+		// c2
+	) &
+		c;
 </script>

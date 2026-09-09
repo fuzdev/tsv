@@ -348,7 +348,7 @@ fn render_line_node(
         *should_remeasure = true;
     }
     if tracking_suffix && (mode == Mode::Break || is_hard) {
-        flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure, indent);
+        flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure);
     }
     // A real newline ends the comment's line → clears the pending swallow, inside
     // `render_line_break` itself.
@@ -788,14 +788,7 @@ fn render_doc_iterative(
         &mut should_remeasure,
     );
 
-    flush_line_suffix(
-        ctx,
-        &mut line_suffix,
-        output,
-        pos,
-        &mut should_remeasure,
-        RenderIndent::level(start_indent_level),
-    );
+    flush_line_suffix(ctx, &mut line_suffix, output, pos, &mut should_remeasure);
 }
 
 /// The shared command-stack render loop with look-ahead — the single
@@ -1329,7 +1322,7 @@ pub(super) fn render_single_doc(
         Some(&mut line_suffix),
         should_remeasure,
     );
-    flush_line_suffix(ctx, &mut line_suffix, output, pos, should_remeasure, indent);
+    flush_line_suffix(ctx, &mut line_suffix, output, pos, should_remeasure);
 }
 
 /// Unified single-doc renderer with optional suffix handling — the

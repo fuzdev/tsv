@@ -22,6 +22,14 @@ Each case here reaches the floor a different way, and the last one is the contro
 - `// c5` / `// c6` — a type shell's trailing comment behind the union member's own.
 - `// c7` / `// c8` — a block tail, where the separator's indent is the body's and
   nothing about the run is chain- or type-specific.
+- `// c9` / `// c10` — a **sequence**'s keep-inside gap. Its builder walks that gap
+  unbounded and pushes one `line_suffix` per comment with a *space* separator, so the run
+  welds at build time and only this floor separates it. Nothing else here is a sequence,
+  and no other fixture reaches the construct, so its reliance on the floor was unpinned.
+- `// c` / `// inj` — a bracketed **type list**'s closer. The construct that closes at the
+  flush is the `>`, a level out from the item the comment belongs to, so this is the shape
+  that fixes the separator's indent: it takes the suffix's own *queued* indent, not the
+  closing break's.
 
 **tsv**: each comment keeps its own line, in the authored order.
 
@@ -32,29 +40,34 @@ c6`), losing `// c6`; at the block tail it agrees with tsv exactly. It also need
 passes to settle — pass 1 additionally breaks the intersection across its `&` — so the
 chain is pinned by `audit_signature_welded.txt` rather than a single-form marker.
 
-`input.svelte` is a fixed point for **both** formatters, and so is prettier's own
-welded landing; the divergence is entirely in how the authored form normalizes, which
-is what `unformatted_ours_welded.svelte` states.
+`input.svelte` is a fixed point for **tsv**, and prettier's own welded landing is a
+fixed point too; for every case but the sequence prettier holds `input.svelte` as well,
+so there the divergence is entirely in how the authored form normalizes — which is what
+`unformatted_ours_welded.svelte` states. The sequence case is the one where prettier's
+answer differs on `input.svelte` itself: it lifts `// c10` **out of the parens** to
+follow the `;`, where tsv keeps it inside the construct it was written in, at the
+indent it was queued at — [which indent the separator breaks at](#which-indent-the-separator-breaks-at),
+below. That is `output_prettier.svelte`.
 
-## Known bound: a switch's last case
+## Which indent the separator breaks at
 
-The separator breaks at the indent of the flush's own line break, which is the
-document's answer for "what indent starts the next line here" — the value a reformat
-then agrees with at every container tail (block, method, object, and a case followed
-by a sibling case). The **last** case of a switch is the one shape where it is not:
-there the next break is the switch's `}`, one level out from where a dangling comment
-in a case settles. That shape no longer reaches this separator — the case's builder
-claims the `;`-line comment itself, own-line and dedented to the case's level, so
-`h() // c⏎; // t` inside a final case is a one-pass fixed point (pinned in
-[last_case_terminator_comment_run](../../../statements/switch/last_case_terminator_comment_run_prettier_divergence/)).
-A bracketed type list's closer after a deferred item run is the remaining bound —
-the run separated behind the last item's own `//`
-(`type G = Foo<A, (a | b // c⏎) // inj⏎>;` — the stripped-shell spelling is what
-reaches the flush; a paren-free authoring does not reproduce) breaks at the `>`'s
-indent, one level out from where the own-line comment settles on pass 2. That shape
-is not fixturable while true and is left out of `input.svelte` deliberately — the
-alternative at that site is the weld, which is content loss rather than a position
-that settles.
+The suffix's **own queued indent** — the indent the comment was captured at, inside
+whatever construct captured it, which is where a reformat then reads it back. The
+alternative is the indent of the break the flush is happening at, and that break belongs
+to whatever is *closing*: a `)`, a `}`, a `>`, which can sit a level out from the item the
+comment belongs to. The last two cases here are exactly those shapes — a sequence's own
+parens and a type list's `>` — and under the closing-break indent both settled one level
+out on pass 1 and moved in on pass 2.
+
+Measured across 2,520 targeted two-suffix runs (a gap comment inside a construct plus a
+statement trailer, over twelve statement hosts and eight type hosts): the closing-break
+indent leaves 22 non-idempotent, the queued indent 2, and the queued indent regresses
+none. A **switch's last case** was this rule's recorded counterexample; it is among the
+shapes the queued indent settles, and the builder-side answer added for it — the case's
+last-statement `;`-line comments defer own-line, dedented to the case's level, so
+`h() // c⏎; // t` inside a final case is a one-pass fixed point, pinned in
+[last_case_terminator_comment_run](../../../statements/switch/last_case_terminator_comment_run_prettier_divergence/)
+— stands on its own and still keeps that shape away from this separator.
 
 Reason: comment position preserved over prettier's merge, and print-once over the
 weld. See

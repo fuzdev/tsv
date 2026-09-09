@@ -1104,6 +1104,7 @@ impl<'a> Printer<'a> {
             "[",
             bracket_start,
             key_start,
+            after_key_line,
             d.concat(&body_parts),
         );
         (bracket, bracket_end + 1)

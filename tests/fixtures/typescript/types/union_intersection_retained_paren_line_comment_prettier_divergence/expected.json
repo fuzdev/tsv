@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 698,
+	"end": 876,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -169,24 +169,88 @@
 					"column": 11
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a TWO-comment run in the same trailing position: both comments stay inside the",
+			"start": 690,
+			"end": 771,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " retained parens, where the author wrote them",
+			"start": 773,
+			"end": 820,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 842,
+			"end": 847,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 8
+				},
+				"end": {
+					"line": 37,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 850,
+			"end": 855,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 697,
+		"end": 875,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 688,
+			"end": 866,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 33,
+					"line": 41,
 					"column": 9
 				}
 			},
@@ -1049,6 +1113,209 @@
 							"value": " layout in both formatters - only the trailing position re-collapses",
 							"start": 568,
 							"end": 638
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 822,
+					"end": 865,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 827,
+						"end": 829,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 6
+							},
+							"end": {
+								"line": 36,
+								"column": 8
+							}
+						},
+						"name": "A5"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 832,
+						"end": 864,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 11
+							},
+							"end": {
+								"line": 40,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSParenthesizedType",
+								"start": 832,
+								"end": 858,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 11
+									},
+									"end": {
+										"line": 39,
+										"column": 2
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 836,
+									"end": 841,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 2
+										},
+										"end": {
+											"line": 37,
+											"column": 7
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 836,
+											"end": 837,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 2
+												},
+												"end": {
+													"line": 37,
+													"column": 3
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 836,
+												"end": 837,
+												"loc": {
+													"start": {
+														"line": 37,
+														"column": 2
+													},
+													"end": {
+														"line": 37,
+														"column": 3
+													}
+												},
+												"name": "a"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 840,
+											"end": 841,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 6
+												},
+												"end": {
+													"line": 37,
+													"column": 7
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 840,
+												"end": 841,
+												"loc": {
+													"start": {
+														"line": 37,
+														"column": 6
+													},
+													"end": {
+														"line": 37,
+														"column": 7
+													}
+												},
+												"name": "b"
+											}
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 842,
+											"end": 847
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 863,
+								"end": 864,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 2
+									},
+									"end": {
+										"line": 40,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 863,
+									"end": 864,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 2
+										},
+										"end": {
+											"line": 40,
+											"column": 3
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 850,
+										"end": 855
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a TWO-comment run in the same trailing position: both comments stay inside the",
+							"start": 690,
+							"end": 771
+						},
+						{
+							"type": "Line",
+							"value": " retained parens, where the author wrote them",
+							"start": 773,
+							"end": 820
 						}
 					]
 				}

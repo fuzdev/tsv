@@ -1,0 +1,910 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1173,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 353,
+				"data": " A block head inside a whitespace-sensitive element never wraps on width: a line break\n\tadded there would be rendered content. Both formatters agree, and the 100/101 boundary is\n\tinert at all three head sites the whitespace-sensitive builder owns — each head has a break\n\tpoint an ordinary head would take at 101, and none of them takes it here. "
+			},
+			{
+				"type": "Text",
+				"start": 353,
+				"end": 355,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 355,
+				"end": 385,
+				"data": " {#if} test, 100 chars "
+			},
+			{
+				"type": "Text",
+				"start": 385,
+				"end": 386,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 386,
+				"end": 486,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 387
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 390
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 391,
+							"end": 480,
+							"test": {
+								"type": "LogicalExpression",
+								"start": 396,
+								"end": 470,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 10
+									},
+									"end": {
+										"line": 7,
+										"column": 84
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 396,
+									"end": 431,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 10
+										},
+										"end": {
+											"line": 7,
+											"column": 45
+										}
+									},
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 435,
+									"end": 470,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 49
+										},
+										"end": {
+											"line": 7,
+											"column": 84
+										}
+									},
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								}
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 471,
+										"end": 475,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							},
+							"alternate": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 486,
+				"end": 488,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 488,
+				"end": 521,
+				"data": " 101 chars - still inline "
+			},
+			{
+				"type": "Text",
+				"start": 521,
+				"end": 522,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 522,
+				"end": 623,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 523
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 526
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 527,
+							"end": 617,
+							"test": {
+								"type": "LogicalExpression",
+								"start": 532,
+								"end": 607,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 10
+									},
+									"end": {
+										"line": 10,
+										"column": 85
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 532,
+									"end": 567,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 10
+										},
+										"end": {
+											"line": 10,
+											"column": 45
+										}
+									},
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 571,
+									"end": 607,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 49
+										},
+										"end": {
+											"line": 10,
+											"column": 85
+										}
+									},
+									"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								}
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 608,
+										"end": 612,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							},
+							"alternate": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 623,
+				"end": 625,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 625,
+				"end": 663,
+				"data": " {#each} expression, 100 chars "
+			},
+			{
+				"type": "Text",
+				"start": 663,
+				"end": 664,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 664,
+				"end": 764,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 665
+					},
+					"end": {
+						"line": 13,
+						"column": 4,
+						"character": 668
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "EachBlock",
+							"start": 669,
+							"end": 758,
+							"expression": {
+								"type": "CallExpression",
+								"start": 676,
+								"end": 736,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 12
+									},
+									"end": {
+										"line": 13,
+										"column": 72
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 676,
+									"end": 678,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 12
+										},
+										"end": {
+											"line": 13,
+											"column": 14
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 679,
+										"end": 706,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 15
+											},
+											"end": {
+												"line": 13,
+												"column": 42
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 708,
+										"end": 735,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 44
+											},
+											"end": {
+												"line": 13,
+												"column": 71
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								],
+								"optional": false
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 745,
+										"end": 751,
+										"expression": {
+											"type": "Identifier",
+											"start": 746,
+											"end": 750,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 82
+												},
+												"end": {
+													"line": 13,
+													"column": 86
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "item",
+								"start": 740,
+								"end": 744,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 76,
+										"character": 740
+									},
+									"end": {
+										"line": 13,
+										"column": 80,
+										"character": 744
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 764,
+				"end": 766,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 766,
+				"end": 799,
+				"data": " 101 chars - still inline "
+			},
+			{
+				"type": "Text",
+				"start": 799,
+				"end": 800,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 800,
+				"end": 901,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 801
+					},
+					"end": {
+						"line": 16,
+						"column": 4,
+						"character": 804
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "EachBlock",
+							"start": 805,
+							"end": 895,
+							"expression": {
+								"type": "CallExpression",
+								"start": 812,
+								"end": 873,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 12
+									},
+									"end": {
+										"line": 16,
+										"column": 73
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 812,
+									"end": 814,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 12
+										},
+										"end": {
+											"line": 16,
+											"column": 14
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 815,
+										"end": 842,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 15
+											},
+											"end": {
+												"line": 16,
+												"column": 42
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 844,
+										"end": 872,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 44
+											},
+											"end": {
+												"line": 16,
+												"column": 72
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								],
+								"optional": false
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 882,
+										"end": 888,
+										"expression": {
+											"type": "Identifier",
+											"start": 883,
+											"end": 887,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 83
+												},
+												"end": {
+													"line": 16,
+													"column": 87
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "item",
+								"start": 877,
+								"end": 881,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 77,
+										"character": 877
+									},
+									"end": {
+										"line": 16,
+										"column": 81,
+										"character": 881
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 901,
+				"end": 903,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 903,
+				"end": 934,
+				"data": " {#each} key, 100 chars "
+			},
+			{
+				"type": "Text",
+				"start": 934,
+				"end": 935,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 935,
+				"end": 1035,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 936
+					},
+					"end": {
+						"line": 19,
+						"column": 4,
+						"character": 939
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "EachBlock",
+							"start": 940,
+							"end": 1029,
+							"expression": {
+								"type": "Identifier",
+								"start": 947,
+								"end": 952,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 12
+									},
+									"end": {
+										"line": 19,
+										"column": 17
+									}
+								},
+								"name": "items"
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 1016,
+										"end": 1022,
+										"expression": {
+											"type": "Identifier",
+											"start": 1017,
+											"end": 1021,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 82
+												},
+												"end": {
+													"line": 19,
+													"column": 86
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "item",
+								"start": 956,
+								"end": 960,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 21,
+										"character": 956
+									},
+									"end": {
+										"line": 19,
+										"column": 25,
+										"character": 960
+									}
+								}
+							},
+							"key": {
+								"type": "CallExpression",
+								"start": 962,
+								"end": 1014,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 27
+									},
+									"end": {
+										"line": 19,
+										"column": 79
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 962,
+									"end": 964,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 27
+										},
+										"end": {
+											"line": 19,
+											"column": 29
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 965,
+										"end": 988,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 30
+											},
+											"end": {
+												"line": 19,
+												"column": 53
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 990,
+										"end": 1013,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 55
+											},
+											"end": {
+												"line": 19,
+												"column": 78
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								],
+								"optional": false
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1035,
+				"end": 1037,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1037,
+				"end": 1070,
+				"data": " 101 chars - still inline "
+			},
+			{
+				"type": "Text",
+				"start": 1070,
+				"end": 1071,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1071,
+				"end": 1172,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 22,
+						"column": 1,
+						"character": 1072
+					},
+					"end": {
+						"line": 22,
+						"column": 4,
+						"character": 1075
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "EachBlock",
+							"start": 1076,
+							"end": 1166,
+							"expression": {
+								"type": "Identifier",
+								"start": 1083,
+								"end": 1088,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 12
+									},
+									"end": {
+										"line": 22,
+										"column": 17
+									}
+								},
+								"name": "items"
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 1153,
+										"end": 1159,
+										"expression": {
+											"type": "Identifier",
+											"start": 1154,
+											"end": 1158,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 83
+												},
+												"end": {
+													"line": 22,
+													"column": 87
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "item",
+								"start": 1092,
+								"end": 1096,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 21,
+										"character": 1092
+									},
+									"end": {
+										"line": 22,
+										"column": 25,
+										"character": 1096
+									}
+								}
+							},
+							"key": {
+								"type": "CallExpression",
+								"start": 1098,
+								"end": 1151,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 27
+									},
+									"end": {
+										"line": 22,
+										"column": 80
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 1098,
+									"end": 1100,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 27
+										},
+										"end": {
+											"line": 22,
+											"column": 29
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 1101,
+										"end": 1124,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 30
+											},
+											"end": {
+												"line": 22,
+												"column": 53
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									{
+										"type": "Identifier",
+										"start": 1126,
+										"end": 1150,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 55
+											},
+											"end": {
+												"line": 22,
+												"column": 79
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								],
+								"optional": false
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
