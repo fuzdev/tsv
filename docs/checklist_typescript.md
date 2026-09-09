@@ -833,13 +833,17 @@ Rejected by the parser today:
   word stays a `ReservedWord` in every mode, so only the statement moves
 - Leading-zero numeric literals (`0777`, `08`) — SyntaxError in **strict** code (use
   `0o777`); read in a sloppy Script, base 8 for the all-octal form
+- Legacy string escapes (`'\7'`, `'\101'`, `'\08'`, `'\8'`, `'\9'`) — SyntaxError in
+  **strict** code (use `\x` or `\u`); read in a sloppy Script, base 8 for the octal form
+  and the digit itself for `\8`/`\9`. A bare `'\0'` is the NUL escape and stays legal. A
+  `"use strict"` directive re-grades the prologue literals ahead of it, so
+  `'\7'; 'use strict';` is rejected too
 - Annex B web-compatibility grammar (HTML-like comments, labelled function
   declarations, `for (var x = 1 in o)`) — out of scope at both goals, ecma262's own
   non-browser-host carve-out
 
 Early errors that still parse (not yet enforced):
 
-- Octal escape sequences in strings (`'\07'`) — accepted under every mode
 - A `"use strict"` directive in a function with a non-simple parameter list
   (`function f(a = 1) { "use strict"; }`) — tsv honors the directive rather than refusing
   the function (acorn rejects it); the params themselves are parsed under the *outer* mode
@@ -852,6 +856,9 @@ Early errors that still parse (not yet enforced):
   module's binding), which is why the production accepts any `ModuleExportName` and the
   bar is an early error rather than a grammar rule
 - `delete` of a plain name (`delete x`)
+- An untagged template's `NotEscapeSequence` (`` `\08` ``, `` `\7` ``) — a rule of its own,
+  mode-independent (the string-literal forms above are the strictness-keyed ones), and
+  rejected by acorn at both goals
 - Invalid regular expressions — an unknown or repeated flag (`/a/qqq`, `/a/gg`), or a body the
   Pattern grammar rejects (`/(?zz:a)/`, `/a{2,1}/u`). This is the `IsValidRegularExpressionLiteral`
   early error; the lexical production is satisfied, so it is deferred like the rest, not a

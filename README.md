@@ -186,13 +186,13 @@ and package READMEs for the full API and CLI flags:
     directive prologue holds a `"use strict"`. The parse goal defaults to Module,
     with an opt-in Script goal (`--goal script`), and since Svelte and TypeScript
     are inherently strict modules the sloppy reading only ever affects standalone
-    JS scripts. The `with` statement and the leading-zero numeric literals
-    (`010`, `08`) are the two rules that move with strictness — sloppy Script code
-    accepts them, strict code rejects them; the legacy string escapes (`"\7"`,
-    `"\08"`) are accepted under every mode; the Annex B web-compatibility grammar
-    is out of scope at both goals; and strict-mode early errors (e.g. duplicate
-    params, reserved-word bindings) still parse for now, with enforcement deferred
-    to a future diagnostics layer
+    JS scripts. The `with` statement, the leading-zero numeric literals
+    (`010`, `08`) and the legacy string escapes (`"\7"`, `"\8"`) are the three
+    rules that move with strictness — sloppy Script code accepts them, strict code
+    rejects them; the Annex B web-compatibility grammar is out of scope at both
+    goals; and strict-mode early errors (e.g. duplicate params, reserved-word
+    bindings) still parse for now, with enforcement deferred to a future
+    diagnostics layer
 
 Each language is a self-contained Rust crate exposing the same
 `parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - no

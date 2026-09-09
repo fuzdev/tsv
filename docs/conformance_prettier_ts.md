@@ -214,13 +214,25 @@ parser refuses them because tsc's scanner has no sloppy mode. There is no
   and `NonOctalDecimalIntegerLiteral` (`08`, `089`, `08.5`, read as decimal) — `Octal literals
   are not allowed. Use the syntax '0o10'.` / `Decimals with leading zeros are not allowed.` —
   [script_goal/sloppy_legacy_octal_literal](../tests/fixtures/typescript/script_goal/sloppy_legacy_octal_literal_prettier_divergence/)
+- Legacy string escapes — `LegacyOctalEscapeSequence` (`'\7'`, `'\101'`, and `'\0'` followed
+  by a decimal digit, read in base 8) and `NonOctalDecimalEscapeSequence` (`'\8'`, `'\9'`,
+  standing for the digit itself) — `Octal escape sequences are not allowed. Use the syntax
+  '\x07'.` / `Escape sequence '\8' is not allowed.` —
+  [script_goal/sloppy_legacy_octal_escape](../tests/fixtures/typescript/script_goal/sloppy_legacy_octal_escape_prettier_divergence/).
+  A bare `'\0'` is the NUL escape, legal in strict code and no divergence
 
-Both forms are disallowed in strict code by **production** (ecma262
-sec-strict-mode-of-ecmascript), not by an early error, so they are legal exactly where the
-code is sloppy: a Script whose directive prologue holds no `"use strict"`. tsv's Script goal
-is spec-conforming, so it reads them and prints them verbatim. A Svelte `<script>` is always
-a module and every other tsv entry point defaults to `Goal::Module`, so nothing here is
-reachable without asking for the Script goal.
+Every form is disallowed in strict code by **production** (ecma262
+sec-strict-mode-of-ecmascript for the literals, sec-literals-string-literals for the
+escapes), not by an early error, so they are legal exactly where the code is sloppy: a Script
+whose directive prologue holds no `"use strict"`. tsv's Script goal is spec-conforming, so it
+reads them and prints them verbatim. A Svelte `<script>` is always a module and every other
+tsv entry point defaults to `Goal::Module`, so nothing here is reachable without asking for
+the Script goal.
+
+prettier's own two routes disagree about the escapes: the `babel` parser it uses for a `.js`
+file prints them, while the `typescript` parser it uses for `.ts` — and the one the fixture
+oracle runs — rejects them. tsv follows acorn and the spec, so a `.js` file carrying a legacy
+escape is a file tsv refuses at the Module goal rather than a formatting divergence.
 
 tsc's scanner raises the error with no strictness check at all, which makes tsv's acceptance
 an over-acceptance against tsc in *both* modes as well — the same posture the parser takes

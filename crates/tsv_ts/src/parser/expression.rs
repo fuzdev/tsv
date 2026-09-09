@@ -1603,7 +1603,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::String => {
                 let (start, end) = self.current_pos();
-                let cooked = self.extract_string_cooked();
+                let cooked = self.extract_string_cooked()?;
                 self.advance()?;
                 Ok(ParsedExpr::with_start_end(
                     self.arena,
@@ -2838,7 +2838,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             let mut stmt = self.parse_statement()?;
             if in_prologue {
-                in_prologue = self.note_directive(&mut stmt);
+                in_prologue = self.note_directive(&mut stmt, &body)?;
             }
             body.push(stmt);
         }

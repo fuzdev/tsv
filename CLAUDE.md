@@ -834,12 +834,13 @@ Cross-language coupling exists only where languages integrate — `tsv_svelte` d
 
 **Strictness is a property of the source text, and tsv reads it the way the spec defines it.** Module code is strict always (ecma262 sec-strict-mode-code); Script code is strict **iff** its directive prologue holds a `"use strict"`, and so is any function body, class, or nested scope that inherits or declares it. Every tsv entry point but the explicit `Goal::Script` parses a module, so the everyday answer is *strict* — a Svelte `<script>`, a `.ts` file, `format_str`.
 
-**Two rules move with strictness**, and both are disallowances strict code states over a production the sloppy grammar admits:
+**Three rules move with strictness**, and all three are disallowances strict code states over a production the sloppy grammar admits:
 
 - the **leading-zero numeric literal** — `LegacyOctalIntegerLiteral` (`010`, base 8) and `NonOctalDecimalIntegerLiteral` (`08`) — which lexes under every mode and is rejected at the point the token becomes a node, where the enclosing code's strictness is settled;
+- the **legacy string escape** — `LegacyOctalEscapeSequence` (`"\7"`, `"\101"`, and `"\0"` followed by a decimal digit) and `NonOctalDecimalEscapeSequence` (`"\8"`, `"\9"`) — which decodes under every mode and is rejected at the same seam, the one place a string-literal token becomes a node. A bare `"\0"` is the NUL escape, legal everywhere. The rule reaches backwards as well as forwards: a `"use strict"` directive re-grades the prologue literals ahead of it, so `function f() { "\7"; "use strict"; }` is a syntax error (ecma262 sec-literals-string-literals);
 - the **`with` statement**, rejected at its keyword for the same reason. It stays a `ReservedWord` in every mode (lexing it as an identifier would read `with (a);` as a call), so only the STATEMENT moves; the name channel never does.
 
-One construct stays put: the legacy string escapes (`"\7"`, `"\08"`) are **accepted** under every mode — a deferred early error like the rest below.
+The **untagged template** carries its own `NotEscapeSequence` rule, which is mode-independent and not one of these three; tsv defers it.
 
 **Annex B is out.** The web-compatibility grammar — HTML-like comments, labelled function declarations, `if (a) function f(){}` hoisting, `for (var x = 1 in o)` — is "normative but optional if the ECMAScript host is not a web browser" (ecma262 sec-web-compat), and tsv takes that carve-out: it is a formatter and parser, not a browser host, so those productions are not in the grammar at either goal.
 

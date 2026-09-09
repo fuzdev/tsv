@@ -486,7 +486,7 @@ The clearest case is `dollar_prefix_invalid`: it is literally
 a JS one. `let $$slots = 1;` is valid JavaScript, and tsc — [this repo's oracle for
 what is really an error](../CLAUDE.md#strictness-module-strict-script-by-directive) — accepts it under `--strict`.
 Nothing in the deferred set (duplicate parameter names, reserved words as identifiers,
-octal escapes, `delete` of a plain name) reaches any of these rules.
+`delete` of a plain name) reaches any of these rules.
 
 The one rule with any overlap at all is `declaration_duplicate`, and Svelte says so
 itself at `phases/scope.js:688` ("declaring function twice is also caught by acorn in
