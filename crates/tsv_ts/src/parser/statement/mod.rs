@@ -15,6 +15,25 @@ mod modules;
 mod type_declarations;
 mod variable;
 
+/// Which statement position a parse is in — the axis ecma262 draws between
+/// `StatementListItem` (a declaration is admissible) and the single `Statement` an
+/// `if` arm, a loop body, a `with` body or a labelled item takes (it is not).
+///
+/// It gates the reading of exactly one word: `let`. A **labelled** item bars the other
+/// declarations too, but through a rule that reads the finished node
+/// (`Parser::parse_labeled_statement`'s labelled-item check) rather than the token that
+/// opens it — and that rule reaches labels alone. In any other nested body a `const` /
+/// `class` / `function` declaration is one more deferred early error tsv parses
+/// (`if (a) const x = 1;`, `for (;;) const x = 1;`, `while (a) class C {}`; acorn
+/// rejects all three).
+#[derive(Clone, Copy)]
+enum StatementPosition {
+    /// A `StatementList` — a `Program`, a block, a function body, a `switch` case.
+    List,
+    /// The single `Statement` a nested position takes.
+    Single,
+}
+
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a `ModuleItem`: an import/export declaration or any
     /// `StatementListItem`. Import/export declarations are valid only here — at the
@@ -48,7 +67,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.error_msg("'import' and 'export' may only appear at the top level")
     }
 
+    /// Parse a `StatementListItem` — the statement position that admits a
+    /// declaration beside a statement (a `Program`, a block, a function body, a
+    /// `switch` case).
     pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+        self.parse_statement_at(StatementPosition::List)
+    }
+
+    /// Parse the single `Statement` a nested position takes — an `if` arm, a `while` /
+    /// `do` / `for` body, a `with` body, a labelled item.
+    ///
+    /// `IfStatement`, every iteration statement and `WithStatement` take a `Statement`,
+    /// and `LabelledItem : Statement | FunctionDeclaration`, so a `LexicalDeclaration`
+    /// cannot appear here at all. That is exactly what changes the reading of `let`:
+    /// with no declaration to compete with, `let` is the `IdentifierReference` its own
+    /// production admits, and ASI closes the statement at it. acorn spells the same fork
+    /// as the `context` parameter of `parseStatement` / `isLet`.
+    pub(super) fn parse_nested_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+        self.parse_statement_at(StatementPosition::Single)
+    }
+
+    fn parse_statement_at(
+        &mut self,
+        position: StatementPosition,
+    ) -> Result<Statement<'arena>, ParseError> {
         // A labeled statement, checked before the keyword dispatch below because a
         // `LabelIdentifier` may be a word the lexer turned into a `Keyword` token
         // (`async: …`, `string: …`, `let: …`) — those never reach the `Identifier`
@@ -94,13 +136,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `IdentifierReference` and this is an expression statement (`let;`,
                 // `let = 1`, `let.x = 1`, `let++`). See `Parser::at_let_declaration`
                 // for the rule and for why `let [` still commits to the declaration.
-                KeywordKind::Let => {
-                    if self.at_let_declaration() {
+                //
+                // In a single-statement position there is no declaration to compete
+                // with, so the reference reading is the only one — except for that same
+                // `let [`, which `ExpressionStatement`'s lookahead bars from being an
+                // expression, leaving no reading at all.
+                KeywordKind::Let => match position {
+                    StatementPosition::List if self.at_let_declaration() => {
                         self.parse_variable_declaration()
-                    } else {
-                        self.parse_expression_statement()
                     }
-                }
+                    StatementPosition::Single
+                        if matches!(self.peek_kind(), TokenKind::BracketOpen) =>
+                    {
+                        Err(self.error_msg(
+                            "A lexical declaration cannot appear in a single-statement context",
+                        ))
+                    }
+                    _ => self.parse_expression_statement(),
+                },
                 KeywordKind::Return => self.parse_return_statement(),
                 KeywordKind::Function => {
                     // A `function` inside a `declare namespace`/`module` body carries no

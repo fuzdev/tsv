@@ -136,6 +136,7 @@ This input is **valid** by tsv's parse oracle (Svelte / acorn-typescript / `pars
 - Operator keyword heading a member access after `<` (`p < keyof.a > (t, u)`) — `Type expected.` (acorn reads a comparison on the value `keyof.a` — an operator keyword cannot head a qualified type name, unlike an atom's `p < string.length > (t, u)`; tsc commits to type arguments at the keyword and has no type after the `.`) — [less_than_keyword_member](../tests/fixtures/typescript/syntax/disambiguation/less_than_keyword_member_prettier_divergence/)
 - `using`/`await using` cast (`using as T`, `(await using) satisfies T`) — `',' expected.` — [using/cast](../tests/fixtures/typescript/typescript_specific/using/cast_prettier_divergence/)
 - Bare definite-assignment class property (`b!;` — no type annotation, no initializer) — `Declarations with definite assignment assertions must also have type annotations.` (TS1264; acorn-typescript defers the early error, tsv follows) — [property_definite_no_init](../tests/fixtures/typescript/statements/class/property_definite_no_init_prettier_divergence/)
+- `let` heading a for-head with no binding after it — one message per head: `for (let in o)` → `Only a single variable declaration is allowed in a 'for...in' statement.`; `for (let.x in o)` and `for (let = 3; ;)` → `Variable declaration expected.`; `for (let instanceof o; ;)` → `'instanceof' is not allowed as a variable declaration name.` (tsc commits `for (let` to a declaration on the keyword alone; acorn and the grammar read the head as an expression). The fixture's fifth head, `for (let; ;)`, prettier **parses** — it is its printer that throws, below — [script_goal/let_reference_for_head](../tests/fixtures/typescript/script_goal/let_reference_for_head_prettier_divergence/)
 - Ambient generator signature (`declare function* g(): Iterator<number>;`) — `Generators are not allowed in an ambient context.` (TS1221; a *checker* grammar error, not a parse error — see below) — [declare/function/generator](../tests/fixtures/typescript/typescript_specific/declare/function/generator_prettier_divergence/)
 - Bodiless generator signature in a namespace body (`declare namespace N { function* g(): void; }`, and the plain-`namespace` spelling) — `A function signature cannot be declared as a generator.` (TS1221 / TS1222) — [namespace/generator_signature](../tests/fixtures/typescript/declarations/namespace/generator_signature_prettier_divergence/)
 - Ambient `async` signature (`declare async function f(): Promise<void>;`) — `'async' modifier cannot be used in an ambient context.` (TS1040; **also** a Svelte divergence, acorn rejecting the bare form) — [declare/function/async](../tests/fixtures/typescript/typescript_specific/declare/function/async_svelte_prettier_divergence/), and with a comment in each gap of the head — the `declare`→`async` one being reachable from no other construct — [declare/function/async_keyword_comment](../tests/fixtures/typescript/typescript_specific/declare/function/async_keyword_comment_svelte_prettier_divergence/)
@@ -201,6 +202,25 @@ and is rejected by acorn and tsv. Every other identifier-shaped word after
 `using` is a binding attempt in both parsers — those cases are ordinary
 `_svelte_divergence` fixtures (acorn has no `using` declarations at all); only
 the cast keywords diverge from tsc, in tsv's favor of the drop-in oracle.
+
+**`let` in a for-head**: `ForStatement` restricts its init with `[lookahead ∉ { let [ }]`
+and the for-in form with `[lookahead ≠ let []`, so a `let` that no binding follows is the
+`IdentifierReference` the production admits and the head is an expression. tsc's parser
+commits on the keyword instead (`parseForOrForInOrForOfStatement` tests
+`token() === LetKeyword` with no lookahead) and then demands a binding, so
+typescript-estree throws. prettier's own `babel` and `acorn` routes format every one of
+these — and print the for-in lefts with exactly the parens tsv adds (`for (let in o)` →
+`for ((let) in o)`) — so the divergence is the `typescript` route's parser, not prettier's
+printer. The for-of head's own `[lookahead ∉ { let }]` stays a syntax error on both sides.
+
+One head of the five is not a parse rejection at all: `for (let; ;) {}` **parses** under
+the `typescript` route — a `ForStatement` whose init is a `VariableDeclarationList`
+holding zero declarations, tsc reporting an empty `parseDiagnostics` — and prettier's
+printer then throws on that empty list,
+`InvalidDocError: Unexpected doc 'undefined', Expected it to be 'string' or 'object'`. It
+is cataloged here rather than in its own entry because the fixture's `prettier_rejects.txt`
+pins the *file's* first error, which the `for (let = 3; ;)` head raises during the parse,
+ahead of any printing. ◆prettier_bug
 
 ## Sloppy-script literals prettier refuses
 
@@ -347,6 +367,31 @@ it. A break **after** `declare` is ordinary ASI and parses as two statements in 
 fixture's `unformatted_asi` variant, which both formatters normalize to `input`).
 Same-line spellings stay one ambient declaration in both (`declare abstract class B
 {}`). Only the mixed form — same-line word, break before the declaration — diverges.
+
+## Statement-position `let` prettier reads as a declaration
+
+The other half of the tsc-vs-acorn `let` disagreement cataloged in
+[§Prettier rejects valid input](#prettier-rejects-valid-input), and here prettier does
+**not** throw — it prints a different reading. The fixture pins that through an
+`unformatted_ours_*` variant and the `audit_signature_*.txt` recording prettier's chain
+from it:
+[script_goal/let_reference_statement_position](../tests/fixtures/typescript/script_goal/let_reference_statement_position_prettier_divergence/).
+
+A single-statement position — a labelled item, an `if` arm, a loop body — takes a
+`Statement`, and a `LexicalDeclaration` is not one. So `let` there can only be the
+reference, nothing may follow it in the same statement, and a line break closes the
+statement by ASI. tsv reads `L: let ⏎ a = 1;` as `L: let;` then `a = 1;`, and
+`if (a) let ⏎ {}` as `if (a) let;` then a block; prettier's `typescript` route reads each
+pair as ONE declaration and prints `L: let a = 1;` / `if (a) let {};`, so the line break's
+meaning is gone and two statements become one.
+
+The fixture holds five such spellings, and four of them come out of that chain as text no
+ECMAScript parser accepts: `L: let a = 1;`, `while (a) let c = 1;`, `for (;;) let d = 1;`
+and `if (a) let {};` are syntax errors under acorn and under the spec alike, a
+`LexicalDeclaration` being no `Statement`. Only the fifth, the `if (a) let;` / `else b;`
+pair, survives untouched — prettier finds no following statement to weld onto it. That is
+why the chain the fixture pins ends at a form tsv cannot reparse. prettier's own `babel`
+and `acorn` routes print exactly what tsv prints. ◆spec_violation
 
 ## TypeScript: Template Literals
 

@@ -265,7 +265,7 @@ fn widened_binding_names_are_format_idempotent() {
 /// The same hazard on the **reference** side, which the binding sweep above cannot
 /// reach: a newly-admitted `IdentifierReference` must survive format → reparse →
 /// format too. `let` earns the emphasis — statement-initial, its printed form is
-/// re-read by the very `isLetDeclaration` lookahead that classified it, so a
+/// re-read by the very `isLet` lookahead that classified it, so a
 /// printer that dropped or added a token here would flip the reading on the way
 /// back in.
 #[test]
@@ -291,6 +291,15 @@ fn widened_reference_forms_are_format_idempotent() {
         "var [let] = a;",
         "function f([let]) {}",
         "try {} catch ([yield]) {}",
+        // the two positions a lookahead alone classifies: a for-head and a
+        // single-statement body, whose printed form is re-read by that same lookahead
+        "for (let in o) {}",
+        "for (let; ; ) {}",
+        "for (let = 3; ; ) {}",
+        "for (let.x in o) {}",
+        "L: let\nx = 1;",
+        "if (a) let\n{}",
+        "while (a) let\nx = 1;",
     ] {
         let once = format(src);
         if !accepts(&once) {
@@ -315,7 +324,7 @@ fn widened_reference_forms_are_format_idempotent() {
 /// reference spelling is the same strict-mode early error tsv defers in the
 /// binding spelling. What separates the two readings is a lookahead, not a rule:
 /// statement-initial `let` heads a declaration exactly when a binding follows
-/// (tsc's `isLetDeclaration`).
+/// (acorn's `isLet`).
 #[test]
 fn let_is_a_reference_when_no_binding_follows() {
     for src in [
@@ -346,8 +355,9 @@ fn let_is_a_reference_when_no_binding_follows() {
 /// *grammar*: `ExpressionStatement` carries `[lookahead ∉ { …, `let` `[` }]`, so
 /// `let [` can never begin one. `let[0] = 1` is therefore a declaration with an
 /// invalid array binding pattern, not an indexed assignment — a syntax error, as
-/// tsc reports (TS1181). A for-head commits to the declaration on the keyword
-/// alone (tsc does the same), so it needs no lookahead restriction to agree.
+/// tsc reports (TS1181). A `for` init takes that same restriction and no more; the
+/// for-of head's own `[lookahead ∉ { let }]` is the wider one, which is why the two
+/// `of` heads below reject whatever follows the keyword.
 #[test]
 fn let_bracket_is_never_an_expression_statement() {
     for src in ["let[0] = 1;", "for (let[0] of a) {}", "for (let.x of a) {}"] {
@@ -371,6 +381,90 @@ fn let_bracket_is_never_an_expression_statement() {
         node_type_at("let\nx = 1;", "/body/0").as_deref(),
         Some("VariableDeclaration"),
         "a line break does not split the declaration"
+    );
+}
+
+/// The two positions where only a *lookahead* keeps the reference reading from the
+/// declaration one, both of them reachable at either goal (a `let` reference is a
+/// strict-mode early error, and tsv defers it exactly as it defers `let = 1`).
+///
+/// - a **for-head**: `ForStatement` restricts its init with the same
+///   `[lookahead ∉ { let [ }]` as `ExpressionStatement`, and the for-in form with
+///   `[lookahead ≠ let []`, so a `let` no binding follows is an expression there
+/// - a **single-statement position** — an `if` arm, a loop or `with` body, a labelled
+///   item: each takes a `Statement`, which a `LexicalDeclaration` is not, so the
+///   reference is the only reading and ASI closes it
+///
+/// The node types are the assertion: both readings *accept* the same bytes in several
+/// of these, and only the tree says which one was taken.
+#[test]
+fn let_is_a_reference_in_a_for_head_and_a_statement_position() {
+    for src in [
+        "for (let in o) {}",
+        "for (let; ; ) {}",
+        "for (let = 3; ; ) {}",
+        "for (let.x in o) {}",
+        "for (let instanceof o; ; ) {}",
+        "for ([let][1] in o) {}",
+        "L: let;",
+        "L: let\nx = 1;",
+        "if (a) let;\nelse b;",
+        "if (a) let\n{}",
+        "while (a) let\nx = 1;",
+        "for (;;) let\nd = 1;",
+    ] {
+        assert!(accepts(src), "`{src}` must parse");
+    }
+    // …and the binding forms are declarations still, in the for-head where one is
+    // admissible at all.
+    for src in [
+        "for (let x of y) {}",
+        "for (let [a] in o) {}",
+        "for (let of of x) {}",
+    ] {
+        assert!(accepts(src), "`{src}` must still be a declaration");
+    }
+    // A declaration is inadmissible in a single-statement position, so the `let [`
+    // lookahead — the one spelling the expression reading cannot take — leaves no
+    // reading at all, and a binding on the same line closes neither.
+    for src in [
+        "L: let [a] = b;",
+        "if (a) let [a] = b;",
+        "while (a) let x = 1;",
+        "for (let of x) {}",
+        "for await (let of x) {}",
+    ] {
+        assert!(!accepts(src), "`{src}` must reject");
+    }
+    assert_eq!(
+        node_type_at("for (let in o) {}", "/body/0/left").as_deref(),
+        Some("Identifier"),
+        "a for-in left that is bare `let` is the reference, not a declaration"
+    );
+    assert_eq!(
+        node_type_at("for (let; ; ) {}", "/body/0/init").as_deref(),
+        Some("Identifier"),
+        "a `for` init that is bare `let` is the reference"
+    );
+    assert_eq!(
+        node_type_at("for (let of of x) {}", "/body/0/left").as_deref(),
+        Some("VariableDeclaration"),
+        "`let of` binds `of` — the second `of` is the keyword"
+    );
+    assert_eq!(
+        node_type_at("L: let\nx = 1;", "/body/0/body/expression").as_deref(),
+        Some("Identifier"),
+        "a labelled `let` is the reference, and ASI ends the statement at it"
+    );
+    assert_eq!(
+        node_type_at("L: let\nx = 1;", "/body/1").as_deref(),
+        Some("ExpressionStatement"),
+        "…so the assignment is a statement of its own"
+    );
+    assert_eq!(
+        node_type_at("while (a) let\nx = 1;", "/body/0/body").as_deref(),
+        Some("ExpressionStatement"),
+        "a loop body is a `Statement`, so the same split applies"
     );
 }
 
