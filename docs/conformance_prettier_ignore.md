@@ -858,6 +858,33 @@ declaration (`@dec⏎// prettier-ignore⏎export class D {}`) freezes nothing, i
 tsv. The decorator belongs to the declaration it decorates, so the gap is inside the statement
 rather than before it, and there is no following member for the rule to bind to.
 
+**A statement's terminator is the printer's, not the author's.** A freeze over a statement
+covers the statement's own content; the `;` after it is re-emitted rather than copied. Prettier
+says the same — its `locEnd` overrides stop at the last declarator, the keyword, or the content
+end, and `shouldIgnoredNodePrintSemicolon` prints one back — and tsv has to concede the
+terminator regardless, since a frozen `VariableDeclaration` whose author relied on ASI must get
+its `;` restored or the next statement's printed form re-binds the pair into one broken
+statement. Owning the *other* end too is what keeps it one rule rather than two: a terminator
+the author left detached from its statement — `const a  =  x⏎;`, the semicolon-free style's
+`;[…]` idiom, or a merely padded `break  ;` — is re-emitted glued, and both formatters agree at
+all ten kinds
+([detached terminator](../tests/fixtures/typescript/syntax/asi/prettier_ignore_semicolon_detached/)).
+
+A `;` a statement kind does **not** own is content, and freezes as authored on both formatters:
+an empty-statement body's (`for (  ;;  )⏎;`, `while (  a  )⏎;`, `l:⏎;` — there the `;` *is* the
+body), and one belonging to a kind prettier's table does not list (`type A  =  B⏎;`).
+
+- **A comment before the terminator** — ◆comment_preservation — prettier finds its content end
+  in a comment-STRIPPED copy of the text, so a comment between the content and the `;` falls
+  outside the frozen slice and is re-printed *past* the terminator (`fn(  a  ) /* c */ ;` →
+  `fn(  a  ); /* c */`). tsv counts a comment as content and keeps it inside the slice where the
+  author put it — the same reading of the directive's promise that makes a range
+  [byte-verbatim](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/).
+  A `//` additionally owns the rest of its line, so a terminator written below one stays there:
+  pulling the `;` up would not move it but SWALLOW it, welding `const a = x // c⏎;` +
+  `(y) => 1;` into output that no longer parses at all —
+  [detached terminator comment](../tests/fixtures/typescript/syntax/asi/prettier_ignore_semicolon_detached_comment_prettier_divergence/)
+
 **On declaration heads and parenthesized statements.** The last two statement-level heads are
 the ones where prettier **relocates the directive out of the gap** and freezes anyway — the
 `export`→declaration, `export default`→value and `export =`→value gaps, and the `(`→expression

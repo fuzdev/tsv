@@ -385,6 +385,28 @@ A `case` label rides inside its own frozen case, and a class name and `extends`
 clause stay parent-owned outside the frozen body — so the siblings the freeze
 does not reach still reformat.
 
+A statement's **terminator is the printer's**, like the delimiters above: the
+frozen slice ends at the statement's own content and the `;` is emitted after it.
+So a terminator the author left detached — on its own line, or merely padded —
+comes back glued, and one the author omitted comes back supplied wherever the
+statement's kind always carries it:
+
+```ts
+// format-ignore
+const aaa  =  bbb
+;
+
+// format-ignore
+debugger  ;
+```
+
+print as `const aaa  =  bbb;` and `debugger;`. A `;` the statement's kind does
+**not** own is content and freezes untouched — an empty-statement body's, where
+the `;` *is* the body (`for (  ;;  )` then `;` on the next line), and one on a
+declaration whose kind carries no terminator rule (`type Aaa  =  Bbb`). So is a
+terminator written below a `//`, which owns the rest of its line: pulling the `;`
+up onto it would not move the terminator, it would comment it out.
+
 One position is inert: a directive between a **decorator** and its declaration
 freezes nothing, because the decorator belongs to the declaration and the gap is
 inside the statement rather than before it.

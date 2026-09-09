@@ -432,7 +432,13 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// bucket moves and nothing already compared changes: the retry runs on the module
 	// parse's ERROR path only, so no module-valid file is reinterpreted, and the
 	// printer reads no goal.
-	typescript: 5157,
+	//
+	// 5157 → 5159: `prettier/tests/format/js/ignore/issue-18303.js` arrives from `unknown`
+	// (89 → 88, which names the change and carries its measurement). ⚠️ The measured rise is
+	// ONE — 5158 at the baseline, 5159 at the tip; the committed floor was already a unit slack
+	// from an earlier landing this change did not measure, and the re-pin absorbs it, since a
+	// floor is only worth having tight.
+	typescript: 5159,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -703,7 +709,28 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//     own output at both goals, so this is a paren-retention disagreement, not a
 	//     round-trip break. Only reachable at Script goal: `(await) satisfies …`
 	//     rejects at Module, which is why the whole file used to be an `error`.
-	typescript: 89,
+	//
+	// 89 → 88: `prettier/tests/format/js/ignore/issue-18303.js` leaves for `match` (`match`
+	// 5158 → 5159). A frozen statement's TERMINATOR is the printer's, not the author's, so the
+	// slice now ends at the statement's own content and the `;` is re-emitted glued — prettier's
+	// `locEnd` overrides (`src/language-js/location/overrides.js`) read together with
+	// `shouldIgnoredNodePrintSemicolon`, which tsv had implemented only at the ASI end (restore a
+	// `;` the author never wrote) and not at the other (a `;` the author wrote detached). The
+	// file's `// prettier-ignore⏎let y =⏎ 1⏎ +⏎ 1⏎;` was its only hunk.
+	//
+	// Measured by a baseline-vs-tip byte A/B over the 11,491 `find`-enumerated
+	// `../corpora/collections` + `../prettier/tests/format` files named EXPLICITLY (`--list`
+	// honors `.prettierignore` and hides ~800 suite files): 11 movers, ALL in the prettier
+	// suites and NONE in real code, every one improving — this file to parity, and the ten
+	// `js/no-semi/*.js` statement files from 2 or 4 differing hunks down to 1 or 2. The `--all`
+	// bucket diff confirms the scope: `typescript` `match` / `unknown` are the only cells that
+	// move in any language, with `partial` / `safety` / `errors` / `expected_errors` and every
+	// `svelte` and `css` bucket identical.
+	//
+	// Those ten stay `unknown` on a REMAINING hunk of the same shape one seam over: prettier's
+	// `isNextLineEmpty` is a DISJUNCTION over the content end OR the full end, so `a()⏎⏎;` keeps
+	// a blank line tsv drops. Same `locEnd` table, a different reader, and its own change.
+	typescript: 88,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.
