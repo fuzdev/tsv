@@ -212,8 +212,11 @@ enum OpenParenLineBlockComment {
 /// makes a logical chain hand its breaking to the head's own paren group.
 ///
 /// `if`, `while`, do-while and `switch` are on that list; **`with` is not**, so a `with`
-/// object keeps the ordinary chain layout (its own group, continuation indent) and stays
-/// on one indented line where the four others break per operand.
+/// object keeps the ordinary chain layout an expression has anywhere else: its own group,
+/// so a chain that FITS on the head's indented line stays there where the four others
+/// break per operand once the head breaks — and a chain that does not fit breaks per
+/// operand too, with the continuation indent the four others do not take. The axis is
+/// membership in that list; both layouts follow from it.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(in crate::printer::statements) enum HeadChainGrouping {
     /// The head's paren group drives the chain (`if` / `while` / do-while / `switch`).
@@ -450,7 +453,7 @@ impl<'a> Printer<'a> {
     /// - the C-style `for`'s body arm (`for_loop.rs`, `build_for_statement_doc`).
     ///   **Live**: it has an inline arm of its own guarded on this answer, so the clause
     ///   reaches that anchor through the gate rather than needing a second spelling.
-    /// - `do`→body (`while_loop.rs`), read as `… && !is_block`. Inert by that guard —
+    /// - `do`→body (`paren_head.rs`), read as `… && !is_block`. Inert by that guard —
     ///   the block case falls to the `else`, which re-asks through the emitter above.
     /// - [`Self::build_adjust_clause_with_comments`] (`if`/`while`, **non-block** body)
     ///   and `append_close_paren_with_non_block_body` (for-in/of, **non-block** body).

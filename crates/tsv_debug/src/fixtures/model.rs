@@ -58,13 +58,15 @@ pub const TSV_REJECTS_FILENAME: &str = "tsv_rejects.txt";
 
 /// Marker file selecting the parse goal for a standalone-script fixture. When
 /// present (containing `script`), the fixture's `input.ts` is parsed as a
-/// strict **Script** (`tsv_ts::Goal::Script`) rather than the default
-/// **Module** — by both tsv and the acorn `expected.json` oracle — so `await`
-/// is an ordinary identifier and `import`/`export`/`import.meta` are syntax
-/// errors. Absent (the common case) means `Goal::Module`. Valid on `.ts` /
-/// `.svelte.ts` fixtures only (Svelte `<script>` and CSS have no goal); the
-/// structure validator rejects it anywhere else (rule S23), since nothing there
-/// would read it.
+/// **Script** (`tsv_ts::Goal::Script`) rather than the default **Module** — by
+/// both tsv and the acorn `expected.json` oracle — so `await` is an ordinary
+/// identifier, `import`/`export`/`import.meta` are syntax errors, and the code
+/// is sloppy unless its own `"use strict"` prologue makes it strict. Absent
+/// (the common case) means `Goal::Module`. Valid on `.ts` / `.svelte.ts`
+/// fixtures only (Svelte `<script>` and CSS have no goal); the structure
+/// validator rejects it anywhere else, and rejects any content but `script` /
+/// `module` (rule S23), since the lenient reader would otherwise grade a typo
+/// at Module without saying so.
 pub const GOAL_FILENAME: &str = "goal";
 
 /// Type of input file for a fixture

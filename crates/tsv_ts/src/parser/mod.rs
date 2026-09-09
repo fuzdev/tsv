@@ -1326,7 +1326,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Every string literal in the grammar is consumed here — an expression, an object or
     /// class key, a type-literal member key, a literal type, an import type's specifier,
     /// a module specifier — which is why the strict-mode legacy-escape gate
-    /// ([`Parser::legacy_escape_error`]) is stated here and nowhere else.
+    /// ([`Parser::legacy_escape_error`]) rides here for every literal as its token
+    /// becomes a node; the gate's one other asker is the retroactive prologue walk
+    /// (`Parser::note_directive`), over literals whose tokens are already gone.
     pub(super) fn extract_string_cooked(&self) -> Result<StringCooked<'arena>, ParseError> {
         match self.current_decoded {
             Some(decoded) => {

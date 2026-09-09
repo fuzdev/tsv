@@ -337,10 +337,11 @@ pub async fn parse_typescript(source: &str) -> Result<Value, DenoError> {
 /// Parse TypeScript with acorn against an explicit goal symbol.
 ///
 /// `Goal::Module` (the default, via [`parse_typescript`]) mirrors Svelte's
-/// always-module parse; `Goal::Script` parses a standalone strict script (acorn
-/// `sourceType: 'script'`), so it accepts `await` as an identifier and rejects
-/// `import`/`export`/`import.meta` — matching tsv's own `Goal::Script` parse for
-/// standalone-script fixtures.
+/// always-module parse; `Goal::Script` parses a standalone script (acorn
+/// `sourceType: 'script'`) — sloppy unless its own `"use strict"` prologue says
+/// otherwise, so it accepts `await` as an identifier, `with`, and the legacy
+/// literals, and rejects `import`/`export`/`import.meta` — matching tsv's own
+/// `Goal::Script` parse for standalone-script fixtures.
 pub async fn parse_typescript_with_goal(
     source: &str,
     goal: tsv_ts::Goal,
@@ -379,7 +380,7 @@ pub async fn parse_by_type(
 ///
 /// The goal reaches acorn only (`sourceType`); Svelte `<script>` is hard-wired to
 /// a module and CSS has no goal, so both ignore it — mirroring
-/// `tsv_cli::cli::format_source::format_source_in_with_goal_option`.
+/// `tsv_cli::cli::format_source::format_source_in_with_source_type`.
 pub async fn parse_by_type_with_goal(
     content: &str,
     parser: tsv_cli::cli::input::ParserType,
