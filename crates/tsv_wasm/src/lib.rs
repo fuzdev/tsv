@@ -322,7 +322,10 @@ export interface TypeScriptParseOptions {
 	locations?: boolean | undefined;
 	/**
 	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
-	 * `import`/`export`/`import.meta` are syntax errors.
+	 * `import`/`export`/`import.meta` are syntax errors. A script is also
+	 * **sloppy** unless its own `"use strict"` directive prologue makes it
+	 * strict, so `with` and the legacy octal literals/escapes parse there; a
+	 * module is always strict.
 	 * @default 'module'
 	 */
 	goal?: 'script' | 'module' | undefined;
@@ -404,7 +407,10 @@ export interface FormatOptions {
 export interface TypeScriptFormatOptions {
 	/**
 	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
-	 * `import`/`export`/`import.meta` are syntax errors.
+	 * `import`/`export`/`import.meta` are syntax errors. A script is also
+	 * **sloppy** unless its own `"use strict"` directive prologue makes it
+	 * strict, so `with` and the legacy octal literals/escapes parse there; a
+	 * module is always strict.
 	 * @default 'module'
 	 */
 	goal?: 'script' | 'module' | undefined;

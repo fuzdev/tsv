@@ -32,8 +32,10 @@
  * hands its parser a fixed `file.ts`): the `typescript` bench group is one group,
  * and per-file script-kind routing would make two rows measure different parsers on
  * the same file set. TypeScript is a superset for everything in scope here; the
- * places it isn't (annex-B HTML comments, legacy octals) are sloppy-mode-only and
- * excluded from test262's graded positives.
+ * one place it isn't is Annex B (HTML-like comments), which tsv excludes from the
+ * graded set as a non-browser host. Legacy octal literals ARE graded — sloppy
+ * scripts among test262's positives — and tsc's scanner refuses them under every
+ * mode, so a tsc row shows that refusal as the reference behavior it is.
  */
 
 import { BaseImplementation, type Language, type ParseGoal } from './types.ts';

@@ -6,7 +6,7 @@ Comprehensive reference for TypeScript/JS language features supported by tsv's p
 
 Every syntax feature of the published ECMAScript standard is supported, as enumerated below — through **ES2025**, the most recent edition that added grammar (import attributes; its two RegExp additions ride the opaque regex body, see [Regular Expressions](#regular-expressions)). ES2026 added library APIs only, no new syntax. The finished (Stage 4) `using` declarations, awaiting publication in a later edition, are supported too — see [Explicit Resource Management](#explicit-resource-management). On the TypeScript side every construct the `tsc` oracle parses is parsed here, down to its newest contextual keyword (`defer`); the `conformance:ts-fixtures` and `conformance:ts-repo` gates pin those oracles' versions, so this doc names none.
 
-Sloppy-mode constructs are excluded by design (see [Out of Scope](#out-of-scope)). ECMAScript conformance is measured against test262 (see [conformance_test262.md](./conformance_test262.md)). Constructs tsv does not parse — all of them TC39 proposals — are listed under [Future Work](#future-work).
+Annex B's web-browser-host grammar is excluded by design; core sloppy-mode constructs are parsed at a `Script` goal (see [Out of Scope](#out-of-scope)). ECMAScript conformance is measured against test262 (see [conformance_test262.md](./conformance_test262.md)). Constructs tsv does not parse — all of them TC39 proposals — are listed under [Future Work](#future-work).
 
 **On proposal maturity**: this doc deliberately carries **no TC39 stage labels**. A stage can change at any TC39 meeting, and no gate here can catch a label that has gone stale — so a stage quoted in this file would be a claim nothing keeps honest. Year tags on shipped features (`- ES2020`) are a different thing: an edition is a historical fact and does not rot, so those stay. For a construct's current stage, read the oracle — `../../proposals/`, where `finished-proposals.md` is Stage 4, `README.md` is Stage 2 and up, and the rest are `stage-1-proposals.md`, `stage-0-proposals.md`, `inactive-proposals.md`.
 
@@ -825,7 +825,7 @@ Strictness and the *goal* (`Module` vs `Script`) are orthogonal, coupled only by
 Module ⟹ strict. tsv defaults to `Module` (Svelte hard-wires it); a `Script` goal is
 available (`parse_with_goal`, `--goal script`), where `await` is an ordinary
 identifier and `import`/`export`/`import.meta` are errors. See
-[conformance_test262.md](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis).
+[conformance_test262.md](./conformance_test262.md#design-decision-module-strict-script-by-directive-annex-b-out).
 
 Rejected by the parser today:
 

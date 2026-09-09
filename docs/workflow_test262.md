@@ -15,7 +15,7 @@ This document contains:
 - Current full-suite results (§Current Results — refresh after conformance work)
 - Scope (what's tested vs skipped) and test directory priorities
 - The command interface and frontmatter/execution design
-- Design decisions (strict mode only)
+- Design decisions (Module strict, Script by directive, Annex B out)
 
 **This workflow doc describes HOW to work. The conformance doc describes WHAT we're testing against.**
 
@@ -42,8 +42,7 @@ cargo run -p tsv_cli parse --content 'a /* comment */ => x' --parser typescript 
 
 **A) Out of scope** → Document and move on
 
-- Sloppy-mode only features (we're strict-mode only)
-- AnnexB web-compat features (lower priority)
+- AnnexB web-compat features (a declared non-goal — tsv is not a web browser host)
 - Runtime/resolution phase errors (we only test parsing)
 
 **B) Early error detection missing** → Lower priority, track for later
@@ -109,7 +108,7 @@ in [conformance_test262.md §Current Results](./conformance_test262.md#current-r
 Results:
   Positive tests: 41000 passed, 1100 failed
   Negative tests: 1400 passed, 3000 failed
-  Skipped:        2600 (sloppy mode: 2500, runtime: 50, resolution: 50)
+  Skipped:        900 (Annex B: 790, runtime: 60, resolution: 50)
 
 Pass rate: 42400/46500 (91.2%)
 ```
@@ -128,8 +127,9 @@ Pass rate: 42400/46500 (91.2%)
 - Positive failed, many tests — **High** — Fix immediately - blocking valid code
 - Positive failed, few tests — Medium — Fix when addressing related code
 - Negative failed, early error — Lower — Track for later - code runs but shouldn't
-- Sloppy-mode required (`noStrict`) — Skip — Outside the graded strict subset
-- AnnexB features — Lower — Web-compat, not essential
+- Sloppy-mode required (`noStrict`) — **Graded** — a sloppy `Script` run, no prefix
+- AnnexB features — Skip — web-compat, a declared non-goal (a `noStrict` test under
+  `test/annexB/`); the rest of that subtree is graded
 
 ### Common Failure Patterns
 
@@ -347,9 +347,9 @@ deno task check
    - User approval ensures fixture is correct
    - Catching errors early saves rework
 
-5. **Add AnnexB/sloppy features without discussion**
-   - We're strict-mode only by design
-   - Adding sloppy mode is a major scope change
+5. **Add AnnexB features without discussion**
+   - Annex B is out of scope by design — tsv is not a web browser host
+   - Adding it is a major scope change (core sloppy mode is already parsed)
 
 ### Red Flags
 

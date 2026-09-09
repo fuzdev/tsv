@@ -25,6 +25,16 @@ pub enum FailureReason {
     UnexpectedParseError(String),
     /// Should have failed to parse but succeeded
     UnexpectedParseSuccess,
+    /// A mode-unflagged test's two runs disagreed: one accepted the source and
+    /// the other rejected it, so the test's own claim — that the verdict is the
+    /// same sloppy and strict — does not hold for tsv. Names the run that
+    /// rejected and carries its parse error.
+    ModeDisagreement {
+        /// Which of the two runs rejected.
+        rejected_by: ModeRun,
+        /// The rejecting run's parse error.
+        error: String,
+    },
     /// Couldn't read the test file
     ReadError(String),
 }
@@ -38,8 +48,15 @@ pub enum SkipReason {
     ResolutionPhase,
     /// No frontmatter found
     NoFrontmatter,
-    /// Test requires sloppy (non-strict) mode
-    SloppyModeRequired,
+    /// Test declares a sloppy-only run (`flags: [noStrict]`) of the Annex B
+    /// web-compatibility grammar — a test under `test/annexB/`. Annex B is
+    /// "normative but optional if the ECMAScript host is not a web browser"
+    /// (ecma262, Annex B preamble) and tsv is not one, so those tests are out of
+    /// scope rather than failures. The skip is `noStrict` **and** the subtree,
+    /// never the subtree alone: the rest of `test/annexB/` is runtime library
+    /// tests (`String.prototype.substr`, `escape`, the RegExp extensions) whose
+    /// syntax is ordinary, and those stay graded.
+    AnnexB,
     /// Test requires a syntactic proposal tsv does not implement (the named
     /// `features:` entry); see `frontmatter::UNIMPLEMENTED_FEATURES`.
     UnimplementedFeature(&'static str),
@@ -61,7 +78,7 @@ pub struct TestSummary {
     pub skipped_runtime: usize,
     pub skipped_resolution: usize,
     pub skipped_no_frontmatter: usize,
-    pub skipped_sloppy_mode: usize,
+    pub skipped_annex_b: usize,
     pub skipped_unimplemented_feature: usize,
     pub skipped_raw_strict_conflict: usize,
     pub skipped_filtered: usize,
@@ -74,7 +91,7 @@ impl TestSummary {
         self.skipped_runtime
             + self.skipped_resolution
             + self.skipped_no_frontmatter
-            + self.skipped_sloppy_mode
+            + self.skipped_annex_b
             + self.skipped_unimplemented_feature
             + self.skipped_raw_strict_conflict
     }
@@ -103,7 +120,7 @@ impl TestSummary {
                 SkipReason::RuntimePhase => self.skipped_runtime += 1,
                 SkipReason::ResolutionPhase => self.skipped_resolution += 1,
                 SkipReason::NoFrontmatter => self.skipped_no_frontmatter += 1,
-                SkipReason::SloppyModeRequired => self.skipped_sloppy_mode += 1,
+                SkipReason::AnnexB => self.skipped_annex_b += 1,
                 SkipReason::UnimplementedFeature(_) => self.skipped_unimplemented_feature += 1,
                 SkipReason::RawStrictConflict => self.skipped_raw_strict_conflict += 1,
             },
@@ -138,13 +155,67 @@ enum Classification {
     Grade {
         /// Whether a parse-phase failure is expected (negative parse test).
         is_negative_parse: bool,
-        /// Whether the test carries `flags: [module]`.
-        module: bool,
-        /// Whether the test carries `flags: [onlyStrict]` — it declares a single
-        /// strict run, so the harness's `"use strict"` transform applies
-        /// (`graded_source`).
-        only_strict: bool,
+        /// The run(s) the test's flags declare.
+        runs: GradedRuns,
     },
+}
+
+/// The parse run(s) a test declares, read off its `flags`
+/// (test262/INTERPRETING.md §Strict Mode, §flags). This is the whole of what the
+/// runner needs from strictness metadata: it picks the goal, decides whether the
+/// harness's `"use strict"` prefix applies, and says how many parses grade the
+/// test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GradedRuns {
+    /// `flags: [module]` — one run at `Goal::Module`, strict by the goal itself.
+    Module,
+    /// `flags: [onlyStrict]` — one Script run, made strict the way the harness
+    /// makes it strict, by prepending [`USE_STRICT_PREFIX`] to the source.
+    StrictScript,
+    /// `flags: [noStrict]`, or `flags: [raw]` (verbatim source, non-strict mode
+    /// only) — one sloppy Script run over the file's own bytes.
+    SloppyScript,
+    /// No mode flag — the bulk of the suite. test262 requires the test to run
+    /// **twice**, sloppy and strict, and declares the verdict identical in both,
+    /// so tsv grades both and holds the test to that claim.
+    BothScripts,
+}
+
+/// One of the two runs a [`GradedRuns::BothScripts`] test declares.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModeRun {
+    /// The file's own bytes, at a sloppy `Goal::Script`.
+    Sloppy,
+    /// The same bytes behind the harness's [`USE_STRICT_PREFIX`].
+    Strict,
+}
+
+impl ModeRun {
+    /// The run's name for a failure message.
+    fn label(self) -> &'static str {
+        match self {
+            Self::Sloppy => "sloppy",
+            Self::Strict => "strict",
+        }
+    }
+}
+
+/// Read a test's declared run(s) off its flags.
+///
+/// `module` wins over everything (it is a goal, and it negates the two-run
+/// default by itself); `onlyStrict` and `noStrict` each declare their single
+/// run; `raw` forbids the source modification the strict run needs, so a raw
+/// test is the sloppy run alone. Everything left is the two-run default.
+fn graded_runs(frontmatter: &frontmatter::Frontmatter) -> GradedRuns {
+    if frontmatter.is_module() {
+        GradedRuns::Module
+    } else if frontmatter.is_only_strict() {
+        GradedRuns::StrictScript
+    } else if frontmatter.is_no_strict() || frontmatter.is_raw() {
+        GradedRuns::SloppyScript
+    } else {
+        GradedRuns::BothScripts
+    }
 }
 
 /// The directive test262-harness inserts as the initial character sequence of a
@@ -152,72 +223,55 @@ enum Classification {
 /// (test262/INTERPRETING.md §Strict Mode). The tests never carry it themselves.
 const USE_STRICT_PREFIX: &str = "\"use strict\";\n";
 
-/// The source tsv grades: the test's file content with test262-harness's
-/// strict-mode transform applied where the harness would apply it.
-///
-/// An `onlyStrict` test declares exactly one run, the strict one, and the
-/// harness produces that run by prepending [`USE_STRICT_PREFIX`] — so the file
-/// alone is not what the suite means by the test. A `module` test is strict by
-/// the goal itself and takes no prefix; so does everything else tsv grades,
-/// which is passed through verbatim (a `raw` test, which forbids any source
-/// modification, is refused by `classify` if it ever declares `onlyStrict`).
+/// The source of a **strict** Script run: the file's own bytes behind
+/// [`USE_STRICT_PREFIX`], exactly as test262-harness produces them.
 ///
 /// The prefix shifts every byte offset by its length and every line number by
-/// one. Nothing here reads a position: `run_test` only formats the parse error
-/// into a human-facing failure message — which says so, via
-/// [`takes_strict_prefix`] — and `grade_for_manifest` reduces it to a
-/// [`Verdict`], so the shift is display-only.
-fn graded_source(content: &str, module: bool, only_strict: bool) -> Cow<'_, str> {
-    if takes_strict_prefix(module, only_strict) {
-        Cow::Owned(format!("{USE_STRICT_PREFIX}{content}"))
+/// one. Nothing grades a position: `run_test` only formats the parse error into
+/// a human-facing failure message — which says so — and `grade_for_manifest`
+/// reduces it to a [`Verdict`], so the shift is display-only.
+fn strict_source(content: &str) -> String {
+    format!("{USE_STRICT_PREFIX}{content}")
+}
+
+/// The source of a **single**-run test: the strict transform for the one shape
+/// the harness applies it to, the file's own bytes otherwise.
+///
+/// A [`GradedRuns::BothScripts`] test has two sources, not one, and reaches
+/// [`strict_source`] directly for its strict half — so the transform is spelled
+/// in exactly one place either way.
+fn graded_source(content: &str, runs: GradedRuns) -> Cow<'_, str> {
+    if takes_strict_prefix(runs) {
+        Cow::Owned(strict_source(content))
     } else {
         Cow::Borrowed(content)
     }
 }
 
-/// Whether the graded source carries [`USE_STRICT_PREFIX`]: an `onlyStrict` test
-/// at script goal is the one shape the harness prepends it to. Spelled once, so
-/// `graded_source` and the failure message that reports the line shift agree.
-fn takes_strict_prefix(module: bool, only_strict: bool) -> bool {
-    only_strict && !module
+/// Whether a single-run test's graded source carries [`USE_STRICT_PREFIX`].
+/// Spelled once, so `graded_source` and the failure message that reports the
+/// line shift agree.
+fn takes_strict_prefix(runs: GradedRuns) -> bool {
+    matches!(runs, GradedRuns::StrictScript)
 }
 
-/// `raw` tests (`flags: [raw]`) whose parse verdict genuinely depends on sloppy
-/// semantics, keyed by test262-root-relative path (`/`-separated). Per
-/// test262/INTERPRETING.md a raw test runs once **in non-strict mode only**;
-/// nearly all exercise mode-INDEPENDENT syntax (hashbang comments, HTML-close
-/// comments, `"use strict"` directive prologues) whose accept/reject is identical
-/// strict or sloppy, so they grade correctly at their goal and stay graded. The
-/// entries here are the exceptions: they are sloppy *by content*, so their verdict
-/// belongs to the sloppy run — which is outside the graded strict subset, exactly
-/// as `noStrict` is, and skipped for the same reason. The skip is one of scope,
-/// not capability: the sloppy `Script` goal parses these fine, and the graded
-/// subset simply does not admit the sloppy run yet.
-///
-/// Currently one: `hashbang/use-strict.js`, where the leading `#!` makes the
-/// following `"use strict"` a hashbang comment rather than a directive, leaving
-/// the program sloppy so its `with ({}) {}` is legal — a verdict only the sloppy
-/// run can give.
-const SLOPPY_ONLY_RAW_TESTS: &[&str] = &["test/language/comments/hashbang/use-strict.js"];
+/// The test262 subtree holding the **Annex B** web-compatibility tests
+/// (`/`-separated, as `TestFile::relative_path` spells it on Unix).
+const ANNEX_B_PREFIX: &str = "test/annexB/";
 
-/// Whether a graded path is a `raw` test whose verdict needs the sloppy run the
-/// strict subset doesn't cover (see `SLOPPY_ONLY_RAW_TESTS`). Gated on the `raw`
-/// flag so a future non-raw test reusing one of these paths wouldn't be silently
-/// skipped.
-fn is_sloppy_only_raw(frontmatter: &frontmatter::Frontmatter, relative_path: &str) -> bool {
-    frontmatter.is_raw() && {
-        let normalized = relative_path.replace('\\', "/");
-        SLOPPY_ONLY_RAW_TESTS.contains(&normalized.as_str())
-    }
+/// Whether a test262-root-relative path names a test under [`ANNEX_B_PREFIX`].
+fn is_annex_b_path(relative_path: &str) -> bool {
+    relative_path.replace('\\', "/").starts_with(ANNEX_B_PREFIX)
 }
 
 /// Read a test's frontmatter and decide skip-vs-grade.
 ///
-/// The graded subset is the strict one, so sloppy (`noStrict`) tests are skipped, as are
-/// runtime/resolution negatives (we only test parsing), tests requiring an
-/// unimplemented syntactic proposal, and files with no frontmatter. `relative_path`
-/// is the test262-root-relative path, needed only for the sloppy-by-content `raw`
-/// skip (`is_sloppy_only_raw`).
+/// tsv grades both modes, so a test is skipped only for something tsv does not
+/// implement or cannot parse-grade: the Annex B grammar, runtime/resolution
+/// negatives (we only test parsing), an unimplemented syntactic proposal,
+/// contradictory `raw` + `onlyStrict` metadata, and files with no frontmatter.
+/// `relative_path` is the test262-root-relative path, needed only for the Annex B
+/// skip.
 fn classify(relative_path: &str, content: &str) -> Classification {
     let Some(frontmatter) = frontmatter::parse(content) else {
         return Classification::Skip(SkipReason::NoFrontmatter);
@@ -237,43 +291,39 @@ fn classify(relative_path: &str, content: &str) -> Classification {
     if let Some(feature) = frontmatter.requires_unimplemented_feature() {
         return Classification::Skip(SkipReason::UnimplementedFeature(feature));
     }
-    // Both kinds of sloppy-mode-required test are out of the graded strict subset:
-    // an explicit `noStrict` declaration, and a `raw` test (non-strict mode only
-    // per test262/INTERPRETING.md) that is sloppy *by content* — it uses a
-    // construct only sloppy code admits (`with`), which the strict subset is not
-    // the place to grade. The remaining raw tests exercise mode-independent syntax
-    // and stay graded at their goal.
-    if frontmatter.requires_sloppy_mode() || is_sloppy_only_raw(&frontmatter, relative_path) {
-        return Classification::Skip(SkipReason::SloppyModeRequired);
+    // A sloppy-only test OF THE ANNEX B GRAMMAR is out of scope: Annex B is
+    // optional for a non-browser host and tsv is one, so its constructs are a
+    // declared non-goal rather than a conformance gap. Keyed on `noStrict` AND
+    // the subtree — the rest of `test/annexB/` is mostly runtime library tests
+    // plus semantics tests over core syntax, and a directory-keyed skip would
+    // drop them for nothing.
+    if frontmatter.is_no_strict() && is_annex_b_path(relative_path) {
+        return Classification::Skip(SkipReason::AnnexB);
     }
     // `raw` and `onlyStrict` are contradictory — the first forbids modifying the
     // source, the second is graded through the harness's prepended directive — so
     // there is no source to grade honestly. test262 carries no such test; refusing
     // it here is what lets `graded_source` prepend on `onlyStrict` alone.
-    if frontmatter.is_raw() && frontmatter.requires_strict_mode() {
+    if frontmatter.is_raw() && frontmatter.is_only_strict() {
         return Classification::Skip(SkipReason::RawStrictConflict);
     }
     Classification::Grade {
         is_negative_parse: frontmatter.is_negative_parse(),
-        module: frontmatter.is_module(),
-        only_strict: frontmatter.requires_strict_mode(),
+        runs: graded_runs(&frontmatter),
     }
 }
 
 /// The parse goal for a graded test. A `module`-flagged test is parsed as a
-/// `Module`; everything else tsv grades (the run-both-ways default and
-/// `onlyStrict`) is a `Script` — `await` is an ordinary identifier there, and
-/// `import`/`export`/`import.meta` are syntax errors. The goal carries no
-/// strictness of its own past `Module`: an `onlyStrict` script is made strict by
-/// the harness prefix [`graded_source`] prepends; a run-both-ways test is graded
-/// once at the bare `Script` and declares its verdict mode-independent; the
-/// sloppy-declaring tests (`noStrict`, and the sloppy-by-content `raw` test) are
-/// skipped above.
-fn goal_for(module: bool) -> tsv_ts::Goal {
-    if module {
-        tsv_ts::Goal::Module
-    } else {
-        tsv_ts::Goal::Script
+/// `Module`; every other run is a `Script` — `await` is an ordinary identifier
+/// there, and `import`/`export`/`import.meta` are syntax errors. The goal carries
+/// no strictness of its own past `Module`: a Script run is strict exactly when its
+/// source carries the harness's `"use strict"` prefix.
+fn goal_for(runs: GradedRuns) -> tsv_ts::Goal {
+    match runs {
+        GradedRuns::Module => tsv_ts::Goal::Module,
+        GradedRuns::StrictScript | GradedRuns::SloppyScript | GradedRuns::BothScripts => {
+            tsv_ts::Goal::Script
+        }
     }
 }
 
@@ -293,18 +343,83 @@ pub fn run_test(test: &TestFile) -> (TestResult, Option<bool>) {
         Classification::Skip(reason) => (TestResult::Skipped(reason), None),
         Classification::Grade {
             is_negative_parse,
-            module,
-            only_strict,
+            runs,
         } => (
-            run_parse_test(
-                &graded_source(&content, module, only_strict),
-                is_negative_parse,
-                goal_for(module),
-                takes_strict_prefix(module, only_strict),
-            ),
+            grade_runs(&content, is_negative_parse, runs),
             Some(is_negative_parse),
         ),
     }
+}
+
+/// Grade every run a test declares, into one result.
+///
+/// A single-run test is its run's verdict. A mode-unflagged test declares
+/// **two** runs — sloppy and strict — and asserts the same verdict in both
+/// (test262/INTERPRETING.md §Strict Mode), so tsv parses both and holds it to
+/// that claim: a positive passes only if both accept, a parse negative only if
+/// both reject. When the two disagree the test's claim is the one thing that
+/// cannot be true, so the disagreement is its own failure rather than a plain
+/// accept/reject miss — it says tsv's strictness model, not the source, is what
+/// differs between the runs.
+fn grade_runs(content: &str, is_negative_parse: bool, runs: GradedRuns) -> TestResult {
+    if runs != GradedRuns::BothScripts {
+        return run_parse_test(
+            &graded_source(content, runs),
+            is_negative_parse,
+            goal_for(runs),
+            takes_strict_prefix(runs),
+        );
+    }
+
+    let sloppy = parse_run(content, tsv_ts::Goal::Script);
+    let strict = parse_run(&strict_source(content), tsv_ts::Goal::Script);
+    match (sloppy, strict) {
+        (None, None) => {
+            if is_negative_parse {
+                TestResult::Failed(FailureReason::UnexpectedParseSuccess)
+            } else {
+                TestResult::Passed
+            }
+        }
+        (Some(error), Some(_)) => {
+            if is_negative_parse {
+                TestResult::Passed
+            } else {
+                TestResult::Failed(FailureReason::UnexpectedParseError(error))
+            }
+        }
+        (None, Some(error)) => TestResult::Failed(FailureReason::ModeDisagreement {
+            rejected_by: ModeRun::Strict,
+            error: format!("{error}{}", strict_prefix_note()),
+        }),
+        (Some(error), None) => TestResult::Failed(FailureReason::ModeDisagreement {
+            rejected_by: ModeRun::Sloppy,
+            error,
+        }),
+    }
+}
+
+/// Parse one run and render its error, or `None` when the source parsed. The
+/// unit both `grade_runs` and `run_parse_test` grade.
+fn parse_run(source: &str, goal: tsv_ts::Goal) -> Option<String> {
+    // test262 tests are pure ECMAScript, so we parse as TypeScript (a superset).
+    let arena = bumpalo::Bump::new();
+    match tsv_ts::parse_with_goal(source, goal, &arena) {
+        Ok(_) => None,
+        Err(error) => Some(format!("{error:?}")),
+    }
+}
+
+/// The note appended to a strict run's parse error: every position it carries
+/// counts from the prefixed source rather than the file.
+fn strict_prefix_note() -> String {
+    // The prefix is one line and `USE_STRICT_PREFIX.len()` bytes, so every
+    // position in the render is off the file's by exactly that.
+    format!(
+        " (source graded with the `\"use strict\";` prefix: `position` is +{} \
+         bytes and `line_number` +1 against the file)",
+        USE_STRICT_PREFIX.len()
+    )
 }
 
 /// Accept-or-reject verdict for a single parse — the unit of the differential
@@ -324,30 +439,38 @@ pub enum Verdict {
 /// parse-phase negatives); `tsv` is what `tsv_ts::parse` actually did. A
 /// downstream consumer (`benches/js/diagnostics/test262_compare.ts`) runs the
 /// alternative parser over the same file and joins on `relative_path`.
+///
+/// **One row per test, not per run.** A mode-unflagged test is graded twice by
+/// `run_test` (sloppy and strict); the manifest carries its **sloppy** run,
+/// which `strict: false` names — so a consumer that reproduces the row's parse
+/// reproduces one real run of the test, and both sides compare like for like.
+/// The strict half of such a test is graded by the runner alone.
 #[derive(Debug, serde::Serialize)]
 pub struct ManifestEntry {
     /// Path relative to the test262 root — the join key, and (joined onto
     /// `Manifest::test262_root`) where the consumer reads the source.
     pub relative_path: String,
     /// Whether the test carries `flags: [module]`. Load-bearing: it selects the
-    /// parse goal on both sides of the differential. tsv grades this file at
-    /// `goal_for(module)` (`module` → `Goal::Module`, else `Goal::Script`),
-    /// and the consumer mirrors that goal in the alternative parser — so an
-    /// `await`-as-identifier script test lands in `both-accept`, not `both-reject`.
+    /// parse goal on both sides of the differential (`module` → `Goal::Module`,
+    /// else `Goal::Script`), and the consumer mirrors that goal in the
+    /// alternative parser — so an `await`-as-identifier script test lands in
+    /// `both-accept`, not `both-reject`.
     pub module: bool,
-    /// Whether the graded parse is a strict-mode one *by the test's own
-    /// declaration*: `module` (strict by the goal) or `onlyStrict` (strict by
-    /// the harness's prepended `"use strict"` — see `graded_source`). A consumer
-    /// reproducing tsv's parse applies the same directive when this is `true`
-    /// and `module` is `false`.
+    /// Whether this row's parse is a strict one: `module` (strict by the goal)
+    /// or `onlyStrict` (strict by the harness's prepended `"use strict"` — see
+    /// `graded_source`). A consumer reproducing tsv's parse applies the same
+    /// directive when this is `true` and `module` is `false`. A mode-unflagged
+    /// test's row is its sloppy run, so this is `false` there — the goal alone
+    /// then carries the mode, which is what makes the row reproducible from
+    /// `module` + `strict` and nothing else.
     pub strict: bool,
     /// What test262 expects: `accept` for positives, `reject` for parse negatives.
     pub expected: Verdict,
-    /// What `tsv_ts::parse_with_goal` did on this file at `goal_for(module)`.
+    /// What `tsv_ts::parse_with_goal` did on this row's source and goal.
     pub tsv: Verdict,
 }
 
-/// Top-level differential manifest: tsv's graded strict subset plus metadata.
+/// Top-level differential manifest: tsv's graded subset plus metadata.
 #[derive(Debug, serde::Serialize)]
 pub struct Manifest {
     /// The test262 root the `relative_path`s are relative to, exactly as passed
@@ -375,13 +498,12 @@ impl Manifest {
 /// Grade one test for the differential manifest, or `None` if tsv skips it.
 ///
 /// Shares `classify` with `run_test`, so the manifest covers precisely tsv's
-/// graded strict subset (unreadable files are also skipped).
+/// graded subset (unreadable files are also skipped).
 pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
     let content = fs::read_to_string(&test.path).ok()?;
     let Classification::Grade {
         is_negative_parse,
-        module,
-        only_strict,
+        runs,
     } = classify(&test.relative_path, &content)
     else {
         return None;
@@ -392,17 +514,18 @@ pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
     } else {
         Verdict::Accept
     };
-    let source = graded_source(&content, module, only_strict);
-    let arena = bumpalo::Bump::new();
-    let tsv = match tsv_ts::parse_with_goal(&source, goal_for(module), &arena) {
-        Ok(_) => Verdict::Accept,
-        Err(_) => Verdict::Reject,
+    // One row per test, so a two-run test contributes its SLOPPY run — the row's
+    // `strict: false` says which, and the consumer reproduces exactly that parse.
+    let source = graded_source(&content, runs);
+    let tsv = match parse_run(&source, goal_for(runs)) {
+        None => Verdict::Accept,
+        Some(_) => Verdict::Reject,
     };
 
     Some(ManifestEntry {
         relative_path: test.relative_path.clone(),
-        module,
-        strict: module || only_strict,
+        module: runs == GradedRuns::Module,
+        strict: matches!(runs, GradedRuns::Module | GradedRuns::StrictScript),
         expected,
         tsv,
     })
@@ -421,39 +544,27 @@ fn run_parse_test(
     goal: tsv_ts::Goal,
     strict_prefixed: bool,
 ) -> TestResult {
-    // Try to parse the content as TypeScript/JS at the test's goal.
-    // Note: test262 tests are pure ECMAScript, so we parse as TypeScript
-    // (which is a superset of JS)
-    let arena = bumpalo::Bump::new();
-    let parse_result = tsv_ts::parse_with_goal(content, goal, &arena);
-
-    match (parse_result, is_negative_parse) {
+    match (parse_run(content, goal), is_negative_parse) {
         // Positive test passed: parsed successfully as expected
-        (Ok(_), false) => TestResult::Passed,
+        (None, false) => TestResult::Passed,
 
         // Positive test failed: should have parsed but didn't
-        (Err(error), false) => {
+        (Some(error), false) => {
             let note = if strict_prefixed {
-                // The prefix is one line and `USE_STRICT_PREFIX.len()` bytes, so
-                // every position in the render is off the file's by exactly that.
-                Cow::Owned(format!(
-                    " (source graded with the `\"use strict\";` prefix: `position` is +{} \
-                     bytes and `line_number` +1 against the file)",
-                    USE_STRICT_PREFIX.len()
-                ))
+                Cow::Owned(strict_prefix_note())
             } else {
                 Cow::Borrowed("")
             };
             TestResult::Failed(FailureReason::UnexpectedParseError(format!(
-                "{error:?}{note}"
+                "{error}{note}"
             )))
         }
 
         // Negative test passed: failed to parse as expected
-        (Err(_), true) => TestResult::Passed,
+        (Some(_), true) => TestResult::Passed,
 
         // Negative test failed: should have failed but parsed successfully
-        (Ok(_), true) => TestResult::Failed(FailureReason::UnexpectedParseSuccess),
+        (None, true) => TestResult::Failed(FailureReason::UnexpectedParseSuccess),
     }
 }
 
@@ -466,6 +577,11 @@ pub fn format_failure(reason: &FailureReason) -> String {
         FailureReason::UnexpectedParseSuccess => {
             "Expected: Parse error (phase: parse)\nGot: Parse success".to_string()
         }
+        FailureReason::ModeDisagreement { rejected_by, error } => format!(
+            "Expected: the same verdict sloppy and strict (the test declares both runs)\n\
+             Got: the {} run rejected and the other accepted\n{error}",
+            rejected_by.label()
+        ),
         FailureReason::ReadError(e) => format!("Could not read file: {e}"),
     }
 }
@@ -501,53 +617,142 @@ mod tests {
         ));
     }
 
-    /// With no features filtered, a noStrict test is skipped for sloppy mode
-    /// regardless of which proposal features it also carries.
+    /// A `noStrict` test declares the sloppy run, which tsv grades — the only
+    /// ones skipped are the Annex B ones, keyed on the subtree as well as the
+    /// flag.
     #[test]
-    fn classify_nostrict_skips_sloppy() {
-        let both = "/*---\nfeatures: [import-defer]\nflags: [noStrict]\n---*/\n";
+    fn classify_grades_nostrict_outside_annex_b() {
+        let no_strict = "/*---\nflags: [noStrict]\n---*/\nwith ({}) {}\n";
         assert!(matches!(
-            classify("test/x.js", both),
-            Classification::Skip(SkipReason::SloppyModeRequired)
+            classify("test/language/statements/with/x.js", no_strict),
+            Classification::Grade {
+                runs: GradedRuns::SloppyScript,
+                ..
+            }
+        ));
+
+        // Same flag under `test/annexB/` — out of scope for a non-browser host.
+        assert!(matches!(
+            classify("test/annexB/language/statements/with/x.js", no_strict),
+            Classification::Skip(SkipReason::AnnexB)
+        ));
+
+        // An Annex B test WITHOUT `noStrict` is an ordinary runtime library test
+        // whose syntax is fine: graded, not skipped.
+        let annex_b_library = "/*---\nesid: sec-string.prototype.substr\n---*/\n'a'.substr(0);\n";
+        assert!(matches!(
+            classify(
+                "test/annexB/built-ins/String/prototype/substr/x.js",
+                annex_b_library
+            ),
+            Classification::Grade { .. }
         ));
     }
 
-    /// A `raw` test runs in non-strict mode only, but most exercise
-    /// mode-independent syntax tsv grades correctly, so a raw test is GRADED at
-    /// its goal — UNLESS it is sloppy by content (in `SLOPPY_ONLY_RAW_TESTS`), in
-    /// which case it's skipped like `noStrict`, out of the graded strict subset.
+    /// A `raw` test's source is used verbatim and runs in non-strict mode only,
+    /// so it is graded as the sloppy run alone — including the one whose `#!`
+    /// turns its `"use strict"` into a comment and leaves a sloppy `with`.
     #[test]
-    fn classify_grades_raw_but_skips_sloppy() {
-        // Mode-independent raw test (a hashbang not in the sloppy-only list) — graded.
+    fn classify_grades_raw_as_the_sloppy_run() {
         let raw = "/*---\nflags: [raw]\n---*/\n#!/usr/bin/env node\n";
         assert!(matches!(
             classify(
                 "test/language/comments/hashbang/preceding-whitespace.js",
                 raw
             ),
-            Classification::Grade { .. }
+            Classification::Grade {
+                runs: GradedRuns::SloppyScript,
+                ..
+            }
         ));
 
-        // The sloppy-by-content raw test (`with` needs sloppy mode) — skipped.
         let sloppy_raw = "/*---\nflags: [raw]\n---*/\n#!\"use strict\"\nwith ({}) {}\n";
         assert!(matches!(
             classify("test/language/comments/hashbang/use-strict.js", sloppy_raw),
-            Classification::Skip(SkipReason::SloppyModeRequired)
+            Classification::Grade {
+                runs: GradedRuns::SloppyScript,
+                ..
+            }
         ));
-        // Same content at a non-listed path stays graded — the skip is path-keyed
-        // and gated on the `raw` flag, not a content sniff.
+    }
+
+    /// `module` outranks `raw`: a `[module, raw]` test is one Module parse of
+    /// the file's own bytes, so the verbatim-source demand is honored by
+    /// construction rather than by the flag's own arm. The suite carries such
+    /// tests (`test/language/comments/hashbang/module.js`).
+    #[test]
+    fn classify_grades_module_raw_as_one_module_run() {
+        let module_raw = "#!/usr/bin/env node\n/*---\nflags: [module, raw]\n---*/\n";
         assert!(matches!(
-            classify(
-                "test/language/comments/hashbang/preceding-hashbang.js",
-                sloppy_raw
-            ),
-            Classification::Grade { .. }
+            classify("test/language/comments/hashbang/module.js", module_raw),
+            Classification::Grade {
+                runs: GradedRuns::Module,
+                ..
+            }
+        ));
+        assert_eq!(graded_source(module_raw, GradedRuns::Module), module_raw);
+    }
+
+    /// A test with no mode flag declares BOTH runs, and the classification says
+    /// so — that is what makes `grade_runs` parse it twice.
+    #[test]
+    fn classify_reports_both_runs_when_unflagged() {
+        let plain = "/*---\nesid: sec-example\n---*/\nvar x = 1;\n";
+        assert!(matches!(
+            classify("test/x.js", plain),
+            Classification::Grade {
+                runs: GradedRuns::BothScripts,
+                ..
+            }
         ));
 
-        let no_strict = "/*---\nflags: [noStrict]\n---*/\n";
+        // `module` wins over the two-run default: it negates it by itself.
+        let module = "/*---\nflags: [module]\n---*/\nexport default 1;\n";
         assert!(matches!(
-            classify("test/x.js", no_strict),
-            Classification::Skip(SkipReason::SloppyModeRequired)
+            classify("test/x.js", module),
+            Classification::Grade {
+                runs: GradedRuns::Module,
+                ..
+            }
+        ));
+    }
+
+    /// The two runs of an unflagged test are graded together: a positive passes
+    /// only if both accept, a negative only if both reject, and a construct whose
+    /// verdict is strictness-keyed makes the two disagree.
+    #[test]
+    fn grade_runs_holds_both_scripts_to_one_verdict() {
+        // Mode-independent and valid: both runs accept.
+        assert!(matches!(
+            grade_runs("var x = 1;\n", false, GradedRuns::BothScripts),
+            TestResult::Passed
+        ));
+        // Mode-independent and invalid: both runs reject, so the negative passes.
+        assert!(matches!(
+            grade_runs("var 1 = x;\n", true, GradedRuns::BothScripts),
+            TestResult::Passed
+        ));
+        // `with` is legal sloppy and a syntax error strict: the runs disagree, so
+        // neither polarity can pass, and the failure names the strict run.
+        assert!(matches!(
+            grade_runs("with ({}) {}\n", false, GradedRuns::BothScripts),
+            TestResult::Failed(FailureReason::ModeDisagreement {
+                rejected_by: ModeRun::Strict,
+                ..
+            })
+        ));
+        assert!(matches!(
+            grade_runs("with ({}) {}\n", true, GradedRuns::BothScripts),
+            TestResult::Failed(FailureReason::ModeDisagreement {
+                rejected_by: ModeRun::Strict,
+                ..
+            })
+        ));
+        // A `noStrict` test of the same source declares the sloppy run only, and
+        // that run accepts.
+        assert!(matches!(
+            grade_runs("with ({}) {}\n", false, GradedRuns::SloppyScript),
+            TestResult::Passed
         ));
     }
 
@@ -559,17 +764,7 @@ mod tests {
         assert!(matches!(
             classify("test/x.js", only_strict),
             Classification::Grade {
-                only_strict: true,
-                module: false,
-                ..
-            }
-        ));
-
-        let plain = "/*---\nesid: sec-example\n---*/\nvar x = 1;\n";
-        assert!(matches!(
-            classify("test/x.js", plain),
-            Classification::Grade {
-                only_strict: false,
+                runs: GradedRuns::StrictScript,
                 ..
             }
         ));
@@ -593,17 +788,23 @@ mod tests {
         ));
     }
 
-    /// The directive is prepended for `onlyStrict` only — a `module` test is
-    /// strict by its goal, and everything else is graded verbatim.
+    /// A single-run test takes the directive only when it is the `onlyStrict`
+    /// one — a `module` test is strict by its goal, and the sloppy runs are
+    /// graded verbatim. (A two-run test's strict half reaches `strict_source`
+    /// directly, which is the same transform.)
     #[test]
     fn graded_source_prefixes_only_strict() {
         let content = "var x = 1;\n";
         assert_eq!(
-            graded_source(content, false, true),
+            graded_source(content, GradedRuns::StrictScript),
+            strict_source(content)
+        );
+        assert_eq!(
+            strict_source(content),
             format!("\"use strict\";\n{content}")
         );
-        assert_eq!(graded_source(content, false, false), content);
-        assert_eq!(graded_source(content, true, false), content);
-        assert_eq!(graded_source(content, true, true), content);
+        assert_eq!(graded_source(content, GradedRuns::SloppyScript), content);
+        assert_eq!(graded_source(content, GradedRuns::BothScripts), content);
+        assert_eq!(graded_source(content, GradedRuns::Module), content);
     }
 }

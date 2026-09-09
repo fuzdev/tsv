@@ -2,19 +2,22 @@
  * Harvest the test262 graded-positive file list for the conformance corpus.
  *
  * Runs `tsv_debug test262 --emit-manifest` (the Rust harness grades tsv's
- * strict subset from each test's front-matter: `negative:` expectations,
- * `noStrict`/`raw` sloppy exclusions, `module` flags), then filters to the
- * EXPECTED-POSITIVE tests and writes the path list the corpus loader's
- * `files_from` entry consumes. The filter is tool-neutral by construction —
- * test262's own metadata decides, never tsv's verdict, so the subset can't
- * bias per-tool coverage toward tsv.
+ * subset from each test's front-matter: `negative:` expectations, the Annex B
+ * exclusion, `module` flags), then filters to the EXPECTED-POSITIVE tests and
+ * writes the path list the corpus loader's `files_from` entry consumes. The
+ * filter is tool-neutral by construction — test262's own metadata decides,
+ * never tsv's verdict, so the subset can't bias per-tool coverage toward tsv.
  *
  * Each emitted entry carries its declared parse **goal** (from the manifest's
- * per-file `module` flag: `flags: [module]` → `module`, else strict `script`),
- * so the conformance-coverage surface parses every tool at the goal test262
- * declares — a script-goal `await`-identifier test is no longer scored as a
- * failure against a module parse. (The `diagnostics/test262_compare.ts`
- * differential remains the deeper per-tool goal-aware view.)
+ * per-file `module` flag: `flags: [module]` → `module`, else `script`), so the
+ * conformance-coverage surface parses every tool at the goal test262 declares —
+ * a script-goal `await`-identifier test is no longer scored as a failure against
+ * a module parse. The manifest carries ONE row per test, and a mode-unflagged
+ * test's row is its SLOPPY run, so a `script` entry here is a sloppy script on
+ * every tool — the `"use strict"` prefix an `onlyStrict` row would need is the
+ * differential's business, not this cache's. (The
+ * `diagnostics/test262_compare.ts` differential remains the deeper per-tool
+ * goal-aware view.)
  *
  * Output:
  * - benches/js/.cache/test262_files.json — sorted `{path, goal}` array (project-root-relative paths)
@@ -133,7 +136,7 @@ interface Manifest {
 const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8')) as Manifest;
 const positives = manifest.tests.filter((t) => t.expected === 'accept');
 // Emit `{path, goal}` — the goal is the manifest's `module` flag (a
-// `flags: [module]` test parses as a module, everything else as a strict script).
+// `flags: [module]` test parses as a module, everything else as a script).
 const files = positives
 	.map((t) => ({
 		path: join(manifest.test262_root, t.relative_path),

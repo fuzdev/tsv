@@ -47,28 +47,24 @@ impl Frontmatter {
         self.negative_phase.as_deref() == Some("resolution")
     }
 
-    /// Check if this test should be skipped (runtime/resolution negative tests).
-    pub fn should_skip(&self) -> bool {
-        self.is_negative_runtime() || self.is_negative_resolution()
-    }
-
     /// Check if this test uses ES modules.
     pub fn is_module(&self) -> bool {
         self.flags.iter().any(|f| f == "module")
     }
 
-    /// Check if this test requires non-strict (sloppy) mode.
-    pub fn requires_sloppy_mode(&self) -> bool {
+    /// Check if this test declares a single sloppy run (`flags: [noStrict]`):
+    /// the harness's `"use strict"` transform must **not** be applied, and the
+    /// test runs once, in non-strict mode only.
+    pub fn is_no_strict(&self) -> bool {
         self.flags.iter().any(|f| f == "noStrict")
     }
 
     /// Check if this test's source is used verbatim (`flags: [raw]`): no harness
     /// files, no `"use strict"` transform. Per test262/INTERPRETING.md a raw test
-    /// runs **once, in non-strict mode only**. Most exercise mode-independent
-    /// syntax (hashbang, HTML-close comments, directive prologues) tsv grades
-    /// correctly anyway; the runner skips the ones whose verdict genuinely needs
-    /// sloppy semantics (see `runner::is_sloppy_only_raw`), plus the contradictory
-    /// `raw` + `onlyStrict` shape test262 does not carry.
+    /// runs **once, in non-strict mode only**, so the runner grades it as the
+    /// sloppy run alone. The contradictory `raw` + `onlyStrict` shape — a strict
+    /// run of a source that may not be modified — test262 does not carry, and the
+    /// runner refuses rather than grading.
     pub fn is_raw(&self) -> bool {
         self.flags.iter().any(|f| f == "raw")
     }
@@ -77,7 +73,7 @@ impl Frontmatter {
     /// Such a test never carries `"use strict"` itself — test262-harness inserts
     /// the directive ahead of the source, and so does the runner
     /// (`runner::graded_source`).
-    pub fn requires_strict_mode(&self) -> bool {
+    pub fn is_only_strict(&self) -> bool {
         self.flags.iter().any(|f| f == "onlyStrict")
     }
 
@@ -361,7 +357,6 @@ negative:
 
         let fm = parse(content).unwrap();
         assert!(fm.is_negative_runtime());
-        assert!(fm.should_skip());
     }
 
     #[test]
