@@ -157,7 +157,7 @@ impl<'a> Printer<'a> {
                         // flattening welds `}` onto it (`` `${a // c}` ``, unparseable).
                         // The opening edge asks nothing — a leading run reaches this group
                         // as a real hardline of its own.
-                        let close = self.obligated_break(has_trailing_line_comment);
+                        let close = self.obligated_break(has_trailing_line_comment, d.softline());
                         d.concat(&[d.indent(d.concat(&[d.softline(), full_expr_doc])), close])
                     } else {
                         full_expr_doc

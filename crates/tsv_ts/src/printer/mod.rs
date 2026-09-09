@@ -1234,7 +1234,12 @@ impl<'a> Printer<'a> {
             .unwrap_or(next_start)
     }
 
-    /// Check if there are line comments (// style) between two positions
+    /// Whether any **line** comment lies in `[start, end)`.
+    ///
+    /// The one lookup in the family that names no axis, because it provably has none:
+    /// `owned ⇒ is_block`, so skipping and counting agree here by construction — the
+    /// rationale is on [`tsv_lang::has_line_comments_in_range`], and it is what a
+    /// caller may rely on when the run it is asking about is one it emits.
     ///
     /// Uses binary search: O(log n + k) where k is comments in range
     #[inline]

@@ -369,7 +369,8 @@ impl<'a> Printer<'a> {
             // one range covers both its placements — the glued comment `paren_glued` took
             // is still physically in the gap it left.
             let leading_line_comment = self.has_line_comments_between(operator_end, argument_start);
-            let mut parts: DocBuf = smallvec![self.obligated_break(leading_line_comment)];
+            let mut parts: DocBuf =
+                smallvec![self.obligated_break(leading_line_comment, d.softline())];
             if let Some(leading) = leading_comments_opt {
                 parts.push(leading);
             }
@@ -405,7 +406,7 @@ impl<'a> Printer<'a> {
             shell_parts.push(d.indent(d.concat(&parts)));
             // The shell's CLOSING edge, the same seam: a deferred `//` needs this
             // separator to end its line, or a flattening lets the run escape past the `)`.
-            shell_parts.push(self.obligated_break(trailing_line_comment));
+            shell_parts.push(self.obligated_break(trailing_line_comment, d.softline()));
             shell_parts.push(d.text(")"));
             let shell = d.concat(&shell_parts);
             // The second break the group cannot see for itself. A `//` in the leading run
@@ -1887,6 +1888,38 @@ impl<'a> Printer<'a> {
     /// `Aligned` a deferred trailing `//` rides its `line_suffix` past the `)` and the
     /// enclosing `;` (`(aa,⏎bb); // c`); under `Hanging` the closing softline flushes it
     /// inside (`return (⏎aa,⏎bb // c⏎);`) — both prettier's, from one rule.
+    /// Where an operand gap's same-line TRAILING run ENDS: the start of the first comment
+    /// that begins its own line, or `next_start` when every comment in the gap is glued to
+    /// what precedes it.
+    ///
+    /// **One position, read by both sides of the split** — the previous operand's trailing
+    /// emitter takes `[gap_start, here)` and the next operand's leading emitter takes
+    /// `[here, next_start)`, so together they PARTITION the gap. The two ran ~40 lines and
+    /// one loop iteration apart, each walking the same comments and re-deriving the same
+    /// boundary; that is the shape an unclaimed comment (a DROP) or a doubly-claimed one (a
+    /// DOUBLE-PRINT) comes out of (`docs/comments.md` §The element-comma seam). Stating it
+    /// once is what makes the partition structural.
+    ///
+    /// Own-line-ness is a SOURCE question asked against the PREVIOUS COMMENT's end, never
+    /// the operand's, so a glued chain (`a /* c1 */ /* c2 */, b`) stays one run. The claim
+    /// is a prefix by construction: comments are disjoint and ordered, so once one begins
+    /// its own line every later one in the gap does too.
+    ///
+    /// Not [`Self::trailing_claim_end`], whose rule looks FORWARD (does this comment's glue
+    /// chain reach the next item's line?) — the statement-gap seam's question, and a
+    /// different answer on the same bytes.
+    fn sequence_gap_trailing_end(&self, gap_start: u32, next_start: u32) -> u32 {
+        let mut pos = gap_start;
+        for comment in self.comments_to_emit_between(gap_start, next_start) {
+            // Comment-adjacency read (real even in canonical mode).
+            if self.comment_has_newline_between(pos, comment.span.start) {
+                return comment.span.start;
+            }
+            pos = comment.span.end;
+        }
+        next_start
+    }
+
     fn build_sequence_doc_with_line_comments(
         &self,
         seq: &internal::SequenceExpression<'_>,
@@ -1909,24 +1942,21 @@ impl<'a> Printer<'a> {
             let expr_end = expr.span().end;
             let mut od = DocBuf::new();
 
-            // Own-line comments from the previous comma gap lead this operand.
-            // The same-line prefix of that gap trails the previous operand (emitted
-            // there), so skip it here; once a comment is own-line the rest follow.
-            if i > 0 {
+            // The previous comma gap, split at the one position both of its emitters read
+            // ([`Self::sequence_gap_trailing_end`]): its same-line prefix trailed the
+            // previous operand and was emitted there, and everything from the first
+            // own-line comment on leads THIS operand.
+            let prev_gap = (i > 0).then(|| {
                 let prev_end = seq.expressions[i - 1].span().end;
-                let mut pos = prev_end;
-                let mut in_trailing_run = true;
-                for comment in self.comments_to_emit_between(prev_end, expr_start) {
-                    // Comment-adjacency read (real even in canonical mode).
-                    let own_line = self.comment_has_newline_between(pos, comment.span.start);
-                    // Once a comment is own-line (or the trailing run already ended),
-                    // it and the rest lead the next operand.
-                    if !in_trailing_run || own_line {
-                        in_trailing_run = false;
-                        od.push(self.build_comment_doc(comment));
-                        od.push(d.hardline());
-                    }
-                    pos = comment.span.end;
+                (
+                    prev_end,
+                    self.sequence_gap_trailing_end(prev_end, expr_start),
+                )
+            });
+            if let Some((_, own_line_start)) = prev_gap {
+                for comment in self.comments_to_emit_between(own_line_start, expr_start) {
+                    od.push(self.build_comment_doc(comment));
+                    od.push(d.hardline());
                 }
             }
 
@@ -1934,22 +1964,13 @@ impl<'a> Printer<'a> {
 
             // Same-line comments in the next comma gap trail this operand: a block
             // stays inline before the comma; a line comment defers via `line_suffix`
-            // so it renders after the comma at end-of-line. Own-line comments belong
-            // to the next operand (handled above), so stop at the first one.
+            // so it renders after the comma at end-of-line. The rest of that gap leads
+            // the next operand, which claims it from the same split position.
             if !is_last {
                 let next_start = seq.expressions[i + 1].span().start;
-                let mut pos = expr_end;
-                for comment in self.comments_to_emit_between(expr_end, next_start) {
-                    // Comment-adjacency read (real even in canonical mode): an
-                    // own-line comment must lead the next operand, not merge into
-                    // the previous operand's `line_suffix` trailing run.
-                    if self.comment_has_newline_between(pos, comment.span.start) {
-                        break;
-                    }
-                    // Same-line trailing comment: block inline before the comma, line
-                    // comment deferred via `line_suffix` to render after the comma.
+                let own_line_start = self.sequence_gap_trailing_end(expr_end, next_start);
+                for comment in self.comments_to_emit_between(expr_end, own_line_start) {
                     od.push(self.build_trailing_comment_doc(comment));
-                    pos = comment.span.end;
                 }
             } else if keep_trailing_inside {
                 // Value position: the last operand's trailing comment trails the operand — a
@@ -1964,12 +1985,23 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            if i > 0 {
+            if let Some((prev_end, own_line_start)) = prev_gap {
                 if i == 1 {
                     first_end = inner.len();
                 }
                 inner.push(d.text(","));
-                inner.push(d.line());
+                // The separator is where the previous operand's deferred trailing run
+                // FLUSHES, so a `//` in that run makes this break an obligation rather than
+                // a break point ([`Printer::obligated_break`], which carries the rule). The
+                // `break_parent` above states the run's geometry as a group FLAG, and
+                // `remove_lines` drops it — leaving the deferred `//` to ride past every
+                // remaining operand, the `)`, and the whitespace-sensitive element the head
+                // sits in (`{#each (a // c⏎, b) as x}` inside a `<pre>`, where the comment
+                // lands after `</pre>` as page text). The question is asked of the gap this
+                // separator sits in, over exactly the run that gap's trailing emitter
+                // claimed — never carried across an iteration from where it was emitted.
+                let flushes_line_comment = self.has_line_comments_between(prev_end, own_line_start);
+                inner.push(self.obligated_break(flushes_line_comment, d.line()));
             }
             inner.push(d.concat(&od));
         }

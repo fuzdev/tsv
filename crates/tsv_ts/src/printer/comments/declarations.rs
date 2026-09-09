@@ -1787,7 +1787,7 @@ impl<'a> Printer<'a> {
     /// census, F1 and the fuzzer are all blind — this seam is the guard. So the line-comment
     /// gap routes to [`Self::append_keyword_value_line_comments`], which keeps every comment
     /// on the line the author gave it and drops the tail to a continuation line indented one
-    /// level ([`docs/conformance_prettier.md`](../../../../../docs/conformance_prettier.md)
+    /// level ([`docs/conformance_prettier.md`](../../../../docs/conformance_prettier.md)
     /// §Uniform Forced-Continuation Indent) — the same emitter every sibling keyword→value
     /// gap uses, rather than a rule of its own.
     ///

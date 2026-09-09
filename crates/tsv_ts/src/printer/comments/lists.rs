@@ -1140,14 +1140,14 @@ impl<'a> Printer<'a> {
         let (line_prefix, pull_pos) = self.delimiter_line_comment_prefix(bracket_char, body_start);
         let leading_line_comment = self.has_line_comments_between(bracket_char + 1, body_start);
         let mut inner = DocBuf::new();
-        inner.push(self.obligated_break(leading_line_comment));
+        inner.push(self.obligated_break(leading_line_comment, d.softline()));
         inner.extend(self.build_leading_comments_multiline(bracket_char + 1, body_start, pull_pos));
         inner.push(body);
         d.group_break(self.build_delimited_doc(
             d.text(open),
             line_prefix,
             d.indent(d.concat(&inner)),
-            self.obligated_break(body_trailing_line_comment),
+            self.obligated_break(body_trailing_line_comment, d.softline()),
             d.text("]"),
         ))
     }
@@ -1226,7 +1226,7 @@ impl<'a> Printer<'a> {
     /// partition one gap, so a scan that starts past the comma leaves the comments the
     /// author wrote on the other side of it (`a: 1⏎// c⏎, b`) with no emitter at all; that
     /// was a live DROP at four sites. The parameter is named for the cursor it wants.
-    /// See [docs/comments.md](../../../../../docs/comments.md) §The element-comma seam.
+    /// See [docs/comments.md](../../../../docs/comments.md) §The element-comma seam.
     ///
     /// `delimiter_pull` is `Some(pos)` **only for the first item** — a later item's gap can
     /// still be on the delimiter's line (a one-line list), and dropping there would delete
