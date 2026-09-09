@@ -642,7 +642,21 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// which take the same bracket break and stay `unknown` on their pre-existing
 	// comment-position hunks alone — the union-hug seam work landing alongside moved no suite
 	// file, glued-block unions being absent from an already-formatted corpus.
-	typescript: 88,
+	//
+	// 88 → 87: `prettier/tests/format/typescript/decorators/inline-decorators.ts` leaves for
+	// `match`. A parameter's decorators and its binding are now ONE group joined by `line`s
+	// (prettier's `printDecorators` plus the `group([decoratorsDoc, doc])` its caller wraps
+	// around the pair), where tsv had joined them with a literal space that could never
+	// width-break — so the file's `@d4({⏎ x: string⏎})` constructor parameter drops
+	// `private a: string` to its own line, as prettier does. Measured by a baseline-vs-tip
+	// byte A/B over 11,491 `find`-enumerated `../corpora/collections` + `../prettier/tests/format`
+	// files named EXPLICITLY (`--list` honors `.prettierignore` and hides ~800 suite files):
+	// this file is the ONLY mover in either corpus, and the `--all` run confirms it —
+	// `partial` / `svelte` / `css` / `errors` / `expected_errors` are unmoved. The sole-parameter
+	// hug declining a DECORATED parameter (prettier's `hasNotParameterDecorator`) rides in
+	// corpus-neutral: an already-prettier-formatted corpus carries no decorated parameter the
+	// old gate would have hugged.
+	typescript: 87,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.

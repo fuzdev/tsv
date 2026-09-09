@@ -1,0 +1,1038 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 669,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line comment run in a decorator gap keeps its own line, whether or not a",
+			"start": 20,
+			"end": 102,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " newline directly follows a decorator.",
+			"start": 104,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " One comment: prettier keeps its line here too",
+			"start": 166,
+			"end": 214,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 233,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 8
+				},
+				"end": {
+					"line": 8,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 244,
+			"end": 251,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 3
+				},
+				"end": {
+					"line": 9,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two comments the author glued onto one line: prettier collapses the run",
+			"start": 275,
+			"end": 349,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 366,
+			"end": 373,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 8
+				},
+				"end": {
+					"line": 16,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 377,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 3
+				},
+				"end": {
+					"line": 17,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 386,
+			"end": 394,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 12
+				},
+				"end": {
+					"line": 17,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The class MEMBER twin of the same authoring, where prettier keeps the run",
+			"start": 418,
+			"end": 494,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 502,
+			"end": 509,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 7
+				},
+				"end": {
+					"line": 23,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 512,
+			"end": 520,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 521,
+			"end": 529,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 11
+				},
+				"end": {
+					"line": 24,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The class-LEVEL twin, where prettier keeps it too",
+			"start": 551,
+			"end": 603,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 610,
+			"end": 617,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 6
+				},
+				"end": {
+					"line": 30,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 619,
+			"end": 627,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 628,
+			"end": 636,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 10
+				},
+				"end": {
+					"line": 31,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 668,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 659,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 34,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 147,
+					"end": 548,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 153,
+						"end": 161,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 7
+							},
+							"end": {
+								"line": 5,
+								"column": 15
+							}
+						},
+						"name": "Boundary"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 162,
+						"end": 548,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 16
+							},
+							"end": {
+								"line": 27,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 217,
+								"end": 271,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 6
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 217,
+									"end": 223,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 8
+										}
+									},
+									"name": "single"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 223,
+									"end": 271,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 8
+										},
+										"end": {
+											"line": 12,
+											"column": 6
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 263,
+											"end": 264,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 3
+												},
+												"end": {
+													"line": 11,
+													"column": 4
+												}
+											},
+											"name": "p",
+											"decorators": [
+												{
+													"type": "Decorator",
+													"start": 228,
+													"end": 232,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 3
+														},
+														"end": {
+															"line": 8,
+															"column": 7
+														}
+													},
+													"expression": {
+														"type": "Identifier",
+														"start": 229,
+														"end": 232,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 4
+															},
+															"end": {
+																"line": 8,
+																"column": 7
+															}
+														},
+														"name": "fn1"
+													}
+												},
+												{
+													"type": "Decorator",
+													"start": 255,
+													"end": 259,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 3
+														},
+														"end": {
+															"line": 10,
+															"column": 7
+														}
+													},
+													"expression": {
+														"type": "Identifier",
+														"start": 256,
+														"end": 259,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 4
+															},
+															"end": {
+																"line": 10,
+																"column": 7
+															}
+														},
+														"name": "fn2"
+													}
+												}
+											],
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " t ",
+													"start": 233,
+													"end": 240
+												},
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 244,
+													"end": 251
+												}
+											]
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 269,
+										"end": 271,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 4
+											},
+											"end": {
+												"line": 12,
+												"column": 6
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " One comment: prettier keeps its line here too",
+										"start": 166,
+										"end": 214
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 352,
+								"end": 414,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 6
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 352,
+									"end": 356,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 6
+										}
+									},
+									"name": "pair"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 356,
+									"end": 414,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 6
+										},
+										"end": {
+											"line": 20,
+											"column": 6
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 406,
+											"end": 407,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 3
+												},
+												"end": {
+													"line": 19,
+													"column": 4
+												}
+											},
+											"name": "p",
+											"decorators": [
+												{
+													"type": "Decorator",
+													"start": 361,
+													"end": 365,
+													"loc": {
+														"start": {
+															"line": 16,
+															"column": 3
+														},
+														"end": {
+															"line": 16,
+															"column": 7
+														}
+													},
+													"expression": {
+														"type": "Identifier",
+														"start": 362,
+														"end": 365,
+														"loc": {
+															"start": {
+																"line": 16,
+																"column": 4
+															},
+															"end": {
+																"line": 16,
+																"column": 7
+															}
+														},
+														"name": "fn1"
+													}
+												},
+												{
+													"type": "Decorator",
+													"start": 398,
+													"end": 402,
+													"loc": {
+														"start": {
+															"line": 18,
+															"column": 3
+														},
+														"end": {
+															"line": 18,
+															"column": 7
+														}
+													},
+													"expression": {
+														"type": "Identifier",
+														"start": 399,
+														"end": 402,
+														"loc": {
+															"start": {
+																"line": 18,
+																"column": 4
+															},
+															"end": {
+																"line": 18,
+																"column": 7
+															}
+														},
+														"name": "fn2"
+													}
+												}
+											],
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " t ",
+													"start": 366,
+													"end": 373
+												},
+												{
+													"type": "Block",
+													"value": " c1 ",
+													"start": 377,
+													"end": 385
+												},
+												{
+													"type": "Block",
+													"value": " c2 ",
+													"start": 386,
+													"end": 394
+												}
+											]
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 412,
+										"end": 414,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 4
+											},
+											"end": {
+												"line": 20,
+												"column": 6
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Two comments the author glued onto one line: prettier collapses the run",
+										"start": 275,
+										"end": 349
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 497,
+								"end": 545,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 8
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 539,
+									"end": 540,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 2
+										},
+										"end": {
+											"line": 26,
+											"column": 3
+										}
+									},
+									"name": "a",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " t ",
+											"start": 502,
+											"end": 509
+										},
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 512,
+											"end": 520
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 521,
+											"end": 529
+										}
+									]
+								},
+								"value": {
+									"type": "Literal",
+									"start": 543,
+									"end": 544,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 6
+										},
+										"end": {
+											"line": 26,
+											"column": 7
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 497,
+										"end": 501,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 6
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 498,
+											"end": 501,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 3
+												},
+												"end": {
+													"line": 23,
+													"column": 6
+												}
+											},
+											"name": "fn1"
+										}
+									},
+									{
+										"type": "Decorator",
+										"start": 532,
+										"end": 536,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 2
+											},
+											"end": {
+												"line": 25,
+												"column": 6
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 533,
+											"end": 536,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 3
+												},
+												"end": {
+													"line": 25,
+													"column": 6
+												}
+											},
+											"name": "fn2"
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The class MEMBER twin of the same authoring, where prettier keeps the run",
+										"start": 418,
+										"end": 494
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line comment run in a decorator gap keeps its own line, whether or not a",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " newline directly follows a decorator.",
+							"start": 104,
+							"end": 144
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 605,
+					"end": 658,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 15
+						}
+					},
+					"decorators": [
+						{
+							"type": "Decorator",
+							"start": 605,
+							"end": 609,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 1
+								},
+								"end": {
+									"line": 30,
+									"column": 5
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 606,
+								"end": 609,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 30,
+										"column": 5
+									}
+								},
+								"name": "fn1"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " t ",
+									"start": 610,
+									"end": 617
+								}
+							]
+						},
+						{
+							"type": "Decorator",
+							"start": 638,
+							"end": 642,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 1
+								},
+								"end": {
+									"line": 32,
+									"column": 5
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 639,
+								"end": 642,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 5
+									}
+								},
+								"name": "fn2"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 619,
+									"end": 627
+								},
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 628,
+									"end": 636
+								}
+							]
+						}
+					],
+					"id": {
+						"type": "Identifier",
+						"start": 650,
+						"end": 655,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 7
+							},
+							"end": {
+								"line": 33,
+								"column": 12
+							}
+						},
+						"name": "Level"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 656,
+						"end": 658,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 13
+							},
+							"end": {
+								"line": 33,
+								"column": 15
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The class-LEVEL twin, where prettier keeps it too",
+							"start": 551,
+							"end": 603
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

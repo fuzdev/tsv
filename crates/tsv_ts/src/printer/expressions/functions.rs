@@ -452,8 +452,9 @@ impl<'a> Printer<'a> {
     /// its own ordinary parameter doc.
     ///
     /// See [`Self::param_delimiter_gaps_empty`] for the comment precondition and
-    /// [`Self::param_has_own_line_decorators`] for the decorator one (an own-line parameter
-    /// decorator forces the list to expand, which the hug cannot express).
+    /// [`Self::param_has_decorators`] for the decorator one (prettier's
+    /// `hasNotParameterDecorator`: any decorator declines the hug, because the decorator
+    /// and its binding form a group of their own that the hug cannot express).
     pub(in crate::printer) fn hugs_sole_parameter(
         &self,
         params: &[internal::Expression<'_>],
@@ -464,7 +465,7 @@ impl<'a> Printer<'a> {
         params.len() == 1
             && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
             && self.param_delimiter_gaps_empty(&params[0], open, close, comments_present)
-            && !self.param_has_own_line_decorators(&params[0])
+            && !self.param_has_decorators(&params[0])
     }
 
     /// Build a doc with `context` active so the outermost curried arrow chain in

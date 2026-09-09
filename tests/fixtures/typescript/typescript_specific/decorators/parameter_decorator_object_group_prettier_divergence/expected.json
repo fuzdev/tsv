@@ -1,0 +1,1656 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1129,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A DECORATED sole parameter declines the hug, so its object-type annotation",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keeps a group of its own and stays flat while it fits.",
+			"start": 99,
+			"end": 156,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The decorator's own line comes from the author",
+			"start": 178,
+			"end": 227,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ...and from the width, when the decorator and binding do not fit together",
+			"start": 277,
+			"end": 353,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A decorated PATTERN keeps its own group in both formatters",
+			"start": 477,
+			"end": 538,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The other direction of the same dropped group: an annotation the AUTHOR expanded,",
+			"start": 661,
+			"end": 745,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " at a width where everything fits. Prettier collapses it (and with it the decorator's",
+			"start": 748,
+			"end": 835,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own line); tsv keeps the expansion, whose break carries the decorator to its line.",
+			"start": 838,
+			"end": 923,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A second parameter takes the hug out of the question in both formatters",
+			"start": 987,
+			"end": 1061,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 76
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1128,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1119,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 38,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 159,
+					"end": 1118,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 165,
+						"end": 173,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 7
+							},
+							"end": {
+								"line": 5,
+								"column": 15
+							}
+						},
+						"name": "Boundary"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 174,
+						"end": 1118,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 16
+							},
+							"end": {
+								"line": 37,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 230,
+								"end": 274,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 6
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 230,
+									"end": 238,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 10
+										}
+									},
+									"name": "authored"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 238,
+									"end": 274,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 10
+										},
+										"end": {
+											"line": 10,
+											"column": 6
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 251,
+											"end": 267,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 3
+												},
+												"end": {
+													"line": 9,
+													"column": 19
+												}
+											},
+											"name": "a",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 252,
+												"end": 267,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 4
+													},
+													"end": {
+														"line": 9,
+														"column": 19
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeLiteral",
+													"start": 254,
+													"end": 267,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 6
+														},
+														"end": {
+															"line": 9,
+															"column": 19
+														}
+													},
+													"members": [
+														{
+															"type": "TSPropertySignature",
+															"start": 256,
+															"end": 265,
+															"loc": {
+																"start": {
+																	"line": 9,
+																	"column": 8
+																},
+																"end": {
+																	"line": 9,
+																	"column": 17
+																}
+															},
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 256,
+																"end": 259,
+																"loc": {
+																	"start": {
+																		"line": 9,
+																		"column": 8
+																	},
+																	"end": {
+																		"line": 9,
+																		"column": 11
+																	}
+																},
+																"name": "aaa"
+															},
+															"typeAnnotation": {
+																"type": "TSTypeAnnotation",
+																"start": 259,
+																"end": 265,
+																"loc": {
+																	"start": {
+																		"line": 9,
+																		"column": 11
+																	},
+																	"end": {
+																		"line": 9,
+																		"column": 17
+																	}
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeReference",
+																	"start": 261,
+																	"end": 265,
+																	"loc": {
+																		"start": {
+																			"line": 9,
+																			"column": 13
+																		},
+																		"end": {
+																			"line": 9,
+																			"column": 17
+																		}
+																	},
+																	"typeName": {
+																		"type": "Identifier",
+																		"start": 261,
+																		"end": 265,
+																		"loc": {
+																			"start": {
+																				"line": 9,
+																				"column": 13
+																			},
+																			"end": {
+																				"line": 9,
+																				"column": 17
+																			}
+																		},
+																		"name": "Aaaa"
+																	}
+																}
+															}
+														}
+													]
+												}
+											},
+											"decorators": [
+												{
+													"type": "Decorator",
+													"start": 243,
+													"end": 247,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 3
+														},
+														"end": {
+															"line": 8,
+															"column": 7
+														}
+													},
+													"expression": {
+														"type": "Identifier",
+														"start": 244,
+														"end": 247,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 4
+															},
+															"end": {
+																"line": 8,
+																"column": 7
+															}
+														},
+														"name": "dec"
+													}
+												}
+											]
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 272,
+										"end": 274,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 4
+											},
+											"end": {
+												"line": 10,
+												"column": 6
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The decorator's own line comes from the author",
+										"start": 178,
+										"end": 227
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 356,
+								"end": 473,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 6
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 356,
+									"end": 361,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 7
+										}
+									},
+									"name": "width"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 361,
+									"end": 473,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 7
+										},
+										"end": {
+											"line": 15,
+											"column": 6
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 451,
+											"end": 466,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 3
+												},
+												"end": {
+													"line": 14,
+													"column": 18
+												}
+											},
+											"name": "aaa",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 454,
+												"end": 466,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 6
+													},
+													"end": {
+														"line": 14,
+														"column": 18
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeLiteral",
+													"start": 456,
+													"end": 466,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 8
+														},
+														"end": {
+															"line": 14,
+															"column": 18
+														}
+													},
+													"members": [
+														{
+															"type": "TSPropertySignature",
+															"start": 458,
+															"end": 464,
+															"loc": {
+																"start": {
+																	"line": 14,
+																	"column": 10
+																},
+																"end": {
+																	"line": 14,
+																	"column": 16
+																}
+															},
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 458,
+																"end": 460,
+																"loc": {
+																	"start": {
+																		"line": 14,
+																		"column": 10
+																	},
+																	"end": {
+																		"line": 14,
+																		"column": 12
+																	}
+																},
+																"name": "aa"
+															},
+															"typeAnnotation": {
+																"type": "TSTypeAnnotation",
+																"start": 460,
+																"end": 464,
+																"loc": {
+																	"start": {
+																		"line": 14,
+																		"column": 12
+																	},
+																	"end": {
+																		"line": 14,
+																		"column": 16
+																	}
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeReference",
+																	"start": 462,
+																	"end": 464,
+																	"loc": {
+																		"start": {
+																			"line": 14,
+																			"column": 14
+																		},
+																		"end": {
+																			"line": 14,
+																			"column": 16
+																		}
+																	},
+																	"typeName": {
+																		"type": "Identifier",
+																		"start": 462,
+																		"end": 464,
+																		"loc": {
+																			"start": {
+																				"line": 14,
+																				"column": 14
+																			},
+																			"end": {
+																				"line": 14,
+																				"column": 16
+																			}
+																		},
+																		"name": "Aa"
+																	}
+																}
+															}
+														}
+													]
+												}
+											},
+											"decorators": [
+												{
+													"type": "Decorator",
+													"start": 366,
+													"end": 447,
+													"loc": {
+														"start": {
+															"line": 13,
+															"column": 3
+														},
+														"end": {
+															"line": 13,
+															"column": 84
+														}
+													},
+													"expression": {
+														"type": "CallExpression",
+														"start": 367,
+														"end": 447,
+														"loc": {
+															"start": {
+																"line": 13,
+																"column": 4
+															},
+															"end": {
+																"line": 13,
+																"column": 84
+															}
+														},
+														"callee": {
+															"type": "Identifier",
+															"start": 367,
+															"end": 414,
+															"loc": {
+																"start": {
+																	"line": 13,
+																	"column": 4
+																},
+																"end": {
+																	"line": 13,
+																	"column": 51
+																}
+															},
+															"name": "decoratorWithAQuiteLongNameIndeedXXXXXXXXXXXXXX"
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 415,
+																"end": 424,
+																"loc": {
+																	"start": {
+																		"line": 13,
+																		"column": 52
+																	},
+																	"end": {
+																		"line": 13,
+																		"column": 61
+																	}
+																},
+																"name": "argument1"
+															},
+															{
+																"type": "Identifier",
+																"start": 426,
+																"end": 435,
+																"loc": {
+																	"start": {
+																		"line": 13,
+																		"column": 63
+																	},
+																	"end": {
+																		"line": 13,
+																		"column": 72
+																	}
+																},
+																"name": "argument2"
+															},
+															{
+																"type": "Identifier",
+																"start": 437,
+																"end": 446,
+																"loc": {
+																	"start": {
+																		"line": 13,
+																		"column": 74
+																	},
+																	"end": {
+																		"line": 13,
+																		"column": 83
+																	}
+																},
+																"name": "argument3"
+															}
+														]
+													}
+												}
+											]
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 471,
+										"end": 473,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 4
+											},
+											"end": {
+												"line": 15,
+												"column": 6
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " ...and from the width, when the decorator and binding do not fit together",
+										"start": 277,
+										"end": 353
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 541,
+								"end": 658,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 6
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 541,
+									"end": 548,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 9
+										}
+									},
+									"name": "pattern"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 548,
+									"end": 658,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 9
+										},
+										"end": {
+											"line": 21,
+											"column": 6
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "ObjectPattern",
+											"start": 640,
+											"end": 651,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 3
+												},
+												"end": {
+													"line": 20,
+													"column": 14
+												}
+											},
+											"properties": [
+												{
+													"type": "Property",
+													"start": 642,
+													"end": 645,
+													"loc": {
+														"start": {
+															"line": 20,
+															"column": 5
+														},
+														"end": {
+															"line": 20,
+															"column": 8
+														}
+													},
+													"method": false,
+													"shorthand": true,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 642,
+														"end": 645,
+														"loc": {
+															"start": {
+																"line": 20,
+																"column": 5
+															},
+															"end": {
+																"line": 20,
+																"column": 8
+															}
+														},
+														"name": "aaa"
+													},
+													"value": {
+														"type": "Identifier",
+														"start": 642,
+														"end": 645,
+														"loc": {
+															"start": {
+																"line": 20,
+																"column": 5
+															},
+															"end": {
+																"line": 20,
+																"column": 8
+															}
+														},
+														"name": "aaa"
+													},
+													"kind": "init"
+												}
+											],
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 647,
+												"end": 651,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 10
+													},
+													"end": {
+														"line": 20,
+														"column": 14
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 649,
+													"end": 651,
+													"loc": {
+														"start": {
+															"line": 20,
+															"column": 12
+														},
+														"end": {
+															"line": 20,
+															"column": 14
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 649,
+														"end": 651,
+														"loc": {
+															"start": {
+																"line": 20,
+																"column": 12
+															},
+															"end": {
+																"line": 20,
+																"column": 14
+															}
+														},
+														"name": "Tt"
+													}
+												}
+											},
+											"decorators": [
+												{
+													"type": "Decorator",
+													"start": 553,
+													"end": 636,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 3
+														},
+														"end": {
+															"line": 19,
+															"column": 86
+														}
+													},
+													"expression": {
+														"type": "CallExpression",
+														"start": 554,
+														"end": 636,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 4
+															},
+															"end": {
+																"line": 19,
+																"column": 86
+															}
+														},
+														"callee": {
+															"type": "Identifier",
+															"start": 554,
+															"end": 603,
+															"loc": {
+																"start": {
+																	"line": 19,
+																	"column": 4
+																},
+																"end": {
+																	"line": 19,
+																	"column": 53
+																}
+															},
+															"name": "decoratorWithAQuiteLongNameIndeedXXXXXXXXXXXXXXXX"
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 604,
+																"end": 613,
+																"loc": {
+																	"start": {
+																		"line": 19,
+																		"column": 54
+																	},
+																	"end": {
+																		"line": 19,
+																		"column": 63
+																	}
+																},
+																"name": "argument1"
+															},
+															{
+																"type": "Identifier",
+																"start": 615,
+																"end": 624,
+																"loc": {
+																	"start": {
+																		"line": 19,
+																		"column": 65
+																	},
+																	"end": {
+																		"line": 19,
+																		"column": 74
+																	}
+																},
+																"name": "argument2"
+															},
+															{
+																"type": "Identifier",
+																"start": 626,
+																"end": 635,
+																"loc": {
+																	"start": {
+																		"line": 19,
+																		"column": 76
+																	},
+																	"end": {
+																		"line": 19,
+																		"column": 85
+																	}
+																},
+																"name": "argument3"
+															}
+														]
+													}
+												}
+											]
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 656,
+										"end": 658,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 4
+											},
+											"end": {
+												"line": 21,
+												"column": 6
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A decorated PATTERN keeps its own group in both formatters",
+										"start": 477,
+										"end": 538
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 926,
+								"end": 984,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 30,
+										"column": 6
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 926,
+									"end": 940,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 16
+										}
+									},
+									"name": "authoredObject"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 940,
+									"end": 984,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 16
+										},
+										"end": {
+											"line": 30,
+											"column": 6
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 953,
+											"end": 977,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 3
+												},
+												"end": {
+													"line": 29,
+													"column": 4
+												}
+											},
+											"name": "a",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 954,
+												"end": 977,
+												"loc": {
+													"start": {
+														"line": 27,
+														"column": 4
+													},
+													"end": {
+														"line": 29,
+														"column": 4
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeLiteral",
+													"start": 956,
+													"end": 977,
+													"loc": {
+														"start": {
+															"line": 27,
+															"column": 6
+														},
+														"end": {
+															"line": 29,
+															"column": 4
+														}
+													},
+													"members": [
+														{
+															"type": "TSPropertySignature",
+															"start": 962,
+															"end": 972,
+															"loc": {
+																"start": {
+																	"line": 28,
+																	"column": 4
+																},
+																"end": {
+																	"line": 28,
+																	"column": 14
+																}
+															},
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 962,
+																"end": 965,
+																"loc": {
+																	"start": {
+																		"line": 28,
+																		"column": 4
+																	},
+																	"end": {
+																		"line": 28,
+																		"column": 7
+																	}
+																},
+																"name": "aaa"
+															},
+															"typeAnnotation": {
+																"type": "TSTypeAnnotation",
+																"start": 965,
+																"end": 971,
+																"loc": {
+																	"start": {
+																		"line": 28,
+																		"column": 7
+																	},
+																	"end": {
+																		"line": 28,
+																		"column": 13
+																	}
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeReference",
+																	"start": 967,
+																	"end": 971,
+																	"loc": {
+																		"start": {
+																			"line": 28,
+																			"column": 9
+																		},
+																		"end": {
+																			"line": 28,
+																			"column": 13
+																		}
+																	},
+																	"typeName": {
+																		"type": "Identifier",
+																		"start": 967,
+																		"end": 971,
+																		"loc": {
+																			"start": {
+																				"line": 28,
+																				"column": 9
+																			},
+																			"end": {
+																				"line": 28,
+																				"column": 13
+																			}
+																		},
+																		"name": "Aaaa"
+																	}
+																}
+															}
+														}
+													]
+												}
+											},
+											"decorators": [
+												{
+													"type": "Decorator",
+													"start": 945,
+													"end": 949,
+													"loc": {
+														"start": {
+															"line": 26,
+															"column": 3
+														},
+														"end": {
+															"line": 26,
+															"column": 7
+														}
+													},
+													"expression": {
+														"type": "Identifier",
+														"start": 946,
+														"end": 949,
+														"loc": {
+															"start": {
+																"line": 26,
+																"column": 4
+															},
+															"end": {
+																"line": 26,
+																"column": 7
+															}
+														},
+														"name": "dec"
+													}
+												}
+											]
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 982,
+										"end": 984,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 4
+											},
+											"end": {
+												"line": 30,
+												"column": 6
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The other direction of the same dropped group: an annotation the AUTHOR expanded,",
+										"start": 661,
+										"end": 745
+									},
+									{
+										"type": "Line",
+										"value": " at a width where everything fits. Prettier collapses it (and with it the decorator's",
+										"start": 748,
+										"end": 835
+									},
+									{
+										"type": "Line",
+										"value": " own line); tsv keeps the expansion, whose break carries the decorator to its line.",
+										"start": 838,
+										"end": 923
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 1064,
+								"end": 1115,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 36,
+										"column": 6
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 1064,
+									"end": 1067,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 2
+										},
+										"end": {
+											"line": 32,
+											"column": 5
+										}
+									},
+									"name": "two"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 1067,
+									"end": 1115,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 5
+										},
+										"end": {
+											"line": 36,
+											"column": 6
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 1080,
+											"end": 1096,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 3
+												},
+												"end": {
+													"line": 34,
+													"column": 19
+												}
+											},
+											"name": "a",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 1081,
+												"end": 1096,
+												"loc": {
+													"start": {
+														"line": 34,
+														"column": 4
+													},
+													"end": {
+														"line": 34,
+														"column": 19
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeLiteral",
+													"start": 1083,
+													"end": 1096,
+													"loc": {
+														"start": {
+															"line": 34,
+															"column": 6
+														},
+														"end": {
+															"line": 34,
+															"column": 19
+														}
+													},
+													"members": [
+														{
+															"type": "TSPropertySignature",
+															"start": 1085,
+															"end": 1094,
+															"loc": {
+																"start": {
+																	"line": 34,
+																	"column": 8
+																},
+																"end": {
+																	"line": 34,
+																	"column": 17
+																}
+															},
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 1085,
+																"end": 1088,
+																"loc": {
+																	"start": {
+																		"line": 34,
+																		"column": 8
+																	},
+																	"end": {
+																		"line": 34,
+																		"column": 11
+																	}
+																},
+																"name": "aaa"
+															},
+															"typeAnnotation": {
+																"type": "TSTypeAnnotation",
+																"start": 1088,
+																"end": 1094,
+																"loc": {
+																	"start": {
+																		"line": 34,
+																		"column": 11
+																	},
+																	"end": {
+																		"line": 34,
+																		"column": 17
+																	}
+																},
+																"typeAnnotation": {
+																	"type": "TSTypeReference",
+																	"start": 1090,
+																	"end": 1094,
+																	"loc": {
+																		"start": {
+																			"line": 34,
+																			"column": 13
+																		},
+																		"end": {
+																			"line": 34,
+																			"column": 17
+																		}
+																	},
+																	"typeName": {
+																		"type": "Identifier",
+																		"start": 1090,
+																		"end": 1094,
+																		"loc": {
+																			"start": {
+																				"line": 34,
+																				"column": 13
+																			},
+																			"end": {
+																				"line": 34,
+																				"column": 17
+																			}
+																		},
+																		"name": "Aaaa"
+																	}
+																}
+															}
+														}
+													]
+												}
+											},
+											"decorators": [
+												{
+													"type": "Decorator",
+													"start": 1072,
+													"end": 1076,
+													"loc": {
+														"start": {
+															"line": 33,
+															"column": 3
+														},
+														"end": {
+															"line": 33,
+															"column": 7
+														}
+													},
+													"expression": {
+														"type": "Identifier",
+														"start": 1073,
+														"end": 1076,
+														"loc": {
+															"start": {
+																"line": 33,
+																"column": 4
+															},
+															"end": {
+																"line": 33,
+																"column": 7
+															}
+														},
+														"name": "dec"
+													}
+												}
+											]
+										},
+										{
+											"type": "Identifier",
+											"start": 1101,
+											"end": 1108,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 3
+												},
+												"end": {
+													"line": 35,
+													"column": 10
+												}
+											},
+											"name": "b",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 1102,
+												"end": 1108,
+												"loc": {
+													"start": {
+														"line": 35,
+														"column": 4
+													},
+													"end": {
+														"line": 35,
+														"column": 10
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 1104,
+													"end": 1108,
+													"loc": {
+														"start": {
+															"line": 35,
+															"column": 6
+														},
+														"end": {
+															"line": 35,
+															"column": 10
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 1104,
+														"end": 1108,
+														"loc": {
+															"start": {
+																"line": 35,
+																"column": 6
+															},
+															"end": {
+																"line": 35,
+																"column": 10
+															}
+														},
+														"name": "Bbbb"
+													}
+												}
+											}
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 1113,
+										"end": 1115,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 4
+											},
+											"end": {
+												"line": 36,
+												"column": 6
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A second parameter takes the hug out of the question in both formatters",
+										"start": 987,
+										"end": 1061
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A DECORATED sole parameter declines the hug, so its object-type annotation",
+							"start": 20,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " keeps a group of its own and stays flat while it fits.",
+							"start": 99,
+							"end": 156
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

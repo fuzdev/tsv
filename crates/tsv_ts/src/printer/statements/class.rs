@@ -378,13 +378,7 @@ impl<'a> Printer<'a> {
         let mut parts = smallvec![];
 
         // Decorators (inline or own-line depending on original source)
-        let next_token_start = prop
-            .decorators
-            .as_ref()
-            .and_then(|decs| decs.last())
-            .map_or(prop.span.start, |dec| {
-                self.find_first_token_after(dec.span.end)
-            });
+        let next_token_start = self.member_decorator_boundary(prop.decorators, prop.span.start);
         if let Some(dec_doc) =
             self.build_class_member_decorators_doc(prop.decorators, next_token_start)
         {
@@ -672,13 +666,7 @@ impl<'a> Printer<'a> {
         let mut parts = smallvec![];
 
         // Decorators (inline or own-line depending on original source)
-        let next_token_start = method
-            .decorators
-            .as_ref()
-            .and_then(|decs| decs.last())
-            .map_or(method.span.start, |dec| {
-                self.find_first_token_after(dec.span.end)
-            });
+        let next_token_start = self.member_decorator_boundary(method.decorators, method.span.start);
         if let Some(dec_doc) =
             self.build_class_member_decorators_doc(method.decorators, next_token_start)
         {
