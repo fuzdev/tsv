@@ -62,8 +62,7 @@ use decorators::class_expr_has_decorators;
 pub use expressions::assignment::should_inline_logical_expression;
 use expressions::assignment::{
     arrow_chain_should_break, is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
-    is_simple_value, is_type_assertion_call, jsdoc_cast_comment_is_own_line,
-    should_break_after_operator,
+    is_simple_value, is_type_assertion_call, should_break_after_operator,
 };
 use needs_parens::{ParenContext, is_in_binary, needs_parens};
 use types::unwrap_parenthesized;

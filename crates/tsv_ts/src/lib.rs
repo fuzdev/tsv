@@ -349,19 +349,24 @@ pub fn format_folded_in(
 }
 
 /// The shared body of [`format_in`] and [`format_folded_in`]: the one place the
-/// intent-preserving format registers its comments and hands the printer its table.
+/// intent-preserving format merges its comments, registers them and hands the printer its
+/// table.
 fn format_document_in(
     program: &Program<'_>,
     source: &str,
     line_breaks: LineBreaks<'_>,
     arena: &DocArena,
 ) -> String {
+    // The printer's comment VIEW: a byte-adjacent indentable pair is one comment (the rule,
+    // and why it is a view rather than a parse, is `tsv_lang::merge_nestled_block_comments`).
+    let comments = tsv_lang::merge_nestled_block_comments(source, program.comments);
     // The print-once comment ledger's expectation for this document (diagnostic; see
-    // `tsv_lang::comment_ledger`). A Svelte host registers its own `Root.comments`, so
-    // an embedded `<script>` never reaches here.
+    // `tsv_lang::comment_ledger`) — the MERGED list, which is the one the printers emit. A
+    // Svelte host registers its own `Root.comments`, so an embedded `<script>` never
+    // reaches here.
     #[cfg(feature = "comment_check")]
-    tsv_lang::comment_ledger::register_parsed(source, program.comments);
-    format_program_in(program, source, line_breaks, arena, false)
+    tsv_lang::comment_ledger::register_parsed(source, &comments);
+    format_program_in(program, source, &comments, line_breaks, arena, false)
 }
 
 /// Format a program with newline-derived authoring intent **erased** — the
@@ -404,7 +409,10 @@ pub fn format_canonical(program: &Program<'_>, source: &str) -> String {
 /// the arena-reuse contract).
 pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
-    format_program_in(program, source, line_breaks, arena, true)
+    // Deliberately the parser's own list: the nestled-pair merge is prettier's rule, read
+    // through prettier's oracle, and this reprint answers to neither — its contract above
+    // is that comments are never merged, only relocated.
+    format_program_in(program, source, program.comments, line_breaks, arena, true)
 }
 
 /// The shared body of every format: given the document's line verdict (the arena-parked
@@ -417,11 +425,12 @@ pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena
 fn format_program_in(
     program: &Program<'_>,
     source: &str,
+    comments: &[ast::Comment],
     line_breaks: LineBreaks<'_>,
     arena: &DocArena,
     canonical: bool,
 ) -> String {
-    let inputs = PrinterInputs::for_document(source, program.comments, line_breaks.table());
+    let inputs = PrinterInputs::for_document(source, comments, line_breaks.table());
     // This printer IS the document — a break after any doc it builds is its own, so an
     // emitter may defer a `//` to the end of a line.
     let mut printer = make_printer(arena, &inputs, EmbedContext::line_owning());
@@ -1023,8 +1032,16 @@ pub fn build_type_annotation_doc(
 /// Used when embedding TypeScript in other formats like Svelte's `<script>`.
 ///
 /// `line_table` must be the host document's whole-source line table (spans are absolute,
-/// so a table over an island slice is wrong); `comments` stay island-local (taken from
-/// `program`).
+/// so a table over an island slice is wrong); `comments` stay **island-local** (taken from
+/// `program`), which is load-bearing rather than incidental — `push_program_trailing_comments`
+/// scans to `source.len()` and the statement walk opens at byte 0, so an array holding the
+/// host's template comments would emit every one of them into this `<script>`. That is why
+/// this island builds its own environment instead of borrowing the host's `ts_inputs()`
+/// like every template island, and therefore why it applies the comment-view merge
+/// (`tsv_lang::merge_nestled_block_comments`) a second time. The two agree by construction:
+/// the merge is a function of the source bytes, and an island's comments are a contiguous
+/// run of the host's — the print-once ledger, which the host registers from ITS merge,
+/// grades that agreement on every Svelte fixture.
 pub fn build_program_doc(
     arena: &DocArena,
     program: &Program<'_>,
@@ -1032,7 +1049,8 @@ pub fn build_program_doc(
     line_table: LineTable<'_>,
     embed: EmbedContext,
 ) -> DocId {
-    let inputs = PrinterInputs::for_document(source, program.comments, line_table);
+    let comments = tsv_lang::merge_nestled_block_comments(source, program.comments);
+    let inputs = PrinterInputs::for_document(source, &comments, line_table);
     let printer = make_doc_printer(arena, &inputs, embed);
     printer.build_program_doc(program)
 }

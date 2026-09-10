@@ -33,10 +33,7 @@ use crate::printer::ShareTag;
 use crate::printer::comments::{CommentFilter, CommentSpacing, KeywordOperandGap};
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
-use crate::printer::{
-    ParenContext, PatternContext, Printer, chain, class_expr_has_decorators,
-    jsdoc_cast_comment_is_own_line,
-};
+use crate::printer::{ParenContext, PatternContext, Printer, chain, class_expr_has_decorators};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -451,7 +448,7 @@ impl<'a> Printer<'a> {
     /// [`Printer::push_leading_comment_run`] applies to every other leading comment:
     ///
     /// - **hardline** when the author isolated the comment on a line of its own
-    ///   ([`jsdoc_cast_comment_is_own_line`]). That predicate also drives the enclosing
+    ///   ([`Printer::jsdoc_cast_comment_own_line`]). That predicate also drives the enclosing
     ///   assignment to hang, so the `(` lands indented under it — the two must agree.
     /// - **space** when something follows the `*/` on its line
     ///   ([`Printer::comment_hugs_next`]) — the `(` itself, or a comment before it.
@@ -506,12 +503,19 @@ impl<'a> Printer<'a> {
                 .is_none(),
             "a JSDoc cast's comment→`(` gap is whitespace-only by construction"
         );
-        let mut parts: DocBuf = smallvec![self.build_comment_doc(&cast.comment)];
+        // The array's entry, not the node's copy: a nestled predecessor merges INTO the
+        // cast's comment, and printing the copy would drop it ([`Self::jsdoc_cast_comment`]).
+        // `jsdoc_cast_comment_own_line` below resolves the same entry again rather than
+        // taking this one — the resolution stays inside that predicate so its two other
+        // callers, which hold only the cast, cannot reach a different answer. Deliberate:
+        // one predicate is worth more than one saved lookup on a path this rare.
+        let comment = self.jsdoc_cast_comment(cast);
+        let mut parts: DocBuf = smallvec![self.build_comment_doc(&comment)];
         if self.jsdoc_cast_in_cannot_hang_gap(cast) {
             parts.push(d.text(" "));
-        } else if jsdoc_cast_comment_is_own_line(cast, self.source) {
+        } else if self.jsdoc_cast_comment_own_line(cast) {
             self.push_blank_preserving_separator(&mut parts, comment_end, open, d.hardline());
-        } else if self.comment_hugs_next(&cast.comment) || self.jsdoc_cast_in_value_gap(cast) {
+        } else if self.comment_hugs_next(&comment) || self.jsdoc_cast_in_value_gap(cast) {
             parts.push(d.text(" "));
         } else {
             self.push_blank_preserving_separator(&mut parts, comment_end, open, d.line());

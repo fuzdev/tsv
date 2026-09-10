@@ -1,0 +1,2537 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1789,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Two block comments the author left BYTE-ADJACENT, both indentable (every line of",
+			"start": 20,
+			"end": 103,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the pair starts with `*`), are ONE comment: no separator comes between them at any",
+			"start": 105,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " position. One byte of gap, or either comment not indentable, and they are two",
+			"start": 192,
+			"end": 272,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (separator_glued_run, body_dangling_run).",
+			"start": 274,
+			"end": 318,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Leading a statement.",
+			"start": 321,
+			"end": 344,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 346,
+			"end": 356,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 356,
+			"end": 366,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 4
+				},
+				"end": {
+					"line": 10,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Leading an object member.",
+			"start": 383,
+			"end": 411,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 427,
+			"end": 438,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 438,
+			"end": 449,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 5
+				},
+				"end": {
+					"line": 17,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Trailing an object member.",
+			"start": 463,
+			"end": 492,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 515,
+			"end": 526,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 526,
+			"end": 537,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 5
+				},
+				"end": {
+					"line": 26,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Dangling - the only content of an object literal.",
+			"start": 544,
+			"end": 596,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 612,
+			"end": 623,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 623,
+			"end": 634,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 5
+				},
+				"end": {
+					"line": 33,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Dangling - a class body.",
+			"start": 641,
+			"end": 668,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 682,
+			"end": 693,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 39,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 693,
+			"end": 704,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 5
+				},
+				"end": {
+					"line": 40,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Dangling - an interface body.",
+			"start": 710,
+			"end": 742,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 1
+				},
+				"end": {
+					"line": 43,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 760,
+			"end": 771,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 2
+				},
+				"end": {
+					"line": 46,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 771,
+			"end": 782,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 5
+				},
+				"end": {
+					"line": 47,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Dangling - a parameter list.",
+			"start": 788,
+			"end": 819,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 836,
+			"end": 847,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 2
+				},
+				"end": {
+					"line": 53,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 847,
+			"end": 858,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 5
+				},
+				"end": {
+					"line": 54,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Leading an argument.",
+			"start": 867,
+			"end": 890,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 1
+				},
+				"end": {
+					"line": 57,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 898,
+			"end": 909,
+			"loc": {
+				"start": {
+					"line": 59,
+					"column": 2
+				},
+				"end": {
+					"line": 60,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 909,
+			"end": 920,
+			"loc": {
+				"start": {
+					"line": 60,
+					"column": 5
+				},
+				"end": {
+					"line": 61,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Three in a row.",
+			"start": 929,
+			"end": 947,
+			"loc": {
+				"start": {
+					"line": 64,
+					"column": 1
+				},
+				"end": {
+					"line": 64,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 949,
+			"end": 959,
+			"loc": {
+				"start": {
+					"line": 65,
+					"column": 1
+				},
+				"end": {
+					"line": 66,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 959,
+			"end": 969,
+			"loc": {
+				"start": {
+					"line": 66,
+					"column": 4
+				},
+				"end": {
+					"line": 67,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* c\n",
+			"start": 969,
+			"end": 979,
+			"loc": {
+				"start": {
+					"line": 67,
+					"column": 4
+				},
+				"end": {
+					"line": 68,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A gap after the pair leaves the third its own comment.",
+			"start": 996,
+			"end": 1053,
+			"loc": {
+				"start": {
+					"line": 71,
+					"column": 1
+				},
+				"end": {
+					"line": 71,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 1055,
+			"end": 1065,
+			"loc": {
+				"start": {
+					"line": 72,
+					"column": 1
+				},
+				"end": {
+					"line": 73,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 1065,
+			"end": 1075,
+			"loc": {
+				"start": {
+					"line": 73,
+					"column": 4
+				},
+				"end": {
+					"line": 74,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* c\n",
+			"start": 1076,
+			"end": 1086,
+			"loc": {
+				"start": {
+					"line": 74,
+					"column": 5
+				},
+				"end": {
+					"line": 75,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The `/**` spelling is not the rule - a `*`-aligned `/*` nestles too.",
+			"start": 1103,
+			"end": 1174,
+			"loc": {
+				"start": {
+					"line": 78,
+					"column": 1
+				},
+				"end": {
+					"line": 78,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n * a\n ",
+			"start": 1176,
+			"end": 1189,
+			"loc": {
+				"start": {
+					"line": 79,
+					"column": 1
+				},
+				"end": {
+					"line": 81,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n* b\n",
+			"start": 1189,
+			"end": 1202,
+			"loc": {
+				"start": {
+					"line": 81,
+					"column": 4
+				},
+				"end": {
+					"line": 83,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - one byte of gap and the pair is two comments.",
+			"start": 1219,
+			"end": 1277,
+			"loc": {
+				"start": {
+					"line": 86,
+					"column": 1
+				},
+				"end": {
+					"line": 86,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 1279,
+			"end": 1289,
+			"loc": {
+				"start": {
+					"line": 87,
+					"column": 1
+				},
+				"end": {
+					"line": 88,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 1290,
+			"end": 1300,
+			"loc": {
+				"start": {
+					"line": 88,
+					"column": 5
+				},
+				"end": {
+					"line": 89,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - a newline between them keeps two lines.",
+			"start": 1317,
+			"end": 1369,
+			"loc": {
+				"start": {
+					"line": 92,
+					"column": 1
+				},
+				"end": {
+					"line": 92,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 1371,
+			"end": 1381,
+			"loc": {
+				"start": {
+					"line": 93,
+					"column": 1
+				},
+				"end": {
+					"line": 94,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n ",
+			"start": 1383,
+			"end": 1393,
+			"loc": {
+				"start": {
+					"line": 95,
+					"column": 1
+				},
+				"end": {
+					"line": 96,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - single-line blocks are not indentable, so they stay two.",
+			"start": 1410,
+			"end": 1479,
+			"loc": {
+				"start": {
+					"line": 99,
+					"column": 1
+				},
+				"end": {
+					"line": 99,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 1481,
+			"end": 1488,
+			"loc": {
+				"start": {
+					"line": 100,
+					"column": 1
+				},
+				"end": {
+					"line": 100,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 1489,
+			"end": 1496,
+			"loc": {
+				"start": {
+					"line": 100,
+					"column": 9
+				},
+				"end": {
+					"line": 100,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - a multi-line block whose lines lack `*` is not indentable.",
+			"start": 1513,
+			"end": 1584,
+			"loc": {
+				"start": {
+					"line": 103,
+					"column": 1
+				},
+				"end": {
+					"line": 103,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a\nz ",
+			"start": 1586,
+			"end": 1596,
+			"loc": {
+				"start": {
+					"line": 104,
+					"column": 1
+				},
+				"end": {
+					"line": 105,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b\nz ",
+			"start": 1597,
+			"end": 1607,
+			"loc": {
+				"start": {
+					"line": 105,
+					"column": 6
+				},
+				"end": {
+					"line": 106,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - the pair must BOTH be indentable.",
+			"start": 1624,
+			"end": 1670,
+			"loc": {
+				"start": {
+					"line": 109,
+					"column": 1
+				},
+				"end": {
+					"line": 109,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 1672,
+			"end": 1682,
+			"loc": {
+				"start": {
+					"line": 110,
+					"column": 1
+				},
+				"end": {
+					"line": 111,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 1683,
+			"end": 1690,
+			"loc": {
+				"start": {
+					"line": 111,
+					"column": 5
+				},
+				"end": {
+					"line": 111,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Trailing at the end of the body.",
+			"start": 1707,
+			"end": 1742,
+			"loc": {
+				"start": {
+					"line": 114,
+					"column": 1
+				},
+				"end": {
+					"line": 114,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n ",
+			"start": 1758,
+			"end": 1768,
+			"loc": {
+				"start": {
+					"line": 116,
+					"column": 1
+				},
+				"end": {
+					"line": 117,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 1768,
+			"end": 1778,
+			"loc": {
+				"start": {
+					"line": 117,
+					"column": 4
+				},
+				"end": {
+					"line": 118,
+					"column": 4
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1788,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1779,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 119,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 368,
+					"end": 380,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 374,
+							"end": 379,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 374,
+								"end": 375,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 378,
+								"end": 379,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two block comments the author left BYTE-ADJACENT, both indentable (every line of",
+							"start": 20,
+							"end": 103
+						},
+						{
+							"type": "Line",
+							"value": " the pair starts with `*`), are ONE comment: no separator comes between them at any",
+							"start": 105,
+							"end": 190
+						},
+						{
+							"type": "Line",
+							"value": " position. One byte of gap, or either comment not indentable, and they are two",
+							"start": 192,
+							"end": 272
+						},
+						{
+							"type": "Line",
+							"value": " (separator_glued_run, body_dangling_run).",
+							"start": 274,
+							"end": 318
+						},
+						{
+							"type": "Line",
+							"value": " Leading a statement.",
+							"start": 321,
+							"end": 344
+						},
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 346,
+							"end": 356
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 356,
+							"end": 366
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 413,
+					"end": 460,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 419,
+							"end": 459,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 419,
+								"end": 420,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 423,
+								"end": 459,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 452,
+										"end": 456,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 452,
+											"end": 453,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 455,
+											"end": 456,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 5
+												},
+												"end": {
+													"line": 18,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": "* a\n ",
+												"start": 427,
+												"end": 438
+											},
+											{
+												"type": "Block",
+												"value": "* b\n",
+												"start": 438,
+												"end": 449
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Leading an object member.",
+							"start": 383,
+							"end": 411
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 494,
+					"end": 541,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 500,
+							"end": 540,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 500,
+								"end": 501,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 504,
+								"end": 540,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 11
+									},
+									"end": {
+										"line": 27,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 508,
+										"end": 512,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 508,
+											"end": 509,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 2
+												},
+												"end": {
+													"line": 23,
+													"column": 3
+												}
+											},
+											"name": "e"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 511,
+											"end": 512,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 5
+												},
+												"end": {
+													"line": 23,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": "* a\n ",
+												"start": 515,
+												"end": 526
+											},
+											{
+												"type": "Block",
+												"value": "* b\n",
+												"start": 526,
+												"end": 537
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing an object member.",
+							"start": 463,
+							"end": 492
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 598,
+					"end": 638,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 604,
+							"end": 637,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 34,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 604,
+								"end": 605,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 608,
+								"end": 637,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 11
+									},
+									"end": {
+										"line": 34,
+										"column": 2
+									}
+								},
+								"properties": []
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Dangling - the only content of an object literal.",
+							"start": 544,
+							"end": 596
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 670,
+					"end": 707,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 676,
+						"end": 677,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 7
+							},
+							"end": {
+								"line": 37,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 678,
+						"end": 707,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 9
+							},
+							"end": {
+								"line": 41,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 612,
+							"end": 623
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 623,
+							"end": 634
+						},
+						{
+							"type": "Line",
+							"value": " Dangling - a class body.",
+							"start": 641,
+							"end": 668
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 744,
+					"end": 785,
+					"loc": {
+						"start": {
+							"line": 44,
+							"column": 1
+						},
+						"end": {
+							"line": 48,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 754,
+						"end": 755,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 11
+							},
+							"end": {
+								"line": 44,
+								"column": 12
+							}
+						},
+						"name": "B"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 756,
+						"end": 785,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 13
+							},
+							"end": {
+								"line": 48,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 682,
+							"end": 693
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 693,
+							"end": 704
+						},
+						{
+							"type": "Line",
+							"value": " Dangling - an interface body.",
+							"start": 710,
+							"end": 742
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 821,
+					"end": 864,
+					"loc": {
+						"start": {
+							"line": 51,
+							"column": 1
+						},
+						"end": {
+							"line": 55,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 830,
+						"end": 832,
+						"loc": {
+							"start": {
+								"line": 51,
+								"column": 10
+							},
+							"end": {
+								"line": 51,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 862,
+						"end": 864,
+						"loc": {
+							"start": {
+								"line": 55,
+								"column": 3
+							},
+							"end": {
+								"line": 55,
+								"column": 5
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": "* a\n ",
+								"start": 836,
+								"end": 847
+							},
+							{
+								"type": "Block",
+								"value": "* b\n",
+								"start": 847,
+								"end": 858
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 760,
+							"end": 771
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 771,
+							"end": 782
+						},
+						{
+							"type": "Line",
+							"value": " Dangling - a parameter list.",
+							"start": 788,
+							"end": 819
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 892,
+					"end": 926,
+					"loc": {
+						"start": {
+							"line": 58,
+							"column": 1
+						},
+						"end": {
+							"line": 62,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 892,
+						"end": 925,
+						"loc": {
+							"start": {
+								"line": 58,
+								"column": 1
+							},
+							"end": {
+								"line": 62,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 892,
+							"end": 894,
+							"loc": {
+								"start": {
+									"line": 58,
+									"column": 1
+								},
+								"end": {
+									"line": 58,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 921,
+								"end": 922,
+								"loc": {
+									"start": {
+										"line": 61,
+										"column": 6
+									},
+									"end": {
+										"line": 61,
+										"column": 7
+									}
+								},
+								"name": "g",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* a\n ",
+										"start": 898,
+										"end": 909
+									},
+									{
+										"type": "Block",
+										"value": "* b\n",
+										"start": 909,
+										"end": 920
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Leading an argument.",
+							"start": 867,
+							"end": 890
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 981,
+					"end": 993,
+					"loc": {
+						"start": {
+							"line": 69,
+							"column": 1
+						},
+						"end": {
+							"line": 69,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 987,
+							"end": 992,
+							"loc": {
+								"start": {
+									"line": 69,
+									"column": 7
+								},
+								"end": {
+									"line": 69,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 987,
+								"end": 988,
+								"loc": {
+									"start": {
+										"line": 69,
+										"column": 7
+									},
+									"end": {
+										"line": 69,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 991,
+								"end": 992,
+								"loc": {
+									"start": {
+										"line": 69,
+										"column": 11
+									},
+									"end": {
+										"line": 69,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Three in a row.",
+							"start": 929,
+							"end": 947
+						},
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 949,
+							"end": 959
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 959,
+							"end": 969
+						},
+						{
+							"type": "Block",
+							"value": "* c\n",
+							"start": 969,
+							"end": 979
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1088,
+					"end": 1100,
+					"loc": {
+						"start": {
+							"line": 76,
+							"column": 1
+						},
+						"end": {
+							"line": 76,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1094,
+							"end": 1099,
+							"loc": {
+								"start": {
+									"line": 76,
+									"column": 7
+								},
+								"end": {
+									"line": 76,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1094,
+								"end": 1095,
+								"loc": {
+									"start": {
+										"line": 76,
+										"column": 7
+									},
+									"end": {
+										"line": 76,
+										"column": 8
+									}
+								},
+								"name": "i"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1098,
+								"end": 1099,
+								"loc": {
+									"start": {
+										"line": 76,
+										"column": 11
+									},
+									"end": {
+										"line": 76,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A gap after the pair leaves the third its own comment.",
+							"start": 996,
+							"end": 1053
+						},
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 1055,
+							"end": 1065
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 1065,
+							"end": 1075
+						},
+						{
+							"type": "Block",
+							"value": "* c\n",
+							"start": 1076,
+							"end": 1086
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1204,
+					"end": 1216,
+					"loc": {
+						"start": {
+							"line": 84,
+							"column": 1
+						},
+						"end": {
+							"line": 84,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1210,
+							"end": 1215,
+							"loc": {
+								"start": {
+									"line": 84,
+									"column": 7
+								},
+								"end": {
+									"line": 84,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1210,
+								"end": 1211,
+								"loc": {
+									"start": {
+										"line": 84,
+										"column": 7
+									},
+									"end": {
+										"line": 84,
+										"column": 8
+									}
+								},
+								"name": "j"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1214,
+								"end": 1215,
+								"loc": {
+									"start": {
+										"line": 84,
+										"column": 11
+									},
+									"end": {
+										"line": 84,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `/**` spelling is not the rule - a `*`-aligned `/*` nestles too.",
+							"start": 1103,
+							"end": 1174
+						},
+						{
+							"type": "Block",
+							"value": "\n * a\n ",
+							"start": 1176,
+							"end": 1189
+						},
+						{
+							"type": "Block",
+							"value": "\n* b\n",
+							"start": 1189,
+							"end": 1202
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1302,
+					"end": 1314,
+					"loc": {
+						"start": {
+							"line": 90,
+							"column": 1
+						},
+						"end": {
+							"line": 90,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1308,
+							"end": 1313,
+							"loc": {
+								"start": {
+									"line": 90,
+									"column": 7
+								},
+								"end": {
+									"line": 90,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1308,
+								"end": 1309,
+								"loc": {
+									"start": {
+										"line": 90,
+										"column": 7
+									},
+									"end": {
+										"line": 90,
+										"column": 8
+									}
+								},
+								"name": "k"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1312,
+								"end": 1313,
+								"loc": {
+									"start": {
+										"line": 90,
+										"column": 11
+									},
+									"end": {
+										"line": 90,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - one byte of gap and the pair is two comments.",
+							"start": 1219,
+							"end": 1277
+						},
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 1279,
+							"end": 1289
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 1290,
+							"end": 1300
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1395,
+					"end": 1407,
+					"loc": {
+						"start": {
+							"line": 97,
+							"column": 1
+						},
+						"end": {
+							"line": 97,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1401,
+							"end": 1406,
+							"loc": {
+								"start": {
+									"line": 97,
+									"column": 7
+								},
+								"end": {
+									"line": 97,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1401,
+								"end": 1402,
+								"loc": {
+									"start": {
+										"line": 97,
+										"column": 7
+									},
+									"end": {
+										"line": 97,
+										"column": 8
+									}
+								},
+								"name": "l"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1405,
+								"end": 1406,
+								"loc": {
+									"start": {
+										"line": 97,
+										"column": 11
+									},
+									"end": {
+										"line": 97,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - a newline between them keeps two lines.",
+							"start": 1317,
+							"end": 1369
+						},
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 1371,
+							"end": 1381
+						},
+						{
+							"type": "Block",
+							"value": "* b\n ",
+							"start": 1383,
+							"end": 1393
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1498,
+					"end": 1510,
+					"loc": {
+						"start": {
+							"line": 101,
+							"column": 1
+						},
+						"end": {
+							"line": 101,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1504,
+							"end": 1509,
+							"loc": {
+								"start": {
+									"line": 101,
+									"column": 7
+								},
+								"end": {
+									"line": 101,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1504,
+								"end": 1505,
+								"loc": {
+									"start": {
+										"line": 101,
+										"column": 7
+									},
+									"end": {
+										"line": 101,
+										"column": 8
+									}
+								},
+								"name": "m"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1508,
+								"end": 1509,
+								"loc": {
+									"start": {
+										"line": 101,
+										"column": 11
+									},
+									"end": {
+										"line": 101,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - single-line blocks are not indentable, so they stay two.",
+							"start": 1410,
+							"end": 1479
+						},
+						{
+							"type": "Block",
+							"value": " a ",
+							"start": 1481,
+							"end": 1488
+						},
+						{
+							"type": "Block",
+							"value": " b ",
+							"start": 1489,
+							"end": 1496
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1609,
+					"end": 1621,
+					"loc": {
+						"start": {
+							"line": 107,
+							"column": 1
+						},
+						"end": {
+							"line": 107,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1615,
+							"end": 1620,
+							"loc": {
+								"start": {
+									"line": 107,
+									"column": 7
+								},
+								"end": {
+									"line": 107,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1615,
+								"end": 1616,
+								"loc": {
+									"start": {
+										"line": 107,
+										"column": 7
+									},
+									"end": {
+										"line": 107,
+										"column": 8
+									}
+								},
+								"name": "n"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1619,
+								"end": 1620,
+								"loc": {
+									"start": {
+										"line": 107,
+										"column": 11
+									},
+									"end": {
+										"line": 107,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - a multi-line block whose lines lack `*` is not indentable.",
+							"start": 1513,
+							"end": 1584
+						},
+						{
+							"type": "Block",
+							"value": " a\nz ",
+							"start": 1586,
+							"end": 1596
+						},
+						{
+							"type": "Block",
+							"value": " b\nz ",
+							"start": 1597,
+							"end": 1607
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1692,
+					"end": 1704,
+					"loc": {
+						"start": {
+							"line": 112,
+							"column": 1
+						},
+						"end": {
+							"line": 112,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1698,
+							"end": 1703,
+							"loc": {
+								"start": {
+									"line": 112,
+									"column": 7
+								},
+								"end": {
+									"line": 112,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1698,
+								"end": 1699,
+								"loc": {
+									"start": {
+										"line": 112,
+										"column": 7
+									},
+									"end": {
+										"line": 112,
+										"column": 8
+									}
+								},
+								"name": "o"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1702,
+								"end": 1703,
+								"loc": {
+									"start": {
+										"line": 112,
+										"column": 11
+									},
+									"end": {
+										"line": 112,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - the pair must BOTH be indentable.",
+							"start": 1624,
+							"end": 1670
+						},
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 1672,
+							"end": 1682
+						},
+						{
+							"type": "Block",
+							"value": " b ",
+							"start": 1683,
+							"end": 1690
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1744,
+					"end": 1756,
+					"loc": {
+						"start": {
+							"line": 115,
+							"column": 1
+						},
+						"end": {
+							"line": 115,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1750,
+							"end": 1755,
+							"loc": {
+								"start": {
+									"line": 115,
+									"column": 7
+								},
+								"end": {
+									"line": 115,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1750,
+								"end": 1751,
+								"loc": {
+									"start": {
+										"line": 115,
+										"column": 7
+									},
+									"end": {
+										"line": 115,
+										"column": 8
+									}
+								},
+								"name": "p"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1754,
+								"end": 1755,
+								"loc": {
+									"start": {
+										"line": 115,
+										"column": 11
+									},
+									"end": {
+										"line": 115,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing at the end of the body.",
+							"start": 1707,
+							"end": 1742
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": "* a\n ",
+							"start": 1758,
+							"end": 1768
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 1768,
+							"end": 1778
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

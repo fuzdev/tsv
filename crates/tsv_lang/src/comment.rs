@@ -190,6 +190,123 @@ pub fn is_indentable_block(source: &str, comment: &Comment) -> bool {
 }
 
 //
+// Nestled Block Comments: two comments the author welded are ONE
+//
+//
+// A pair of **indentable** block comments the author left byte-adjacent
+// (`/** a⏎ *//** b⏎ */`, no separator at all between the `*/` and the `/*`) is a single
+// comment, not two. Prettier states that as a parse-time splice
+// (`language-js/parse/postprocess/merge-nestled-jsdoc-comments.js`, run from
+// `postprocess/index.js` ahead of comment attachment), which rewrites the two nodes into
+// one whose `value` is `a *//* b` and whose range spans both.
+//
+// tsv cannot state it in the parse: `parse` is a drop-in for acorn / Svelte, which emit
+// two `Block` comments, so merging in the wire would move every fixture's `expected.json`
+// and both parse gates. The seam is the **printer's comment view** — the format entry
+// points swap in the merged list before they build a printer (and before they register the
+// print-once ledger's expectation, so the ledger keeps grading the list actually printed).
+//
+// One merged entry, rather than a "no separator here" arm at each of the dozen
+// comment→comment separators, is the whole point: the run emitters, the *unconditional*
+// dangling hardline, and every layout gate then answer correctly by construction. A
+// per-emitter rule is exactly the class `docs/comments.md` records as invisible to every
+// gate but a prettier `compare`.
+
+/// Merge every run of byte-adjacent indentable block comments in `comments` into one
+/// entry each — prettier's `mergeNestledJsdocComments` over tsv's detached array.
+///
+/// Borrows for ~every document, which merges nothing: the caller keeps the parser's own
+/// slice and pays one adjacency pass, no allocation. The `Cow` is what lets all three
+/// format seams spell this the same way — `let comments = merge_nestled_block_comments(…)`
+/// then `&comments` — rather than each unwrapping an `Option<Vec<_>>` its own way.
+///
+/// A merged entry's `span` and `content_span` simply span the pair, which is what makes
+/// this a *view* rather than a rewrite: [`Comment::content`] is a pure source slice, so
+/// the merged content **is** prettier's merged `value` (`* a *//* b`), and the printers'
+/// indentable-block emitter reprints it to the welded form byte for byte. Sortedness,
+/// non-overlap and [`Comment::MIN_SPAN_LEN`] all survive a merge, so every lookup here
+/// keeps working on the result. The trailing entry's flags are kept: it is the one whose
+/// `span.end` binds the following token, so ownership ([`Comment::owned_by_node`]) and the
+/// two serializer hints all belong to it.
+///
+/// Three conditions, matching prettier's:
+///
+/// - **byte-adjacency** — `locEnd(a) === locStart(b)`, a zero gap. One space, one tab or a
+///   newline and the pair stays two comments on both sides.
+/// - **both [indentable](is_indentable_block)** — prettier's `isIndentableBlockComment` on
+///   each. A single-line block, or a multi-line one whose lines are not `*`-aligned, never
+///   nestles. (The merged entry is then indentable too: its interior line is `a's last`
+///   + `*//*` + `b's first`, which is `*`-prefixed either way.)
+/// - **`/*`-delimited and acorn-shape** — the rule is a JS-parse postprocess, so it reaches
+///   `<script>` bodies and template expressions but never Svelte's own template-reader
+///   comments (`emit_character_field`, the same discriminator [`Comment::wire_value`]
+///   splits on) nor an HTML `<!-- -->`, whose four-byte introducer would also make the
+///   merged content a lie.
+///
+/// The walk is right-to-left like the oracle's, so a run of three folds into one entry
+/// (`a *//* b *//* c`) rather than a pair plus a straggler.
+#[must_use]
+pub fn merge_nestled_block_comments<'c>(
+    source: &str,
+    comments: &'c [Comment],
+) -> Cow<'c, [Comment]> {
+    // The adjacency pass alone for the ~every document that merges nothing: a comment's
+    // end equals its successor's start only where the author wrote no separator at all.
+    if !comments
+        .windows(2)
+        .any(|pair| nestles(source, &pair[0], &pair[1]))
+    {
+        return Cow::Borrowed(comments);
+    }
+
+    let mut merged: Vec<Comment> = Vec::with_capacity(comments.len());
+    for comment in comments.iter().rev() {
+        match merged.last_mut() {
+            // `following` is already the fold of everything to its right, so testing
+            // against it (rather than against the untouched successor) is what makes a
+            // run of three one entry — the oracle's own `followingComment` cursor.
+            Some(following) if nestles(source, comment, following) => {
+                following.span.start = comment.span.start;
+                following.content_span.start = comment.content_span.start;
+            }
+            _ => merged.push(*comment),
+        }
+    }
+    merged.reverse();
+    Cow::Owned(merged)
+}
+
+/// Whether `b` follows `a` with **no separator at all** and the pair is therefore one
+/// comment — the predicate behind [`merge_nestled_block_comments`], stated once so the
+/// cheap pre-pass and the fold cannot disagree.
+fn nestles(source: &str, a: &Comment, b: &Comment) -> bool {
+    a.span.end == b.span.start
+        && is_slash_star_acorn_comment(a)
+        && is_slash_star_acorn_comment(b)
+        && is_indentable_block(source, a)
+        && is_indentable_block(source, b)
+}
+
+/// Whether `comment` is a `/* … */` that an **acorn** parse collected.
+///
+/// Two conjuncts doing two different jobs. `!emit_character_field` is the live
+/// discriminator and the one prettier's own scope turns on: it is set for the
+/// template-open-tag-shape comments Svelte's *template reader* collects (an in-tag
+/// `<div /* c */ >`) and cleared for everything an acorn parse produced, which is exactly
+/// the set prettier's JS-parse postprocess reaches.
+///
+/// The two-byte-introducer test is an **invariant guard**, not a live discriminator: no
+/// producer puts a four-byte `<!-- … -->` introducer in any array this merge runs over
+/// (`tsv_svelte`'s template comments are a distinct `HtmlComment` type, and every `Comment`
+/// in `Root.comments` comes from its JS live-lexer path), so it cannot fire today. It stays
+/// because [`Comment`] *admits* that shape and the merge's whole correctness rests on the
+/// introducer being two bytes wide — a merged entry's content is a raw source slice, so a
+/// wider introducer would make it something other than `a *//* b`, silently, in release.
+fn is_slash_star_acorn_comment(comment: &Comment) -> bool {
+    !comment.emit_character_field && comment.content_span.start == comment.span.start + 2
+}
+
+//
 // Format-Ignore Directive Recognition
 //
 //

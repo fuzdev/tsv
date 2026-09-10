@@ -140,63 +140,6 @@ impl<'a> Printer<'a> {
     }
 }
 
-/// Whether the author gave a JSDoc cast's comment a line of its own — a newline on
-/// **both** sides of it, as in `const a =⏎\t/** @type {A} */⏎\t(expr)`.
-///
-/// Both sides is the rule prettier applies, and only that shape hangs. A newline on
-/// one side alone collapses to a space:
-///
-/// ```js
-/// const a = /** @type {A} */⏎  (expr);  // →  const a = /** @type {A} */ (expr);
-/// const a =⏎  /** @type {A} */ (expr);  // →  const a = /** @type {A} */ (expr);
-/// ```
-///
-/// The single source of truth for both consequences of that shape: the hang itself
-/// (`choose_layout` below, and the declarator's own predicates in
-/// `statements/variable.rs`) and the **hardline** the cast prints between the comment and
-/// its `(` (`build_jsdoc_cast_lead_doc`). They must agree — a hang without the hardline
-/// leaves the `(` stranded, and a hardline without the hang un-indents it. A gap that
-/// CANNOT hang at all (a Svelte braced head, a computed key —
-/// [`Printer::jsdoc_cast_cannot_hang_target`]) opts out of both halves together: the
-/// cast reflows to a space there without consulting this predicate, which is the only
-/// way the two can still agree where no operator line exists to end.
-///
-/// ⚠️ **This answers only the HANG, not "is there a separator".** The cast is the last
-/// comment of whatever leading run precedes it, so when this returns `false` the gap is
-/// still prettier's `printLeadingComment` question — a space when something follows the
-/// `*/` on its line, otherwise the soft `line` whose fate the enclosing group decides.
-/// Reading `false` as "space" collapsed a break the author left after the `*/`
-/// (`a();⏎/* c */ /** @type {A} */⏎(b);`) at statement position, where the list keeps
-/// lines and every *other* leading comment — a plain glued run, a bundler annotation —
-/// kept it. `build_jsdoc_cast_lead_doc` owns that three-way split.
-///
-/// ⚠️ **The soft `line` arm is scoped to gaps that are not VALUE gaps**, because a value
-/// gap answers the break with a rule rather than with width: an unforced break there
-/// reflows (`docs/conformance_prettier.md` §Authored breaks in value position),
-/// so the separator is a space and the two authorings reach one fixed point. Letting the
-/// soft `line` decide it instead put the `(` at the statement's own indent whenever the
-/// enclosing group broke — a break with no hang, which is the second failure this doc
-/// names, reached from the other side. `Printer::jsdoc_cast_value_gap_target` is how the
-/// value gap says so.
-pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> bool {
-    let bytes = source.as_bytes();
-    // Only whitespace between the start of the line and the comment.
-    let mut i = cast.comment.span.start as usize;
-    let newline_before = loop {
-        if i == 0 {
-            break true;
-        }
-        i -= 1;
-        match bytes[i] {
-            b'\n' => break true,
-            b' ' | b'\t' | b'\r' => {}
-            _ => break false,
-        }
-    };
-    newline_before
-        && !tsv_lang::printing::is_same_line(source, cast.comment.span.end, cast.span.start)
-}
-
 /// Choose the layout strategy for an assignment
 ///
 /// Follows prettier's `chooseLayout` logic in assignment.js

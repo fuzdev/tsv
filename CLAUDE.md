@@ -976,6 +976,20 @@ ceiling (`blank_scan_end`) at the scan's far end. Guards: the **print-once ledge
 sees a comment a parse path consumed without registering. **Hazard 5 no gate reaches at all** —
 the fabricated line is its own fixed point, so only a prettier `compare` finds it.
 
+⚠️ **Two indentable block comments the author left BYTE-ADJACENT are ONE comment**
+(`/** a⏎ *//** b⏎ */`, no separator at all). Prettier says so as a parse-time splice
+(`merge-nestled-jsdoc-comments.js`); tsv says it in the printer's comment **view**
+(`tsv_lang::merge_nestled_block_comments`, applied at the three format seams —
+`tsv_ts::format_document_in`, `tsv_ts::build_program_doc`, `tsv_svelte`'s `format_root`),
+because its own `parse` is a drop-in wire that must keep reporting two. One merged ENTRY,
+never a "no separator here" arm at each of the dozen comment→comment separators: the run
+emitters, the *unconditional* dangling `hardline` and every layout gate then answer by
+construction. Scoped as prettier's is — `/*`-delimited comments an acorn parse collected, so a
+Svelte template island merges and a `<style>` sheet or an in-tag comment does not. The one node
+carrying a `Comment` copy of its own, `JsdocCast`, must read the array instead
+(`Printer::jsdoc_cast_comment`) or it drops the pair's first half. See
+[docs/comments.md §Two comments the author WELDED are one comment](docs/comments.md#two-comments-the-author-welded-are-one-comment-the-merged-view).
+
 **The emitter rules — one emitter per question, never a hand-rolled copy.** Each is stated in
 full in docs/comments.md; here is the seam to reach for:
 

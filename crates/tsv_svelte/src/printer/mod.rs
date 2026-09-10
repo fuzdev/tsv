@@ -1162,15 +1162,25 @@ fn format_root<'a>(
     line_breaks: LineBreaks<'a>,
     arena: &'a DocArena,
 ) -> String {
+    // The printer's comment VIEW (`tsv_lang::merge_nestled_block_comments`). Two facts are
+    // this array's own: it serves both this printer and every TEMPLATE island it constructs
+    // (`ts_inputs` hands it over), so one merge here reaches every `{expr}` — a `<script>`
+    // body is the exception, building its own island-local environment (`build_program_doc`);
+    // and it also holds Svelte's in-tag comments, which the merge declines, since prettier's
+    // rule is a JS-parse postprocess and its own Svelte printer drops those outright, so
+    // there is no oracle for them either way.
+    let comments = tsv_lang::merge_nestled_block_comments(source, &root.comments);
+
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`). `Root.comments` is the `<script>` + template-expression
-    // JS comments; the `<style>` island registers its own through `tsv_css`. The template's
+    // JS comments, registered as MERGED — the list the printers emit; the `<style>` island
+    // registers its own through `tsv_css`. The template's
     // `<!-- -->` (`FragmentNode::Comment`) comments are AST nodes rather than detached, so
     // they register by span through a recursive fragment walk — hoisted section comments
     // included, since they still live in `Root.fragment.nodes` (see `print_root`).
     #[cfg(feature = "comment_check")]
     {
-        tsv_lang::comment_ledger::register_parsed(source, &root.comments);
+        tsv_lang::comment_ledger::register_parsed(source, &comments);
         let mut html_comment_spans = Vec::new();
         collect_html_comment_spans(&root.fragment, &mut html_comment_spans);
         tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
@@ -1186,7 +1196,7 @@ fn format_root<'a>(
     let mut printer = Printer::with_line_breaks(
         arena,
         source,
-        &root.comments,
+        &comments,
         EmbedContext::default(),
         line_breaks,
     );
