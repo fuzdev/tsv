@@ -1908,6 +1908,13 @@ impl<'a> Printer<'a> {
                         // comment is dropped outright.
                         let before_eq = self.has_comments_to_emit_between(id_end, eq_pos);
                         let after_eq = self.has_comments_to_emit_between(eq_pos + 1, init_start);
+                        // prettier's `chooseLayout` fourth disjunct
+                        // ([`Printer::indentable_block_leads_value`]) — a header
+                        // declarator's `=` takes it exactly as a statement-level one does.
+                        // **on page**, unlike `after_eq`: a JSDoc cast's comment is OWNED,
+                        // so the gap emits nothing for it and it still hangs.
+                        let indentable_leads_value =
+                            self.indentable_block_leads_value(eq_pos + 1, init_start);
                         let continuation = before_eq
                             .then(|| {
                                 self.build_initializer_line_continuation(
@@ -1944,6 +1951,7 @@ impl<'a> Printer<'a> {
                                         init_start,
                                         has_comments_before_eq: before_eq,
                                         has_comments_after_eq: after_eq,
+                                        indentable_leads_value,
                                     },
                                 },
                                 &build_value,

@@ -1373,9 +1373,10 @@ impl<'a> Printer<'a> {
                     // decides this layout: the cast prints a hardline between it and its `(`,
                     // so without the matching hang the `(` lands at the member's own indent
                     // and the next pass collapses it — an authoring with no fixed point. Same
-                    // narrow test, same reason, as the binding defaults; the wider
-                    // `owned_leading_comment_hangs` would also hang an indentable block this
-                    // member keeps inline (`member_init_multiline_block_comment`).
+                    // test, same reason, as the binding defaults — and this gap asks ONLY
+                    // it: adding the `printAssignment` family's general rule
+                    // ([`Printer::indentable_block_leads_value`]) would hang an indentable
+                    // block prettier keeps inline here (`member_init_multiline_block_comment`).
                     d.concat(&[id_doc, d.text(" ="), hang_after_operator(d, value_doc)])
                 } else {
                     // Only a glued single-line block (or no comment) reaches here — the

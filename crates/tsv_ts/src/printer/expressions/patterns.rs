@@ -258,6 +258,14 @@ impl<'a> Printer<'a> {
         // `RhsCommentInfo::glued_through`.
         let rhs_glued_through =
             self.comment_run_glued_through(effective_rhs_start, rhs_comment_end);
+        // prettier's `chooseLayout` fourth disjunct — an indentable block leading the RHS
+        // hangs it ([`Printer::indentable_block_leads_value`]). Two things make it see what
+        // a node-keyed reading of the same rule cannot: the RANGE is the gap, so a comment
+        // a discarded grouping paren separates from the RHS's first token still counts, and
+        // the AXIS is **on page**, so a comment the RHS owns counts even though this gap
+        // emits nothing for it.
+        let rhs_indentable_leads_value =
+            self.indentable_block_leads_value(effective_rhs_start, rhs_comment_end);
         // The `=`→RHS head: an own-line directive there freezes the whole RHS — including a
         // nested assignment, so a chain freezes from the directive down.
         let rhs_frozen = self.value_head_frozen_span(effective_rhs_start, assign.right.span());
@@ -269,6 +277,7 @@ impl<'a> Printer<'a> {
             comments: rhs_comments,
             has_line_comment: rhs_has_line_comment,
             glued_through: rhs_glued_through,
+            indentable_leads_value: rhs_indentable_leads_value,
             boundary: Some(assign.span.end),
             frozen: rhs_frozen,
         };

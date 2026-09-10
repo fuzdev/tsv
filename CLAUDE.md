@@ -962,9 +962,11 @@ gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller emi
 comment nothing prints is a DROPPED comment — a builder that *reassembles* a node instead of
 routing through `build_expression_doc`, or *replaces* its doc with a frozen slice, must claim
 on its own seam (`prepend_owned_leading_comment_at`, `build_frozen_node_doc`); (2) an owned
-comment travels *inside* its node's doc, so the gap around it can't see it — ask the node
-(`owned_leading_comment_effect`), and ask it AHEAD of every shape-keyed layout arm, since an arm
-placed before it shadows the rule for its shape; (3) a region the parser *lifts out* of its container is still
+comment travels *inside* its node's doc, so a gap's **to emit** reading can't see it — ask the
+gap **on page** (`indentable_block_leads_value`), never the node: a node-keyed reading resolves
+the comment from the value's own first token and goes blind to every comment a discarded paren,
+a second comment or a cast's `(` stands in front of. Ask it AHEAD of every shape-keyed layout
+arm, since an arm placed before it shadows the rule for its shape; (3) a region the parser *lifts out* of its container is still
 inside the container's gap, so two emitters print it (`AttrGaps::claimed`) — ownership masks
 this one, only a line comment exposes the double-print; (4) an **alternate-layout container
 builder** that emits only its children's docs runs no gap lookup, so every gap comment is

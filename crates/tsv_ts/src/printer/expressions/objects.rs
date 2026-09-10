@@ -627,14 +627,25 @@ impl<'a> Printer<'a> {
             // value is a LAYOUT decision, so an owned annotation hangs it exactly as any
             // other own-line comment does — even though this gap emits nothing for it (the
             // value's own node prints it, and the `comments_doc` below is empty).
-            let has_own_line_comment_post_colon =
-                self.any_comment_on_page(colon_pos + 1, value_start, |c| {
+            //
+            // Split into its two rules rather than one fused per-comment test, because they
+            // are not the same rule and only one of them is this family's: the indentable
+            // half is prettier's `chooseLayout` fourth disjunct
+            // ([`Printer::indentable_block_leads_value`], shared verbatim with the declarator
+            // and `build_assignment_layout` so the seams cannot drift), the own-line half is
+            // `hasLeadingOwnLineComment`, which every operator→value gap asks. Splitting an
+            // existence test over a disjunction preserves it exactly, and the first half is
+            // then the value the layout below is handed.
+            let indentable_leads_value =
+                self.indentable_block_leads_value(colon_pos + 1, value_start);
+            let has_own_line_comment_post_colon = indentable_leads_value
+                || self.any_comment_on_page(colon_pos + 1, value_start, |c| {
                     // The glue half is [`Printer::comment_hugs_next`] — the comment's own
                     // neighbours, never the distance to the value, which sits inside any
                     // grouping paren the author wrote (see
                     // `Printer::comment_hangs_value_after_operator`). It subsumes the
                     // `!c.is_block` arm: a line comment never hugs what follows it.
-                    self.block_comment_is_indentable(c) || !self.comment_hugs_next(c)
+                    !self.comment_hugs_next(c)
                 });
 
             // The `:`→value head: an own-line directive there freezes the whole value.
@@ -763,6 +774,12 @@ impl<'a> Printer<'a> {
                                 // the two can't drift.
                                 glued_through: self
                                     .comment_run_glued_through(colon_pos + 1, value_start),
+                                // Provably `false` on this arm — an indentable block in the
+                                // gap took `has_own_line_comment_post_colon` above, which
+                                // hangs the value itself. Threaded rather than hardcoded, and
+                                // it is literally that gate's own first disjunct, so the two
+                                // cannot drift.
+                                indentable_leads_value,
                                 boundary: None,
                                 frozen: value_frozen,
                             },

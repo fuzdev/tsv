@@ -1,0 +1,960 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 852,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An INDENTABLE multi-line cast comment hangs the value under the operator, the",
+			"start": 10,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " rule every leading comment takes — the cast's own parens stand between the",
+			"start": 92,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment and the value and change nothing about it.",
+			"start": 171,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " declarator",
+			"start": 227,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * @type {A}\n ",
+			"start": 254,
+			"end": 278,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " assignment expression",
+			"start": 286,
+			"end": 310,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * @type {A}\n ",
+			"start": 326,
+			"end": 350,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " object property",
+			"start": 358,
+			"end": 376,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * @type {A}\n ",
+			"start": 398,
+			"end": 424,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 3
+				},
+				"end": {
+					"line": 24,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " class field",
+			"start": 435,
+			"end": 449,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * @type {A}\n ",
+			"start": 470,
+			"end": 496,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 3
+				},
+				"end": {
+					"line": 32,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Contrast: a single-line cast comment is not indentable and keeps the value on",
+			"start": 507,
+			"end": 587,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the operator's line.",
+			"start": 589,
+			"end": 612,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 624,
+			"end": 640,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 11
+				},
+				"end": {
+					"line": 37,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A cast comment the author gave a line of its own keeps it, and the `(` follows",
+			"start": 648,
+			"end": 729,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " on the line below — the cast's own hang, which this rule leaves alone.",
+			"start": 731,
+			"end": 804,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {A} ",
+			"start": 818,
+			"end": 834,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 2
+				},
+				"end": {
+					"line": 42,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 851,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 842,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 44,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 242,
+					"end": 283,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 248,
+							"end": 282,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 248,
+								"end": 249,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 280,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "x",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "*\n * @type {A}\n ",
+										"start": 254,
+										"end": 278
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An INDENTABLE multi-line cast comment hangs the value under the operator, the",
+							"start": 10,
+							"end": 90
+						},
+						{
+							"type": "Line",
+							"value": " rule every leading comment takes — the cast's own parens stand between the",
+							"start": 92,
+							"end": 169
+						},
+						{
+							"type": "Line",
+							"value": " comment and the value and change nothing about it.",
+							"start": 171,
+							"end": 224
+						},
+						{
+							"type": "Line",
+							"value": " declarator",
+							"start": 227,
+							"end": 240
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 312,
+					"end": 318,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 316,
+							"end": 317,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 5
+								},
+								"end": {
+									"line": 13,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 316,
+								"end": 317,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 5
+									},
+									"end": {
+										"line": 13,
+										"column": 6
+									}
+								},
+								"name": "b"
+							},
+							"init": null
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " assignment expression",
+							"start": 286,
+							"end": 310
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 320,
+					"end": 355,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 320,
+						"end": 354,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 9
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 320,
+							"end": 321,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 2
+								}
+							},
+							"name": "b"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 352,
+							"end": 353,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 7
+								},
+								"end": {
+									"line": 17,
+									"column": 8
+								}
+							},
+							"name": "x",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "*\n * @type {A}\n ",
+									"start": 326,
+									"end": 350
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 378,
+					"end": 432,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 384,
+							"end": 431,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 384,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 388,
+								"end": 431,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 11
+									},
+									"end": {
+										"line": 25,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 392,
+										"end": 428,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 10
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 392,
+											"end": 393,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 2
+												},
+												"end": {
+													"line": 21,
+													"column": 3
+												}
+											},
+											"name": "k"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 426,
+											"end": 427,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 8
+												},
+												"end": {
+													"line": 24,
+													"column": 9
+												}
+											},
+											"name": "x",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": "*\n * @type {A}\n ",
+													"start": 398,
+													"end": 424
+												}
+											]
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " object property",
+							"start": 358,
+							"end": 376
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 451,
+					"end": 504,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 457,
+						"end": 458,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 7
+							},
+							"end": {
+								"line": 28,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 459,
+						"end": 504,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 9
+							},
+							"end": {
+								"line": 33,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 463,
+								"end": 501,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 11
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 463,
+									"end": 464,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 3
+										}
+									},
+									"name": "d"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 498,
+									"end": 499,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 8
+										},
+										"end": {
+											"line": 32,
+											"column": 9
+										}
+									},
+									"name": "x",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "*\n * @type {A}\n ",
+											"start": 470,
+											"end": 496
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " class field",
+							"start": 435,
+							"end": 449
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 614,
+					"end": 645,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 620,
+							"end": 644,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 7
+								},
+								"end": {
+									"line": 37,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 620,
+								"end": 621,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 7
+									},
+									"end": {
+										"line": 37,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 642,
+								"end": 643,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 29
+									},
+									"end": {
+										"line": 37,
+										"column": 30
+									}
+								},
+								"name": "x",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 624,
+										"end": 640
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Contrast: a single-line cast comment is not indentable and keeps the value on",
+							"start": 507,
+							"end": 587
+						},
+						{
+							"type": "Line",
+							"value": " the operator's line.",
+							"start": 589,
+							"end": 612
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 806,
+					"end": 841,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 812,
+							"end": 840,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 7
+								},
+								"end": {
+									"line": 43,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 812,
+								"end": 813,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 7
+									},
+									"end": {
+										"line": 41,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 838,
+								"end": 839,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 3
+									},
+									"end": {
+										"line": 43,
+										"column": 4
+									}
+								},
+								"name": "x",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {A} ",
+										"start": 818,
+										"end": 834
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A cast comment the author gave a line of its own keeps it, and the `(` follows",
+							"start": 648,
+							"end": 729
+						},
+						{
+							"type": "Line",
+							"value": " on the line below — the cast's own hang, which this rule leaves alone.",
+							"start": 731,
+							"end": 804
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
