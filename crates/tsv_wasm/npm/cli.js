@@ -564,9 +564,12 @@ async function format_paths(values, positionals) {
 	// result is a valid answer (exit 0), unlike the format action below which
 	// treats "nothing found" as a usage error.
 	if (values.list) {
-		for (const path of files) {
-			print(`${path}\n`);
-		}
+		// One write for the whole listing, as the native CLI does (`cli/format.rs`): a
+		// per-path write re-enters the writer and issues a syscall for each of
+		// (potentially thousands of) lines. It also decides what a closed reader costs
+		// — `write_fd` goes quiet on `EPIPE` by *catching* it, so a per-path loop pays
+		// a throw and a catch once per remaining path, where one write pays one.
+		print(files.map((path) => `${path}\n`).join(''));
 		if (traversal_errors.length > 0) process.exit(2);
 		return;
 	}

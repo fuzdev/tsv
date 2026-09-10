@@ -53,6 +53,7 @@
 //! spellings drifts, and this is the module both pools already go through to build a
 //! thread.
 
+use crate::err_line;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 
@@ -99,7 +100,7 @@ pub fn clamp_worker_count(requested: usize) -> usize {
     let logical = thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
     let ceiling = logical.saturating_mul(MAX_WORKERS_PER_LOGICAL_CPU);
     if requested > ceiling {
-        eprintln!("warning: --jobs {requested} exceeds this machine's ceiling; using {ceiling}");
+        err_line!("warning: --jobs {requested} exceeds this machine's ceiling; using {ceiling}");
         return ceiling;
     }
     requested

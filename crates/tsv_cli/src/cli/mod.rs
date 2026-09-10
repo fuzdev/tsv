@@ -2,8 +2,10 @@ pub mod commands;
 pub mod discover;
 pub mod format_source;
 pub mod input;
+pub mod out;
 pub mod stack;
 
+use crate::{err_line, out_line};
 use argh::FromArgs;
 use commands::{format::FormatCommand, parse::ParseCommand};
 
@@ -28,7 +30,7 @@ pub enum Subcommand {
 impl TopLevel {
     pub fn run(self) {
         if self.version {
-            println!("tsv {}", env!("CARGO_PKG_VERSION"));
+            out_line!("tsv {}", env!("CARGO_PKG_VERSION"));
             return;
         }
         match self.nested {
@@ -40,7 +42,7 @@ impl TopLevel {
             // required (the npm cli.js pins the same contract: help-shaped
             // stderr, exit 1).
             None => {
-                eprintln!(
+                err_line!(
                     "One of the following subcommands must be present:\n    help\n    parse\n    format\n\nRun tsv --help for more information."
                 );
                 std::process::exit(1);

@@ -1,4 +1,6 @@
 use crate::cli::input::{InputArgs, ParserType};
+use crate::cli::out::write_stdout;
+use crate::err_line;
 use crate::json_utils::indent_json_with_tabs;
 use argh::FromArgs;
 use std::process;
@@ -52,7 +54,7 @@ impl ParseCommand {
         let goal = match parse_source_type_arg(self.source_type.as_deref()) {
             Ok(g) => g.unwrap_or(tsv_ts::Goal::Module),
             Err(e) => {
-                eprintln!("Error: {e}");
+                err_line!("Error: {e}");
                 process::exit(1);
             }
         };
@@ -65,12 +67,12 @@ impl ParseCommand {
         let (input, parser_type) = match input_args.resolve() {
             Ok(pair) => pair,
             Err(e) => {
-                eprintln!("Error: {e}");
+                err_line!("Error: {e}");
                 process::exit(1);
             }
         };
         if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
-            eprintln!("Error: {e}");
+            err_line!("Error: {e}");
             process::exit(1);
         }
 
@@ -82,23 +84,23 @@ impl ParseCommand {
             !self.no_locations,
         ) {
             Ok(json) => {
-                // The wire bytes are UTF-8 by construction; writing them
-                // directly (plus the newline `println!` would add) skips the
-                // O(output) validation a `String` round trip would pay on
-                // ~15×-source-sized JSON.
-                use std::io::Write;
-                let stdout = std::io::stdout();
-                let mut out = stdout.lock();
-                if out
-                    .write_all(&json)
-                    .and_then(|()| out.write_all(b"\n"))
-                    .is_err()
-                {
-                    process::exit(1);
-                }
+                // The wire bytes are UTF-8 by construction; writing them directly skips
+                // the O(output) validation a `String` round trip would pay on
+                // ~15×-source-sized JSON. The newline is a second write rather than a
+                // `push` onto the same buffer: the writer sizes its `Vec` from an
+                // estimate (`estimated_json_capacity`), so a wire that lands exactly on
+                // its capacity would pay a realloc and a full copy of the output for
+                // one byte — and two writes cost the same syscalls either way.
+                //
+                // A consumer that closed the pipe stops the write without failing the
+                // run — the rule `write_stdout` holds for both commands. This used to
+                // `exit(1)` there, reporting a closed reader as the parse error it
+                // wasn't.
+                write_stdout(&json);
+                write_stdout(b"\n");
             }
             Err(e) => {
-                eprintln!("Parse error: {e}");
+                err_line!("Parse error: {e}");
                 process::exit(1);
             }
         }

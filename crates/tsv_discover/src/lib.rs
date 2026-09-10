@@ -117,16 +117,30 @@ pub fn is_formattable(name: &str) -> bool {
 /// native CLI and the WASM CLI emit the identical text.
 pub fn unsupported_extension_error(path: &str) -> Option<String> {
     (!is_formattable(path)).then(|| {
-        let mut list = String::new();
-        for ext in FORMATTABLE_EXTENSIONS {
-            if !list.is_empty() {
-                list.push_str(", ");
-            }
-            list.push('.');
-            list.push_str(ext);
-        }
+        let list = formattable_extension_list(", ");
         format!("{path}: unsupported file extension (tsv formats {list})")
     })
+}
+
+/// [`FORMATTABLE_EXTENSIONS`] rendered as dotted names joined by `separator`
+/// (`".ts, .mts, …"`, `".ts/.mts/…"`).
+///
+/// Here rather than at each message because the list is prose in more than one
+/// sentence — this crate's unsupported-extension refusal and the CLI's
+/// nothing-in-scope error — and a hand-typed copy is how a ninth language ships with
+/// two messages naming eight. The separator varies because the sentences do; the set
+/// never does.
+#[must_use]
+pub fn formattable_extension_list(separator: &str) -> String {
+    let mut list = String::new();
+    for ext in FORMATTABLE_EXTENSIONS {
+        if !list.is_empty() {
+            list.push_str(separator);
+        }
+        list.push('.');
+        list.push_str(ext);
+    }
+    list
 }
 
 /// Whether a directory `name` is an always-pruned [safety net](SAFETY_NET_DIRS)

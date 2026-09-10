@@ -1,4 +1,5 @@
 use argh::FromArgs;
+use tsv_cli::{err_line, out_line};
 
 /// The command name argh prints in usage, help, and error text.
 ///
@@ -19,7 +20,7 @@ fn main() {
         .map(std::ffi::OsString::into_string)
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_else(|arg| {
-            eprintln!("Invalid utf8: {}", arg.to_string_lossy());
+            err_line!("Invalid utf8: {}", arg.to_string_lossy());
             std::process::exit(1)
         });
     let arg_strs: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -28,11 +29,11 @@ fn main() {
         tsv_cli::cli::TopLevel::from_args(&[CMD_NAME], &arg_strs).unwrap_or_else(|early_exit| {
             std::process::exit(match early_exit.status {
                 Ok(()) => {
-                    println!("{}", early_exit.output);
+                    out_line!("{}", early_exit.output);
                     0
                 }
                 Err(()) => {
-                    eprintln!(
+                    err_line!(
                         "{}\nRun {CMD_NAME} --help for more information.",
                         early_exit.output
                     );
