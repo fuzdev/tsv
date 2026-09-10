@@ -42,7 +42,9 @@ use tsv_lang::doc::arena::DocId;
 /// `BlockStatement`, `false` for the containers that use a different AST node
 /// (`SwitchCase`, `StaticBlock`, `TSModuleBlock`) and for every clause body.
 ///
-/// `clause_tail_dedent` is the `;`-terminator gap's deferral axis. In a statement
+/// `clause_tail_dedent` is the `;`-terminator gap's deferral axis — read through
+/// [`StatementContext::terminator_gap`] by the kinds that can hand the gap to their list, and
+/// through [`StatementContext::clause_tail`] by the kinds that never can. In a statement
 /// LIST the joiner's own break immediately follows the statement doc, so the gap's
 /// own-line run can take real breaks — the emission is closed on its own line before
 /// anything else can queue a `line_suffix` (`None`). A non-block CLAUSE body's last
@@ -59,6 +61,45 @@ use tsv_lang::doc::arena::DocId;
 pub(in crate::printer) struct StatementContext {
     pub(in crate::printer) in_program_or_block: bool,
     clause_tail_dedent: Option<u8>,
+}
+
+/// Who prints the comments in a `;`-terminated statement's content→`;` gap — the axis
+/// `gap` alone was standing in for, and could not express.
+///
+/// Three answers, not two. `gap == None` used to mean "a statement in a list", which
+/// is true of every statement `build_statement_doc` reaches from a list walk and false of the
+/// embedded declaration entry points, whose `;` has no list around it at all. Reading the
+/// absent dedent as list membership DROPPED the comment in `{let a /* c */;}` — the gap was
+/// handed to a seam that does not exist there.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum TerminatorGap {
+    /// The enclosing statement LIST. Prettier's `__contentEnd` ejects the gap from the
+    /// statement ([`Printer::statement_comment_claim_end`]), and the list's own seam places
+    /// the run by the ordinary own-line / same-line split.
+    ListClaims,
+    /// The statement itself, deferring an own-line run `dedent` levels through `line_suffix`:
+    /// a non-block CLAUSE body, whose tail line stays open to the enclosing construct, where
+    /// a later gap's deferred `//` would otherwise flush onto real text and weld.
+    ClauseTail(u8),
+    /// The statement itself, with real breaks — no enclosing list to hand to, and no open
+    /// tail. The embedded declaration entries (`{const …}` / `{let …}` in a Svelte template)
+    /// are the callers.
+    NodeOwned,
+}
+
+impl TerminatorGap {
+    /// The `line_suffix` dedent, for the emitters that only ever ask that.
+    pub(in crate::printer) const fn clause_tail(self) -> Option<u8> {
+        match self {
+            Self::ClauseTail(dedent) => Some(dedent),
+            Self::ListClaims | Self::NodeOwned => None,
+        }
+    }
+
+    /// Whether the enclosing list claims the gap, so the statement emits a bare `;`.
+    pub(in crate::printer) const fn list_claims(self) -> bool {
+        matches!(self, Self::ListClaims)
+    }
 }
 
 impl StatementContext {
@@ -108,8 +149,21 @@ impl StatementContext {
 
     /// The clause-tail deferral: `Some(dedent)` when the `;`-terminator gap's
     /// own-line run must ride in `line_suffix` docs, dedented this many levels.
+    /// The `line_suffix` dedent alone — for the terminator emitters whose node ALWAYS keeps
+    /// its own gap (a type alias, a `declare function`, a module declaration: kinds prettier's
+    /// `nodeTypesWithContentEnd` does not list), so the list-claims answer cannot arise and
+    /// the wider [`Self::terminator_gap`] would say nothing they can use.
     pub(in crate::printer) fn clause_tail(self) -> Option<u8> {
         self.clause_tail_dedent
+    }
+
+    /// This container's [`TerminatorGap`]. A statement `build_statement_doc` reaches from a
+    /// list walk is always a list member — the embedded entry points do not go through a
+    /// `StatementContext` at all, which is what keeps [`TerminatorGap::NodeOwned`] out of
+    /// here by construction.
+    pub(in crate::printer) fn terminator_gap(self) -> TerminatorGap {
+        self.clause_tail_dedent
+            .map_or(TerminatorGap::ListClaims, TerminatorGap::ClauseTail)
     }
 }
 
@@ -127,13 +181,13 @@ impl<'a> Printer<'a> {
         match statement {
             Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt, ctx),
             Statement::VariableDeclaration(decl) => {
-                self.build_variable_declaration_doc(decl, true, ctx.clause_tail())
+                self.build_variable_declaration_doc(decl, true, ctx.terminator_gap())
             }
             Statement::TSTypeAliasDeclaration(decl) => {
                 self.build_type_alias_declaration_doc(decl, ctx.clause_tail())
             }
             Statement::ReturnStatement(ret) => {
-                self.build_return_statement_doc(ret, ctx.clause_tail())
+                self.build_return_statement_doc(ret, ctx.terminator_gap())
             }
             // A statement-position block (bare `{ }`, a labeled block's body, or a
             // block nested directly in another block) expands its empty form to `{\n}`,
@@ -169,18 +223,18 @@ impl<'a> Printer<'a> {
             Statement::SwitchStatement(stmt) => self.build_switch_statement_doc(stmt),
             Statement::TryStatement(stmt) => self.build_try_statement_doc(stmt),
             Statement::ThrowStatement(stmt) => {
-                self.build_throw_statement_doc(stmt, ctx.clause_tail())
+                self.build_throw_statement_doc(stmt, ctx.terminator_gap())
             }
             Statement::BreakStatement(stmt) => {
-                self.build_break_statement_doc(stmt, ctx.clause_tail())
+                self.build_break_statement_doc(stmt, ctx.terminator_gap())
             }
             Statement::ContinueStatement(stmt) => {
-                self.build_continue_statement_doc(stmt, ctx.clause_tail())
+                self.build_continue_statement_doc(stmt, ctx.terminator_gap())
             }
             Statement::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt, ctx),
             Statement::EmptyStatement(_) => d.text(";"),
             Statement::DebuggerStatement(stmt) => {
-                self.build_bare_keyword_terminator_doc("debugger", stmt.span, ctx.clause_tail())
+                self.build_bare_keyword_terminator_doc("debugger", stmt.span, ctx.terminator_gap())
             }
             Statement::TSInterfaceDeclaration(decl) => self.build_interface_declaration_doc(decl),
             Statement::TSDeclareFunction(decl) => {
@@ -227,13 +281,7 @@ impl<'a> Printer<'a> {
             return d.concat(&[value_doc, d.text(";")]);
         }
         let mut parts: DocBuf = smallvec![value_doc];
-        self.push_semicolon_with_gap_comments(
-            &mut parts,
-            gap_start,
-            stmt.span.end,
-            true,
-            ctx.clause_tail(),
-        );
+        self.push_statement_semicolon(&mut parts, gap_start, stmt.span.end, ctx.terminator_gap());
         d.concat(&parts)
     }
 
@@ -475,21 +523,21 @@ impl<'a> Printer<'a> {
         Some(close)
     }
 
-    /// Build a Doc for a return statement. `clause_tail` reaches both terminator
+    /// Build a Doc for a return statement. `gap` reaches both terminator
     /// gaps — the bare form's keyword→`;` gap and the argument form's operand→`;`
     /// gap (threaded through the restricted production's own emitters).
     fn build_return_statement_doc(
         &self,
         ret: &internal::ReturnStatement<'_>,
-        clause_tail: Option<u8>,
+        gap: TerminatorGap,
     ) -> DocId {
         let Some(arg) = &ret.argument else {
             // No argument: a bare keyword closed by `;` (interior comments handled
             // there) — `return; /* c */` etc.
-            return self.build_bare_keyword_terminator_doc("return", ret.span, clause_tail);
+            return self.build_bare_keyword_terminator_doc("return", ret.span, gap);
         };
 
-        self.build_keyword_argument_doc("return", ret.span.start, ret.span.end, arg, clause_tail)
+        self.build_keyword_argument_doc("return", ret.span.start, ret.span.end, arg, gap)
     }
 
     /// Build a Doc for a "bare" keyword-terminator statement — a keyword that takes
@@ -511,12 +559,12 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         span: Span,
-        clause_tail: Option<u8>,
+        gap: TerminatorGap,
     ) -> DocId {
         let d = self.d();
         let keyword_end = span.start + keyword.len() as u32;
         let mut parts: DocBuf = smallvec![d.text(keyword)];
-        self.push_semicolon_with_gap_comments(&mut parts, keyword_end, span.end, true, clause_tail);
+        self.push_statement_semicolon(&mut parts, keyword_end, span.end, gap);
         d.concat(&parts)
     }
 }

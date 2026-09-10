@@ -249,12 +249,11 @@ impl<'a> Printer<'a> {
         // `push_semicolon_with_gap_comments`.
         if let Some(close) = close_paren {
             parts.push(d.text(")"));
-            self.push_semicolon_with_gap_comments(
+            self.push_statement_semicolon(
                 &mut parts,
                 close + 1,
                 stmt.span.end,
-                true,
-                ctx.clause_tail(),
+                ctx.terminator_gap(),
             );
         } else {
             parts.push(d.text(");"));

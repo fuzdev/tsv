@@ -3,6 +3,7 @@
 use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
+use crate::printer::statements::TerminatorGap;
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ContinuationValue, LeadingGlue, ParenContext,
     analysis, class_expr_has_decorators, conditional_should_break_after_op, is_curried_arrow_chain,
@@ -667,11 +668,27 @@ impl<'a> Printer<'a> {
     /// `emit_semicolon` is `false` only for embedders that supply their own
     /// terminator — Svelte's `{const …}`/`{let …}` tags close with `}` and drop
     /// the `;` (a bare `{let a}` is the lone exception, which passes `true`).
-    pub(crate) fn build_variable_declaration_doc(
+    /// [`Self::build_variable_declaration_doc`] for an EMBEDDED declaration — a Svelte
+    /// `{const …}` / `{let …}` tag, reached through `tsv_ts::build_variable_declaration_doc`
+    /// rather than from a statement list.
+    ///
+    /// It exists so the public entry names its answer instead of passing one: there is no
+    /// enclosing list, so a comment in the content→`;` gap is this doc's to print
+    /// ([`TerminatorGap::NodeOwned`]). Handing it over on the list's answer dropped it
+    /// outright (`{let a /* c */;}`), and the axis stays inside the printer.
+    pub(crate) fn build_embedded_variable_declaration_doc(
         &self,
         decl: &internal::VariableDeclaration<'_>,
         emit_semicolon: bool,
-        clause_tail: Option<u8>,
+    ) -> DocId {
+        self.build_variable_declaration_doc(decl, emit_semicolon, TerminatorGap::NodeOwned)
+    }
+
+    pub(in crate::printer) fn build_variable_declaration_doc(
+        &self,
+        decl: &internal::VariableDeclaration<'_>,
+        emit_semicolon: bool,
+        gap: TerminatorGap,
     ) -> DocId {
         let d = self.d();
 
@@ -984,13 +1001,7 @@ impl<'a> Printer<'a> {
         // after it (`const x = 1;⏎// c`). See `push_semicolon_with_gap_comments`.
         if emit_semicolon {
             if let Some(last) = decl.declarations.last() {
-                self.push_semicolon_with_gap_comments(
-                    &mut parts,
-                    last.span.end,
-                    decl.span.end,
-                    true,
-                    clause_tail,
-                );
+                self.push_statement_semicolon(&mut parts, last.span.end, decl.span.end, gap);
             } else {
                 parts.push(d.text(";"));
             }

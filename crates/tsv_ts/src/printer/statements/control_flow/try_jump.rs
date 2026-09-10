@@ -3,6 +3,7 @@
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
 use crate::ast::internal::{self, Statement};
 use crate::printer::statements::StatementContext;
+use crate::printer::statements::TerminatorGap;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -194,31 +195,25 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_throw_statement_doc(
         &self,
         stmt: &internal::ThrowStatement<'_>,
-        clause_tail: Option<u8>,
+        gap: TerminatorGap,
     ) -> DocId {
-        self.build_keyword_argument_doc(
-            "throw",
-            stmt.span.start,
-            stmt.span.end,
-            stmt.argument,
-            clause_tail,
-        )
+        self.build_keyword_argument_doc("throw", stmt.span.start, stmt.span.end, stmt.argument, gap)
     }
 
     pub(in crate::printer::statements) fn build_break_statement_doc(
         &self,
         stmt: &internal::BreakStatement<'_>,
-        clause_tail: Option<u8>,
+        gap: TerminatorGap,
     ) -> DocId {
-        self.build_jump_statement_doc("break", stmt.span, stmt.label.as_ref(), clause_tail)
+        self.build_jump_statement_doc("break", stmt.span, stmt.label.as_ref(), gap)
     }
 
     pub(in crate::printer::statements) fn build_continue_statement_doc(
         &self,
         stmt: &internal::ContinueStatement<'_>,
-        clause_tail: Option<u8>,
+        gap: TerminatorGap,
     ) -> DocId {
-        self.build_jump_statement_doc("continue", stmt.span, stmt.label.as_ref(), clause_tail)
+        self.build_jump_statement_doc("continue", stmt.span, stmt.label.as_ref(), gap)
     }
 
     /// Shared builder for break/continue statements with optional label and trailing comments.
@@ -227,7 +222,7 @@ impl<'a> Printer<'a> {
         keyword: &'static str,
         span: Span,
         label: Option<&internal::Identifier<'_>>,
-        clause_tail: Option<u8>,
+        gap: TerminatorGap,
     ) -> DocId {
         let d = self.d();
         if let Some(label) = label {
@@ -246,13 +241,7 @@ impl<'a> Printer<'a> {
             // Comments between label and `;`: a same-line block trails *after* the `;`
             // (`break loop; /* c */`, prettier 3.9), a same-line line via `line_suffix`,
             // an own-line comment on its own line after. See `push_semicolon_with_gap_comments`.
-            self.push_semicolon_with_gap_comments(
-                &mut parts,
-                label.span.end,
-                span.end,
-                true,
-                clause_tail,
-            );
+            self.push_statement_semicolon(&mut parts, label.span.end, span.end, gap);
             d.concat(&parts)
         } else {
             // No label: a bare keyword closed by `;`. It swallows a following explicit
@@ -261,7 +250,7 @@ impl<'a> Printer<'a> {
             // span — the shared helper preserves it (own-line aware, blank line kept). The
             // previous inline-only emission merged consecutive own-line comments onto one
             // line (`break; // c1 // c2`, swallowing the second).
-            self.build_bare_keyword_terminator_doc(keyword, span, clause_tail)
+            self.build_bare_keyword_terminator_doc(keyword, span, gap)
         }
     }
 

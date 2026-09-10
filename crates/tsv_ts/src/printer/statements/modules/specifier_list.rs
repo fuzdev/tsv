@@ -6,6 +6,7 @@
 use super::header_comments::is_only_whitespace_and_comments;
 use super::{MODULE_KW_LEN, MODULE_TYPE_KW_LEN, Printer};
 use crate::ast::internal;
+use crate::printer::statements::TerminatorGap;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -252,7 +253,17 @@ impl<'a> Printer<'a> {
             parts.push(content);
         }
         parts.push(d.text(";"));
-        self.push_post_semi_comments(&mut parts, content_end, decl_end);
+        // No pre-`;` gap emission: every caller is a module DECLARATION, one of the kinds
+        // prettier ejects that gap from (`nodeTypesWithContentEnd`), and a module
+        // declaration is always a statement-list member — so the list's own seam places the
+        // run ([`Printer::push_statement_semicolon`], which states the partition). The
+        // `export as namespace` / `import =` / `export =` spellings are NOT those kinds and
+        // keep the node-owned split at their own sites.
+        debug_assert_eq!(
+            self.node_terminator_claim_end(content_end, decl_end, TerminatorGap::ListClaims),
+            content_end,
+            "a module declaration's content→`;` gap is trivia, so the list claims all of it"
+        );
         d.concat(&parts)
     }
 

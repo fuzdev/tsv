@@ -878,6 +878,134 @@ impl<'a> Printer<'a> {
         span.start + content.len() as u32
     }
 
+    /// Where a statement's own COMMENT CLAIM ends — prettier's `__contentEnd`
+    /// (`setContentEnd`, `src/language-js/parse/postprocess/index.js`), the third reader of
+    /// the [`Self::statement_content_end`] table and the only one that measures the
+    /// comment-STRIPPED text prettier itself measures.
+    ///
+    /// The whole point of the difference: the region between a statement's content and the
+    /// `;` that terminates it is trivia, so a comment the author left there is **not inside
+    /// the statement** for attachment purposes — it falls in the gap BETWEEN two statements,
+    /// where the ordinary own-line / same-line split decides whether it trails the statement
+    /// before it or leads the one after (`docs/comments.md` §The statement-gap seam). That is
+    /// what makes `a()⏎/* c */;⏎b();` print as `a();⏎/* c */ b();`: the comment leads `b()`
+    /// and, being glued to a pure separator, shares its line
+    /// ([`Printer::comment_hugs_next`]).
+    ///
+    /// ⚠️ **Not a replacement for its sibling — a third reading, and the two must not be
+    /// swapped.** [`Self::statement_content_end`] counts a comment as CONTENT, which is what
+    /// keeps a freeze slice verbatim and what keeps
+    /// [`Printer::statement_content_tail_blank`]'s scan from crossing a comment's own
+    /// interior newlines (`docs/comments.md` §The five hazards, hazard 5). This reading is
+    /// for the comment CURSOR alone; the blank cursor and the freeze slice keep theirs.
+    ///
+    /// The walk is backwards and alternating — whitespace, then a comment ending where that
+    /// trim stopped, then whitespace again — because the gap may hold a run
+    /// (`a()⏎/* c1 */ /* c2 */;`) and prettier's `stripComments` blanks every one of them
+    /// before its single `trimEnd`. Bounded below by the content end its sibling reports, so
+    /// a comment INSIDE the statement's content (`fn(/* c */)`) is never reached.
+    /// Whether a statement's terminator gap belongs to the enclosing statement LIST rather
+    /// than to the statement itself — the kind half of prettier's `nodeTypesWithContentEnd`.
+    ///
+    /// The one-step reading of the [`Self::frozen_statement_terminator`] table
+    /// ([`Self::own_statement_terminator`]): a HEADER kind is excluded even though a `;` does
+    /// follow it, because that `;` is its clause BODY's and the body keeps the node-owned
+    /// split ([`Printer::push_statement_semicolon`]) — it is not a list member, so no gap
+    /// downstream would ever emit its run. Claiming it here as well double-prints it.
+    ///
+    /// A kind the table calls [`FrozenTerminator::Never`] has no terminator to eject at all.
+    pub(in crate::printer) fn statement_hands_off_terminator_gap(
+        &self,
+        mut stmt: &internal::Statement<'_>,
+    ) -> bool {
+        // Follow every DELEGATING wrapper first: the answer is the statement that actually
+        // prints the `;`.
+        loop {
+            match Self::delegated_statement(stmt) {
+                Some(inner) => {
+                    // ⚠️ A directive INSIDE the wrapper freezes only the inner statement
+                    // (`export⏎// prettier-ignore⏎const a = 1;`, `l:⏎// prettier-ignore⏎fn();`),
+                    // and a frozen slice already holds its terminator-gap comment — the same
+                    // reason the walk's own freeze verdict suppresses the hand-off
+                    // ([`Printer::statement_emitted_end`]). The walk cannot see this one: it
+                    // asks of the gap ABOVE the wrapper, which is directive-free here.
+                    if self.member_gap_frozen(stmt.span().start, inner.span().start) {
+                        return false;
+                    }
+                    stmt = inner;
+                }
+                None => return Self::statement_owns_terminator_gap_emitter(stmt),
+            }
+        }
+    }
+
+    /// Whether `stmt`'s own `;` is printed by an emitter that HANDS its gap to the enclosing
+    /// list — the terminal step of [`Self::statement_hands_off_terminator_gap`], asked once
+    /// every delegating wrapper has been followed.
+    ///
+    /// The [`Self::frozen_statement_terminator`] table answers it for every kind but one, so
+    /// the two stay one table. The exception is `export default`, whose value is held INLINE
+    /// rather than as a statement: an EXPRESSION routes through
+    /// [`Printer::split_terminator_gap_comments`] and hands over, while a DECLARATION
+    /// (`export default function main(): void;`) is printed by its own signature printer,
+    /// which keeps the gap — so the wrapper cannot answer from its kind alone. Reading it as
+    /// one kind double-printed every ambient default overload.
+    fn statement_owns_terminator_gap_emitter(stmt: &internal::Statement<'_>) -> bool {
+        if let internal::Statement::ExportDefaultDeclaration(decl) = stmt {
+            return matches!(
+                decl.declaration,
+                internal::ExportDefaultValue::Expression(_)
+            );
+        }
+        matches!(
+            Self::own_statement_terminator(stmt),
+            Ok(FrozenTerminator::Always | FrozenTerminator::IfAuthored)
+        )
+    }
+
+    pub(in crate::printer) fn statement_comment_claim_end(
+        &self,
+        stmt: &internal::Statement<'_>,
+    ) -> u32 {
+        let span = stmt.span();
+        if !self.statement_hands_off_terminator_gap(stmt) {
+            return span.end;
+        }
+        let Some(content) = span.extract(self.source).strip_suffix(';') else {
+            // ASI supplied the terminator: no authored `;`, so no trivia region to eject.
+            return span.end;
+        };
+        self.trivia_run_start(span.start, span.start + content.len() as u32)
+    }
+
+    /// Where the run of TRIVIA ending at `end` begins — walking back over ECMAScript
+    /// whitespace and whole comments alternately, never below `floor`.
+    ///
+    /// Prettier's `stripComments` + `trimEnd` pair, as a position: blanking every comment
+    /// and then trimming is the same walk, and the alternation is what a RUN needs
+    /// (`a()⏎/* c1 */ /* c2 */;` trims, steps over `c2`, trims again, steps over `c1`).
+    ///
+    /// The stopping byte is what makes this the right question at a terminator gap: a `)`
+    /// the printer keeps is neither, so a comment the author wrote inside a retained shell
+    /// (`return (x /* c */);`) is never ejected — the shell closes *after* it.
+    pub(in crate::printer) fn trivia_run_start(&self, floor: u32, end: u32) -> u32 {
+        let mut pos = end;
+        loop {
+            let before = Span::new(floor, pos).extract(self.source);
+            let trimmed =
+                before.trim_end_matches(|c| is_es_whitespace(c) || is_es_line_terminator(c));
+            pos = floor + trimmed.len() as u32;
+            match self
+                .comments_in_source_between(floor, pos)
+                .last()
+                .filter(|c| c.span.end == pos)
+            {
+                Some(comment) => pos = comment.span.start,
+                None => return pos,
+            }
+        }
+    }
+
     /// The verbatim extent of a frozen statement, and whether a `;` follows it — the
     /// [`Self::statement_content_end`] table plus prettier's
     /// `shouldIgnoredNodePrintSemicolon`, which are one walk read twice.
@@ -935,31 +1063,77 @@ impl<'a> Printer<'a> {
     /// the way prettier does: a statement's terminator is its tail's.
     fn frozen_statement_terminator(mut stmt: &internal::Statement<'_>) -> FrozenTerminator {
         loop {
-            stmt = match stmt {
-                internal::Statement::VariableDeclaration(_)
-                | internal::Statement::BreakStatement(_)
-                | internal::Statement::ContinueStatement(_)
-                | internal::Statement::DebuggerStatement(_) => return FrozenTerminator::Always,
-                internal::Statement::ExpressionStatement(_)
-                | internal::Statement::ReturnStatement(_)
-                | internal::Statement::ThrowStatement(_)
-                | internal::Statement::DoWhileStatement(_)
-                | internal::Statement::ImportDeclaration(_)
-                | internal::Statement::ExportNamedDeclaration(_)
-                | internal::Statement::ExportDefaultDeclaration(_)
-                | internal::Statement::ExportAllDeclaration(_) => {
-                    return FrozenTerminator::IfAuthored;
-                }
-                internal::Statement::IfStatement(s) => s.alternate.unwrap_or(s.consequent),
-                internal::Statement::ForStatement(s) => s.body,
-                internal::Statement::ForInStatement(s) => s.body,
-                internal::Statement::ForOfStatement(s) => s.body,
-                internal::Statement::WhileStatement(s) => s.body,
-                internal::Statement::WithStatement(s) => s.body,
-                internal::Statement::LabeledStatement(s) => s.body,
-                _ => return FrozenTerminator::Never,
-            };
+            match Self::own_statement_terminator(stmt) {
+                Ok(terminator) => return terminator,
+                Err(tail) => stmt = tail,
+            }
         }
+    }
+
+    /// The statement `stmt` DELEGATES to — the inner statement that prints its text, its
+    /// `;` included — or `None` when `stmt` prints its own.
+    ///
+    /// A delegating wrapper adds a prefix and hands the rest to
+    /// [`Printer::build_statement_doc`] under a context it *inherits*: an `export` with a
+    /// declaration (`build_export_declaration_doc`) and a label
+    /// (`StatementContext::labeled_body`, which changes only the directive-prologue fact).
+    /// So the wrapper and the inner statement must answer
+    /// [`Self::statement_hands_off_terminator_gap`] alike, and the inner one is the
+    /// authority — it is the one holding the emitter.
+    ///
+    /// ⚠️ **A clause-BEARING header is not this**, though the freeze table walks through one
+    /// the same way ([`Self::own_statement_terminator`]). `if` / `for` / `while` / `with`
+    /// build their body under `StatementContext::clause_body`, which keeps the node-owned
+    /// split *because the body's tail line stays open to the enclosing construct* — so that
+    /// `;`'s gap is the body's to print and an enclosing list must not reach for it.
+    /// Conflating the two walks cost one DOUBLE-PRINT (every `export type A = B;`) and one
+    /// DROP (every `l: a();`), each found by the gap-injection audit rather than by a
+    /// fixture — the authoring is one no formatted document contains.
+    fn delegated_statement<'s, 'arena>(
+        stmt: &'s internal::Statement<'arena>,
+    ) -> Option<&'s internal::Statement<'arena>> {
+        match stmt {
+            internal::Statement::ExportNamedDeclaration(decl) => decl.declaration,
+            internal::Statement::LabeledStatement(stmt) => Some(stmt.body),
+            _ => None,
+        }
+    }
+
+    /// One step of the [`Self::frozen_statement_terminator`] table: this statement's OWN
+    /// terminator rule, or the tail statement a header kind defers to.
+    ///
+    /// Two readings of one table rather than two tables. The recursive reading answers "does
+    /// a `;` follow this statement's text", which is a fact about the whole construct; the
+    /// **one-step** reading answers "is this statement's `;` its own", which is what
+    /// [`Self::statement_hands_off_terminator_gap`] needs — a header kind's terminator
+    /// belongs to a CLAUSE BODY, printed by a site that keeps the node-owned split, so
+    /// lowering the enclosing list's cursor over it would claim a comment that body already
+    /// prints (a DOUBLE-PRINT).
+    fn own_statement_terminator<'s, 'arena>(
+        stmt: &'s internal::Statement<'arena>,
+    ) -> Result<FrozenTerminator, &'s internal::Statement<'arena>> {
+        Ok(match stmt {
+            internal::Statement::VariableDeclaration(_)
+            | internal::Statement::BreakStatement(_)
+            | internal::Statement::ContinueStatement(_)
+            | internal::Statement::DebuggerStatement(_) => FrozenTerminator::Always,
+            internal::Statement::ExpressionStatement(_)
+            | internal::Statement::ReturnStatement(_)
+            | internal::Statement::ThrowStatement(_)
+            | internal::Statement::DoWhileStatement(_)
+            | internal::Statement::ImportDeclaration(_)
+            | internal::Statement::ExportNamedDeclaration(_)
+            | internal::Statement::ExportDefaultDeclaration(_)
+            | internal::Statement::ExportAllDeclaration(_) => FrozenTerminator::IfAuthored,
+            internal::Statement::IfStatement(s) => return Err(s.alternate.unwrap_or(s.consequent)),
+            internal::Statement::ForStatement(s) => return Err(s.body),
+            internal::Statement::ForInStatement(s) => return Err(s.body),
+            internal::Statement::ForOfStatement(s) => return Err(s.body),
+            internal::Statement::WhileStatement(s) => return Err(s.body),
+            internal::Statement::WithStatement(s) => return Err(s.body),
+            internal::Statement::LabeledStatement(s) => return Err(s.body),
+            _ => FrozenTerminator::Never,
+        })
     }
 
     /// [`Self::build_frozen_node_doc`] minus the must-break — the claim, over a slice whose

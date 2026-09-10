@@ -12,6 +12,7 @@
 mod header_comments;
 mod import_attributes;
 mod specifier_list;
+use crate::printer::statements::TerminatorGap;
 use specifier_list::SpecifierListSpans;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
@@ -470,7 +471,7 @@ impl<'a> Printer<'a> {
                         decl.span.end,
                         false,
                         false,
-                        None,
+                        TerminatorGap::ListClaims,
                     );
                     parts.push(d.text(";"));
                     parts.extend(after);
@@ -492,7 +493,7 @@ impl<'a> Printer<'a> {
                     decl.span.end,
                     false,
                     false,
-                    None,
+                    TerminatorGap::ListClaims,
                 );
                 parts.push(d.text(";"));
                 parts.extend(after);
