@@ -61,6 +61,17 @@ use tsv_lang::doc::arena::DocId;
 pub(in crate::printer) struct StatementContext {
     pub(in crate::printer) in_program_or_block: bool,
     clause_tail_dedent: Option<u8>,
+    /// Whether this statement's own tail is also the tail of the outermost statement a
+    /// LIST holds — so a comment freed from its `;`-terminator gap lands in that list's
+    /// gap, where the ordinary own-line / same-line split places it.
+    ///
+    /// True for a list member, and inherited by a clause BODY whose construct emits
+    /// nothing after it (`continues == false`): `if (cond) expr⏎/* c */;⏎fn();` is the
+    /// list's gap read one construct deeper, and prettier reads it that way too. False
+    /// once any enclosing construct continues past the tail — an `if`'s CONSEQUENT before
+    /// an `else`, a do-while's body before its `while` — where the gap is interior to the
+    /// construct and no list seam can reach it.
+    tail_reaches_list: bool,
 }
 
 /// Who prints the comments in a `;`-terminated statement's content→`;` gap — the axis
@@ -107,12 +118,14 @@ impl StatementContext {
     pub(in crate::printer) const PROGRAM_OR_BLOCK: Self = Self {
         in_program_or_block: true,
         clause_tail_dedent: None,
+        tail_reaches_list: true,
     };
     /// A statement list whose container is not one of those AST nodes
     /// (`SwitchCase`, `StaticBlock`, `TSModuleBlock`).
     pub(in crate::printer) const OTHER_LIST: Self = Self {
         in_program_or_block: false,
         clause_tail_dedent: None,
+        tail_reaches_list: true,
     };
 
     /// The context for a non-block clause BODY built from `self`'s position.
@@ -134,6 +147,7 @@ impl StatementContext {
         Self {
             in_program_or_block: false,
             clause_tail_dedent: Some(base.saturating_add(u8::from(indented))),
+            tail_reaches_list: self.tail_reaches_list && !continues,
         }
     }
 
@@ -162,8 +176,24 @@ impl StatementContext {
     /// `StatementContext` at all, which is what keeps [`TerminatorGap::NodeOwned`] out of
     /// here by construction.
     pub(in crate::printer) fn terminator_gap(self) -> TerminatorGap {
-        self.clause_tail_dedent
-            .map_or(TerminatorGap::ListClaims, TerminatorGap::ClauseTail)
+        match self.clause_tail_dedent {
+            // A list member: the gap is the list's, as prettier's `__contentEnd` says.
+            None => TerminatorGap::ListClaims,
+            // A clause BODY whose tail is the enclosing list member's tail. The gap sits
+            // between two list members like any other, so it takes the list's own seam —
+            // which is what puts a block comment on the next statement's line
+            // (`if (cond) expr⏎/* c */;⏎fn();` → `if (cond) expr;⏎/* c */ fn();`, the same
+            // answer the plain statement list gives and the one prettier gives here). The
+            // clause-tail deferral is for a tail that stays OPEN to its construct; this one
+            // does not, and keeping the node-owned split gave one authoring two answers
+            // depending on whether a clause bore it.
+            //
+            // ⚠️ [`Printer::statement_hands_off_terminator_gap`] is the other end of this
+            // rule and walks to the SAME body. The two must agree exactly: both claiming is
+            // a DOUBLE-PRINT, neither claiming a DROP.
+            Some(_) if self.tail_reaches_list => TerminatorGap::ListClaims,
+            Some(dedent) => TerminatorGap::ClauseTail(dedent),
+        }
     }
 }
 

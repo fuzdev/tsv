@@ -42,14 +42,18 @@ fn tsv_stdin(args: &[&str], input: &str) -> std::process::Output {
     child.wait_with_output().expect("Failed to wait for output")
 }
 
-/// Create a fresh temp directory unique to this test.
+/// Create a fresh temp directory unique to this test, removed when the test leaves.
+///
+/// Returns the [`TempTree`] guard rather than a bare path so the cleanup rides the
+/// scope exit — see that type for why a trailing `remove_dir_all` cleans up the wrong
+/// half of the runs.
 /// Test helper; panicking on IO failure is the desired behavior.
 #[allow(clippy::expect_used)]
-fn temp_dir(name: &str) -> PathBuf {
+fn temp_dir(name: &str) -> TempTree {
     let dir = std::env::temp_dir().join(format!("tsv_cli_tests_{name}_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("Failed to create temp dir");
-    dir
+    TempTree(dir)
 }
 
 static BUILD: Once = Once::new();
@@ -512,7 +516,6 @@ fn test_format_source_type_rejected_in_path_mode() {
         stderr.contains("--source-type applies to --content/--stdin"),
         "Should explain the path-mode restriction: {stderr}"
     );
-    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -881,6 +884,36 @@ fn test_format_nonexistent_path() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("tsv_cli_test_path"));
 }
 
+/// `--help`'s extension list IS [`tsv_discover::FORMATTABLE_EXTENSIONS`], not a copy.
+///
+/// argh renders `--help` from doc comments, and a doc comment is a string literal — so
+/// `FormatCommand`'s `paths` doc cannot build its list from the const the way
+/// `unsupported_extension_error` and the nothing-in-scope error do
+/// ([`tsv_discover::formattable_extension_list`]). That leaves two spellings of one fact,
+/// and `--help` is the one that drifts silently: nothing else reads it, so a ninth
+/// language would ship with a refusal naming nine and a help text naming eight. This is
+/// what fails instead.
+///
+/// The comparison strips ALL whitespace from the help text rather than matching the line:
+/// argh wraps at word boundaries, so a longer list moves to its own line — a real
+/// rendering, not a drift — and the rendered list holds no whitespace of its own, which
+/// makes the stripped `contains` exact rather than merely lenient.
+#[test]
+fn test_format_help_extension_list_is_rendered_from_the_const() {
+    let output = tsv(&["format", "--help"]);
+    let help: String = String::from_utf8_lossy(&output.stdout)
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    let list = tsv_discover::formattable_extension_list("/");
+    assert!(
+        help.contains(&list),
+        "`tsv format --help` must name the formattable extensions as `{list}` (rendered from \
+         tsv_discover::FORMATTABLE_EXTENSIONS); the `paths` doc comment in \
+         crates/tsv_cli/src/cli/commands/format.rs has drifted from the const"
+    );
+}
+
 /// An explicitly named file bypasses the ignore files, but **not** the extension
 /// check: the parser dispatch behind a path has no unknown arm, so without this
 /// gate a `.json` file is parsed as TypeScript — usually a baffling syntax error,
@@ -1104,7 +1137,7 @@ fn test_format_dedup_symlink_alias() {
     let link =
         std::env::temp_dir().join(format!("tsv_cli_tests_dedup_link_{}", std::process::id()));
     let _ = fs::remove_file(&link);
-    std::os::unix::fs::symlink(&dir, &link).unwrap();
+    std::os::unix::fs::symlink(dir.path(), &link).unwrap();
 
     let output = tsv(&[
         "format",
@@ -1211,8 +1244,6 @@ fn test_command_name_is_independent_of_argv0() {
         stderr.contains("Run tsv --help for more information."),
         "stderr: {stderr}"
     );
-
-    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -1318,7 +1349,7 @@ fn test_format_content_with_paths_errors() {
 /// without needing a real `git` binary.
 /// Test helper; panicking on IO failure is the desired behavior.
 #[allow(clippy::unwrap_used)]
-fn git_repo(name: &str) -> PathBuf {
+fn git_repo(name: &str) -> TempTree {
     let dir = temp_dir(name);
     fs::create_dir(dir.join(".git")).unwrap();
     dir
@@ -1993,7 +2024,6 @@ fn test_format_path_falls_back_to_script() {
         String::from_utf8_lossy(&again.stdout).trim().is_empty(),
         "an unchanged file prints no path"
     );
-    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -2022,7 +2052,6 @@ fn test_format_path_both_goals_fail_reports_the_module_error() {
         !stderr.contains("'import' is only allowed in a module"),
         "should not report the script retry's earlier error: {stderr}"
     );
-    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -2066,8 +2095,6 @@ fn test_format_path_module_only_extension_takes_no_script_retry() {
             "{name} settles no goal, so the script retry still reaches it"
         );
     }
-
-    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -2086,7 +2113,6 @@ fn test_format_path_module_only_extension_still_formats_valid_module() {
         "import x from 'y';\nconst z = 1;\n",
         "the file must be formatted in place"
     );
-    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -2216,7 +2242,7 @@ fn test_source_type_refused_on_a_goalless_language() {
 #[cfg(unix)]
 #[allow(clippy::expect_used)]
 fn pipe_overflow_tree(name: &str) -> TempTree {
-    let tree = TempTree(temp_dir(name));
+    let tree = temp_dir(name);
     let pad = "p".repeat(150);
     for i in 0..PIPE_TREE_FILES {
         fs::write(tree.path().join(format!("{pad}_{i}.ts")), UNFORMATTED_TS)
@@ -2230,20 +2256,30 @@ fn pipe_overflow_tree(name: &str) -> TempTree {
 /// `temp_dir` names its directory after the pid, so a leak is never reclaimed by a
 /// later run, and a `remove_dir_all` written after the assertions only cleans up the
 /// runs that passed: the wrong half, since a failing run is the one a developer
-/// re-runs. These trees are 1,200 files each, so the leak is measured in thousands of
-/// files per red test. Same shape as `ReleasePoolOnUnwind` in the format command — the
-/// cleanup belongs on the way out, not on the happy path.
-#[cfg(unix)]
+/// re-runs. The pipe tests' trees are 1,200 files each, so the leak is measured in
+/// thousands of files per red test. Same shape as `ReleasePoolOnUnwind` in the format
+/// command — the cleanup belongs on the way out, not on the happy path.
+///
+/// Every temp tree in this file is one, because a guard two call sites use is a
+/// convention the other forty do not follow: `temp_dir` returns it, so a test cannot
+/// opt out by forgetting. It [`Deref`]s to `Path`, so `&dir` and `dir.join(..)` read
+/// exactly as they did against the bare `PathBuf`.
 struct TempTree(PathBuf);
 
-#[cfg(unix)]
 impl TempTree {
     fn path(&self) -> &Path {
         &self.0
     }
 }
 
-#[cfg(unix)]
+impl std::ops::Deref for TempTree {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
 impl Drop for TempTree {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
@@ -2406,7 +2442,7 @@ fn test_format_slow_pipe_consumer_gets_every_line() {
 #[cfg(unix)]
 #[test]
 fn test_parse_closed_pipe_is_not_a_parse_error() {
-    let tree = TempTree(temp_dir("parse_closed_pipe"));
+    let tree = temp_dir("parse_closed_pipe");
     let path = tree.path().join("big.ts");
     // Enough statements that the wire clears the 64 KiB pipe buffer by a wide margin.
     use std::fmt::Write as _;

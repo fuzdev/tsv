@@ -872,6 +872,227 @@ const format_ignore_preserved: DivergencePattern = {
 	}
 };
 
+/**
+ * Strip whitespace AND statement terminators. The content proof for a divergence whose
+ * whole subject is WHERE the `;` lands — see [`prettier_ignore_frozen_terminator`].
+ *
+ * Dropping `;` is sound here and nowhere else: a terminator is already a `FORMATTING_CHAR`
+ * the safety check excludes (`safety.ts`), because a statement's terminator is the
+ * printer's rather than the author's — both formatters re-emit one, they just disagree
+ * about the line it lands on. Everything that is content — every letter, digit, bracket
+ * and comment byte — still has to match, in order, or the gate fails and the detector is
+ * disabled. A pattern resting on this must NOT declare `may_alter_char_frequency`, so it
+ * can never vouch for a SAFETY hunk.
+ */
+function strip_ws_and_terminators(s: string): string {
+	return strip_all_ws(s).replace(/;/g, '');
+}
+
+/**
+ * Whether a line is ENTIRELY one comment — a `//` line, or a `/* … *\/` that opens and
+ * closes on it. A comment merely TRAILING code is not one: the subject of
+ * [`clause_terminator_comment_then_blank`] is the own-line comment a clause's terminator
+ * gap hoists, and the same file's `for (;;) continue; // comment` spellings are matches on
+ * both formatters.
+ */
+function is_own_line_comment(line: string): boolean {
+	const trimmed = line.trim();
+	return trimmed.startsWith('//') || (trimmed.startsWith('/*') && trimmed.endsWith('*/'));
+}
+
+/**
+ * A statement line ending in its OWN `;` — the seam whose terminator gap
+ * [`clause_terminator_comment_then_blank`]'s comment was written in.
+ *
+ * Deliberately not keyed on a clause head. The rule is the seam's, not the clause's: a
+ * plain statement's terminator gap hoists its comment exactly as a clause body's does, and
+ * the fixture pins both. Keying on `if` / `for` / `while` matched where the divergence was
+ * first written down rather than what causes it, and left the plain-seam cells unexplained.
+ *
+ * A line that is itself a comment, or that closes a block, is not one — `;\s*$` alone would
+ * take a `};` or a `/* … *\/;`.
+ */
+const TERMINATED_STATEMENT = /;\s*$/;
+
+/**
+ * The clause tail's hoisted terminator-gap comment, before an author blank.
+ *
+ * `for (;;) continue⏎// c⏎;⏎⏎fn();` — the comment sits in the clause body's terminator gap.
+ * Both formatters hoist it past the `;`; tsv stops at the author's blank and keeps the
+ * comment with the statement it was written under, prettier carries it past the blank too
+ * and re-attaches it as the NEXT statement's leading comment. Both landings are stable on
+ * both formatters, so the only thing that ever differs is which side of the comment the
+ * blank line sits on.
+ */
+const clause_terminator_comment_then_blank: DivergencePattern = {
+	id: 'clause_terminator_comment_then_blank',
+	description:
+		"tsv keeps a clause tail's hoisted terminator-gap comment above the author blank that follows it; prettier carries the comment past the blank, re-attaching it to the next statement",
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['Comment relocation'],
+	fixtures: ['typescript/statements/for/clause_terminator_comment_then_blank_prettier_divergence'],
+	detect(ctx) {
+		const ours_lines = ctx.ours_lines!;
+		const prettier_lines = ctx.prettier_lines!;
+
+		// CONTENT PROOF — drop the blank lines and the two outputs are the SAME lines, in the
+		// same order, indentation included. So the whole divergence is where the blanks sit:
+		// no comment crossed a statement, nothing was lost, added, re-indented or re-wrapped.
+		// A single non-blank difference anywhere fails this and disables the detector, so it
+		// can never absorb a real relocation — which is the neighbouring bug this pattern
+		// would otherwise be able to launder.
+		const ours_body = ours_lines.filter((line) => line.trim() !== '');
+		const prettier_body = prettier_lines.filter((line) => line.trim() !== '');
+		if (ours_body.length !== prettier_body.length) return null;
+		if (ours_body.some((line, i) => line !== prettier_body[i])) return null;
+
+		// FAMILY SIGNATURE — the sites, read off both outputs so the pattern is keyed on the
+		// actual cause rather than on "a blank moved somewhere". In ours a comment sits
+		// directly under a clause-bodied statement with the author blank BELOW it; in prettier
+		// the same comment line has the blank ABOVE it and code below. The window each site
+		// contributes spans the statement, the comment and the blank on both sides, since the
+		// line diff resolves the swap by moving whichever of the three it finds cheaper.
+		const ours_window = new Set<number>();
+		const site_comments = new Set<string>();
+		for (let i = 1; i + 1 < ours_lines.length; i++) {
+			if (!is_own_line_comment(ours_lines[i])) continue;
+			const above = ours_lines[i - 1];
+			if (!TERMINATED_STATEMENT.test(above)) continue;
+			if (is_own_line_comment(above) || above.trim().startsWith('}')) continue;
+			if (ours_lines[i + 1].trim() !== '') continue;
+			for (let k = i - 1; k <= i + 2; k++) ours_window.add(k);
+			site_comments.add(ours_lines[i]);
+		}
+		if (ours_window.size === 0) return null;
+
+		// EVERY prettier-side counterpart, not the first: a file exercising the shape spells
+		// the same comment text over and over (`// comment` six times in
+		// `js/for/continue-and-break-comment-without-blocks.js`), and matching by text alone
+		// would pin every site's window onto the first occurrence — leaving the last site's
+		// hunk unclaimed and the file `partial`.
+		const prettier_window = new Set<number>();
+		for (let j = 1; j + 1 < prettier_lines.length; j++) {
+			if (!site_comments.has(prettier_lines[j])) continue;
+			if (prettier_lines[j - 1].trim() !== '') continue;
+			if (prettier_lines[j + 1].trim() === '') continue;
+			for (let k = j - 2; k <= j + 1; k++) prettier_window.add(k);
+		}
+		if (prettier_window.size === 0) return null;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			const ours = hunk.ours_range;
+			const prettier = hunk.prettier_range;
+			if (ours) {
+				for (let k = ours.start; k <= ours.end; k++) if (ours_window.has(k)) return true;
+			}
+			if (prettier) {
+				for (let k = prettier.start; k <= prettier.end; k++) {
+					if (prettier_window.has(k)) return true;
+				}
+			}
+			return false;
+		});
+
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'clause_terminator_comment_then_blank',
+			confidence: 'certain',
+			hunk_indices,
+			reason:
+				"clause tail's hoisted terminator-gap comment kept above the author blank; prettier carries it past the blank onto the next statement"
+		};
+	}
+};
+
+/**
+ * A `prettier-ignore`d statement's frozen slice reaching PAST a comment in its terminator gap.
+ *
+ * The one place both formatters honor the same directive and still diverge, which is why
+ * [`format_ignore_preserved`] deliberately does not look at this spelling. They disagree
+ * about the frozen slice's EXTENT, not about the freeze: prettier finds the content end in
+ * a comment-STRIPPED copy of the text, so a comment between the content and the `;` falls
+ * outside the slice and is re-printed past the re-emitted terminator (`fn(  a  ) /* c *\/;`
+ * → `fn(  a  ); /* c *\/`). tsv counts a comment as content and keeps it inside the slice
+ * where the author put it — and a `//` additionally owns the rest of its line, so a
+ * terminator written below one stays there rather than being pulled up onto a line that
+ * would SWALLOW it.
+ */
+const prettier_ignore_frozen_terminator: DivergencePattern = {
+	id: 'prettier_ignore_frozen_terminator',
+	description:
+		"tsv's `prettier-ignore` slice counts a terminator-gap comment as content and freezes through it; prettier's content end skips comments, so it re-emits the `;` ahead of them",
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['Format-ignore directive'],
+	fixtures: [
+		'typescript/syntax/asi/prettier_ignore_semicolon_detached_comment_prettier_divergence'
+	],
+	detect(ctx) {
+		const ours_lines = ctx.ours_lines!;
+		const prettier_lines = ctx.prettier_lines!;
+
+		// CONTENT PROOF — with whitespace and terminators removed the two outputs are
+		// character-identical, in order. So nothing was lost, added or reordered: the `;` and
+		// the line breaks are the only things that moved, which is exactly what this
+		// divergence claims. See [`strip_ws_and_terminators`] for why dropping `;` is sound
+		// only for this question.
+		//
+		// ⚠️ Its blind spot is the one [`format_ignore_preserved`] carries too: a whitespace-only
+		// bug INSIDE a frozen slice — tsv reformatting bytes it promised to copy — passes this
+		// gate. The freeze's own extent is graded by `ignore:audit`, not here.
+		if (strip_ws_and_terminators(ctx.ours) !== strip_ws_and_terminators(ctx.prettier)) {
+			return null;
+		}
+
+		// FAMILY SIGNATURE — an actual `prettier-ignore` directive in our output. Unlike the
+		// tsv-native spelling, this one is honored by BOTH formatters, so the directive alone
+		// explains nothing; what does is the frozen slice below it reaching past a comment.
+		const directives: number[] = [];
+		for (let i = 0; i < ours_lines.length; i++) {
+			if (/(?:\/\/|\/\*|<!--)\s*prettier-ignore\s*(?:\*\/|-->)?\s*$/.test(ours_lines[i])) {
+				directives.push(i);
+			}
+		}
+		if (directives.length === 0) return null;
+		const first = directives[0];
+
+		// …and the TELL that this file's divergence is the terminator's, not some other
+		// whitespace the two formatters lay out differently under a freeze. The directive plus
+		// the content proof above is NOT enough on its own — every `prettier-ignore` divergence
+		// whose slice differs only in layout passes both, and claiming those laundered three
+		// unrelated files (a frozen binary's break in `js/ignore/issue-11077.js`, mapped-type
+		// members in `typescript/prettier-ignore/mapped-types.ts`, call-argument breaking in
+		// `js/ignore/issue-10661.js`) straight into `known`.
+		//
+		// The tell is a terminator OURS printed on the far side of a comment: a lone `;` line,
+		// or one glued to a closing `*​/`. tsv re-glues every terminator it emits itself, so
+		// neither survives except inside a frozen slice — and the same line must be absent from
+		// prettier's output, which is the statement that prettier put its `;` somewhere else.
+		const tell = /^\s*;\s*$|\*\/\s*;\s*$/;
+		const has_tell = ours_lines.some(
+			(line, i) => i >= first && tell.test(line) && !prettier_lines.includes(line)
+		);
+		if (!has_tell) return null;
+
+		// Claim only hunks at or below the first directive — a divergence ABOVE every one of
+		// them cannot have been caused by a freeze, and leaving it unclaimed keeps the file
+		// `partial`, which is the honest verdict, rather than quietly absorbing it into
+		// `known`. The same rule [`format_ignore_preserved`] states.
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			const start = hunk.ours_range?.start;
+			return start != null && start >= first;
+		});
+
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'prettier_ignore_frozen_terminator',
+			confidence: 'certain',
+			hunk_indices,
+			reason:
+				'`prettier-ignore` slice frozen through its terminator-gap comment; prettier re-emits the `;` ahead of the comment'
+		};
+	}
+};
+
 // ─── Pattern Detectors ──────────────────────────────────────────────────────
 //
 // Ordered from most specific/narrow to most broad.
@@ -3990,8 +4211,14 @@ export const PATTERNS: DivergencePattern[] = [
 	css_comment_stable_quirk,
 
 	// Directive-driven suppression — the most specific signal there is (an explicit
-	// author directive), so it precedes every layout heuristic.
+	// author directive), so it precedes every layout heuristic. The second is the one
+	// spelling BOTH formatters honor, where the divergence is the frozen slice's extent.
 	format_ignore_preserved,
+	prettier_ignore_frozen_terminator,
+
+	// Terminator-gap comment placement — keyed on a clause-bodied statement, so it runs
+	// ahead of the broad `comment_position`.
+	clause_terminator_comment_then_blank,
 
 	// 3. Feature-specific patterns
 	template_literal_width,

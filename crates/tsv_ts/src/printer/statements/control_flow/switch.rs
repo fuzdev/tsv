@@ -4,7 +4,7 @@
 
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
 use crate::ast::internal::{self, Statement};
-use crate::printer::expressions::blocks::StatementBlankScan;
+use crate::printer::expressions::blocks::{OrphanSemiCursor, StatementBlankScan};
 use crate::printer::statements::StatementContext;
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer, next_printed_stmt_start,
@@ -94,7 +94,32 @@ impl<'a> Printer<'a> {
             // own-line comment keeps its line, and author blank lines are preserved.
             if i > 0 {
                 let run_start = comments.first().map_or(case.span.start, |c| c.span.start);
-                self.push_blank_preserving_hardline(&mut case_parts, prev_blank_end, run_start);
+                // The author blank is placed ONCE, and a run whose last comment GLUES to the
+                // label (`fn1()⏎/* c */;⏎⏎case 2:`) leaves no line below itself to carry one:
+                // the glue erases the gap the author wrote it in, so it rides ABOVE the run
+                // instead. The same rule [`StatementBlankScan::blank_before_leading_run`]
+                // states for a statement list's leading run, at the seam whose "next item" is
+                // a `case` label.
+                //
+                // ⚠️ Without it that blank was silently EATEN — the one authored blank in
+                // `fn1()⏎/* c */;⏎⏎case 2:` reached the output nowhere. A dropped blank is its
+                // own fixed point, so F1, the ledger and the census are all blind to it;
+                // `blanks:audit`'s absorb pin is the only gate that sees one, and only once a
+                // fixture spells the authoring.
+                //
+                // The scan opens at the run's LAST comment end, so it cannot cross comment
+                // bytes and fabricate a blank out of a comment's own newlines
+                // (`docs/comments.md` hazard 5) — everything from there to the label is
+                // whitespace and the terminator.
+                let glued_tail_blank = self
+                    .glued_run_blank_anchor(&comments)
+                    .is_some_and(|end| self.has_blank_line_between_strict(end, case.span.start));
+                if glued_tail_blank {
+                    case_parts.push(d.literalline());
+                    case_parts.push(d.hardline());
+                } else {
+                    self.push_blank_preserving_hardline(&mut case_parts, prev_blank_end, run_start);
+                }
             }
             self.push_leading_comment_run(
                 &mut case_parts,
@@ -451,83 +476,44 @@ impl<'a> Printer<'a> {
             // separator (mirroring `build_statement_list_docs_into`).
             if matches!(stmt, Statement::EmptyStatement(_)) {
                 let stmt_end = stmt.span().end;
-                let next_bound = case
-                    .consequent
-                    .get(i + 1)
-                    .map_or(inline_comment_boundary, |s| s.span().start);
-                // A comment hugging the next printed statement — or, past the last
-                // one, the next case's label — leads it; the orphan scan must stop at
-                // the claim split so its leading run still finds it.
-                let claim_end = if body_has_comments {
-                    self.statement_claim_end(case.consequent, i, next_case_start, false)
-                } else {
-                    u32::MAX
-                };
-                // A dropped `;` owns no terminator gap, so its own run reads one line.
-                let search_end = self
-                    .find_end_with_trailing_comments(stmt_end, u32::MAX)
-                    .min(next_bound)
-                    .min(claim_end)
-                    // ⚠️ **The cursor is MONOTONE**, the block walk's twin rule — and this
-                    // copy had not carried it. Both `min`s are bounds on THIS `;`'s own slot
-                    // and neither knows where the last PRINTED statement's trailing run
-                    // ended; a run that follows a multi-line block to its closing line ends
-                    // past a following `;` (`case 1: fn1();;; /* m⏎n */ // c`), so taking
-                    // them raw moved `prev_end` BACKWARD over comments already emitted and
-                    // this slot printed them a SECOND time.
-                    .max(prev_end);
-
-                // ⚠️ A TRAILING dropped `;` — one with no printed statement after it in this
-                // consequent — claims nothing. An orphan run is a leading run with its item
-                // dropped, and here there is no item left in the consequent to lead: the
-                // comments are the CASE seam's, and the between-case (or after-last-case) run
-                // places them at the case's level, which is where a reformat reads them back
-                // from. Claiming them at the consequent's level printed a form that was not
-                // its own fixed point — `case 1: fn1();⏎// c⏎;` dedented on the second pass
-                // (an F1 break invisible to every fixture, since no `input` holds the
-                // authoring). The bound is the printing arm's own `has_next_stmt`, asked of
-                // the next PRINTED statement — so a `;` in the middle of a run of them
-                // answers for the whole run rather than for its immediate neighbour.
+                // A TRAILING dropped `;` — one with no printed statement after it in this
+                // consequent — claims nothing; [`Printer::orphan_semi_slot`] states why. The
+                // bound is the printing arm's own `has_next_stmt`, asked of the next PRINTED
+                // statement, so a `;` in the middle of a run of them answers for the whole
+                // run rather than for its immediate neighbour.
                 let trailing_semi_run =
                     next_printed_stmt_start(case.consequent, i, inline_comment_boundary)
                         == inline_comment_boundary;
-
-                let leading_comments = if body_has_comments && !trailing_semi_run {
-                    self.collect_leading_comments(
+                let slot = self.orphan_semi_slot(
+                    case.consequent,
+                    i,
+                    inline_comment_boundary,
+                    next_case_start,
+                    OrphanSemiCursor {
                         prev_end,
-                        search_end,
+                        prev_stmt_end,
                         prev_claim_anchor,
                         prev_deferred_line_comment,
-                        None,
-                    )
-                } else {
-                    CommentVec::new()
-                };
+                        has_comments: body_has_comments,
+                    },
+                    !trailing_semi_run,
+                );
 
-                if !leading_comments.is_empty() {
+                if !slot.comments.is_empty() {
                     let mut stmt_parts: DocBuf = smallvec![d.hardline()];
-                    if prev_stmt_end.is_some() && self.blank_before_orphan_run(prev_end, search_end)
-                    {
+                    if slot.blank_above {
                         stmt_parts.push(d.hardline());
                     }
-                    self.push_orphaned_comment_run(&mut stmt_parts, &leading_comments, search_end);
+                    self.push_orphaned_comment_run(
+                        &mut stmt_parts,
+                        &slot.comments,
+                        slot.search_end,
+                    );
                     parts.push(d.indent(d.concat(&stmt_parts)));
                     prev_stmt_end = Some(stmt_end);
                 }
 
-                // The cursor moves only over what this slot emitted: a trailing run claims
-                // nothing, so everything from here on stays ahead of it for the case seam.
-                if !trailing_semi_run {
-                    prev_end = search_end;
-                }
-                // The orphan run is content and moves the BLANK anchor; a `;` that printed
-                // nothing becomes the bound instead. It moves no CLAIM anchor at all, for
-                // the reason the block walk's twin states.
-                if leading_comments.is_empty() {
-                    blanks.skipped_semi(self, stmt.span().start);
-                } else {
-                    blanks.printed(search_end, false);
-                }
+                slot.advance(self, &mut prev_end, &mut blanks, stmt_start);
                 continue;
             }
 
@@ -785,12 +771,7 @@ impl<'a> Printer<'a> {
                 self.find_end_with_trailing_comments(stmt_gap_start, printed_tail)
                     .min(claim_end)
             };
-            // The BLANK cursor stays at the statement's FULL end — see the block walk for why
-            // the two cannot be one value.
-            blanks.printed(
-                prev_end.max(stmt_end),
-                self.statement_content_tail_blank(stmt, frozen.is_some()),
-            );
+            blanks.printed_statement(self, prev_end, stmt, frozen.is_some());
             prev_stmt_end = Some(stmt_end);
             prev_claim_anchor = Some(prev_end);
             prev_deferred_line_comment = this_defers_line_comment;
