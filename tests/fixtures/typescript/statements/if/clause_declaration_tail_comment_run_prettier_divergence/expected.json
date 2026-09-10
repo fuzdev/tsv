@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 277,
+	"end": 594,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -89,24 +89,168 @@
 					"column": 6
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a glued run in that same gap breaks between its members, the answer the gap gives",
+			"start": 268,
+			"end": 352,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " once the `;` sits ahead of the run",
+			"start": 354,
+			"end": 391,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 413,
+			"end": 421,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 423,
+			"end": 431,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 482,
+			"end": 490,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 492,
+			"end": 497,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c9 ",
+			"start": 540,
+			"end": 548,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c10 ",
+			"start": 550,
+			"end": 559,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c11 ",
+			"start": 561,
+			"end": 570,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 10
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 276,
+		"end": 593,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 267,
+			"end": 584,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 13,
+					"line": 28,
 					"column": 9
 				}
 			},
@@ -543,6 +687,466 @@
 								"value": " c4",
 								"start": 248,
 								"end": 253
+							}
+						]
+					}
+				},
+				{
+					"type": "IfStatement",
+					"start": 393,
+					"end": 444,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 12
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 397,
+						"end": 398,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 5
+							},
+							"end": {
+								"line": 15,
+								"column": 6
+							}
+						},
+						"name": "d"
+					},
+					"consequent": {
+						"type": "TSTypeAliasDeclaration",
+						"start": 400,
+						"end": 411,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 8
+							},
+							"end": {
+								"line": 15,
+								"column": 19
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 405,
+							"end": 406,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 13
+								},
+								"end": {
+									"line": 15,
+									"column": 14
+								}
+							},
+							"name": "Z"
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 409,
+							"end": 410,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 17
+								},
+								"end": {
+									"line": 15,
+									"column": 18
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 409,
+								"end": 410,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 17
+									},
+									"end": {
+										"line": 15,
+										"column": 18
+									}
+								},
+								"name": "W"
+							}
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 438,
+						"end": 444,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 12
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 438,
+							"end": 443,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 6
+								},
+								"end": {
+									"line": 18,
+									"column": 11
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 438,
+								"end": 441,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 6
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"name": "fn4"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c5 ",
+								"start": 413,
+								"end": 421
+							},
+							{
+								"type": "Block",
+								"value": " c6 ",
+								"start": 423,
+								"end": 431
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a glued run in that same gap breaks between its members, the answer the gap gives",
+							"start": 268,
+							"end": 352
+						},
+						{
+							"type": "Line",
+							"value": " once the `;` sits ahead of the run",
+							"start": 354,
+							"end": 391
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 446,
+					"end": 510,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 12
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 450,
+						"end": 451,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 5
+							},
+							"end": {
+								"line": 19,
+								"column": 6
+							}
+						},
+						"name": "e"
+					},
+					"consequent": {
+						"type": "TSDeclareFunction",
+						"start": 453,
+						"end": 480,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 8
+							},
+							"end": {
+								"line": 19,
+								"column": 35
+							}
+						},
+						"declare": true,
+						"id": {
+							"type": "Identifier",
+							"start": 470,
+							"end": 471,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 25
+								},
+								"end": {
+									"line": 19,
+									"column": 26
+								}
+							},
+							"name": "h"
+						},
+						"expression": false,
+						"generator": false,
+						"async": false,
+						"params": [],
+						"returnType": {
+							"type": "TSTypeAnnotation",
+							"start": 473,
+							"end": 479,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 28
+								},
+								"end": {
+									"line": 19,
+									"column": 34
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 475,
+								"end": 479,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 30
+									},
+									"end": {
+										"line": 19,
+										"column": 34
+									}
+								}
+							}
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 504,
+						"end": 510,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 12
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 504,
+							"end": 509,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 6
+								},
+								"end": {
+									"line": 22,
+									"column": 11
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 504,
+								"end": 507,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 6
+									},
+									"end": {
+										"line": 22,
+										"column": 9
+									}
+								},
+								"name": "fn5"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c7 ",
+								"start": 482,
+								"end": 490
+							},
+							{
+								"type": "Line",
+								"value": " c8",
+								"start": 492,
+								"end": 497
+							}
+						]
+					}
+				},
+				{
+					"type": "IfStatement",
+					"start": 512,
+					"end": 583,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 12
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 516,
+						"end": 517,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 5
+							},
+							"end": {
+								"line": 23,
+								"column": 6
+							}
+						},
+						"name": "f"
+					},
+					"consequent": {
+						"type": "TSModuleDeclaration",
+						"start": 519,
+						"end": 538,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 8
+							},
+							"end": {
+								"line": 23,
+								"column": 27
+							}
+						},
+						"id": {
+							"type": "Literal",
+							"start": 534,
+							"end": 537,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 23
+								},
+								"end": {
+									"line": 23,
+									"column": 26
+								}
+							},
+							"value": "n",
+							"raw": "'n'"
+						},
+						"declare": true
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 577,
+						"end": 583,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 12
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 577,
+							"end": 582,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 6
+								},
+								"end": {
+									"line": 27,
+									"column": 11
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 577,
+								"end": 580,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 6
+									},
+									"end": {
+										"line": 27,
+										"column": 9
+									}
+								},
+								"name": "fn6"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c9 ",
+								"start": 540,
+								"end": 548
+							},
+							{
+								"type": "Block",
+								"value": " c10 ",
+								"start": 550,
+								"end": 559
+							},
+							{
+								"type": "Block",
+								"value": " c11 ",
+								"start": 561,
+								"end": 570
 							}
 						]
 					}

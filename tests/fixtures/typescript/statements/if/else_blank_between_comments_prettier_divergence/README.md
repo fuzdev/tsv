@@ -23,6 +23,7 @@ enclosing context varying):
 | `}`→`catch` | *relocates the comments into the body — **carrying the blank with them*** | preserves in place |
 | do-while `}`→`while` | *relocates into the condition parens — **carrying the blank*** | preserves in place |
 | **`}`→`else` / `else if`** | **collapses** | **preserves** |
+| **non-block consequent's `;`→`else`** | **collapses** | **preserves** |
 
 The two relocating rows are the telling ones: even where prettier moves the comments out
 of the gap entirely, it keeps the blank between them. It treats the blank as meaningful
@@ -35,6 +36,17 @@ between two statements — which both formatters preserve — so tsv keeps it he
 Line comments, block comments, a longer run (every blank in it), and `else if` — the
 divergence is uniform across all four, and is *only* about the blank; the comments' own
 positions match prettier exactly.
+
+A **non-block** consequent reaches the same gap by a different route — through its own
+terminator — and answers the same way. That route is the one place the blank is read by
+the clause-tail deferral rather than by the `}`→`else` gap: the consequent's tail stays
+open to the `else`, so its terminator-gap run rides in `line_suffix` docs and each member
+carries its own break and its own blank. `unformatted_ours_pre_terminator.svelte` is the
+authoring that exercises it, with the comments written *before* the `;` — including a run
+the author glued onto one line, which breaks between its members (that split is not this
+fixture's subject; see
+[clause_terminator_gap_glued_comment_run](../clause_terminator_gap_glued_comment_run/))
+while the authored blank between the two remarks survives it.
 
 Not covered here (each is a different question with its own fixture): a blank **above**
 the first comment in this gap is preserved by both — [else_blank_before_comment](../else_blank_before_comment/);

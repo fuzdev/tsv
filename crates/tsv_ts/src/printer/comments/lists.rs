@@ -43,14 +43,17 @@ pub(crate) enum GapDeferral {
     /// immediately follows the returned docs (a list joiner's hardline, the for
     /// header's `line`), closing the run's last line before anything else can queue a
     /// `line_suffix`. The doc is the break INTO the run; breaks within it are the
-    /// shared site's `hardline`.
+    /// shared site's `hardline`. A run the author GLUED onto one line keeps that line —
+    /// prettier's answer at every gap this variant reaches.
     Break(DocId),
-    /// The run rides in `line_suffix` docs, each own-line member carrying its break
-    /// inside, dedented this many levels to the flushing construct's level
+    /// The run rides in `line_suffix` docs, EVERY member carrying its break inside,
+    /// dedented this many levels to the flushing construct's level
     /// ([`Printer::build_clause_tail_comment_doc`]) — the clause-body statement tail,
     /// whose last line stays open to the enclosing construct, where a later gap's
     /// deferred `//` must meet the run in source order at the flush
-    /// (`doc/arena_render_suffix.rs` owes the separator between them).
+    /// (`doc/arena_render_suffix.rs` owes the separator between them). ⚠️ Author gluing
+    /// does NOT survive here — the OPPOSITE answer to `Break`, deliberately, for the
+    /// reason stated at [`Printer::push_gap_comments`].
     LineSuffix(u8),
 }
 
@@ -2062,6 +2065,10 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_trailing_comment_doc(comment));
                 }
             } else {
+                // The author's blank above this comment — the one question BOTH deferrals
+                // ask, which they then spell differently: `Break` as a `literalline` ahead
+                // of the break, `LineSuffix` as the flag the suffix builder carries inside.
+                let blank = preserve_blank && self.has_blank_line_between(prev, comment.span.start);
                 match deferral {
                     GapDeferral::Break(first_break) => {
                         // The separator, BEFORE the comment — a space where the author
@@ -2071,9 +2078,7 @@ impl<'a> Printer<'a> {
                         if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
                             deferred.push(d.text(" "));
                         } else {
-                            if preserve_blank
-                                && self.has_blank_line_between(prev, comment.span.start)
-                            {
+                            if blank {
                                 deferred.push(d.literalline());
                             }
                             deferred.push(if deferred_open {
@@ -2085,22 +2090,24 @@ impl<'a> Printer<'a> {
                         deferred_open = true;
                         deferred.push(self.build_comment_doc(comment));
                     }
+                    // Every member takes its own break, INSIDE the suffix, at the flushing
+                    // construct's level.
+                    //
+                    // ⚠️ No glue arm here, unlike `Break` — the two deferrals want OPPOSITE
+                    // answers on a run the author wrote on one line, and the asymmetry is the
+                    // rule rather than an oversight. `Break` reaches gaps whose run is emitted
+                    // ONCE (a `,` gap, a `for` head, a type member's `;`), where prettier keeps
+                    // the author's gluing and so does tsv. This arm reaches only the clause
+                    // bodies whose tail stays OPEN to a continuing construct — `if`+`else`,
+                    // do-while, and a declaration in clause position (a `type` alias,
+                    // `declare function`, shorthand `declare module 'm'`) — where the SAME gap
+                    // is read again from the ejected seam once the `;` normalizes ahead of the
+                    // run, and that seam breaks between members. Keeping the glue here gave one
+                    // document two shapes: it printed on one line and split on the next pass.
+                    // Cataloged in `docs/conformance_prettier_ts_comments.md` §Comment
+                    // normalization (stable quirks).
                     GapDeferral::LineSuffix(dedent) => {
-                        // Deferred spelling of the same two arms: a glued follower rides
-                        // in its own suffix behind the previous one (kind-agnostic — an
-                        // inline block would render ahead of the buffer and reorder),
-                        // an own-line comment carries its break INSIDE the suffix, at
-                        // the flushing construct's level, with an author blank as the
-                        // second hardline the deferred sites use.
-                        deferred.push(
-                            if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
-                                self.build_trailing_line_comment_doc(comment)
-                            } else {
-                                let blank = preserve_blank
-                                    && self.has_blank_line_between(prev, comment.span.start);
-                                self.build_clause_tail_comment_doc(comment, blank, dedent)
-                            },
-                        );
+                        deferred.push(self.build_clause_tail_comment_doc(comment, blank, dedent));
                     }
                 }
             }
