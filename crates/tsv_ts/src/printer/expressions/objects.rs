@@ -672,7 +672,26 @@ impl<'a> Printer<'a> {
                         d.text(":"),
                         prop.value,
                         AssignmentLeft::short_key(is_short_key),
-                        RhsCommentInfo::frozen_only(value_frozen),
+                        RhsCommentInfo {
+                            comments: None,
+                            has_line_comment: false,
+                            glued_through: false,
+                            // ⚠️ NOT `frozen_only`, whose `gap: None` claims the gap is
+                            // provably empty. The two emptiness tests above are **emit**-keyed
+                            // and this branch is exactly where a comment the value OWNS lands
+                            // — invisible to both (`docs/comments.md` hazard 2) — so the HOIST
+                            // still has work here even though nothing is emitted:
+                            // `: /* c⏎d */ t + u + v` broke the binary chain until this gap
+                            // was handed over. `indentable_leads_value` is `false` by
+                            // construction (it is the first disjunct of the gate this arm
+                            // declined), so it is written, not re-asked.
+                            gap: Some(ValueGap {
+                                start: colon_pos + 1,
+                                indentable_leads_value: false,
+                            }),
+                            boundary: None,
+                            frozen: value_frozen,
+                        },
                     )
                 }
             } else {
@@ -699,18 +718,13 @@ impl<'a> Printer<'a> {
                     // gap is an `isObjectProperty` value gap whichever arm prints it, so
                     // the chain here is FLAT like its sibling arms', not indented.
                     self.mark_jsdoc_cast_value_gap(prop.value);
-                    // The fourth disjunct's run is hoisted OUT of the value's doc when the
+                    // A MULTI-LINE block's run is hoisted OUT of the value's doc when the
                     // value OWNS it, so the comment's hard break cannot reach the value's
                     // own group ([`Printer::hoist_owned_value_gap_run`]). This arm builds
                     // its own hang, so it takes the run-only form and owes the paired
                     // suppression below — exactly the debt that function's ⚠️ names.
-                    let hoisted_run = self.hoisted_owned_value_gap_run_opt(
-                        ValueGap {
-                            start: colon_pos + 1,
-                            indentable_leads_value,
-                        },
-                        prop.value,
-                    );
+                    let hoisted_run =
+                        self.hoisted_owned_value_gap_run_opt(colon_pos + 1, prop.value);
                     let comments_doc = hoisted_run
                         .or_else(|| self.build_value_gap_comments_opt(colon_pos + 1, value_start))
                         .unwrap_or_else(|| d.empty());

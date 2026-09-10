@@ -652,14 +652,12 @@ impl<'a> Printer<'a> {
                         comments: rhs_comments,
                         has_line_comment: false,
                         glued_through: self.comment_run_glued_through(eq_pos + 1, value_start),
+                        // The `=`→value gap: its start, which the HOIST scans, paired with
                         // prettier's `chooseLayout` fourth disjunct — an indentable block
                         // leading the value hangs it under the `=`
                         // ([`Printer::indentable_block_leads_value`]).
                         gap: Some(ValueGap {
                             start: eq_pos + 1,
-                            // prettier's `chooseLayout` fourth disjunct — an indentable block
-                            // leading the value hangs it under the `=`
-                            // ([`Printer::indentable_block_leads_value`]).
                             indentable_leads_value: self
                                 .indentable_block_leads_value(eq_pos + 1, value_start),
                         }),

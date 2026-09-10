@@ -2,7 +2,6 @@
 
 use super::Printer;
 use crate::ast::internal::{self, Expression};
-use crate::printer::comments::ValueGap;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{
@@ -175,20 +174,20 @@ impl<'a> Printer<'a> {
         // read wherever that build lands.
         self.mark_jsdoc_cast_value_gap(init);
 
-        // prettier's `chooseLayout` fourth disjunct hoists its run OUT of the value's doc
-        // when the value OWNS it ([`Printer::hoist_owned_value_gap_run`] carries the why —
-        // an owned comment travels inside its node's doc, and its reprinted body force-breaks
+        // A MULTI-LINE block leading the value hoists its run OUT of the value's doc when
+        // the value OWNS it ([`Printer::hoist_owned_value_gap_run`] carries the why — an
+        // owned comment travels inside its node's doc, and its reprinted body force-breaks
         // every group around it). This is the run-only form, because the cascade below picks
         // among many arms rather than handing over one build, so the paired suppression is
         // applied to `value` here instead: the two must move together or the comment is
-        // printed twice / not at all.
-        let hoisted_run = self.hoisted_owned_value_gap_run_opt(
-            ValueGap {
-                start: rhs_comments_start,
-                indentable_leads_value,
-            },
-            init,
-        );
+        // printed twice / not at all — and "together" binds EVERY arm, not just the ones
+        // that read `gap_comments` (`prepend_hoisted` below is the other two's share).
+        //
+        // Unguarded, unlike the binding default's twin: when the name→value gap holds no
+        // comment at all, `equals_pos` is the sentinel `init_start` and this range is
+        // inverted, which the comment lookups read as empty — the same invariant every
+        // other gated call site here rides.
+        let hoisted_run = self.hoisted_owned_value_gap_run_opt(rhs_comments_start, init);
         let build_value = &|| self.build_value_under_hoist(hoisted_run, init, value);
         let value: &dyn Fn() -> DocId = build_value;
 
@@ -201,6 +200,21 @@ impl<'a> Printer<'a> {
                 d.concat(&[comment_doc, init_doc])
             } else {
                 init_doc
+            }
+        };
+        // ⚠️ The hoisted run alone, for the two arms below that own their own comment
+        // emission and must NOT take the whole of `gap_comments`: the multiline-string and
+        // curried-arrow arms put an emit-axis block on the `=` line, and moving it down onto
+        // the value's line is a relocation neither prettier nor tsv makes. The hoisted run
+        // has no such choice — it is the value's OWN comment, glued to the value's first
+        // token, so it goes wherever the value goes. Omitting it is a DROP
+        // (`docs/comments.md` hazard 1): both arms build the value under the hoist's
+        // suppression, so nothing else prints it — which is exactly what `gaps:audit` caught
+        // the moment the licence widened to reach a multiline string and a curried head.
+        let prepend_hoisted = |init_doc: DocId| -> DocId {
+            match hoisted_run {
+                Some(run) => d.concat(&[run, init_doc]),
+                None => init_doc,
             }
         };
 
@@ -426,13 +440,17 @@ impl<'a> Printer<'a> {
             // after `=`. An inline block glued to `=` trails it on that line.
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" ="));
-            if has_comments_after_eq
+            // The emit-axis run trails the `=`; a hoisted one instead leads the value below,
+            // where the author glued it. Exactly one of the two — the hoisted run is the
+            // on-page reading of this same gap, so emitting both double-prints.
+            if hoisted_run.is_none()
+                && has_comments_after_eq
                 && let Some(inline) =
                     self.build_inline_comments_between_doc_opt(equals_pos + 1, init_start)
             {
                 parts.push(inline);
             }
-            parts.push(d.indent_hardline(value()));
+            parts.push(d.indent_hardline(prepend_hoisted(value())));
         } else if is_curried_arrow {
             // Mandatory break after `=`; the arrow printer stacks the heads under it.
             // ⚠️ Deliberately does NOT set `ArrowChainContext::AssignmentRhs`, unlike
@@ -443,7 +461,7 @@ impl<'a> Printer<'a> {
             // leans on the same decline; if that decline ever moves, both sites move.
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" ="));
-            parts.push(d.indent_hardline(value()));
+            parts.push(d.indent_hardline(prepend_hoisted(value())));
         } else if comment_hangs_value {
             // The leading comment's hang (see `comment_hangs_value`). The binding prints as
             // built — a pattern or a type annotation stays flat while it fits, prettier's
