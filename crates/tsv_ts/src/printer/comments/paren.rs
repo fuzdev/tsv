@@ -11,6 +11,7 @@ use crate::ast::internal;
 use crate::printer::ParenContext;
 use crate::printer::chain::chain_paren_leading_gap;
 use crate::printer::expressions::operators::SeqLayout;
+use crate::printer::statements::TerminatorGap;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -472,15 +473,16 @@ impl<'a> Printer<'a> {
     /// the flushing construct's level in one pass instead of settling on the reparse.
     /// The same-line arms are indent-free (no interior break), so only the own-line
     /// arm reads it.
-    pub(crate) fn split_terminator_gap_comments(
+    pub(in crate::printer) fn split_terminator_gap_comments(
         &self,
         parts: &mut DocBuf,
         argument_end: u32,
         span_end: u32,
         keep_operand_line_inline: bool,
         operand_parens_printed: bool,
-        clause_tail: Option<u8>,
+        gap: TerminatorGap,
     ) -> DocBuf {
+        let clause_tail = gap.clause_tail();
         let d = self.d();
         let mut deferred = DocBuf::new();
         // What physically precedes each comment — an **in-source** cursor that ADVANCES
@@ -494,7 +496,14 @@ impl<'a> Printer<'a> {
         // position — right after the `;` — while the buffer flushes at the line's end,
         // so the pair comes out REORDERED.
         let mut run_deferred = false;
-        for comment in self.comments_to_emit_between(argument_end, span_end) {
+        // ⚠️ The statement's own claim stops where the trailing TRIVIA run begins: past that
+        // point the comments are the enclosing statement LIST's, and every caller here is one
+        // of the kinds prettier ejects (`return` / `throw` / `export default` — see
+        // [`Printer::statement_hands_off_terminator_gap`]). Emitting them as well is a
+        // DOUBLE-PRINT; the list places them by the ordinary own-line / same-line split.
+        // A non-block CLAUSE body has no such list, so it claims the whole gap as before.
+        let claim_end = self.node_terminator_claim_end(argument_end, span_end, gap);
+        for comment in self.comments_to_emit_between(argument_end, claim_end) {
             let same_line = !self.has_newline_between(prev_end, comment.span.start);
             let operand_enclosed =
                 same_line && self.gap_has_close_paren(comment.span.end, span_end);
@@ -542,39 +551,6 @@ impl<'a> Printer<'a> {
     pub(crate) fn gap_has_close_paren(&self, start: u32, end: u32) -> bool {
         find_char_skipping_comments(self.source.as_bytes(), start as usize, end as usize, b')')
             .is_some()
-    }
-
-    /// Collect comments between a module statement's last content token and its
-    /// terminating `;`, returned to emit **after** the `;` (prettier 3.9 — the `;`
-    /// is structure; trailing past it is lossless). A same-line block trails inline
-    /// (`} /* c */` → `}; /* c */`); a same-line line comment trails via `line_suffix`
-    /// (`}; // c`); an own-line comment stays on its own line after the `;`. Module
-    /// statements (import/export source, specifiers, attributes) have no operand
-    /// parens, so every trailing comment is statement-attached. The caller emits the
-    /// `;` right after the content, then calls this to push what follows it.
-    pub(crate) fn push_post_semi_comments(&self, deferred: &mut DocBuf, start: u32, end: u32) {
-        let d = self.d();
-        let mut prev_end = start;
-        for comment in self.comments_to_emit_between(start, end) {
-            let same_line = self.is_same_line(prev_end, comment.span.start);
-            if comment.is_block && same_line {
-                // Same-line block comment trails inline after the `;`.
-                deferred.push(d.text(" "));
-                deferred.push(self.build_comment_doc(comment));
-            } else if same_line {
-                // Trailing line comment: after the `;` via `line_suffix` (zero width).
-                deferred
-                    .push(d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)])));
-            } else {
-                // Own-line comment (line or block): preserve its own line after the `;`.
-                if self.has_blank_line_between(prev_end, comment.span.start) {
-                    deferred.push(d.literalline());
-                }
-                deferred.push(d.hardline());
-                deferred.push(self.build_comment_doc(comment));
-            }
-            prev_end = comment.span.end;
-        }
     }
 
     /// Append trailing comments from stripped grouping parens in spread elements,

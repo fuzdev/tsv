@@ -862,7 +862,7 @@ pub fn build_variable_declaration_doc(
     emit_semicolon: bool,
 ) -> DocId {
     with_doc_printer(arena, inputs, embed, |printer| {
-        printer.build_variable_declaration_doc(decl, emit_semicolon, None)
+        printer.build_embedded_variable_declaration_doc(decl, emit_semicolon)
     })
 }
 

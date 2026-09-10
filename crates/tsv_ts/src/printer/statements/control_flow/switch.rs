@@ -59,6 +59,13 @@ impl<'a> Printer<'a> {
         let brace_start = body_open_brace
             .unwrap_or_else(|| close_paren.map_or_else(|| stmt.discriminant.span().end, |p| p + 1));
         let mut prev_end = brace_start + 1;
+        // The BLANK cursor, which `prev_end` cannot serve — the same split the statement
+        // walks carry ([`StatementBlankScan`]). A case whose last statement handed its
+        // terminator gap over ends its *emission* above that statement's `;`, and a blank the
+        // author left inside that gap (`case 1:⏎a()⏎⏎;⏎case 2:`) belongs to the statement's
+        // own tail, not between the cases — measured from the comment cursor it reads as a
+        // blank the author never wrote between them.
+        let mut prev_blank_end = brace_start + 1;
         // Whole-body comment presence gate (the `blocks.rs` `body_has_comments` idiom):
         // a switch body with no on-page comment (~all of them) skips the per-case /
         // per-consequent comment scans below. Fail-open — on-page counts owned, so a
@@ -86,7 +93,7 @@ impl<'a> Printer<'a> {
             // own-line comment keeps its line, and author blank lines are preserved.
             if i > 0 {
                 let run_start = comments.first().map_or(case.span.start, |c| c.span.start);
-                self.push_blank_preserving_hardline(&mut case_parts, prev_end, run_start);
+                self.push_blank_preserving_hardline(&mut case_parts, prev_blank_end, run_start);
             }
             self.push_leading_comment_run(
                 &mut case_parts,
@@ -106,44 +113,52 @@ impl<'a> Printer<'a> {
             // there. The case builder recomputes the identical bound for its last
             // statement (its slot floor past any trailing dropped `;`s is exactly
             // `case.span.end`), so the two claims cannot disagree.
-            let case_claim_end = match next_case_start {
-                Some(ncs) if body_has_comments => self.trailing_claim_end(case.span.end, ncs),
-                _ => u32::MAX,
-            };
-
             // Rule A over the case list: an own-line directive in the `{`→first-case or
             // between-case gap freezes the case that follows it, over the case's own node
             // span — the label rides inside the slice, the sibling cases still normalize.
             // The gap anchor is the same `prev_end` the leading run above just used.
-            match self.gap_frozen_span(prev_end, case.span) {
+            //
+            // Either arm reports where the case's emission ENDED, which is what the
+            // between-cases / after-last-case runs must open at. ⚠️ It is not
+            // `case.span.end` advanced over trailing comments: a last statement that hands
+            // its terminator gap to the consequent list ends its own emission ABOVE its `;`
+            // ([`Printer::statement_emitted_end`]), and a cursor derived from the case span
+            // sits past the comment written there — which no run then reaches, a DROP the
+            // gap-injection audit found at `case 1: break /* c */;`. The consequent walk
+            // already tracks the value; re-deriving it here is what let the two disagree.
+            prev_end = match self.gap_frozen_span(prev_end, case.span) {
                 Some(frozen) => {
-                    case_parts.push(self.build_frozen_span_doc(frozen));
                     // The frozen slice is the case's own span, so a comment TRAILING its
-                    // last statement sits outside it — and the cursor below skips past
-                    // such a comment on the case builder's behalf. Bypassing that builder
-                    // therefore has to claim the same run here, or the comment has no
-                    // emitter at all (`gaps:audit` `DROPPED );⟨⟩␣`).
+                    // last statement sits outside it — and this arm claims the same run the
+                    // case builder would, or the comment has no emitter at all
+                    // (`gaps:audit` `DROPPED );⟨⟩␣`). A freeze copies the terminator gap
+                    // verbatim, so the case span IS the emission end here.
+                    let case_claim_end = match next_case_start {
+                        Some(ncs) if body_has_comments => {
+                            self.trailing_claim_end(case.span.end, ncs)
+                        }
+                        _ => u32::MAX,
+                    };
+                    case_parts.push(self.build_frozen_span_doc(frozen));
                     case_parts.extend(self.build_trailing_same_line_comment_docs(
                         case.span.end,
                         inline_comment_boundary.min(case_claim_end),
                     ));
+                    self.find_end_with_trailing_comments(case.span.end)
+                        .min(case_claim_end)
                 }
-                None => case_parts.push(self.build_switch_case_doc_inner(
-                    case,
-                    inline_comment_boundary,
-                    next_case_start,
-                    body_has_comments,
-                )),
-            }
-
-            // Advance past any same-line trailing comment on the case's last
-            // statement — the case builder already emitted it (trailing), so the
-            // between-cases / after-last-case comment loops must not re-emit it on
-            // its own line. Clamped to the claim split so a handed-over comment
-            // stays ahead of the cursor for the between-case run to find.
-            prev_end = self
-                .find_end_with_trailing_comments(case.span.end)
-                .min(case_claim_end);
+                None => {
+                    let (doc, emitted_end) = self.build_switch_case_doc_inner(
+                        case,
+                        inline_comment_boundary,
+                        next_case_start,
+                        body_has_comments,
+                    );
+                    case_parts.push(doc);
+                    emitted_end
+                }
+            };
+            prev_blank_end = prev_end.max(case.span.end);
         }
 
         // Comments after the last case, before the body's `}` — or, in a body with no
@@ -240,7 +255,7 @@ impl<'a> Printer<'a> {
         inline_comment_boundary: u32,
         next_case_start: Option<u32>,
         body_has_comments: bool,
-    ) -> DocId {
+    ) -> (DocId, u32) {
         let d = self.d();
         let mut parts = DocBuf::new();
 
@@ -409,6 +424,9 @@ impl<'a> Printer<'a> {
         // block list uses ([`StatementBlankScan`]).
         let mut blanks = StatementBlankScan::new(label_trailing_end);
         let mut prev_stmt_end: Option<u32> = None;
+        // The already-trailed anchor, which parts from the span end once a statement hands
+        // its terminator gap to this consequent list — see the block walk.
+        let mut prev_claim_anchor: Option<u32> = None;
         // Set when the statement just emitted deferred a line comment past its own `;`, so
         // its doc ends on a later line than the `;` and cannot carry that line's comments.
         let mut prev_deferred_line_comment = false;
@@ -432,7 +450,7 @@ impl<'a> Printer<'a> {
                 // one, the next case's label — leads it; the orphan scan must stop at
                 // the claim split so its leading run still finds it.
                 let claim_end = if body_has_comments {
-                    self.statement_claim_end(case.consequent, i, next_case_start)
+                    self.statement_claim_end(case.consequent, i, next_case_start, false)
                 } else {
                     u32::MAX
                 };
@@ -445,7 +463,7 @@ impl<'a> Printer<'a> {
                     self.collect_leading_comments(
                         prev_end,
                         search_end,
-                        prev_stmt_end,
+                        prev_claim_anchor,
                         prev_deferred_line_comment,
                         None,
                     )
@@ -467,6 +485,7 @@ impl<'a> Printer<'a> {
                 }
 
                 prev_end = search_end;
+                prev_claim_anchor = Some(search_end);
                 // The orphan run is content and moves the anchor; a `;` that printed
                 // nothing becomes the bound instead.
                 if leading_comments.is_empty() {
@@ -487,7 +506,7 @@ impl<'a> Printer<'a> {
                 self.collect_leading_comments(
                     prev_end,
                     stmt_start,
-                    prev_stmt_end,
+                    prev_claim_anchor,
                     prev_deferred_line_comment,
                     Some(stmt_start),
                 )
@@ -513,6 +532,16 @@ impl<'a> Printer<'a> {
             // at the `;` below hands over); trailing it here welds a following block onto
             // the line comment, making it the comment's text.
             let stmt_end = stmt.span().end;
+            // The comment CURSOR, which `stmt_end` cannot serve: a statement that hands its
+            // terminator gap to this consequent list ends its own claim at the content
+            // ([`Printer::statement_comment_claim_end`]), and the comment written there is
+            // this list's to place — behind `stmt_end` it would be dropped outright. The
+            // block walk states the same pair ([`Printer::push_statement_trailing_run`]).
+            // The freeze verdict, hoisted above the gap start it gates: a frozen slice already
+            // holds its terminator-gap comment, so handing it over prints it TWICE
+            // ([`Printer::statement_emitted_end`]).
+            let frozen = self.gap_frozen_span(prev_end, stmt.span());
+            let stmt_gap_start = self.statement_emitted_end(stmt, frozen.is_some());
             let next_bound = next_printed_stmt_start(case.consequent, i, inline_comment_boundary);
             // Deferring hands the `;` line's comments to the NEXT statement's leading run,
             // so it needs one to exist. For the last statement of a consequent there is no
@@ -524,45 +553,67 @@ impl<'a> Printer<'a> {
             // case, whose next break is the switch's `}` — the renderer-side holdout
             // `doc/arena_render_suffix.rs` names.
             let has_next_stmt = next_bound != inline_comment_boundary;
+            // A `//` closing the terminator gap still closes the statement's LAST LINE
+            // whoever emits it, so the landing below is unchanged by the hand-off — only the
+            // emitter moved (the gap's run is this list's now, and it trails on the content's
+            // line exactly as the statement's own doc used to put it).
+            let hands_off = frozen.is_none() && self.statement_hands_off_terminator_gap(stmt);
             let terminator_defers =
                 body_has_comments && self.terminator_defers_line_comment(stmt_start, stmt_end);
             // THIS statement's verdict — distinct from `prev_deferred_line_comment`, which
             // is the PREVIOUS statement's and is still being read below (the leading run
             // and the blank scan). The trailing gate needs its own answer here, before the
             // loop tail hands it forward, so the two must not share one variable.
-            let this_defers_line_comment = terminator_defers && has_next_stmt;
+            // …but a statement that hands its gap over defers NOTHING of its own: the trailing
+            // run below emits that `//` and the cursor advances past it. Suppressing the run
+            // here would leave it to a leading run whose cursor never reaches back this far.
+            let this_defers_line_comment = terminator_defers && has_next_stmt && !hands_off;
+            // The own-line landing is the LAST statement's alone — with a next statement the
+            // `;`-line run leads it instead, at consequent indent. Before the hand-off this
+            // fell out of `this_defers_line_comment` swallowing the `has_next_stmt` case; now
+            // that a handed-over statement no longer takes that arm, the bound is explicit.
+            let deferred_tail_landing = terminator_defers && !has_next_stmt;
             // The claim stops at the split: a comment hugging the next printed
             // statement — or, past the last one, the next case's label — leads it
             // instead (`b1(); /* c */ let d1 = 1;`, `b1(); /* c */ case 2:`), emitted
             // by that statement's leading run / the switch's between-case run.
             let claim_end = if body_has_comments {
-                self.statement_claim_end(case.consequent, i, next_case_start)
+                self.statement_claim_end(case.consequent, i, next_case_start, frozen.is_some())
             } else {
                 u32::MAX
             };
             let trailing = if this_defers_line_comment {
                 DocBuf::new()
-            } else if terminator_defers {
+            } else if deferred_tail_landing {
                 // Last statement behind a deferred pre-`;` `//`: nothing may share the
                 // flush line (the `//` runs to its end), so each `;`-line comment takes
                 // its own line at case-label level — the after-last-case run's settled
                 // position (see the `has_next_stmt` note above). Dedent 1 mirrors the
                 // consequent's `d.indent(...)` wrap below.
-                self.build_deferred_tail_same_line_comment_docs(
-                    stmt_end,
-                    next_bound.min(claim_end),
+                let bound = next_bound.min(claim_end);
+                // Two runs, split at the `;`: the terminator gap's own comments trail on the
+                // content's line (empty unless this statement handed its gap over — otherwise
+                // `stmt_gap_start` IS `stmt_end`), and the `;`-line run behind them takes the
+                // own-line landing.
+                let mut docs =
+                    self.build_trailing_same_line_comment_docs(stmt_gap_start, bound.min(stmt_end));
+                docs.extend(self.build_deferred_tail_same_line_comment_docs(
+                    stmt_end.max(stmt_gap_start),
+                    bound,
                     1,
-                )
+                ));
+                docs
             } else {
-                self.build_trailing_same_line_comment_docs(stmt_end, next_bound.min(claim_end))
+                self.build_trailing_same_line_comment_docs(
+                    stmt_gap_start,
+                    next_bound.min(claim_end),
+                )
             };
 
             // Rule A over the consequent list: an own-line directive in the label→first
             // gap or between statements freezes the statement that follows it. Resolved
             // BEFORE the layout choice because the hug below would pull the directive onto
             // the label's line — an inert placement, so the freeze would die on pass 2.
-            let frozen = self.gap_frozen_span(prev_end, stmt.span());
-
             // First block statement hugs the case label: `case 'a': { ... }` — the two
             // layouts that keep something on the label's own line. Both need that line
             // free of leading comments: a comment written ON the label's line trails the
@@ -645,19 +696,34 @@ impl<'a> Printer<'a> {
             // Clamped to the claim split so a handed-over comment stays ahead of it.
             prev_end = if this_defers_line_comment {
                 stmt_end
+            } else if deferred_tail_landing {
+                // The two runs the trailing arm emitted, in order: the terminator gap's own
+                // (from the content's line) and the `;`-line landing behind it. Advancing over
+                // only the first leaves the second ahead of the cursor, where the next leading
+                // run — or the after-last-case run — prints it a SECOND time.
+                let after_gap = self
+                    .find_end_with_trailing_comments(stmt_gap_start)
+                    .max(stmt_end);
+                self.find_end_with_trailing_comments(after_gap)
+                    .min(claim_end)
             } else {
-                self.find_end_with_trailing_comments(stmt_end)
+                self.find_end_with_trailing_comments(stmt_gap_start)
                     .min(claim_end)
             };
-            blanks.printed(prev_end, self.statement_content_tail_blank(stmt));
+            // The BLANK cursor stays at the statement's FULL end — see the block walk for why
+            // the two cannot be one value.
+            blanks.printed(
+                prev_end.max(stmt_end),
+                self.statement_content_tail_blank(stmt),
+            );
             prev_stmt_end = Some(stmt_end);
+            prev_claim_anchor = Some(prev_end);
             prev_deferred_line_comment = this_defers_line_comment;
         }
 
-        // Note: a same-line trailing comment on the *last* statement is consumed
-        // above; the switch printer advances its case cursor past it (via
-        // `find_end_with_trailing_comments`) so it is not re-emitted there.
-
-        d.concat(&parts)
+        // The cursor travels out with the doc: it is already past every comment this
+        // consequent emitted and clamped to the claim split, so the switch's between-case
+        // run opens exactly where this left off (see the caller).
+        (d.concat(&parts), prev_end)
     }
 }

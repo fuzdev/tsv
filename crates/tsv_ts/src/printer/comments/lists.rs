@@ -8,6 +8,7 @@
 
 use super::{CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
+use crate::printer::statements::TerminatorGap;
 use crate::printer::{next_printed_stmt, next_printed_stmt_start, statement_gap_floor};
 use tsv_lang::Span;
 use tsv_lang::comments_in_source_after_comment;
@@ -543,13 +544,74 @@ impl<'a> Printer<'a> {
         body: &[internal::Statement<'_>],
         index: usize,
         tail_target: Option<u32>,
+        frozen: bool,
     ) -> u32 {
         match next_printed_stmt(body, index)
             .map(|s| s.span().start)
             .or(tail_target)
         {
-            Some(target) => self.trailing_claim_end(statement_gap_floor(body, index), target),
+            Some(target) => {
+                self.trailing_claim_end(self.statement_gap_scan_start(body, index, frozen), target)
+            }
             None => u32::MAX,
+        }
+    }
+
+    /// Where `body[index]`'s trailing gap OPENS for the comment scans — the slot floor
+    /// ([`statement_gap_floor`]) lowered into the statement's own terminator gap.
+    ///
+    /// The two directions answer two different obstacles and compose in one order. A
+    /// dropped `;` after the statement RAISES the floor, because a comment before it binds
+    /// inside that `;`'s own slot and trails. A `;` the statement itself owns LOWERS it, to
+    /// [`Printer::statement_comment_claim_end`] — prettier's `__contentEnd` — because the
+    /// trivia between a statement's content and its terminator is not inside the statement
+    /// at all, and the comment there is the gap's to place
+    /// ([`Self::push_statement_semicolon`], the other half of the partition).
+    ///
+    /// The lowering applies only when nothing was raised: with a dropped `;` in the way the
+    /// gap starts past it, and reaching back over that `;` into the previous statement's
+    /// tail would re-claim a comment its own slot rule already placed.
+    ///
+    /// A kind prettier does not eject reports its own span end and nothing moves, so the
+    /// table is read here and nowhere else in the seam.
+    fn statement_gap_scan_start(
+        &self,
+        body: &[internal::Statement<'_>],
+        index: usize,
+        frozen: bool,
+    ) -> u32 {
+        let floor = statement_gap_floor(body, index);
+        if floor == body[index].span().end {
+            self.statement_emitted_end(&body[index], frozen)
+        } else {
+            floor
+        }
+    }
+
+    /// Where `stmt`'s own emission ENDS for the enclosing list's comment scans: its
+    /// terminator-gap claim end ([`Printer::statement_comment_claim_end`]), or its span end
+    /// when the statement is FROZEN.
+    ///
+    /// Named for the emission rather than for a gap, because it is not a sibling of
+    /// [`statement_gap_floor`] or [`Self::statement_gap_scan_start`] and must not be reached
+    /// for as one: those two answer where a gap's SCAN opens (and a dropped `;` RAISES them),
+    /// while this only ever moves DOWN, into the statement's own terminator gap. It is the
+    /// anchor a trailing run and a cursor take.
+    ///
+    /// ⚠️ A format-ignore freeze copies the statement's text verbatim up to
+    /// [`Printer::statement_content_end`], and that measure counts a comment as CONTENT — so
+    /// a comment in the terminator gap is already inside the slice (a cataloged divergence,
+    /// `docs/conformance_prettier_ignore.md` §Format-ignore directive). Handing it to the list
+    /// as well prints it TWICE. The freeze is the caller's verdict, so the caller states it.
+    pub(crate) fn statement_emitted_end(
+        &self,
+        stmt: &internal::Statement<'_>,
+        frozen: bool,
+    ) -> u32 {
+        if frozen {
+            stmt.span().end
+        } else {
+            self.statement_comment_claim_end(stmt)
         }
     }
 
@@ -627,14 +689,20 @@ impl<'a> Printer<'a> {
         body: &[internal::Statement<'_>],
         index: usize,
         list_end: u32,
+        frozen: bool,
     ) -> u32 {
-        let stmt_end = body[index].span().end;
+        // ⚠️ The ANCHOR only ever moves DOWN, so it is the claim end rather than
+        // [`Self::statement_gap_scan_start`]: a dropped `;` RAISES that, and anchoring the
+        // statement's own trailing run past a `;` puts the cursor above a comment written
+        // before it — which that `;`'s orphan run then cannot find, a DROP. Raising is the
+        // claim SCAN's rule, not the anchor's.
+        let stmt_end = self.statement_emitted_end(&body[index], frozen);
         let bound = next_printed_stmt_start(body, index, list_end);
         self.push_trailing_run(
             parts,
             stmt_end,
             bound,
-            self.statement_claim_end(body, index, None),
+            self.statement_claim_end(body, index, None, frozen),
         )
     }
 
@@ -1645,21 +1713,46 @@ impl<'a> Printer<'a> {
         block_after_separator: bool,
         clause_tail: Option<u8>,
     ) {
-        if self.semicolon_gap_is_bare(content_end, span_end) {
+        let semicolon_pos = Self::semicolon_pos(content_end, span_end);
+        self.push_semicolon_gap_bounded(
+            parts,
+            content_end,
+            semicolon_pos,
+            block_after_separator,
+            clause_tail,
+        );
+    }
+
+    /// [`Self::push_semicolon_with_gap_comments`] over a gap whose far end the caller
+    /// states, rather than the `;`'s own position.
+    ///
+    /// The two differ only for a statement that hands its terminator gap to the enclosing
+    /// LIST ([`Self::push_statement_semicolon`]): there the node's claim stops at the start
+    /// of the trailing trivia run, which is *not* the `;` whenever the printer keeps a `)`
+    /// in between (`const a = (b /* c */);` — the comment is inside the shell and stays this
+    /// node's, while anything past the `)` is the list's).
+    fn push_semicolon_gap_bounded(
+        &self,
+        parts: &mut DocBuf,
+        content_end: u32,
+        gap_end: u32,
+        block_after_separator: bool,
+        clause_tail: Option<u8>,
+    ) {
+        if !self.has_comments_to_emit_between(content_end, gap_end) {
             // `push_gap_comments`' own zero-comment gate, asked here first: with nothing to
             // emit, the deferred run's buffer and the deferral need not exist, and the
             // terminator is the bare `;` — the common case by a wide margin.
             parts.push(self.d().text(";"));
             return;
         }
-        let semicolon_pos = Self::semicolon_pos(content_end, span_end);
         let deferral = self.terminator_gap_deferral(clause_tail);
         let mut after = DocBuf::new();
         self.push_gap_comments(
             parts,
             &mut after,
             content_end,
-            semicolon_pos,
+            gap_end,
             GapBinding {
                 block_after: block_after_separator,
                 preserve_blank: true,
@@ -1668,6 +1761,73 @@ impl<'a> Printer<'a> {
         );
         parts.push(self.d().text(";"));
         parts.extend(after);
+    }
+
+    /// The `;` terminator for a **statement**, whose gap comments are the one kind a node
+    /// does not print itself.
+    ///
+    /// [`Printer::statement_comment_claim_end`] (prettier's `__contentEnd`) ends a
+    /// `;`-terminated statement at its CONTENT, so a comment the author left between that
+    /// content and the `;` is not inside the statement at all — it falls in the gap BETWEEN
+    /// two statements, where the ordinary own-line / same-line split decides whether it
+    /// trails the statement before it or leads the one after
+    /// ([`Self::comment_leads_next_item`]). In a statement LIST that seam is right there, so
+    /// this emits the bare `;` and lets it claim the run: `a()⏎/* c */;⏎b();` prints
+    /// `a();⏎/* c */ b();`, the comment leading `b()` glued to the pure separator it was
+    /// written against.
+    ///
+    /// ⚠️ **The two sides must PARTITION the gap** (`docs/comments.md` §The element-comma
+    /// seam states the rule for its own seam; this is the same obligation): emitting here as
+    /// well is a DOUBLE-PRINT, and lowering the list's cursor without stopping here is what
+    /// would cause it. The list's cursor is the same predicate
+    /// ([`Self::statement_gap_scan_start`]), which is why neither side re-spells it.
+    ///
+    /// A **clause body** (`if (a) foo()⏎/* c */;`) is not a list member and has no such seam,
+    /// so nothing downstream would ever emit the run: it keeps the node-owned split
+    /// ([`Self::push_semicolon_with_gap_comments`]) and its `line_suffix` deferral. That is
+    /// the whole of the axis — `clause_tail` already carries it.
+    ///
+    /// The KIND table is read on the list side rather than here, so a `;` prettier does not
+    /// eject — a `TSImportEqualsDeclaration`, a class property, a type-literal member — never
+    /// reaches this at all; those sites call the node-owned emitter directly.
+    pub(in crate::printer) fn push_statement_semicolon(
+        &self,
+        parts: &mut DocBuf,
+        content_end: u32,
+        span_end: u32,
+        gap: TerminatorGap,
+    ) {
+        let claim_end = self.node_terminator_claim_end(content_end, span_end, gap);
+        self.push_semicolon_gap_bounded(parts, content_end, claim_end, true, gap.clause_tail());
+    }
+
+    /// The upper bound a **node's own** `;`-terminator gap emitter may claim to.
+    ///
+    /// `content_end` for a clause body, which owns its whole gap; otherwise the start of the
+    /// trailing trivia run ([`Printer::trivia_run_start`]), because everything from there to
+    /// the `;` is the enclosing statement LIST's ([`Self::push_statement_semicolon`]). The
+    /// two emitters that ask are the only ones whose callers are statements prettier ejects.
+    ///
+    /// The `;` is located the way [`Self::semicolon_pos`] locates it, but from the source
+    /// rather than from a span: one caller passes the `;`'s own position as `span_end` and
+    /// the other the statement's end, and the trailing byte answers both.
+    pub(in crate::printer) fn node_terminator_claim_end(
+        &self,
+        content_end: u32,
+        span_end: u32,
+        gap: TerminatorGap,
+    ) -> u32 {
+        if !gap.list_claims() {
+            return span_end;
+        }
+        let semicolon_pos = if span_end > content_end
+            && self.source.as_bytes().get(span_end as usize - 1) == Some(&b';')
+        {
+            span_end - 1
+        } else {
+            span_end
+        };
+        self.trivia_run_start(content_end, semicolon_pos)
     }
 
     /// Where a statement's `;` sits: the span's last byte when the span reaches past the
@@ -1680,10 +1840,15 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether the content→`;` gap holds no comment to emit — the one question the
-    /// terminator idiom ([`Self::push_semicolon_with_gap_comments`]) asks before it splits
-    /// anything. When it holds, the terminator is exactly the `;` text, so a caller that
-    /// holds only the content can pair the two without assembling a buffer.
+    /// Whether the content→`;` gap holds no comment to emit — a caller's PRE-CHECK, for the
+    /// one that can skip assembling a buffer when it holds (the expression statement, whose
+    /// value doc is already in hand).
+    ///
+    /// The terminator emitters ask their own bounded form
+    /// ([`Self::push_semicolon_gap_bounded`]), because a statement that hands its gap to the
+    /// enclosing list claims only part of it. This is the wider question — any comment at all
+    /// before the `;` — so it is sound as a pre-check in either direction: it never reports
+    /// bare where the emitter would print something.
     pub(crate) fn semicolon_gap_is_bare(&self, content_end: u32, span_end: u32) -> bool {
         !self.has_comments_to_emit_between(content_end, Self::semicolon_pos(content_end, span_end))
     }
