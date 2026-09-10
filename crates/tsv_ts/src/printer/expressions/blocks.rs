@@ -91,6 +91,37 @@ impl StatementBlankScan {
         self.content_tail_blank = content_tail_blank;
     }
 
+    /// Advance over a statement the walk PRINTED — the loop-tail both statement walks run.
+    ///
+    /// ⚠️ **The blank cursor takes the statement's FULL end, never the comment cursor**, which
+    /// is the whole content of the `.max` here. `prev_end` may have been lowered INTO the
+    /// statement's terminator gap (prettier's `__contentEnd`,
+    /// [`Printer::statement_gap_scan_start`]) so the next statement's leading run can find the
+    /// comment written there, and a blank scan opened at that position would cross the
+    /// comment's own bytes — hazard 5, a FABRICATED blank (`docs/comments.md` §The five
+    /// hazards). Prettier splits the two ends the same way: `isNextLineEmpty` measures from the
+    /// full end while attachment measures from `__contentEnd`. Every handed-over comment lies
+    /// below the span end, so opening there crosses none of them.
+    ///
+    /// The [`Printer::statement_content_tail_blank`] verdict travels with it because it is the
+    /// new anchor's own [`Self::blank_before`] arm — a fact about the statement the anchor
+    /// belongs to, unreachable once the walk has moved past it. Pairing them here is what
+    /// keeps a caller from advancing the cursor and forgetting the arm; before this the rule
+    /// was spelled out at the block walk and left to a "see the block walk for why"
+    /// cross-reference at the consequent's, which is a shared rule with no shared spelling.
+    pub(in crate::printer) fn printed_statement(
+        &mut self,
+        printer: &Printer<'_>,
+        prev_end: u32,
+        stmt: &internal::Statement<'_>,
+        frozen: bool,
+    ) {
+        self.printed(
+            prev_end.max(stmt.span().end),
+            printer.statement_content_tail_blank(stmt, frozen),
+        );
+    }
+
     /// Whether the separator before a statement's LEADING RUN must hoist an author blank
     /// above the whole run — the one statement of a question BOTH statement walks ask (the
     /// program/block/namespace list and the switch consequent's own), so the two cannot
@@ -106,16 +137,20 @@ impl StatementBlankScan {
     ///   run's own members, where its own separator already places it
     ///   ([`Printer::push_leading_comments_before`]). Hoisting it as well prints the author's
     ///   single blank TWICE, so this arm answers `false`.
-    /// - The run is **wholly inside** the gap — nothing in it sits below the blank, so this
-    ///   seam is the only emitter that can place it, and the run is hoisted past the `;`
-    ///   whichever side the author wrote the blank on. So this arm is a DISJUNCTION over the
-    ///   two cursors, because neither can see both sides: above the run
-    ///   (`a() // c1⏎⏎// c2⏎;⏎b()`) only the COMMENT cursor reaches, the blank cursor being
-    ///   anchored at the statement's FULL end, below the whole run — which is how that blank
-    ///   came to be DROPPED outright; below the terminator (`a()⏎/* c */;⏎⏎b()`) only the
-    ///   BLANK cursor does, and that is the "rides above instead, the break it sat on is
-    ///   gone" reading `syntax/comments/comment_before_detached_semicolon` pins. One
-    ///   `literalline` either way, so an author blank on both sides still prints once.
+    /// - The run is **wholly inside** the gap — the run is hoisted past the `;`, so this arm
+    ///   is a DISJUNCTION over the two cursors, because neither can see both sides. Above the
+    ///   run (`a() // c1⏎⏎// c2⏎;⏎b()`) only the COMMENT cursor reaches, the blank cursor
+    ///   being anchored at the statement's FULL end, below the whole run — which is how that
+    ///   blank came to be DROPPED outright, and nothing else can place it, so that disjunct is
+    ///   unconditional. Below the terminator (`a()⏎/* c */;⏎⏎b()`) only the BLANK cursor
+    ///   does, and there the run's own last separator is a second candidate emitter — so that
+    ///   disjunct is taken only when the run's last comment GLUES to the item
+    ///   ([`Printer::glued_run_blank_anchor`]) and so keeps no line below itself: the "rides
+    ///   above instead, the break it sat on is gone" reading
+    ///   `syntax/comments/comment_before_detached_semicolon` pins. A run that ends its own
+    ///   line keeps the blank below, where `push_leading_comment_run` puts it back — reading
+    ///   it here as well printed the author's single blank TWICE. One `literalline` either
+    ///   way, so an author blank on both sides still prints once.
     /// - Otherwise the ordinary [`Self::blank_before`], over the blank cursor.
     ///
     /// `blank_scan_end` keeps every count off comment bytes (`docs/comments.md` hazard 5).
@@ -138,8 +173,24 @@ impl StatementBlankScan {
         let below_terminator =
             || self.blank_before(printer, printer.blank_scan_end(self.anchor(), stmt_start));
         if inside_gap {
+            // The blank ABOVE the run: no other seam can reach it, so this one always does.
             printer.has_blank_line_between(prev_end, printer.blank_scan_end(prev_end, run_start))
-                || below_terminator()
+                // The blank BELOW the terminator is placed ONCE, and which seam places it is
+                // decided by the run's own last separator. A run whose last comment GLUES to
+                // the next item (`a()⏎/* c */;⏎⏎b()` → `a();⏎⏎/* c */ b();`) leaves no line
+                // below itself to carry the blank, so it rides above instead — the "the break
+                // it sat on is gone" reading `syntax/comments/comment_before_detached_semicolon`
+                // pins. A run that ends its own line keeps it below, where
+                // [`Printer::push_leading_comment_run`]'s `push_blank_preserving_hardline`
+                // finds it and puts it back — the authored relative order the
+                // `clause_terminator_comment_then_blank` divergence records.
+                //
+                // ⚠️ Reading it here **as well** printed the author's single blank TWICE
+                // (`a()⏎// c⏎;⏎⏎b()` gained a line neither formatter emits). A fabricated
+                // blank is its own fixed point, so no gate reaches it: `blanks:audit` grades
+                // an INJECTED blank against the pristine output, and both sides fabricate.
+                || (printer.glued_run_blank_anchor(leading_comments).is_some()
+                    && below_terminator())
         } else {
             !spans_terminator && below_terminator()
         }
@@ -156,6 +207,98 @@ impl StatementBlankScan {
     pub(in crate::printer) fn skipped_semi(&mut self, printer: &Printer<'_>, semi_start: u32) {
         if semi_start >= self.anchor && !printer.is_same_line(self.anchor, semi_start) {
             self.bound = self.bound.min(semi_start);
+        }
+    }
+}
+
+/// The walk state a statement list carries INTO a dropped `EmptyStatement`'s slot.
+///
+/// Read-only and `Copy`: both walks keep these as plain locals shared with their printing
+/// arm, and the slot only asks them questions.
+#[derive(Clone, Copy)]
+pub(in crate::printer) struct OrphanSemiCursor {
+    /// The comment cursor — everything the list has already emitted sits behind it.
+    pub prev_end: u32,
+    /// End of the last thing the list PRINTED; `None` when it has printed nothing yet.
+    pub prev_stmt_end: Option<u32>,
+    /// [`Printer::comment_already_trailed`]'s anchor: where the previous statement's own
+    /// emission actually ENDED, which parts from its span end once it hands its terminator
+    /// gap to the list.
+    pub prev_claim_anchor: Option<u32>,
+    /// The previous statement deferred a line comment past its own `;`, so it trailed
+    /// NOTHING on that line ([`Printer::terminator_defers_line_comment`]).
+    pub prev_deferred_line_comment: bool,
+    /// The list's zero-comment fast gate — see `body_has_comments` in
+    /// [`Printer::build_statement_list_docs_into`].
+    pub has_comments: bool,
+}
+
+/// What a dropped `EmptyStatement`'s slot DECIDES — the shared half of the orphan arm both
+/// statement walks run ([`Printer::orphan_semi_slot`] builds it).
+///
+/// The arm has two halves and only one of them is shareable. The decision — how far the
+/// slot reaches, which comments it claims, whether an author blank sits above them, and how
+/// the walk's cursors move over it — is this type. The EMISSION genuinely differs (the block
+/// list pushes into its caller-owned `body_parts`; the switch consequent wraps the run in
+/// `d.indent`) and stays at each callsite.
+///
+/// A type for the same reason [`StatementBlankScan`] is one: the two arms were hand-rolled
+/// copies, and the copy is what let them drift THREE ways in a single session — the monotone
+/// cursor clamp only the block walk carried (a real DOUBLE-PRINT, pinned by
+/// `switch/consequent_empty_statement_run_multiline_trailer`), the blank question's axis
+/// (in-source vs to-emit), and the claim-anchor update. Each is stated once here.
+pub(in crate::printer) struct OrphanSemiSlot<'c> {
+    /// Upper bound of this `;`'s slot: the run emitter's own bound, the blank scan's far
+    /// end, and the position the comment cursor advances to.
+    pub search_end: u32,
+    /// The comments this slot must print; empty when it claims none. Mutable because the
+    /// block walk's first slot must still drop what the opening `{`'s line already carries.
+    pub comments: CommentVec<'c>,
+    /// An author blank line separates the run from the last thing the list printed. Folds in
+    /// "something HAS printed" — with nothing above it there is no gap to be blank.
+    pub blank_above: bool,
+    /// Whether this slot claims its comments at all ([`Printer::orphan_semi_slot`]'s
+    /// `claims`), kept so [`Self::advance`] moves the cursor only over what was emitted.
+    claims: bool,
+}
+
+impl OrphanSemiSlot<'_> {
+    /// Move the walk's cursors over the slot — the third of the three drifts, and the one
+    /// with no local spelling left: a caller states its emission, never this bookkeeping.
+    ///
+    /// ⚠️ **An orphan slot moves NO claim anchor**, which is why none is passed. The anchor
+    /// answers "did the previous item TRAIL this comment, ahead of the cursor"
+    /// ([`Printer::comment_already_trailed`]), and only a trailing run can leave one there —
+    /// its cursor is clamped to the claim split, while this run's IS its upper bound, so
+    /// everything the slot emitted is already behind `prev_end`. [`Self::search_end`] is also
+    /// capped by the NEXT dropped `;`'s start, a third position that predicate's ⚠️ does not
+    /// admit and that can sit on a later comment's line: anchored there, the next slot calls
+    /// that comment already-trailed and DROPS it (`a()// c1⏎;;;; // c2`, and again with a
+    /// comment in the terminator gap — both found by the gap-injection audit, and both
+    /// needing two `;`s, so a single one never showed either). Keeping the last printed
+    /// statement's anchor preserves the one reading that IS meaningful: a comment its
+    /// trailing run claimed and its clamped cursor stopped short of.
+    ///
+    /// The COMMENT cursor moves only over what the slot claimed: a slot that claims nothing
+    /// leaves every comment in it ahead of the cursor, for the seam past the list to place.
+    ///
+    /// The orphan run is content and moves the BLANK anchor exactly as a statement does; a
+    /// `;` that printed nothing becomes that scan's bound instead
+    /// ([`StatementBlankScan::skipped_semi`]).
+    pub(in crate::printer) fn advance(
+        &self,
+        printer: &Printer<'_>,
+        prev_end: &mut u32,
+        blanks: &mut StatementBlankScan,
+        semi_start: u32,
+    ) {
+        if self.claims {
+            *prev_end = self.search_end;
+        }
+        if self.comments.is_empty() {
+            blanks.skipped_semi(printer, semi_start);
+        } else {
+            blanks.printed(self.search_end, false);
         }
     }
 }
@@ -267,6 +410,120 @@ impl<'a> Printer<'a> {
         search_end: u32,
     ) -> bool {
         self.has_blank_line_between(prev_end, self.blank_scan_end(prev_end, search_end))
+    }
+
+    /// Where a blank BELOW a leading run would have to sit — `Some(end)` when the run's last
+    /// comment GLUES to what follows it, `None` otherwise.
+    ///
+    /// The glue erases the gap the author wrote that blank in, so the run keeps no line below
+    /// itself to carry one and the seam ABOVE the run becomes its only emitter. Both statement
+    /// seams that can hoist a blank ask exactly this — the statement list's leading run
+    /// ([`StatementBlankScan::blank_before_leading_run`]) and the switch's between-case run —
+    /// and asking it in one place is the point: two hand-rolled copies of one comment question
+    /// is the drift this whole area has paid for repeatedly.
+    ///
+    /// Each caller then MEASURES with its own cursor, and those genuinely differ: the list
+    /// walk's blank cursor carries the content-end arm ([`StatementBlankScan::blank_before`])
+    /// that a raw source scan cannot express, while the case seam scans plain source to the
+    /// label. One question, two scans — which is why this returns the anchor rather than a
+    /// verdict.
+    pub(in crate::printer) fn glued_run_blank_anchor(
+        &self,
+        comments: &[&internal::Comment],
+    ) -> Option<u32> {
+        comments
+            .last()
+            .filter(|c| self.comment_hugs_next(c))
+            .map(|c| c.span.end)
+    }
+
+    /// Decide the slot the dropped `EmptyStatement` at `body[index]` opens — the shared half
+    /// of both statement walks' orphan arm. See [`OrphanSemiSlot`] for why it is one type.
+    ///
+    /// `list_end` is the far edge of the walk's own window (a body's `}`, a case's boundary)
+    /// and `tail_target` the construct past the list's end that a gap comment could still
+    /// lead ([`Self::statement_claim_end`]) — `None` where nothing prints there.
+    ///
+    /// `claims` is the one asymmetry between the two walks, and it is principled. A TRAILING
+    /// run of dropped `;`s — one with no printed statement after it — claims nothing in a
+    /// switch consequent: an orphan run is a leading run with its item dropped, and there is
+    /// no item left to lead, so the comments are the CASE seam's and the between-case (or
+    /// after-last-case) run places them at the case's level, which is where a reformat reads
+    /// them back from. Claiming them at consequent level printed a form that was not its own
+    /// fixed point (`case 1: fn1();⏎// c⏎;` dedented on the second pass). A block body has no
+    /// such seam past its end, so its slots always claim.
+    pub(in crate::printer) fn orphan_semi_slot(
+        &self,
+        body: &[internal::Statement<'_>],
+        index: usize,
+        list_end: u32,
+        tail_target: Option<u32>,
+        cursor: OrphanSemiCursor,
+        claims: bool,
+    ) -> OrphanSemiSlot<'_> {
+        let stmt_end = body[index].span().end;
+        // Zero-comment fast gate, the list's own: with no comment anywhere in its window
+        // every query below is provably empty, so the slot reaches exactly its own `;` and
+        // claims nothing. The block walk had this; the consequent's copy ran the searches
+        // anyway and then discarded their answer.
+        if !cursor.has_comments {
+            return OrphanSemiSlot {
+                search_end: stmt_end,
+                comments: CommentVec::new(),
+                blank_above: false,
+                claims,
+            };
+        }
+        let next_start = body.get(index + 1).map_or(list_end, |s| s.span().start);
+        // A comment hugging the next printed statement's start leads it
+        // (`a(); ; /* c */ b();`) — or, past the last one, the construct at `tail_target` (a
+        // consequent's next `case` label). The orphan run must stop at the claim split so
+        // that leading run still finds it.
+        let claim_end = self.statement_claim_end(body, index, tail_target, false);
+        // A dropped `;` owns no terminator gap, so its own run reads one line.
+        let search_end = self
+            .find_end_with_trailing_comments(stmt_end, u32::MAX)
+            .min(next_start)
+            .min(claim_end)
+            // ⚠️ **The cursor is MONOTONE.** Both `min`s above are bounds on this `;`'s own
+            // slot and neither knows where the last PRINTED statement's trailing run ended —
+            // a run that follows a multi-line block to its closing line ends past a following
+            // `;` (`a();;; /* m⏎n */ // c`), so taking them raw moves the cursor BACKWARD over
+            // comments already emitted and the next slot prints one of them a SECOND time.
+            // Nothing else caught it: `comment_already_trailed`'s span-end anchor is a line
+            // below such a comment, and its ⚠️ argues from exactly the invariant this restores
+            // — a comment inside the trailing run stays BEHIND the cursor and never reaches
+            // that filter.
+            .max(cursor.prev_end);
+
+        // `prev_deferred_line_comment` reaches the ORPHAN run too, the way it does a printing
+        // one: the previous statement deferred a line comment past its own `;` and so trailed
+        // NOTHING on that line, which leaves this run its only emitter. Answering `false` made
+        // the filter call the gap's comments already-trailed and skip them — a DROP, since the
+        // dropped `;` puts no leading run after them either (`a = 1 // c1⏎; /* c2 */ ;⏎b = 2;`).
+        let comments = if claims {
+            self.collect_leading_comments(
+                cursor.prev_end,
+                search_end,
+                cursor.prev_claim_anchor,
+                cursor.prev_deferred_line_comment,
+                None,
+            )
+        } else {
+            CommentVec::new()
+        };
+
+        OrphanSemiSlot {
+            // Asked only where there is a run to hoist it above — the emitters read it under
+            // their own `is_empty` guard, and a caller that filters the run down to nothing
+            // never reaches it either.
+            blank_above: !comments.is_empty()
+                && cursor.prev_stmt_end.is_some()
+                && self.blank_before_orphan_run(cursor.prev_end, search_end),
+            search_end,
+            comments,
+            claims,
+        }
     }
 
     /// Build a Doc for a block statement. Its body is a genuine `BlockStatement`
@@ -518,91 +775,44 @@ impl<'a> Printer<'a> {
             // with nothing following them in this iteration to glue to.
             if matches!(stmt, internal::Statement::EmptyStatement(_)) {
                 let stmt_end = stmt.span().end;
-                let next_start = body.get(i + 1).map_or(body_end, |s| s.span().start);
-                let search_end = if body_has_comments {
-                    // A comment hugging the next printed statement's start leads it
-                    // (`a(); ; /* c */ b();`) — the orphan run must stop at the claim
-                    // split so that statement's leading run still finds it.
-                    let claim_end = self.statement_claim_end(body, i, None, false);
-                    // A dropped `;` owns no terminator gap, so its own run reads one line.
-                    self.find_end_with_trailing_comments(stmt_end, u32::MAX)
-                        .min(next_start)
-                        .min(claim_end)
-                        // ⚠️ **The cursor is MONOTONE.** Both `min`s above are bounds on
-                        // this `;`'s own slot and neither knows where the last PRINTED
-                        // statement's trailing run ended — a run that follows a multi-line
-                        // block to its closing line ends past a following `;` (`a();;;
-                        // /* m⏎n */ // c`), so taking them raw moved `prev_end` BACKWARD
-                        // over comments already emitted and the next `;`'s orphan run
-                        // printed one of them a second time. Nothing else caught it:
-                        // `comment_already_trailed`'s span-end anchor is a line below such
-                        // a comment, and its ⚠️ argues from exactly the invariant this
-                        // restores — a comment inside the trailing run stays BEHIND the
-                        // cursor and never reaches that filter.
-                        .max(prev_end)
-                } else {
-                    stmt_end
-                };
-
-                // `prev_deferred_line_comment` reaches the ORPHAN run too, the way it does
-                // the printing run below: the previous statement deferred a line comment
-                // past its own `;` and so trailed NOTHING on that line, which leaves this
-                // run its only emitter. Answering `false` here made the filter call the
-                // gap's comments already-trailed and skip them — a DROP, since the dropped
-                // `;` puts no leading run after them either
-                // (`a = 1 // c1⏎; /* c2 */ ;⏎b = 2;`). The switch consequent's own orphan
-                // arm has always passed it; this copy is the one that drifted.
-                let mut leading_comments = if body_has_comments {
-                    self.collect_leading_comments(
+                // A block body has no seam past its end that could re-place a trailing run's
+                // comments, so every slot here claims — [`Printer::orphan_semi_slot`].
+                let mut slot = self.orphan_semi_slot(
+                    body,
+                    i,
+                    body_end,
+                    None,
+                    OrphanSemiCursor {
                         prev_end,
-                        search_end,
+                        prev_stmt_end,
                         prev_claim_anchor,
                         prev_deferred_line_comment,
-                        None,
-                    )
-                } else {
-                    CommentVec::new()
-                };
+                        has_comments: body_has_comments,
+                    },
+                    true,
+                );
+                // The opening `{`'s line is the caller's to print, so a comment the author
+                // glued there is emitted as a prefix on it and this slot must not claim it
+                // too. Only the FIRST slot can: no later statement shares that line.
                 if is_first && let Some(dpos) = delimiter_pull_pos {
-                    leading_comments.retain(|c| !self.comment_on_delimiter_line(dpos, c));
+                    slot.comments
+                        .retain(|c| !self.comment_on_delimiter_line(dpos, c));
                 }
 
-                if !leading_comments.is_empty() {
+                if !slot.comments.is_empty() {
                     if prev_stmt_end.is_some() {
-                        if self.blank_before_orphan_run(prev_end, search_end) {
+                        if slot.blank_above {
                             body_parts.push(d.literalline());
                         }
                         body_parts.push(d.hardline());
                     } else if has_leading {
                         body_parts.push(d.hardline());
                     }
-                    self.push_orphaned_comment_run(body_parts, &leading_comments, search_end);
+                    self.push_orphaned_comment_run(body_parts, &slot.comments, slot.search_end);
                     prev_stmt_end = Some(stmt_end);
                 }
 
-                prev_end = search_end;
-                // ⚠️ An orphan slot moves NO claim anchor. The anchor answers "did the
-                // previous item TRAIL this comment, ahead of the cursor"
-                // ([`Printer::comment_already_trailed`]), and only a trailing run can leave
-                // one there — its cursor is clamped to the claim split, while this run's IS
-                // its upper bound, so everything it emitted is already behind `prev_end`.
-                // `search_end` is also capped by the NEXT dropped `;`'s start, a third
-                // position that predicate's ⚠️ does not admit and that can sit on a later
-                // comment's line: anchored there, the next slot calls that comment
-                // already-trailed and DROPS it (`a()// c1⏎;;;; // c2`, and again with a
-                // comment in the terminator gap — both found by the gap-injection audit,
-                // and both needing two `;`s, so a single one never showed either).
-                // Keeping the last printed statement's anchor instead preserves the one
-                // reading that IS meaningful: a comment its trailing run claimed and its
-                // clamped cursor stopped short of.
-                //
-                // The orphan run is content and moves the BLANK anchor exactly as a
-                // statement does; a `;` that printed nothing becomes the bound instead.
-                if leading_comments.is_empty() {
-                    blanks.skipped_semi(self, stmt.span().start);
-                } else {
-                    blanks.printed(search_end, false);
-                }
+                slot.advance(self, &mut prev_end, &mut blanks, stmt_start);
                 continue;
             }
 
@@ -723,19 +933,7 @@ impl<'a> Printer<'a> {
             } else {
                 prev_end = stmt_end;
             }
-            // ⚠️ The BLANK cursor is the statement's FULL end, never the comment cursor:
-            // `prev_end` may have been lowered INTO the statement's terminator gap (prettier's
-            // `__contentEnd`, [`Printer::statement_gap_scan_start`]) so the next statement's
-            // leading run can find the comment there, and a blank scan opened at that
-            // position would cross the comment's own bytes — hazard 5, a FABRICATED blank
-            // (`docs/comments.md` §The five hazards). Prettier splits the two ends the same
-            // way: its `isNextLineEmpty` measures from the full end while attachment measures
-            // from `__contentEnd`. The handed comments all lie below `stmt_end`, so opening
-            // there crosses none of them.
-            blanks.printed(
-                prev_end.max(stmt_end),
-                self.statement_content_tail_blank(stmt, stmt_frozen),
-            );
+            blanks.printed_statement(self, prev_end, stmt, stmt_frozen);
             prev_stmt_end = Some(stmt_end);
             prev_claim_anchor = Some(prev_end);
         }

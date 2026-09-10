@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 208,
+	"end": 368,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,88 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the rule is the SEAM's, not the clause's: a plain statement's own terminator gap",
+			"start": 199,
+			"end": 282,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " answers identically",
+			"start": 284,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 316,
+			"end": 321,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 340,
+			"end": 348,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 207,
+		"end": 367,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 198,
+			"end": 358,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 12,
+					"line": 22,
 					"column": 9
 				}
 			},
@@ -288,6 +352,228 @@
 							"value": " c2 ",
 							"start": 180,
 							"end": 188
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 308,
+					"end": 314,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 308,
+						"end": 313,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 308,
+							"end": 311,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 4
+								}
+							},
+							"name": "fn3"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the rule is the SEAM's, not the clause's: a plain statement's own terminator gap",
+							"start": 199,
+							"end": 282
+						},
+						{
+							"type": "Line",
+							"value": " answers identically",
+							"start": 284,
+							"end": 306
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 324,
+					"end": 330,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 324,
+						"end": 329,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 324,
+							"end": 327,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 17,
+									"column": 4
+								}
+							},
+							"name": "fn4"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 316,
+							"end": 321
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 332,
+					"end": 338,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 332,
+						"end": 337,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 332,
+							"end": 335,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 1
+								},
+								"end": {
+									"line": 18,
+									"column": 4
+								}
+							},
+							"name": "fn5"
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 351,
+					"end": 357,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 351,
+						"end": 356,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 351,
+							"end": 354,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 1
+								},
+								"end": {
+									"line": 21,
+									"column": 4
+								}
+							},
+							"name": "fn6"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c4 ",
+							"start": 340,
+							"end": 348
 						}
 					]
 				}

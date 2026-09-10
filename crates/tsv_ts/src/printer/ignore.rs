@@ -907,60 +907,70 @@ impl<'a> Printer<'a> {
     /// Whether a statement's terminator gap belongs to the enclosing statement LIST rather
     /// than to the statement itself — the kind half of prettier's `nodeTypesWithContentEnd`.
     ///
-    /// The one-step reading of the [`Self::frozen_statement_terminator`] table
-    /// ([`Self::own_statement_terminator`]): a HEADER kind is excluded even though a `;` does
-    /// follow it, because that `;` is its clause BODY's and the body keeps the node-owned
-    /// split ([`Printer::push_statement_semicolon`]) — it is not a list member, so no gap
-    /// downstream would ever emit its run. Claiming it here as well double-prints it.
+    /// The **recursive** reading of the [`Self::frozen_statement_terminator`] table
+    /// ([`Self::own_statement_terminator`]): a HEADER kind's `;` belongs to its clause BODY,
+    /// so the walk follows it there and answers for the emitter that actually prints it. The
+    /// tail-most body is the one the table names (an `if`'s alternate before its consequent,
+    /// a loop's body), which is exactly the body whose tail is the header's own — so the gap
+    /// this claims sits between two LIST members like any other, and the list's seam places
+    /// its run (`if (cond) expr⏎/* c */;⏎fn();` → `if (cond) expr;⏎/* c */ fn();`, the answer
+    /// the plain statement list and prettier both give).
+    ///
+    /// ⚠️ **`StatementContext::terminator_gap` is the other end of this rule and must agree
+    /// exactly** — both claiming is a DOUBLE-PRINT, neither a DROP. It reaches the same body
+    /// by carrying `tail_reaches_list` down the clause chain, and both stop at the same
+    /// place: a body whose tail stays OPEN to a continuing construct (an `if`'s consequent
+    /// before its `else`, a do-while's body) keeps the node-owned split
+    /// ([`Printer::push_statement_semicolon`]), because no list seam can reach a gap interior
+    /// to the construct.
     ///
     /// A kind the table calls [`FrozenTerminator::Never`] has no terminator to eject at all.
     pub(in crate::printer) fn statement_hands_off_terminator_gap(
         &self,
         mut stmt: &internal::Statement<'_>,
     ) -> bool {
-        // Follow every DELEGATING wrapper first: the answer is the statement that actually
-        // prints the `;`.
+        // Walk to the statement that actually prints the `;` — through every DELEGATING
+        // wrapper, and through every clause-bearing HEADER to its tail-most clause body
+        // ([`Self::own_statement_terminator`] picks that body: an `if`'s alternate before its
+        // consequent, a loop's body). Both steps end at one emitter, and the answer is that
+        // emitter's.
         loop {
-            match Self::delegated_statement(stmt) {
-                Some(inner) => {
-                    // ⚠️ A directive INSIDE the wrapper freezes only the inner statement
-                    // (`export⏎// prettier-ignore⏎const a = 1;`, `l:⏎// prettier-ignore⏎fn();`),
-                    // and a frozen slice already holds its terminator-gap comment — the same
-                    // reason the walk's own freeze verdict suppresses the hand-off
-                    // ([`Printer::statement_emitted_end`]). The walk cannot see this one: it
-                    // asks of the gap ABOVE the wrapper, which is directive-free here.
-                    if self.member_gap_frozen(stmt.span().start, inner.span().start) {
-                        return false;
-                    }
-                    stmt = inner;
-                }
-                None => return Self::statement_owns_terminator_gap_emitter(stmt),
+            // `export default`'s value is held INLINE rather than as a statement, so its kind
+            // cannot answer alone: an EXPRESSION routes through
+            // [`Printer::split_terminator_gap_comments`] and hands over, while a DECLARATION
+            // (`export default function main(): void;`) is printed by its own signature
+            // printer, which keeps the gap. Reading it as one kind double-printed every
+            // ambient default overload.
+            if let internal::Statement::ExportDefaultDeclaration(decl) = stmt {
+                return matches!(
+                    decl.declaration,
+                    internal::ExportDefaultValue::Expression(_)
+                );
             }
+            let inner = match Self::delegated_statement(stmt) {
+                Some(inner) => inner,
+                None => match Self::own_statement_terminator(stmt) {
+                    Ok(terminator) => {
+                        return matches!(
+                            terminator,
+                            FrozenTerminator::Always | FrozenTerminator::IfAuthored
+                        );
+                    }
+                    Err(body) => body,
+                },
+            };
+            // ⚠️ A directive INSIDE the step freezes only the inner statement
+            // (`export⏎// prettier-ignore⏎const a = 1;`, `l:⏎// prettier-ignore⏎fn();`,
+            // `if (a)⏎// prettier-ignore⏎fn(  b  );`), and a frozen slice already holds its
+            // terminator-gap comment — the same reason the walk's own freeze verdict
+            // suppresses the hand-off ([`Printer::statement_emitted_end`]). The walk cannot
+            // see this one: it asks of the gap ABOVE the outermost statement, which is
+            // directive-free here.
+            if self.member_gap_frozen(stmt.span().start, inner.span().start) {
+                return false;
+            }
+            stmt = inner;
         }
-    }
-
-    /// Whether `stmt`'s own `;` is printed by an emitter that HANDS its gap to the enclosing
-    /// list — the terminal step of [`Self::statement_hands_off_terminator_gap`], asked once
-    /// every delegating wrapper has been followed.
-    ///
-    /// The [`Self::frozen_statement_terminator`] table answers it for every kind but one, so
-    /// the two stay one table. The exception is `export default`, whose value is held INLINE
-    /// rather than as a statement: an EXPRESSION routes through
-    /// [`Printer::split_terminator_gap_comments`] and hands over, while a DECLARATION
-    /// (`export default function main(): void;`) is printed by its own signature printer,
-    /// which keeps the gap — so the wrapper cannot answer from its kind alone. Reading it as
-    /// one kind double-printed every ambient default overload.
-    fn statement_owns_terminator_gap_emitter(stmt: &internal::Statement<'_>) -> bool {
-        if let internal::Statement::ExportDefaultDeclaration(decl) = stmt {
-            return matches!(
-                decl.declaration,
-                internal::ExportDefaultValue::Expression(_)
-            );
-        }
-        matches!(
-            Self::own_statement_terminator(stmt),
-            Ok(FrozenTerminator::Always | FrozenTerminator::IfAuthored)
-        )
     }
 
     pub(in crate::printer) fn statement_comment_claim_end(
@@ -1081,12 +1091,18 @@ impl<'a> Printer<'a> {
     /// [`Self::statement_hands_off_terminator_gap`] alike, and the inner one is the
     /// authority — it is the one holding the emitter.
     ///
-    /// ⚠️ **A clause-BEARING header is not this**, though the freeze table walks through one
-    /// the same way ([`Self::own_statement_terminator`]). `if` / `for` / `while` / `with`
-    /// build their body under `StatementContext::clause_body`, which keeps the node-owned
-    /// split *because the body's tail line stays open to the enclosing construct* — so that
-    /// `;`'s gap is the body's to print and an enclosing list must not reach for it.
-    /// Conflating the two walks cost one DOUBLE-PRINT (every `export type A = B;`) and one
+    /// ⚠️ **A clause-BEARING header is not this**, though
+    /// [`Self::statement_hands_off_terminator_gap`] now walks through one as well and the
+    /// freeze table always did ([`Self::own_statement_terminator`]). The two steps stay
+    /// separate because they answer to different context: a delegating wrapper's inner
+    /// statement INHERITS the wrapper's context, so the two are interchangeable, while
+    /// `if` / `for` / `while` / `with` build their body under `StatementContext::clause_body`,
+    /// which decides for itself whether the gap is the list's — it is only when the body's
+    /// tail is also the header's (`StatementContext::tail_reaches_list`), and a body whose
+    /// tail stays OPEN to a continuing construct (an `if`'s consequent before its `else`, a
+    /// do-while's body) keeps the node-owned split. So the clause step is sound here for the
+    /// reason its own context states, not because the two walks are the same walk.
+    /// Conflating them cost one DOUBLE-PRINT (every `export type A = B;`) and one
     /// DROP (every `l: a();`), each found by the gap-injection audit rather than by a
     /// fixture — the authoring is one no formatted document contains.
     fn delegated_statement<'s, 'arena>(

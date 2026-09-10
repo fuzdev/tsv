@@ -822,7 +822,25 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// `partial` (32) / `safety` (0) / `errors` (188) / `expected_errors` and every `svelte` and
 	// `css` bucket are unmoved; a file whose bytes did not move cannot change bucket, since
 	// prettier's side of the comparison is fixed.
-	typescript: 73,
+	//
+	// 73 → 71: a DETECTOR change, not a formatter one — the two files leaving were already
+	// cataloged divergences with fixtures, burning an `unknown` slot each because
+	// `lib/divergence/patterns.ts` had no clause claiming them. Not a byte moved:
+	// `js/for/continue-and-break-comment-without-blocks.js` is the whole
+	// `clause_terminator_comment_then_blank` family (the hoisted terminator-gap comment tsv
+	// keeps above the author blank), and `js/comments/break-continue-statements-3.js` is the
+	// `prettier-ignore` slice frozen through a `//`-ended terminator gap. Two new patterns,
+	// each resting on a content proof — blank-lines-removed line equality for the first,
+	// whitespace-and-terminators-removed equality for the second — so neither can absorb a
+	// real relocation or loss. ⚠️ The second needed a second narrowing pass: the directive
+	// plus its content proof also claimed three unrelated whitespace-only `prettier-ignore`
+	// divergences (`js/ignore/issue-11077.js`, `js/ignore/issue-10661.js`,
+	// `typescript/prettier-ignore/mapped-types.ts`), so it now additionally requires the tell
+	// that the TERMINATOR is what moved. Verified by set-diffing the `--all --json` bucket
+	// lists across the change: `unknown` loses exactly these two, `known` 122 → 124, and
+	// `partial` (32) / `safety` (0) / `errors` (188) and every `svelte` and `css` bucket are
+	// file-for-file identical.
+	typescript: 71,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.

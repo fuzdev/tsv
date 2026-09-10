@@ -9,4 +9,14 @@
 	/* c2 */
 
 	fn2();
+	// the rule is the SEAM's, not the clause's: a plain statement's own terminator gap
+	// answers identically
+	fn3();
+	// c3
+
+	fn4();
+	fn5();
+	/* c4 */
+
+	fn6();
 </script>
