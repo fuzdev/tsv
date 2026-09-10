@@ -21,7 +21,7 @@ use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use crate::printer::LeadingGlue;
-use crate::printer::layout::{bracketed_list_body, hang_after_operator};
+use crate::printer::layout::bracketed_list_body;
 use crate::printer::{CommentVec, ShellLeadingRun};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Comment;
@@ -1743,11 +1743,23 @@ impl<'a> Printer<'a> {
     /// colon when it exceeds print width — matching prettier's `shouldIndent` →
     /// `indent(parts)`. Redundant comment-free parens around the value are stripped
     /// first (prettier does the same). A hugging union (`{ ... } | null`) keeps its
-    /// inline `: ` since the object owns its own expansion; `union_prints_hugged`
-    /// owns that question whole — pairing the bare syntactic shape with a NARROWER
-    /// comment scan here (line comments between members only) would let a block comment
-    /// between members, or a line comment in the leading `|`→first-member gap, read as
-    /// "hug" while the printer expands them.
+    /// inline `: ` since the object owns its own expansion.
+    ///
+    /// ⚠️ **The union arm IS the annotation `:` seam** — the same window, handed to
+    /// [`Printer::build_annotation_union_doc`] rather than restated here. The hug
+    /// question, the handed-run split (docs/comments.md hazard 3) and the gap run's
+    /// place INSIDE the hang group are one answer for the mapped value, the
+    /// index-signature value and every other annotation, because a mapped `:` is that
+    /// seam wearing a different node. The copy this replaced differed in exactly one
+    /// respect — it pushed the gap run outside the hang — and that alone destroyed an
+    /// authored break after a multi-line block and made the seam converge only on the
+    /// second pass (`mapped_value_own_line_block_comment`).
+    ///
+    /// The intersection and plain arms keep their own emission: prettier is
+    /// NON-CONVERGENT on the mapped seam for every non-union value (it hangs the value
+    /// under a comment it leaves on the `:` line, at an indent that is not a fixed
+    /// point), so there is no oracle to route them toward, and as written they answer
+    /// exactly as the index signature's identical arms do.
     fn build_mapped_value_tail_doc(
         &self,
         head: &KeywordValueHead<'_>,
@@ -1755,8 +1767,8 @@ impl<'a> Printer<'a> {
         type_ann: &TSType<'_>,
     ) -> DocId {
         let d = self.d();
-        let mut tail_parts: DocBuf = smallvec![d.text(":")];
         if self.has_line_comments_between(colon_pos + 1, head.value_start) {
+            let mut tail_parts: DocBuf = smallvec![d.text(":")];
             let value_doc = self.build_keyword_value_doc(head, TrailingBlock::Inline);
             self.append_keyword_value_line_comments(
                 &mut tail_parts,
@@ -1764,49 +1776,25 @@ impl<'a> Printer<'a> {
                 head.value_start,
                 value_doc,
             );
-        } else {
-            let gap_comments = || {
-                self.build_comments_between(
-                    colon_pos + 1,
-                    type_ann.span().start,
-                    CommentSpacing::Leading,
-                )
-            };
-            match self.unwrap_redundant_parens(type_ann) {
-                TSType::Union(u) => {
-                    // The same value seam as the annotation `:` (`build_union_value_doc`):
-                    // a glued block run in the gap is handed INTO the union — bound to
-                    // the first member, declining the hug, as prettier binds it — and
-                    // then the gap's comments are the union's to print, not this arm's
-                    // (docs/comments.md hazard 3).
-                    let UnionValueDoc {
-                        doc: type_doc,
-                        run_handed,
-                        hugged,
-                    } = self.build_union_value_doc(colon_pos + 1, u);
-                    if !run_handed {
-                        tail_parts.push(gap_comments());
-                    }
-                    if hugged {
-                        tail_parts.push(d.text(" "));
-                        tail_parts.push(type_doc);
-                    } else {
-                        tail_parts.push(hang_after_operator(d, type_doc));
-                    }
-                }
-                TSType::Intersection(i) => {
-                    tail_parts.push(gap_comments());
-                    tail_parts.push(d.text(" "));
-                    tail_parts.push(self.intersection_hanging_with_indent(i));
-                }
-                _ => {
-                    tail_parts.push(gap_comments());
-                    tail_parts.push(d.text(" "));
-                    tail_parts.push(self.build_type_doc(type_ann));
-                }
-            }
+            return d.concat(&tail_parts);
         }
-        d.concat(&tail_parts)
+        let type_start = type_ann.span().start;
+        let value_type = self.unwrap_redundant_parens(type_ann);
+        if let TSType::Union(u) = value_type {
+            return self.build_annotation_union_doc(colon_pos + 1, type_start, u, true);
+        }
+        // One emission for both remaining kinds — they differ only in the value doc, and
+        // spelling the `: <run> <value>` shape twice is how the two would drift.
+        let value_doc = match value_type {
+            TSType::Intersection(i) => self.intersection_hanging_with_indent(i),
+            _ => self.build_type_doc(type_ann),
+        };
+        d.concat(&[
+            d.text(":"),
+            self.build_comments_between(colon_pos + 1, type_start, CommentSpacing::Leading),
+            d.text(" "),
+            value_doc,
+        ])
     }
 
     /// The mapped type's brace shell around an already-built member body: own-line

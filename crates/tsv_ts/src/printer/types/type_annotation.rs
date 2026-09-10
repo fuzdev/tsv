@@ -382,12 +382,22 @@ impl<'a> Printer<'a> {
     /// The `: <union>` doc for every annotation position — the one place the hug
     /// question is asked at the `:` seam, shared by the plain entry
     /// ([`Self::build_type_annotation_doc_parens`] — parameters, destructured and rest
-    /// bindings, index-signature values) and the wrapping entry
+    /// bindings, index-signature values), the wrapping entry
     /// ([`Self::build_type_annotation_doc_with_wrapping`] — variables, class properties,
-    /// property signatures, return types). The two share it so the positions cannot
+    /// property signatures, return types) and the **mapped type**'s own `:`
+    /// ([`Self::build_mapped_value_tail_doc`], whose node is not a `TSTypeAnnotation` but
+    /// whose seam is this one). They share it so the positions cannot
     /// disagree: prettier's union printer decides the hug on the union alone, and an
     /// entry that hangs every union after the `:` breaks a parameter's `{ … } | null`
     /// after `a:` while the same annotation on a variable hugs.
+    ///
+    /// ⚠️ The mapped type reached this seam through a hand-rolled copy that pushed the
+    /// gap run OUTSIDE the hang. Two fixed points one pass apart followed: with the run
+    /// outside, the hang measures the union alone, fits, and collapses onto the `:` line
+    /// — destroying the author's break; the collapsed output then GLUES the run to the
+    /// union's head, so the next pass hands it in ([`Self::build_union_value_doc`]), its
+    /// multi-line text defeats `arena_fits`, and the hang opens. The run belongs inside
+    /// the group whose break it is meant to force.
     ///
     /// `type_start` is the gap's far end — the caller's own window, so the hang path is
     /// each entry's own. `gap_may_have_comments` is the caller's zero-comment gate over
@@ -396,7 +406,7 @@ impl<'a> Printer<'a> {
     /// The hug is [`Self::build_hugged_union_after_operator_doc`]'s; every other union
     /// **hangs** ([`Self::hang_annotation_union_doc`]) — it breaks after the `:` with the
     /// members indented, the gap run riding inside the hang group.
-    fn build_annotation_union_doc(
+    pub(in crate::printer) fn build_annotation_union_doc(
         &self,
         colon_end: u32,
         type_start: u32,

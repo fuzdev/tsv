@@ -3,9 +3,8 @@
 	// first member, so prettier prints it outside the union's group: a union that fits
 	// stays flat below the comment and gains no leading `|`. Both multi-line kinds ask
 	// the same question, and every seam that hands its gap run into the union answers it
-	// the same way — the cells below are a census of those seams. (The two pipe variants
-	// carry the first seven; repeating them at every seam adds no claim this fixture does
-	// not already make, and the extra authorings reach a broke-after bug of their own.)
+	// the same way — the cells below are a census of those seams, and the two pipe
+	// variants carry every one of them.
 
 	// annotation `:`
 	let v1:
