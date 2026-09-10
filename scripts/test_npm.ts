@@ -23,7 +23,7 @@
  * Prerequisites: deno task build:npm:format (or build:npm:parse / build:npm:all)
  */
 
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
@@ -33,6 +33,8 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
+	unlinkSync,
 	writeFileSync
 } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
@@ -59,6 +61,17 @@ if (!variant) {
 }
 const has_format = variant !== 'parse';
 const has_parse = variant !== 'format';
+/**
+ * Deliberately a SECOND copy of `scripts/patch_npm_package.ts`'s map, not an
+ * import of it: the patcher writes these names into the built package.json and
+ * the `has the right name` test grades that write, which an import would turn
+ * into a tautology. Double entry — the two must agree, and a publish under a
+ * name nobody meant is what disagreeing costs.
+ */
+/** Windows has no `sh`, and no `| head`; the pipe-behavior rows below are
+ * posix-only by nature rather than by omission. */
+const posix = process.platform !== 'win32';
+
 const PKG_NAMES = {
 	format: '@fuzdev/tsv_format_wasm',
 	parse: '@fuzdev/tsv_parse_wasm',
@@ -775,6 +788,19 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		assert.throws(() => browser[guarded]('const x = 1'), /WASM not initialized/);
 	});
 
+	// The class exports are the one family that cannot take a per-call guard, so
+	// the lazy entry wraps each in a guarded subclass. Without it, `new
+	// IgnoreStack()` before init reaches the glue's `wasm.ignorestack_new()` with
+	// `wasm` still undefined and reports an opaque `TypeError` — a different
+	// answer to the same mistake every function export names plainly.
+	it(
+		'constructing a class export before init throws the friendly error',
+		{ skip: !has_format },
+		() => {
+			assert.throws(() => new browser.IgnoreStack(), /WASM not initialized/);
+		}
+	);
+
 	it('reconstruct_locations works BEFORE init (pure JS, no WASM)', { skip: !has_parse }, () => {
 		// A hand-built span-only node — no parse needed, so this runs before the
 		// init_sync below, proving the helper carries no init guard (it never
@@ -818,6 +844,18 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 			browser.format_typescript('await => 1;', { sourceType: 'script' }),
 			'(await) => 1;\n'
 		);
+	});
+
+	// The other half of the guarded subclass: everything but the constructor
+	// guard is still the base class's — the prototype methods, `free()`, and an
+	// `instanceof` that answers for the name the entry exports.
+	it('a class export constructs and works after init', { skip: !has_format }, () => {
+		const stack = new browser.IgnoreStack();
+		assert.ok(stack instanceof browser.IgnoreStack);
+		stack.push_gitignore('', 'build/\n');
+		assert.equal(stack.is_ignored('build/x.ts', false), true);
+		assert.equal(stack.is_ignored('src/x.ts', false), false);
+		stack.free();
 	});
 
 	it('init is idempotent after init_sync', async () => {
@@ -869,6 +907,137 @@ describe(`worker entry (worker.js): ${pkg_dir}`, () => {
 	});
 });
 
+// Resolution through the package's `exports` map — the one claim nothing else
+// here makes. Every other entry test imports by relative path, which bypasses
+// the map entirely: a `.` map whose conditions were ordered `default` before
+// `node` would hand Node the lazy browser entry (no auto-init, no
+// `wasm_module`) and every one of those tests would still pass. So this stages
+// the built package under a temp `node_modules/@fuzdev/<name>` and drives it
+// from a child process whose cwd is that consumer — the real resolution path,
+// conditions and all.
+//
+// The `./worker` half runs in a worker thread that imports the subpath by bare
+// specifier, the shape the package documents for a fan-out consumer: `cli.js`
+// reaches its own copy relatively, so this is the only place the public subpath
+// is exercised as published.
+const pkg_name = PKG_NAMES[variant];
+const consumer_dir = mkdtempSync(join(tmpdir(), 'tsv-consumer-'));
+const consumer_link = join(consumer_dir, 'node_modules', pkg_name);
+mkdirSync(dirname(consumer_link), { recursive: true });
+// A symlink, not a copy: these packages declare no dependencies and import
+// nothing but their own relative files, so Node resolving the link to its
+// real path changes no answer. (The napi loader's suite copies instead — its
+// `createRequire` resolves `@fuzdev/tsv-<triple>` from the module's REAL
+// path, which a link puts outside the staged `node_modules`.) 'junction' so
+// this works on Windows without the developer-mode symlink privilege; the
+// type argument is ignored on POSIX.
+symlinkSync(fileURLToPath(new URL(`../${pkg_dir}`, import.meta.url)), consumer_link, 'junction');
+// Staged and torn down at FILE scope, not inside the suite: a hook registered
+// in a `describe` does not run when a `--test-name-pattern` filters that suite
+// out, while the body that made the directory runs regardless — so the natural
+// way to iterate on one of these tests would leak a staging per run.
+after(() => {
+	// Unlink the link FIRST. `rmSync` unlinks symlinks rather than following
+	// them, but the blast radius if that ever changed is the built package this
+	// whole file tests, so the removal never gets the chance. Best-effort on
+	// both: a cleanup failure must not fail an otherwise-green suite.
+	try {
+		unlinkSync(consumer_link);
+	} catch {
+		// already gone — the rmSync below still clears the directory
+	}
+	try {
+		rmSync(consumer_dir, { recursive: true, force: true });
+	} catch {
+		// leaked into the OS temp dir, which is harmless
+	}
+});
+
+describe(`bare-specifier resolution (exports map): ${pkg_dir}`, () => {
+	/** Whichever export this variant has, on an already-initialized module. */
+	const exercise = (mod: string) =>
+		has_format
+			? `${mod}.format_typescript('const   x=1')`
+			: `${mod}.parse_typescript('const x = 1;').type`;
+	const expected = has_format ? 'const x = 1;\n' : 'Program';
+
+	const worker_source = `import {workerData, parentPort} from 'node:worker_threads';
+const tsv = await import(${JSON.stringify(`${pkg_name}/worker`)});
+let guard;
+try {
+	${exercise('tsv')};
+	guard = 'did not throw';
+} catch (error) {
+	guard = error.message;
+}
+tsv.init_sync({module: workerData.module});
+parentPort.postMessage({guard, has_wasm_module: 'wasm_module' in tsv, out: ${exercise('tsv')}});
+`;
+
+	// One child answers every question below: each is a resolution fact, and a
+	// spawn per fact would pay a fresh WASM init each time.
+	const probe_source = `import {Worker} from 'node:worker_threads';
+const report = {};
+const main = await import(${JSON.stringify(pkg_name)});
+report.has_wasm_module = main.wasm_module instanceof WebAssembly.Module;
+report.auto_init = ${exercise('main')};
+report.package_json = (
+	await import(${JSON.stringify(`${pkg_name}/package.json`)}, {with: {type: 'json'}})
+).default.name;
+report.unexported = await import(${JSON.stringify(`${pkg_name}/browser.js`)}).then(
+	() => 'resolved',
+	(error) => error.code
+);
+report.worker = await new Promise((resolve, reject) => {
+	const worker = new Worker(${JSON.stringify(worker_source)}, {
+		eval: true,
+		workerData: {module: main.wasm_module}
+	});
+	worker.on('message', (message) => {
+		void worker.terminate();
+		resolve(message);
+	});
+	worker.on('error', reject);
+});
+console.log(JSON.stringify(report));
+`;
+	const probe = spawnSync(process.execPath, ['--input-type=module', '--eval', probe_source], {
+		cwd: consumer_dir,
+		encoding: 'utf-8'
+	});
+	const report = probe.status === 0 ? JSON.parse(probe.stdout) : undefined;
+
+	it('the consumer probe runs', () => {
+		assert.equal(probe.status, 0, `probe failed:\n${probe.stdout}\n${probe.stderr}`);
+	});
+
+	it('the bare specifier resolves to the auto-init node entry', () => {
+		assert.equal(
+			report?.has_wasm_module,
+			true,
+			'the `node` condition did not resolve to index.js (no wasm_module on the bare import)'
+		);
+		assert.equal(report?.auto_init, expected, 'the bare import did not auto-initialize');
+	});
+
+	it('the ./worker subpath resolves to the lazy entry, guarded and wasm_module-free', () => {
+		assert.match(String(report?.worker?.guard), /WASM not initialized/);
+		assert.equal(report?.worker?.has_wasm_module, false);
+		assert.equal(report?.worker?.out, expected);
+	});
+
+	it('./package.json resolves', () => {
+		assert.equal(report?.package_json, pkg_name);
+	});
+
+	// The encapsulation half of the same map: an entry file that is not a
+	// subpath must stay unreachable, so `./worker` is the only name a consumer
+	// can bind the lazy entry by.
+	it('a file the exports map does not name is not importable', () => {
+		assert.equal(report?.unexported, 'ERR_PACKAGE_PATH_NOT_EXPORTED');
+	});
+});
+
 // CLI (`tsv` bin, `all` variant only) — subprocess tests against the contract
 // the JS CLI mirrors from the native tsv_cli: flags, exit codes, output streams.
 describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
@@ -879,6 +1048,84 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			input: stdin,
 			cwd
 		});
+
+	// Output to a NON-BLOCKING pipe. Sync writes are required here (an async
+	// `process.stdout.write` before `process.exit` truncates), but a bare
+	// `writeFileSync(1, …)` only survives while fd 1 stays BLOCKING — and this
+	// CLI takes that away from itself: spawning the worker pool pipes the
+	// workers' stdio through the parent, which initializes `process.stdout` and
+	// flips fd 1 to non-blocking. A full pipe then threw `EAGAIN`, killing the
+	// run with a Node stack trace and a half-written path AFTER files had
+	// already been rewritten — the report lost while the changes were not.
+	//
+	// Reproducing it needs all three conditions at once, which is why every
+	// other test here misses it: enough files to spawn workers, enough output
+	// to fill a pipe, and a consumer that does not drain instantly. The `sh -c`
+	// wrapper supplies the third; `--jobs` is left at its default so the pool
+	// actually spawns.
+	it('a slow pipe consumer gets every line, with no crash', { skip: !posix }, () => {
+		const tree = mkdtempSync(join(tmpdir(), 'tsv-pipe-'));
+		try {
+			// Both thresholds have to be crossed at once, and they are separate
+			// numbers: >768 files so the pool spawns (which is what flips fd 1 to
+			// non-blocking), and >64 KiB of changed-path text so the pipe actually
+			// fills. 1200 files with ordinary names gave ~54 KB and the bug did
+			// NOT reproduce — hence the deliberately long name, worth ~190 KB.
+			const count = 1200;
+			const pad = 'p'.repeat(150);
+			for (let i = 0; i < count; i++) {
+				writeFileSync(join(tree, `${pad}_${i}.ts`), 'const   x=1\n');
+			}
+			const quoted = JSON.stringify(cli_path);
+			const result = spawnSync(
+				'sh',
+				['-c', `${JSON.stringify(process.execPath)} ${quoted} format . | { sleep 1; cat; }`],
+				{ encoding: 'utf-8', cwd: tree, maxBuffer: 64 * 1024 * 1024 }
+			);
+			assert.equal(result.status, 0, `the run died: ${result.stderr}`);
+			assert.doesNotMatch(
+				result.stderr,
+				/EAGAIN|ReferenceError|^\s*at /m,
+				`the CLI crashed writing to a slow pipe: ${result.stderr}`
+			);
+			assert.equal(
+				result.stdout.trim().split('\n').length,
+				count,
+				'the changed-path list was truncated'
+			);
+			assert.match(result.stderr, new RegExp(`${count} formatted`));
+		} finally {
+			rmSync(tree, { recursive: true, force: true });
+		}
+	});
+
+	// The other end of the same rule: a consumer that goes away mid-stream is
+	// `| head`, and the conventional answer to EPIPE is to stop writing, not to
+	// throw. (The native CLI currently aborts here — see docs/cli.md.)
+	it('a consumer that exits early is not a crash', { skip: !posix }, () => {
+		const tree = mkdtempSync(join(tmpdir(), 'tsv-pipe-head-'));
+		try {
+			const pad = 'p'.repeat(150);
+			for (let i = 0; i < 1200; i++) {
+				writeFileSync(join(tree, `${pad}_${i}.ts`), 'const   x=1\n');
+			}
+			const result = spawnSync(
+				'sh',
+				[
+					'-c',
+					`${JSON.stringify(process.execPath)} ${JSON.stringify(cli_path)} format . | head -2`
+				],
+				{ encoding: 'utf-8', cwd: tree }
+			);
+			assert.doesNotMatch(
+				result.stderr,
+				/EPIPE|EAGAIN|ReferenceError|^\s*at /m,
+				`the CLI crashed on a closed pipe: ${result.stderr}`
+			);
+		} finally {
+			rmSync(tree, { recursive: true, force: true });
+		}
+	});
 
 	it('format --content prints formatted source', () => {
 		const result = run_cli(['format', '--content', 'const   x=1', '--parser', 'typescript']);

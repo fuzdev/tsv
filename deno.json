@@ -172,7 +172,8 @@
 		"test:napi:npm:run": "node --test scripts/test_napi_npm.ts",
 		"publish:napi": "deno run --allow-read --allow-write=crates/tsv_napi/pkg --allow-env --allow-run=npm scripts/publish_napi.ts",
 		"validate:napi": "deno run --allow-read scripts/validate_napi_artifact.ts",
-		"validate:artifacts": "deno run --allow-read scripts/validate_artifacts.ts",
+		"engines:audit": "deno run --allow-read --allow-write --allow-env --allow-run scripts/engine_parity.ts",
+		"validate:artifacts": "deno run --allow-read --allow-env=BENCH_STALE_OK scripts/validate_artifacts.ts",
 
 		"publish": "deno run --allow-read --allow-write --allow-run --allow-env --allow-net scripts/publish.ts"
 	},

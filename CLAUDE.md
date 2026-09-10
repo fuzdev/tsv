@@ -227,6 +227,12 @@ deno task census:audit               # comment CENSUS: raw input-vs-output trivi
 deno task width:audit                # print-width RATCHET: a new KIND of over-width output line — the ONLY gate that measures a column. ⚠️ NOT a debt list (sanctioned overruns are real); also :update
 deno task ignore:audit               # `prettier-ignore` honoring RATCHET: honoring, second-pass stability, freeze scope, trailing inertness (also :update)
 deno task razor:audit                # print-width RAZOR SWEEP: pads a text word to walk each Svelte seed across column 100, grading F1 + the stray line-head boundary space at every width — the ONLY instrument that varies WIDTH, and the only one that can see a mangled form that is its own fixed point (pure Rust; ./docs/audits.md)
+deno task engines:audit              # ENGINE PARITY: the wasm32 build and the native build must format every
+#                          file to the SAME BYTES — exit code, changed-path list, diagnostics and all ~18k
+#                          resulting files, over both fixture trees plus the `../corpora` snapshot when
+#                          present. The wasm side runs under NODE, the host `cli.js` ships for, which is how
+#                          it found the EAGAIN pipe crash. Needs both packages built, so NOT in check — it
+#                          gates in CI's `artifacts` job, the first point at which both exist; ~7 s
 deno task render:audit <paths>       # render-equivalence over REAL Svelte (sidecar — NOT in check; release-gated leg of `deno task conformance`)
 deno task idempotency:sweep          # F1 idempotency sweep over the real-code corpus (minutes — NOT in check; conformance cadence)
 deno task audit:corpus               # the standing content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
@@ -306,7 +312,7 @@ deno task publish --wetrun               # resume a failed wetrun (sentinel retr
 # Flags: --bump patch|minor|major, --no-check, --no-git
 deno task test:npm[:parse|:all]          # builds the npm package, then runs Node tests against it (:all includes CLI tests; `:run` suffix skips the rebuild — freshness-guarded, aborts on a stale staging)
 deno task test:napi:npm                  # stages the napi loader + host platform package, then runs Node tests against the packaged shape (`:run` skips the rebuild — freshness-guarded, aborts on a stale staging)
-deno task validate:artifacts             # tight wasm size bounds + Deno smoke of all built bundles (fails if nothing is built)
+deno task validate:artifacts             # tight wasm size bounds + Deno smoke of all built bundles, lazy entries included (fails if nothing is built, or if what is built is STALE — `pkg/` is gitignored, and an old bundle sizes and smokes as cleanly as a fresh one)
 ```
 
 `scripts/validate_artifacts.ts` holds deliberately tight (~±8%) size bounds — a legitimate binary size change fails the publish until the constants are updated, keeping size moves visible and intentional.

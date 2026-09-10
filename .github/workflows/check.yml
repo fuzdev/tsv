@@ -202,6 +202,15 @@ jobs:
       - name: N-API npm package test (linux)
         run: deno task test:napi:npm
 
+      # ENGINE PARITY, and the only place it can run: one Rust source compiled
+      # to wasm32 and natively must format to the same bytes, and this is the
+      # first step at which BOTH artifacts exist — `build:packages` above made
+      # the wasm one, the N-API step just made the native `tsv_cli`. The corpus
+      # is the fixture trees plus, when the snapshot checkout is present, the
+      # real-code one; ~7s for ~18k files.
+      - name: Engine parity (wasm vs native)
+        run: deno task engines:audit
+
   # Platform confidence for the native builds: the committed-tree test suite
   # (fixtures, CLI integration, the napi in-crate tests) plus the real N-API
   # JS-boundary test, on each OS a native artifact will ship for. Linux's half

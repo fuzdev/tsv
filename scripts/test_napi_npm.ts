@@ -56,8 +56,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { CORE_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
-import { assert_staged_fresh } from './check_staged_freshness.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
+import { assert_staged_fresh, staged_staleness } from './check_staged_freshness.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 
 const pkg_root = 'crates/tsv_napi/pkg';
@@ -115,10 +115,27 @@ await assert_staged_fresh([
 		rebuild: 'deno task build:napi:packages'
 	},
 	{
+		// Every hand-written CODE source the loader package copies, not just
+		// index.js: the staged files are written in one pass, so index.js's mtime
+		// dates the whole staging and a sibling edited since then is the same
+		// staleness. (`cli.js` gets its own check below only because it is the one
+		// shared with the wasm package. `README.md` and `LICENSE` are copied too
+		// and deliberately absent — nothing here reads them, so their age cannot
+		// make a verdict wrong.)
 		label: 'staged loader',
 		staged: `${pkg_root}/napi/index.js`,
 		crates: [],
-		files: ['crates/tsv_napi/npm/index.js', 'scripts/build_napi_packages.ts'],
+		files: [
+			'crates/tsv_napi/npm/index.js',
+			'crates/tsv_napi/npm/index.d.ts',
+			'crates/tsv_napi/npm/platform.js',
+			'crates/tsv_napi/npm/bin.js',
+			'crates/tsv_wasm/npm/locations.js',
+			'crates/tsv_wasm/npm/locations.d.ts',
+			'crates/tsv_wasm/types/tsv_ast.d.ts',
+			'scripts/build_napi_packages.ts',
+			'scripts/npm_metadata.ts'
+		],
 		rebuild: 'deno task build:napi:packages'
 	},
 	{
@@ -129,6 +146,25 @@ await assert_staged_fresh([
 		rebuild: 'deno task build:napi:packages'
 	}
 ]);
+
+// The one artifact this suite READS but does not build: `@fuzdev/tsv_wasm`,
+// which the export-set parity claim below compares the loader against. Absent
+// or STALE it is skipped, not failed — `deno task test:napi:npm` cannot
+// refresh another package's staging, and the two cases are equally unusable
+// here, since an export set captured before the delta moved reads as clean.
+// Sources are the wasm bundle's own (`scripts/validate_artifacts.ts` names the
+// same set), because a feature or an export moves with them.
+const wasm_package_index = 'crates/tsv_wasm/pkg/all/npm/index.js';
+const wasm_parity_staleness = await staged_staleness({
+	label: 'the @fuzdev/tsv_wasm package',
+	staged: wasm_package_index,
+	crates: [...CORE_CRATES, ...WASM_CRATES],
+	files: ['scripts/patch_npm_package.ts', 'scripts/npm_metadata.ts', 'deno.json'],
+	rebuild: 'deno task build:npm:all'
+});
+const wasm_parity_skip: string | false = wasm_parity_staleness
+	? `${wasm_parity_staleness.reason} — restage: deno task build:npm:all`
+	: false;
 
 const staged = stage(true);
 const staged_bare = stage(false);
@@ -158,13 +194,34 @@ if (posix) {
 	);
 }
 
+/** The empty tree the `--jobs` verdict table lists (see that suite for why an
+ * empty one). Staged here, beside the other temp dirs, so the file's ONE
+ * `after` owns every cleanup: a hook registered inside a `describe` does not
+ * run when a `--test-name-pattern` filters that suite out, while the body that
+ * made the directory runs regardless — so iterating on one test would leak a
+ * staging per run. */
+const empty_dir = mkdtempSync(join(tmpdir(), 'tsv_jobs_'));
+
+/** Scratch tree for the invalid-UTF-8 parity rows, which need real files on
+ * disk to prove neither bin rewrote one. Module scope for the same reason as
+ * `empty_dir` — the file's one `after` owns the cleanup. */
+const utf8_dir = mkdtempSync(join(tmpdir(), 'tsv_utf8_'));
+
 after(() => {
 	// Best-effort: on Windows the loaded addon stays mapped into the process,
 	// so its .node file — and therefore `staged` — is undeletable until exit
 	// (EPERM). A leaked temp staging is harmless (ephemeral CI runners, OS
 	// temp); a cleanup failure must not fail an otherwise-green suite. The
 	// bare staging loads nothing and deletes everywhere.
-	for (const dir of [staged, staged_bare, staged_no_binary, staged_bad_mode, staged_signal]) {
+	for (const dir of [
+		staged,
+		staged_bare,
+		staged_no_binary,
+		staged_bad_mode,
+		staged_signal,
+		empty_dir,
+		utf8_dir
+	]) {
 		if (!dir) continue;
 		try {
 			rmSync(dir, { recursive: true, force: true });
@@ -177,6 +234,28 @@ after(() => {
 const loader_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'index.js');
 // ESM import of the ESM loader — the ordinary consumer path.
 const api = await import(pathToFileURL(loader_path).href);
+/**
+ * The libc detection, loaded here rather than in its own suite far below.
+ * Two reasons, and the second is a trap:
+ *
+ * - A `let` filled in by the suite's first test makes every later row depend
+ *   on that one having run, so a `--test-name-pattern` selecting a single row
+ *   reports `is_musl is not a function` instead of the verdict it is about.
+ * - ⚠️ NO TOP-LEVEL `await` MAY FOLLOW THE FIRST `describe` IN THIS FILE. Each
+ *   one yields, and node:test drains whatever is already registered while it
+ *   does — including the root `after`, which deletes `staged`. Registration
+ *   below then races a teardown that already ran, and the suites past the
+ *   await fail with `Cannot find module .../@fuzdev/tsv/cli.js`. A full run
+ *   usually wins the race (the registered suites outlast the await) and a
+ *   filtered one loses it, which is the worst shape a trap can have. Every
+ *   top-level await in this file therefore sits above the first `describe`.
+ */
+const { is_musl, platform_triple } = (await import(
+	pathToFileURL(join(staged, 'node_modules', '@fuzdev', 'tsv', 'platform.js')).href
+)) as {
+	is_musl: (probes?: unknown) => boolean;
+	platform_triple: () => string;
+};
 
 /** Assert `fn` throws an Error whose message contains `needle` exactly. */
 const throws_with = (fn: () => unknown, needle: string): void => {
@@ -207,6 +286,69 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.strictEqual(api.init, undefined);
 		assert.strictEqual(api.init_sync, undefined);
 	});
+
+	// The class carries the same kind of delta one level down: a GC-managed
+	// native object has no hand to free, so `free()` and the `[Symbol.dispose]`
+	// wasm-bindgen aliases to it are absent here. Stated as its own claim
+	// because the README lists it beside the four above, and a reader who takes
+	// "export for export" literally would otherwise expect `free()` to exist.
+	it('its IgnoreStack carries no manual-lifetime methods', () => {
+		const proto = api.IgnoreStack.prototype;
+		assert.strictEqual(proto.free, undefined);
+		assert.strictEqual(proto[Symbol.dispose], undefined);
+		assert.strictEqual(typeof proto.classify_dir, 'function');
+	});
+
+	// The parity claim itself, as a SET rather than as prose maintained in two
+	// places (`npm/index.js`'s module doc and the README both list the delta).
+	// SKIPPED, not failed, when the wasm package is absent or stale: this task
+	// does not build that package, so grading it either way would be answering
+	// about code the run cannot refresh — and a stale staging is exactly as
+	// unusable here as a missing one, since an export set from before the delta
+	// moved reads as clean. So it gates wherever both are current: after
+	// `build:packages` locally, and in the CI job that builds every publishable
+	// bundle. The verdict is `wasm_parity_skip`, graded at module scope because
+	// reading mtimes is async and a `describe` body must register its tests
+	// synchronously.
+	it(
+		'differs from @fuzdev/tsv_wasm by exactly the WASM lifecycle',
+		{ skip: wasm_parity_skip },
+		async () => {
+			const wasm = await import(pathToFileURL(wasm_package_index).href);
+			assert.deepEqual(
+				Object.keys(wasm)
+					.filter((name) => !(name in api))
+					.sort(),
+				['init', 'init_sync', 'reinstantiate', 'wasm_module'],
+				'the wasm package has an export this loader is missing'
+			);
+			assert.deepEqual(
+				Object.keys(api)
+					.filter((name) => !(name in wasm))
+					.sort(),
+				[],
+				'this loader has an export the wasm package is missing'
+			);
+			// And one level down, over the shared class. `Reflect.ownKeys`, not
+			// `getOwnPropertyNames`: half the stated delta is `[Symbol.dispose]`,
+			// which the glue assigns as an own SYMBOL-keyed property after the
+			// class body, and a name-only walk cannot see it — so the prose would
+			// have gone on claiming a delta the set diff never graded.
+			const own_keys = (proto: object): Array<string> => Reflect.ownKeys(proto).map(String);
+			const wasm_methods = own_keys(wasm.IgnoreStack.prototype);
+			const native_methods = own_keys(api.IgnoreStack.prototype);
+			assert.deepEqual(
+				wasm_methods.filter((name) => !native_methods.includes(name)).sort(),
+				['Symbol(Symbol.dispose)', '__destroy_into_raw', 'free'],
+				'the wasm IgnoreStack has a method this one is missing beyond its manual lifetime'
+			);
+			assert.deepEqual(
+				native_methods.filter((name) => !wasm_methods.includes(name)).sort(),
+				[],
+				'the native IgnoreStack has a method the wasm one is missing'
+			);
+		}
+	);
 
 	it('parses to objects with loc, and _json siblings return the string', () => {
 		const ast = api.parse_typescript('const x = 1;');
@@ -372,6 +514,33 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.equal(from_cjs.format_typescript('const   x=1'), 'const x = 1;\n');
 	});
 
+	// The ESM half of the same claim. The CJS test above resolves through
+	// `require.resolve`, which walks the `require` condition; an `import` walks
+	// its own. Nothing else in this suite reaches the package by its NAME —
+	// every other test opens a staged file by path, which bypasses the exports
+	// map entirely — so this is the only place the `.` entry is resolved the way
+	// a consumer's `import '@fuzdev/tsv'` resolves it, from a cwd inside the
+	// staged install. The second half is the encapsulation: a file the map does
+	// not name stays unreachable.
+	it('an ESM host resolves the bare specifier, and only the named subpaths', () => {
+		const probe = spawnSync(
+			process.execPath,
+			[
+				'--input-type=module',
+				'--eval',
+				`const tsv = await import('@fuzdev/tsv');
+const unexported = await import('@fuzdev/tsv/cli.js').then(() => 'resolved', (error) => error.code);
+process.stdout.write(JSON.stringify({out: tsv.format_typescript('const   x=1'), unexported}));`
+			],
+			{ cwd: staged, encoding: 'utf-8' }
+		);
+		assert.equal(probe.status, 0, probe.stderr);
+		assert.deepEqual(JSON.parse(probe.stdout), {
+			out: 'const x = 1;\n',
+			unexported: 'ERR_PACKAGE_PATH_NOT_EXPORTED'
+		});
+	});
+
 	it('package.json selection fields and pins are coherent', () => {
 		const loader_pkg = JSON.parse(
 			readFileSync(join(staged, 'node_modules', '@fuzdev', 'tsv', 'package.json'), 'utf8')
@@ -468,6 +637,91 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	});
 });
 
+// Libc detection — the one piece of the loader that decides which package to
+// resolve before anything is loaded, and the one that cannot be exercised on
+// the host that runs this suite: every question it asks is about a machine
+// this is not. `is_musl` therefore takes its three probes as a bag, so the
+// DECISION can be driven over hosts the CI matrix will never have (an Alpine
+// container, a Debian box with the `musl` package installed, a runtime whose
+// `process.report` is absent or partial).
+describe('libc detection (platform.js)', () => {
+	/** A stub probe bag that records which probes a verdict actually asked. */
+	const probe_bag = (facts: {
+		musl_loader: boolean;
+		mapped_libc?: string;
+		reported_glibc?: string;
+	}) => {
+		const asked: Array<string> = [];
+		return {
+			asked,
+			probes: {
+				musl_loader: () => {
+					asked.push('musl_loader');
+					return facts.musl_loader;
+				},
+				mapped_libc: () => {
+					asked.push('mapped_libc');
+					return facts.mapped_libc;
+				},
+				reported_glibc: () => {
+					asked.push('reported_glibc');
+					return facts.reported_glibc;
+				}
+			}
+		};
+	};
+
+	it('the shipped module exports the detection', () => {
+		assert.equal(typeof is_musl, 'function');
+		assert.equal(typeof platform_triple, 'function');
+	});
+
+	// A stock glibc system: one readdir, and nothing else is paid for. The
+	// ordering IS the contract — the two probes below it cost ~2x and ~20x —
+	// so the assertion is on what was asked, not only on the verdict.
+	it('no musl loader ends it: gnu, with no further probe', () => {
+		const { asked, probes } = probe_bag({ musl_loader: false });
+		assert.equal(is_musl(probes), false);
+		assert.deepEqual(asked, ['musl_loader']);
+	});
+
+	it('a musl loader with musl mapped: musl, without consulting the report', () => {
+		const { asked, probes } = probe_bag({ musl_loader: true, mapped_libc: 'musl' });
+		assert.equal(is_musl(probes), true);
+		assert.deepEqual(asked, ['musl_loader', 'mapped_libc']);
+	});
+
+	// The case the loader used to get wrong whenever the report was silent: a
+	// glibc host that merely has musl INSTALLED carries the loader, so only the
+	// mapped libc separates it from Alpine.
+	it('a musl loader with glibc mapped: gnu (musl installed on a glibc host)', () => {
+		const { asked, probes } = probe_bag({ musl_loader: true, mapped_libc: 'gnu' });
+		assert.equal(is_musl(probes), false);
+		assert.deepEqual(asked, ['musl_loader', 'mapped_libc']);
+	});
+
+	// Map unreadable (no `/proc`, or a statically linked host binary): the
+	// report is the last word, and it is trusted only positively.
+	it('an unreadable map falls back to the report naming a glibc runtime: gnu', () => {
+		const { asked, probes } = probe_bag({ musl_loader: true, reported_glibc: '2.41' });
+		assert.equal(is_musl(probes), false);
+		assert.deepEqual(asked, ['musl_loader', 'mapped_libc', 'reported_glibc']);
+	});
+
+	it('an unreadable map and a silent report: musl (the loader stands)', () => {
+		const { probes } = probe_bag({ musl_loader: true });
+		assert.equal(is_musl(probes), true);
+	});
+
+	// The real host, against the triple the BUILD script detected (Deno-side)
+	// and staged the platform package under. The loader answering differently
+	// is how a `require('@fuzdev/tsv-<triple>')` misses a package that installed
+	// correctly.
+	it('the detected triple matches the staged platform package', () => {
+		assert.equal(platform_triple(), triple);
+	});
+});
+
 // The `tsv` bin — `bin.js`, the dispatcher that execs the platform package's
 // native `tsv_cli` binary, with the shared `cli.js` (the wasm package's bin,
 // staged here bound to the native loader) as its fallback. The full
@@ -477,8 +731,24 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 // forwarding: exit codes, stdout/stderr split, stdin piping, in-place writes.
 const bin_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'bin.js');
 const cli_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'cli.js');
+/** The real `tsv_cli` binary the platform package ships — what `bin.js` execs. */
+const native_path = join(staged, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name);
+/** Through the `tsv` bin — the `npx tsv` path, and this suite's subject. */
 const run_cli = (args: Array<string>, stdin?: string) =>
 	spawnSync(process.execPath, [bin_path, ...args], { encoding: 'utf-8', input: stdin });
+/**
+ * The native binary DIRECTLY, for the parity suites below.
+ *
+ * Not through `bin.js`, which would be one hop with a fallback in it: the
+ * dispatcher degrades to `cli.js` when the binary is missing or unrunnable, so
+ * a parity suite reading the "native" side through it would compare `cli.js`
+ * to `cli.js` and pass every row while measuring nothing. (Verified: pointing
+ * `run_cli` at `cli_path` leaves all 87 parity assertions green.) Something
+ * else pins the dispatch — this leaves the parity verdicts with nothing to
+ * degrade into.
+ */
+const run_native = (args: Array<string>, input: string | Buffer = '') =>
+	spawnSync(native_path, args, { encoding: 'utf-8', input });
 
 describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () => {
 	it('is wired as the package bin', () => {
@@ -734,13 +1004,40 @@ const advertised_flags = (help: string, source: string): Array<string> => {
 	return flags;
 };
 
-const run_mirror = (args: Array<string>) =>
-	spawnSync(process.execPath, [cli_path, ...args], { encoding: 'utf-8', input: '' });
+const run_mirror = (args: Array<string>, input: string | Buffer = '') =>
+	spawnSync(process.execPath, [cli_path, ...args], { encoding: 'utf-8', input });
+
+// The three parity suites below all compare `run_native` against `run_mirror`,
+// and a faithful mirror compared against ITSELF passes every row — so a runner
+// quietly pointing at the wrong bin would leave 38 green assertions measuring
+// nothing. `run_native` spawns the binary with no dispatcher in between, which
+// removes the way that happens by accident; this pins the rest. argh's
+// generated help prints a `Positional Arguments:` section header that the
+// mirror's hand-written help never does, so one probe separates the two bins
+// in both directions.
+describe('parity anchor: the two bins under comparison really are the two bins', () => {
+	it('run_native reaches argh, and run_mirror does not', () => {
+		const native = run_native(['help', 'format']);
+		assert.equal(native.status, 0, native.stderr);
+		assert.match(
+			native.stdout,
+			/Positional Arguments:/,
+			'the native runner is not reaching the real binary — every parity row below is vacuous'
+		);
+		const mirror = run_mirror(['help', 'format']);
+		assert.equal(mirror.status, 0, mirror.stderr);
+		assert.doesNotMatch(
+			mirror.stdout,
+			/Positional Arguments:/,
+			'the mirror runner is reaching the native binary — every parity row below is vacuous'
+		);
+	});
+});
 
 describe('flag parity: the native CLI and cli.js recognize the same flags', () => {
 	for (const command of ['format', 'parse']) {
 		it(`${command}: every flag the native CLI advertises, cli.js recognizes`, () => {
-			const help = run_cli(['help', command], '');
+			const help = run_native(['help', command]);
 			assert.equal(help.status, 0, help.stderr);
 			const flags = advertised_flags(help.stdout, `argh's \`${command}\` help`);
 			for (const flag of flags) {
@@ -758,13 +1055,346 @@ describe('flag parity: the native CLI and cli.js recognize the same flags', () =
 			assert.equal(help.status, 0, help.stderr);
 			const flags = advertised_flags(help.stdout, `cli.js's \`${command}\` help`);
 			for (const flag of flags) {
-				const result = run_cli([command, flag], '');
+				const result = run_native([command, flag]);
 				assert.doesNotMatch(
 					result.stderr,
 					/Unrecognized argument/,
 					`the native CLI does not know \`${command} ${flag}\`, which cli.js advertises`
 				);
 			}
+		});
+	}
+});
+
+// Message PRECEDENCE parity. The suite above pins that both CLIs RECOGNIZE the
+// same flags; this pins what they SAY when several are wrong at once. Order is
+// real contract: each command validates in a fixed sequence, so a doubly-bad
+// invocation has exactly one right answer, and the mirror re-states that
+// sequence by hand — the shape that drifts silently, since every other test
+// here drives one fault at a time and so only ever sees the winner it already
+// expected.
+//
+// Every row is a usage error that lands BEFORE any file is touched, so the
+// table needs no fixture tree; `x.ts` is a name, never a file. Three claims per
+// row: the two bins exit alike, on the code the row names; their stderr is
+// byte-identical; and it is still the message the row is about (without which a
+// row whose case stopped being reachable would pass on two identical
+// somethings). The rows deliberately stop where the messages stop being tsv's
+// own — argh and `parseArgs` word their own failures, and those agree on the
+// exit code alone.
+const USAGE_ROWS: Array<{ args: Array<string>; exit: number; says: string }> = [
+	// `format` — the single-input mode, in its validation order
+	{ args: ['format'], exit: 2, says: 'No input provided' },
+	{ args: ['format', '--content', 'x'], exit: 2, says: '--content requires --parser' },
+	{
+		args: ['format', '--stdin', '--parser', 'ts', 'x.ts'],
+		exit: 2,
+		says: '--content/--stdin cannot be combined with file paths'
+	},
+	{
+		args: ['format', '--content', 'x', '--parser', 'ts', '--jobs', '2'],
+		exit: 2,
+		says: '--jobs applies to file paths'
+	},
+	{
+		args: ['format', '--content', 'x', '--parser', 'ts', '--list'],
+		exit: 2,
+		says: '--list applies to file paths'
+	},
+	{
+		args: ['format', '--content', 'x', '--parser', 'ts', '--source-type', 'bogus'],
+		exit: 2,
+		says: "invalid --source-type 'bogus'"
+	},
+	{
+		args: ['format', '--content', 'a{color:red}', '--parser', 'css', '--source-type', 'script'],
+		exit: 2,
+		says: '--source-type is only supported for typescript'
+	},
+	// `format` — path mode
+	{ args: ['format', '--parser', 'ts', 'x.ts'], exit: 2, says: '--parser applies to' },
+	{
+		args: ['format', '--source-type', 'script', 'x.ts'],
+		exit: 2,
+		says: '--source-type applies to'
+	},
+	{ args: ['format', '--list', '--check', 'x.ts'], exit: 2, says: '--list and --check' },
+	// PRECEDENCE — each row is faulty in two or more ways, and names the winner
+	{
+		args: ['format', '--content', 'x', '--parser', 'ts', '--jobs', '2', '--list', 'x.ts'],
+		exit: 2,
+		says: '--content/--stdin cannot be combined with file paths'
+	},
+	{
+		args: ['format', '--content', 'x', '--parser', 'ts', '--jobs', '2', '--list'],
+		exit: 2,
+		says: '--jobs applies to file paths'
+	},
+	{
+		// the mode refusals precede the source type, which precedes the parser
+		args: ['format', '--content', 'x', '--list', '--source-type', 'bogus'],
+		exit: 2,
+		says: '--list applies to file paths'
+	},
+	{
+		args: ['format', '--content', 'x', '--source-type', 'bogus'],
+		exit: 2,
+		says: "invalid --source-type 'bogus'"
+	},
+	{
+		// a bad VALUE outranks the language that has no source type at all
+		args: ['format', '--content', 'x', '--parser', 'css', '--source-type', 'bogus'],
+		exit: 2,
+		says: "invalid --source-type 'bogus'"
+	},
+	{
+		args: ['format', '--parser', 'ts', '--source-type', 'script', 'x.ts'],
+		exit: 2,
+		says: '--parser applies to'
+	},
+	{
+		args: ['format', '--parser', 'ts', '--list', '--check', 'x.ts'],
+		exit: 2,
+		says: '--parser applies to'
+	},
+	{
+		args: ['format', '--source-type', 'script', '--list', '--check', 'x.ts'],
+		exit: 2,
+		says: '--source-type applies to'
+	},
+	// `parse` — the same questions, answered with its own exit code
+	{ args: ['parse'], exit: 1, says: 'No input provided' },
+	{ args: ['parse', '--content', 'x'], exit: 1, says: '--content requires --parser' },
+	{
+		args: ['parse', '--content', 'x', '--source-type', 'bogus'],
+		exit: 1,
+		says: "invalid --source-type 'bogus'"
+	},
+	{
+		args: ['parse', '--content', 'x', '--parser', 'css', '--source-type', 'bogus'],
+		exit: 1,
+		says: "invalid --source-type 'bogus'"
+	}
+];
+
+describe('message parity: the native CLI and cli.js refuse in the same order', () => {
+	for (const { args, exit, says } of USAGE_ROWS) {
+		it(`${args.join(' ')} → exit ${exit}, ${says}`, () => {
+			const native = run_native(args);
+			const mirror = run_mirror(args);
+			assert.equal(native.status, exit, `native stderr: ${native.stderr}`);
+			assert.equal(mirror.status, exit, `cli.js stderr: ${mirror.stderr}`);
+			assert.equal(mirror.stderr, native.stderr, 'the two bins must word this refusal alike');
+			// A plain substring, not a regex: every `says` is literal text, and
+			// hand-escaping it for `assert.match` only invents a way to get the
+			// escape set wrong.
+			assert.ok(
+				native.stderr.includes(says),
+				`the row's own message is gone; both bins now say: ${native.stderr}`
+			);
+		});
+	}
+});
+
+// Invalid UTF-8. The native CLI reads every file and stdin with Rust's
+// `read_to_string`, which REFUSES invalid bytes; Node's
+// `readFileSync(path, 'utf-8')` substitutes U+FFFD and returns a string that
+// looks fine. On the format path that is not a wrong message but DATA LOSS:
+// a lone stray byte inside a string literal still parses after the
+// substitution, so the mirror used to write the repaired text back over the
+// author's file and report `1 formatted`, exit 0, where the native CLI
+// refuses and leaves the bytes alone. `cli.js` now decodes strictly
+// (`decode_source`), throwing Rust's own wording so the refusals read alike.
+//
+// The file-untouched assertion is the one that matters: an exit code can be
+// argued about, a rewritten byte cannot.
+describe('invalid UTF-8 parity: both CLIs refuse, and neither rewrites the file', () => {
+	/** Valid TypeScript except for one invalid UTF-8 byte inside a string —
+	 * the shape that survives a lossy decode and therefore gets written back. */
+	const bad_bytes = Buffer.concat([
+		Buffer.from("const   s = '"),
+		Buffer.from([0xff]),
+		Buffer.from("hi';\n")
+	]);
+
+	const write_case = (name: string): string => {
+		const file = join(utf8_dir, name);
+		writeFileSync(file, bad_bytes);
+		return file;
+	};
+
+	it('format <path> refuses on both, and leaves every byte in place', () => {
+		const native_file = write_case('native.ts');
+		const mirror_file = write_case('mirror.ts');
+		const native = run_native(['format', native_file]);
+		const mirror = run_mirror(['format', mirror_file]);
+		assert.equal(native.status, 2, `native: ${native.stderr}`);
+		assert.equal(mirror.status, 2, `cli.js formatted a file it could not read: ${mirror.stderr}`);
+		assert.ok(
+			readFileSync(native_file).equals(bad_bytes),
+			'the native CLI rewrote a file it refused'
+		);
+		assert.ok(
+			readFileSync(mirror_file).equals(bad_bytes),
+			'cli.js rewrote the invalid bytes — U+FFFD substitution reached the disk'
+		);
+		// same refusal, modulo the two different filenames
+		const strip = (text: string, file: string) => text.split(file).join('<path>');
+		assert.equal(strip(mirror.stderr, mirror_file), strip(native.stderr, native_file));
+		assert.match(native.stderr, /read failed: stream did not contain valid UTF-8/);
+	});
+
+	it('parse <path> refuses on both rather than emitting a mangled AST', () => {
+		const native_file = write_case('native_parse.ts');
+		const mirror_file = write_case('mirror_parse.ts');
+		const native = run_native(['parse', native_file]);
+		const mirror = run_mirror(['parse', mirror_file]);
+		assert.equal(native.status, 1, `native: ${native.stderr}`);
+		assert.equal(
+			mirror.status,
+			1,
+			`cli.js parsed undecodable bytes: ${mirror.stdout.slice(0, 200)}`
+		);
+		assert.equal(mirror.stdout, '');
+		assert.match(native.stderr, /stream did not contain valid UTF-8/);
+	});
+
+	for (const [command, code] of [
+		['format', 2],
+		['parse', 1]
+	] as Array<[string, number]>) {
+		it(`${command} --stdin refuses on both, with the same message and exit ${code}`, () => {
+			const args = [command, '--stdin', '--parser', 'ts'];
+			const native = run_native(args, bad_bytes);
+			const mirror = run_mirror(args, bad_bytes);
+			assert.equal(native.status, code, `native: ${native.stderr}`);
+			assert.equal(mirror.status, native.status, `cli.js: ${mirror.stderr || mirror.stdout}`);
+			assert.equal(mirror.stderr, native.stderr, 'the two bins must word this refusal alike');
+			assert.match(native.stderr, /Error reading from stdin: stream did not contain valid UTF-8/);
+		});
+	}
+});
+
+// Repeated value-taking options. argh refuses a second `--content`/`--parser`/
+// `--source-type`/`--jobs` ("duplicate values provided", exit 1) where
+// `parseArgs` silently keeps the last, so `cli.js` restates the refusal — the
+// `--jobs` grammar's sibling, and the sharper half: an unrefused
+// `--parser ts --parser css` does not merely pick, it formats the input under
+// a grammar the same invocation named against. The verdict is what is pinned,
+// not the message (each argument parser words its own parse failures), and the
+// SWITCHES ride along as the control: argh counts a repeated `--check` without
+// complaint, which is what taking the last already means, so those must NOT be
+// refused by either bin.
+describe('repeated-option parity: both CLIs refuse a second value, and neither refuses a second switch', () => {
+	const repeated: Array<{ args: Array<string>; refused: boolean; why: string }> = [
+		{
+			args: ['format', '--content', 'x', '--parser', 'ts', '--content', 'y'],
+			refused: true,
+			why: 'a second --content silently formatted the LAST one'
+		},
+		{
+			args: ['format', '--content', 'x', '--parser', 'ts', '--parser', 'css'],
+			refused: true,
+			why: 'a second --parser formatted TS input as CSS'
+		},
+		{
+			args: [
+				'format',
+				'--content',
+				'x',
+				'--parser',
+				'ts',
+				'--source-type',
+				'module',
+				'--source-type',
+				'script'
+			],
+			refused: true,
+			why: 'a second --source-type'
+		},
+		{
+			args: ['format', '--list', '--jobs', '2', '--jobs', '3', '.'],
+			refused: true,
+			why: 'a second --jobs'
+		},
+		{
+			args: ['parse', '--content', 'x', '--parser', 'ts', '--content', 'y'],
+			refused: true,
+			why: 'the same rule on the other command'
+		},
+		// The controls. Both must come out CLEAN, so each is an invocation whose
+		// single-switch form exits 0 — a repeated `--check` would exit 1 on
+		// changed input and prove nothing about the repetition.
+		{
+			args: ['format', '--list', '--list', empty_dir],
+			refused: false,
+			why: 'a repeated switch is fine (argh counts it)'
+		},
+		{
+			args: ['parse', '--content', 'x', '--parser', 'ts', '--pretty', '--pretty'],
+			refused: false,
+			why: 'the same, on parse'
+		}
+	];
+
+	for (const { args, refused, why } of repeated) {
+		it(`${args.join(' ')} is ${refused ? 'refused' : 'accepted'} by both (${why})`, () => {
+			const native = run_native(args);
+			const mirror = run_mirror(args);
+			// A refusal is exit 1 (an argument error on both sides); acceptance is
+			// a clean 0, which is why the controls are invocations that do no work.
+			assert.equal(
+				native.status,
+				refused ? 1 : 0,
+				`the native CLI disagrees with the row: ${native.stderr}`
+			);
+			assert.equal(
+				mirror.status,
+				native.status,
+				`cli.js ${mirror.status === 0 ? 'accepted' : 'refused'} what the native CLI did not: ${mirror.stderr || native.stderr}`
+			);
+		});
+	}
+});
+
+// `--jobs` is the one flag whose accepted SET is stated twice: argh parses it as
+// a Rust `usize`, `cli.js` re-states that with a regex. The messages are each
+// argument parser's own and will never match, so what is pinned here is the
+// verdict — a value one bin runs and the other refuses is the drift, and both
+// edges of `usize` are the ones a regex misses. `--list` is the probe because it
+// returns before the pool is ever sized: an accepted value does no work and a
+// refused one is an argument error, so the exit code is a clean yes/no.
+describe('--jobs parity: both CLIs accept exactly what a Rust usize accepts', () => {
+	const rows: Array<{ value: string; accepted: boolean; why: string }> = [
+		{ value: '2', accepted: true, why: 'an ordinary count' },
+		{ value: '0', accepted: true, why: 'each pool floors it at 1 itself' },
+		{ value: '007', accepted: true, why: 'leading zeros' },
+		{ value: '+5', accepted: true, why: "Rust's FromStr takes a leading +" },
+		{ value: '18446744073709551615', accepted: true, why: 'usize::MAX' },
+		{ value: '18446744073709551616', accepted: false, why: 'one past usize::MAX' },
+		{ value: '-1', accepted: false, why: 'negative' },
+		{ value: '5.0', accepted: false, why: 'not an integer' },
+		{ value: '5e3', accepted: false, why: 'exponent notation' },
+		{ value: '0x5', accepted: false, why: 'hex' },
+		{ value: ' 5', accepted: false, why: 'leading space' },
+		{ value: '', accepted: false, why: 'empty' }
+	];
+
+	for (const { value, accepted, why } of rows) {
+		it(`--jobs ${JSON.stringify(value)} is ${accepted ? 'accepted' : 'refused'} by both (${why})`, () => {
+			const args = ['format', '--jobs', value, '--list', empty_dir];
+			const native = run_native(args);
+			const mirror = run_mirror(args);
+			assert.equal(
+				native.status,
+				accepted ? 0 : 1,
+				`native disagrees with the row: ${native.stderr}`
+			);
+			assert.equal(
+				mirror.status,
+				native.status,
+				`cli.js ${mirror.status === 0 ? 'accepted' : 'refused'} what the native CLI did not: ${mirror.stderr || native.stderr}`
+			);
 		});
 	}
 });

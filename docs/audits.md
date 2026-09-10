@@ -25,6 +25,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
+| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job (needs both packages built; NOT in `deno task check`) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
@@ -814,6 +815,52 @@ so a smaller corpus can only cost coverage. A **dirty** checkout is refused rath
 graded — `git ls-files` describes the commit, the walk describes the disk, and a local
 modification would otherwise read as a tsv finding (`deno task doctor` reports the same
 state). ~0.1 s on the `--profile corpus` `tsv_cli` binary `format:audit` already built.
+
+## Engine Parity Audit (`engines:audit`)
+
+```bash
+deno task engines:audit [roots...]   # --json
+```
+
+**What it proves.** tsv's formatter is one Rust source compiled twice — to wasm32 for
+the npm packages, natively for `tsv_cli` and the N-API addon — and the packages state
+the equality as a contract. Nothing graded it: the fixture gate runs the native build
+alone, and `scripts/validate_artifacts.ts` smoke-tests three tiny inputs per variant,
+which proves each bundle *runs*, not that it *agrees*. This copies each corpus root into
+two temp trees, formats one with the native CLI and the other with the WASM CLI, and
+requires the two runs to agree on everything observable: exit code, the changed-path
+list on stdout, the diagnostics on stderr, and every resulting byte on disk. Both bins
+run with the temp tree as cwd, so even the paths they print are comparable. The default
+roots are `tests/fixtures` and `tests/fixtures_compile` plus `../corpora/collections`
+when the snapshot is present — ~18,000 files, several hundred of them the
+`input_invalid_*` family, so a refusal has to be worded alike as much as a format.
+
+Two trees rather than one tree twice, deliberately: formatting with native and then
+re-running WASM over the SAME tree would prove only that native's output is a WASM fixed
+point, which two engines with genuinely different outputs can both satisfy.
+
+The WASM side runs under **node**, the host `cli.js` ships for, not under Deno's compat
+layer — which is not a detail. The audit's first honest run failed, and the finding was
+a `cli.js` bug that only exists on that host: spawning the worker pool pipes the
+workers' stdio through the parent, flipping fd 1 to non-blocking, after which the
+CLI's synchronous `writeFileSync(1, …)` threw `EAGAIN` into a full pipe and killed the
+run — with files already rewritten and the report of what changed lost.
+
+**Blind spots.** It compares the two CLI **drivers** as well as the two engines, so a
+driver-only difference reads as a failure here (a real finding, just a differently
+located one — `scripts/test_napi_npm.ts` is where the driver contract is pinned flag by
+flag). It sees only inputs the corpus holds, and only the format path: `parse` wire
+equality is not graded. And a divergence both engines share, from prettier, is the
+conformance gates' business, not this one.
+
+**Gating.** CI's `artifacts` job, immediately after the N-API step — the first point at
+which both artifacts exist (`build:packages` made the wasm one, the N-API step's
+`cargo build -p tsv_cli --release` the native one). Deliberately **not** in `deno task
+check`, which builds no packages. Locally: `deno task build:npm:all && deno task
+build:napi:packages` first. Both bins are mtime-guarded like every other staged
+artifact, so a run against a binary from before a formatter change refuses rather than
+reporting a stale agreement. `../corpora` absent is a warn-skip (CI has no sibling
+checkouts); every root skipping is a failure, since then nothing was compared. ~7 s.
 
 ## Doc-Link Audit (`docs:audit`)
 

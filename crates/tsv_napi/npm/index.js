@@ -10,8 +10,13 @@
  * that one the universal fallback (browsers + unsupported platforms). What is
  * absent here is only what a WASM engine needs and this one doesn't: `init()`
  * and `init_sync()` (nothing to initialize), `wasm_module` (no compiled
- * module to hand a worker), and `reinstantiate()` (no instance to poison — a
- * native stack overflow is a process-fatal SIGSEGV, not a recoverable trap).
+ * module to hand a worker), `reinstantiate()` (no instance to poison — a
+ * native stack overflow is a process-fatal SIGSEGV, not a recoverable trap),
+ * and, one level down, `IgnoreStack`'s `free()` and its `[Symbol.dispose]`
+ * alias, which a GC-managed native object has no handle to need. That list is
+ * the whole delta — `scripts/test_napi_npm.ts` compares the two export sets
+ * rather than trusting this sentence.
+ *
  * `npm/cli.js` reads that absence three ways: as the signal to load this
  * loader in its workers rather than the wasm `./worker` entry, as the signal
  * to size its pool for an engine with no wasm tier-up competing for cores — a

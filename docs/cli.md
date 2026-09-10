@@ -53,7 +53,16 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   native CLI, warned about on stderr when it bites (see
   [§Multi-File Formatting](#multi-file-formatting)'s parallelism note; `cli.js`
   restates the native `clamp_worker_count` by hand — same constant, same
-  message, so both surfaces refuse the same numbers). The bound does a
+  message, so both surfaces refuse the same numbers). They also ACCEPT the same
+  ones, which takes its own restatement: the flag's value is parsed as a Rust
+  `usize` on one side and by a regex on the other, so `cli.js` mirrors that
+  grammar too — ASCII digits, an optional leading `+`, nothing past
+  `usize::MAX` — and `scripts/test_napi_npm.ts` runs the accept/reject table
+  through both bins, which is the only place both exist at once. Repetition is
+  restated for the same reason and across the whole value-taking family
+  (`--content`, `--parser`, `--source-type`, `--jobs`): argh refuses a second
+  one and `parseArgs` would keep the last, so `cli.js` refuses too. Repeated
+  SWITCHES stay fine on both — argh counts them. The bound does a
   different job here than natively: a JS worker is a whole V8 isolate (~13 MB
   resident on either engine, where the native thread's reservation is lazily
   committed and costs ~none), so an unbounded width on a large tree hits the
@@ -329,6 +338,29 @@ run formats normally — on the sequential path and in every pool worker alike. 
   - **Heuristic fallback**: a `.gitignore` in scope is **authoritative** and turns the heuristic off; with no `.gitignore`, the heuristic — hidden directories plus `dist`/`build`/`target` — is the fallback "not source" guess, except that an explicit tsv-layer `!` re-include overrides it.
   - **Re-include idiom**: to selectively re-include under a pruned (or otherwise ignored) directory, re-include the directory itself first — `!dist/` admits the whole directory, then `dist/*` + `!dist/keep.ts` narrows it back to just the files you want. A bare `!dist/keep.ts` (without `!dist/`) is a **no-op** — the heuristic prunes `dist` before descending, mirroring git's parent-directory rule (a gitignored `dist/` likewise blocks a later `!dist/keep.ts`). tsv emits a **stderr warning** for this case (non-fatal — no effect on the exit code, stdout, or `--list`/`--check` output), pointing at the `!dir/` escape.
   - **Subdirectory invocation**: because the boundary is found by walking up, the repo-root rules apply even from a subdirectory, and formatting a subdirectory directly gives the same result as formatting it via an ancestor. But a tree that *contains* repos (a non-repo directory with `.git` subdirectories below it) does not honor the inner repos' `.gitignore`s — run tsv per repo.
+  - **Piped output**: `cli.js` writes stdout and stderr **synchronously** (an
+    async `process.stdout.write` before `process.exit` truncates), which is only
+    safe while the fd stays blocking — and the CLI takes that away from itself:
+    spawning the worker pool pipes the workers' stdio through the parent, which
+    flips fd 1 to non-blocking. Its writer therefore loops over `writeSync`,
+    honors partial writes, sleeps 1 ms and retries on `EAGAIN`, and goes quiet on
+    `EPIPE`. Without that, `tsv format .` into `head`/`less`/`grep` died with a
+    Node stack trace and a half-written path once the tree was large enough to
+    both spawn workers and fill a 64 KiB pipe — after files had been rewritten,
+    so the changes landed and the report of them did not. ⚠️ The **native** CLI
+    is the one still rough here: a consumer that exits early (`| head`) aborts it
+    (exit 134, a Rust panic notice) where the conventional answer is to stop
+    quietly. Its slow-pipe behavior is correct.
+  - **Invalid UTF-8 in a source file**: reading is **strict UTF-8 on both CLIs**
+    — the native one because Rust's `read_to_string` refuses invalid bytes, and
+    `cli.js` because it decodes through `TextDecoder(..., {fatal: true})` rather
+    than `readFileSync(path, 'utf-8')`, which would substitute U+FFFD. The
+    distinction is not cosmetic on the format path: a stray byte inside a string
+    literal still parses after substitution, so a lossy reader would write the
+    repaired text back over the author's file and call it formatted. Both bins
+    instead report `read failed: stream did not contain valid UTF-8`, count the
+    file as an error, and leave every byte in place. Same rule for `--stdin` and
+    for `parse`.
   - **Unreadable ignore files**: a `.gitignore`/`.formatignore`/`.prettierignore` that is present but can't be read (invalid UTF-8 — reading is strict UTF-8 on both the native and WASM CLIs — or a permission error) is **not** silently treated as absent: tsv emits a non-fatal stderr warning and drops that file's rules (so an unreadable `.gitignore` also leaves the build-output heuristic *on* for its subtree). A file that genuinely isn't there, or is deleted between the directory listing and the read, stays silent. This is also a `--check` reproducibility hazard — surfacing it is the point.
   - **`--check` reproducibility** assumes the ignore files are **committed**: a local/uncommitted `.formatignore` or `.prettierignore` (or git's unread `.git/info/exclude` / `core.excludesFile`) makes a clean CI checkout disagree.
   - **Shared by construction**: the matcher is the `tsv_ignore` crate's `IgnoreStack`; the per-directory prune/descend policy (heuristic, safety nets, the shadow warning) is the `tsv_discover` crate's verdict. The WASM CLI, the native npm package, and editors call into the same two crates, so every surface agrees rather than hand-mirroring the logic. See `cli/discover.rs`.
