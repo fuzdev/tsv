@@ -1101,7 +1101,8 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 
 	// The other end of the same rule: a consumer that goes away mid-stream is
 	// `| head`, and the conventional answer to EPIPE is to stop writing, not to
-	// throw. (The native CLI currently aborts here — see docs/cli.md.)
+	// throw. The native CLI answers the same way (`tsv_cli`'s `cli/out.rs`), with
+	// its own rows in `tests/cli_tests.rs` — see docs/cli.md §Multi-File Formatting.
 	it('a consumer that exits early is not a crash', { skip: !posix }, () => {
 		const tree = mkdtempSync(join(tmpdir(), 'tsv-pipe-head-'));
 		try {
@@ -1122,6 +1123,39 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 				/EPIPE|EAGAIN|ReferenceError|^\s*at /m,
 				`the CLI crashed on a closed pipe: ${result.stderr}`
 			);
+		} finally {
+			rmSync(tree, { recursive: true, force: true });
+		}
+	});
+
+	// `--list` is the one stdout path that used to write once per line. It now builds
+	// the listing and writes it once, as the native CLI does — which is also what
+	// decides the cost of a closed reader here: `write_fd` absorbs `EPIPE` by CATCHING
+	// it, so a per-path loop paid a throw and a catch for every remaining path. This
+	// row grades the write shape's observable half: the listing still arrives, and a
+	// reader that leaves mid-stream is not a crash.
+	it('--list survives a consumer that exits early, and is otherwise complete', () => {
+		const tree = mkdtempSync(join(tmpdir(), 'tsv-pipe-list-'));
+		try {
+			const pad = 'p'.repeat(150);
+			for (let i = 0; i < 1200; i++) {
+				writeFileSync(join(tree, `${pad}_${i}.ts`), 'const   x=1\n');
+			}
+			const quoted = JSON.stringify(cli_path);
+			const node = JSON.stringify(process.execPath);
+			const piped = spawnSync('sh', ['-c', `${node} ${quoted} format --list . | head -2`], {
+				encoding: 'utf-8',
+				cwd: tree
+			});
+			assert.doesNotMatch(
+				piped.stderr,
+				/EPIPE|EAGAIN|ReferenceError|^\s*at /m,
+				`--list crashed on a closed pipe: ${piped.stderr}`
+			);
+			// and unpiped, every path is still there
+			const whole = run_cli(['format', '--list', '.'], undefined, tree);
+			assert.equal(whole.status, 0, whole.stderr);
+			assert.equal(whole.stdout.trim().split('\n').length, 1200);
 		} finally {
 			rmSync(tree, { recursive: true, force: true });
 		}

@@ -2200,3 +2200,233 @@ fn test_source_type_refused_on_a_goalless_language() {
         "an invalid value is reported as such"
     );
 }
+
+/// A tree big enough to fill a pipe: 1,200 unformatted files whose **names** are long
+/// enough that the changed-path report clears the 64 KiB pipe buffer.
+///
+/// Both numbers are load-bearing and independent. 1,200 files with ordinary names is
+/// only ~54 KB of paths and does **not** reproduce the closed-pipe bug — the whole
+/// report fits in the buffer, the single write succeeds, and nothing ever sees `EPIPE`.
+/// The 150-byte name brings it to ~190 KB. The same pair of thresholds is why the JS
+/// mirror's rows (`scripts/test_npm.ts`) are shaped this way.
+///
+/// A fresh tree per call, because a second run has nothing to report: the files are
+/// formatted in place, so the report that has to overflow the pipe exists only once.
+/// Test helper; panicking on IO failure is the desired behavior.
+#[cfg(unix)]
+#[allow(clippy::expect_used)]
+fn pipe_overflow_tree(name: &str) -> TempTree {
+    let tree = TempTree(temp_dir(name));
+    let pad = "p".repeat(150);
+    for i in 0..PIPE_TREE_FILES {
+        fs::write(tree.path().join(format!("{pad}_{i}.ts")), UNFORMATTED_TS)
+            .expect("write seed file");
+    }
+    tree
+}
+
+/// A temp tree that is removed when the test leaves — **assertion failure included**.
+///
+/// `temp_dir` names its directory after the pid, so a leak is never reclaimed by a
+/// later run, and a `remove_dir_all` written after the assertions only cleans up the
+/// runs that passed: the wrong half, since a failing run is the one a developer
+/// re-runs. These trees are 1,200 files each, so the leak is measured in thousands of
+/// files per red test. Same shape as `ReleasePoolOnUnwind` in the format command — the
+/// cleanup belongs on the way out, not on the happy path.
+#[cfg(unix)]
+struct TempTree(PathBuf);
+
+#[cfg(unix)]
+impl TempTree {
+    fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+#[cfg(unix)]
+impl Drop for TempTree {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+#[cfg(unix)]
+const PIPE_TREE_FILES: usize = 1200;
+
+/// A piped run: the shell's output plus the **CLI's own** exit code.
+#[cfg(unix)]
+struct PipedRun {
+    out: std::process::Output,
+    /// `tsv`'s own status, which the pipeline otherwise hides behind the last
+    /// command's. Captured through a file rather than `PIPESTATUS`, which is a bashism
+    /// — `/bin/sh` is dash on most Linux distributions, where it expands to nothing.
+    code: i32,
+}
+
+/// Run `tsv <tsv_args> <pipeline>` through `sh` with `dir` as the cwd.
+///
+/// A pipe needs a shell: `std::process::Command` can spawn a child but not hand its
+/// stdout to a second process that then *exits early*, which is the condition under
+/// test. The status file is a sibling of `dir`, not inside it, so it cannot perturb a
+/// tree the run is formatting.
+/// Test helper; panicking on spawn failure is the desired behavior.
+#[cfg(unix)]
+#[allow(clippy::expect_used)]
+fn tsv_piped(dir: &Path, tsv_args: &str, pipeline: &str) -> PipedRun {
+    let bin = built_tsv();
+    let status_file = dir.with_extension("status");
+    let _ = fs::remove_file(&status_file);
+    let script = format!(
+        "{{ '{}' {tsv_args}; echo $? > '{}'; }} {pipeline}",
+        bin.display(),
+        status_file.display()
+    );
+    let out = Command::new("sh")
+        .args(["-c", &script])
+        .current_dir(dir)
+        .output()
+        .expect("Failed to execute shell");
+    let code = fs::read_to_string(&status_file)
+        .unwrap_or_default()
+        .trim()
+        .parse()
+        .unwrap_or(-1);
+    let _ = fs::remove_file(&status_file);
+    PipedRun { out, code }
+}
+
+/// A panic notice in either stream means the run aborted rather than stopping.
+#[cfg(unix)]
+fn assert_no_pipe_panic(label: &str, run: &PipedRun) {
+    let stderr = String::from_utf8_lossy(&run.out.stderr);
+    let stdout = String::from_utf8_lossy(&run.out.stdout);
+    assert!(
+        !stderr.contains("panicked") && !stderr.contains("Broken pipe"),
+        "{label}: the CLI crashed on a closed pipe: {stderr}"
+    );
+    assert!(
+        !stdout.contains("panicked"),
+        "{label}: the CLI crashed on a closed pipe: {stdout}"
+    );
+}
+
+/// A consumer that exits early (`| head`) stops the output and nothing else.
+///
+/// Rust sets `SIGPIPE` to `SIG_IGN`, so the write returns `EPIPE` rather than killing
+/// the process — and `println!` turned that into a panic (exit 134 under the release
+/// profile's `panic = "abort"`, 101 under an unwinding one) *after* every file had
+/// already been rewritten: the changes landed and the report of them became a crash
+/// notice. So `EPIPE` stops the write and the run finishes on its own terms, which is
+/// what `ls | head` looks like from the caller's side and what the JS mirror already
+/// did (`cli.js`'s `write_fd`; `scripts/test_npm.ts` carries the twin rows).
+///
+/// **Both fds**, in two shapes that fail differently: bare `| head` closes stdout while
+/// stderr stays on the terminal, grading the changed-path write; `2>&1 | head` closes
+/// the *same* pipe for both, grading the summary — the write a stdout-only fix leaves
+/// panicking one line further down.
+#[cfg(unix)]
+#[test]
+fn test_format_closed_pipe_consumer_is_not_a_crash() {
+    for (label, pipeline) in [
+        ("stdout_only", "| head -2 >/dev/null"),
+        ("both_fds", "2>&1 | head -2 >/dev/null"),
+    ] {
+        let tree = pipe_overflow_tree(&format!("closed_pipe_{label}"));
+        let run = tsv_piped(tree.path(), "format .", pipeline);
+        assert_no_pipe_panic(label, &run);
+        assert_eq!(run.code, 0, "{label}: format reported a failure");
+        // The report is truncated, not the work: every file is still formatted.
+        let formatted = fs::read_dir(tree.path())
+            .unwrap()
+            .filter(|e| fs::read_to_string(e.as_ref().unwrap().path()).unwrap() == FORMATTED_TS)
+            .count();
+        assert_eq!(
+            formatted, PIPE_TREE_FILES,
+            "{label}: files were left unformatted"
+        );
+    }
+}
+
+/// The closed pipe does not overwrite the exit code, because for `--check` the exit
+/// code **is** the API.
+///
+/// This is why a `BrokenPipe` write goes quiet instead of reporting 141, or restoring
+/// `SIGPIPE` to `SIG_DFL` and dying by the signal: either of those answers "the reader
+/// left" to a caller that asked "would anything change?".
+#[cfg(unix)]
+#[test]
+fn test_format_check_exit_code_survives_a_closed_pipe() {
+    let tree = pipe_overflow_tree("closed_pipe_check");
+    let run = tsv_piped(tree.path(), "format --check .", "| head -2 >/dev/null");
+    assert_no_pipe_panic("--check", &run);
+    assert_eq!(
+        run.code,
+        1,
+        "--check must still report would-change through a closed pipe, stderr: {}",
+        String::from_utf8_lossy(&run.out.stderr)
+    );
+    // And `--check` still wrote nothing.
+    let pad = "p".repeat(150);
+    assert_eq!(
+        fs::read_to_string(tree.path().join(format!("{pad}_0.ts"))).unwrap(),
+        UNFORMATTED_TS
+    );
+}
+
+/// The other end of the same rule: a consumer that is merely **slow** gets everything.
+///
+/// `EPIPE` is the only write error the CLI absorbs, so a reader that drains late must
+/// still receive every line — otherwise "stop quietly" would have become "stop early",
+/// which is a silently truncated report rather than a fixed crash.
+#[cfg(unix)]
+#[test]
+fn test_format_slow_pipe_consumer_gets_every_line() {
+    let tree = pipe_overflow_tree("slow_pipe");
+    let run = tsv_piped(tree.path(), "format .", "| { sleep 1; cat; }");
+    assert_no_pipe_panic("slow consumer", &run);
+    let stderr = String::from_utf8_lossy(&run.out.stderr);
+    assert_eq!(run.code, 0, "the run died: {stderr}");
+    assert_eq!(
+        String::from_utf8_lossy(&run.out.stdout).lines().count(),
+        PIPE_TREE_FILES,
+        "the changed-path list was truncated, stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains(&format!("{PIPE_TREE_FILES} formatted")),
+        "stderr: {stderr}"
+    );
+}
+
+/// `parse`'s wire goes through the same writer, so a closed reader is not a parse error.
+///
+/// This one never panicked — `parse` wrote through a hand-locked handle and answered a
+/// failed write with `exit(1)`, its *parse-error* code, so `tsv parse big.ts | head` was
+/// indistinguishable from invalid syntax. One writer for both commands settles it at 0,
+/// the answer `cli.js` gives.
+#[cfg(unix)]
+#[test]
+fn test_parse_closed_pipe_is_not_a_parse_error() {
+    let tree = TempTree(temp_dir("parse_closed_pipe"));
+    let path = tree.path().join("big.ts");
+    // Enough statements that the wire clears the 64 KiB pipe buffer by a wide margin.
+    use std::fmt::Write as _;
+    let mut src = String::new();
+    for i in 0..2000 {
+        let _ = writeln!(src, "const x{i} = {i};");
+    }
+    fs::write(&path, &src).unwrap();
+
+    let run = tsv_piped(tree.path(), "parse big.ts", "| head -c 100 >/dev/null");
+    assert_no_pipe_panic("parse", &run);
+    assert_eq!(
+        run.code,
+        0,
+        "a closed reader is not a parse failure, stderr: {}",
+        String::from_utf8_lossy(&run.out.stderr)
+    );
+
+    // A real parse error still reports 1 — the closed-pipe answer didn't swallow it.
+    fs::write(&path, "const bad = ;\n").unwrap();
+    let broken = tsv_in_dir(tree.path(), &["parse", "big.ts"]);
+    assert_eq!(broken.status.code(), Some(1));
+}

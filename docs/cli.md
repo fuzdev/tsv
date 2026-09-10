@@ -338,19 +338,46 @@ run formats normally — on the sequential path and in every pool worker alike. 
   - **Heuristic fallback**: a `.gitignore` in scope is **authoritative** and turns the heuristic off; with no `.gitignore`, the heuristic — hidden directories plus `dist`/`build`/`target` — is the fallback "not source" guess, except that an explicit tsv-layer `!` re-include overrides it.
   - **Re-include idiom**: to selectively re-include under a pruned (or otherwise ignored) directory, re-include the directory itself first — `!dist/` admits the whole directory, then `dist/*` + `!dist/keep.ts` narrows it back to just the files you want. A bare `!dist/keep.ts` (without `!dist/`) is a **no-op** — the heuristic prunes `dist` before descending, mirroring git's parent-directory rule (a gitignored `dist/` likewise blocks a later `!dist/keep.ts`). tsv emits a **stderr warning** for this case (non-fatal — no effect on the exit code, stdout, or `--list`/`--check` output), pointing at the `!dir/` escape.
   - **Subdirectory invocation**: because the boundary is found by walking up, the repo-root rules apply even from a subdirectory, and formatting a subdirectory directly gives the same result as formatting it via an ancestor. But a tree that *contains* repos (a non-repo directory with `.git` subdirectories below it) does not honor the inner repos' `.gitignore`s — run tsv per repo.
-  - **Piped output**: `cli.js` writes stdout and stderr **synchronously** (an
-    async `process.stdout.write` before `process.exit` truncates), which is only
-    safe while the fd stays blocking — and the CLI takes that away from itself:
-    spawning the worker pool pipes the workers' stdio through the parent, which
-    flips fd 1 to non-blocking. Its writer therefore loops over `writeSync`,
-    honors partial writes, sleeps 1 ms and retries on `EAGAIN`, and goes quiet on
-    `EPIPE`. Without that, `tsv format .` into `head`/`less`/`grep` died with a
-    Node stack trace and a half-written path once the tree was large enough to
-    both spawn workers and fill a 64 KiB pipe — after files had been rewritten,
-    so the changes landed and the report of them did not. ⚠️ The **native** CLI
-    is the one still rough here: a consumer that exits early (`| head`) aborts it
-    (exit 134, a Rust panic notice) where the conventional answer is to stop
-    quietly. Its slow-pipe behavior is correct.
+  - **Piped output — a closed consumer is not a failure.** `tsv format . | head`
+    fills the 64 KiB pipe buffer on any tree whose changed-path report exceeds
+    it, so `head` has exited by the time the rest is written. **Both bins stop
+    writing and finish the run on their own terms**: the exit code still reports
+    the work (0 clean, 1 `--check` would-change, 2 errors) and the stderr summary
+    still prints when stderr is not the closed fd, so `tsv format . | head` stays
+    informative. The rule covers **both fds** — `2>&1 | head` closes the same
+    pipe for both, and a stdout-only rule would just move the failure one line
+    down, onto the summary.
+
+    Why not the two alternatives, since this is a shipped exit-code contract:
+    **141** (what a tool killed by `SIGPIPE` reports) and **restoring `SIGPIPE`
+    to `SIG_DFL`** both replace the 0/1/2 verdict with "the reader left", and for
+    `--check` the exit code *is* the API. Exiting 0 is also the honest answer for
+    `format`, whose stdout is a *report* of files already rewritten rather than
+    the product: a reader that left does not un-format them. And only this answer
+    is one both bins can give identically — Node ignores `SIGPIPE` too, so
+    `cli.js` could never die by the signal, only fake a code where the native
+    side died by one. Any **other** write error still aborts loudly on both: a
+    report truncated by a full disk, with nothing said about it, is worse than a
+    crash.
+
+    The mechanism differs because the two runtimes fail differently. Native:
+    Rust sets `SIGPIPE` to `SIG_IGN` at startup, so the write returns `EPIPE` and
+    `println!`/`eprintln!` panic on it — every byte therefore goes through
+    `cli/out.rs` (`write_stdout` / `write_stderr`, and the `out_line!` /
+    `err_line!` macros over them), which absorbs `BrokenPipe` and panics on
+    anything else. `parse` rides the same writer, so a closed reader there no
+    longer reports `1`, its parse-error code. `cli.js` writes both fds
+    **synchronously** (an async `process.stdout.write` before `process.exit`
+    truncates), which is only safe while the fd stays blocking — and it takes
+    that away from itself: spawning the worker pool pipes the workers' stdio
+    through the parent, which flips fd 1 to non-blocking. Its `write_fd`
+    therefore loops over `writeSync`, honors partial writes, sleeps 1 ms and
+    retries on `EAGAIN`, and goes quiet on `EPIPE`. The `EAGAIN` half has no
+    native counterpart: that pool is threads, and the fd stays blocking.
+
+    A consumer that is merely **slow** gets every line on both bins — `EPIPE` is
+    the only write error either absorbs. Pinned by `tests/cli_tests.rs`
+    (`*_closed_pipe_*`, `*_slow_pipe_*`) and `scripts/test_npm.ts`'s twin rows.
   - **Invalid UTF-8 in a source file**: reading is **strict UTF-8 on both CLIs**
     — the native one because Rust's `read_to_string` refuses invalid bytes, and
     `cli.js` because it decodes through `TextDecoder(..., {fatal: true})` rather

@@ -2,7 +2,9 @@ use crate::cli::commands::parse::{check_source_type_language, parse_source_type_
 use crate::cli::discover::{Diagnostics, FileSink, discover_files, discover_into, path_sort_key};
 use crate::cli::format_source::{format_source_in, format_source_with_source_type};
 use crate::cli::input::{InputArgs, ParserType};
+use crate::cli::out::write_stdout;
 use crate::cli::stack::{clamp_worker_count, sized_thread};
+use crate::err_line;
 use argh::FromArgs;
 use std::fs;
 use std::num::NonZeroUsize;
@@ -60,6 +62,14 @@ pub struct FormatCommand {
     paths: Vec<String>,
 }
 
+/// What a report slot says when no worker ever filled it.
+///
+/// Two readers reach it — the streamed path's walk-index sweep and the collected path's
+/// merge — and both mean the same thing: a worker died *outside* `catch_unwind`, which
+/// cannot happen in release (`panic = "abort"` kills the process first). One spelling so
+/// the two cannot drift; `tests/cli_tests.rs` asserts a `--jobs 0` run never produces it.
+const WORKER_PANICKED: &str = "worker thread panicked";
+
 /// Per-file result, reported in sorted-path order.
 enum FileOutcome {
     Unchanged,
@@ -80,17 +90,17 @@ impl FormatCommand {
     /// `--content`/`--stdin` mode — format one input to stdout (or `--check` it).
     fn run_single(self) {
         if !self.paths.is_empty() {
-            eprintln!("Error: --content/--stdin cannot be combined with file paths");
+            err_line!("Error: --content/--stdin cannot be combined with file paths");
             process::exit(2);
         }
         if self.jobs.is_some() {
-            eprintln!(
+            err_line!(
                 "Error: --jobs applies to file paths; --content/--stdin format a single input"
             );
             process::exit(2);
         }
         if self.list {
-            eprintln!(
+            err_line!(
                 "Error: --list applies to file paths; --content/--stdin format a single input"
             );
             process::exit(2);
@@ -98,7 +108,7 @@ impl FormatCommand {
         let goal = match parse_source_type_arg(self.source_type.as_deref()) {
             Ok(g) => g,
             Err(e) => {
-                eprintln!("Error: {e}");
+                err_line!("Error: {e}");
                 process::exit(2);
             }
         };
@@ -111,27 +121,27 @@ impl FormatCommand {
         let (input, parser_type) = match input_args.resolve() {
             Ok(pair) => pair,
             Err(e) => {
-                eprintln!("Error: {e}");
+                err_line!("Error: {e}");
                 process::exit(2);
             }
         };
         if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
-            eprintln!("Error: {e}");
+            err_line!("Error: {e}");
             process::exit(2);
         }
         match format_source_with_source_type(input.content(), parser_type, goal) {
             Ok(formatted) => {
                 if self.check {
                     if formatted != input.content() {
-                        eprintln!("would change");
+                        err_line!("would change");
                         process::exit(1);
                     }
                 } else {
-                    print!("{formatted}");
+                    write_stdout(formatted.as_bytes());
                 }
             }
             Err(e) => {
-                eprintln!("Parse error: {e}");
+                err_line!("Parse error: {e}");
                 process::exit(2);
             }
         }
@@ -140,11 +150,11 @@ impl FormatCommand {
     /// Path mode — discover files, format in parallel, report sorted.
     fn run_paths(self) {
         if self.paths.is_empty() {
-            eprintln!("Error: No input provided. Use a file path, --content, or --stdin");
+            err_line!("Error: No input provided. Use a file path, --content, or --stdin");
             process::exit(2);
         }
         if self.parser.is_some() {
-            eprintln!(
+            err_line!(
                 "Error: --parser applies to --content/--stdin; file paths use extension detection"
             );
             process::exit(2);
@@ -157,13 +167,13 @@ impl FormatCommand {
         // `--source-type` here asks for something no answer fits, and is refused
         // rather than ignored.
         if self.source_type.is_some() {
-            eprintln!(
+            err_line!(
                 "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script"
             );
             process::exit(2);
         }
         if self.list && self.check {
-            eprintln!("Error: --list and --check cannot be combined");
+            err_line!("Error: --list and --check cannot be combined");
             process::exit(2);
         }
         // --list reports the in-scope set and stops — no formatting, and an
@@ -176,16 +186,16 @@ impl FormatCommand {
                 Err(bad_args) => exit_bad_args(&bad_args),
             };
             report_discovery(&discovered.errors, &discovered.warnings);
-            // build the whole listing and emit it in one write: a per-path
-            // `println!` re-locks stdout and re-enters the formatter for each of
-            // (potentially thousands of) lines, which dominates `--list` on a large
-            // tree; one buffered write is dramatically cheaper.
+            // build the whole listing and emit it in one write: a per-path write
+            // re-locks stdout and flushes for each of (potentially thousands of)
+            // lines, which dominates `--list` on a large tree; one buffered write is
+            // dramatically cheaper.
             use std::fmt::Write as _;
             let mut listing = String::new();
             for path in &discovered.files {
                 let _ = writeln!(listing, "{}", path.display());
             }
-            print!("{listing}");
+            write_stdout(listing.as_bytes());
             if !discovered.errors.is_empty() {
                 process::exit(2);
             }
@@ -209,7 +219,7 @@ impl FormatCommand {
             };
 
         // Buffer the changed-path lines and emit them in one write, for the same
-        // reason `--list` does (above): a per-path `println!` re-locks stdout and
+        // reason `--list` does (above): a per-path write re-locks stdout and
         // flushes for each of (potentially thousands of) changed files, which
         // dominates `--check` on a large unformatted tree. The common case (few
         // changes) keeps the buffer tiny. Errors stay per-line on stderr (rare,
@@ -227,11 +237,11 @@ impl FormatCommand {
                 }
                 FileOutcome::Error(e) => {
                     errors += 1;
-                    eprintln!("error: {}: {e}", path.display());
+                    err_line!("error: {}: {e}", path.display());
                 }
             }
         }
-        print!("{changed_paths}");
+        write_stdout(changed_paths.as_bytes());
 
         let action = if self.check {
             "would change"
@@ -243,7 +253,7 @@ impl FormatCommand {
         } else {
             String::new()
         };
-        eprintln!("{changed} {action}, {unchanged} unchanged{error_note}");
+        err_line!("{changed} {action}, {unchanged} unchanged{error_note}");
 
         if errors > 0 {
             process::exit(2);
@@ -259,10 +269,10 @@ impl FormatCommand {
 /// code or stdout, so `--list` / `--check` output stays clean.
 fn report_discovery(errors: &[String], warnings: &[String]) {
     for msg in errors {
-        eprintln!("error: {msg}");
+        err_line!("error: {msg}");
     }
     for msg in warnings {
-        eprintln!("warning: {msg}");
+        err_line!("warning: {msg}");
     }
 }
 
@@ -270,20 +280,25 @@ fn report_discovery(errors: &[String], warnings: &[String]) {
 /// run before anything is formatted.
 fn exit_bad_args(bad_args: &[String]) -> ! {
     for msg in bad_args {
-        eprintln!("error: {msg}");
+        err_line!("error: {msg}");
     }
     process::exit(2);
 }
 
 /// An empty scope is a usage error for the format action (`--list` reports the
-/// empty set and exits 0 instead). Neutral wording: an empty result can mean "no
-/// .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css here" *or* "all of them are ignored"
-/// (e.g. a target under a gitignored dir), so don't imply a wrong-extension cause.
+/// empty set and exits 0 instead). Neutral wording: an empty result can mean "none of
+/// the extensions tsv formats are here" *or* "all of them are ignored" (e.g. a target
+/// under a gitignored dir), so don't imply a wrong-extension cause.
+///
+/// The extension list is rendered from `tsv_discover`'s `FORMATTABLE_EXTENSIONS`, the
+/// same const the discovery filter reads, so a new language reaches this sentence
+/// rather than leaving it naming the old set. `crates/tsv_wasm/npm/cli.js` restates the
+/// finished message by hand (as it does `clamp_worker_count`), and the two are compared
+/// byte for byte by `scripts/test_napi_npm.ts`'s message-parity suite.
 fn exit_if_nothing_in_scope(file_count: usize, error_count: usize) {
     if file_count == 0 && error_count == 0 {
-        eprintln!(
-            "Error: No files to format — no unignored .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css files in scope"
-        );
+        let extensions = tsv_discover::formattable_extension_list("/");
+        err_line!("Error: No files to format — no unignored {extensions} files in scope");
         process::exit(2);
     }
 }
@@ -401,11 +416,11 @@ where
                 // one situation should not read as two different failures depending
                 // on which `tsv` the caller invoked.
                 if handles.is_empty() {
-                    eprintln!(
+                    err_line!(
                         "warning: could not start format workers ({e}); formatting on one thread"
                     );
                 } else {
-                    eprintln!(
+                    err_line!(
                         "warning: only {} of {jobs} format workers started",
                         handles.len()
                     );
@@ -646,7 +661,7 @@ fn format_streamed(
         let (path, outcome) = slots[*walk_index as usize].take().unwrap_or_else(|| {
             (
                 PathBuf::new(),
-                FileOutcome::Error("worker thread panicked".to_string()),
+                FileOutcome::Error(WORKER_PANICKED.to_string()),
             )
         });
         files.push(path);
@@ -750,9 +765,7 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
     // None only if a worker died outside catch_unwind (shouldn't happen)
     merged
         .into_iter()
-        .map(|outcome| {
-            outcome.unwrap_or_else(|| FileOutcome::Error("worker thread panicked".to_string()))
-        })
+        .map(|outcome| outcome.unwrap_or_else(|| FileOutcome::Error(WORKER_PANICKED.to_string())))
         .collect()
 }
 

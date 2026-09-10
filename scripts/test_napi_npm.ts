@@ -1194,6 +1194,26 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 			);
 		});
 	}
+
+	// The nothing-in-scope refusal, which needs a real empty directory and so cannot
+	// be a `USAGE_ROWS` entry. It is the one refusal whose text is *derived* on the
+	// native side — rendered from `tsv_discover::FORMATTABLE_EXTENSIONS`, the const the
+	// discovery filter itself reads — while `cli.js` restates the finished sentence by
+	// hand (as it does `clamp_worker_count` and `Goal::from_extension`). So this row is
+	// what makes a ninth formattable extension fail here instead of shipping two bins
+	// that name different sets.
+	it(`format <empty dir> → exit 2, both bins name the same extension set`, () => {
+		const args = ['format', empty_dir];
+		const native = run_native(args);
+		const mirror = run_mirror(args);
+		assert.equal(native.status, 2, `native stderr: ${native.stderr}`);
+		assert.equal(mirror.status, 2, `cli.js stderr: ${mirror.stderr}`);
+		assert.equal(mirror.stderr, native.stderr, 'the two bins must word this refusal alike');
+		assert.ok(
+			native.stderr.includes('No files to format'),
+			`the row's own message is gone; both bins now say: ${native.stderr}`
+		);
+	});
 });
 
 // Invalid UTF-8. The native CLI reads every file and stdin with Rust's
