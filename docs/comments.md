@@ -88,6 +88,59 @@ But the ledger only sees a document **as authored**, so it cannot see a *wholly*
 
 Prettier, oxfmt and biome all get the paren binding wrong — see [conformance_prettier_ts_comments.md §Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation) and [§JSDoc / paren semantics](./conformance_prettier_ts_comments.md#jsdoc--paren-semantics).
 
+## Two comments the author WELDED are one comment: the merged view
+
+A pair of **indentable** block comments the author left byte-adjacent — `/** a⏎ *//** b⏎ */`,
+with no separator at all between the `*/` and the `/*` — is **one** comment, not two. Prettier
+states this as a parse-time splice (`language-js/parse/postprocess/merge-nestled-jsdoc-comments.js`,
+run from `postprocess/index.js` **ahead of** comment attachment and ahead of the type-cast scan),
+which rewrites the two nodes into one whose `value` is `a *//* b` and whose range spans both.
+
+tsv cannot say it in the parse: `parse` is a drop-in for acorn / Svelte, which report two `Block`
+comments, so merging in the wire would move every fixture's `expected.json` and both parse gates.
+It says it in the **printer's comment view** instead — `tsv_lang::merge_nestled_block_comments`,
+applied where a format hands a printer its comment list. Three conditions, matching prettier's:
+byte-adjacency (`locEnd(a) === locStart(b)`, a zero gap — one space or one newline and the pair
+stays two on both sides); both [indentable](#the-comments-text-three-kinds-three-trims-and-one-of-them-is-no-trim)
+(`tsv_lang::is_indentable_block`, so a single-line block or a non-`*`-aligned one never nestles);
+and `/*`-delimited comments an **acorn** parse collected, which is what scopes the rule to
+`<script>` bodies and template expressions and away from an in-tag Svelte comment or a `<style>`
+sheet, exactly as prettier's own JS-parse postprocess is scoped.
+
+⚠️ **One merged ENTRY, never a "no separator here" arm at each separator.** Every
+comment→comment separator would otherwise have to learn the rule — the leading run, each
+trailing run, and the dangling run whose `hardline` is deliberately *unconditional* (§Trailing
+and dangling runs) — and that is precisely the class this document records as drifting
+invisibly: the welded text reparses as the same two comments, so the ledger, the census, F1 and
+the fuzzer are all blind, and only a prettier `compare` shows it. One entry makes every emitter
+and every layout gate answer correctly by construction. A merge preserves sortedness,
+non-overlap and `Comment::MIN_SPAN_LEN`, so every lookup here keeps working on the result; and
+because `Comment::content` is a pure source slice, the merged entry's content **is** prettier's
+merged `value`, which the indentable-block emitter reprints to the welded form byte for byte.
+
+⚠️ **A merged entry's flags are the TRAILING comment's**, because it is the one whose `span.end`
+binds the following token: ownership, and the two serializer hints. Which is also the trap —
+`JsdocCast` is the one node that carries a `Comment` **copy** of its own, taken at parse, and a
+cast's comment can be a nestled pair's tail (`/** a⏎ *//** @type {T}⏎ */ (x)` satisfies both
+rules). Printing the copy there **drops** the predecessor, hazard 1 exactly: the merged entry is
+`owned_by_node`, so no gap emitter will claim it. Every read of `cast.comment` that can see the
+pair's start goes through `Printer::jsdoc_cast_comment`, which resolves the array's entry from
+the cast's `(`.
+
+**The merge is directive-NEUTRAL, and by construction rather than by luck.** A `format-ignore`
+honors only from its own line (`directive_alone_on_line`: a newline before its `/*` and after its
+`*/`), while nestling *is* a glued neighbour at one of those two ends — so a directive that
+nestles was already inert before the merge, under the cataloged
+[glued-directive rule](./conformance_prettier_ignore.md#format-ignore-directive). The merged view
+then also removes it from `has_format_ignore`, which is the same answer reached a second way, and
+prettier — which loses the directive text to its own splice — agrees on the outcome from a third.
+No spelling exists where the merge changes what tsv freezes. Pinned by
+`typescript/syntax/comments/prettier_ignore_nestled_block`; the rule itself by
+`typescript/syntax/comments/nestled_block_run` (the `<script>` island, with the adjacency and
+indentability controls) and `svelte/syntax/comments/expr_nestled_block_run` (the template
+islands, with the CSS control). The three format seams that build the view are asserted to agree
+by `tests/nestled_block_comment_format_seams.rs`.
+
 ## Content is a source slice, never owned
 
 The content is **not stored owned** — comment text is a pure delimiter-stripped sub-slice of source, so `Comment` holds a `content_span` and recovers the text on demand via `Comment::content(source) -> &str` (`source` must be the host document the spans were recorded against); every field is `Copy`, no `String` per comment. `multiline` is precomputed so the multi-line-block expansion checks (`has_multiline_block_comments_on_page_in_range` and the printers) read an O(1), source-free flag instead of re-scanning content. The full comment span includes its delimiters (`//` / `/* */` / a `#!` hashbang, whose content includes the `#!`); the lexer is the single owner of those widths.

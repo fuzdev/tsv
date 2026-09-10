@@ -446,7 +446,12 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 5171 → 5172: `prettier/tests/format/js/comments-closure-typecast/no-semi/not-on-same-line.js`
 	// arrives from `unknown` (76 → 75, which names the change and carries its measurement) — the
 	// author blank between an OWNED JSDoc-cast comment and the `(` it casts.
-	typescript: 5172,
+	//
+	// 5172 → 5174: `prettier/tests/format/js/comments/jsdoc-nestled.js` and
+	// `…/jsdoc-nestled-dangling.js` arrive from `unknown` (75 → 73, which names the change and
+	// carries its measurement) — a byte-adjacent pair of indentable block comments is ONE
+	// comment, so no separator comes between them.
+	typescript: 5174,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -781,7 +786,31 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// set-diffed across a pre-change and a tip `--profile corpus` FFI build confirm the scope —
 	// `unknown` loses exactly this file, and `partial` / `safety` / `errors` / `expected_errors`
 	// and every `svelte` and `css` bucket are identical file-for-file.
-	typescript: 75,
+	//
+	// 75 → 73: `js/comments/jsdoc-nestled.js` and `js/comments/jsdoc-nestled-dangling.js` leave
+	// for `match` (`match` 5172 → 5174), and the nestle was each file's whole divergence. A pair
+	// of INDENTABLE block comments the author left byte-adjacent (`/** a⏎ *//** b⏎ */`, no
+	// separator at all) is ONE comment: prettier says so as a parse-time splice
+	// (`language-js/parse/postprocess/merge-nestled-jsdoc-comments.js`, which rewrites the two
+	// nodes into one whose value is `a *//* b`), and tsv says it in the printer's comment VIEW —
+	// its own parse is a drop-in for acorn/Svelte, which emit two `Block` comments, so merging
+	// in the wire would move every fixture's `expected.json`. One merged entry rather than a
+	// "no separator here" arm at each of the dozen comment→comment separators is what makes the
+	// run emitters, the *unconditional* dangling hardline and every layout gate answer alike:
+	// tsv was emitting a space at the glued sites and a hardline at the dangling ones.
+	// Scoped exactly as prettier's is — `/*`-delimited comments an acorn parse collected, so a
+	// Svelte template island merges and a `<style>` sheet or an in-tag comment does not.
+	//
+	// Measured by a baseline-vs-tip byte A/B over the 11,491 `find`-enumerated
+	// `../corpora/collections` + `../prettier/tests/format` files named EXPLICITLY (`--list`
+	// honors `.prettierignore` and hides ~800 suite files), stdout, stderr and exit code `cmp`'d
+	// per file: exactly these two files move, ZERO in real code. The 950 files tsv rejects were
+	// re-run with `--source-type script` FORCED and are byte-identical there too. The
+	// `--all --json` bucket lists confirm the scope — `unknown` loses exactly these two, and
+	// `partial` (32) / `safety` (0) / `errors` (188) / `expected_errors` and every `svelte` and
+	// `css` bucket are unmoved; a file whose bytes did not move cannot change bucket, since
+	// prettier's side of the comparison is fixed.
+	typescript: 73,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.

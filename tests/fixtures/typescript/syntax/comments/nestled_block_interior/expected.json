@@ -1,0 +1,1243 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1206,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " What a NESTLED pair's text looks like coming out. The pair is one comment",
+			"start": 10,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (nestled_block_run), so its interior is reindented as one - the join line is the",
+			"start": 88,
+			"end": 171,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " first comment's last line, its `*/`, the second's `/*`, and that comment's first",
+			"start": 173,
+			"end": 256,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line, all as a single continuation line taking a single leading space.",
+			"start": 258,
+			"end": 331,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The join line carries content on both sides of the delimiters.",
+			"start": 334,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n * z ",
+			"start": 401,
+			"end": 415,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 415,
+			"end": 425,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 8
+				},
+				"end": {
+					"line": 10,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ... and on neither.",
+			"start": 442,
+			"end": 464,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * a\n ",
+			"start": 466,
+			"end": 480,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n* b\n",
+			"start": 480,
+			"end": 494,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 4
+				},
+				"end": {
+					"line": 18,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nothing but the stars.",
+			"start": 511,
+			"end": 536,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n ",
+			"start": 538,
+			"end": 546,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n",
+			"start": 546,
+			"end": 554,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 4
+				},
+				"end": {
+					"line": 24,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank `*` line on each side of the join.",
+			"start": 571,
+			"end": 616,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n *\n ",
+			"start": 618,
+			"end": 632,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n*\n",
+			"start": 632,
+			"end": 646,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 4
+				},
+				"end": {
+					"line": 32,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Ragged authored indentation on the join line reindents like any other.",
+			"start": 663,
+			"end": 736,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* e\n ",
+			"start": 738,
+			"end": 748,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 37,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* f\n",
+			"start": 748,
+			"end": 758,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 4
+				},
+				"end": {
+					"line": 38,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Several lines each side, so the join is one continuation among many.",
+			"start": 775,
+			"end": 846,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* g\n * l1\n * l2\n ",
+			"start": 848,
+			"end": 872,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 45,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* h\n* m1\n* m2\n",
+			"start": 872,
+			"end": 896,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 4
+				},
+				"end": {
+					"line": 48,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A multi-byte character ahead of the join - the spans are byte offsets, the widths",
+			"start": 913,
+			"end": 997,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 1
+				},
+				"end": {
+					"line": 51,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " are not.",
+			"start": 999,
+			"end": 1010,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 1
+				},
+				"end": {
+					"line": 52,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* 日本語\n ",
+			"start": 1012,
+			"end": 1024,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 1
+				},
+				"end": {
+					"line": 54,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* g\n",
+			"start": 1024,
+			"end": 1034,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 4
+				},
+				"end": {
+					"line": 55,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control - the same interiors with one byte of gap stay two comments, each",
+			"start": 1051,
+			"end": 1127,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 1
+				},
+				"end": {
+					"line": 58,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " reindented on its own.",
+			"start": 1129,
+			"end": 1154,
+			"loc": {
+				"start": {
+					"line": 59,
+					"column": 1
+				},
+				"end": {
+					"line": 59,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* a\n * z ",
+			"start": 1156,
+			"end": 1170,
+			"loc": {
+				"start": {
+					"line": 60,
+					"column": 1
+				},
+				"end": {
+					"line": 61,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* b\n",
+			"start": 1171,
+			"end": 1181,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 9
+				},
+				"end": {
+					"line": 62,
+					"column": 4
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1205,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1196,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 64,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 427,
+					"end": 439,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 433,
+							"end": 438,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 433,
+								"end": 434,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 437,
+								"end": 438,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " What a NESTLED pair's text looks like coming out. The pair is one comment",
+							"start": 10,
+							"end": 86
+						},
+						{
+							"type": "Line",
+							"value": " (nestled_block_run), so its interior is reindented as one - the join line is the",
+							"start": 88,
+							"end": 171
+						},
+						{
+							"type": "Line",
+							"value": " first comment's last line, its `*/`, the second's `/*`, and that comment's first",
+							"start": 173,
+							"end": 256
+						},
+						{
+							"type": "Line",
+							"value": " line, all as a single continuation line taking a single leading space.",
+							"start": 258,
+							"end": 331
+						},
+						{
+							"type": "Line",
+							"value": " The join line carries content on both sides of the delimiters.",
+							"start": 334,
+							"end": 399
+						},
+						{
+							"type": "Block",
+							"value": "* a\n * z ",
+							"start": 401,
+							"end": 415
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 415,
+							"end": 425
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 496,
+					"end": 508,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 502,
+							"end": 507,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 502,
+								"end": 503,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 506,
+								"end": 507,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " ... and on neither.",
+							"start": 442,
+							"end": 464
+						},
+						{
+							"type": "Block",
+							"value": "*\n * a\n ",
+							"start": 466,
+							"end": 480
+						},
+						{
+							"type": "Block",
+							"value": "*\n* b\n",
+							"start": 480,
+							"end": 494
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 556,
+					"end": 568,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 562,
+							"end": 567,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 562,
+								"end": 563,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 566,
+								"end": 567,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 11
+									},
+									"end": {
+										"line": 25,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nothing but the stars.",
+							"start": 511,
+							"end": 536
+						},
+						{
+							"type": "Block",
+							"value": "*\n ",
+							"start": 538,
+							"end": 546
+						},
+						{
+							"type": "Block",
+							"value": "*\n",
+							"start": 546,
+							"end": 554
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 648,
+					"end": 660,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 654,
+							"end": 659,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 7
+								},
+								"end": {
+									"line": 33,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 654,
+								"end": 655,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 7
+									},
+									"end": {
+										"line": 33,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 658,
+								"end": 659,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 11
+									},
+									"end": {
+										"line": 33,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank `*` line on each side of the join.",
+							"start": 571,
+							"end": 616
+						},
+						{
+							"type": "Block",
+							"value": "* a\n *\n ",
+							"start": 618,
+							"end": 632
+						},
+						{
+							"type": "Block",
+							"value": "* b\n*\n",
+							"start": 632,
+							"end": 646
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 760,
+					"end": 772,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 766,
+							"end": 771,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 7
+								},
+								"end": {
+									"line": 39,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 766,
+								"end": 767,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 7
+									},
+									"end": {
+										"line": 39,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 770,
+								"end": 771,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 11
+									},
+									"end": {
+										"line": 39,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Ragged authored indentation on the join line reindents like any other.",
+							"start": 663,
+							"end": 736
+						},
+						{
+							"type": "Block",
+							"value": "* e\n ",
+							"start": 738,
+							"end": 748
+						},
+						{
+							"type": "Block",
+							"value": "* f\n",
+							"start": 748,
+							"end": 758
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 898,
+					"end": 910,
+					"loc": {
+						"start": {
+							"line": 49,
+							"column": 1
+						},
+						"end": {
+							"line": 49,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 904,
+							"end": 909,
+							"loc": {
+								"start": {
+									"line": 49,
+									"column": 7
+								},
+								"end": {
+									"line": 49,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 904,
+								"end": 905,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 7
+									},
+									"end": {
+										"line": 49,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 908,
+								"end": 909,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 11
+									},
+									"end": {
+										"line": 49,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Several lines each side, so the join is one continuation among many.",
+							"start": 775,
+							"end": 846
+						},
+						{
+							"type": "Block",
+							"value": "* g\n * l1\n * l2\n ",
+							"start": 848,
+							"end": 872
+						},
+						{
+							"type": "Block",
+							"value": "* h\n* m1\n* m2\n",
+							"start": 872,
+							"end": 896
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1036,
+					"end": 1048,
+					"loc": {
+						"start": {
+							"line": 56,
+							"column": 1
+						},
+						"end": {
+							"line": 56,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1042,
+							"end": 1047,
+							"loc": {
+								"start": {
+									"line": 56,
+									"column": 7
+								},
+								"end": {
+									"line": 56,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1042,
+								"end": 1043,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 7
+									},
+									"end": {
+										"line": 56,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1046,
+								"end": 1047,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 11
+									},
+									"end": {
+										"line": 56,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-byte character ahead of the join - the spans are byte offsets, the widths",
+							"start": 913,
+							"end": 997
+						},
+						{
+							"type": "Line",
+							"value": " are not.",
+							"start": 999,
+							"end": 1010
+						},
+						{
+							"type": "Block",
+							"value": "* 日本語\n ",
+							"start": 1012,
+							"end": 1024
+						},
+						{
+							"type": "Block",
+							"value": "* g\n",
+							"start": 1024,
+							"end": 1034
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1183,
+					"end": 1195,
+					"loc": {
+						"start": {
+							"line": 63,
+							"column": 1
+						},
+						"end": {
+							"line": 63,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1189,
+							"end": 1194,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 7
+								},
+								"end": {
+									"line": 63,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1189,
+								"end": 1190,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 7
+									},
+									"end": {
+										"line": 63,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 1193,
+								"end": 1194,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 11
+									},
+									"end": {
+										"line": 63,
+										"column": 12
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control - the same interiors with one byte of gap stay two comments, each",
+							"start": 1051,
+							"end": 1127
+						},
+						{
+							"type": "Line",
+							"value": " reindented on its own.",
+							"start": 1129,
+							"end": 1154
+						},
+						{
+							"type": "Block",
+							"value": "* a\n * z ",
+							"start": 1156,
+							"end": 1170
+						},
+						{
+							"type": "Block",
+							"value": "* b\n",
+							"start": 1171,
+							"end": 1181
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

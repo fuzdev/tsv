@@ -39,6 +39,7 @@ Foundation for all parsing.
 - Nested comment handling
 - Comment preservation in AST
 - Leading/trailing comment attachment
+- Nestled pairs — two **indentable** block comments the author left byte-adjacent (`/** a⏎ *//** b⏎ */`, no separator at all) are ONE comment, so nothing may come between them at any position. Prettier merges them in its parse postprocess; tsv's parse is a drop-in wire that keeps reporting two, so the merge is the printer's comment view — see [comments.md §Two comments the author WELDED are one comment](./comments.md#two-comments-the-author-welded-are-one-comment-the-merged-view)
 - `format-ignore` / `prettier-ignore` directive (`// format-ignore` emits the next construct verbatim — see [directives.md](./directives.md))
 
 ### Identifiers

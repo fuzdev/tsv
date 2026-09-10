@@ -14,7 +14,6 @@
 
 use crate::ast::internal::{self, Expression};
 use crate::printer::Printer;
-use crate::printer::expressions::assignment::jsdoc_cast_comment_is_own_line;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan;
 
@@ -344,7 +343,7 @@ impl<'a> Printer<'a> {
         // own line, so it is always the space — but a JSDoc cast may own its comment from
         // the line ABOVE its `(`, and collapsing that onto one line is a relocation the
         // unfrozen path does not make (`build_jsdoc_cast_lead_doc` keeps the break on exactly
-        // `jsdoc_cast_comment_is_own_line`'s shape, and so does prettier). Reading it off
+        // `Self::jsdoc_cast_comment_own_line`'s shape, and so does prettier). Reading it off
         // the source keeps the two producers answering with one rule rather than the
         // claim having to know which bound the comment.
         let separator = if self.comment_has_newline_between(comment.span.end, start) {
@@ -380,7 +379,7 @@ impl<'a> Printer<'a> {
             return false;
         }
         // A JSDoc cast keeps its own hang rule, and must: it prints a hardline between the
-        // comment and its `(` on exactly the shape `jsdoc_cast_comment_is_own_line`
+        // comment and its `(` on exactly the shape `Self::jsdoc_cast_comment_own_line`
         // describes, and a hang without that hardline strands the `(` (see that
         // function's doc — it is the single source of truth for both). The cast is resolved
         // through [`Self::leading_jsdoc_cast`] rather than matched because it may lead the value
@@ -393,7 +392,7 @@ impl<'a> Printer<'a> {
             // indentable — the comment prints against its own `(`, so it does not hang the
             // value the way a general owned comment does, and the general arm below is not
             // asked for it.
-            return jsdoc_cast_comment_is_own_line(cast, self.source);
+            return self.jsdoc_cast_comment_own_line(cast);
         }
         self.owned_leading_comment_at(expr.span().start)
             .is_some_and(|comment| self.block_comment_is_indentable(comment))
@@ -406,7 +405,7 @@ impl<'a> Printer<'a> {
     /// A value gap that builds its own layout (a binding default, an enum member) rather than
     /// routing through [`Printer::build_assignment_layout`] must ask this, because the cast
     /// prints a **hardline** between its comment and its `(` on exactly this shape
-    /// ([`jsdoc_cast_comment_is_own_line`], the source of truth for both halves) and a
+    /// ([`Self::jsdoc_cast_comment_own_line`], the source of truth for both halves) and a
     /// hardline with no hang leaves that `(` at the binding's own indent — a form the next
     /// pass collapses, so the authoring has no fixed point.
     ///
@@ -420,7 +419,7 @@ impl<'a> Printer<'a> {
     /// value — and both take that lookup's document-level short-circuit.
     pub(crate) fn is_own_line_jsdoc_cast(&self, value: &Expression<'_>) -> bool {
         self.leading_jsdoc_cast(value)
-            .is_some_and(|cast| jsdoc_cast_comment_is_own_line(cast, self.source))
+            .is_some_and(|cast| self.jsdoc_cast_comment_own_line(cast))
     }
 
     /// **on page**: where `expr`'s printed content begins in source — the start of the owned
@@ -452,7 +451,7 @@ impl<'a> Printer<'a> {
         // from its leftmost leaf too, and a bound taken past it drops an authored blank line
         // (`[a,⏎⏎/** @type {A} */⏎(x).b]`) — the loss this function exists to prevent.
         if let Some(cast) = self.leading_jsdoc_cast(expr) {
-            return Some(cast.comment.span.start);
+            return Some(self.jsdoc_cast_comment(cast).span.start);
         }
         self.owned_leading_comment_at(expr.span().start)
             .map(|c| c.span.start)
@@ -468,5 +467,89 @@ impl<'a> Printer<'a> {
     /// ([`Self::leading_jsdoc_cast`], which also walks the left spine this position cannot).
     pub(crate) fn owned_leading_comment_at(&self, start: u32) -> Option<&'a internal::Comment> {
         tsv_lang::owned_leading_comment_at(self.source, self.comments, start)
+    }
+
+    /// A JSDoc cast's owned comment **as this printer's array holds it**.
+    ///
+    /// `JsdocCast` is the one node carrying a `Comment` copy of its own, taken at parse.
+    /// The format path's comment view merges a nestled pair into one entry
+    /// (`tsv_lang::merge_nestled_block_comments`), and a cast's comment can be the pair's
+    /// TAIL — the merge is keyed on `*/`→`/*` adjacency and the cast on what precedes its
+    /// `(`, so `/** a⏎ *//** @type {T}⏎ */ (x)` satisfies both. The copy is then only half
+    /// of what the array holds, and printing it **drops** the predecessor: the merged entry
+    /// is `owned_by_node`, so no gap emitter will claim it (hazard 1).
+    ///
+    /// The lookup is the ordinary ownership one at the cast's `(` — a merge only ever
+    /// extends an entry to the LEFT, so the array entry still ends where the copy does and
+    /// [`Self::owned_leading_comment_at`] finds it from the same position that bound it.
+    /// Unconditional rather than gated on a document flag: a cast is rare, and a gate that
+    /// can be forgotten at a fourth read site is worth less than the two compares it saves.
+    pub(crate) fn jsdoc_cast_comment(&self, cast: &internal::JsdocCast<'_>) -> internal::Comment {
+        self.owned_leading_comment_at(cast.span.start)
+            .copied()
+            .unwrap_or(cast.comment)
+    }
+
+    /// Whether the author gave a JSDoc cast's comment a line of its own — a newline on
+    /// **both** sides of it, as in `const a =⏎\t/** @type {A} */⏎\t(expr)`.
+    ///
+    /// Both sides is the rule prettier applies, and only that shape hangs. A newline on
+    /// one side alone collapses to a space:
+    ///
+    /// ```js
+    /// const a = /** @type {A} */⏎  (expr);  // →  const a = /** @type {A} */ (expr);
+    /// const a =⏎  /** @type {A} */ (expr);  // →  const a = /** @type {A} */ (expr);
+    /// ```
+    ///
+    /// The single source of truth for both consequences of that shape: the hang itself
+    /// (`expressions::assignment::choose_layout`, and the declarator's own predicates in
+    /// `statements/variable.rs`) and the **hardline** the cast prints between the comment and
+    /// its `(` (`build_jsdoc_cast_lead_doc`). They must agree — a hang without the hardline
+    /// leaves the `(` stranded, and a hardline without the hang un-indents it. A gap that
+    /// CANNOT hang at all (a Svelte braced head, a computed key —
+    /// [`Printer::jsdoc_cast_cannot_hang_target`]) opts out of both halves together: the
+    /// cast reflows to a space there without consulting this predicate, which is the only
+    /// way the two can still agree where no operator line exists to end.
+    ///
+    /// ⚠️ **This answers only the HANG, not "is there a separator".** The cast is the last
+    /// comment of whatever leading run precedes it, so when this returns `false` the gap is
+    /// still prettier's `printLeadingComment` question — a space when something follows the
+    /// `*/` on its line, otherwise the soft `line` whose fate the enclosing group decides.
+    /// Reading `false` as "space" collapsed a break the author left after the `*/`
+    /// (`a();⏎/* c */ /** @type {A} */⏎(b);`) at statement position, where the list keeps
+    /// lines and every *other* leading comment — a plain glued run, a bundler annotation —
+    /// kept it. `build_jsdoc_cast_lead_doc` owns that three-way split.
+    ///
+    /// ⚠️ **The soft `line` arm is scoped to gaps that are not VALUE gaps**, because a value
+    /// gap answers the break with a rule rather than with width: an unforced break there
+    /// reflows (`docs/conformance_prettier.md` §Authored breaks in value position),
+    /// so the separator is a space and the two authorings reach one fixed point. Letting the
+    /// soft `line` decide it instead put the `(` at the statement's own indent whenever the
+    /// enclosing group broke — a break with no hang, which is the second failure this doc
+    /// names, reached from the other side. `Printer::jsdoc_cast_value_gap_target` is how the
+    /// value gap says so.
+    ///
+    /// ⚠️ **It reads the ARRAY's comment, not the node's copy** ([`Self::jsdoc_cast_comment`]):
+    /// a nestled predecessor merges into the cast's comment, and the line the run opens is
+    /// then the predecessor's. The resolution lives inside this predicate rather than at its
+    /// caller so the two cannot part.
+    pub(crate) fn jsdoc_cast_comment_own_line(&self, cast: &internal::JsdocCast<'_>) -> bool {
+        let comment = self.jsdoc_cast_comment(cast);
+        let bytes = self.source.as_bytes();
+        // Only whitespace between the start of the line and the comment.
+        let mut i = comment.span.start as usize;
+        let newline_before = loop {
+            if i == 0 {
+                break true;
+            }
+            i -= 1;
+            match bytes[i] {
+                b'\n' => break true,
+                b' ' | b'\t' | b'\r' => {}
+                _ => break false,
+            }
+        };
+        newline_before
+            && !tsv_lang::printing::is_same_line(self.source, comment.span.end, cast.span.start)
     }
 }
