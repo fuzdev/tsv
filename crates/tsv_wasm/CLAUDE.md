@@ -327,7 +327,12 @@ bare specifier through the `node` condition, which always lands on the auto-init
 `index.js`, leaving the lazy entry unreachable off the browser path.
 
 `npm/cli.js` is the first consumer (see [Files](#files)), but the pair is public
-API — `scripts/test_npm.ts` drives a real worker through it.
+API, and reaches its own copy by relative path — so the SUBPATH is exercised only
+by the package suites: `scripts/test_npm.ts` drives a real worker through it by
+bare specifier, out of a temp `node_modules` (the only place the `exports` map is
+walked the way a consumer walks it, conditions included), and
+`scripts/validate_artifacts.ts` pins the same-module-instance claim under Deno by
+initializing through `./worker` and then calling `browser.js`.
 
 The declarations are **one file per entry**, and that is what makes
 `wasm_module` non-optional where it exists. `index.d.ts` (the Node/Bun entry)
@@ -392,10 +397,29 @@ JS callers consume the verdict instead of re-deriving the prune decision.
 
 Unlike the parse exports, the class is emitted as `export class` (not
 `export function`); `scripts/patch_npm_package.ts` detects `export class` and
-re-exports it through the package facade alongside the functions, and
-`scripts/validate_artifacts.ts` smoke-tests it (present in format/all, absent in
-parse-only). The wasm-bindgen-generated `tsv_wasm.d.ts` declares the class, so no
-`tsv_ast.d.ts` entry is needed.
+carries it through the package facade alongside the functions — verbatim from the
+auto-init `index.js`, and as a **guarded subclass** in the two lazy entries
+(`browser.js` and the `./worker` subpath it backs), because a constructor cannot
+take the per-call init guard the functions do and `new IgnoreStack()` before
+`init()` would otherwise report an opaque `TypeError` from the glue where every
+other export names the mistake. The subclass adds the guard and nothing else:
+the prototype methods, `free()`, `[Symbol.dispose]`, and the generation stamping
+the constructor does are all still the base class's, and so is `instanceof` —
+in the direction that is asked. What subclassing costs is the OTHER direction:
+the name is no longer one constructor across the entries, so an instance from
+the auto-init `index.js` is not `instanceof` the lazy entries' `IgnoreStack`.
+Two ways to meet that, and only one is guarded. A class RETURNED from Rust would
+be built on the base prototype by the glue's own `__wrap` and so fail the check
+against the very entry that handed it out — silently, in browsers only — which
+`scripts/patch_npm_package.ts` fails the build on (a second
+`FinalizationRegistry.register` site is the tell); no class is returned today.
+The other is a consumer importing `.` and `./worker` into ONE thread and
+comparing across them, which the subpath exists precisely not to be — a worker
+imports it, and a bundler resolves both names to the same module. Both package
+suites smoke the class (`scripts/validate_artifacts.ts` per variant under Deno,
+`scripts/test_npm.ts` under Node — present in format/all, absent in parse-only).
+The wasm-bindgen-generated `tsv_wasm.d.ts` declares the class, so no
+`tsv_ast.d.ts` entry is needed (the subclass is assignable to it).
 
 ## TS Type Maintenance
 
@@ -507,7 +531,10 @@ e.g. `test:npm:run` — skips the rebuild, as in the publish/CI pipelines, and i
 freshness-guarded: `scripts/check_staged_freshness.ts` aborts it when a staged
 artifact is older than its sources), and `deno task validate:artifacts`
 checks tight wasm size bounds plus a Deno runtime smoke of every built
-bundle (both run in the publish pipeline). The npm package itself covers
+bundle — the auto-init entries, and the two lazy ones with their
+not-initialized guards — under the same freshness guard, since `pkg/` is
+gitignored and a stale bundle sizes and smokes exactly as cleanly as a fresh
+one (both run in the publish pipeline). The npm package itself covers
 Node/browser/bundler consumers, so there is no standalone `web`-target
 build beyond the npm artifacts; the `nodejs`-target `pkg/all/nodejs/` build
 exists solely to feed the Node bench runner (`build:bench:node`).

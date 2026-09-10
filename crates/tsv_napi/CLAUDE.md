@@ -91,10 +91,15 @@ have no ESM loader, so the platform addon rides a
 `createRequire(import.meta.url)` shim (oxc-parser's shape); that is the only
 CommonJS left. A CommonJS host reaches the package by dynamic `import()` — the
 path every supported Node allows, and the one `test_napi_npm.ts` gates. It
-detects the platform triple (musl via a `/lib/ld-musl-*` probe first, then
-`process.report`'s `glibcVersionRuntime` — trusted only positively — to rule
-out a glibc system that merely has musl installed), requires
-`@fuzdev/tsv-<triple>`, and on failure throws an error
+detects the platform triple (`platform.js`: a `/lib/ld-musl-*` probe first,
+which ends it on a stock glibc system; then, only if that hits, the libc
+actually mapped into this process from `/proc/self/maps`, which is what
+separates Alpine from a glibc host that merely has musl INSTALLED; and only if
+the map says neither, `process.report`'s `glibcVersionRuntime`, trusted
+positively — a runtime shipping no report, or a partial one, must not read as
+musl. Cheapest question first, and each is able to end it; the three probes go
+in as a bag, so `scripts/test_napi_npm.ts` drives the verdict over hosts no
+runner has), requires `@fuzdev/tsv-<triple>`, and on failure throws an error
 naming the triple, the prebuilt set, and `@fuzdev/tsv_wasm` as the universal
 fallback.
 
@@ -104,11 +109,19 @@ export names, same `(source, options?)` bags, same error strings: the loader's
 `read_options` mirrors the wasm crate's key for key, and
 `scripts/test_napi_npm.ts` asserts the strings. `parse_<lang>` returns the
 JSON-parsed object, `parse_<lang>_json` the wire string. The deliberately
-absent exports are the WASM lifecycle trio — `init()`/`init_sync()` (nothing
-to initialize), `wasm_module` (no compiled module), and `reinstantiate()` (no
-instance to poison; a native overflow is a process-fatal SIGSEGV) — whose
-absence is itself the engine signal `cli.js` keys on. Neither
-package exports the bench-only `parse_internal_*` family
+absent exports are the four WASM lifecycle ones — `init()`/`init_sync()`
+(nothing to initialize), `wasm_module` (no compiled module), and
+`reinstantiate()` (no instance to poison; a native overflow is a process-fatal
+SIGSEGV) — whose absence is itself the engine signal `cli.js` keys on, plus
+`IgnoreStack`'s `free()` and its `[Symbol.dispose]` alias, which a GC-managed
+native object has no handle to need. That is the whole delta, and it is checked
+as a SET rather than as prose: `scripts/test_napi_npm.ts` diffs the two
+packages' export names, and the class's keys via `Reflect.ownKeys` — a
+name-only walk would miss `[Symbol.dispose]`, which is half of what the
+sentence above claims. It runs whenever the wasm package is staged AND fresh,
+and SKIPS otherwise: `deno task test:napi:npm` does not build that package, and
+an export set captured before the delta moved reads as clean. Neither package
+exports the bench-only `parse_internal_*` family
 (`scripts/patch_npm_package.ts` filters it out of the wasm wrappers too).
 
 The locations helpers (`reconstruct_locations` / `create_locator` / `loc_of`)
@@ -146,9 +159,13 @@ copy stays byte-identical with no dead dispatch code — and so the wasm CLI
 can never resolve a sibling-installed native platform package by accident.
 
 Tests: `deno task test:napi:npm` stages a temp `node_modules` and drives the
-packaged shape under Node — loader resolution, ESM and CommonJS hosts, the options
-surface with exact error strings, package.json coherence (pins, selection
-fields, `files` on both packages, the executable bit on the CLI binary, the
+packaged shape under Node — loader resolution (by BARE SPECIFIER: the ESM walk
+of the `exports` map from a cwd inside the staging, and the CommonJS
+`require.resolve` walk of the same map, plus the encapsulation — a file the map
+does not name stays unreachable), the options surface with exact error strings,
+the export-set diff against `@fuzdev/tsv_wasm` when that package is staged and
+fresh, package.json coherence (pins, selection fields, `files` on both
+packages, the executable bit on the CLI binary, the
 loader-`SUPPORTED`-vs-optionalDependencies agreement), the
 unsupported-platform error, and the `tsv` bin: that `bin.js` really
 dispatches to the binary (argh's help output — a discriminator the JS mirror
@@ -164,11 +181,49 @@ re-raised. The last two are posix-only by nature, not by omission: the
 fallback branch keys on any spawn error, so a Windows staging would re-enter
 an already-proven branch, and signal death has no Windows analogue.
 
-Both CLIs exist here and only here, so this is also where their **flag sets**
-are held together: each side is handed every flag the other advertises and
-must not answer with its unknown-flag error. Recognition, not behavior —
-semantics stay with `scripts/test_npm.ts` and `tests/cli_tests.rs` — which is
-what catches the hand-written mirror going stale against argh. The shared
+Both CLIs exist here and only here, so this is also where their contract is
+held together, in five claims the hand-written mirror can drift on and
+nothing else can see. All three read the native side from the platform
+package's **binary directly**, never through `bin.js`: the dispatcher falls
+back to `cli.js` when the binary is missing or unrunnable, and a parity suite
+reading "native" through it would compare the mirror to itself and pass every
+row while measuring nothing. A faithful mirror cannot notice that, so an
+anchor test pins it — argh's help prints a `Positional Arguments:` header the
+mirror's hand-written help never does, which separates the two bins in both
+directions and fails the section if either runner is ever repointed.
+
+- **Flag sets** — each side is handed every flag the other advertises and must
+  not answer with its unknown-flag error. Recognition, not behavior: semantics
+  stay with `scripts/test_npm.ts` and `tests/cli_tests.rs`.
+- **Message precedence** — each command validates in a fixed order, so a
+  doubly-bad invocation has one right answer. A table of usage errors (each
+  landing before any file is touched, several of them faulty two or three ways
+  at once) must produce the same exit code AND byte-identical stderr from both
+  bins. Where the messages stop being tsv's own — argh and `parseArgs` word
+  their own parse failures, and the OS words its own `ENOENT` — the table
+  stops; those agree on the exit code alone.
+- **The `--jobs` accepted set** — a Rust `usize` on one side, a regex on the
+  other, so the verdict is pinned over both edges (`+5`, `usize::MAX`, one
+  past it) rather than the message, which is each argument parser's own.
+- **Invalid UTF-8** — the native CLI reads with Rust's `read_to_string`, which
+  refuses invalid bytes; Node's `readFileSync(path, 'utf-8')` substitutes
+  U+FFFD and returns a string that looks fine, so `cli.js` decodes strictly
+  instead. The format path is why it matters: a stray byte inside a string
+  literal still parses after substitution, so the lossy read wrote the repaired
+  text back over the author's file and reported success. The row asserts the
+  refusal AND that neither bin touched a byte.
+- **Repeated options** — argh refuses a second `--content`/`--parser`/
+  `--source-type`/`--jobs`; `parseArgs` would keep the last, so `cli.js`
+  restates the refusal. The sharp one is `--parser ts --parser css`, which
+  unrefused does not merely pick a value but formats the input under a grammar
+  the same invocation named against. Repeated switches are the control: argh
+  counts them, so neither bin may refuse those.
+
+The **libc detection** is pinned here too, and not against this host: `is_musl`
+takes its three probes as a bag, so the suite drives the verdict over the hosts
+no runner has — Alpine, a glibc box with musl installed, a runtime whose
+`process.report` is missing or partial — and asserts which probes a verdict
+paid for, since the ordering is what keeps the common case one readdir. The shared
 `tests/discovery/scenarios.json` parity table runs through **both** bin
 entries: `bin.js` (native discovery via the shim — the real `npx tsv` path)
 and `cli.js` directly (the fallback JS loop over the native `IgnoreStack`,
@@ -221,7 +276,7 @@ Three properties a Node/Bun host inherits from this crate, none of them visible 
 ## Files
 
 - `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `napi_source_type` decoding the optional `sourceType` string, and `parse_ast_for_format!` carrying the format path's unset one), the three `lang_bindings!` invocations, the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
-- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written, mirroring the wasm packages' surface minus `init`/`init_sync`/`wasm_module`/`reinstantiate`, and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The Span-Only Wire), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper and `cli.js` fallback (see §The npm packages)
+- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written, mirroring the wasm packages' surface minus the WASM lifecycle (§The npm packages states the exact delta, and the suite diffs it as a set), and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The Span-Only Wire), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper and `cli.js` fallback (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not `allow` — `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` (an inner `allow` overrides `deny`), so the macro output compiles while any hand-written `unsafe` stays a compile error; deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` + `tsv_lang` (`normalize_carriage_returns`) behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two
 

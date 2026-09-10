@@ -3,7 +3,10 @@
  *
  * Creates:
  * - index.js — Node.js/Bun entry: auto-init via readFileSync + initSync (zero config)
- * - browser.js — Browser/default entry: async `init()` with not-initialized guards
+ * - browser.js — Browser/default entry: async `init()` with not-initialized
+ *   guards — a wrapper per function export, and a guarded SUBCLASS per class
+ *   export, since a constructor cannot take a per-call guard and `new` before
+ *   init would otherwise report the glue's opaque `TypeError`
  * - worker.js — the `./worker` subpath: browser.js under the name a worker
  *   consumer reaches for (the same module instance, so the same singleton)
  * - index.d.ts / browser.d.ts — type declarations, one per entry (the Node
@@ -151,8 +154,9 @@ if (!has_parse_exports && has_parse) {
 }
 
 // wasm-bindgen emits exported structs as `export class` (e.g. IgnoreStack,
-// the discovery matcher). They re-export through the facade like functions, but
-// can't take the per-call init guard — re-exported directly in browser.js.
+// the discovery matcher). They re-export through the facade like functions;
+// the lazy entries wrap each in a guarded subclass so `new` before init reports
+// the same not-initialized error the function exports do (see step 3).
 const classes = [...generated_js.matchAll(/^export class (\w+)/gm)].map((m) => m[1]).sort();
 
 // 1b. Append the `reinstantiate` hook to the generated glue.
@@ -206,8 +210,11 @@ const register_pattern = /(\w+)Finalization\.register\((\w+), \2\.__wbg_ptr, \2\
 const free_pattern =
 	/free\(\) \{\n(\s+)const ptr = this\.__destroy_into_raw\(\);\n\s+wasm\.(\w+)\(ptr, 0\);\n/g;
 let registry_rewrites = 0;
-let register_rewrites = 0;
 let free_rewrites = 0;
+/** Register sites per class — the constructor's, plus `__wrap`'s if Rust ever
+ * hands one back. The count is read twice below: as a rewrite tally, and as the
+ * `__wrap` tripwire the lazy entries' guarded subclass needs. */
+const register_sites = new Map<string, number>();
 const patched_glue =
 	generated_js
 		.replace(registry_pattern, (_m, free_fn) => {
@@ -222,7 +229,7 @@ const patched_glue =
 			);
 		})
 		.replace(register_pattern, (_m, cls, obj) => {
-			register_rewrites++;
+			register_sites.set(cls, (register_sites.get(cls) ?? 0) + 1);
 			return (
 				`${cls}Finalization.register(${obj}, ` +
 				`{ ptr: ${obj}.__wbg_ptr, gen: (${obj}.__tsv_gen = __tsv_instance_generation) }, ${obj})`
@@ -273,11 +280,29 @@ if (registry_rewrites !== classes.length || free_rewrites !== classes.length) {
 }
 // A class registers at least once (its constructor); a class that is also
 // returned from Rust registers again in its `__wrap`.
+const register_rewrites = [...register_sites.values()].reduce((sum, n) => sum + n, 0);
 if (register_rewrites < classes.length) {
 	console.error(
 		`FAIL: rewrote ${register_rewrites} FinalizationRegistry.register site(s) in ${main_js} but ` +
 			`found ${classes.length} exported class(es) — the register shape drifted from the ` +
 			`pattern the reinstantiate guard stamps`
+	);
+	Deno.exit(1);
+}
+// The `__wrap` tripwire for the lazy entries' guarded subclass (step 3). A class
+// RETURNED from Rust is wrapped by the glue's own `X.__wrap`, which builds the
+// BASE prototype — so such an instance would fail `instanceof` against the name
+// `browser.js` and `./worker` export, silently, in browsers only. No class is
+// returned today; this fails the build the day one is, rather than letting the
+// subclass quietly become wrong.
+const wrapped_classes = classes.filter((name) => (register_sites.get(name) ?? 0) > 1);
+if (wrapped_classes.length) {
+	console.error(
+		`FAIL: class(es) ${wrapped_classes.join(', ')} are RETURNED from Rust (a second ` +
+			`FinalizationRegistry.register site, in \`__wrap\`). The lazy entries wrap each class in a ` +
+			`guarded subclass, and \`__wrap\` builds the base prototype — so an instance handed back ` +
+			`from Rust would not be \`instanceof\` the class browser.js/worker.js exports. Decide how ` +
+			`those entries should present this class before shipping it.`
 	);
 	Deno.exit(1);
 }
@@ -371,14 +396,11 @@ console.log(`Created ${pkg_root}/index.js`);
 const browser_js = `import {
 	default as _init,
 	initSync,
-${fns.map((f) => `\t${f} as _${f},`).join('\n')}
+${[...fns, ...classes].map((f) => `\t${f} as _${f},`).join('\n')}
 } from './${main_js}';
 // the trap-recovery hook re-exports as-is — it guards itself (throws until initialized)
 export { reinstantiate } from './${main_js}';
 ${
-	// classes re-export as-is — consumers must `await init()` before instantiating
-	classes.length ? `export { ${classes.join(', ')} } from './${main_js}';\n` : ''
-}${
 	// the reconstruction helper is pure JS — re-export directly, no init guard
 	locations_reexport
 }
@@ -402,7 +424,25 @@ export function init_sync(...args) {
 	_ready = true;
 }
 
-${fns
+${classes
+	.map(
+		// A guarded SUBCLASS, not a re-export: constructing before init reaches the
+		// glue's `wasm.<ctor>()` with `wasm` still undefined, which throws an opaque
+		// `TypeError: Cannot read properties of undefined` — the one export family in
+		// this entry that answered the not-initialized case differently from every
+		// other. Subclassing keeps everything else the base class's: `instanceof`, the
+		// prototype methods, `free()`, and the FinalizationRegistry stamping its
+		// constructor does. The guard runs before `super()`, which is legal precisely
+		// because it does not touch `this`.
+		(c) =>
+			`export class ${c} extends _${c} {
+	constructor(...args) {
+		_check();
+		super(...args);
+	}
+}`
+	)
+	.join('\n\n')}${classes.length ? '\n\n' : ''}${fns
 	.map(
 		// Arity-agnostic passthrough: every export takes an optional trailing
 		// options object, so the guard must forward every argument, not a fixed

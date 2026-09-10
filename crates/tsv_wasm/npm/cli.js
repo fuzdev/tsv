@@ -33,13 +33,15 @@
  * post-parse usage/validation errors (an invalid `--source-type`, conflicting inputs) exit 2.
  */
 
+import { Buffer } from 'node:buffer';
 import {
 	existsSync,
 	readdirSync,
 	readFileSync,
 	realpathSync,
 	statSync,
-	writeFileSync
+	writeFileSync,
+	writeSync
 } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { dirname, isAbsolute, join, relative as path_relative, sep } from 'node:path';
@@ -256,6 +258,20 @@ Options:
   --no-locations    omit per-node loc (span-only wire; svelte also omits name_loc; no-op for css)
 `;
 
+/**
+ * `Atomics.wait`'s timer cell — the one way to sleep synchronously, which is
+ * what `write_fd`'s EAGAIN retry needs. Never notified, so every wait runs its
+ * full timeout.
+ *
+ * ⚠️ Declared HERE, above the top-level `await` below, and not beside
+ * `write_fd` where it belongs: module evaluation stops at that await, so every
+ * `const`/`let` further down is still in its temporal dead zone for the whole
+ * of `main()`. Function declarations hoist and are fine anywhere; module STATE
+ * is not, and the failure is a `ReferenceError` from whichever call happens to
+ * need it first.
+ */
+const WRITE_BACKOFF = new Int32Array(new SharedArrayBuffer(4));
+
 // the two roles this file plays: the CLI itself, and the worker it spawns for
 // path-mode formatting (see `format_files_parallel`)
 if (isMainThread) {
@@ -324,7 +340,7 @@ function run_help(args) {
 function parse_argv(args, options, help) {
 	let parsed;
 	try {
-		parsed = parseArgs({ args, options, allowPositionals: true, strict: true });
+		parsed = parseArgs({ args, options, allowPositionals: true, strict: true, tokens: true });
 	} catch (error) {
 		eprint(`Error: ${error.message}\n`);
 		process.exit(1);
@@ -332,6 +348,22 @@ function parse_argv(args, options, help) {
 	if (parsed.values.help) {
 		print(help);
 		process.exit(0);
+	}
+	// A repeated VALUE-taking option is an argument error, because argh makes it
+	// one ("duplicate values provided", exit 1) while `parseArgs` silently keeps
+	// the last — the same shape as the `--jobs` grammar below, one flag family
+	// over, and the worse half of it: `--parser ts --parser css` does not just
+	// pick a value, it formats the input under a grammar the invocation also
+	// named against. Repeated SWITCHES need no rule; argh counts them without
+	// complaint, which is what taking the last already means.
+	const seen = new Set();
+	for (const token of parsed.tokens) {
+		if (token.kind !== 'option' || options[token.name]?.type !== 'string') continue;
+		if (seen.has(token.name)) {
+			eprint(`Error: --${token.name} was given more than once\n`);
+			process.exit(1);
+		}
+		seen.add(token.name);
 	}
 	return parsed;
 }
@@ -418,12 +450,26 @@ async function run_format(args) {
 
 	// validated before mode dispatch — a bad value exits 1 in every mode (argh parity)
 	const parser = values.parser === undefined ? undefined : resolve_parser(values.parser);
-	// --jobs sets the worker-thread count in path mode: a non-integer value is
-	// an argument-parsing error (exit 1, argh parity), and combining it with
-	// --content/--stdin is rejected in format_single like the native CLI (exit 2)
-	if (values.jobs !== undefined && !/^\d+$/.test(values.jobs)) {
-		eprint(`Error: --jobs expects an integer, got '${values.jobs}'\n`);
-		process.exit(1);
+	// --jobs sets the worker-thread count in path mode: a bad value is an
+	// argument-parsing error (exit 1, argh parity), and combining it with
+	// --content/--stdin is rejected in format_single like the native CLI (exit 2).
+	// argh parses the flag as a Rust `usize`, so the accepted set is ASCII digits
+	// with an OPTIONAL LEADING `+`, refused above `usize::MAX` — both edges
+	// restated here, since a value one bin calls an error and the other silently
+	// clamps is exactly the drift this hand-mirroring exists to prevent. BigInt
+	// for the bound: the ceiling sits past Number's safe range, though anything
+	// near it is clamped to this machine's own ceiling long before it matters.
+	// The bound is the 64-bit `usize` every published platform triple has; a
+	// 32-bit native target would refuse lower, and this would have to ask.
+	if (values.jobs !== undefined) {
+		if (!/^\+?\d+$/.test(values.jobs)) {
+			eprint(`Error: --jobs expects an integer, got '${values.jobs}'\n`);
+			process.exit(1);
+		}
+		if (BigInt(values.jobs.replace(/^\+/, '')) > 18446744073709551615n) {
+			eprint(`Error: --jobs value '${values.jobs}' is too large\n`);
+			process.exit(1);
+		}
 	}
 	if (values.content !== undefined || values.stdin) {
 		format_single(values, positionals, parser);
@@ -582,7 +628,7 @@ async function format_paths(values, positionals) {
 function format_one(path, check) {
 	let source;
 	try {
-		source = readFileSync(path, 'utf-8');
+		source = decode_source(readFileSync(path));
 	} catch (error) {
 		return { kind: 'error', message: `read failed: ${error.message}` };
 	}
@@ -919,7 +965,7 @@ function run_parse(args) {
 		const path = positionals[0];
 		parser = flag_parser === undefined ? parser_from_extension(path) : flag_parser;
 		try {
-			input = readFileSync(path, 'utf-8');
+			input = decode_source(readFileSync(path));
 		} catch (error) {
 			eprint(`Error: Error reading file '${path}': ${error.message}\n`);
 			process.exit(1);
@@ -956,28 +1002,90 @@ function run_parse(args) {
 	print(`${json}\n`);
 }
 
-/** Synchronous stdout write — `process.stdout.write` is async on pipes, so a
- * `process.exit` right after it can truncate output. Safe from EAGAIN only
- * while nothing in the process initializes the `process.stdout`/`process.stderr`
- * streams (including via `console.*`) — stream init flips the fd to
- * non-blocking, after which a sync write to a full pipe can throw. */
-function print(text) {
-	writeFileSync(1, text);
+/**
+ * Write to a fd synchronously, surviving a **non-blocking pipe**.
+ *
+ * Sync is the requirement: `process.stdout.write` is async on pipes, so a
+ * `process.exit` right after it truncates output. But a bare
+ * `writeFileSync(fd, text)` is only safe while the fd stays BLOCKING, and this
+ * CLI takes that away from itself — spawning the worker pool initializes the
+ * parent's `process.stdout`/`stderr` (the workers' stdio is piped through it),
+ * which flips the fd to non-blocking. A full pipe then makes the very next
+ * write throw `EAGAIN`, which nothing caught: `tsv format .` into `head`,
+ * `less`, `grep` or a CI log collector died with a Node stack trace and a
+ * half-written path, AFTER having already rewritten files on disk — so the
+ * report of what changed was lost while the changes were not. Only large trees
+ * hit it, because only they spawn workers and only they fill a pipe.
+ *
+ * So: loop over `writeSync`, honor partial writes, sleep 1 ms and retry on
+ * `EAGAIN` (a spin would burn a core against a consumer as slow as a human
+ * scrolling `less`), and go quiet on `EPIPE` — the consumer closed, which is
+ * what `| head` is, and the conventional answer there is to stop, not to
+ * throw.
+ */
+function write_fd(fd, text) {
+	const buf = Buffer.from(text, 'utf-8');
+	let offset = 0;
+	while (offset < buf.length) {
+		try {
+			offset += writeSync(fd, buf, offset);
+		} catch (error) {
+			if (error.code === 'EAGAIN') {
+				Atomics.wait(WRITE_BACKOFF, 0, 0, 1);
+				continue;
+			}
+			if (error.code === 'EPIPE') return;
+			throw error;
+		}
+	}
 }
 
-/** Synchronous stderr write (same truncation hazard as `print`). */
+/** Synchronous stdout write. */
+function print(text) {
+	write_fd(1, text);
+}
+
+/** Synchronous stderr write. */
 function eprint(text) {
-	writeFileSync(2, text);
+	write_fd(2, text);
 }
 
 /** Read all of stdin, exiting with the calling command's error code on
  * failure (`format` uses 2, `parse` uses 1 — mirroring the native CLI). */
 function read_stdin(exit_code) {
 	try {
-		return readFileSync(0, 'utf-8');
+		return decode_source(readFileSync(0));
 	} catch (error) {
 		eprint(`Error: Error reading from stdin: ${error.message}\n`);
 		process.exit(exit_code);
+	}
+}
+
+/**
+ * Decode source bytes as **strict** UTF-8, mirroring Rust's `read_to_string`
+ * — which is what the native CLI reads every file and stdin with, and which
+ * REFUSES invalid bytes rather than repairing them.
+ *
+ * Node's `readFileSync(path, 'utf-8')` does the opposite: it substitutes
+ * U+FFFD for every invalid sequence and hands back a string that looks fine.
+ * On the format path that is not a wrong message, it is DATA LOSS — a `.ts`
+ * file holding one stray byte inside a string literal still parses after the
+ * substitution, so the formatter writes the repaired text back over the
+ * author's file and reports `1 formatted`, exit 0, where the native CLI
+ * refuses and leaves the bytes alone. `read_ignore_file` below has always
+ * decoded strictly for the same reason; the source path is where it costs
+ * more.
+ *
+ * `ignoreBOM: true` *keeps* a leading BOM (the option name is inverted), so a
+ * BOM-prefixed file decodes exactly as Rust's `read_to_string` leaves it.
+ * The thrown message is Rust's own wording, so every caller's existing
+ * `${error.message}` interpolation reproduces the native text byte for byte.
+ */
+function decode_source(buf) {
+	try {
+		return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buf);
+	} catch {
+		throw new Error('stream did not contain valid UTF-8');
 	}
 }
 
