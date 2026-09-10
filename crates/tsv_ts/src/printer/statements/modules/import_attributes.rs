@@ -5,6 +5,7 @@
 use super::Printer;
 use super::specifier_list::{CommaListBlanks, CommaListSpans};
 use crate::ast::internal;
+use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -345,21 +346,28 @@ impl<'a> Printer<'a> {
         let after_colon = colon_pos + 1;
         if self.has_line_comments_between(after_colon, value_start)
             || self.has_own_line_value_gap_comment(colon_pos, value_start)
+            || self.indentable_block_leads_value(after_colon, value_start)
         {
-            // A line comment can't trail the `:` inline without swallowing the
-            // value, so break after `:` and indent the value one level, each gap
-            // comment on its own line — `type:⏎\t// c⏎\t'json'`. Matches prettier's
-            // value-leading break, which puts any block comment sharing the gap on
-            // its own line too. A block comment the author isolated on its own line
-            // takes the same layout, for the same reason it does in an object
-            // property: collapsing it onto the `:` line would move it.
-            let mut cont: DocBuf = smallvec![d.hardline()];
-            for comment in self.comments_to_emit_between(after_colon, value_start) {
-                cont.push(self.build_comment_doc(comment));
-                cont.push(d.hardline());
-            }
-            cont.push(value_doc);
-            parts.push(d.indent(d.concat(&cont)));
+            // Break after the `:` and hang the value one level, for any of three
+            // reasons: a line comment can't trail the `:` inline without swallowing the
+            // value; a block the author isolated on its own line can only keep it if the
+            // value hangs; and an INDENTABLE block leading the value hangs it whatever
+            // the author's own breaks say — prettier routes `ImportAttribute` through
+            // `printProperty` → `printAssignment`, so this gap is a `chooseLayout` site
+            // and [`Printer::indentable_block_leads_value`] is its fourth disjunct,
+            // shared verbatim with the declarator, the assignment expression and the
+            // object property so the seams cannot drift.
+            //
+            // ⚠️ One emitter for all three, and the run's own separators are what tell
+            // them apart: `printLeadingComment` puts a space after a comment the author
+            // glued to the value and a hardline after one that owns its line, which is
+            // the whole difference between `type:⏎\t/** c⏎\t */ 'json'` and
+            // `type:⏎\t/** c⏎\t */⏎\t'json'`. A hand-rolled hardline after every comment
+            // collapses the two and prints the hang as the own-line shape.
+            let comments_doc = self
+                .build_value_gap_comments_opt(after_colon, value_start)
+                .unwrap_or_else(|| d.empty());
+            parts.push(hang_after_operator(d, d.concat(&[comments_doc, value_doc])));
         } else {
             // Block comments only (or none): trail the `:` inline (` /* c */ `),
             // matching prettier when the attribute fits on one line.

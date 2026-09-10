@@ -995,7 +995,12 @@ emitters, the *unconditional* dangling `hardline` and every layout gate then ans
 construction. Scoped as prettier's is — `/*`-delimited comments an acorn parse collected, so a
 Svelte template island merges and a `<style>` sheet or an in-tag comment does not. The one node
 carrying a `Comment` copy of its own, `JsdocCast`, must read the array instead
-(`Printer::jsdoc_cast_comment`) or it drops the pair's first half. See
+(`Printer::jsdoc_cast_comment`) or it drops the pair's first half. The **parser** owes the merge
+one reading too, and it is the same rule (`tsv_lang::nestled_run_start`), because prettier's
+splice runs ahead of its `isTypeCastComment` scan: a cast's `@type` marker may sit in the run's
+HEAD (`= /** @type {T}⏎ *//** b⏎ */ (a)`), so `jsdoc_cast_comment_index` tests the CONCATENATED
+content — reading the `(`'s own comment alone strips the parens, and a cast without its parens
+is not a cast. See
 [docs/comments.md §Two comments the author WELDED are one comment](docs/comments.md#two-comments-the-author-welded-are-one-comment-the-merged-view).
 
 **The emitter rules — one emitter per question, never a hand-rolled copy.** Each is stated in

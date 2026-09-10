@@ -184,9 +184,19 @@ impl Comment {
 /// [`is_honored_format_ignore`] is: two printers answering it differently means one host
 /// hangs a value its sibling keeps inline (`<script>`'s `=` vs the `{@const}` tag's).
 pub fn is_indentable_block(source: &str, comment: &Comment) -> bool {
+    is_indentable_block_content(comment, comment.content(source))
+}
+
+/// [`is_indentable_block`] over a content slice the caller already holds.
+///
+/// The spelling [`nestled_run_start`] needs: its caller may hold a source slice the
+/// comment's spans do not index (`tsv_ts`'s parser reads an island's local `source` while
+/// every `Comment` carries host coordinates), so *where the content comes from* is the
+/// caller's business and the rule stays one predicate.
+fn is_indentable_block_content(comment: &Comment, content: &str) -> bool {
     comment.is_block
         && comment.multiline
-        && printing::is_indentable_block_comment(printing::split_lf(comment.content(source)))
+        && printing::is_indentable_block_comment(printing::split_lf(content))
 }
 
 //
@@ -276,15 +286,54 @@ pub fn merge_nestled_block_comments<'c>(
     Cow::Owned(merged)
 }
 
+/// The index of the first comment in the **nestled run** ending at `end_idx` — `end_idx`
+/// itself when nothing nestles into it.
+///
+/// The run this walks is exactly the one [`merge_nestled_block_comments`] folds into a
+/// single entry, so a caller that must ask a *content* question of the merged comment
+/// reads the rule rather than restating it. `tsv_ts`'s parser is that caller: prettier
+/// runs `mergeNestledJsdocComments` from `postprocess/index.js` **ahead of** its
+/// `isTypeCastComment` scan, so a `/** @type {T}⏎ *//** c⏎ */ (x)` is a cast on the
+/// merged text even though the comment the `(` follows carries no marker.
+///
+/// `content_of` resolves a comment's [`Comment::content`] — a closure because the parser
+/// holds an island's local slice while the spans are host coordinates.
+///
+/// The walk tests each pair on the **untouched** comments, where the fold tests its
+/// left operand against the entry it has already extended. The two answer alike, and
+/// `nestled_run_start_names_the_runs_the_merge_folds` pins it: a pair is only reached
+/// after its right neighbour's own step passed, which is where the fold's kept flags
+/// (`is_block`, `multiline`, [`Comment::emit_character_field`] — all the trailing
+/// entry's) and its own content were already graded, and a merged content is indentable
+/// exactly when both halves are (the weld line inherits the left half's last line).
+#[must_use]
+pub fn nestled_run_start<'s>(
+    comments: &[Comment],
+    end_idx: usize,
+    content_of: impl Fn(&Comment) -> &'s str,
+) -> usize {
+    let mut start = end_idx;
+    while start > 0 && nestles_with(&comments[start - 1], &comments[start], &content_of) {
+        start -= 1;
+    }
+    start
+}
+
 /// Whether `b` follows `a` with **no separator at all** and the pair is therefore one
 /// comment — the predicate behind [`merge_nestled_block_comments`], stated once so the
 /// cheap pre-pass and the fold cannot disagree.
 fn nestles(source: &str, a: &Comment, b: &Comment) -> bool {
+    nestles_with(a, b, &|c: &Comment| c.content(source))
+}
+
+/// [`nestles`] with the content resolved by the caller — see [`is_indentable_block_content`]
+/// for why the source is not a parameter.
+fn nestles_with<'s>(a: &Comment, b: &Comment, content_of: &impl Fn(&Comment) -> &'s str) -> bool {
     a.span.end == b.span.start
         && is_slash_star_acorn_comment(a)
         && is_slash_star_acorn_comment(b)
-        && is_indentable_block(source, a)
-        && is_indentable_block(source, b)
+        && is_indentable_block_content(a, content_of(a))
+        && is_indentable_block_content(b, content_of(b))
 }
 
 /// Whether `comment` is a `/* … */` that an **acorn** parse collected.
@@ -1396,6 +1445,84 @@ mod tests {
             .map(|c| c.span.start)
             .collect();
         assert_eq!(starts, vec![2, 30]);
+    }
+
+    /// A `/*`-delimited block comment at `start`, its content span the interior.
+    fn block_comment_at(source: &str, start: usize, text: &str) -> Comment {
+        let end = start + text.len();
+        let content = &source[start + 2..end - 2];
+        Comment {
+            content_span: Span::new((start + 2) as u32, (end - 2) as u32),
+            is_block: true,
+            multiline: Comment::content_is_multiline(true, content),
+            span: Span::new(start as u32, end as u32),
+            emit_character_field: false,
+            bump_pattern_columns: false,
+            owned_by_node: false,
+        }
+    }
+
+    /// Lay `pieces` out in order, collecting a `Comment` for each one that opens `/*`.
+    fn laid_out(pieces: &[&str]) -> (String, Vec<Comment>) {
+        let source: String = pieces.concat();
+        let mut comments = Vec::new();
+        let mut at = 0;
+        for piece in pieces {
+            if piece.starts_with("/*") {
+                comments.push(block_comment_at(&source, at, piece));
+            }
+            at += piece.len();
+        }
+        (source, comments)
+    }
+
+    /// [`nestled_run_start`] must name exactly the runs [`merge_nestled_block_comments`]
+    /// folds.
+    ///
+    /// They are two readings of one rule — the printer prints the fold while `tsv_ts`'s
+    /// parser asks a *content* question of it (a JSDoc cast whose `@type` sits in the
+    /// run's head decides paren retention) — and a disagreement would retain a cast's
+    /// parens in a document whose comment is no longer the cast, or strip them from one
+    /// whose comment is. The walk tests untouched pairs where the fold tests its own
+    /// extended entry, so the equivalence is the thing to pin, not either spelling.
+    #[test]
+    fn nestled_run_start_names_the_runs_the_merge_folds() {
+        let (source, comments) = laid_out(&[
+            // a run of three
+            "/** a\n */",
+            "/** b\n */",
+            "/** c\n */",
+            " ",
+            // a run of two
+            "/** d\n */",
+            "/** e\n */",
+            // adjacent, but a single-line block never nestles - two runs of one
+            "/* f */",
+            "/** g\n */",
+            "\n",
+            // adjacent, but the left half's last content line is neither empty nor
+            // `*`-prefixed, so it is not indentable - two runs of one
+            "/** h\nx */",
+            "/** i\n */",
+        ]);
+        let merged = merge_nestled_block_comments(&source, &comments);
+        assert!(
+            merged.len() < comments.len(),
+            "the fixture must actually merge something"
+        );
+
+        let mut derived = Vec::new();
+        let mut past = comments.len();
+        while past > 0 {
+            let end_idx = past - 1;
+            let start_idx = nestled_run_start(&comments, end_idx, |c| c.content(&source));
+            derived.push((comments[start_idx].span.start, comments[end_idx].span.end));
+            past = start_idx;
+        }
+        derived.reverse();
+
+        let folded: Vec<(u32, u32)> = merged.iter().map(|c| (c.span.start, c.span.end)).collect();
+        assert_eq!(derived, folded);
     }
 
     #[test]

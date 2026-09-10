@@ -495,6 +495,19 @@ impl<'a> Printer<'a> {
             };
             // Every `fluid` marker in this function ties to the one assignment group.
             let fluid = |rhs: DocId| fluid_after_operator(d, rhs, GroupId::Assignment);
+            // Break-after-operator, honoring the pre-`=` comment continuation path
+            // (`type A<X> // c⏎= …`). `lead_space` is false ONLY there, and the caller has
+            // already wrapped the comment run + `=` + value in one `d.indent`
+            // (`build_continuation_indent`), so the hang's own indent would double it —
+            // the value sits at the `=`'s level, not one deeper. Still grouped, so a value
+            // that fits stays on the `=` line exactly as the hang's flat case does.
+            let hang = |rhs: DocId| -> DocId {
+                if lead_space {
+                    hang_after_operator(d, rhs)
+                } else {
+                    d.group(d.concat(&[d.line(), rhs]))
+                }
+            };
 
             // Check the type kind for different formatting rules. Redundant
             // comment-free parens around the RHS are stripped (prettier does the
@@ -530,6 +543,32 @@ impl<'a> Printer<'a> {
                     self.intersection_hanging_with_indent(i)
                 })
             };
+            // The value, for an arm that does NOT own the intersection layout itself (the
+            // fourth-disjunct hang and the complex-params `break-lhs`): an intersection
+            // keeps the hanging-indent doc its own arm hugs with, so a continuation member
+            // sits one level in under `type`, where prettier's `printIntersectionType`
+            // indent puts it. Stated once so an arm added later cannot reach for
+            // `build_value` and flatten that indent.
+            let build_value_keeping_intersection_indent = || -> DocId {
+                match value_type {
+                    TSType::Intersection(i) => build_intersection(i),
+                    _ => build_value(),
+                }
+            };
+            // `chooseLayout`'s FOURTH disjunct — `hasComment(rightNode, Leading,
+            // isIndentableBlockComment)` → break-after-operator — read once at the gap
+            // ([`Printer::indentable_block_leads_value`], shared verbatim with the
+            // declarator, the assignment expression, the object property and the import
+            // attribute so the seams cannot drift). Prettier prints
+            // `TSTypeAliasDeclaration` through `printAssignment` (`type-alias.js`), so it
+            // hangs the value at EVERY value kind and at a complex type-parameter head
+            // alike — which is why this is asked ahead of every value-shaped arm below,
+            // and why the union arm's own hug question (`union_hugs_equals`) reads it too.
+            // The arm the author's
+            // own break owns (`broke_after_value_leading_run`) still comes first: it
+            // reproduces that break rather than reflowing the value onto the comment's
+            // closing line.
+            let indentable_leads_value = self.indentable_block_leads_value(eq_pos + 1, type_start);
             // A block run the author broke AFTER (`type A = /* c */⏎<value>`) takes
             // prettier's break-after-operator for EVERY value kind — `chooseLayout`'s
             // `hasLeadingOwnLineComment` arm wins ahead of the per-kind layouts, so it
@@ -544,6 +583,11 @@ impl<'a> Printer<'a> {
             if let Some(run) = self.broke_after_value_leading_run(eq_pos + 1, type_start) {
                 let type_doc = build_value();
                 parts.push(self.break_or_hang_after_operator_run_doc(&run, type_start, type_doc));
+            } else if indentable_leads_value && !matches!(value_type, TSType::Union(_)) {
+                // The hang, for every value kind but a union — which keeps its own arm
+                // below because the run must be handed INTO it (`run_handed`) rather than
+                // stranded ahead of the `|` its broken layout synthesizes.
+                parts.push(hang(make_rhs(build_value_keeping_intersection_indent())));
             } else if let TSType::Union(u) = value_type {
                 // A glued block run between `=` and a union with no authored leading
                 // `|` is handed INTO the union, which binds it to the first member —
@@ -564,49 +608,53 @@ impl<'a> Printer<'a> {
                 // decline the hug and expand — a member/gap comment, or the run handed
                 // in above, which prettier binds to the first member — and then the `=`
                 // has to break like any other non-hugging union.
-                if hugged {
-                    // Hugged unions (e.g., `{ ... } | null`): the object type handles its own
-                    // expansion, so keep `= {` together like other internally-breaking types
+                // Whether the union HUGS the `=` — two shapes, and the fourth disjunct
+                // overrides BOTH, stated once here rather than as a conjunct on each so a
+                // third hug shape cannot be added without it: a hug is a layout arm like
+                // any other, and prettier hangs `{ … } | null` — and a single-member
+                // union — under an indentable leading block exactly as it hangs every
+                // other value.
+                let union_hugs_equals = !indentable_leads_value
+                    && (
+                        // Hugged unions (e.g. `{ ... } | null`): the object type handles
+                        // its own expansion, so keep `= {` together like other
+                        // internally-breaking types.
+                        hugged
+                        // A single-member union prints transparently as its member
+                        // (prettier drops the node in postprocess), so a member that owns
+                        // its comment break hugs the `=` exactly as it would bare —
+                        // `= | (A // c)` collapses to the retained shell, whose parens own
+                        // the break. The hang below would split the `=` for a break the
+                        // reparse (seeing the bare shell) reproduces at the shell, not the
+                        // `=` (F1).
+                        //
+                        // A member that collapses to an INTERSECTION takes that arm's rule
+                        // for the same reason, read off the doc the collapse just built:
+                        // the intersection arm below hugs a `will_break` value and the bare
+                        // authoring goes straight there, so hanging here split the `=` for
+                        // a break the reparse — which no longer sees a union at all —
+                        // reproduces inside the intersection (`= | ((// c⏎A | B) & C)`).
+                        // The kind is asked because the break must be the MEMBER's: a
+                        // member collapsing to a union breaks from the union's own
+                        // leading-`|` layout, which is what the hang indents.
+                        || (u.types.len() == 1
+                            && (self.value_owns_its_comment_break(&u.types[0])
+                                || (matches!(
+                                    unwrap_parenthesized(&u.types[0]),
+                                    TSType::Intersection(_)
+                                ) && d.will_break(type_doc))))
+                    );
+                if union_hugs_equals {
                     parts.push(d.text(" "));
                     parts.push(make_rhs(type_doc));
-                } else if u.types.len() == 1
-                    && (self.value_owns_its_comment_break(&u.types[0])
-                        || (matches!(unwrap_parenthesized(&u.types[0]), TSType::Intersection(_))
-                            && d.will_break(type_doc)))
-                {
-                    // A single-member union prints transparently as its member (prettier
-                    // drops the node in postprocess), so a member that owns its comment
-                    // break hugs the `=` exactly as it would bare — `= | (A // c)`
-                    // collapses to the retained shell, whose parens own the break. The
-                    // hang below would split the `=` for a break the reparse (seeing the
-                    // bare shell) reproduces at the shell, not the `=` (F1).
-                    //
-                    // A member that collapses to an INTERSECTION takes that arm's rule for
-                    // the same reason, read off the doc the collapse just built: the
-                    // intersection arm below hugs a `will_break` value and the bare
-                    // authoring goes straight there, so hanging here split the `=` for a
-                    // break the reparse — which no longer sees a union at all — reproduces
-                    // inside the intersection (`= | ((// c⏎A | B) & C)`). The kind is asked
-                    // because the break must be the MEMBER's: a member collapsing to a
-                    // union breaks from the union's own leading-`|` layout, which is what
-                    // the hang indents.
-                    parts.push(d.text(" "));
-                    parts.push(make_rhs(type_doc));
-                } else if lead_space {
-                    // Normal unions: break after `=` with leading `| ` and a hanging indent.
-                    parts.push(hang_after_operator(d, make_rhs(type_doc)));
                 } else {
-                    // Pre-`=` comment continuation path (`type A<X> // c⏎= | a | b`):
-                    // `lead_space` is false ONLY here, and the caller already wrapped the
-                    // comment run + `=` + value in one `d.indent`
-                    // (`build_continuation_indent`). A break must therefore NOT add the
-                    // hang's extra indent — the members sit at the `=`'s level, not one
-                    // deeper (else a double-indent). Still grouped so a short union stays
-                    // inline on the `=` line (`= A | B`), matching the hang arm's flat
-                    // case. A `_prettier_divergence` (type_alias_line_pre_equals_break):
+                    // Normal unions: break after `=` with leading `| ` and a hanging
+                    // indent — or, on the pre-`=` continuation path, the un-indented
+                    // group `hang` yields there. That path is itself a
+                    // `_prettier_divergence` (`type_alias_line_pre_equals_break`):
                     // prettier relocates the comment after `=` and never emits this
                     // preserved-comment form.
-                    parts.push(d.group(d.concat(&[d.line(), make_rhs(type_doc)])));
+                    parts.push(hang(make_rhs(type_doc)));
                 }
             } else if let TSType::Conditional(cond) = value_type
                 && should_break_before_conditional_type(cond)
@@ -631,16 +679,8 @@ impl<'a> Printer<'a> {
                 // Behind the intersection / conditional / internal-breaking arms this arm
                 // never reached those values, and a wide head broke after `=` instead of
                 // breaking the list (`type_param_complex_break_lhs_long`).
-                //
-                // An intersection keeps the hanging-indent doc its own arm hugs with, so a
-                // continuation member sits one level in under `type`, where prettier's
-                // `printIntersectionType` indent puts it.
-                let type_doc = match value_type {
-                    TSType::Intersection(i) => build_intersection(i),
-                    _ => build_value(),
-                };
                 parts.push(d.text(" "));
-                parts.push(make_rhs(type_doc));
+                parts.push(make_rhs(build_value_keeping_intersection_indent()));
             } else if let TSType::Intersection(i) = value_type {
                 // Intersection types (prettier's `fluid`): the first member hugs the
                 // `=` line when it fits and the intersection breaks after `=` when it
