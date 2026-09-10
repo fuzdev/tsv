@@ -16,6 +16,14 @@ reparses as a single comment. That is content loss, so tsv does not follow it;
 `unformatted_ours_pre_terminator.svelte` states the ours-only normalization and the
 auto-generated chain marker pins prettier's own multi-pass landing from that authoring.
 
+The later cases carry a run the author **glued** onto one line. It breaks between its
+members for the same reason every clause tail does: the declaration's tail stays open to
+the `else`, so the gap defers through `line_suffix`, and the same document read back with
+the `;` ahead of the run is split by the ejected seam — one shape per document, whichever
+way the terminator was written. See
+[clause_terminator_gap_glued_comment_run](../clause_terminator_gap_glued_comment_run/)
+for that rule's own fixture.
+
 Reason: print-once over the weld, authored order preserved. See
 [conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 and

@@ -1,0 +1,591 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 509,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a glued block pair in the `do` body's terminator gap takes one line per comment",
+			"start": 10,
+			"end": 92,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 105,
+			"end": 113,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 115,
+			"end": 123,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a `//` behind a glued block closes the line either way",
+			"start": 137,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 207,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 217,
+			"end": 222,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an authored blank between two remarks survives the split, one comment per line",
+			"start": 236,
+			"end": 317,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 330,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 340,
+			"end": 348,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 351,
+			"end": 359,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " CONTROL: a run glued to the body's own line is a TRAILING run and keeps that line",
+			"start": 373,
+			"end": 457,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t1 ",
+			"start": 469,
+			"end": 477,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 11
+				},
+				"end": {
+					"line": 20,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t2 ",
+			"start": 478,
+			"end": 486,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 20
+				},
+				"end": {
+					"line": 20,
+					"column": 28
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 508,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 499,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "DoWhileStatement",
+					"start": 94,
+					"end": 135,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 11
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 97,
+						"end": 103,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 4
+							},
+							"end": {
+								"line": 3,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 97,
+							"end": 102,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 4
+								},
+								"end": {
+									"line": 3,
+									"column": 9
+								}
+							},
+							"name": "expr1"
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 132,
+						"end": 133,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 8
+							},
+							"end": {
+								"line": 6,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 105,
+								"end": 113
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 115,
+								"end": 123
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a glued block pair in the `do` body's terminator gap takes one line per comment",
+							"start": 10,
+							"end": 92
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 196,
+					"end": 234,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 11
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 199,
+						"end": 205,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 4
+							},
+							"end": {
+								"line": 8,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 199,
+							"end": 204,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 4
+								},
+								"end": {
+									"line": 8,
+									"column": 9
+								}
+							},
+							"name": "expr2"
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 231,
+						"end": 232,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 8
+							},
+							"end": {
+								"line": 11,
+								"column": 9
+							}
+						},
+						"name": "b",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c3 ",
+								"start": 207,
+								"end": 215
+							},
+							{
+								"type": "Line",
+								"value": " c4",
+								"start": 217,
+								"end": 222
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a `//` behind a glued block closes the line either way",
+							"start": 137,
+							"end": 194
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 319,
+					"end": 371,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 11
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 322,
+						"end": 328,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 4
+							},
+							"end": {
+								"line": 13,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 322,
+							"end": 327,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 4
+								},
+								"end": {
+									"line": 13,
+									"column": 9
+								}
+							},
+							"name": "expr3"
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 368,
+						"end": 369,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 8
+							},
+							"end": {
+								"line": 18,
+								"column": 9
+							}
+						},
+						"name": "c",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c5 ",
+								"start": 330,
+								"end": 338
+							},
+							{
+								"type": "Block",
+								"value": " c6 ",
+								"start": 340,
+								"end": 348
+							},
+							{
+								"type": "Block",
+								"value": " c7 ",
+								"start": 351,
+								"end": 359
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an authored blank between two remarks survives the split, one comment per line",
+							"start": 236,
+							"end": 317
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 459,
+					"end": 498,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 11
+						}
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 462,
+						"end": 468,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 4
+							},
+							"end": {
+								"line": 20,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 462,
+							"end": 467,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 4
+								},
+								"end": {
+									"line": 20,
+									"column": 9
+								}
+							},
+							"name": "expr4"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " t1 ",
+								"start": 469,
+								"end": 477
+							}
+						]
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 495,
+						"end": 496,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 8
+							},
+							"end": {
+								"line": 21,
+								"column": 9
+							}
+						},
+						"name": "d",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " t2 ",
+								"start": 478,
+								"end": 486
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " CONTROL: a run glued to the body's own line is a TRAILING run and keeps that line",
+							"start": 373,
+							"end": 457
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 476,
+	"end": 838,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -217,24 +217,184 @@
 					"column": 6
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A non-block consequent reaches this gap through its own terminator, and the blank",
+			"start": 467,
+			"end": 551,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 1
+				},
+				"end": {
+					"line": 47,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " survives the hoist past the `;`",
+			"start": 553,
+			"end": 587,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 1
+				},
+				"end": {
+					"line": 48,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 602,
+			"end": 608,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 611,
+			"end": 617,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 1
+				},
+				"end": {
+					"line": 52,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A glued run in that terminator gap breaks between its members and still keeps the",
+			"start": 631,
+			"end": 715,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 1
+				},
+				"end": {
+					"line": 55,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " authored blank between the two remarks",
+			"start": 717,
+			"end": 758,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 1
+				},
+				"end": {
+					"line": 56,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c12 ",
+			"start": 773,
+			"end": 782,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 1
+				},
+				"end": {
+					"line": 58,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c13 ",
+			"start": 784,
+			"end": 793,
+			"loc": {
+				"start": {
+					"line": 59,
+					"column": 1
+				},
+				"end": {
+					"line": 59,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c14 ",
+			"start": 796,
+			"end": 805,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 1
+				},
+				"end": {
+					"line": 61,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c15 ",
+			"start": 807,
+			"end": 816,
+			"loc": {
+				"start": {
+					"line": 62,
+					"column": 1
+				},
+				"end": {
+					"line": 62,
+					"column": 10
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 475,
+		"end": 837,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 466,
+			"end": 828,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 47,
+					"line": 64,
 					"column": 9
 				}
 			},
@@ -1006,6 +1166,328 @@
 							"value": " else-if is the same gap and the same rule",
 							"start": 361,
 							"end": 405
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 589,
+					"end": 628,
+					"loc": {
+						"start": {
+							"line": 49,
+							"column": 1
+						},
+						"end": {
+							"line": 53,
+							"column": 10
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 593,
+						"end": 594,
+						"loc": {
+							"start": {
+								"line": 49,
+								"column": 5
+							},
+							"end": {
+								"line": 49,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 596,
+						"end": 600,
+						"loc": {
+							"start": {
+								"line": 49,
+								"column": 8
+							},
+							"end": {
+								"line": 49,
+								"column": 12
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 596,
+							"end": 599,
+							"loc": {
+								"start": {
+									"line": 49,
+									"column": 8
+								},
+								"end": {
+									"line": 49,
+									"column": 11
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 596,
+								"end": 597,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 8
+									},
+									"end": {
+										"line": 49,
+										"column": 9
+									}
+								},
+								"name": "f"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 624,
+						"end": 628,
+						"loc": {
+							"start": {
+								"line": 53,
+								"column": 6
+							},
+							"end": {
+								"line": 53,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 624,
+							"end": 627,
+							"loc": {
+								"start": {
+									"line": 53,
+									"column": 6
+								},
+								"end": {
+									"line": 53,
+									"column": 9
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 624,
+								"end": 625,
+								"loc": {
+									"start": {
+										"line": 53,
+										"column": 6
+									},
+									"end": {
+										"line": 53,
+										"column": 7
+									}
+								},
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c10",
+								"start": 602,
+								"end": 608
+							},
+							{
+								"type": "Line",
+								"value": " c11",
+								"start": 611,
+								"end": 617
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A non-block consequent reaches this gap through its own terminator, and the blank",
+							"start": 467,
+							"end": 551
+						},
+						{
+							"type": "Line",
+							"value": " survives the hoist past the `;`",
+							"start": 553,
+							"end": 587
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 760,
+					"end": 827,
+					"loc": {
+						"start": {
+							"line": 57,
+							"column": 1
+						},
+						"end": {
+							"line": 63,
+							"column": 10
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 764,
+						"end": 765,
+						"loc": {
+							"start": {
+								"line": 57,
+								"column": 5
+							},
+							"end": {
+								"line": 57,
+								"column": 6
+							}
+						},
+						"name": "a"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 767,
+						"end": 771,
+						"loc": {
+							"start": {
+								"line": 57,
+								"column": 8
+							},
+							"end": {
+								"line": 57,
+								"column": 12
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 767,
+							"end": 770,
+							"loc": {
+								"start": {
+									"line": 57,
+									"column": 8
+								},
+								"end": {
+									"line": 57,
+									"column": 11
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 767,
+								"end": 768,
+								"loc": {
+									"start": {
+										"line": 57,
+										"column": 8
+									},
+									"end": {
+										"line": 57,
+										"column": 9
+									}
+								},
+								"name": "f"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": {
+						"type": "ExpressionStatement",
+						"start": 823,
+						"end": 827,
+						"loc": {
+							"start": {
+								"line": 63,
+								"column": 6
+							},
+							"end": {
+								"line": 63,
+								"column": 10
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 823,
+							"end": 826,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 6
+								},
+								"end": {
+									"line": 63,
+									"column": 9
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 823,
+								"end": 824,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 6
+									},
+									"end": {
+										"line": 63,
+										"column": 7
+									}
+								},
+								"name": "g"
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c12 ",
+								"start": 773,
+								"end": 782
+							},
+							{
+								"type": "Block",
+								"value": " c13 ",
+								"start": 784,
+								"end": 793
+							},
+							{
+								"type": "Block",
+								"value": " c14 ",
+								"start": 796,
+								"end": 805
+							},
+							{
+								"type": "Block",
+								"value": " c15 ",
+								"start": 807,
+								"end": 816
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A glued run in that terminator gap breaks between its members and still keeps the",
+							"start": 631,
+							"end": 715
+						},
+						{
+							"type": "Line",
+							"value": " authored blank between the two remarks",
+							"start": 717,
+							"end": 758
 						}
 					]
 				}

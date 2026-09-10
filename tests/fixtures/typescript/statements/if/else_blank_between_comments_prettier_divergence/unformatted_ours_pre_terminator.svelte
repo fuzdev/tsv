@@ -46,19 +46,19 @@
 	}
 	// A non-block consequent reaches this gap through its own terminator, and the blank
 	// survives the hoist past the `;`
-	if (a) f();
+	if (a) f()
 	// c10
 
 	// c11
+	;
 	else g();
 
 	// A glued run in that terminator gap breaks between its members and still keeps the
 	// authored blank between the two remarks
-	if (a) f();
-	/* c12 */
-	/* c13 */
+	if (a) f()
+	/* c12 */ /* c13 */
 
-	/* c14 */
-	/* c15 */
+	/* c14 */ /* c15 */
+	;
 	else g();
 </script>
