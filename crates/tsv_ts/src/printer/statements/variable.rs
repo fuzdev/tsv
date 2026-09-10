@@ -181,7 +181,8 @@ impl<'a> Printer<'a> {
         // among many arms rather than handing over one build, so the paired suppression is
         // applied to `value` here instead: the two must move together or the comment is
         // printed twice / not at all — and "together" binds EVERY arm, not just the ones
-        // that read `gap_comments` (`prepend_hoisted` below is the other two's share).
+        // that read `gap_comments` (`prepend_hoisted` below is the multiline-string arm's
+        // share; every other arm takes the whole of `gap_comments`).
         //
         // Unguarded, unlike the binding default's twin: when the name→value gap holds no
         // comment at all, `equals_pos` is the sentinel `init_start` and this range is
@@ -202,15 +203,29 @@ impl<'a> Printer<'a> {
                 init_doc
             }
         };
-        // ⚠️ The hoisted run alone, for the two arms below that own their own comment
-        // emission and must NOT take the whole of `gap_comments`: the multiline-string and
-        // curried-arrow arms put an emit-axis block on the `=` line, and moving it down onto
-        // the value's line is a relocation neither prettier nor tsv makes. The hoisted run
-        // has no such choice — it is the value's OWN comment, glued to the value's first
-        // token, so it goes wherever the value goes. Omitting it is a DROP
-        // (`docs/comments.md` hazard 1): both arms build the value under the hoist's
-        // suppression, so nothing else prints it — which is exactly what `gaps:audit` caught
-        // the moment the licence widened to reach a multiline string and a curried head.
+        // ⚠️ The hoisted run alone, for the MULTILINE-STRING arm below, which owns its own
+        // comment emission and must NOT take the whole of `gap_comments`: it puts an
+        // emit-axis block on the `=` line, and moving it down onto the value's line is a
+        // relocation neither prettier nor tsv makes. The hoisted run has no such choice — it
+        // is the value's OWN comment, glued to the value's first token, so it goes wherever
+        // the value goes. Omitting it is a DROP (`docs/comments.md` hazard 1): the arm builds
+        // the value under the hoist's suppression, so nothing else prints it — which is
+        // exactly what `gaps:audit` caught the moment the licence widened to reach a
+        // multiline string and a curried head.
+        //
+        // ⚠️ **The curried-arrow arm does NOT share that restriction, and reading it as a
+        // two-arm rule cost a dropped comment.** The restriction is about a value that stays
+        // on the `=` line: a multiline string opens there, so its gap run and its value share
+        // a line either way. A curried chain is pushed BELOW the `=` by a hardline, so there
+        // is no `=` line left for the run to stay on and nothing to relocate — and the bare
+        // authoring already prints the run on the value's line, from the arrow's own doc,
+        // because the comment is glued to the head's `(` and the arrow OWNS it. The two only
+        // part when a redundant paren shell stands between: the comment is then owned by the
+        // node the strip discards, `hoisted_run` declines, and an arm carrying only
+        // `prepend_hoisted` printed nothing at all (`const a = /* x */ (({}) => () => test);`
+        // lost its comment outright). Taking the whole of `gap_comments` there is what makes
+        // the shell authoring converge on the bare one's fixed point, which is the rule every
+        // other value kind in this builder already keeps.
         let prepend_hoisted = |init_doc: DocId| -> DocId {
             match hoisted_run {
                 Some(run) => d.concat(&[run, init_doc]),
@@ -459,9 +474,14 @@ impl<'a> Printer<'a> {
             // exactly that context, precisely so this `=` can own the break instead.
             // `build_assignment_layout` sets the context for EVERY curried chain and
             // leans on the same decline; if that decline ever moves, both sites move.
+            //
+            // `make_init_doc`, not `prepend_hoisted`: the hardline has already moved the
+            // value off the `=` line, so the gap's whole run travels with it (see the ⚠️ on
+            // `prepend_hoisted`). A shell-stripped value owns no run for the hoist to find,
+            // and the emit-axis half is then the only thing printing the comment.
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" ="));
-            parts.push(d.indent_hardline(prepend_hoisted(value())));
+            parts.push(d.indent_hardline(make_init_doc(value())));
         } else if comment_hangs_value {
             // The leading comment's hang (see `comment_hangs_value`). The binding prints as
             // built — a pattern or a type annotation stays flat while it fits, prettier's

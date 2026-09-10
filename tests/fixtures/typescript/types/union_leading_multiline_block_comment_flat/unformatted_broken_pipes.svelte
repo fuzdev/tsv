@@ -3,9 +3,8 @@
 	// first member, so prettier prints it outside the union's group: a union that fits
 	// stays flat below the comment and gains no leading `|`. Both multi-line kinds ask
 	// the same question, and every seam that hands its gap run into the union answers it
-	// the same way — the cells below are a census of those seams. (The two pipe variants
-	// carry the first seven; repeating them at every seam adds no claim this fixture does
-	// not already make, and the extra authorings reach a broke-after bug of their own.)
+	// the same way — the cells below are a census of those seams, and the two pipe
+	// variants carry every one of them.
 
 	// annotation `:`
 	let v1:
@@ -67,7 +66,8 @@ d */ | Ooo
 	// `satisfies`
 	const a2 = v1 satisfies
 		/* c
-d */ Ooo | Ppp;
+d */ | Ooo
+		| Ppp;
 
 	// type alias `=`
 	type T5 =
@@ -78,40 +78,46 @@ d */ | Ooo
 	// function-type return `=>`
 	type T6 = () =>
 		/* c
-d */ Ooo | Ppp;
+d */ | Ooo
+		| Ppp;
 
 	// index signature value
 	type T7 = {
 		[k: string]:
 			/* c
-d */ Ooo | Ppp;
+d */ | Ooo
+			| Ppp;
 	};
 
 	// mapped-type value
 	type T8 = {
 		[K in string]:
 			/* c
-d */ Ooo | Ppp;
+d */ | Ooo
+			| Ppp;
 	};
 
 	// tuple member
 	type T9 = [
 		/* c
-d */ Ooo | Ppp
+d */ | Ooo
+		| Ppp
 	];
 
 	// type-parameter constraint
 	type T10<
 		X extends
 			/* c
-d */ Ooo | Ppp
+d */ | Ooo
+			| Ppp
 	> = X;
 
 	// type-parameter default
 	type T11<
 		X =
 			/* c
-d */ Ooo | Ppp
+d */ | Ooo
+			| Ppp
 	> = X;
 
 	// null control: a single-line block binds to the first member instead

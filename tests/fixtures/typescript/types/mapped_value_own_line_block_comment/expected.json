@@ -1,0 +1,2153 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1120,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multi-line block the author broke after hangs the mapped-type value and keeps",
+			"start": 20,
+			"end": 102,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the authored break.",
+			"start": 104,
+			"end": 126,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 159,
+			"end": 168,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 3
+				},
+				"end": {
+					"line": 7,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The indentable kind answers the same way.",
+			"start": 189,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 266,
+			"end": 284,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 3
+				},
+				"end": {
+					"line": 16,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A single-line block the author gave its own line hangs the value too.",
+			"start": 305,
+			"end": 377,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 410,
+			"end": 417,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 3
+				},
+				"end": {
+					"line": 23,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Null control: a multi-line block GLUED to the value keeps that line, the pair",
+			"start": 438,
+			"end": 518,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " hanging together below the `:`.",
+			"start": 520,
+			"end": 554,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 587,
+			"end": 596,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 3
+				},
+				"end": {
+					"line": 32,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Null control: a single-line block glued after the `:` stays inline.",
+			"start": 614,
+			"end": 684,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 714,
+			"end": 721,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 17
+				},
+				"end": {
+					"line": 37,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An author blank survives with the break it belongs to — after the run...",
+			"start": 739,
+			"end": 814,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 847,
+			"end": 856,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 3
+				},
+				"end": {
+					"line": 44,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ...and between two comments of one run.",
+			"start": 878,
+			"end": 920,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 1
+				},
+				"end": {
+					"line": 49,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 953,
+			"end": 961,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 3
+				},
+				"end": {
+					"line": 52,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 966,
+			"end": 974,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 3
+				},
+				"end": {
+					"line": 54,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Null control: no comment.",
+			"start": 995,
+			"end": 1023,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 1
+				},
+				"end": {
+					"line": 58,
+					"column": 29
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1119,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1110,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 64,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 128,
+					"end": 186,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 133,
+						"end": 134,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 137,
+						"end": 185,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 142,
+							"end": 153,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 3
+								},
+								"end": {
+									"line": 5,
+									"column": 14
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSStringKeyword",
+								"start": 147,
+								"end": 153,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 8
+									},
+									"end": {
+										"line": 5,
+										"column": 14
+									}
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 172,
+							"end": 181,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 3
+								},
+								"end": {
+									"line": 8,
+									"column": 12
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 172,
+									"end": 175,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 3
+										},
+										"end": {
+											"line": 8,
+											"column": 6
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 172,
+										"end": 175,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 6
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 178,
+									"end": 181,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 9
+										},
+										"end": {
+											"line": 8,
+											"column": 12
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 178,
+										"end": 181,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 9
+											},
+											"end": {
+												"line": 8,
+												"column": 12
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c\nd ",
+									"start": 159,
+									"end": 168
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block the author broke after hangs the mapped-type value and keeps",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " the authored break.",
+							"start": 104,
+							"end": 126
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 235,
+					"end": 302,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 240,
+						"end": 241,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 244,
+						"end": 301,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 10
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 249,
+							"end": 260,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 3
+								},
+								"end": {
+									"line": 13,
+									"column": 14
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSStringKeyword",
+								"start": 254,
+								"end": 260,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 8
+									},
+									"end": {
+										"line": 13,
+										"column": 14
+									}
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 288,
+							"end": 297,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 3
+								},
+								"end": {
+									"line": 17,
+									"column": 12
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 288,
+									"end": 291,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 3
+										},
+										"end": {
+											"line": 17,
+											"column": 6
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 288,
+										"end": 291,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 3
+											},
+											"end": {
+												"line": 17,
+												"column": 6
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 294,
+									"end": 297,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 9
+										},
+										"end": {
+											"line": 17,
+											"column": 12
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 294,
+										"end": 297,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 9
+											},
+											"end": {
+												"line": 17,
+												"column": 12
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "*\n * c\n ",
+									"start": 266,
+									"end": 284
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The indentable kind answers the same way.",
+							"start": 189,
+							"end": 233
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 379,
+					"end": 435,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 384,
+						"end": 385,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 6
+							},
+							"end": {
+								"line": 21,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 388,
+						"end": 434,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 10
+							},
+							"end": {
+								"line": 25,
+								"column": 2
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 393,
+							"end": 404,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 3
+								},
+								"end": {
+									"line": 22,
+									"column": 14
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSStringKeyword",
+								"start": 398,
+								"end": 404,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 8
+									},
+									"end": {
+										"line": 22,
+										"column": 14
+									}
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 421,
+							"end": 430,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 3
+								},
+								"end": {
+									"line": 24,
+									"column": 12
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 421,
+									"end": 424,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 3
+										},
+										"end": {
+											"line": 24,
+											"column": 6
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 421,
+										"end": 424,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 3
+											},
+											"end": {
+												"line": 24,
+												"column": 6
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 427,
+									"end": 430,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 9
+										},
+										"end": {
+											"line": 24,
+											"column": 12
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 427,
+										"end": 430,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 9
+											},
+											"end": {
+												"line": 24,
+												"column": 12
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 410,
+									"end": 417
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A single-line block the author gave its own line hangs the value too.",
+							"start": 305,
+							"end": 377
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 556,
+					"end": 611,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 561,
+						"end": 562,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 6
+							},
+							"end": {
+								"line": 29,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 565,
+						"end": 610,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 10
+							},
+							"end": {
+								"line": 33,
+								"column": 2
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 570,
+							"end": 581,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 3
+								},
+								"end": {
+									"line": 30,
+									"column": 14
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSStringKeyword",
+								"start": 575,
+								"end": 581,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 8
+									},
+									"end": {
+										"line": 30,
+										"column": 14
+									}
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 597,
+							"end": 606,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 5
+								},
+								"end": {
+									"line": 32,
+									"column": 14
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 597,
+									"end": 600,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 5
+										},
+										"end": {
+											"line": 32,
+											"column": 8
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 597,
+										"end": 600,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 5
+											},
+											"end": {
+												"line": 32,
+												"column": 8
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 603,
+									"end": 606,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 11
+										},
+										"end": {
+											"line": 32,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 603,
+										"end": 606,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 11
+											},
+											"end": {
+												"line": 32,
+												"column": 14
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c\nd ",
+									"start": 587,
+									"end": 596
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Null control: a multi-line block GLUED to the value keeps that line, the pair",
+							"start": 438,
+							"end": 518
+						},
+						{
+							"type": "Line",
+							"value": " hanging together below the `:`.",
+							"start": 520,
+							"end": 554
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 686,
+					"end": 736,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 691,
+						"end": 692,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 6
+							},
+							"end": {
+								"line": 36,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 695,
+						"end": 735,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 10
+							},
+							"end": {
+								"line": 38,
+								"column": 2
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 700,
+							"end": 711,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 3
+								},
+								"end": {
+									"line": 37,
+									"column": 14
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSStringKeyword",
+								"start": 705,
+								"end": 711,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 8
+									},
+									"end": {
+										"line": 37,
+										"column": 14
+									}
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 722,
+							"end": 731,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 25
+								},
+								"end": {
+									"line": 37,
+									"column": 34
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 722,
+									"end": 725,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 25
+										},
+										"end": {
+											"line": 37,
+											"column": 28
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 722,
+										"end": 725,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 25
+											},
+											"end": {
+												"line": 37,
+												"column": 28
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 728,
+									"end": 731,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 31
+										},
+										"end": {
+											"line": 37,
+											"column": 34
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 728,
+										"end": 731,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 31
+											},
+											"end": {
+												"line": 37,
+												"column": 34
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 714,
+									"end": 721
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Null control: a single-line block glued after the `:` stays inline.",
+							"start": 614,
+							"end": 684
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 816,
+					"end": 875,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 47,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 821,
+						"end": 822,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 6
+							},
+							"end": {
+								"line": 41,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 825,
+						"end": 874,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 10
+							},
+							"end": {
+								"line": 47,
+								"column": 2
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 830,
+							"end": 841,
+							"loc": {
+								"start": {
+									"line": 42,
+									"column": 3
+								},
+								"end": {
+									"line": 42,
+									"column": 14
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSStringKeyword",
+								"start": 835,
+								"end": 841,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 8
+									},
+									"end": {
+										"line": 42,
+										"column": 14
+									}
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 861,
+							"end": 870,
+							"loc": {
+								"start": {
+									"line": 46,
+									"column": 3
+								},
+								"end": {
+									"line": 46,
+									"column": 12
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 861,
+									"end": 864,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 3
+										},
+										"end": {
+											"line": 46,
+											"column": 6
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 861,
+										"end": 864,
+										"loc": {
+											"start": {
+												"line": 46,
+												"column": 3
+											},
+											"end": {
+												"line": 46,
+												"column": 6
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 867,
+									"end": 870,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 9
+										},
+										"end": {
+											"line": 46,
+											"column": 12
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 867,
+										"end": 870,
+										"loc": {
+											"start": {
+												"line": 46,
+												"column": 9
+											},
+											"end": {
+												"line": 46,
+												"column": 12
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c\nd ",
+									"start": 847,
+									"end": 856
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An author blank survives with the break it belongs to — after the run...",
+							"start": 739,
+							"end": 814
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 922,
+					"end": 992,
+					"loc": {
+						"start": {
+							"line": 50,
+							"column": 1
+						},
+						"end": {
+							"line": 56,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 927,
+						"end": 928,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 6
+							},
+							"end": {
+								"line": 50,
+								"column": 7
+							}
+						},
+						"name": "H"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 931,
+						"end": 991,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 10
+							},
+							"end": {
+								"line": 56,
+								"column": 2
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 936,
+							"end": 947,
+							"loc": {
+								"start": {
+									"line": 51,
+									"column": 3
+								},
+								"end": {
+									"line": 51,
+									"column": 14
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSStringKeyword",
+								"start": 941,
+								"end": 947,
+								"loc": {
+									"start": {
+										"line": 51,
+										"column": 8
+									},
+									"end": {
+										"line": 51,
+										"column": 14
+									}
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 978,
+							"end": 987,
+							"loc": {
+								"start": {
+									"line": 55,
+									"column": 3
+								},
+								"end": {
+									"line": 55,
+									"column": 12
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 978,
+									"end": 981,
+									"loc": {
+										"start": {
+											"line": 55,
+											"column": 3
+										},
+										"end": {
+											"line": 55,
+											"column": 6
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 978,
+										"end": 981,
+										"loc": {
+											"start": {
+												"line": 55,
+												"column": 3
+											},
+											"end": {
+												"line": 55,
+												"column": 6
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 984,
+									"end": 987,
+									"loc": {
+										"start": {
+											"line": 55,
+											"column": 9
+										},
+										"end": {
+											"line": 55,
+											"column": 12
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 984,
+										"end": 987,
+										"loc": {
+											"start": {
+												"line": 55,
+												"column": 9
+											},
+											"end": {
+												"line": 55,
+												"column": 12
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 953,
+									"end": 961
+								},
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 966,
+									"end": 974
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " ...and between two comments of one run.",
+							"start": 878,
+							"end": 920
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1025,
+					"end": 1067,
+					"loc": {
+						"start": {
+							"line": 59,
+							"column": 1
+						},
+						"end": {
+							"line": 61,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1030,
+						"end": 1031,
+						"loc": {
+							"start": {
+								"line": 59,
+								"column": 6
+							},
+							"end": {
+								"line": 59,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 1034,
+						"end": 1066,
+						"loc": {
+							"start": {
+								"line": 59,
+								"column": 10
+							},
+							"end": {
+								"line": 61,
+								"column": 2
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 1039,
+							"end": 1050,
+							"loc": {
+								"start": {
+									"line": 60,
+									"column": 3
+								},
+								"end": {
+									"line": 60,
+									"column": 14
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSStringKeyword",
+								"start": 1044,
+								"end": 1050,
+								"loc": {
+									"start": {
+										"line": 60,
+										"column": 8
+									},
+									"end": {
+										"line": 60,
+										"column": 14
+									}
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 1053,
+							"end": 1062,
+							"loc": {
+								"start": {
+									"line": 60,
+									"column": 17
+								},
+								"end": {
+									"line": 60,
+									"column": 26
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 1053,
+									"end": 1056,
+									"loc": {
+										"start": {
+											"line": 60,
+											"column": 17
+										},
+										"end": {
+											"line": 60,
+											"column": 20
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 1053,
+										"end": 1056,
+										"loc": {
+											"start": {
+												"line": 60,
+												"column": 17
+											},
+											"end": {
+												"line": 60,
+												"column": 20
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 1059,
+									"end": 1062,
+									"loc": {
+										"start": {
+											"line": 60,
+											"column": 23
+										},
+										"end": {
+											"line": 60,
+											"column": 26
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 1059,
+										"end": 1062,
+										"loc": {
+											"start": {
+												"line": 60,
+												"column": 23
+											},
+											"end": {
+												"line": 60,
+												"column": 26
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Null control: no comment.",
+							"start": 995,
+							"end": 1023
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 1070,
+					"end": 1109,
+					"loc": {
+						"start": {
+							"line": 63,
+							"column": 1
+						},
+						"end": {
+							"line": 63,
+							"column": 40
+						}
+					},
+					"exportKind": "type",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 1084,
+							"end": 1085,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 15
+								},
+								"end": {
+									"line": 63,
+									"column": 16
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1084,
+								"end": 1085,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 15
+									},
+									"end": {
+										"line": 63,
+										"column": 16
+									}
+								},
+								"name": "A"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1084,
+								"end": 1085,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 15
+									},
+									"end": {
+										"line": 63,
+										"column": 16
+									}
+								},
+								"name": "A"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 1087,
+							"end": 1088,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 18
+								},
+								"end": {
+									"line": 63,
+									"column": 19
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1087,
+								"end": 1088,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 18
+									},
+									"end": {
+										"line": 63,
+										"column": 19
+									}
+								},
+								"name": "B"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1087,
+								"end": 1088,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 18
+									},
+									"end": {
+										"line": 63,
+										"column": 19
+									}
+								},
+								"name": "B"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 1090,
+							"end": 1091,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 21
+								},
+								"end": {
+									"line": 63,
+									"column": 22
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1090,
+								"end": 1091,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 21
+									},
+									"end": {
+										"line": 63,
+										"column": 22
+									}
+								},
+								"name": "C"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1090,
+								"end": 1091,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 21
+									},
+									"end": {
+										"line": 63,
+										"column": 22
+									}
+								},
+								"name": "C"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 1093,
+							"end": 1094,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 24
+								},
+								"end": {
+									"line": 63,
+									"column": 25
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1093,
+								"end": 1094,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 24
+									},
+									"end": {
+										"line": 63,
+										"column": 25
+									}
+								},
+								"name": "D"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1093,
+								"end": 1094,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 24
+									},
+									"end": {
+										"line": 63,
+										"column": 25
+									}
+								},
+								"name": "D"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 1096,
+							"end": 1097,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 27
+								},
+								"end": {
+									"line": 63,
+									"column": 28
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1096,
+								"end": 1097,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 27
+									},
+									"end": {
+										"line": 63,
+										"column": 28
+									}
+								},
+								"name": "E"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1096,
+								"end": 1097,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 27
+									},
+									"end": {
+										"line": 63,
+										"column": 28
+									}
+								},
+								"name": "E"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 1099,
+							"end": 1100,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 30
+								},
+								"end": {
+									"line": 63,
+									"column": 31
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1099,
+								"end": 1100,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 30
+									},
+									"end": {
+										"line": 63,
+										"column": 31
+									}
+								},
+								"name": "F"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1099,
+								"end": 1100,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 30
+									},
+									"end": {
+										"line": 63,
+										"column": 31
+									}
+								},
+								"name": "F"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 1102,
+							"end": 1103,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 33
+								},
+								"end": {
+									"line": 63,
+									"column": 34
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1102,
+								"end": 1103,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 33
+									},
+									"end": {
+										"line": 63,
+										"column": 34
+									}
+								},
+								"name": "G"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1102,
+								"end": 1103,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 33
+									},
+									"end": {
+										"line": 63,
+										"column": 34
+									}
+								},
+								"name": "G"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 1105,
+							"end": 1106,
+							"loc": {
+								"start": {
+									"line": 63,
+									"column": 36
+								},
+								"end": {
+									"line": 63,
+									"column": 37
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1105,
+								"end": 1106,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 36
+									},
+									"end": {
+										"line": 63,
+										"column": 37
+									}
+								},
+								"name": "H"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1105,
+								"end": 1106,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 36
+									},
+									"end": {
+										"line": 63,
+										"column": 37
+									}
+								},
+								"name": "H"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": null
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
