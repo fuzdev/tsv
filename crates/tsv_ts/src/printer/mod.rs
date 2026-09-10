@@ -1504,15 +1504,22 @@ impl<'a> Printer<'a> {
     /// an owned leading comment is whitespace-adjacent to the value's first token, hence
     /// inside this range by construction.
     ///
-    /// ⚠️ TODO: the hang is right, but the comment's hard break also propagates into the
-    /// VALUE's own group, so a value that would fit flat explodes with it
-    /// (`const a =⏎/** @type {A} */⏎(x) ? b : c` breaks the ternary; `= /**⏎ * c⏎ */ x + y +
-    /// z` breaks the binary chain). Prettier keeps them flat: its leading comment is printed
-    /// *outside* the value's group, while an owned one travels inside its node's doc by
-    /// construction — the property that keeps a synthesized paren from landing between the
-    /// two. Fixing it means either hoisting the comment to the OUTERMOST node starting at it
-    /// (giving up that property) or a hard break that ends its line without breaking the
-    /// group around it; neither is local, and both need their own fixture.
+    /// ⚠️ **The run this fires on is HOISTED out of the value's doc**
+    /// ([`Printer::hoist_owned_value_gap_run`]). Without that, a comment the value OWNS
+    /// travels *inside* its node's doc — tsv's ownership is innermost-wins — and its
+    /// reprinted body is a `MultilineText`, which the layout memo answers
+    /// `LAYOUT_BREAKS_FORCED`, so the value's own group broke and a value prettier keeps
+    /// flat exploded (`= /**⏎ * c⏎ */ b + c + d` broke the binary chain, `… */ f ? g : h`
+    /// the ternary, and the type alias's union gained a fabricated leading `|`). Prettier
+    /// attaches such a comment to the OUTERMOST node starting there and prints it outside
+    /// that group, which is the shape this seam already builds; the hoist is what routes
+    /// the comment into it. Pinned by
+    /// `expressions/assignment/operator_value_indentable_block_comment_flat`.
+    ///
+    /// ⚠️ The same propagation still reaches two seams OUTSIDE this family — a binding
+    /// default and an enum member, which correctly decline the hang and so never ask this
+    /// question. Their value's group still breaks under an owned indentable comment; the
+    /// hoist would apply unchanged, but each needs its own fixture cells first.
     ///
     /// ⚠️ **Distinct from [`Self::comment_hangs_value_after_operator`]**, the gap's other
     /// hang rule, and NOT foldable into it: that one is prettier's

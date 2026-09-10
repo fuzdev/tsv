@@ -35,6 +35,7 @@ mod element_comma;
 mod lists;
 mod member_body;
 mod owned;
+pub(crate) use owned::ValueGap;
 mod paren;
 mod render;
 mod scan;
@@ -1945,6 +1946,28 @@ impl<'a> Printer<'a> {
     /// separates two items and is preserved.
     pub(crate) fn build_value_gap_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
         self.build_leading_comment_run_opt(start, end, LeadingGlue::AdjacentValueGap)
+    }
+
+    /// [`Self::build_value_gap_comments_opt`] on the **on page** axis — the run INCLUDING
+    /// a comment the value owns.
+    ///
+    /// The one caller is [`Self::hoist_owned_value_gap_run`], which pairs it with the
+    /// suppression that keeps the value from printing the same comment again; read that
+    /// function for why the seam hoists at all. Nothing else may call this: on every other
+    /// gap the emit axis is the correct one, and an on-page reading there double-prints.
+    pub(crate) fn build_hoisted_value_gap_comments_opt(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> Option<DocId> {
+        let mut parts = DocBuf::new();
+        self.push_leading_comment_run(
+            &mut parts,
+            self.comments_on_page_between(start, end),
+            end,
+            LeadingGlue::AdjacentValueGap,
+        );
+        (!parts.is_empty()).then(|| self.d().concat(&parts))
     }
 
     /// Like `build_rhs_comments_opt`, but a single-line block comment glued to the

@@ -553,10 +553,12 @@ fragment to `{#if`, indents what follows, and drops `}` to base — whether the 
 printWidth or from a comment. A head far under printWidth still takes that shape when a *line*
 comment forces the break. (A **multi-line block** comment's newlines live inside its verbatim
 source span, which renders with no context indent by design, so its continuation is the
-comment's own line and only the `}` dangle shows; a **single-line block** comment breaks
-nothing and the head stays inline, both formatters agreeing.) Prettier never dangles a block
-head's `}` whatever broke it, so this is the one divergence on a second trigger — not a
-print-width tolerance:
+comment's own line and only the `}` dangle shows; an **indentable block** comment reaches the
+same place by the other route — tsv reprints it at the head's own column rather than copying
+it, but its closing line still carries the value, so again only the `}` dangle shows; a
+**single-line block** comment breaks nothing and the head stays inline, both formatters
+agreeing.) Prettier never dangles a block head's `}` whatever broke it, so this is the one
+divergence on a second trigger — not a print-width tolerance:
 
 - `{#if}` (comment-forced head break) — [if/condition_breaking_comment](../tests/fixtures/svelte/blocks/if/condition_breaking_comment_prettier_divergence/)
 

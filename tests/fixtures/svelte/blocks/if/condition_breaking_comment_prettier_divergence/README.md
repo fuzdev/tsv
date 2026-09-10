@@ -28,6 +28,16 @@ Boundary shapes covered:
   nothing to indent. The `}` still dangles.
 - **single-line block comment** — breaks nothing. The head stays inline and both formatters
   agree, pinning that the trigger is the *break*, not a comment's mere presence.
+- **indentable block comment** — the other route to the same place. Its lines are *reprinted*
+  at the head's own column rather than copied, so unlike the verbatim kind above it does take
+  a context indent; but its closing line still carries the value (` */ cond`), so there is
+  still no continuation line and again only the `}` dangle shows. That the two comment kinds
+  land on one shape by opposite mechanisms is what makes "keyed on *that* the head broke"
+  literal rather than incidental.
+
+`unformatted_ours_flush_stars.svelte` writes the indentable comment's continuation lines flush
+at column 0. Both formatters reindent them to the head's column; only the `}` still parts them,
+so the variant carries the divergence and pins the reprint at the same time.
 
 ## Reason
 

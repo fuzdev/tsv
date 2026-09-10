@@ -2,6 +2,7 @@
 
 use super::Printer;
 use crate::ast::internal::{self, Expression};
+use crate::printer::comments::ValueGap;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{
@@ -174,10 +175,29 @@ impl<'a> Printer<'a> {
         // read wherever that build lands.
         self.mark_jsdoc_cast_value_gap(init);
 
+        // prettier's `chooseLayout` fourth disjunct hoists its run OUT of the value's doc
+        // when the value OWNS it ([`Printer::hoist_owned_value_gap_run`] carries the why —
+        // an owned comment travels inside its node's doc, and its reprinted body force-breaks
+        // every group around it). This is the run-only form, because the cascade below picks
+        // among many arms rather than handing over one build, so the paired suppression is
+        // applied to `value` here instead: the two must move together or the comment is
+        // printed twice / not at all.
+        let hoisted_run = self.hoisted_owned_value_gap_run_opt(
+            ValueGap {
+                start: rhs_comments_start,
+                indentable_leads_value,
+            },
+            init,
+        );
+        let build_value = &|| self.build_value_under_hoist(hoisted_run, init, value);
+        let value: &dyn Fn() -> DocId = build_value;
+
         // Helper: build init doc with optional inline block comments prepended.
         // Comments use Trailing spacing (`/* comment */ `) so no extra space needed.
+        // `or`, never a concat — see [`Printer::hoisted_owned_value_gap_run_opt`].
+        let gap_comments = hoisted_run.or(rhs_block_comment_doc);
         let make_init_doc = |init_doc: DocId| -> DocId {
-            if let Some(comment_doc) = rhs_block_comment_doc {
+            if let Some(comment_doc) = gap_comments {
                 d.concat(&[comment_doc, init_doc])
             } else {
                 init_doc

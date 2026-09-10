@@ -19,8 +19,8 @@ c2 */ cond
 
 <!-- indentable block comment: reprinted at the head's column (not verbatim), but its last line still carries the value, so only the } dangle shows (divergence) -->
 {#if /**
- * c1
- */ cond
+* c1
+*/ cond
 }
 	<p>text</p>
 {/if}

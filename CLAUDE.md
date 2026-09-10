@@ -929,11 +929,16 @@ enclosing gap, so a paren synthesized around an ENCLOSING expression can never l
 between them. A bundler annotation (`/* @__PURE__ */`), a JSDoc cast (handed to the
 `JsdocCast` node) and a plain glued comment bind identically; `owned ⇒ is_block`, so no
 line comment is ever owned. **Ownership is a fact about who PRINTS a comment, never about
-whether it EXISTS** — every bug in this class has been a violation of that sentence. The one
-node that breaks "the innermost node its token begins prints it" is the **paren-less arrow**
-(its span starts at its sole parameter, and it prints a synthesized `(` ahead of it): the arrow
-keeps the claim and the parameter is suppressed (`Printer::with_owned_comment_claimed_above`) —
-a suppression is only a de-duplication where some enclosing node provably claims
+whether it EXISTS** — every bug in this class has been a violation of that sentence. Two
+places break "the innermost node its token begins prints it", and both suppress the inner
+claim through `Printer::with_owned_comment_claimed_above` — a suppression is only a
+de-duplication where some enclosing node provably claims, never a shortcut to silence one:
+the **paren-less arrow** (its span starts at its sole parameter and it prints a synthesized
+`(` ahead of it, so the arrow keeps the claim), and the **`printAssignment` operator→value
+hoist** (`Printer::hoist_owned_value_gap_run`), which pulls the fourth disjunct's run out of
+the value's doc so the comment's hard break cannot force the value's own group — tsv's
+ownership is innermost-wins where prettier's attachment is outermost, and that asymmetry is
+the whole reason the hoist exists
 ([docs/comments.md §Owned comments](docs/comments.md#owned-comments--the-one-crack-in-the-detached-model)).
 
 A comment can be asked about along exactly **three** axes, and the lookup API
