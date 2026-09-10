@@ -4,6 +4,7 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
+use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::printer::{
     ClassMemberModifiers, ContinuationValue, MemberBlankScan, MemberBody, MemberFloor,
@@ -654,8 +655,14 @@ impl<'a> Printer<'a> {
                         // prettier's `chooseLayout` fourth disjunct — an indentable block
                         // leading the value hangs it under the `=`
                         // ([`Printer::indentable_block_leads_value`]).
-                        indentable_leads_value: self
-                            .indentable_block_leads_value(eq_pos + 1, value_start),
+                        gap: Some(ValueGap {
+                            start: eq_pos + 1,
+                            // prettier's `chooseLayout` fourth disjunct — an indentable block
+                            // leading the value hangs it under the `=`
+                            // ([`Printer::indentable_block_leads_value`]).
+                            indentable_leads_value: self
+                                .indentable_block_leads_value(eq_pos + 1, value_start),
+                        }),
                         boundary: None,
                         frozen: value_frozen,
                     },

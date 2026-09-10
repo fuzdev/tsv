@@ -19,6 +19,7 @@ use crate::printer::Printer;
 use crate::printer::calls::chain_has_calls;
 use crate::printer::chain::chain_paren_leading_gap;
 use crate::printer::class_expr_has_decorators;
+use crate::printer::comments::ValueGap;
 use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
@@ -860,13 +861,12 @@ pub struct RhsCommentInfo {
     /// the fits walk. `false` when the run has an own-line separator (a real hardline
     /// the value must sit under), or when `comments` is `None`.
     pub glued_through: bool,
-    /// An INDENTABLE block comment leads the RHS
-    /// ([`Printer::indentable_block_leads_value`]) — prettier's `chooseLayout` fourth
-    /// disjunct, which takes `BreakAfterOperator` ahead of every layout the value or the
-    /// left would otherwise choose. Resolved by the caller, which is the one that holds the
-    /// gap's spans; **on page**, so a comment the RHS owns counts even though `comments` is
-    /// `None` for it.
-    pub indentable_leads_value: bool,
+    /// The operator→RHS gap, for the HOIST that pulls a run the RHS owns out of the RHS's
+    /// own doc ([`Printer::hoist_owned_value_gap_run`]) — its start paired with the fourth
+    /// disjunct's verdict over it, since neither alone licenses the hoist. `None` where
+    /// there is no gap to scan: [`RhsCommentInfo::frozen_only`], and any caller whose
+    /// zero-comment fast path already proved the gap empty.
+    pub gap: Option<ValueGap>,
     /// When `Some`, scan for trailing comments from stripped grouping parens between
     /// the RHS end and this boundary, wrapping in parens if found.
     pub boundary: Option<u32>,
@@ -877,6 +877,19 @@ pub struct RhsCommentInfo {
 }
 
 impl RhsCommentInfo {
+    /// prettier's `chooseLayout` **fourth disjunct** over the operator→RHS gap — an
+    /// INDENTABLE block comment leads the RHS ([`Printer::indentable_block_leads_value`]),
+    /// which takes `BreakAfterOperator` ahead of every layout the value or the left would
+    /// otherwise choose.
+    ///
+    /// Read through [`ValueGap`] rather than kept as a field of its own: the verdict and the
+    /// range it was taken over are one fact, and a second copy is a second answer waiting to
+    /// drift. `false` where there is no gap, which is exactly right — a gap with no comments
+    /// has no comment leading the RHS.
+    pub fn indentable_leads_value(&self) -> bool {
+        self.gap.is_some_and(|gap| gap.indentable_leads_value)
+    }
+
     /// The gap carries nothing but a freeze verdict — the shape most callers want, and
     /// the one the zero-comment fast paths reach with `None`.
     pub fn frozen_only(frozen: Option<Span>) -> Self {
@@ -884,7 +897,7 @@ impl RhsCommentInfo {
             comments: None,
             has_line_comment: false,
             glued_through: false,
-            indentable_leads_value: false,
+            gap: None,
             boundary: None,
             frozen,
         }
@@ -1029,7 +1042,7 @@ impl<'a> Printer<'a> {
         // gap emits nothing for it. The gap reading is **on page** and counts it anyway,
         // which is why no owned companion is needed here.
         if layout != AssignmentLayout::BreakAfterOperator
-            && self.value_hangs_under_operator(rhs_info.indentable_leads_value, right_expr)
+            && self.value_hangs_under_operator(rhs_info.indentable_leads_value(), right_expr)
         {
             layout = AssignmentLayout::BreakAfterOperator;
         }
@@ -1045,13 +1058,23 @@ impl<'a> Printer<'a> {
         // (`mark_jsdoc_cast_value_gap`), and every value built here is an assignment's.
         self.mark_jsdoc_cast_value_gap(right_expr);
         self.mark_assignment_value(right_expr);
-        let right_doc = self.build_with_arrow_chain_context(chain_context, || {
-            if let Some(boundary) = rhs_info.boundary {
-                self.build_expression_doc_with_paren_comments(right_expr, boundary, false)
-            } else {
-                self.build_expression_doc(right_expr)
-            }
-        });
+        // The fourth disjunct's run is hoisted OUT of the RHS's doc when the RHS owns it,
+        // so the comment's hard break cannot reach the value's own group
+        // ([`Printer::hoist_owned_value_gap_run`]). Asked only where the disjunct fired over
+        // a real gap; everywhere else `hoisted_run` is `None` and the RHS keeps its claim.
+        let build_right = || {
+            self.build_with_arrow_chain_context(chain_context, || {
+                if let Some(boundary) = rhs_info.boundary {
+                    self.build_expression_doc_with_paren_comments(right_expr, boundary, false)
+                } else {
+                    self.build_expression_doc(right_expr)
+                }
+            })
+        };
+        let (hoisted_run, right_doc) = match rhs_info.gap {
+            Some(gap) => self.hoist_owned_value_gap_run(gap, right_expr, build_right),
+            None => (None, build_right()),
+        };
         // Parenthesize an `in` RHS inside a for-header init (`for (a = (b in c);…)`);
         // a no-op elsewhere. The assignment builder is the RHS's only build site and
         // never routes it through `needs_parens`, so the for-init rule is applied here.
@@ -1109,7 +1132,9 @@ impl<'a> Printer<'a> {
 
         // Build the RHS doc with optional inline comments prepended
         // Comments use Trailing spacing (`/* comment */ `) so no extra space needed
-        let right_doc_with_comments = if let Some(comments_doc) = rhs_info.comments {
+        // `or`, never a concat — see [`Printer::hoisted_owned_value_gap_run_opt`].
+        let gap_comments = hoisted_run.or(rhs_info.comments);
+        let right_doc_with_comments = if let Some(comments_doc) = gap_comments {
             d.concat(&[comments_doc, right_doc])
         } else {
             right_doc

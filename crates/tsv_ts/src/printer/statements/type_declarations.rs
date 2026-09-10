@@ -4,7 +4,10 @@
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
 use crate::printer::ignore::is_freeze_target;
-use crate::printer::layout::{fluid_after_operator, hang_after_operator};
+use crate::printer::layout::{
+    fluid_after_operator, fluid_after_operator_unindented, hang_after_operator,
+    hang_after_operator_unindented,
+};
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::{
     type_needs_parens_for_array_element, type_needs_parens_for_indexed_access_object,
@@ -493,19 +496,43 @@ impl<'a> Printer<'a> {
                     None => rhs,
                 }
             };
+            // **The two break-after-`=` markers, each aware of the pre-`=` comment
+            // continuation path** (`type A<X> // c⏎= …`). `lead_space` is false ONLY
+            // there, and the caller has already wrapped the comment run + `=` + value in
+            // one `d.indent` ([`Printer::build_continuation_indent`]), so a marker's own
+            // indent would DOUBLE it — the value's lines sit at the `=`'s level, not one
+            // deeper. Prettier is the oracle for that column even though it is not the
+            // oracle for the shape: it relocates the comment across the `=` and hangs the
+            // value below it, at exactly the level these yield, so the divergence is the
+            // comment's position alone
+            // (`types/comments/type_alias_line_pre_equals_hang_prettier_divergence`).
+            //
+            // ⚠️ **Every arm below goes through one of these two, never through
+            // `hang_after_operator` / `fluid_after_operator` directly.** Reaching for the
+            // bare helper is how the generic-conditional, template-literal,
+            // comment-driven-break and `fluid` arms each answered the continuation path
+            // one level deeper than the union arm beside them — one question with two
+            // answers inside one function. An arm that hugs the `=` (`d.text(" ")` + the
+            // value) asks nothing here and is right as it stands: its value starts on the
+            // `=` line, so its own continuation is a level in either way.
+
             // Every `fluid` marker in this function ties to the one assignment group.
-            let fluid = |rhs: DocId| fluid_after_operator(d, rhs, GroupId::Assignment);
-            // Break-after-operator, honoring the pre-`=` comment continuation path
-            // (`type A<X> // c⏎= …`). `lead_space` is false ONLY there, and the caller has
-            // already wrapped the comment run + `=` + value in one `d.indent`
-            // (`build_continuation_indent`), so the hang's own indent would double it —
-            // the value sits at the `=`'s level, not one deeper. Still grouped, so a value
+            // Un-indented on the continuation path: both the marker's `indent(line)` and
+            // the value's `indent_if_break` are the level already spent.
+            let fluid = |rhs: DocId| -> DocId {
+                if lead_space {
+                    fluid_after_operator(d, rhs, GroupId::Assignment)
+                } else {
+                    fluid_after_operator_unindented(d, rhs, GroupId::Assignment)
+                }
+            };
+            // Break-after-operator. Still grouped on the continuation path, so a value
             // that fits stays on the `=` line exactly as the hang's flat case does.
             let hang = |rhs: DocId| -> DocId {
                 if lead_space {
                     hang_after_operator(d, rhs)
                 } else {
-                    d.group(d.concat(&[d.line(), rhs]))
+                    hang_after_operator_unindented(d, rhs)
                 }
             };
 
@@ -583,10 +610,14 @@ impl<'a> Printer<'a> {
             if let Some(run) = self.broke_after_value_leading_run(eq_pos + 1, type_start) {
                 let type_doc = build_value();
                 parts.push(self.break_or_hang_after_operator_run_doc(&run, type_start, type_doc));
-            } else if indentable_leads_value && !matches!(value_type, TSType::Union(_)) {
-                // The hang, for every value kind but a union — which keeps its own arm
-                // below because the run must be handed INTO it (`run_handed`) rather than
-                // stranded ahead of the `|` its broken layout synthesizes.
+            } else if indentable_leads_value {
+                // The hang, for EVERY value kind — a union included, since the run is now
+                // hoisted out of the value's doc ([`Printer::hoist_owned_value_gap_run`])
+                // and so no longer force-breaks the union's own group. While it did, a
+                // union had to keep an arm of its own so the run was handed INTO it
+                // (`run_handed`) rather than stranded ahead of the fabricated leading `|`
+                // that broken layout synthesized; with the propagation gone the two arms
+                // are one.
                 parts.push(hang(make_rhs(build_value_keeping_intersection_indent())));
             } else if let TSType::Union(u) = value_type {
                 // A glued block run between `=` and a union with no authored leading
@@ -663,7 +694,7 @@ impl<'a> Printer<'a> {
                 // (prettier's `shouldBreakBeforeConditionalType`, a `shouldBreakAfterOperator`
                 // arm) — asked here, ahead of the complex-params arm, exactly where
                 // `chooseLayout` asks it; the plain-halves conditional is the `fluid` arm below.
-                parts.push(hang_after_operator(d, make_rhs(build_value())));
+                parts.push(hang(make_rhs(build_value())));
             } else if has_complex_params {
                 // Complex type parameters — two or more, one constrained or defaulted —
                 // take prettier's `break-lhs`, asked right after the break-after-operator
@@ -775,7 +806,7 @@ impl<'a> Printer<'a> {
                     //     template layout is already a deliberate divergence — see
                     //     template_literal_type_long; `is_simple_type_arg` excludes them
                     //     from atomic inlining for the same reason).
-                    parts.push(hang_after_operator(d, make_rhs(type_doc)));
+                    parts.push(hang(make_rhs(type_doc)));
                 } else {
                     // The comment-free remainder is prettier's `fluid` default
                     // (`chooseLayout`'s fallthrough): the value hugs the `=` line and

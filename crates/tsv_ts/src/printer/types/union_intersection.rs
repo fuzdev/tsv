@@ -447,6 +447,34 @@ impl<'a> Printer<'a> {
         (d.concat(&parts), breaks)
     }
 
+    /// A union member's **leading** comment run, wearing the per-member `align(2)` offset
+    /// the member itself takes ([`Self::build_union_member_offset_doc`]).
+    ///
+    /// One statement of one rule for the three places a leading run is emitted — the block
+    /// layout's first member and its post-separator members
+    /// ([`Self::push_post_separator_block_comments`]), and the line-comment layout's inline
+    /// branch. Prettier prints a member's leading comments *inside* the offset
+    /// (`union-type.js` puts the whole comment-wrapped doc in the `align` when the member
+    /// has leading comments), so an indentable block's reindented lines belong two columns
+    /// past the `|` rather than flush under it. The mirror is
+    /// [`Self::push_pre_separator_block_comments`], which deliberately takes NO offset: a
+    /// comment on that side binds to the PRECEDING member and prints outside the align
+    /// (`printComments(align(2, typeDoc))`).
+    ///
+    /// Applied unconditionally, never keyed on whether the run breaks: `align` binds only
+    /// the lines opened *inside* it, so a single-line block is unaffected and a
+    /// non-indentable one — whose newlines live in its verbatim span rather than in the doc
+    /// — is untouched by construction. Both are pinned as null controls in
+    /// `types/union_member_leading_block_comment_offset`, beside the intersection, which has
+    /// no per-member offset for a run to take.
+    ///
+    /// ⚠️ Not to be confused with the two **gap** runs at the same seam
+    /// ([`Self::push_union_member_leading_run`]'s callers), which take the PREVIOUS member's
+    /// offset conditionally — a different question with a different anchor.
+    fn union_member_leading_run_offset_doc(&self, run: DocId) -> DocId {
+        self.d().align(2, run)
+    }
+
     /// Append the block comments sitting *after* the `|` separator and before the union
     /// member that follows it (`A | /* c */ B`), each spaced, appending nothing when
     /// there are none.
@@ -460,6 +488,9 @@ impl<'a> Printer<'a> {
     /// after the `|` and takes a space either way. The intersection, whose gate leaves a
     /// comment sharing the `&`'s line on this path, needs the source-keyed separator
     /// instead ([`Self::build_member_leading_block_comments`]).
+    ///
+    /// The run leads its member, so it wears the member's offset
+    /// ([`Self::union_member_leading_run_offset_doc`] carries that rule).
     fn push_post_separator_block_comments(
         &self,
         parts: &mut DocBuf,
@@ -475,7 +506,7 @@ impl<'a> Printer<'a> {
                 CommentFilter::BlockOnly,
             )
         {
-            parts.push(comments);
+            parts.push(self.union_member_leading_run_offset_doc(comments));
         }
     }
 
@@ -1635,15 +1666,13 @@ impl<'a> Printer<'a> {
                 // Extract leading block comments before the first type
                 // (e.g., `| /* c */ A | B` — comment between leading `|` and first member).
                 //
-                // `align(2)` for the same reason as the line-comment path's run: when
-                // this run ends in a break — an own-line multi-line block, or its soft
-                // `line` breaking as the union expands — it is the run that places the
-                // member's own first line, which then belongs at the per-member offset
-                // rather than flush under the `|`. It takes the SAME `align(2)` sub-tab
-                // offset as the member (below) so the run's lines and the member's align
-                // consistently; splitting the offset across the two siblings is sound
-                // because `align` is a per-line property. Unconditional because it binds
-                // only the breaks inside it, so a run that hugs its member is unaffected.
+                // The offset is the shared leading-run rule
+                // ([`Self::union_member_leading_run_offset_doc`]); what is specific here is
+                // WHY this run needs it: when the run ends in a break — an own-line
+                // multi-line block, or its soft `line` breaking as the union expands — it is
+                // the run, not the `| `, that places the member's own first line. Splitting
+                // the offset across the two siblings is sound because `align` is a per-line
+                // property, so it agrees with the member's own wrapper below.
                 // A frozen first member emitted its run before the `| ` above. An
                 // EXTERNAL glued run handed in from the value seam takes this same
                 // position — after the `if_break` pipe, bound to the member it leads
@@ -1652,7 +1681,7 @@ impl<'a> Printer<'a> {
                 if has_leading_run && !frozen {
                     let (run, _) =
                         self.build_member_leading_block_comments(union_bound_end, type_start);
-                    parts.push(d.align(2, run));
+                    parts.push(self.union_member_leading_run_offset_doc(run));
                 }
             }
 
@@ -1997,9 +2026,17 @@ impl<'a> Printer<'a> {
                     }
                     parts.extend(closing);
                     parts.push(d.text("| "));
-                    for comment in inline {
-                        parts.push(self.build_comment_doc(comment));
-                        parts.push(d.text(" "));
+                    // These lead the member, so they take its offset — the same rule the
+                    // block layout's two leading-run sites take
+                    // ([`Self::union_member_leading_run_offset_doc`]). The `| ` stays
+                    // outside it: the pipe is flush and the offset begins after it.
+                    if !inline.is_empty() {
+                        let mut run = DocBuf::new();
+                        for comment in inline {
+                            run.push(self.build_comment_doc(comment));
+                            run.push(d.text(" "));
+                        }
+                        parts.push(self.union_member_leading_run_offset_doc(d.concat(&run)));
                     }
                 } else {
                     // No pipe found, just add separator

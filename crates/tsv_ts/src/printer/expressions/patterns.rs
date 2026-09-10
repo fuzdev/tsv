@@ -9,6 +9,7 @@
 
 use super::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
+use crate::printer::comments::ValueGap;
 use crate::printer::comments::next_real_element_start;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{
@@ -277,7 +278,10 @@ impl<'a> Printer<'a> {
             comments: rhs_comments,
             has_line_comment: rhs_has_line_comment,
             glued_through: rhs_glued_through,
-            indentable_leads_value: rhs_indentable_leads_value,
+            gap: Some(ValueGap {
+                start: effective_rhs_start,
+                indentable_leads_value: rhs_indentable_leads_value,
+            }),
             boundary: Some(assign.span.end),
             frozen: rhs_frozen,
         };

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 389,
+	"end": 600,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -302,6 +302,107 @@
 					]
 				},
 				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 388,
+				"end": 390,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 390,
+				"end": 554,
+				"data": " indentable block comment: reprinted at the head's column (not verbatim), but its last line still carries the value, so only the } dangle shows (divergence) "
+			},
+			{
+				"type": "Text",
+				"start": 554,
+				"end": 555,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 555,
+				"end": 599,
+				"test": {
+					"type": "Identifier",
+					"start": 574,
+					"end": 578,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 4
+						},
+						"end": {
+							"line": 23,
+							"column": 8
+						}
+					},
+					"name": "cond",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": "*\n * c1\n ",
+							"start": 560,
+							"end": 573
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 580,
+							"end": 582,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 582,
+							"end": 593,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 25,
+									"column": 2,
+									"character": 583
+								},
+								"end": {
+									"line": 25,
+									"column": 3,
+									"character": 584
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 585,
+										"end": 589,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 593,
+							"end": 594,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
 			}
 		]
 	},
@@ -352,6 +453,22 @@
 				"end": {
 					"line": 16,
 					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c1\n ",
+			"start": 560,
+			"end": 573,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 5
+				},
+				"end": {
+					"line": 23,
+					"column": 3
 				}
 			}
 		}

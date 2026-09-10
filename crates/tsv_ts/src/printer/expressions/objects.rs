@@ -8,6 +8,7 @@
 // - Blank line preservation between properties
 
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
+use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
@@ -698,15 +699,28 @@ impl<'a> Printer<'a> {
                     // gap is an `isObjectProperty` value gap whichever arm prints it, so
                     // the chain here is FLAT like its sibling arms', not indented.
                     self.mark_jsdoc_cast_value_gap(prop.value);
-                    let comments_doc = self
-                        .build_value_gap_comments_opt(colon_pos + 1, value_start)
+                    // The fourth disjunct's run is hoisted OUT of the value's doc when the
+                    // value OWNS it, so the comment's hard break cannot reach the value's
+                    // own group ([`Printer::hoist_owned_value_gap_run`]). This arm builds
+                    // its own hang, so it takes the run-only form and owes the paired
+                    // suppression below — exactly the debt that function's ⚠️ names.
+                    let hoisted_run = self.hoisted_owned_value_gap_run_opt(
+                        ValueGap {
+                            start: colon_pos + 1,
+                            indentable_leads_value,
+                        },
+                        prop.value,
+                    );
+                    let comments_doc = hoisted_run
+                        .or_else(|| self.build_value_gap_comments_opt(colon_pos + 1, value_start))
                         .unwrap_or_else(|| d.empty());
                     let mut value_parts: DocBuf = smallvec![comments_doc];
                     if needs_parens {
                         value_parts.push(d.text("("));
                     }
-                    value_parts
-                        .push(self.build_object_property_value_doc(prop.value, value_frozen));
+                    value_parts.push(self.build_value_under_hoist(hoisted_run, prop.value, || {
+                        self.build_object_property_value_doc(prop.value, value_frozen)
+                    }));
                     if needs_parens {
                         value_parts.push(d.text(")"));
                     }
@@ -779,7 +793,10 @@ impl<'a> Printer<'a> {
                                 // hangs the value itself. Threaded rather than hardcoded, and
                                 // it is literally that gate's own first disjunct, so the two
                                 // cannot drift.
-                                indentable_leads_value,
+                                gap: Some(ValueGap {
+                                    start: colon_pos + 1,
+                                    indentable_leads_value,
+                                }),
                                 boundary: None,
                                 frozen: value_frozen,
                             },

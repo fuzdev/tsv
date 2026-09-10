@@ -90,6 +90,20 @@ fn leading_jsdoc_cast_walk<'x>(expr: &'x Expression<'x>) -> Option<&'x internal:
     }
 }
 
+/// An operator→value gap, for the HOIST ([`Printer::hoisted_owned_value_gap_run_opt`]): where
+/// the gap starts, and whether prettier's `chooseLayout` fourth disjunct fired over it.
+///
+/// The two travel together because neither alone licenses the hoist — a gap with no
+/// indentable block leading its value has nothing to pull out, and the disjunct's verdict is
+/// meaningless without the range it was taken over.
+#[derive(Clone, Copy)]
+pub(crate) struct ValueGap {
+    /// Just past the operator (`=` / `:`), where the leading-comment scan begins.
+    pub(crate) start: u32,
+    /// [`Printer::indentable_block_leads_value`] over this gap, as the caller resolved it.
+    pub(crate) indentable_leads_value: bool,
+}
+
 impl<'a> Printer<'a> {
     /// The [`internal::JsdocCast`] that leads `value`, or `None` — [`leading_jsdoc_cast_walk`]
     /// behind this document's owned-comment presence flag.
@@ -206,6 +220,141 @@ impl<'a> Printer<'a> {
         let doc = build();
         self.claimed_owned_comment_start.set(saved);
         doc
+    }
+
+    /// **Hoist the operator→value leading run OUT of the value's doc**, for the
+    /// `printAssignment` family — returning the run and the value's doc built with the
+    /// value's own claim suppressed.
+    ///
+    /// The reason the two are one call: emitting the run without suppressing DOUBLE-PRINTS
+    /// the comment, suppressing without emitting DROPS it (`docs/comments.md` hazard 1),
+    /// and the obligation `with_owned_comment_claimed_above` states — "some enclosing node
+    /// provably DOES claim it" — is discharged here by construction rather than by a
+    /// caller remembering to pair them.
+    ///
+    /// **Why hoist at all.** tsv's ownership is INNERMOST-wins
+    /// ([`Self::prepend_owned_leading_comment`]'s `left_spine_child` check), so on
+    /// `= /**⏎ * c⏎ */ b + c + d` the comment is claimed by `b` and travels *inside* the
+    /// binary group; its reprinted body is a `MultilineText`, which the layout memo answers
+    /// `LAYOUT_BREAKS_FORCED`, so the group breaks and a value prettier keeps flat explodes.
+    /// Prettier attaches such a comment to the OUTERMOST node starting there and its
+    /// `printComments` wraps the whole group, which is the shape the seam already builds
+    /// (`concat([comments_doc, right_doc])`) — the comment just never reached
+    /// `comments_doc`, because the seam's run is built on the **to emit** axis and that
+    /// axis skips owned comments by definition. Hoisting routes it there.
+    ///
+    /// The run is taken **on page**, so it carries the owned comment and any un-owned
+    /// sibling in one run — prettier prints every leading comment outside the value's
+    /// group, so a mixed run (`= /* c1 */ /**⏎ * c2 */ x`) must not be split across the two
+    /// emitters. `end` is the value's printed start, and the separator stays
+    /// `printLeadingComment`'s: a space where the author glued the value to the `*/`.
+    ///
+    /// ⚠️ **A JSDoc cast is excluded**: it prints its own copy from the `JsdocCast` node
+    /// (`build_jsdoc_cast_lead_doc`), so hoisting would print the comment twice — and its
+    /// value needs no hoist anyway, since the cast's retained parens already stand between
+    /// the comment and anything breakable.
+    ///
+    /// ⚠️ Scoped to the seams that ask `chooseLayout`'s fourth disjunct
+    /// ([`Self::indentable_block_leads_value`]). It is NOT a change to the general
+    /// ownership rule: everywhere else innermost-wins still holds, which is what keeps a
+    /// paren a *parent* synthesizes from landing between a comment and its own token. The
+    /// paren-less arrow reached the same place first and by the same means
+    /// (`build_arrow_params_doc_ungrouped`), which is why it is the one shape in this
+    /// family that was already flat.
+    pub(in crate::printer) fn hoist_owned_value_gap_run(
+        &self,
+        gap: ValueGap,
+        value: &Expression<'_>,
+        build_value: impl FnOnce() -> DocId,
+    ) -> (Option<DocId>, DocId) {
+        let run = self.hoisted_owned_value_gap_run_opt(gap, value);
+        (run, self.build_value_under_hoist(run, value, build_value))
+    }
+
+    /// The **other half of the hoist**: build `value`'s doc with its own claim suppressed
+    /// exactly when `run` is `Some` — the hoisted run that will print the comment instead.
+    ///
+    /// One spelling of the pairing rule, so the three seams that hoist cannot answer it
+    /// differently: suppressing where nothing hoisted is a DROP, hoisting without
+    /// suppressing is a DOUBLE-PRINT, and both have already happened once each in this
+    /// family. [`Self::hoist_owned_value_gap_run`] is the shape for a caller that can hand
+    /// its whole value build over as one closure; a cascade that picks among many arms
+    /// (the declarator, the object property's own-line arm) takes
+    /// [`Self::hoisted_owned_value_gap_run_opt`] and this together.
+    pub(in crate::printer) fn build_value_under_hoist(
+        &self,
+        run: Option<DocId>,
+        value: &Expression<'_>,
+        build_value: impl FnOnce() -> DocId,
+    ) -> DocId {
+        match run {
+            Some(_) => self.with_owned_comment_claimed_above(value.span().start, build_value),
+            None => build_value(),
+        }
+    }
+
+    /// The run half of [`Self::hoist_owned_value_gap_run`], for a cascade that cannot hand
+    /// its value build over as one closure — the declarator and the type alias each pick
+    /// among many arms.
+    ///
+    /// ⚠️ **A caller of this form owes the suppression itself**, through
+    /// [`Self::build_value_under_hoist`] — which is the pairing rule's one spelling, so
+    /// reach for it rather than calling `with_owned_comment_claimed_above` by hand.
+    /// `comments:audit` is the standing guard, but it only sees documents someone wrote.
+    ///
+    /// ⚠️ **The run this returns REPLACES the seam's own, never joins it.** Both are the
+    /// same gap's leading run and this is the wider (on-page) reading of it, so a caller
+    /// takes `hoisted.or(its_own)` — concatenating the two prints every un-owned comment in
+    /// the gap twice.
+    pub(in crate::printer) fn hoisted_owned_value_gap_run_opt(
+        &self,
+        gap: ValueGap,
+        value: &Expression<'_>,
+    ) -> Option<DocId> {
+        let ValueGap {
+            start: gap_start,
+            indentable_leads_value,
+        } = gap;
+        // The fourth disjunct is the whole licence for this hoist, so it is a field of the
+        // gap rather than a gate each caller writes: three seams spelled it three ways
+        // (`.then().flatten()` twice, a `.filter()` once) and a fourth could have forgotten
+        // it. Passed in rather than asked here because every caller resolves it behind a
+        // zero-comment fast gate of its own — re-asking would scan the gap of every
+        // assignment in the document.
+        if !indentable_leads_value {
+            return None;
+        }
+        // ⚠️ **Only a run this seam itself prints may be hoisted**, and the test for that
+        // is that the WHOLE run is glued through to the value
+        // ([`Printer::comment_run_glued_through`]). A gap holding anything the author gave
+        // its own line routes to a different emitter — the declarator's broke-after-`=` arm,
+        // its line-comment continuation, the property's own-line arm — each of which builds
+        // its own run on the emit axis and never reads the hoisted one, so suppressing the
+        // value's claim there leaves NOTHING printing the comment: a DROP
+        // (`docs/comments.md` hazard 1).
+        //
+        // ⚠️ It is deliberately NOT `comments_force_own_line_between`, which was the first
+        // spelling and is a different question — it asks whether the run forces the VALUE
+        // onto its own line, so it answers `false` for a run whose LAST comment is glued
+        // even when an earlier one stands on its own line (`= ⏎/* x */⏎⏎/* d1 */ /* d2⏎*/ v`).
+        // That gap takes the broke-after arm, and the hoist dropped its owned tail comment.
+        // Only `gaps:audit`'s injection found it: the shape needs a comment the author
+        // isolated AND a second one glued to the value, which no fixture in the tree spelled
+        // and which is invisible to a formatted corpus.
+        if !self.comment_run_glued_through(gap_start, value.span().start) {
+            return None;
+        }
+        // ⚠️ The cast test is the LEFT-SPINE one ([`Self::leading_jsdoc_cast`]), never a
+        // match on the value node: a cast at the base of a chain
+        // (`= /** @type {A} */ (x).y`) is the node the comment binds to, and a node-keyed
+        // test sees only the MemberExpression and hoists a run the cast then prints again —
+        // a DOUBLE-PRINT the nestled-cast fixture caught. Same reason
+        // `indentable_block_leads_value` is a gap question rather than a node one, and the
+        // same walk every other cast reading in this file goes through.
+        if self.leading_jsdoc_cast(value).is_some() {
+            return None;
+        }
+        self.build_hoisted_value_gap_comments_opt(gap_start, value.span().start)
     }
 
     /// Prepend the comment `expr` owns, glued to its own first token.

@@ -76,3 +76,38 @@ pub(in crate::printer) fn fluid_after_operator(
         d.indent_if_break(value, group_id),
     ])
 }
+
+/// The **un-indented twins** of the two markers above, for a caller that has already
+/// spent the continuation level itself.
+///
+/// A seam that wraps its whole operator→value region in one `d.indent` — the pre-`=`
+/// comment path of a type alias, via `Printer::build_continuation_indent` — has put the
+/// operator one level in already. A marker's own indent on top of that is a DOUBLE indent:
+/// the value's lines land one level deeper than the operator they hang from, and deeper
+/// than prettier puts them once it has relocated the comment. These yield the same shapes
+/// with that level dropped, so the value sits at the operator's own level.
+///
+/// They live here rather than inline at the seam so the four markers read as two pairs:
+/// the only difference within a pair is the indent, which is the whole question, and an
+/// arm reaching for the wrong half is visible on one screen. Pinned by
+/// `types/comments/type_alias_line_pre_equals_hang_prettier_divergence` (and its union
+/// sibling), whose null controls are the arms that HUG the operator — those spend no level
+/// of their own and ask nothing here.
+pub(in crate::printer) fn hang_after_operator_unindented(d: &DocArena, content: DocId) -> DocId {
+    d.group(d.concat(&[d.line(), content]))
+}
+
+/// The un-indented twin of [`fluid_after_operator`] — see
+/// [`hang_after_operator_unindented`] for when to reach for one. Both of the original's
+/// indents go: the marker group's and the value's conditional one.
+pub(in crate::printer) fn fluid_after_operator_unindented(
+    d: &DocArena,
+    value: DocId,
+    group_id: GroupId,
+) -> DocId {
+    d.concat(&[
+        d.group_with_id(d.line(), group_id),
+        d.line_suffix_boundary(),
+        value,
+    ])
+}
