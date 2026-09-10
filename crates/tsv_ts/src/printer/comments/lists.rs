@@ -14,6 +14,16 @@ use tsv_lang::comments_in_source_after_comment;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// Which side of an inline list-position block comment its separating space sits on —
+/// the one axis [`Printer::inline_block_comment_doc`]'s two callers disagree on.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InlineBlockSide {
+    /// `/*content*/ ` — the comment leads the item after it.
+    Leading,
+    /// ` /*content*/` — the comment trails the item before it.
+    Trailing,
+}
+
 /// How a separator binds the comments in its gap — the two per-separator axes
 /// [`Printer::push_gap_comments`]'s callers state (each explained there).
 #[derive(Clone, Copy)]
@@ -1887,23 +1897,56 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
     ) {
-        let d = self.d();
         for comment in self.comments_to_emit_between(start, end) {
             if comment.is_block {
-                // One text node (`/*content*/ `) — callers may pass `parts` as
-                // fill items, so the space can't split into its own node. The
-                // full span is the verbatim `/*content*/` (delimiters included).
-                let mut w = d.pool_writer();
-                w.push_str(comment.span.extract(self.source));
-                w.push(' ');
-                let doc = w.finish_text();
-                // A comment emission that can't route through `build_comment_doc` (the
-                // trailing space must share the node), so it tags its own ledger node.
-                #[cfg(feature = "comment_check")]
-                d.tag_comment_doc(doc, comment.span, self.source);
-                parts.push(doc);
+                parts.push(self.inline_block_comment_doc(comment, InlineBlockSide::Leading));
             }
         }
+    }
+
+    /// One inline list-position block comment plus its separating space, as **one** part.
+    ///
+    /// One part, not two: a caller may be filling a `fill`, whose parts alternate content
+    /// and separator, so a second `parts.push` would shift every pair after it. A `concat`
+    /// is one `DocId`, which is what lets the indentable arm below exist at all.
+    ///
+    /// ⚠️ An **indentable** multi-line block does not reprint as its own source span — its
+    /// continuation lines are re-indented to the emitting column
+    /// ([`Printer::build_comment_doc`]), which is what prettier does at every one of these
+    /// positions. Emitting the raw span left `A<T /** c⏎ */>` and the import-attribute key
+    /// gap printing the author's original column, a divergence **no formatted corpus can
+    /// see** — tsv's output is its own fixed point, so only an unformatted authoring
+    /// separates the two. Every other shape (single-line, and a *preserved* multi-line
+    /// block, whose interior is verbatim by definition) reprints as its span, so it keeps
+    /// the one-text-node form and the space fuses into it.
+    fn inline_block_comment_doc(
+        &self,
+        comment: &'a internal::Comment,
+        side: InlineBlockSide,
+    ) -> DocId {
+        let d = self.d();
+        if self.block_comment_is_indentable(comment) {
+            let comment_doc = self.build_comment_doc(comment);
+            let space = d.text(" ");
+            return match side {
+                InlineBlockSide::Leading => d.concat(&[comment_doc, space]),
+                InlineBlockSide::Trailing => d.concat(&[space, comment_doc]),
+            };
+        }
+        let mut w = d.pool_writer();
+        if side == InlineBlockSide::Trailing {
+            w.push(' ');
+        }
+        w.push_str(comment.span.extract(self.source));
+        if side == InlineBlockSide::Leading {
+            w.push(' ');
+        }
+        let doc = w.finish_text();
+        // A comment emission that can't route through `build_comment_doc` (the space
+        // must share the node), so it tags its own ledger node.
+        #[cfg(feature = "comment_check")]
+        d.tag_comment_doc(doc, comment.span, self.source);
+        doc
     }
 
     /// Append trailing inline block comments (` /*content*/` format) between two positions.
@@ -1916,21 +1959,9 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
     ) {
-        let d = self.d();
         for comment in self.comments_to_emit_between(start, end) {
             if comment.is_block {
-                // One text node (` /*content*/`) — callers may pass `parts` as
-                // fill items, so the space can't split into its own node. The
-                // full span is the verbatim `/*content*/` (delimiters included).
-                let mut w = d.pool_writer();
-                w.push(' ');
-                w.push_str(comment.span.extract(self.source));
-                let doc = w.finish_text();
-                // A comment emission that can't route through `build_comment_doc` (the
-                // leading space must share the node), so it tags its own ledger node.
-                #[cfg(feature = "comment_check")]
-                d.tag_comment_doc(doc, comment.span, self.source);
-                parts.push(doc);
+                parts.push(self.inline_block_comment_doc(comment, InlineBlockSide::Trailing));
             }
         }
     }

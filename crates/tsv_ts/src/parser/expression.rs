@@ -1976,12 +1976,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .iter()
             .rposition(|c| c.span.end == token_end)?;
         let c = &self.comments[idx];
-        let is_cast = c.is_block && {
-            let start = c.content_span.start as usize - self.base_offset;
-            let end = c.content_span.end as usize - self.base_offset;
-            is_jsdoc_type_cast_comment(&self.source[start..end])
-        };
-        is_cast.then_some(idx)
+        if !c.is_block {
+            return None;
+        }
+        // The text tested is the run's, not this comment's: two byte-adjacent indentable
+        // blocks are ONE comment, and prettier merges them (`mergeNestledJsdocComments`,
+        // run from `postprocess/index.js`) *ahead of* its `isTypeCastComment` scan — so
+        // `/** @type {T}⏎ *//** c⏎ */ (x)` is a cast whose marker sits in the head. The
+        // merged content is a plain source slice from the run's first `/*` to this
+        // comment's `*/` (`merge_nestled_block_comments`, which keeps the trailing
+        // entry's flags), so `idx` remains the comment the cast owns and prints.
+        let run_start =
+            tsv_lang::nestled_run_start(&self.comments, idx, |c| self.comment_content(c));
+        let start = self.comments[run_start].content_span.start as usize - self.base_offset;
+        let end = c.content_span.end as usize - self.base_offset;
+        is_jsdoc_type_cast_comment(&self.source[start..end]).then_some(idx)
+    }
+
+    /// A collected comment's content (delimiters excluded) as a slice of `self.source`.
+    ///
+    /// [`Comment::content`](tsv_lang::Comment::content) itself cannot serve: a comment's
+    /// spans are host coordinates while `self.source` is the island's local slice, so the
+    /// `base_offset` translation lives here rather than at each caller.
+    fn comment_content(&self, comment: &tsv_lang::Comment) -> &'a str {
+        let start = comment.content_span.start as usize - self.base_offset;
+        let end = comment.content_span.end as usize - self.base_offset;
+        &self.source[start..end]
     }
 
     /// Give the node beginning at `head_start` **ownership** of a leading comment glued
