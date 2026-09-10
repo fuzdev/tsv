@@ -677,6 +677,22 @@ impl<'a> Printer<'a> {
     }
 
     fn build_arg_expression_doc_uncached(&self, expr: &Expression<'_>) -> DocId {
+        self.build_value_with_outermost_owned_comment(expr, || {
+            self.build_arg_expression_doc_body(expr)
+        })
+    }
+
+    /// [`Self::build_arg_expression_doc_uncached`] under the seam's owned-comment claim.
+    ///
+    /// ⚠️ **The two binaryish arms below REASSEMBLE the chain** — they reach past
+    /// `build_expression_doc`, so the owned-comment seam never runs for the argument node
+    /// itself and the comment is claimed by the chain's leftmost LEAF instead, *inside* the
+    /// chain's group. A multi-line one then force-breaks a chain prettier keeps flat
+    /// (`calls/arg_multiline_block_comment_flat`,
+    /// `expressions/arrays/element_multiline_block_comment_flat` — array elements share this
+    /// builder). The wrapper above is the claim those arms owe, stated once here rather than
+    /// per arm.
+    fn build_arg_expression_doc_body(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
         // Assignment expressions need parens in argument context for clarity
         if self.needs_parens(expr, ParenContext::Argument) {

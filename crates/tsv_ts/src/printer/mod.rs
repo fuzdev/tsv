@@ -1505,21 +1505,21 @@ impl<'a> Printer<'a> {
     /// inside this range by construction.
     ///
     /// ⚠️ **The run this fires on is HOISTED out of the value's doc**
-    /// ([`Printer::hoist_owned_value_gap_run`]). Without that, a comment the value OWNS
-    /// travels *inside* its node's doc — tsv's ownership is innermost-wins — and its
-    /// reprinted body is a `MultilineText`, which the layout memo answers
-    /// `LAYOUT_BREAKS_FORCED`, so the value's own group broke and a value prettier keeps
-    /// flat exploded (`= /**⏎ * c⏎ */ b + c + d` broke the binary chain, `… */ f ? g : h`
-    /// the ternary, and the type alias's union gained a fabricated leading `|`). Prettier
-    /// attaches such a comment to the OUTERMOST node starting there and prints it outside
-    /// that group, which is the shape this seam already builds; the hoist is what routes
-    /// the comment into it. Pinned by
-    /// `expressions/assignment/operator_value_indentable_block_comment_flat`.
-    ///
-    /// ⚠️ The same propagation still reaches two seams OUTSIDE this family — a binding
-    /// default and an enum member, which correctly decline the hang and so never ask this
-    /// question. Their value's group still breaks under an owned indentable comment; the
-    /// hoist would apply unchanged, but each needs its own fixture cells first.
+    /// ([`Printer::hoist_owned_value_gap_run`]) — but by a WIDER licence than this
+    /// predicate, and the two must not be re-fused. A comment the value OWNS travels
+    /// *inside* its node's doc — tsv's ownership is innermost-wins — and its reprinted body
+    /// is a `MultilineText`, which the layout memo answers `LAYOUT_BREAKS_FORCED`, so the
+    /// value's own group broke and a value prettier keeps flat exploded
+    /// (`= /**⏎ * c⏎ */ b + c + d` broke the binary chain, `… */ f ? g : h` the ternary, and
+    /// the type alias's union gained a fabricated leading `|`). That is a property of the
+    /// comment being MULTI-LINE, which indentability merely implies, so the hoist asks for
+    /// a multi-line block and fires at every value gap — the binding default and the enum
+    /// member included, both of which decline the hang and so never reach this question.
+    /// Prettier attaches such a comment to the OUTERMOST node starting there and prints it
+    /// outside that group, which is the shape those seams already build; the hoist is what
+    /// routes the comment into it. Pinned by
+    /// `expressions/assignment/operator_value_indentable_block_comment_flat` and its
+    /// preserved-kind, binding-default and enum-member siblings.
     ///
     /// ⚠️ **Distinct from [`Self::comment_hangs_value_after_operator`]**, the gap's other
     /// hang rule, and NOT foldable into it: that one is prettier's
@@ -1530,8 +1530,9 @@ impl<'a> Printer<'a> {
     /// default (`AssignmentPattern` prints as a plain `[left, " = ", right]`) and an enum
     /// member. Asking it at a gap outside that family hangs values prettier leaves alone.
     ///
-    /// The *preserved* (non-indentable) multi-line block is the null control and needs no
-    /// rule of its own: its interior prints verbatim through `literalline`s, and the fits
+    /// The *preserved* (non-indentable) multi-line block is the null control **for the
+    /// hang** — it still takes the hoist, which is the wider question above — and needs no
+    /// rule of its own here: its interior prints verbatim through `literalline`s, and the fits
     /// walk charges its first line to the operator's line and ends the measure at its
     /// newline (`CachedWidth::HasNewline`), so the width-decided layouts place it exactly as
     /// prettier's opaque-string measure does — `const a = /* line1⏎line2 */ x;` stays when

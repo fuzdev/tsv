@@ -759,10 +759,35 @@ impl<'a> Printer<'a> {
         // (`docs/comments.md`) instead of hand-rolling the separator: every arm below is reached
         // only once `has_own_line_comment` declined, so no comment in the gap can satisfy
         // `comment_cannot_glue_to_operator`, and the mode's hug test is then unconditionally true.
+        // A MULTI-LINE block the BODY owns is glued to the body's first token and travels
+        // INSIDE its doc, so its reprinted body force-breaks the body's own group and a body
+        // prettier keeps flat explodes ([`Printer::hoist_owned_value_gap_run`] carries the
+        // why). The `=>`→body gap is a value gap like the `=` seams — it already marks
+        // itself one (`mark_jsdoc_cast_value_gap`) — so it hoists the same way: the run
+        // REPLACES the gap's own emitter below, and every arm that builds the body does so
+        // under the paired suppression (`build_value_under_hoist`), or the comment is
+        // dropped outright (`docs/comments.md` hazard 1).
+        //
+        // ⚠️ Declined for an INJECTED body: the expand-last paths pre-build the body doc
+        // elsewhere (`Printer::with_arrow_body_inject`), without this suppression, so the
+        // comment is already inside it and hoisting would print it twice.
+        let hoisted_run = self
+            .arrow_body_inject
+            .get()
+            .is_none_or(|(span, _)| span != body_start)
+            .then(|| self.hoisted_owned_value_gap_run_opt(arrow_end, expr))
+            .flatten();
+        let build_body = |build: &dyn Fn() -> DocId| -> DocId {
+            self.build_value_under_hoist(hoisted_run, expr, build)
+        };
+        // `or`, never a concat — the hoisted run is the same gap read on the wider
+        // (on-page) axis, so emitting both prints every un-owned comment in it twice.
         let gap_run = || {
-            has_post_arrow_comments
-                .then(|| self.build_rhs_comments_glued_opt(arrow_end, body_start))
-                .flatten()
+            hoisted_run.or_else(|| {
+                has_post_arrow_comments
+                    .then(|| self.build_rhs_comments_glued_opt(arrow_end, body_start))
+                    .flatten()
+            })
         };
 
         // ⚠️ These arms are ORDERED and the order is LOAD-BEARING — each is reached only
@@ -823,7 +848,7 @@ impl<'a> Printer<'a> {
                 if let Some(run) = gap_run() {
                     parts.push(run);
                 }
-                parts.push(self.build_arrow_body_doc(expr));
+                parts.push(build_body(&|| self.build_arrow_body_doc(expr)));
             }
         } else if is_arrow_body && (chain_should_break || self.in_stacked_arrow_chain.get()) {
             // Curried arrow chain - all arrows break without indent so they align:
@@ -837,8 +862,10 @@ impl<'a> Printer<'a> {
             //
             // The flag is already set when reached via `in_stacked_arrow_chain`, so
             // unconditionally setting it `true` for the body build is equivalent.
-            let body_doc = self.build_with_stacked_chain(true, || {
-                self.build_arrow_body_doc_with_leading(expr, gap_run())
+            let body_doc = build_body(&|| {
+                self.build_with_stacked_chain(true, || {
+                    self.build_arrow_body_doc_with_leading(expr, gap_run())
+                })
             });
             parts.push(d.concat(&[d.hardline(), body_doc]));
         } else if is_arrow_body && body_arrow_param_comment_forces_break {
@@ -849,8 +876,10 @@ impl<'a> Printer<'a> {
             // (a, // c) =>
             //     (b, // c) =>
             //     (c, // c) => {}
-            let body_doc = self.build_with_stacked_chain(true, || {
-                self.build_arrow_body_doc_with_leading(expr, gap_run())
+            let body_doc = build_body(&|| {
+                self.build_with_stacked_chain(true, || {
+                    self.build_arrow_body_doc_with_leading(expr, gap_run())
+                })
             });
             parts.push(d.indent_hardline(body_doc));
         } else if self.in_stacked_arrow_chain.get() {
@@ -859,8 +888,10 @@ impl<'a> Printer<'a> {
             // Reset flag so arrows inside the body (e.g. callback args) aren't
             // treated as part of the curried chain; restore to `true` (its value on
             // entry, since this arm is reached only when the flag is set) afterward.
-            let body_doc = self.build_with_stacked_chain(false, || {
-                self.build_arrow_body_doc_with_leading(expr, gap_run())
+            let body_doc = build_body(&|| {
+                self.build_with_stacked_chain(false, || {
+                    self.build_arrow_body_doc_with_leading(expr, gap_run())
+                })
             });
             parts.push(d.indent_hardline(body_doc));
         } else if matches!(expr, internal::Expression::ConditionalExpression(_))
@@ -892,7 +923,7 @@ impl<'a> Printer<'a> {
             {
                 doc
             } else {
-                self.build_expression_doc(expr)
+                build_body(&|| self.build_expression_doc(expr))
             };
             // This arm emits the paren tokens itself rather than going through
             // `build_arrow_body_doc`, so it prepends the run on its own seam — the same
@@ -947,7 +978,7 @@ impl<'a> Printer<'a> {
             // `printLeadingComment` `line`. An author blank after the run declines
             // inside the gate (a soft `line` cannot carry it; trails-the-opener is
             // vacuous here, as at the ternary arm) and keeps the glued path.
-            let body_doc = self.build_arrow_body_doc(expr);
+            let body_doc = build_body(&|| self.build_arrow_body_doc(expr));
             parts.push(
                 if let Some(run) = self.opener_trailing_broke_after_run(arrow_end, body_start) {
                     self.hang_after_operator_run_doc(&run, body_doc)

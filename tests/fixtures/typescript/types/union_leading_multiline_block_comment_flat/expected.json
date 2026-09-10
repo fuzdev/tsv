@@ -1,0 +1,5018 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2114,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multi-line block comment in a value seam's gap binds to the UNION, not to its",
+			"start": 20,
+			"end": 102,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " first member, so prettier prints it outside the union's group: a union that fits",
+			"start": 104,
+			"end": 187,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " stays flat below the comment and gains no leading `|`. Both multi-line kinds ask",
+			"start": 189,
+			"end": 272,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same question, and every seam that hands its gap run into the union answers it",
+			"start": 274,
+			"end": 359,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same way — the cells below are a census of those seams. (The two pipe variants",
+			"start": 361,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " carry the first seven; repeating them at every seam adds no claim this fixture does",
+			"start": 448,
+			"end": 534,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " not already make, and the extra authorings reach a broke-after bug of their own.)",
+			"start": 536,
+			"end": 620,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " annotation `:`",
+			"start": 623,
+			"end": 640,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 652,
+			"end": 661,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " annotation `:`, indentable kind",
+			"start": 675,
+			"end": 709,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 721,
+			"end": 737,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " return type",
+			"start": 751,
+			"end": 765,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 784,
+			"end": 793,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " type argument `<`",
+			"start": 835,
+			"end": 855,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 874,
+			"end": 883,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a paren the printer strips",
+			"start": 900,
+			"end": 929,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 945,
+			"end": 954,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " conditional `extends`",
+			"start": 973,
+			"end": 997,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1024,
+			"end": 1033,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 2
+				},
+				"end": {
+					"line": 43,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " property signature `:`",
+			"start": 1059,
+			"end": 1084,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 1
+				},
+				"end": {
+					"line": 47,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1106,
+			"end": 1115,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 3
+				},
+				"end": {
+					"line": 51,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `as`",
+			"start": 1133,
+			"end": 1140,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 1
+				},
+				"end": {
+					"line": 54,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1161,
+			"end": 1170,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 2
+				},
+				"end": {
+					"line": 57,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `satisfies`",
+			"start": 1184,
+			"end": 1198,
+			"loc": {
+				"start": {
+					"line": 59,
+					"column": 1
+				},
+				"end": {
+					"line": 59,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1226,
+			"end": 1235,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 2
+				},
+				"end": {
+					"line": 62,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " type alias `=`",
+			"start": 1249,
+			"end": 1266,
+			"loc": {
+				"start": {
+					"line": 64,
+					"column": 1
+				},
+				"end": {
+					"line": 64,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1280,
+			"end": 1289,
+			"loc": {
+				"start": {
+					"line": 66,
+					"column": 2
+				},
+				"end": {
+					"line": 67,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " function-type return `=>`",
+			"start": 1303,
+			"end": 1331,
+			"loc": {
+				"start": {
+					"line": 69,
+					"column": 1
+				},
+				"end": {
+					"line": 69,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1351,
+			"end": 1360,
+			"loc": {
+				"start": {
+					"line": 71,
+					"column": 2
+				},
+				"end": {
+					"line": 72,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " index signature value",
+			"start": 1374,
+			"end": 1398,
+			"loc": {
+				"start": {
+					"line": 74,
+					"column": 1
+				},
+				"end": {
+					"line": 74,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1430,
+			"end": 1439,
+			"loc": {
+				"start": {
+					"line": 77,
+					"column": 3
+				},
+				"end": {
+					"line": 78,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " mapped-type value",
+			"start": 1457,
+			"end": 1477,
+			"loc": {
+				"start": {
+					"line": 81,
+					"column": 1
+				},
+				"end": {
+					"line": 81,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1511,
+			"end": 1520,
+			"loc": {
+				"start": {
+					"line": 84,
+					"column": 3
+				},
+				"end": {
+					"line": 85,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tuple member",
+			"start": 1538,
+			"end": 1553,
+			"loc": {
+				"start": {
+					"line": 88,
+					"column": 1
+				},
+				"end": {
+					"line": 88,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1569,
+			"end": 1578,
+			"loc": {
+				"start": {
+					"line": 90,
+					"column": 2
+				},
+				"end": {
+					"line": 91,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " type-parameter constraint",
+			"start": 1595,
+			"end": 1623,
+			"loc": {
+				"start": {
+					"line": 94,
+					"column": 1
+				},
+				"end": {
+					"line": 94,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1650,
+			"end": 1659,
+			"loc": {
+				"start": {
+					"line": 97,
+					"column": 3
+				},
+				"end": {
+					"line": 98,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " type-parameter default",
+			"start": 1680,
+			"end": 1705,
+			"loc": {
+				"start": {
+					"line": 101,
+					"column": 1
+				},
+				"end": {
+					"line": 101,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1726,
+			"end": 1735,
+			"loc": {
+				"start": {
+					"line": 104,
+					"column": 3
+				},
+				"end": {
+					"line": 105,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " null control: a single-line block binds to the first member instead",
+			"start": 1756,
+			"end": 1826,
+			"loc": {
+				"start": {
+					"line": 108,
+					"column": 1
+				},
+				"end": {
+					"line": 108,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1839,
+			"end": 1846,
+			"loc": {
+				"start": {
+					"line": 109,
+					"column": 12
+				},
+				"end": {
+					"line": 109,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " null control: an intersection is unaffected",
+			"start": 1860,
+			"end": 1906,
+			"loc": {
+				"start": {
+					"line": 111,
+					"column": 1
+				},
+				"end": {
+					"line": 111,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 1919,
+			"end": 1928,
+			"loc": {
+				"start": {
+					"line": 112,
+					"column": 12
+				},
+				"end": {
+					"line": 113,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " null control: no comment",
+			"start": 1942,
+			"end": 1969,
+			"loc": {
+				"start": {
+					"line": 115,
+					"column": 1
+				},
+				"end": {
+					"line": 115,
+					"column": 28
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2113,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 2104,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 120,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 642,
+					"end": 672,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 646,
+							"end": 671,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 5
+								},
+								"end": {
+									"line": 13,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 646,
+								"end": 671,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 5
+									},
+									"end": {
+										"line": 13,
+										"column": 14
+									}
+								},
+								"name": "v1",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 648,
+									"end": 671,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 7
+										},
+										"end": {
+											"line": 13,
+											"column": 14
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 662,
+										"end": 671,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 5
+											},
+											"end": {
+												"line": 13,
+												"column": 14
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 662,
+												"end": 665,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 5
+													},
+													"end": {
+														"line": 13,
+														"column": 8
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 662,
+													"end": 665,
+													"loc": {
+														"start": {
+															"line": 13,
+															"column": 5
+														},
+														"end": {
+															"line": 13,
+															"column": 8
+														}
+													},
+													"name": "Ooo"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 668,
+												"end": 671,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 11
+													},
+													"end": {
+														"line": 13,
+														"column": 14
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 668,
+													"end": 671,
+													"loc": {
+														"start": {
+															"line": 13,
+															"column": 11
+														},
+														"end": {
+															"line": 13,
+															"column": 14
+														}
+													},
+													"name": "Ppp"
+												}
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c\nd ",
+												"start": 652,
+												"end": 661
+											}
+										]
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block comment in a value seam's gap binds to the UNION, not to its",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " first member, so prettier prints it outside the union's group: a union that fits",
+							"start": 104,
+							"end": 187
+						},
+						{
+							"type": "Line",
+							"value": " stays flat below the comment and gains no leading `|`. Both multi-line kinds ask",
+							"start": 189,
+							"end": 272
+						},
+						{
+							"type": "Line",
+							"value": " the same question, and every seam that hands its gap run into the union answers it",
+							"start": 274,
+							"end": 359
+						},
+						{
+							"type": "Line",
+							"value": " the same way — the cells below are a census of those seams. (The two pipe variants",
+							"start": 361,
+							"end": 446
+						},
+						{
+							"type": "Line",
+							"value": " carry the first seven; repeating them at every seam adds no claim this fixture does",
+							"start": 448,
+							"end": 534
+						},
+						{
+							"type": "Line",
+							"value": " not already make, and the extra authorings reach a broke-after bug of their own.)",
+							"start": 536,
+							"end": 620
+						},
+						{
+							"type": "Line",
+							"value": " annotation `:`",
+							"start": 623,
+							"end": 640
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 711,
+					"end": 748,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 715,
+							"end": 747,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 5
+								},
+								"end": {
+									"line": 19,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 715,
+								"end": 747,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 5
+									},
+									"end": {
+										"line": 19,
+										"column": 15
+									}
+								},
+								"name": "v2",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 717,
+									"end": 747,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 7
+										},
+										"end": {
+											"line": 19,
+											"column": 15
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 738,
+										"end": 747,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 6
+											},
+											"end": {
+												"line": 19,
+												"column": 15
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 738,
+												"end": 741,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 6
+													},
+													"end": {
+														"line": 19,
+														"column": 9
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 738,
+													"end": 741,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 6
+														},
+														"end": {
+															"line": 19,
+															"column": 9
+														}
+													},
+													"name": "Ooo"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 744,
+												"end": 747,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 12
+													},
+													"end": {
+														"line": 19,
+														"column": 15
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 744,
+													"end": 747,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 12
+														},
+														"end": {
+															"line": 19,
+															"column": 15
+														}
+													},
+													"name": "Ppp"
+												}
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": "*\n * c\n ",
+												"start": 721,
+												"end": 737
+											}
+										]
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " annotation `:`, indentable kind",
+							"start": 675,
+							"end": 709
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 767,
+					"end": 832,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 776,
+						"end": 778,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 10
+							},
+							"end": {
+								"line": 22,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 780,
+						"end": 803,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 14
+							},
+							"end": {
+								"line": 24,
+								"column": 14
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 794,
+							"end": 803,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 5
+								},
+								"end": {
+									"line": 24,
+									"column": 14
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 794,
+									"end": 797,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 5
+										},
+										"end": {
+											"line": 24,
+											"column": 8
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 794,
+										"end": 797,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 5
+											},
+											"end": {
+												"line": 24,
+												"column": 8
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 800,
+									"end": 803,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 11
+										},
+										"end": {
+											"line": 24,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 800,
+										"end": 803,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 11
+											},
+											"end": {
+												"line": 24,
+												"column": 14
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c\nd ",
+									"start": 784,
+									"end": 793
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 804,
+						"end": 832,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 15
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 808,
+								"end": 829,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 23
+									}
+								},
+								"argument": {
+									"type": "TSAsExpression",
+									"start": 815,
+									"end": 828,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 9
+										},
+										"end": {
+											"line": 25,
+											"column": 22
+										}
+									},
+									"expression": {
+										"type": "Literal",
+										"start": 815,
+										"end": 819,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 9
+											},
+											"end": {
+												"line": 25,
+												"column": 13
+											}
+										},
+										"value": null,
+										"raw": "null"
+									},
+									"typeAnnotation": {
+										"type": "TSNeverKeyword",
+										"start": 823,
+										"end": 828,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 17
+											},
+											"end": {
+												"line": 25,
+												"column": 22
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " return type",
+							"start": 751,
+							"end": 765
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 857,
+					"end": 897,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 862,
+						"end": 864,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 6
+							},
+							"end": {
+								"line": 29,
+								"column": 8
+							}
+						},
+						"name": "T1"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 867,
+						"end": 896,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 11
+							},
+							"end": {
+								"line": 32,
+								"column": 2
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 867,
+							"end": 870,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 11
+								},
+								"end": {
+									"line": 29,
+									"column": 14
+								}
+							},
+							"name": "Box"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 870,
+							"end": 896,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 14
+								},
+								"end": {
+									"line": 32,
+									"column": 2
+								}
+							},
+							"params": [
+								{
+									"type": "TSUnionType",
+									"start": 884,
+									"end": 893,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 5
+										},
+										"end": {
+											"line": 31,
+											"column": 14
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 884,
+											"end": 887,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 5
+												},
+												"end": {
+													"line": 31,
+													"column": 8
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 884,
+												"end": 887,
+												"loc": {
+													"start": {
+														"line": 31,
+														"column": 5
+													},
+													"end": {
+														"line": 31,
+														"column": 8
+													}
+												},
+												"name": "Ooo"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 890,
+											"end": 893,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 11
+												},
+												"end": {
+													"line": 31,
+													"column": 14
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 890,
+												"end": 893,
+												"loc": {
+													"start": {
+														"line": 31,
+														"column": 11
+													},
+													"end": {
+														"line": 31,
+														"column": 14
+													}
+												},
+												"name": "Ppp"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nd ",
+											"start": 874,
+											"end": 883
+										}
+									]
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " type argument `<`",
+							"start": 835,
+							"end": 855
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 931,
+					"end": 970,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 936,
+						"end": 938,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 6
+							},
+							"end": {
+								"line": 35,
+								"column": 8
+							}
+						},
+						"name": "T2"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 941,
+						"end": 969,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 11
+							},
+							"end": {
+								"line": 38,
+								"column": 4
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 941,
+							"end": 967,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 11
+								},
+								"end": {
+									"line": 38,
+									"column": 2
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 955,
+								"end": 964,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 5
+									},
+									"end": {
+										"line": 37,
+										"column": 14
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 955,
+										"end": 958,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 5
+											},
+											"end": {
+												"line": 37,
+												"column": 8
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 955,
+											"end": 958,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 5
+												},
+												"end": {
+													"line": 37,
+													"column": 8
+												}
+											},
+											"name": "Ooo"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 961,
+										"end": 964,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 11
+											},
+											"end": {
+												"line": 37,
+												"column": 14
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 961,
+											"end": 964,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 11
+												},
+												"end": {
+													"line": 37,
+													"column": 14
+												}
+											},
+											"name": "Ppp"
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c\nd ",
+										"start": 945,
+										"end": 954
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a paren the printer strips",
+							"start": 900,
+							"end": 929
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 999,
+					"end": 1056,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 45,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1004,
+						"end": 1006,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 6
+							},
+							"end": {
+								"line": 41,
+								"column": 8
+							}
+						},
+						"name": "T3"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 1006,
+						"end": 1009,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 8
+							},
+							"end": {
+								"line": 41,
+								"column": 11
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 1007,
+								"end": 1008,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 9
+									},
+									"end": {
+										"line": 41,
+										"column": 10
+									}
+								},
+								"name": "X"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 1012,
+						"end": 1055,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 14
+							},
+							"end": {
+								"line": 45,
+								"column": 5
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 1012,
+							"end": 1013,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 14
+								},
+								"end": {
+									"line": 41,
+									"column": 15
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 1012,
+								"end": 1013,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 14
+									},
+									"end": {
+										"line": 41,
+										"column": 15
+									}
+								},
+								"name": "X"
+							}
+						},
+						"extendsType": {
+							"type": "TSUnionType",
+							"start": 1034,
+							"end": 1043,
+							"loc": {
+								"start": {
+									"line": 43,
+									"column": 5
+								},
+								"end": {
+									"line": 43,
+									"column": 14
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 1034,
+									"end": 1037,
+									"loc": {
+										"start": {
+											"line": 43,
+											"column": 5
+										},
+										"end": {
+											"line": 43,
+											"column": 8
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 1034,
+										"end": 1037,
+										"loc": {
+											"start": {
+												"line": 43,
+												"column": 5
+											},
+											"end": {
+												"line": 43,
+												"column": 8
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 1040,
+									"end": 1043,
+									"loc": {
+										"start": {
+											"line": 43,
+											"column": 11
+										},
+										"end": {
+											"line": 43,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 1040,
+										"end": 1043,
+										"loc": {
+											"start": {
+												"line": 43,
+												"column": 11
+											},
+											"end": {
+												"line": 43,
+												"column": 14
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c\nd ",
+									"start": 1024,
+									"end": 1033
+								}
+							]
+						},
+						"trueType": {
+							"type": "TSLiteralType",
+							"start": 1048,
+							"end": 1049,
+							"loc": {
+								"start": {
+									"line": 44,
+									"column": 4
+								},
+								"end": {
+									"line": 44,
+									"column": 5
+								}
+							},
+							"literal": {
+								"type": "Literal",
+								"start": 1048,
+								"end": 1049,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 4
+									},
+									"end": {
+										"line": 44,
+										"column": 5
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						"falseType": {
+							"type": "TSLiteralType",
+							"start": 1054,
+							"end": 1055,
+							"loc": {
+								"start": {
+									"line": 45,
+									"column": 4
+								},
+								"end": {
+									"line": 45,
+									"column": 5
+								}
+							},
+							"literal": {
+								"type": "Literal",
+								"start": 1054,
+								"end": 1055,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 4
+									},
+									"end": {
+										"line": 45,
+										"column": 5
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " conditional `extends`",
+							"start": 973,
+							"end": 997
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1086,
+					"end": 1130,
+					"loc": {
+						"start": {
+							"line": 48,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1091,
+						"end": 1093,
+						"loc": {
+							"start": {
+								"line": 48,
+								"column": 6
+							},
+							"end": {
+								"line": 48,
+								"column": 8
+							}
+						},
+						"name": "T4"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 1096,
+						"end": 1129,
+						"loc": {
+							"start": {
+								"line": 48,
+								"column": 11
+							},
+							"end": {
+								"line": 52,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 1100,
+								"end": 1126,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 2
+									},
+									"end": {
+										"line": 51,
+										"column": 15
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 1100,
+									"end": 1101,
+									"loc": {
+										"start": {
+											"line": 49,
+											"column": 2
+										},
+										"end": {
+											"line": 49,
+											"column": 3
+										}
+									},
+									"name": "k"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1101,
+									"end": 1125,
+									"loc": {
+										"start": {
+											"line": 49,
+											"column": 3
+										},
+										"end": {
+											"line": 51,
+											"column": 14
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 1116,
+										"end": 1125,
+										"loc": {
+											"start": {
+												"line": 51,
+												"column": 5
+											},
+											"end": {
+												"line": 51,
+												"column": 14
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 1116,
+												"end": 1119,
+												"loc": {
+													"start": {
+														"line": 51,
+														"column": 5
+													},
+													"end": {
+														"line": 51,
+														"column": 8
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1116,
+													"end": 1119,
+													"loc": {
+														"start": {
+															"line": 51,
+															"column": 5
+														},
+														"end": {
+															"line": 51,
+															"column": 8
+														}
+													},
+													"name": "Ooo"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 1122,
+												"end": 1125,
+												"loc": {
+													"start": {
+														"line": 51,
+														"column": 11
+													},
+													"end": {
+														"line": 51,
+														"column": 14
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1122,
+													"end": 1125,
+													"loc": {
+														"start": {
+															"line": 51,
+															"column": 11
+														},
+														"end": {
+															"line": 51,
+															"column": 14
+														}
+													},
+													"name": "Ppp"
+												}
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c\nd ",
+												"start": 1106,
+												"end": 1115
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " property signature `:`",
+							"start": 1059,
+							"end": 1084
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1142,
+					"end": 1181,
+					"loc": {
+						"start": {
+							"line": 55,
+							"column": 1
+						},
+						"end": {
+							"line": 57,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1148,
+							"end": 1180,
+							"loc": {
+								"start": {
+									"line": 55,
+									"column": 7
+								},
+								"end": {
+									"line": 57,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1148,
+								"end": 1150,
+								"loc": {
+									"start": {
+										"line": 55,
+										"column": 7
+									},
+									"end": {
+										"line": 55,
+										"column": 9
+									}
+								},
+								"name": "a1"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 1153,
+								"end": 1180,
+								"loc": {
+									"start": {
+										"line": 55,
+										"column": 12
+									},
+									"end": {
+										"line": 57,
+										"column": 14
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 1153,
+									"end": 1155,
+									"loc": {
+										"start": {
+											"line": 55,
+											"column": 12
+										},
+										"end": {
+											"line": 55,
+											"column": 14
+										}
+									},
+									"name": "v1"
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 1171,
+									"end": 1180,
+									"loc": {
+										"start": {
+											"line": 57,
+											"column": 5
+										},
+										"end": {
+											"line": 57,
+											"column": 14
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 1171,
+											"end": 1174,
+											"loc": {
+												"start": {
+													"line": 57,
+													"column": 5
+												},
+												"end": {
+													"line": 57,
+													"column": 8
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1171,
+												"end": 1174,
+												"loc": {
+													"start": {
+														"line": 57,
+														"column": 5
+													},
+													"end": {
+														"line": 57,
+														"column": 8
+													}
+												},
+												"name": "Ooo"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 1177,
+											"end": 1180,
+											"loc": {
+												"start": {
+													"line": 57,
+													"column": 11
+												},
+												"end": {
+													"line": 57,
+													"column": 14
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1177,
+												"end": 1180,
+												"loc": {
+													"start": {
+														"line": 57,
+														"column": 11
+													},
+													"end": {
+														"line": 57,
+														"column": 14
+													}
+												},
+												"name": "Ppp"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nd ",
+											"start": 1161,
+											"end": 1170
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `as`",
+							"start": 1133,
+							"end": 1140
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1200,
+					"end": 1246,
+					"loc": {
+						"start": {
+							"line": 60,
+							"column": 1
+						},
+						"end": {
+							"line": 62,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1206,
+							"end": 1245,
+							"loc": {
+								"start": {
+									"line": 60,
+									"column": 7
+								},
+								"end": {
+									"line": 62,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1206,
+								"end": 1208,
+								"loc": {
+									"start": {
+										"line": 60,
+										"column": 7
+									},
+									"end": {
+										"line": 60,
+										"column": 9
+									}
+								},
+								"name": "a2"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 1211,
+								"end": 1245,
+								"loc": {
+									"start": {
+										"line": 60,
+										"column": 12
+									},
+									"end": {
+										"line": 62,
+										"column": 14
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 1211,
+									"end": 1213,
+									"loc": {
+										"start": {
+											"line": 60,
+											"column": 12
+										},
+										"end": {
+											"line": 60,
+											"column": 14
+										}
+									},
+									"name": "v1"
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 1236,
+									"end": 1245,
+									"loc": {
+										"start": {
+											"line": 62,
+											"column": 5
+										},
+										"end": {
+											"line": 62,
+											"column": 14
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 1236,
+											"end": 1239,
+											"loc": {
+												"start": {
+													"line": 62,
+													"column": 5
+												},
+												"end": {
+													"line": 62,
+													"column": 8
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1236,
+												"end": 1239,
+												"loc": {
+													"start": {
+														"line": 62,
+														"column": 5
+													},
+													"end": {
+														"line": 62,
+														"column": 8
+													}
+												},
+												"name": "Ooo"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 1242,
+											"end": 1245,
+											"loc": {
+												"start": {
+													"line": 62,
+													"column": 11
+												},
+												"end": {
+													"line": 62,
+													"column": 14
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1242,
+												"end": 1245,
+												"loc": {
+													"start": {
+														"line": 62,
+														"column": 11
+													},
+													"end": {
+														"line": 62,
+														"column": 14
+													}
+												},
+												"name": "Ppp"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nd ",
+											"start": 1226,
+											"end": 1235
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `satisfies`",
+							"start": 1184,
+							"end": 1198
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1268,
+					"end": 1300,
+					"loc": {
+						"start": {
+							"line": 65,
+							"column": 1
+						},
+						"end": {
+							"line": 67,
+							"column": 15
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1273,
+						"end": 1275,
+						"loc": {
+							"start": {
+								"line": 65,
+								"column": 6
+							},
+							"end": {
+								"line": 65,
+								"column": 8
+							}
+						},
+						"name": "T5"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1290,
+						"end": 1299,
+						"loc": {
+							"start": {
+								"line": 67,
+								"column": 5
+							},
+							"end": {
+								"line": 67,
+								"column": 14
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1290,
+								"end": 1293,
+								"loc": {
+									"start": {
+										"line": 67,
+										"column": 5
+									},
+									"end": {
+										"line": 67,
+										"column": 8
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1290,
+									"end": 1293,
+									"loc": {
+										"start": {
+											"line": 67,
+											"column": 5
+										},
+										"end": {
+											"line": 67,
+											"column": 8
+										}
+									},
+									"name": "Ooo"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1296,
+								"end": 1299,
+								"loc": {
+									"start": {
+										"line": 67,
+										"column": 11
+									},
+									"end": {
+										"line": 67,
+										"column": 14
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1296,
+									"end": 1299,
+									"loc": {
+										"start": {
+											"line": 67,
+											"column": 11
+										},
+										"end": {
+											"line": 67,
+											"column": 14
+										}
+									},
+									"name": "Ppp"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c\nd ",
+								"start": 1280,
+								"end": 1289
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " type alias `=`",
+							"start": 1249,
+							"end": 1266
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1333,
+					"end": 1371,
+					"loc": {
+						"start": {
+							"line": 70,
+							"column": 1
+						},
+						"end": {
+							"line": 72,
+							"column": 15
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1338,
+						"end": 1340,
+						"loc": {
+							"start": {
+								"line": 70,
+								"column": 6
+							},
+							"end": {
+								"line": 70,
+								"column": 8
+							}
+						},
+						"name": "T6"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 1343,
+						"end": 1370,
+						"loc": {
+							"start": {
+								"line": 70,
+								"column": 11
+							},
+							"end": {
+								"line": 72,
+								"column": 14
+							}
+						},
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 1346,
+							"end": 1370,
+							"loc": {
+								"start": {
+									"line": 70,
+									"column": 14
+								},
+								"end": {
+									"line": 72,
+									"column": 14
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 1361,
+								"end": 1370,
+								"loc": {
+									"start": {
+										"line": 72,
+										"column": 5
+									},
+									"end": {
+										"line": 72,
+										"column": 14
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 1361,
+										"end": 1364,
+										"loc": {
+											"start": {
+												"line": 72,
+												"column": 5
+											},
+											"end": {
+												"line": 72,
+												"column": 8
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1361,
+											"end": 1364,
+											"loc": {
+												"start": {
+													"line": 72,
+													"column": 5
+												},
+												"end": {
+													"line": 72,
+													"column": 8
+												}
+											},
+											"name": "Ooo"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 1367,
+										"end": 1370,
+										"loc": {
+											"start": {
+												"line": 72,
+												"column": 11
+											},
+											"end": {
+												"line": 72,
+												"column": 14
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1367,
+											"end": 1370,
+											"loc": {
+												"start": {
+													"line": 72,
+													"column": 11
+												},
+												"end": {
+													"line": 72,
+													"column": 14
+												}
+											},
+											"name": "Ppp"
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c\nd ",
+										"start": 1351,
+										"end": 1360
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " function-type return `=>`",
+							"start": 1303,
+							"end": 1331
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1400,
+					"end": 1454,
+					"loc": {
+						"start": {
+							"line": 75,
+							"column": 1
+						},
+						"end": {
+							"line": 79,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1405,
+						"end": 1407,
+						"loc": {
+							"start": {
+								"line": 75,
+								"column": 6
+							},
+							"end": {
+								"line": 75,
+								"column": 8
+							}
+						},
+						"name": "T7"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 1410,
+						"end": 1453,
+						"loc": {
+							"start": {
+								"line": 75,
+								"column": 11
+							},
+							"end": {
+								"line": 79,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSIndexSignature",
+								"start": 1414,
+								"end": 1450,
+								"loc": {
+									"start": {
+										"line": 76,
+										"column": 2
+									},
+									"end": {
+										"line": 78,
+										"column": 15
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 1415,
+										"end": 1424,
+										"loc": {
+											"start": {
+												"line": 76,
+												"column": 3
+											},
+											"end": {
+												"line": 76,
+												"column": 12
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 1416,
+											"end": 1424,
+											"loc": {
+												"start": {
+													"line": 76,
+													"column": 4
+												},
+												"end": {
+													"line": 76,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 1418,
+												"end": 1424,
+												"loc": {
+													"start": {
+														"line": 76,
+														"column": 6
+													},
+													"end": {
+														"line": 76,
+														"column": 12
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1425,
+									"end": 1449,
+									"loc": {
+										"start": {
+											"line": 76,
+											"column": 13
+										},
+										"end": {
+											"line": 78,
+											"column": 14
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 1440,
+										"end": 1449,
+										"loc": {
+											"start": {
+												"line": 78,
+												"column": 5
+											},
+											"end": {
+												"line": 78,
+												"column": 14
+											}
+										},
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 1440,
+												"end": 1443,
+												"loc": {
+													"start": {
+														"line": 78,
+														"column": 5
+													},
+													"end": {
+														"line": 78,
+														"column": 8
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1440,
+													"end": 1443,
+													"loc": {
+														"start": {
+															"line": 78,
+															"column": 5
+														},
+														"end": {
+															"line": 78,
+															"column": 8
+														}
+													},
+													"name": "Ooo"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 1446,
+												"end": 1449,
+												"loc": {
+													"start": {
+														"line": 78,
+														"column": 11
+													},
+													"end": {
+														"line": 78,
+														"column": 14
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1446,
+													"end": 1449,
+													"loc": {
+														"start": {
+															"line": 78,
+															"column": 11
+														},
+														"end": {
+															"line": 78,
+															"column": 14
+														}
+													},
+													"name": "Ppp"
+												}
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c\nd ",
+												"start": 1430,
+												"end": 1439
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " index signature value",
+							"start": 1374,
+							"end": 1398
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1479,
+					"end": 1535,
+					"loc": {
+						"start": {
+							"line": 82,
+							"column": 1
+						},
+						"end": {
+							"line": 86,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1484,
+						"end": 1486,
+						"loc": {
+							"start": {
+								"line": 82,
+								"column": 6
+							},
+							"end": {
+								"line": 82,
+								"column": 8
+							}
+						},
+						"name": "T8"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 1489,
+						"end": 1534,
+						"loc": {
+							"start": {
+								"line": 82,
+								"column": 11
+							},
+							"end": {
+								"line": 86,
+								"column": 2
+							}
+						},
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 1494,
+							"end": 1505,
+							"loc": {
+								"start": {
+									"line": 83,
+									"column": 3
+								},
+								"end": {
+									"line": 83,
+									"column": 14
+								}
+							},
+							"name": "K",
+							"constraint": {
+								"type": "TSStringKeyword",
+								"start": 1499,
+								"end": 1505,
+								"loc": {
+									"start": {
+										"line": 83,
+										"column": 8
+									},
+									"end": {
+										"line": 83,
+										"column": 14
+									}
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 1521,
+							"end": 1530,
+							"loc": {
+								"start": {
+									"line": 85,
+									"column": 5
+								},
+								"end": {
+									"line": 85,
+									"column": 14
+								}
+							},
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 1521,
+									"end": 1524,
+									"loc": {
+										"start": {
+											"line": 85,
+											"column": 5
+										},
+										"end": {
+											"line": 85,
+											"column": 8
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 1521,
+										"end": 1524,
+										"loc": {
+											"start": {
+												"line": 85,
+												"column": 5
+											},
+											"end": {
+												"line": 85,
+												"column": 8
+											}
+										},
+										"name": "Ooo"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 1527,
+									"end": 1530,
+									"loc": {
+										"start": {
+											"line": 85,
+											"column": 11
+										},
+										"end": {
+											"line": 85,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 1527,
+										"end": 1530,
+										"loc": {
+											"start": {
+												"line": 85,
+												"column": 11
+											},
+											"end": {
+												"line": 85,
+												"column": 14
+											}
+										},
+										"name": "Ppp"
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c\nd ",
+									"start": 1511,
+									"end": 1520
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " mapped-type value",
+							"start": 1457,
+							"end": 1477
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1555,
+					"end": 1592,
+					"loc": {
+						"start": {
+							"line": 89,
+							"column": 1
+						},
+						"end": {
+							"line": 92,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1560,
+						"end": 1562,
+						"loc": {
+							"start": {
+								"line": 89,
+								"column": 6
+							},
+							"end": {
+								"line": 89,
+								"column": 8
+							}
+						},
+						"name": "T9"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 1565,
+						"end": 1591,
+						"loc": {
+							"start": {
+								"line": 89,
+								"column": 11
+							},
+							"end": {
+								"line": 92,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSUnionType",
+								"start": 1579,
+								"end": 1588,
+								"loc": {
+									"start": {
+										"line": 91,
+										"column": 5
+									},
+									"end": {
+										"line": 91,
+										"column": 14
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 1579,
+										"end": 1582,
+										"loc": {
+											"start": {
+												"line": 91,
+												"column": 5
+											},
+											"end": {
+												"line": 91,
+												"column": 8
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1579,
+											"end": 1582,
+											"loc": {
+												"start": {
+													"line": 91,
+													"column": 5
+												},
+												"end": {
+													"line": 91,
+													"column": 8
+												}
+											},
+											"name": "Ooo"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 1585,
+										"end": 1588,
+										"loc": {
+											"start": {
+												"line": 91,
+												"column": 11
+											},
+											"end": {
+												"line": 91,
+												"column": 14
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1585,
+											"end": 1588,
+											"loc": {
+												"start": {
+													"line": 91,
+													"column": 11
+												},
+												"end": {
+													"line": 91,
+													"column": 14
+												}
+											},
+											"name": "Ppp"
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c\nd ",
+										"start": 1569,
+										"end": 1578
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " tuple member",
+							"start": 1538,
+							"end": 1553
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1625,
+					"end": 1677,
+					"loc": {
+						"start": {
+							"line": 95,
+							"column": 1
+						},
+						"end": {
+							"line": 99,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1630,
+						"end": 1633,
+						"loc": {
+							"start": {
+								"line": 95,
+								"column": 6
+							},
+							"end": {
+								"line": 95,
+								"column": 9
+							}
+						},
+						"name": "T10"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 1633,
+						"end": 1672,
+						"loc": {
+							"start": {
+								"line": 95,
+								"column": 9
+							},
+							"end": {
+								"line": 99,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 1637,
+								"end": 1669,
+								"loc": {
+									"start": {
+										"line": 96,
+										"column": 2
+									},
+									"end": {
+										"line": 98,
+										"column": 14
+									}
+								},
+								"name": "X",
+								"constraint": {
+									"type": "TSUnionType",
+									"start": 1660,
+									"end": 1669,
+									"loc": {
+										"start": {
+											"line": 98,
+											"column": 5
+										},
+										"end": {
+											"line": 98,
+											"column": 14
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 1660,
+											"end": 1663,
+											"loc": {
+												"start": {
+													"line": 98,
+													"column": 5
+												},
+												"end": {
+													"line": 98,
+													"column": 8
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1660,
+												"end": 1663,
+												"loc": {
+													"start": {
+														"line": 98,
+														"column": 5
+													},
+													"end": {
+														"line": 98,
+														"column": 8
+													}
+												},
+												"name": "Ooo"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 1666,
+											"end": 1669,
+											"loc": {
+												"start": {
+													"line": 98,
+													"column": 11
+												},
+												"end": {
+													"line": 98,
+													"column": 14
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1666,
+												"end": 1669,
+												"loc": {
+													"start": {
+														"line": 98,
+														"column": 11
+													},
+													"end": {
+														"line": 98,
+														"column": 14
+													}
+												},
+												"name": "Ppp"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nd ",
+											"start": 1650,
+											"end": 1659
+										}
+									]
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 1675,
+						"end": 1676,
+						"loc": {
+							"start": {
+								"line": 99,
+								"column": 5
+							},
+							"end": {
+								"line": 99,
+								"column": 6
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 1675,
+							"end": 1676,
+							"loc": {
+								"start": {
+									"line": 99,
+									"column": 5
+								},
+								"end": {
+									"line": 99,
+									"column": 6
+								}
+							},
+							"name": "X"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " type-parameter constraint",
+							"start": 1595,
+							"end": 1623
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1707,
+					"end": 1753,
+					"loc": {
+						"start": {
+							"line": 102,
+							"column": 1
+						},
+						"end": {
+							"line": 106,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1712,
+						"end": 1715,
+						"loc": {
+							"start": {
+								"line": 102,
+								"column": 6
+							},
+							"end": {
+								"line": 102,
+								"column": 9
+							}
+						},
+						"name": "T11"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 1715,
+						"end": 1748,
+						"loc": {
+							"start": {
+								"line": 102,
+								"column": 9
+							},
+							"end": {
+								"line": 106,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 1719,
+								"end": 1745,
+								"loc": {
+									"start": {
+										"line": 103,
+										"column": 2
+									},
+									"end": {
+										"line": 105,
+										"column": 14
+									}
+								},
+								"name": "X",
+								"default": {
+									"type": "TSUnionType",
+									"start": 1736,
+									"end": 1745,
+									"loc": {
+										"start": {
+											"line": 105,
+											"column": 5
+										},
+										"end": {
+											"line": 105,
+											"column": 14
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 1736,
+											"end": 1739,
+											"loc": {
+												"start": {
+													"line": 105,
+													"column": 5
+												},
+												"end": {
+													"line": 105,
+													"column": 8
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1736,
+												"end": 1739,
+												"loc": {
+													"start": {
+														"line": 105,
+														"column": 5
+													},
+													"end": {
+														"line": 105,
+														"column": 8
+													}
+												},
+												"name": "Ooo"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 1742,
+											"end": 1745,
+											"loc": {
+												"start": {
+													"line": 105,
+													"column": 11
+												},
+												"end": {
+													"line": 105,
+													"column": 14
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1742,
+												"end": 1745,
+												"loc": {
+													"start": {
+														"line": 105,
+														"column": 11
+													},
+													"end": {
+														"line": 105,
+														"column": 14
+													}
+												},
+												"name": "Ppp"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nd ",
+											"start": 1726,
+											"end": 1735
+										}
+									]
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 1751,
+						"end": 1752,
+						"loc": {
+							"start": {
+								"line": 106,
+								"column": 5
+							},
+							"end": {
+								"line": 106,
+								"column": 6
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 1751,
+							"end": 1752,
+							"loc": {
+								"start": {
+									"line": 106,
+									"column": 5
+								},
+								"end": {
+									"line": 106,
+									"column": 6
+								}
+							},
+							"name": "X"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " type-parameter default",
+							"start": 1680,
+							"end": 1705
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1828,
+					"end": 1857,
+					"loc": {
+						"start": {
+							"line": 109,
+							"column": 1
+						},
+						"end": {
+							"line": 109,
+							"column": 30
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1833,
+						"end": 1836,
+						"loc": {
+							"start": {
+								"line": 109,
+								"column": 6
+							},
+							"end": {
+								"line": 109,
+								"column": 9
+							}
+						},
+						"name": "T12"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1847,
+						"end": 1856,
+						"loc": {
+							"start": {
+								"line": 109,
+								"column": 20
+							},
+							"end": {
+								"line": 109,
+								"column": 29
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1847,
+								"end": 1850,
+								"loc": {
+									"start": {
+										"line": 109,
+										"column": 20
+									},
+									"end": {
+										"line": 109,
+										"column": 23
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1847,
+									"end": 1850,
+									"loc": {
+										"start": {
+											"line": 109,
+											"column": 20
+										},
+										"end": {
+											"line": 109,
+											"column": 23
+										}
+									},
+									"name": "Ooo"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1853,
+								"end": 1856,
+								"loc": {
+									"start": {
+										"line": 109,
+										"column": 26
+									},
+									"end": {
+										"line": 109,
+										"column": 29
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1853,
+									"end": 1856,
+									"loc": {
+										"start": {
+											"line": 109,
+											"column": 26
+										},
+										"end": {
+											"line": 109,
+											"column": 29
+										}
+									},
+									"name": "Ppp"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 1839,
+								"end": 1846
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " null control: a single-line block binds to the first member instead",
+							"start": 1756,
+							"end": 1826
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1908,
+					"end": 1939,
+					"loc": {
+						"start": {
+							"line": 112,
+							"column": 1
+						},
+						"end": {
+							"line": 113,
+							"column": 15
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1913,
+						"end": 1916,
+						"loc": {
+							"start": {
+								"line": 112,
+								"column": 6
+							},
+							"end": {
+								"line": 112,
+								"column": 9
+							}
+						},
+						"name": "T13"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 1929,
+						"end": 1938,
+						"loc": {
+							"start": {
+								"line": 113,
+								"column": 5
+							},
+							"end": {
+								"line": 113,
+								"column": 14
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1929,
+								"end": 1932,
+								"loc": {
+									"start": {
+										"line": 113,
+										"column": 5
+									},
+									"end": {
+										"line": 113,
+										"column": 8
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1929,
+									"end": 1932,
+									"loc": {
+										"start": {
+											"line": 113,
+											"column": 5
+										},
+										"end": {
+											"line": 113,
+											"column": 8
+										}
+									},
+									"name": "Ooo"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1935,
+								"end": 1938,
+								"loc": {
+									"start": {
+										"line": 113,
+										"column": 11
+									},
+									"end": {
+										"line": 113,
+										"column": 14
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1935,
+									"end": 1938,
+									"loc": {
+										"start": {
+											"line": 113,
+											"column": 11
+										},
+										"end": {
+											"line": 113,
+											"column": 14
+										}
+									},
+									"name": "Ppp"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c\nd ",
+								"start": 1919,
+								"end": 1928
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " null control: an intersection is unaffected",
+							"start": 1860,
+							"end": 1906
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1971,
+					"end": 1992,
+					"loc": {
+						"start": {
+							"line": 116,
+							"column": 1
+						},
+						"end": {
+							"line": 116,
+							"column": 22
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1976,
+						"end": 1979,
+						"loc": {
+							"start": {
+								"line": 116,
+								"column": 6
+							},
+							"end": {
+								"line": 116,
+								"column": 9
+							}
+						},
+						"name": "T14"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1982,
+						"end": 1991,
+						"loc": {
+							"start": {
+								"line": 116,
+								"column": 12
+							},
+							"end": {
+								"line": 116,
+								"column": 21
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1982,
+								"end": 1985,
+								"loc": {
+									"start": {
+										"line": 116,
+										"column": 12
+									},
+									"end": {
+										"line": 116,
+										"column": 15
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1982,
+									"end": 1985,
+									"loc": {
+										"start": {
+											"line": 116,
+											"column": 12
+										},
+										"end": {
+											"line": 116,
+											"column": 15
+										}
+									},
+									"name": "Ooo"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1988,
+								"end": 1991,
+								"loc": {
+									"start": {
+										"line": 116,
+										"column": 18
+									},
+									"end": {
+										"line": 116,
+										"column": 21
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1988,
+									"end": 1991,
+									"loc": {
+										"start": {
+											"line": 116,
+											"column": 18
+										},
+										"end": {
+											"line": 116,
+											"column": 21
+										}
+									},
+									"name": "Ppp"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " null control: no comment",
+							"start": 1942,
+							"end": 1969
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 1995,
+					"end": 2071,
+					"loc": {
+						"start": {
+							"line": 118,
+							"column": 1
+						},
+						"end": {
+							"line": 118,
+							"column": 77
+						}
+					},
+					"exportKind": "type",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 2009,
+							"end": 2011,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 15
+								},
+								"end": {
+									"line": 118,
+									"column": 17
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2009,
+								"end": 2011,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 15
+									},
+									"end": {
+										"line": 118,
+										"column": 17
+									}
+								},
+								"name": "T1"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2009,
+								"end": 2011,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 15
+									},
+									"end": {
+										"line": 118,
+										"column": 17
+									}
+								},
+								"name": "T1"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2013,
+							"end": 2015,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 19
+								},
+								"end": {
+									"line": 118,
+									"column": 21
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2013,
+								"end": 2015,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 19
+									},
+									"end": {
+										"line": 118,
+										"column": 21
+									}
+								},
+								"name": "T2"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2013,
+								"end": 2015,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 19
+									},
+									"end": {
+										"line": 118,
+										"column": 21
+									}
+								},
+								"name": "T2"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2017,
+							"end": 2019,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 23
+								},
+								"end": {
+									"line": 118,
+									"column": 25
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2017,
+								"end": 2019,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 23
+									},
+									"end": {
+										"line": 118,
+										"column": 25
+									}
+								},
+								"name": "T3"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2017,
+								"end": 2019,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 23
+									},
+									"end": {
+										"line": 118,
+										"column": 25
+									}
+								},
+								"name": "T3"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2021,
+							"end": 2023,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 27
+								},
+								"end": {
+									"line": 118,
+									"column": 29
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2021,
+								"end": 2023,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 27
+									},
+									"end": {
+										"line": 118,
+										"column": 29
+									}
+								},
+								"name": "T4"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2021,
+								"end": 2023,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 27
+									},
+									"end": {
+										"line": 118,
+										"column": 29
+									}
+								},
+								"name": "T4"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2025,
+							"end": 2027,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 31
+								},
+								"end": {
+									"line": 118,
+									"column": 33
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2025,
+								"end": 2027,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 31
+									},
+									"end": {
+										"line": 118,
+										"column": 33
+									}
+								},
+								"name": "T5"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2025,
+								"end": 2027,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 31
+									},
+									"end": {
+										"line": 118,
+										"column": 33
+									}
+								},
+								"name": "T5"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2029,
+							"end": 2031,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 35
+								},
+								"end": {
+									"line": 118,
+									"column": 37
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2029,
+								"end": 2031,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 35
+									},
+									"end": {
+										"line": 118,
+										"column": 37
+									}
+								},
+								"name": "T6"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2029,
+								"end": 2031,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 35
+									},
+									"end": {
+										"line": 118,
+										"column": 37
+									}
+								},
+								"name": "T6"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2033,
+							"end": 2035,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 39
+								},
+								"end": {
+									"line": 118,
+									"column": 41
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2033,
+								"end": 2035,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 39
+									},
+									"end": {
+										"line": 118,
+										"column": 41
+									}
+								},
+								"name": "T7"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2033,
+								"end": 2035,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 39
+									},
+									"end": {
+										"line": 118,
+										"column": 41
+									}
+								},
+								"name": "T7"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2037,
+							"end": 2039,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 43
+								},
+								"end": {
+									"line": 118,
+									"column": 45
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2037,
+								"end": 2039,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 43
+									},
+									"end": {
+										"line": 118,
+										"column": 45
+									}
+								},
+								"name": "T8"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2037,
+								"end": 2039,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 43
+									},
+									"end": {
+										"line": 118,
+										"column": 45
+									}
+								},
+								"name": "T8"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2041,
+							"end": 2043,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 47
+								},
+								"end": {
+									"line": 118,
+									"column": 49
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2041,
+								"end": 2043,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 47
+									},
+									"end": {
+										"line": 118,
+										"column": 49
+									}
+								},
+								"name": "T9"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2041,
+								"end": 2043,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 47
+									},
+									"end": {
+										"line": 118,
+										"column": 49
+									}
+								},
+								"name": "T9"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2045,
+							"end": 2048,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 51
+								},
+								"end": {
+									"line": 118,
+									"column": 54
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2045,
+								"end": 2048,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 51
+									},
+									"end": {
+										"line": 118,
+										"column": 54
+									}
+								},
+								"name": "T10"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2045,
+								"end": 2048,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 51
+									},
+									"end": {
+										"line": 118,
+										"column": 54
+									}
+								},
+								"name": "T10"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2050,
+							"end": 2053,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 56
+								},
+								"end": {
+									"line": 118,
+									"column": 59
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2050,
+								"end": 2053,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 56
+									},
+									"end": {
+										"line": 118,
+										"column": 59
+									}
+								},
+								"name": "T11"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2050,
+								"end": 2053,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 56
+									},
+									"end": {
+										"line": 118,
+										"column": 59
+									}
+								},
+								"name": "T11"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2055,
+							"end": 2058,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 61
+								},
+								"end": {
+									"line": 118,
+									"column": 64
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2055,
+								"end": 2058,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 61
+									},
+									"end": {
+										"line": 118,
+										"column": 64
+									}
+								},
+								"name": "T12"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2055,
+								"end": 2058,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 61
+									},
+									"end": {
+										"line": 118,
+										"column": 64
+									}
+								},
+								"name": "T12"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2060,
+							"end": 2063,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 66
+								},
+								"end": {
+									"line": 118,
+									"column": 69
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2060,
+								"end": 2063,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 66
+									},
+									"end": {
+										"line": 118,
+										"column": 69
+									}
+								},
+								"name": "T13"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2060,
+								"end": 2063,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 66
+									},
+									"end": {
+										"line": 118,
+										"column": 69
+									}
+								},
+								"name": "T13"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2065,
+							"end": 2068,
+							"loc": {
+								"start": {
+									"line": 118,
+									"column": 71
+								},
+								"end": {
+									"line": 118,
+									"column": 74
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2065,
+								"end": 2068,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 71
+									},
+									"end": {
+										"line": 118,
+										"column": 74
+									}
+								},
+								"name": "T14"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2065,
+								"end": 2068,
+								"loc": {
+									"start": {
+										"line": 118,
+										"column": 71
+									},
+									"end": {
+										"line": 118,
+										"column": 74
+									}
+								},
+								"name": "T14"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": null
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 2073,
+					"end": 2103,
+					"loc": {
+						"start": {
+							"line": 119,
+							"column": 1
+						},
+						"end": {
+							"line": 119,
+							"column": 31
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 2082,
+							"end": 2084,
+							"loc": {
+								"start": {
+									"line": 119,
+									"column": 10
+								},
+								"end": {
+									"line": 119,
+									"column": 12
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2082,
+								"end": 2084,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 10
+									},
+									"end": {
+										"line": 119,
+										"column": 12
+									}
+								},
+								"name": "v1"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2082,
+								"end": 2084,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 10
+									},
+									"end": {
+										"line": 119,
+										"column": 12
+									}
+								},
+								"name": "v1"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2086,
+							"end": 2088,
+							"loc": {
+								"start": {
+									"line": 119,
+									"column": 14
+								},
+								"end": {
+									"line": 119,
+									"column": 16
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2086,
+								"end": 2088,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 14
+									},
+									"end": {
+										"line": 119,
+										"column": 16
+									}
+								},
+								"name": "v2"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2086,
+								"end": 2088,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 14
+									},
+									"end": {
+										"line": 119,
+										"column": 16
+									}
+								},
+								"name": "v2"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2090,
+							"end": 2092,
+							"loc": {
+								"start": {
+									"line": 119,
+									"column": 18
+								},
+								"end": {
+									"line": 119,
+									"column": 20
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2090,
+								"end": 2092,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 18
+									},
+									"end": {
+										"line": 119,
+										"column": 20
+									}
+								},
+								"name": "fn"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2090,
+								"end": 2092,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 18
+									},
+									"end": {
+										"line": 119,
+										"column": 20
+									}
+								},
+								"name": "fn"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2094,
+							"end": 2096,
+							"loc": {
+								"start": {
+									"line": 119,
+									"column": 22
+								},
+								"end": {
+									"line": 119,
+									"column": 24
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2094,
+								"end": 2096,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 22
+									},
+									"end": {
+										"line": 119,
+										"column": 24
+									}
+								},
+								"name": "a1"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2094,
+								"end": 2096,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 22
+									},
+									"end": {
+										"line": 119,
+										"column": 24
+									}
+								},
+								"name": "a1"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 2098,
+							"end": 2100,
+							"loc": {
+								"start": {
+									"line": 119,
+									"column": 26
+								},
+								"end": {
+									"line": 119,
+									"column": 28
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 2098,
+								"end": 2100,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 26
+									},
+									"end": {
+										"line": 119,
+										"column": 28
+									}
+								},
+								"name": "a2"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 2098,
+								"end": 2100,
+								"loc": {
+									"start": {
+										"line": 119,
+										"column": 26
+									},
+									"end": {
+										"line": 119,
+										"column": 28
+									}
+								},
+								"name": "a2"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": null
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1541,28 +1541,49 @@ impl<'a> Printer<'a> {
             // default: `AssignmentPattern` is deliberately absent from prettier's
             // `shouldIndentIfInlining`, so this is NOT an assignment value and must not be
             // marked as one (`Printer::mark_assignment_value`).
-            let rhs_doc = self.build_expression_doc(pattern.right);
-            let rhs_doc = if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
-                d.parens(rhs_doc)
+            // A comment the value OWNS travels inside its doc, and a multi-line block's
+            // reprinted body force-breaks every group around it — so the default's binary
+            // chain, ternary and member chain all exploded under one
+            // (`param_default_multiline_block_comment_flat`). The hoist pulls that run out
+            // to the seam ([`Printer::hoist_owned_value_gap_run`]); it fires only where the
+            // whole gap run is glued through, which is exactly where the two emit-axis arms
+            // below cannot also print it — a `//` or an own-line block never glues, so
+            // `hoisted_run` and those arms are mutually exclusive by construction.
+            //
+            // Behind `gap_has_comments` because the whole gap is provably empty there —
+            // `eq_pos` is the sentinel `rhs_start`, not a real `=` position — so the scan
+            // is skipped rather than run over the inverted range the sentinel makes.
+            let hoisted_run = gap_has_comments
+                .then(|| self.hoisted_owned_value_gap_run_opt(eq_pos + 1, pattern.right))
+                .flatten();
+            let rhs_doc = self.build_value_under_hoist(hoisted_run, pattern.right, || {
+                let rhs_doc = self.build_expression_doc(pattern.right);
+                if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
+                    d.parens(rhs_doc)
+                } else {
+                    rhs_doc
+                }
+            });
+            let value_doc = if let Some(run) = hoisted_run {
+                // The hoisted run REPLACES the gap's own emitter, never joins it — it is
+                // the same gap read on the wider (on-page) axis, so concatenating the two
+                // prints every un-owned comment in the gap twice.
+                d.concat(&[run, rhs_doc])
+            } else if gap_has_comments && self.has_comments_to_emit_between(eq_pos + 1, rhs_start) {
+                self.build_pattern_value_gap_doc(eq_pos + 1, rhs_start, rhs_doc)
+            } else if self.left_spine_shell_has_own_line_comment(pattern.right) {
+                // The same line comment one shell deeper — inside the grouping parens
+                // of the value's LEFTMOST node (`x = (⏎// c⏎a as any).b`): the value's
+                // printer hoists that run to the head of its doc, so the doc opens
+                // with the run and a hardline, and the gap emitter's continuation
+                // indent is what this seam owes it (`x = // c⏎↹↹value`, the form the
+                // gap's own `//` takes). Without it the value rendered at the
+                // parameter's level and the reparse — reading the comment as the
+                // `=`→value gap's — indented it, a second fixed point one pass away.
+                d.indent(rhs_doc)
             } else {
                 rhs_doc
             };
-            let value_doc =
-                if gap_has_comments && self.has_comments_to_emit_between(eq_pos + 1, rhs_start) {
-                    self.build_pattern_value_gap_doc(eq_pos + 1, rhs_start, rhs_doc)
-                } else if self.left_spine_shell_has_own_line_comment(pattern.right) {
-                    // The same line comment one shell deeper — inside the grouping parens
-                    // of the value's LEFTMOST node (`x = (⏎// c⏎a as any).b`): the value's
-                    // printer hoists that run to the head of its doc, so the doc opens
-                    // with the run and a hardline, and the gap emitter's continuation
-                    // indent is what this seam owes it (`x = // c⏎↹↹value`, the form the
-                    // gap's own `//` takes). Without it the value rendered at the
-                    // parameter's level and the reparse — reading the comment as the
-                    // `=`→value gap's — indented it, a second fixed point one pass away.
-                    d.indent(rhs_doc)
-                } else {
-                    rhs_doc
-                };
 
             // A comment the value OWNS is glued to its first token and travels inside its
             // doc, so neither probe above can see it (`docs/comments.md` hazard 2) — and an

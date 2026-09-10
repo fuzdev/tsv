@@ -263,9 +263,25 @@ impl<'a> Printer<'a> {
         // terminator's. Asking the source a second time here instead would DROP whatever
         // the value declined to claim: the two must be one answer.
         let (value_doc, consumed_close) = if stmt.is_directive {
+            // The directive builder makes the claim itself (it is a reassembly), so it must
+            // not also be wrapped below.
             (self.build_directive_doc(stmt), None)
         } else {
-            self.build_expression_statement_value_doc(stmt, ctx.in_program_or_block)
+            // A MULTI-LINE block the expression OWNS is claimed HERE rather than by the
+            // innermost node its token begins, so it prints outside the expression's own
+            // group and cannot force it broken
+            // ([`Printer::build_value_with_outermost_owned_comment`]). The statement's
+            // leading run belongs to the statement LIST, which emits it on the **to emit**
+            // axis and so never sees the owned member — this seam owes only that one comment
+            // (`syntax/comments/statement_leading_multiline_block_flat`).
+            let mut consumed = None;
+            let doc = self.build_value_with_outermost_owned_comment(stmt.expression, || {
+                let (doc, close) =
+                    self.build_expression_statement_value_doc(stmt, ctx.in_program_or_block);
+                consumed = Some(close);
+                doc
+            });
+            (doc, consumed.flatten())
         };
 
         // Comments between the expression and the `;`, with the `;` bound to the

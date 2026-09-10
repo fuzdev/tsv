@@ -90,12 +90,16 @@ fn leading_jsdoc_cast_walk<'x>(expr: &'x Expression<'x>) -> Option<&'x internal:
     }
 }
 
-/// An operator→value gap, for the HOIST ([`Printer::hoisted_owned_value_gap_run_opt`]): where
-/// the gap starts, and whether prettier's `chooseLayout` fourth disjunct fired over it.
+/// An operator→value gap as the `printAssignment` family resolved it: where the gap starts,
+/// and whether prettier's `chooseLayout` fourth disjunct fired over it.
 ///
-/// The two travel together because neither alone licenses the hoist — a gap with no
-/// indentable block leading its value has nothing to pull out, and the disjunct's verdict is
-/// meaningless without the range it was taken over.
+/// The two travel together because the verdict is meaningless without the range it was taken
+/// over — a second copy of either is a second answer waiting to drift. The HANG reads the
+/// verdict ([`RhsCommentInfo::indentable_leads_value`]); the HOIST
+/// ([`Printer::hoisted_owned_value_gap_run_opt`]) reads only the start and asks its own
+/// licence, which is wider (every multi-line block, not just an indentable one).
+///
+/// [`RhsCommentInfo::indentable_leads_value`]: crate::printer::expressions::assignment::RhsCommentInfo::indentable_leads_value
 #[derive(Clone, Copy)]
 pub(crate) struct ValueGap {
     /// Just past the operator (`=` / `:`), where the leading-comment scan begins.
@@ -237,6 +241,8 @@ impl<'a> Printer<'a> {
     /// `= /**⏎ * c⏎ */ b + c + d` the comment is claimed by `b` and travels *inside* the
     /// binary group; its reprinted body is a `MultilineText`, which the layout memo answers
     /// `LAYOUT_BREAKS_FORCED`, so the group breaks and a value prettier keeps flat explodes.
+    /// A *preserved* multi-line block does the same through a `literalline` interior, which
+    /// is why the licence below is the multi-line reading rather than the hang's.
     /// Prettier attaches such a comment to the OUTERMOST node starting there and its
     /// `printComments` wraps the whole group, which is the shape the seam already builds
     /// (`concat([comments_doc, right_doc])`) — the comment just never reached
@@ -254,20 +260,19 @@ impl<'a> Printer<'a> {
     /// value needs no hoist anyway, since the cast's retained parens already stand between
     /// the comment and anything breakable.
     ///
-    /// ⚠️ Scoped to the seams that ask `chooseLayout`'s fourth disjunct
-    /// ([`Self::indentable_block_leads_value`]). It is NOT a change to the general
-    /// ownership rule: everywhere else innermost-wins still holds, which is what keeps a
-    /// paren a *parent* synthesizes from landing between a comment and its own token. The
-    /// paren-less arrow reached the same place first and by the same means
+    /// ⚠️ Scoped to operator→value gaps, and to the run's multi-line member — NOT a change
+    /// to the general ownership rule: everywhere else innermost-wins still holds, which is
+    /// what keeps a paren a *parent* synthesizes from landing between a comment and its own
+    /// token. The paren-less arrow reached the same place first and by the same means
     /// (`build_arrow_params_doc_ungrouped`), which is why it is the one shape in this
     /// family that was already flat.
     pub(in crate::printer) fn hoist_owned_value_gap_run(
         &self,
-        gap: ValueGap,
+        gap_start: u32,
         value: &Expression<'_>,
         build_value: impl FnOnce() -> DocId,
     ) -> (Option<DocId>, DocId) {
-        let run = self.hoisted_owned_value_gap_run_opt(gap, value);
+        let run = self.hoisted_owned_value_gap_run_opt(gap_start, value);
         (run, self.build_value_under_hoist(run, value, build_value))
     }
 
@@ -308,20 +313,27 @@ impl<'a> Printer<'a> {
     /// the gap twice.
     pub(in crate::printer) fn hoisted_owned_value_gap_run_opt(
         &self,
-        gap: ValueGap,
+        gap_start: u32,
         value: &Expression<'_>,
     ) -> Option<DocId> {
-        let ValueGap {
-            start: gap_start,
-            indentable_leads_value,
-        } = gap;
-        // The fourth disjunct is the whole licence for this hoist, so it is a field of the
-        // gap rather than a gate each caller writes: three seams spelled it three ways
-        // (`.then().flatten()` twice, a `.filter()` once) and a fourth could have forgotten
-        // it. Passed in rather than asked here because every caller resolves it behind a
-        // zero-comment fast gate of its own — re-asking would scan the gap of every
-        // assignment in the document.
-        if !indentable_leads_value {
+        // ⚠️ **The licence is the CAUSE — a multi-line block on the page — not prettier's
+        // fourth disjunct.** The disjunct (an INDENTABLE block, which hangs the value) was
+        // the first spelling, and it named the seams the bug was first seen at rather than
+        // the thing that breaks the group: a *preserved* multi-line block reprints through
+        // the same `MultilineText` body, answers the layout memo the same
+        // `LAYOUT_BREAKS_FORCED`, and explodes the same values — at the same four seams the
+        // disjunct already covered, plus every seam that declines the hang. Indentability is
+        // a two-or-more-line property (`is_indentable_block_comment`), so this reading
+        // strictly SUBSUMES the disjunct's; the hang keeps asking the narrow question
+        // ([`Self::value_hangs_under_operator`]), which is why the two cannot be folded.
+        //
+        // Asked here rather than passed in, so the five seams cannot spell it five ways.
+        // The document-level flag pays for it: the hoist exists only for a comment the value
+        // OWNS, and a document with none has an emit-axis run identical to this on-page one
+        // — the caller's `hoisted.or(its_own)` then prints the same bytes either way.
+        if !self.has_owned_comments
+            || !self.has_multiline_block_comments_on_page_between(gap_start, value.span().start)
+        {
             return None;
         }
         // ⚠️ **Only a run this seam itself prints may be hoisted**, and the test for that
@@ -355,6 +367,60 @@ impl<'a> Printer<'a> {
             return None;
         }
         self.build_hoisted_value_gap_comments_opt(gap_start, value.span().start)
+    }
+
+    /// Build `value`'s doc with a MULTI-LINE comment it OWNS claimed by **this seam**
+    /// rather than by the innermost node its token begins — printing it OUTSIDE the value's
+    /// own group, where prettier's `printComments` puts it.
+    ///
+    /// The **no-gap** sibling of [`Self::hoist_owned_value_gap_run`], for a seam that has no
+    /// run of its own to replace: a call argument, an array element and an expression
+    /// statement each get their leading run from the LIST they sit in, which emits it on the
+    /// **to emit** axis and so never sees the owned member at all. There is nothing to
+    /// hoist *from* the gap — the only comment the value carries is the one it owns — so
+    /// this claims exactly that one, and the list's own run is untouched and cannot
+    /// double-print.
+    ///
+    /// Why these three seams and not `build_expression_doc` generally: innermost-wins is
+    /// what keeps a paren a *parent* synthesizes from landing between a comment and its
+    /// token, and that property is worth keeping everywhere it is not actively wrong. It is
+    /// wrong exactly where the comment's reprinted body force-breaks a group the value would
+    /// otherwise keep flat, which is the multi-line case — hence the `multiline` gate — and
+    /// only at a seam whose value can carry such a group.
+    ///
+    /// Declines when nothing below would claim (no left-spine child starts here, so `value`
+    /// is already the outermost claimant and `build_expression_doc` prints the comment
+    /// outside its group unaided), and at a **JSDoc cast on the left spine**, which prints
+    /// its own copy — the same left-spine reading the hoist makes, and for the same reason:
+    /// a node-keyed test sees a chain's MemberExpression and misses the cast at its base.
+    pub(in crate::printer) fn build_value_with_outermost_owned_comment(
+        &self,
+        value: &Expression<'_>,
+        build_value: impl FnOnce() -> DocId,
+    ) -> DocId {
+        if !self.has_owned_comments {
+            return build_value();
+        }
+        let start = value.span().start;
+        // Nothing below claims, so the seam has nothing to take over.
+        if left_spine_child(value).is_none_or(|c| c.span().start != start) {
+            return build_value();
+        }
+        // An ENCLOSING seam already claims this comment; taking it again double-prints.
+        if self.claimed_owned_comment_start.get() == Some(start) {
+            return build_value();
+        }
+        if !self
+            .owned_leading_comment_at(start)
+            .is_some_and(|c| c.multiline)
+        {
+            return build_value();
+        }
+        if self.leading_jsdoc_cast(value).is_some() {
+            return build_value();
+        }
+        let doc = self.with_owned_comment_claimed_above(start, build_value);
+        self.prepend_owned_leading_comment_at(start, doc)
     }
 
     /// Prepend the comment `expr` owns, glued to its own first token.
@@ -400,13 +466,9 @@ impl<'a> Printer<'a> {
         if left_spine_child(expr).is_some_and(|c| c.span().start == start) {
             return doc;
         }
-        // An ENCLOSING node already claims this comment and prints text ahead of us — the
-        // synthesized `(` of a paren-less arrow, whose span starts at this very parameter
-        // (`Printer::claimed_owned_comment_start`). Innermost-wins is the rule everywhere
-        // else precisely because the innermost node prints first; here it does not.
-        if self.claimed_owned_comment_start.get() == Some(start) {
-            return doc;
-        }
+        // The enclosing-claim check is `prepend_owned_leading_comment_at`'s, so the
+        // reassembly callers get it too — a frozen slice reached it without one and printed
+        // a hoisted comment twice.
         self.prepend_owned_leading_comment_at(start, doc)
     }
 
@@ -457,6 +519,21 @@ impl<'a> Printer<'a> {
         // Document-level short-circuit (also covers the arrow-reassembly callers, which
         // reach here without going through `prepend_owned_leading_comment`).
         if !self.has_owned_comments {
+            return doc;
+        }
+        // An ENCLOSING node already claims this comment and prints text ahead of us — the
+        // synthesized `(` of a paren-less arrow, whose span starts at this very parameter, or
+        // the operator→value hoist ([`Self::hoist_owned_value_gap_run`]), which prints the
+        // run outside the value's group (`Printer::claimed_owned_comment_start`).
+        // Innermost-wins is the rule everywhere else precisely because the innermost node
+        // prints first; here it does not.
+        //
+        // ⚠️ The check lives HERE rather than at the node-keyed seam above, because a
+        // **reassembly** caller never runs that seam: a frozen member slice claims through
+        // this entry point directly (`build_frozen_opaque_node_doc`), and under a hoist it
+        // printed the comment a second time — the mirror image of the DROP the claim exists
+        // to prevent (`prettier_ignore_base_comment`'s multi-line block).
+        if self.claimed_owned_comment_start.get() == Some(start) {
             return doc;
         }
         let Some(comment) = self.owned_leading_comment_at(start) else {

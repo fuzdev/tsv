@@ -861,11 +861,15 @@ pub struct RhsCommentInfo {
     /// the fits walk. `false` when the run has an own-line separator (a real hardline
     /// the value must sit under), or when `comments` is `None`.
     pub glued_through: bool,
-    /// The operator→RHS gap, for the HOIST that pulls a run the RHS owns out of the RHS's
-    /// own doc ([`Printer::hoist_owned_value_gap_run`]) — its start paired with the fourth
-    /// disjunct's verdict over it, since neither alone licenses the hoist. `None` where
-    /// there is no gap to scan: [`RhsCommentInfo::frozen_only`], and any caller whose
-    /// zero-comment fast path already proved the gap empty.
+    /// The operator→RHS gap: its start — which the HOIST scans
+    /// ([`Printer::hoist_owned_value_gap_run`]) — paired with the fourth disjunct's verdict
+    /// over it, which is the HANG's ([`RhsCommentInfo::indentable_leads_value`]).
+    ///
+    /// ⚠️ `None` claims the gap is provably EMPTY, and the proof must be **on page**: an
+    /// emit-keyed fast path cannot see a comment the value OWNS (`docs/comments.md`
+    /// hazard 2), so passing `None` behind one silently declines the hoist and the value's
+    /// group breaks under a multi-line block. The object property's inline arm made exactly
+    /// that mistake by reaching for [`RhsCommentInfo::frozen_only`].
     pub gap: Option<ValueGap>,
     /// When `Some`, scan for trailing comments from stripped grouping parens between
     /// the RHS end and this boundary, wrapping in parens if found.
@@ -892,6 +896,9 @@ impl RhsCommentInfo {
 
     /// The gap carries nothing but a freeze verdict — the shape most callers want, and
     /// the one the zero-comment fast paths reach with `None`.
+    ///
+    /// ⚠️ Only for a caller whose gap is provably comment-free **on page** — see the
+    /// [`RhsCommentInfo::gap`] field, whose `None` this produces.
     pub fn frozen_only(frozen: Option<Span>) -> Self {
         Self {
             comments: None,
@@ -1058,10 +1065,11 @@ impl<'a> Printer<'a> {
         // (`mark_jsdoc_cast_value_gap`), and every value built here is an assignment's.
         self.mark_jsdoc_cast_value_gap(right_expr);
         self.mark_assignment_value(right_expr);
-        // The fourth disjunct's run is hoisted OUT of the RHS's doc when the RHS owns it,
+        // A MULTI-LINE block's run is hoisted OUT of the RHS's doc when the RHS owns it,
         // so the comment's hard break cannot reach the value's own group
-        // ([`Printer::hoist_owned_value_gap_run`]). Asked only where the disjunct fired over
-        // a real gap; everywhere else `hoisted_run` is `None` and the RHS keeps its claim.
+        // ([`Printer::hoist_owned_value_gap_run`], which asks the licence itself). Asked
+        // only over a real gap; everywhere else `hoisted_run` is `None` and the RHS keeps
+        // its claim.
         let build_right = || {
             self.build_with_arrow_chain_context(chain_context, || {
                 if let Some(boundary) = rhs_info.boundary {
@@ -1072,7 +1080,7 @@ impl<'a> Printer<'a> {
             })
         };
         let (hoisted_run, right_doc) = match rhs_info.gap {
-            Some(gap) => self.hoist_owned_value_gap_run(gap, right_expr, build_right),
+            Some(gap) => self.hoist_owned_value_gap_run(gap.start, right_expr, build_right),
             None => (None, build_right()),
         };
         // Parenthesize an `in` RHS inside a for-header init (`for (a = (b in c);…)`);

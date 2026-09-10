@@ -1384,8 +1384,18 @@ impl<'a> Printer<'a> {
             // own trailing scan claims the value→`,` gap
             // (`Printer::collect_trailing_comments`, anchored past the frozen slice), so
             // there is no paren shell here for the freeze to ride inside.
-            let init_doc =
-                self.build_value_head_doc(eq_pos + 1, init, || self.build_expression_doc(init));
+            // A comment the value OWNS is glued to its first token and travels inside its
+            // doc, so a multi-line block's reprinted body force-breaks the member's group
+            // and a value prettier keeps flat explodes
+            // (`member_init_multiline_block_comment_flat`). The hoist pulls that run out to
+            // this seam ([`Printer::hoist_owned_value_gap_run`]); it fires only where the
+            // whole gap run is glued through, so it can never collide with an emit-axis arm
+            // below — `build_eq_comment_break_rhs` returns `None` for exactly that gap, and
+            // a value-head freeze needs an own-line directive, which never glues.
+            let hoisted_run = self.hoisted_owned_value_gap_run_opt(eq_pos + 1, init);
+            let init_doc = self.build_value_head_doc(eq_pos + 1, init, || {
+                self.build_value_under_hoist(hoisted_run, init, || self.build_expression_doc(init))
+            });
 
             // The post-`=` value content (shared by the inline and the continuation
             // forms); any `=`→value block comment leads it. A binary's wrapped
@@ -1393,7 +1403,13 @@ impl<'a> Printer<'a> {
             // own: `TSEnumMember` is in neither of prettier's exempt lists, so the chain
             // takes the continuation-indent default (`Printer::build_binary_chain_doc`).
             // A hand-rolled `indent` here would stack a second level on top of it.
-            let value_doc = self.prepend_rhs_comments(init_doc, eq_pos + 1, init_start);
+            //
+            // The hoisted run REPLACES the gap's own emitter, never joins it — it is the
+            // same gap read on the wider (on-page) axis.
+            let value_doc = match hoisted_run {
+                Some(run) => d.concat(&[run, init_doc]),
+                None => self.prepend_rhs_comments(init_doc, eq_pos + 1, init_start),
+            };
 
             // A line comment between the name and `=` keeps the comment after the
             // name and drops `= value` to a continuation line indented one level
@@ -1449,9 +1465,17 @@ impl<'a> Printer<'a> {
                     // ([`Printer::indentable_block_leads_value`]) would hang an indentable
                     // block prettier keeps inline here (`member_init_multiline_block_comment`).
                     d.concat(&[id_doc, d.text(" ="), hang_after_operator(d, value_doc)])
+                } else if let Some(run) = hoisted_run {
+                    // ⚠️ The hoisted run goes OUTSIDE the value's group, which is the whole
+                    // point of hoisting it: inside, its `MultilineText` body answers the
+                    // layout memo `LAYOUT_BREAKS_FORCED` and breaks the group it was meant
+                    // to leave alone. Prettier's `printComments` shape, `concat([comments,
+                    // group(value)])`.
+                    d.concat(&[id_doc, d.text(" = "), run, d.group(init_doc)])
                 } else {
-                    // Only a glued single-line block (or no comment) reaches here — the
-                    // helper claimed every authoring that hangs. The value gets its own
+                    // Only a glued block (or no comment) reaches here — the helper claimed
+                    // every authoring that hangs, and a glued MULTI-LINE one took the arm
+                    // above. The value gets its own
                     // `group` so the leading run's soft `line` is measured against the
                     // value rather than the enum body, which is hardline-joined and so
                     // always broken; without it the `line` rendered as a newline and

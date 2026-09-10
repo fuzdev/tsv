@@ -1265,6 +1265,13 @@ impl<'a> Printer<'a> {
     /// in-span gap's own never print separately. With a leading `|` authored, the caller's
     /// gap ends at that pipe and the handed run joins the in-span run behind it.
     ///
+    /// ⚠️ A handed run's MULTI-LINE part is emitted **outside** the members' group
+    /// ([`Self::build_union_type_doc_inner`]): inside it, its forced break fabricated the
+    /// leading-`|` layout for every union that would otherwise fit flat. Prettier prints a
+    /// leading comment through `printComments`, outside the `group` `printUnionType`
+    /// returns — the same shape, and the same reason, as the expression side's
+    /// [`Printer::hoist_owned_value_gap_run`].
+    ///
     /// The result carries whether the run was handed in — the caller emits the gap's
     /// comments itself ONLY when it was not: exactly one of the two prints the run
     /// (docs/comments.md hazard 3) — and
@@ -1594,6 +1601,29 @@ impl<'a> Printer<'a> {
         //        | T3
         let mut parts = d.pooled_docbuf();
 
+        // A handed run ending in a MULTI-LINE block is the UNION's, not the first member's
+        // (prettier's binding, [`Self::union_prints_hugged_with`]): it stays ahead of the
+        // pipe (`/* c⏎d */ | A`), the in-span part after.
+        //
+        // ⚠️ It is emitted OUTSIDE the members' group below, and that placement is the rule,
+        // not a detail. A multi-line block reprints to a body the layout memo answers
+        // `LAYOUT_BREAKS_FORCED`, so inside the group it FABRICATED the leading-`|` layout
+        // for every union that would otherwise fit flat — at every seam that hands its gap
+        // run in (`union_leading_multiline_block_comment_flat`). Prettier prints a leading
+        // comment through `printComments`, outside the `group(members)` `printUnionType`
+        // returns; this is that shape. The broken layout is unaffected: the run still lands
+        // ahead of the `if_break` pipe, which is where prettier puts it.
+        let first_frozen = self.list_member_frozen(union.span.start, union.types, 0, freeze_first);
+        let union_bound_end = if first_frozen {
+            run_start
+        } else {
+            self.union_bound_handed_run_end(union, run_start)
+        };
+        let union_bound_run = (union_bound_end > run_start).then(|| {
+            self.build_member_leading_block_comments(run_start, union_bound_end)
+                .0
+        });
+
         // A multi-line frozen member forces the broken one-member-per-line layout (Rule A
         // must-break): a frozen slice is `will_break`-opaque, so the force is explicit.
         // Seeded by the leading-run freeze; the loop ORs in any other frozen multi-line
@@ -1643,20 +1673,6 @@ impl<'a> Printer<'a> {
                 if has_comments && frozen {
                     let (run, _) =
                         self.build_member_leading_block_comments(union.span.start, type_start);
-                    parts.push(run);
-                }
-
-                // A handed run ending in a MULTI-LINE block is the UNION's, not the
-                // member's (prettier's binding, [`Self::union_prints_hugged_with`]): it
-                // stays ahead of the pipe (`/* c⏎d */ | A`), the in-span part after.
-                let union_bound_end = if frozen {
-                    run_start
-                } else {
-                    self.union_bound_handed_run_end(union, run_start)
-                };
-                if union_bound_end > run_start {
-                    let (run, _) =
-                        self.build_member_leading_block_comments(run_start, union_bound_end);
                     parts.push(run);
                 }
 
@@ -1743,10 +1759,14 @@ impl<'a> Printer<'a> {
         // (Rule A must-break): the frozen slice is a `will_break`-opaque verbatim span,
         // so the break is forced explicitly here rather than propagating from the slice.
         // A single-line frozen member keeps the width-decided layout.
-        if freeze_multiline {
+        let members = if freeze_multiline {
             d.group_break(d.concat(&parts))
         } else {
             d.group(d.concat(&parts))
+        };
+        match union_bound_run {
+            Some(run) => d.concat(&[run, members]),
+            None => members,
         }
     }
 

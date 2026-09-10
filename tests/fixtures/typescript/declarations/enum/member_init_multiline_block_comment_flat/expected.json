@@ -1,0 +1,1211 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 808,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multi-line block comment leading an enum member's initializer must not BREAK the",
+			"start": 20,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " value's own group: prettier prints a leading comment outside that group, so a value",
+			"start": 107,
+			"end": 193,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " that fits stays flat below the comment. The member keeps `= value` inline (it never",
+			"start": 195,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " hangs under the `=` — see member_init_multiline_block_comment), so this seam reads",
+			"start": 283,
+			"end": 368,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the comment for itself.",
+			"start": 370,
+			"end": 396,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " binary chain",
+			"start": 409,
+			"end": 424,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 431,
+			"end": 447,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 6
+				},
+				"end": {
+					"line": 11,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ternary",
+			"start": 462,
+			"end": 472,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 479,
+			"end": 495,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 6
+				},
+				"end": {
+					"line": 16,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " member chain",
+			"start": 510,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 532,
+			"end": 548,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 6
+				},
+				"end": {
+					"line": 21,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a preserved (non-indentable) multi-line block asks the same question",
+			"start": 567,
+			"end": 638,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\n\te ",
+			"start": 645,
+			"end": 655,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 6
+				},
+				"end": {
+					"line": 25,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " null control: a single-line block forces no break",
+			"start": 670,
+			"end": 722,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 729,
+			"end": 736,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 6
+				},
+				"end": {
+					"line": 28,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " null control: no comment",
+			"start": 751,
+			"end": 778,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 29
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 807,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 798,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 33,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSEnumDeclaration",
+					"start": 398,
+					"end": 797,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 403,
+						"end": 404,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 427,
+							"end": 457,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 427,
+								"end": 428,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"name": "A"
+							},
+							"initializer": {
+								"type": "BinaryExpression",
+								"start": 448,
+								"end": 457,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 6
+									},
+									"end": {
+										"line": 11,
+										"column": 15
+									}
+								},
+								"left": {
+									"type": "BinaryExpression",
+									"start": 448,
+									"end": 453,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 6
+										},
+										"end": {
+											"line": 11,
+											"column": 11
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 448,
+										"end": 449,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 6
+											},
+											"end": {
+												"line": 11,
+												"column": 7
+											}
+										},
+										"name": "b"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 452,
+										"end": 453,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 10
+											},
+											"end": {
+												"line": 11,
+												"column": 11
+											}
+										},
+										"name": "c"
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 456,
+									"end": 457,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 14
+										},
+										"end": {
+											"line": 11,
+											"column": 15
+										}
+									},
+									"name": "d"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "*\n * c\n ",
+										"start": 431,
+										"end": 447
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " binary chain",
+									"start": 409,
+									"end": 424
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 475,
+							"end": 505,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 475,
+								"end": 476,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"initializer": {
+								"type": "ConditionalExpression",
+								"start": 496,
+								"end": 505,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 6
+									},
+									"end": {
+										"line": 16,
+										"column": 15
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 496,
+									"end": 497,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 6
+										},
+										"end": {
+											"line": 16,
+											"column": 7
+										}
+									},
+									"name": "e"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 500,
+									"end": 501,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 10
+										},
+										"end": {
+											"line": 16,
+											"column": 11
+										}
+									},
+									"name": "f"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 504,
+									"end": 505,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 14
+										},
+										"end": {
+											"line": 16,
+											"column": 15
+										}
+									},
+									"name": "g"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "*\n * c\n ",
+										"start": 479,
+										"end": 495
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " ternary",
+									"start": 462,
+									"end": 472
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 528,
+							"end": 562,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 2
+								},
+								"end": {
+									"line": 21,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 528,
+								"end": 529,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 3
+									}
+								},
+								"name": "C"
+							},
+							"initializer": {
+								"type": "CallExpression",
+								"start": 549,
+								"end": 562,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 6
+									},
+									"end": {
+										"line": 21,
+										"column": 19
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 549,
+									"end": 560,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 6
+										},
+										"end": {
+											"line": 21,
+											"column": 17
+										}
+									},
+									"object": {
+										"type": "CallExpression",
+										"start": 549,
+										"end": 558,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 6
+											},
+											"end": {
+												"line": 21,
+												"column": 15
+											}
+										},
+										"callee": {
+											"type": "MemberExpression",
+											"start": 549,
+											"end": 556,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 6
+												},
+												"end": {
+													"line": 21,
+													"column": 13
+												}
+											},
+											"object": {
+												"type": "CallExpression",
+												"start": 549,
+												"end": 554,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 6
+													},
+													"end": {
+														"line": 21,
+														"column": 11
+													}
+												},
+												"callee": {
+													"type": "MemberExpression",
+													"start": 549,
+													"end": 552,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 6
+														},
+														"end": {
+															"line": 21,
+															"column": 9
+														}
+													},
+													"object": {
+														"type": "Identifier",
+														"start": 549,
+														"end": 550,
+														"loc": {
+															"start": {
+																"line": 21,
+																"column": 6
+															},
+															"end": {
+																"line": 21,
+																"column": 7
+															}
+														},
+														"name": "h"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 551,
+														"end": 552,
+														"loc": {
+															"start": {
+																"line": 21,
+																"column": 8
+															},
+															"end": {
+																"line": 21,
+																"column": 9
+															}
+														},
+														"name": "i"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 555,
+												"end": 556,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 12
+													},
+													"end": {
+														"line": 21,
+														"column": 13
+													}
+												},
+												"name": "j"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 559,
+										"end": 560,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 16
+											},
+											"end": {
+												"line": 21,
+												"column": 17
+											}
+										},
+										"name": "k"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "*\n * c\n ",
+										"start": 532,
+										"end": 548
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " member chain",
+									"start": 510,
+									"end": 525
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 641,
+							"end": 665,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 2
+								},
+								"end": {
+									"line": 25,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 641,
+								"end": 642,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 3
+									}
+								},
+								"name": "D"
+							},
+							"initializer": {
+								"type": "BinaryExpression",
+								"start": 656,
+								"end": 665,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 6
+									},
+									"end": {
+										"line": 25,
+										"column": 15
+									}
+								},
+								"left": {
+									"type": "BinaryExpression",
+									"start": 656,
+									"end": 661,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 6
+										},
+										"end": {
+											"line": 25,
+											"column": 11
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 656,
+										"end": 657,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 6
+											},
+											"end": {
+												"line": 25,
+												"column": 7
+											}
+										},
+										"name": "l"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 660,
+										"end": 661,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 10
+											},
+											"end": {
+												"line": 25,
+												"column": 11
+											}
+										},
+										"name": "m"
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 664,
+									"end": 665,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 14
+										},
+										"end": {
+											"line": 25,
+											"column": 15
+										}
+									},
+									"name": "n"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c\n\te ",
+										"start": 645,
+										"end": 655
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " a preserved (non-indentable) multi-line block asks the same question",
+									"start": 567,
+									"end": 638
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 725,
+							"end": 746,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 725,
+								"end": 726,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 3
+									}
+								},
+								"name": "F"
+							},
+							"initializer": {
+								"type": "BinaryExpression",
+								"start": 737,
+								"end": 746,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 14
+									},
+									"end": {
+										"line": 28,
+										"column": 23
+									}
+								},
+								"left": {
+									"type": "BinaryExpression",
+									"start": 737,
+									"end": 742,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 14
+										},
+										"end": {
+											"line": 28,
+											"column": 19
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 737,
+										"end": 738,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 14
+											},
+											"end": {
+												"line": 28,
+												"column": 15
+											}
+										},
+										"name": "o"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 741,
+										"end": 742,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 18
+											},
+											"end": {
+												"line": 28,
+												"column": 19
+											}
+										},
+										"name": "p"
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 745,
+									"end": 746,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 22
+										},
+										"end": {
+											"line": 28,
+											"column": 23
+										}
+									},
+									"name": "q"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 729,
+										"end": 736
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " null control: a single-line block forces no break",
+									"start": 670,
+									"end": 722
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 781,
+							"end": 794,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 2
+								},
+								"end": {
+									"line": 31,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 781,
+								"end": 782,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 3
+									}
+								},
+								"name": "G"
+							},
+							"initializer": {
+								"type": "BinaryExpression",
+								"start": 785,
+								"end": 794,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 6
+									},
+									"end": {
+										"line": 31,
+										"column": 15
+									}
+								},
+								"left": {
+									"type": "BinaryExpression",
+									"start": 785,
+									"end": 790,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 6
+										},
+										"end": {
+											"line": 31,
+											"column": 11
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 785,
+										"end": 786,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 6
+											},
+											"end": {
+												"line": 31,
+												"column": 7
+											}
+										},
+										"name": "r"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 789,
+										"end": 790,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 10
+											},
+											"end": {
+												"line": 31,
+												"column": 11
+											}
+										},
+										"name": "s"
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 793,
+									"end": 794,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 14
+										},
+										"end": {
+											"line": 31,
+											"column": 15
+										}
+									},
+									"name": "t"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " null control: no comment",
+									"start": 751,
+									"end": 778
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block comment leading an enum member's initializer must not BREAK the",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " value's own group: prettier prints a leading comment outside that group, so a value",
+							"start": 107,
+							"end": 193
+						},
+						{
+							"type": "Line",
+							"value": " that fits stays flat below the comment. The member keeps `= value` inline (it never",
+							"start": 195,
+							"end": 281
+						},
+						{
+							"type": "Line",
+							"value": " hangs under the `=` — see member_init_multiline_block_comment), so this seam reads",
+							"start": 283,
+							"end": 368
+						},
+						{
+							"type": "Line",
+							"value": " the comment for itself.",
+							"start": 370,
+							"end": 396
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
