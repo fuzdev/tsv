@@ -24,8 +24,16 @@ appending a `;` to a line comment's line does not move the terminator, it swallo
 `const a = x // c⏎;` followed by `(y) => 1;` welds into `const a  =  x // c;`, which no longer
 parses at all.
 
+An **author blank inside the slice** is printed once, by the slice itself: the terminator is
+re-emitted glued to the content it terminates, but everything above that content end is copied
+verbatim, blank lines included. Reading such a blank a second time at the statement seam
+fabricates one below the `;` that the author never wrote — and a fabricated blank is its own
+fixed point, so nothing but this fixture and a prettier `compare` reaches it. Both spellings
+carry it (`// c5`, `/* c6 */`).
+
 `unformatted_ours_detached.svelte` pads each block-comment case's terminator onto its own line;
-tsv normalizes all three back to input, and the `//` case is already input's own form.
+tsv normalizes them back to input, and the `// c4` / `/* c6 */` cases are already input's own
+form.
 
 ## Reason
 

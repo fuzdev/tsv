@@ -5,7 +5,7 @@
 // including trailing same-line comments — skipping over comments and strings so
 // glyphs inside them aren't mistaken for the real token.
 
-use super::Printer;
+use super::{Printer, TrailingLineRef};
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 
 impl<'a> Printer<'a> {
@@ -210,7 +210,8 @@ impl<'a> Printer<'a> {
         let end = (upper as usize).min(bytes.len());
         // `skipInlineComment` / `skipTrailingComment`: a comment on the element's own line is
         // trivia, whichever side of the comma it sits on (`a /* c */, b` and `a, /* c */ b`).
-        let mut pos = (self.find_end_with_trailing_comments(from) as usize).min(end);
+        // An element gap, not a statement's: no detached terminator to jump to.
+        let mut pos = (self.find_end_with_trailing_comments(from, u32::MAX) as usize).min(end);
         // `skipToLineEnd = skip(",; \t")` — the separator itself is trivia here, which is the
         // whole reason a pre-comma blank is seen.
         while pos < end && matches!(bytes[pos], b',' | b';' | b' ' | b'\t') {
@@ -283,33 +284,39 @@ impl<'a> Printer<'a> {
     ///
     /// Used to correctly detect blank lines - need to check from after trailing
     /// comments, not just after the statement.
-    pub(in crate::printer) fn find_end_with_trailing_comments(&self, after_pos: u32) -> u32 {
+    ///
+    /// The **in-source** axis of [`TrailingLineRef`] — that type states the rule, and
+    /// [`Printer::trailing_same_line_comments_through`] is its to-emit twin, so the cursor
+    /// this returns lands exactly past the run that one emits. `printed_tail` is the
+    /// statement's ([`Printer::printed_tail`]); [`u32::MAX`] everywhere else.
+    pub(in crate::printer) fn find_end_with_trailing_comments(
+        &self,
+        after_pos: u32,
+        printed_tail: u32,
+    ) -> u32 {
         // The comment-free window answers first: `after_pos` inside it puts the next
         // comment in source at the window's end, so when that comment is on a later line
         // — or there is none — nothing trails and the search is not needed. Asked at
         // every statement's end, and the window has this answer for 97 asks in 100 on a
         // real corpus (the ask that precedes it, the same gap's trailing run, drew the
         // window); the walk below then runs only for a comment actually on the line.
-        if let Some(next_start) = self.comment_free_gap.next_comment_start(after_pos)
+        //
+        // A printed tail below `after_pos` moves the line reference, so a comment on a
+        // LATER line can still be in the run and the window's line test no longer answers.
+        // Only a detached terminator sets one, so every ordinary ask keeps the fast path.
+        if printed_tail == u32::MAX
+            && let Some(next_start) = self.comment_free_gap.next_comment_start(after_pos)
             && (next_start == u32::MAX || !self.is_same_line(after_pos, next_start))
         {
             return after_pos;
         }
         let mut end = after_pos;
-        // Track the "current line" reference — follows multi-line block comments
-        // to their closing */ line (same logic as build_trailing_same_line_comment_docs)
-        let mut line_ref = after_pos;
-
+        let mut line = TrailingLineRef::new(after_pos, printed_tail);
         for comment in self.comments_in_source_after(after_pos) {
-            if self.is_same_line(line_ref, comment.span.start) {
-                end = comment.span.end;
-                // Follow multi-line block comments to their closing line
-                if comment.is_block && !self.is_same_line(comment.span.start, comment.span.end) {
-                    line_ref = comment.span.end;
-                }
-            } else {
+            if !line.take(self, comment) {
                 break;
             }
+            end = comment.span.end;
         }
         end
     }

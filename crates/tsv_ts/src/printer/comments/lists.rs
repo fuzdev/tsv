@@ -6,7 +6,7 @@
 // comment splitting, inline-block comment runs, and comma emission in forced-
 // multiline lists.
 
-use super::{CommentVec, LeadingGlue, Printer};
+use super::{CommentVec, LeadingGlue, Printer, TrailingLineRef};
 use crate::ast::internal;
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{next_printed_stmt, next_printed_stmt_start, statement_gap_floor};
@@ -625,15 +625,25 @@ impl<'a> Printer<'a> {
     /// clamped to the **claim split alone** — a handed-over comment must stay ahead of it
     /// for the next item's leading run to find, and `upper_bound` (the next item's start)
     /// would clamp it past nothing at all.
+    ///
+    /// `printed_tail` is the item's own [`Printer::printed_tail`] — the second source line
+    /// its last PRINTED line holds — and both the emitted run and the cursor read it, or
+    /// the cursor lands above a comment the run just emitted.
     fn push_trailing_run(
         &self,
         parts: &mut DocBuf,
         item_end: u32,
         upper_bound: u32,
         claim_end: u32,
+        printed_tail: u32,
     ) -> u32 {
-        self.push_trailing_same_line_comment_docs(parts, item_end, upper_bound.min(claim_end));
-        self.find_end_with_trailing_comments(item_end)
+        self.push_trailing_same_line_comment_docs(
+            parts,
+            item_end,
+            upper_bound.min(claim_end),
+            printed_tail,
+        );
+        self.find_end_with_trailing_comments(item_end, printed_tail)
             .min(claim_end)
     }
 
@@ -671,7 +681,11 @@ impl<'a> Printer<'a> {
             // to the body's end.
             MemberGap::Last { list_end } => (list_end, u32::MAX),
         };
-        self.push_trailing_run(parts, member_end, upper_bound, claim_end)
+        // A member's separator is the list's, not a terminator the member reaches back over,
+        // and no member slot is ever erased: the caller already opened the gap past the
+        // separator ([`MemberGap`]'s floor), so the run's line is the member's own
+        // throughout and there is no printed tail to jump to.
+        self.push_trailing_run(parts, member_end, upper_bound, claim_end, u32::MAX)
     }
 
     /// The whole trailing arm of the statement-gap seam for `body[index]`, shared by
@@ -683,6 +697,10 @@ impl<'a> Printer<'a> {
     /// (`a(); /* c */ let b = 1;`), emitted by its leading run. Pushes the run into
     /// `parts` and returns the advanced cursor, clamped to the same split so the
     /// handed-over comments stay ahead of it for that leading run to find.
+    ///
+    /// The run reads the statement's PRINTED tail too ([`Printer::printed_tail`]): neither a
+    /// detached `;` nor a dropped one begins a new output line, so a comment the author
+    /// wrote past either, on its line, trails the statement.
     pub(crate) fn push_statement_trailing_run(
         &self,
         parts: &mut DocBuf,
@@ -703,7 +721,36 @@ impl<'a> Printer<'a> {
             stmt_end,
             bound,
             self.statement_claim_end(body, index, None, frozen),
+            self.printed_tail(stmt_end, statement_gap_floor(body, index)),
         )
+    }
+
+    /// Where the statement's PRINTED tail ends in source — the [`TrailingLineRef`] jump —
+    /// or [`u32::MAX`] when its last printed line is one source line.
+    ///
+    /// Nothing between `emitted_end` and the gap's slot floor begins a new OUTPUT line, and
+    /// the two authorings that put something there are one question:
+    ///
+    /// - the statement's **own `;`**, when the author detached it (`a()⏎; // c`) — it prints
+    ///   back up on the content's line, so its image IS on this line;
+    /// - a **dropped `EmptyStatement`** (`a();⏎; // c`) — it prints nothing at all, so it
+    ///   cannot begin a line either.
+    ///
+    /// [`statement_gap_floor`] already reports past the second, and `emitted_end`
+    /// ([`Self::statement_emitted_end`]) sits below the span end exactly when the statement
+    /// handed its terminator gap to this list (prettier's `__contentEnd`,
+    /// [`Printer::statement_comment_claim_end`]) — which covers the first. So the whole
+    /// question is one compare plus one line test, and no kind table is read a second time.
+    ///
+    /// The value is a **jump for a trailing run's line reference**, never an anchor: a run
+    /// still opens at `emitted_end`, so a comment in the terminator gap itself stays the
+    /// gap's ([`Printer::trailing_same_line_comments_through`] states the rule).
+    pub(crate) fn printed_tail(&self, emitted_end: u32, slot_floor: u32) -> u32 {
+        if emitted_end < slot_floor && !self.is_same_line(emitted_end, slot_floor) {
+            slot_floor
+        } else {
+            u32::MAX
+        }
     }
 
     /// Whether `comment` was already emitted as the PREVIOUS item's trailing run — it
@@ -785,18 +832,25 @@ impl<'a> Printer<'a> {
         after_pos: u32,
         upper_bound: u32,
     ) -> impl Iterator<Item = &'a internal::Comment> {
-        let mut line_ref = after_pos;
+        self.trailing_same_line_comments_through(after_pos, upper_bound, u32::MAX)
+    }
+
+    /// [`Self::trailing_same_line_comments`] over a printed tail that spans TWO source
+    /// lines — the [`TrailingLineRef`] jump, [`u32::MAX`] for the one-line case every other
+    /// caller has. That type states the rule; this is the **to-emit** axis of it.
+    ///
+    /// The jump fires only at or past `printed_tail`, so a comment the author wrote in the
+    /// terminator gap ITSELF (`a()⏎/* c */;`) is unreached — that one is the gap's, and the
+    /// list's seam places it ([`Printer::statement_comment_claim_end`]).
+    pub(crate) fn trailing_same_line_comments_through(
+        &self,
+        after_pos: u32,
+        upper_bound: u32,
+        printed_tail: u32,
+    ) -> impl Iterator<Item = &'a internal::Comment> {
+        let mut line = TrailingLineRef::new(after_pos, printed_tail);
         self.comments_to_emit_between(after_pos, upper_bound)
-            .take_while(move |comment| {
-                if !self.is_same_line(line_ref, comment.span.start) {
-                    return false; // Only same-line comments
-                }
-                // Follow multi-line block comments to their closing line
-                if comment.is_block && !self.is_same_line(comment.span.start, comment.span.end) {
-                    line_ref = comment.span.end;
-                }
-                true
-            })
+            .take_while(move |comment| line.take(self, comment))
     }
 
     /// Build docs for trailing same-line comments after a node
@@ -813,9 +867,10 @@ impl<'a> Printer<'a> {
         &self,
         after_pos: u32,
         upper_bound: u32,
+        printed_tail: u32,
     ) -> DocBuf {
         let mut docs = DocBuf::new();
-        self.push_trailing_same_line_comment_docs(&mut docs, after_pos, upper_bound);
+        self.push_trailing_same_line_comment_docs(&mut docs, after_pos, upper_bound, printed_tail);
         docs
     }
 
@@ -825,8 +880,11 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         after_pos: u32,
         upper_bound: u32,
+        printed_tail: u32,
     ) {
-        for comment in self.trailing_same_line_comments(after_pos, upper_bound) {
+        for comment in
+            self.trailing_same_line_comments_through(after_pos, upper_bound, printed_tail)
+        {
             parts.push(self.build_trailing_comment_doc(comment));
         }
     }
