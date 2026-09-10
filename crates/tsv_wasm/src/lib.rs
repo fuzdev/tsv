@@ -85,8 +85,9 @@ fn err(e: impl ToString) -> JsError {
 
 /// Hierarchical, git-faithful matcher for tsv's discovery ignore files,
 /// wrapping `tsv_ignore::IgnoreStack`. Built up by the caller from a repo's
-/// `.gitignore` files plus the repo-root tsv file
-/// (`.formatignore`/`.prettierignore`), then queried per path — both for the raw
+/// `.gitignore` files plus one tsv file per directory (`.formatignore`, or a
+/// `.prettierignore` where no sibling `.formatignore` shadows it), then queried
+/// per path — both for the raw
 /// ignore status (`is_ignored`) and for the shared `tsv_discover` discovery
 /// verdict (`classify_dir`/`should_format_file`). Exposed so the JS CLI
 /// (`npm/cli.js`) and the VS Code extension share the exact same matcher **and**
@@ -304,10 +305,11 @@ const TS_PARSE_DECLS: &'static str = r#"
 export interface ParseOptions {
 	/**
 	 * Emit per-node `loc` (line/column) — the drop-in acorn/svelte wire.
-	 * `false` emits the span-only wire (~46% smaller; Svelte also omits
-	 * `name_loc`): `loc` stays derivable from `start`/`end` plus the source —
-	 * see `reconstruct_locations` / `create_locator`. Inert for CSS (its wire
-	 * has no `loc`) and for `parse_internal_*` (no wire at all).
+	 * `false` emits the span-only wire (much smaller; Svelte also omits
+	 * `name_loc`): `loc` stays derivable from `start`/`end` plus the source,
+	 * via this package's own `reconstruct_locations` / `create_locator` /
+	 * `loc_of` (which throw on the two Svelte shapes the span-only wire can't
+	 * disambiguate — see `locations.d.ts`). Inert for CSS (its wire has no `loc`).
 	 * @default true
 	 */
 	locations?: boolean | undefined;

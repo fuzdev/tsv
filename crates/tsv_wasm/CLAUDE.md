@@ -93,10 +93,14 @@ per-file error instead of poisoning the rest of the run (before the hook, the
 sequential path reported every later file as `memory access out of bounds`, and the
 parallel path was only saved by whichever files the healthy workers drained first).
 Consumers that loop over files on one instance should do the same. Wasm-backed
-objects from before the swap (`IgnoreStack`) are invalidated — `free()` them before
-reinstantiating and rebuild after; the patcher also guards each class's
-`FinalizationRegistry` so an un-freed handle GC'd after a swap leaks its old bytes
-instead of freeing a stale pointer into the fresh instance's allocator. Gated by
+objects from before the swap (`IgnoreStack`) are invalidated — rebuild them after.
+The patcher stamps every handle with the instance generation it was minted under
+(on the object for `free()`, in the `FinalizationRegistry` held value for the GC
+callback), and both free paths no-op on a stale stamp, so a handle from a discarded
+instance leaks its old bytes instead of freeing a stale pointer into the fresh
+instance's allocator — while handles minted after the swap free normally. (A
+module-level "has any reinstantiation happened" check is the wrong shape: a one-way
+fuse that leaks every handle after the first recovery, fresh ones included.) Gated by
 `scripts/test_npm.ts` (the poison-then-recover API contract + both CLI paths) and
 smoked per variant by `scripts/validate_artifacts.ts`.
 

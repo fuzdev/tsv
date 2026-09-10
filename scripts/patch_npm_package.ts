@@ -157,7 +157,7 @@ const classes = [...generated_js.matchAll(/^export class (\w+)/gm)].map((m) => m
 
 // 1b. Append the `reinstantiate` hook to the generated glue.
 //
-// A WASM stack overflow (input nested past the shadow stack, ~1,600 levels) is
+// A WASM stack overflow (input nested past the shadow stack, ~2,500 levels) is
 // the one trap the instance does not survive: `__stack_pointer` is a plain
 // mutable global the trap never restores, so every later call on the instance
 // throws `memory access out of bounds` — and wasm-bindgen's `initSync`
@@ -189,27 +189,56 @@ if (generated_js.includes('__tsv_instance_generation')) {
 	);
 	Deno.exit(1);
 }
-// Guard each exported class's FinalizationRegistry: its callback frees through
-// the LIVE `wasm` binding, so a stale un-`free()`d handle GC'd after a
-// reinstantiation would free an old pointer into the NEW instance — allocator
-// corruption with no error at the point of cause. Guarded, a post-reinstantiate
-// finalization leaks the old object's bytes instead (the old instance is
-// unreachable anyway); explicit `free()` is unaffected and remains the correct
-// consumer move before reinstantiating.
+// Guard each exported class's lifecycle against a reinstantiation. Both free
+// paths — the FinalizationRegistry callback and explicit `free()` — go through
+// the LIVE `wasm` binding, so a handle minted against a discarded instance and
+// freed after a reinstantiation would free an old pointer into the NEW
+// instance: allocator corruption with no error at the point of cause. Each
+// handle is therefore stamped with the instance generation it was created
+// under (on the object for `free()`, in the registry's held value for the
+// callback — the generation must travel WITH the handle, since a module-level
+// "has any reinstantiation happened" check is a one-way fuse that would leak
+// every handle minted after the first recovery, fresh ones included). A stale
+// handle's free is a no-op that leaks the old object's bytes, which the
+// unreachable old instance leaks anyway; a current handle frees normally.
 const registry_pattern = /new FinalizationRegistry\(ptr => wasm\.(\w+)\(ptr, 1\)\)/g;
+const register_pattern = /(\w+)Finalization\.register\((\w+), \2\.__wbg_ptr, \2\)/g;
+const free_pattern =
+	/free\(\) \{\n(\s+)const ptr = this\.__destroy_into_raw\(\);\n\s+wasm\.(\w+)\(ptr, 0\);\n/g;
 let registry_rewrites = 0;
+let register_rewrites = 0;
+let free_rewrites = 0;
 const patched_glue =
-	generated_js.replace(registry_pattern, (_m, free_fn) => {
-		registry_rewrites++;
-		return (
-			`new FinalizationRegistry(ptr => {\n` +
-			`    // patched by patch_npm_package.ts: after a reinstantiation this pointer\n` +
-			`    // belongs to a discarded instance — freeing it into the current one would\n` +
-			`    // corrupt its allocator, so leak it instead\n` +
-			`    if (__tsv_instance_generation === 0) wasm.${free_fn}(ptr, 1);\n` +
-			`})`
-		);
-	}) +
+	generated_js
+		.replace(registry_pattern, (_m, free_fn) => {
+			registry_rewrites++;
+			return (
+				`new FinalizationRegistry(({ ptr, gen }) => {\n` +
+				`    // patched by patch_npm_package.ts: a pointer stamped with an older\n` +
+				`    // instance generation belongs to a discarded instance — freeing it into\n` +
+				`    // the current one would corrupt its allocator, so leak it instead\n` +
+				`    if (gen === __tsv_instance_generation) wasm.${free_fn}(ptr, 1);\n` +
+				`})`
+			);
+		})
+		.replace(register_pattern, (_m, cls, obj) => {
+			register_rewrites++;
+			return (
+				`${cls}Finalization.register(${obj}, ` +
+				`{ ptr: ${obj}.__wbg_ptr, gen: (${obj}.__tsv_gen = __tsv_instance_generation) }, ${obj})`
+			);
+		})
+		.replace(free_pattern, (_m, indent, free_fn) => {
+			free_rewrites++;
+			return (
+				`free() {\n` +
+				`${indent}const ptr = this.__destroy_into_raw();\n` +
+				`${indent}// patched by patch_npm_package.ts: a handle from a discarded instance is\n` +
+				`${indent}// already gone — freeing its pointer into the live one would corrupt the\n` +
+				`${indent}// allocator, so this is a no-op for it\n` +
+				`${indent}if (this.__tsv_gen === __tsv_instance_generation) wasm.${free_fn}(ptr, 0);\n`
+			);
+		}) +
 	`
 // ---- appended by patch_npm_package.ts ----
 
@@ -222,7 +251,7 @@ let __tsv_instance_generation = 0;
  * call throws \`memory access out of bounds\`). Reuses the compiled
  * \`WebAssembly.Module\`, so this never recompiles. Throws if the module was
  * never initialized. Objects backed by the old instance (e.g. \`IgnoreStack\`)
- * are invalidated — \`free()\` them before calling this and rebuild after.
+ * are invalidated — rebuild them after; \`free()\` on a stale one is a safe no-op.
  */
 export function reinstantiate() {
     if (wasm === undefined) {
@@ -234,11 +263,21 @@ export function reinstantiate() {
     initSync({ module });
 }
 `;
-if (registry_rewrites !== classes.length) {
+if (registry_rewrites !== classes.length || free_rewrites !== classes.length) {
 	console.error(
-		`FAIL: rewrote ${registry_rewrites} FinalizationRegistry callback(s) in ${main_js} but ` +
-			`found ${classes.length} exported class(es) — the registry shape drifted from the ` +
-			`pattern the reinstantiate guard rewrites`
+		`FAIL: rewrote ${registry_rewrites} FinalizationRegistry callback(s) and ${free_rewrites} ` +
+			`free() method(s) in ${main_js} but found ${classes.length} exported class(es) — the ` +
+			`class shape drifted from the pattern the reinstantiate guard rewrites`
+	);
+	Deno.exit(1);
+}
+// A class registers at least once (its constructor); a class that is also
+// returned from Rust registers again in its `__wrap`.
+if (register_rewrites < classes.length) {
+	console.error(
+		`FAIL: rewrote ${register_rewrites} FinalizationRegistry.register site(s) in ${main_js} but ` +
+			`found ${classes.length} exported class(es) — the register shape drifted from the ` +
+			`pattern the reinstantiate guard stamps`
 	);
 	Deno.exit(1);
 }
@@ -433,8 +472,12 @@ export declare function init_sync(module: {
  * short-circuits once initialized. Never recompiles (the compiled
  * \`WebAssembly.Module\` is retained); synchronous, so the same environment
  * constraints as \`init_sync\` apply. Throws if the module was never
- * initialized. Objects backed by the old instance (e.g. \`IgnoreStack\`) are
- * invalidated — \`free()\` them before calling this and rebuild after.
+ * initialized.${
+		classes.length
+			? ` Objects backed by the old instance (e.g. \`${classes[0]}\`) are
+ * invalidated — rebuild them after; \`free()\` on a stale one is a safe no-op.`
+			: ''
+	}
  */
 export declare function reinstantiate(): void;
 `;
@@ -560,9 +603,12 @@ Object.assign(pkg, NPM_SHARED_METADATA);
 // bypass the re-export facade and skip initialization entirely.
 pkg.sideEffects = ['./index.js'];
 
-// Remove wasm-pack web target fields superseded by exports
-delete pkg.main;
-delete pkg.types;
+// wasm-pack's web-target fields point at the raw glue; `exports` supersedes them,
+// so replace them with the Node facade for pre-`exports` resolvers (an old
+// `moduleResolution: node10` consumer, tooling that reads `main` directly) — the
+// same pair the N-API loader declares, so both package sets resolve alike.
+pkg.main = 'index.js';
+pkg.types = 'index.d.ts';
 delete pkg.module;
 
 Deno.writeTextFileSync(pkg_path, JSON.stringify(pkg, null, '\t') + '\n');

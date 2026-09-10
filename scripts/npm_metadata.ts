@@ -29,5 +29,8 @@ export const NPM_SHARED_METADATA = {
 	},
 	bugs: 'https://github.com/fuzdev/tsv/issues',
 	funding: 'https://www.ryanatkn.com/funding',
-	engines: { node: '>=22' }
+	engines: { node: '>=22' },
+	// structural, so a hand `npm publish` of a scoped package can never land
+	// restricted — the publish scripts pass `--access public` as well
+	publishConfig: { access: 'public' }
 } as const;

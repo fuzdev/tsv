@@ -193,9 +193,9 @@ function recover_engine_suffix() {
 }
 
 /**
- * Free a wasm-backed `IgnoreStack` deterministically, so no stale handle's GC
- * finalizer survives into a post-trap `reinstantiate`d engine (where the
- * registry's guard would leak it). Engine-split: the native addon's
+ * Free a wasm-backed `IgnoreStack` deterministically, so its bytes return to the
+ * engine now rather than at GC (and a handle outliving a post-trap
+ * `reinstantiate` is leaked by the registry's guard rather than freed). Engine-split: the native addon's
  * `IgnoreStack` is a napi-rs class with no `free()` — napi-rs owns its
  * lifetime, and there is no instance to poison there — so absence is a no-op,
  * not an error.
@@ -426,18 +426,14 @@ async function run_format(args) {
 		process.exit(1);
 	}
 	if (values.content !== undefined || values.stdin) {
-		// --source-type is content/stdin-only and TypeScript-only; a bad value is a
-		// usage error (exit 2, format parity). Path mode rejects --source-type in
-		// format_paths.
-		const source_type = resolve_source_type(values['source-type'], 2);
-		format_single(values, positionals, parser, source_type);
+		format_single(values, positionals, parser);
 	} else {
 		await format_paths(values, positionals);
 	}
 }
 
 /** `--content`/`--stdin` mode — format one input to stdout (or `--check` it). */
-function format_single(values, positionals, parser, source_type) {
+function format_single(values, positionals, parser) {
 	if (positionals.length > 0) {
 		eprint('Error: --content/--stdin cannot be combined with file paths\n');
 		process.exit(2);
@@ -450,6 +446,11 @@ function format_single(values, positionals, parser, source_type) {
 		eprint('Error: --list applies to file paths; --content/--stdin format a single input\n');
 		process.exit(2);
 	}
+	// --source-type is content/stdin-only and TypeScript-only; a bad value is a
+	// usage error (exit 2). Checked AFTER the paths/--jobs/--list refusals, in the
+	// native CLI's order, so a doubly-bad invocation names the same error on both
+	// bins. Path mode rejects --source-type in format_paths.
+	const source_type = resolve_source_type(values['source-type'], 2);
 	const flag = values.content !== undefined ? '--content' : '--stdin';
 	if (parser === undefined) {
 		eprint(`Error: ${flag} requires --parser <svelte|typescript|css>\n`);
@@ -595,7 +596,7 @@ function format_one(path, check) {
 		});
 	} catch (error) {
 		// A trap (`WebAssembly.RuntimeError` — a parse error is a plain `Error`)
-		// is not a per-file failure: a stack overflow (input nested past ~1,600
+		// is not a per-file failure: a stack overflow (input nested past ~2,500
 		// levels — generated or minified code) leaves `__stack_pointer` where the
 		// deep call left it, poisoning the instance so every later file throws
 		// `memory access out of bounds` too. That held on BOTH paths — a worker's
