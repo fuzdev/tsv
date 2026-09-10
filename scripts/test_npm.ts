@@ -322,6 +322,28 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.ok(healthy());
 	});
 
+	// Handles are stamped with the instance generation they were minted under, so
+	// a stale handle's `free()` is a no-op (its pointer belongs to a discarded
+	// instance — freeing it into the live one would corrupt the allocator) while a
+	// handle minted after the swap frees normally. The GC-callback half of the same
+	// stamp can't be driven deterministically here; this pins the explicit path and
+	// that a fresh handle is fully usable after any number of recoveries.
+	it(
+		'reinstantiate: a stale IgnoreStack frees as a no-op, a fresh one works',
+		{ skip: !has_format },
+		() => {
+			const stale = new node_entry.IgnoreStack();
+			stale.push_gitignore('', 'build/\n');
+			node_entry.reinstantiate();
+			assert.doesNotThrow(() => stale.free());
+			const fresh = new node_entry.IgnoreStack();
+			fresh.push_gitignore('', 'build/\n');
+			assert.equal(fresh.is_ignored('build/out.js', false), true);
+			assert.doesNotThrow(() => fresh.free());
+			assert.ok(node_entry.format_typescript('const   x=1'));
+		}
+	);
+
 	it('format options: sourceType switches the TypeScript parse goal', { skip: !has_format }, () => {
 		// at the script goal `await` is an ordinary identifier, so it parses as an
 		// arrow parameter (and prints parenthesized)

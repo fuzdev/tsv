@@ -4,15 +4,17 @@
 
 Rust-based parser compiled to WASM. Drop-in replacement for **Svelte's parser** + **acorn** + **acorn-typescript**.
 
-Parsing only — for formatting, see [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm), or [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) for both plus a CLI.
+Parsing only — for formatting, see [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm), or [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) for both plus a CLI. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API.
 
-Source of truth, full docs, and conformance notes: [github.com/fuzdev/tsv](https://github.com/fuzdev/tsv).
+Docs and benchmarks: [tsv.fuz.dev](https://tsv.fuz.dev/). Source and conformance notes: [github.com/fuzdev/tsv](https://github.com/fuzdev/tsv).
 
 ## Install
 
 ```bash
 npm i @fuzdev/tsv_parse_wasm
 ```
+
+Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
 
 ## Usage
 
@@ -31,7 +33,7 @@ Three parsers: `parse_svelte` (matches Svelte's modern parser), `parse_typescrip
 
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
-To parse across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv_parse_wasm/worker` subpath is the same API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead; there is nothing compiled to hand across.
+To parse across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv_parse_wasm/worker` subpath is the same API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself.
 
 Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) taking the same arguments but returning the AST as a compact JSON string — faster when you're writing it to disk or sending it over the wire, since it skips materializing the JS object tree.
 
@@ -46,7 +48,9 @@ Unknown option keys throw, whatever their value — a typo like `{locatons: fals
 
 A second argument that isn't an object throws too, arrays included. That makes `sources.map(parse_typescript)` an error, since `map` passes the index as the second argument — write `sources.map((s) => parse_typescript(s))`.
 
-Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shapes — nested arrow bodies and member chains — cost several times more of it per level than nested parens (the measured ceiling per nesting shape is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). Past the ceiling the call traps with `memory access out of bounds`, and unlike a parse error that **poisons the instance** — every later call throws the same thing. `reinstantiate()` is the recovery: it synchronously swaps in a fresh instance from the already-compiled module (no recompile — same environment constraints as `init_sync`), and every import keeps working against it. Real code is nowhere near this ceiling; generated and minified code can be.
+A Rust panic — always a tsv bug, please report it — surfaces as a `RuntimeError: unreachable` with the real message on `console.error`; the instance survives it, so the next call works.
+
+Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shapes — nested arrow bodies and member chains — cost several times more of it per level than nested parens (the per-shape stack costs and each surface's ceiling are in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). Past the ceiling the call traps with `memory access out of bounds`, and unlike a parse error or a panic it **poisons the instance** — every later call throws the same thing. `reinstantiate()` is the recovery: it synchronously swaps in a fresh instance from the already-compiled module (no recompile — same environment constraints as `init_sync`), and every import keeps working against it. Real code is nowhere near this ceiling; generated and minified code can be.
 
 ### Reconstructing line/column
 
@@ -60,13 +64,13 @@ const ast = reconstruct_locations(parse_typescript(src, {locations: false}), src
 // every node now carries loc: {start: {line, column}, end: {line, column}}
 ```
 
-`reconstruct_locations(ast, source)` walks the tree and adds `loc` to every node, **mutating in place** and returning it (`structuredClone(ast)` first if you need the input untouched). It's **exact for TypeScript** — each node's `loc` value equals acorn's exactly (the key is appended last, so an object consumer matches but a re-serialized tree won't byte-match the wire's key order) — and **approximate for Svelte**: it doesn't replicate Svelte's `<script>` tag-position or destructure `+1`-column parser quirks, and two Svelte shapes make it **throw** rather than guess — a source holding a lone `\r`, U+2028 or U+2029 (where Svelte's LF-only line count and acorn's ECMAScript one disagree, and the span-only wire can't say which a node carries), and a block binding separated from its `: T` annotation by a newline; parse those with `loc` (the default). Everything else reconstructs exactly, including the `name_loc` on elements, attributes, and directives, the name-shaped `loc` Svelte reports on a shorthand attribute's identifier, a snippet name, and a simple-identifier block pattern, and the `character` field on an in-tag comment (`<div /* c */ class="x">`, including inside `<svelte:options>`). CSS is a no-op (there's no `loc` to rebuild).
+`reconstruct_locations(ast, source)` walks the tree and adds `loc` to every node, **mutating in place** and returning it (`structuredClone(ast)` first if you need the input untouched). It's **exact for TypeScript** — each node's `loc` value equals acorn's exactly (the key is appended last, so an object consumer matches but a re-serialized tree won't byte-match the wire's key order) — and **approximate for Svelte**: it doesn't replicate Svelte's `<script>`/`<style>` tag-position or destructure `+1`-column parser quirks, and two Svelte shapes make it **throw** rather than guess — a source holding a lone `\r`, U+2028 or U+2029 (where Svelte's LF-only line count and acorn's ECMAScript one disagree, and the span-only wire can't say which a node carries), and a block binding separated from its `: T` annotation by a newline; parse those with `loc` (the default). Everything else reconstructs exactly, including the `name_loc` on elements, attributes, and directives, the name-shaped `loc` Svelte reports on a shorthand attribute's identifier, a snippet name, and a simple-identifier block pattern, and the `character` field on an in-tag comment (`<div /* c */ class="x">`, including inside `<svelte:options>`). CSS is a no-op (there's no `loc` to rebuild).
 
 For sparse or repeated lookups, `create_locator(source, opts?)` holds the prebuilt line-start table and exposes `loc_of(node)` and `reconstruct(ast)`; pass `{language: 'svelte'}` for a `.svelte` document (LF-only line rule). A one-shot `loc_of(node, source)` is also exported for the occasional single lookup (it rebuilds the table each call).
 
 ## Status
 
-0.x — pre-release. API may change.
+Pre-alpha — not for production use. The published packages are for feedback; expect bugs and API changes.
 
 ## License
 

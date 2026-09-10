@@ -140,7 +140,7 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
 **Compile-Time Isolation** — Cargo prevents circular dependencies. CSS changes don't trigger TypeScript recompilation.
 
-**Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (with `convert_ast_json()` a thin `Value` wrapper over the bytes). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
+**Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (plus their span-only `_no_locations` twins; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
 **Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, and the experimental `tsv_check` / `tsv_svelte_compile` — which may never ship — are all crate additions; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
@@ -259,8 +259,8 @@ artifacts for user ergonomics independent of the Rust workspace shape.
 
 `tsv_ts`, `tsv_css`, and `tsv_svelte` each expose a default-on `convert`
 feature that gates `pub mod convert` (the writer) and the
-`convert_ast_json_bytes` / `convert_ast_json_string` / `convert_ast_json`
-free functions. The format-only WASM
+`convert_ast_json_bytes` / `convert_ast_json_string` free functions (and
+their `_no_locations` twins). The format-only WASM
 build (`@fuzdev/tsv_format_wasm`) declares its language deps with
 `default-features = false` so the convert layer is excluded at link
 time; the parse-capable builds (`@fuzdev/tsv_parse_wasm` and the full

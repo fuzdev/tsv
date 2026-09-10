@@ -49,7 +49,8 @@ if (bin === undefined) {
 		// rather than failing a run the fallback can serve
 		process.stderr.write(
 			`warning: @fuzdev/tsv could not run its native CLI at ${bin} ` +
-				`(${result.error.message}); falling back to the JS CLI\n`
+				`(${result.error.message}); falling back to the JS CLI — reinstall ` +
+				`@fuzdev/tsv-${platform_triple()} (or restore the executable bit) to get the native one back\n`
 		);
 		await import('./cli.js');
 	} else if (result.signal) {

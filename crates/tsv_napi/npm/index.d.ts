@@ -26,7 +26,7 @@ export type * from './tsv_ast.js';
 export interface ParseOptions {
 	/**
 	 * Emit per-node `loc` (line/column) — the drop-in acorn/svelte wire.
-	 * `false` emits the span-only wire (~46% smaller; Svelte also omits
+	 * `false` emits the span-only wire (much smaller; Svelte also omits
 	 * `name_loc`): `loc` stays derivable from `start`/`end` plus the source,
 	 * via this package's own `reconstruct_locations` / `create_locator` /
 	 * `loc_of` (which throw on the two Svelte shapes the span-only wire can't
@@ -125,7 +125,10 @@ export function format_css(source: string, options?: FormatOptions): string;
  *
  * Mirrors `@fuzdev/tsv_wasm`'s class method for method, including the
  * `string | undefined` (never `null`) of the maybe-a-warning methods, so the
- * two type-check interchangeably.
+ * two type-check interchangeably — save the WASM class's wasm-bindgen
+ * lifecycle pair, `free()` and `[Symbol.dispose]()`: this class is
+ * GC-managed and has neither, so a `using stack = new IgnoreStack()` or an
+ * explicit `stack.free()` is a WASM-only spelling.
  */
 export class IgnoreStack {
 	constructor();

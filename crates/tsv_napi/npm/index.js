@@ -52,11 +52,20 @@ let addon;
 try {
 	addon = require(`@fuzdev/tsv-${triple}`);
 } catch (cause) {
+	// Two different failures share this catch: a platform with no prebuilt
+	// package, and a supported platform whose package did not install (a
+	// lockfile resolved on another OS, `--omit=optional`, npm's optional-dep
+	// bugs). Only the second has a remedy short of switching engines, so name it.
+	const remedy = SUPPORTED.includes(triple)
+		? `This platform is prebuilt, so the package should have installed with @fuzdev/tsv — ` +
+			`run \`npm i @fuzdev/tsv-${triple}\`, or delete node_modules and the lockfile and ` +
+			`reinstall (a lockfile from another platform, or --omit=optional, drops it); ` +
+			`@fuzdev/tsv_wasm (universal WASM, same API) needs no native package. `
+		: `Prebuilt platforms: ${SUPPORTED.join(', ')}. ` +
+			`On an unsupported platform use @fuzdev/tsv_wasm (universal WASM, same API). `;
 	throw new Error(
 		`@fuzdev/tsv: failed to load the native binding for ${triple} ` +
-			`(@fuzdev/tsv-${triple}). Prebuilt platforms: ${SUPPORTED.join(', ')}. ` +
-			`On an unsupported platform use @fuzdev/tsv_wasm (universal WASM, same API). ` +
-			`Cause: ${cause?.message ?? cause}`,
+			`(@fuzdev/tsv-${triple}). ${remedy}Cause: ${cause?.message ?? cause}`,
 		{ cause }
 	);
 }

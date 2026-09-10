@@ -197,11 +197,11 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.equal(api.format_svelte('<div   >x</div   >'), '<div>x</div>\n');
 	});
 
-	// The WASM lifecycle trio is deliberately ABSENT, and the absence is API:
+	// The four WASM lifecycle exports are deliberately ABSENT, and the absence is API:
 	// cli.js reads a missing `wasm_module` as "bind workers to this loader" and
 	// a missing `reinstantiate` as "a trapped engine cannot be recovered" — an
 	// accidental export here would silently flip those branches.
-	it('exports none of the WASM lifecycle trio', () => {
+	it('exports none of the four WASM lifecycle exports', () => {
 		assert.strictEqual(api.wasm_module, undefined);
 		assert.strictEqual(api.reinstantiate, undefined);
 		assert.strictEqual(api.init, undefined);
@@ -445,11 +445,20 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		);
 	});
 
-	it('an unsupported platform fails loudly and points at the WASM package', async () => {
+	// This host IS a prebuilt platform, so the bare staging exercises the
+	// "supported but not installed" arm (a lockfile from another OS,
+	// --omit=optional): the message must name the missing package as the remedy,
+	// not list the user's own platform as prebuilt and tell them to switch engines.
+	// The genuinely-unsupported arm can't be reached from a supported host.
+	it('a missing platform package fails loudly, naming the package to install', async () => {
 		const bare_loader = join(staged_bare, 'node_modules', '@fuzdev', 'tsv', 'index.js');
 		await assert.rejects(import(pathToFileURL(bare_loader).href), (e: unknown) => {
 			assert.ok(e instanceof Error);
 			assert.ok(e.message.includes(triple), `message names the triple: ${e.message}`);
+			assert.ok(
+				e.message.includes(`npm i @fuzdev/tsv-${triple}`),
+				`message names the install remedy: ${e.message}`
+			);
 			assert.ok(
 				e.message.includes('@fuzdev/tsv_wasm'),
 				`message points at the WASM fallback: ${e.message}`

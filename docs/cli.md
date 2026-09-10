@@ -105,8 +105,10 @@ All content-processing commands support three input methods:
 - **Stdin**: `command --stdin --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 
 `parse` and `format` also take `--source-type script|module` (TypeScript only — naming
-one for a Svelte or CSS input is an error, as it is on every binding, never a silent
-drop) — ESTree's own spelling, and the value the wire's `Program.sourceType`
+one for a Svelte or CSS input is an error, as it is on every JS binding, never a silent
+drop; the C FFI alone accepts its module code `0` on every language, the neutral value
+of a required `u32`, while rejecting the script code there — `tsv_ffi`'s `lib.rs` states
+the carve-out) — ESTree's own spelling, and the value the wire's `Program.sourceType`
 carries. It selects the parse goal: at `script`, `await` is an ordinary identifier
 and `import`/`export`/`import.meta` are errors. Unset, `parse` uses `module`, while
 `format` uses `module` **retried as `script`** if that parse fails (see
