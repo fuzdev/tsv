@@ -447,6 +447,33 @@ Three slot rules bound the scan, because the gap can hold erased structure:
   (`a = 1; /* c */ ; b = 2;` trails, `a = 1; ; /* c */ b = 2;` leads, both matching
   prettier).
 
+⚠️ **An orphan slot claims nothing it cannot also place, and moves no claim ANCHOR.** A
+dropped `;`'s run is a leading run with its item dropped, so two things bound it. Its cursor
+IS its upper bound — everything it emitted is behind `prev_end` — which means it never needs
+to advance the already-trailed anchor, and advancing it is a DROP: the bound is capped by the
+*next* dropped `;`'s start, a third position `Printer::comment_already_trailed`'s ⚠️ does not
+admit, and one that can share a later comment's line (`a()// c1⏎;;;; // c2` lost `// c2`;
+the shape needs two `;`s, which is why one never showed it). Keeping the last printed
+statement's anchor instead preserves the one reading that IS meaningful — a comment its
+trailing run claimed and its clamped cursor stopped short of. And in a **switch consequent**
+a TRAILING run of dropped `;`s — none with a printed statement after it — claims nothing at
+all: there is no item left in the consequent to lead, so the comments are the CASE seam's and
+the between-case run lands them at the case's level, which is where a reformat reads them
+back from. Claiming them at the consequent's level printed a form that was not its own fixed
+point (`case 1: fn1();⏎// c⏎;` dedented on pass two), an F1 break no fixture could hold,
+since no `input` contains the authoring. The bound is the printing arm's own `has_next_stmt`.
+
+⚠️ **An orphan slot's cursor is MONOTONE**, and this is the third rule the two copies of the
+walk have to hold alike. A slot's own bounds — the next `;`'s start, the claim split — know
+nothing about where the last PRINTED statement's trailing run ended, and a run that follows a
+multi-line block to its closing line ends *past* a following `;` (`a();;; /* m⏎n */ // c`).
+Taking those bounds raw moves the cursor BACKWARD over comments already emitted, and the slot
+prints them a SECOND time — a real double-print, which the block walk clamps with `.max(prev_end)`
+and the switch consequent's copy did not. Nothing else catches it: the print-once ledger sees a
+document only as authored, and no fixture held the shape. Its blank question is shared too
+(`Printer::blank_before_orphan_run`), for the reason the leading run's is. Pinned by
+[switch/consequent_empty_statement_run_multiline_trailer](../tests/fixtures/typescript/statements/switch/consequent_empty_statement_run_multiline_trailer/).
+
 ⚠️ **The BLANK question wants the opposite treatment of that same dropped `;`, so the
 list carries two cursors.** The comment cursor advances past a `;` that prints nothing
 (the slot rules above); the blank question must not, because prettier's
@@ -500,6 +527,47 @@ every kind the table lists, the unlisted controls, both comment directions, the
 `SwitchCase` label gap that is measured from a kind with no split at all (with its
 author-blank null control), and the frozen spelling, whose terminator is the printer's for
 the same reason.
+
+⚠️ **The TRAILING RUN reads that terminator too — as a LINE REFERENCE, never as an
+anchor.** A trailing run asks about the OUTPUT line, not the author's, and the reference
+tracks the last source position whose PRINTED image is still on this line — the same rule
+the walks already apply to a multi-line block comment (follow it to its closing line). Two
+authorings put something between the run's anchor and a comment that begins no output line
+of its own, and they are one question: the statement's **own `;`** when the author detached
+it (`a()⏎; // c`) prints back **up** on the content's line, and a **dropped
+`EmptyStatement`** (`a();⏎; // c`) prints **nothing at all**. `Printer::printed_tail` names
+the position — the gap's slot floor, when it sits below `Printer::statement_emitted_end` on a
+line of its own, which is one compare plus one line test, so no kind table is read twice —
+and `TrailingLineRef` steps it for both walks (`Printer::trailing_same_line_comments_through`
+over what the emitter owes, `Printer::find_end_with_trailing_comments` over the bytes, so the
+cursor lands exactly past the run). Three things follow. The run still OPENS at the emitted
+end, and the jump fires only at or past the tail, so a comment in the terminator gap itself
+is unreached — that one is the gap's, and the seam above places it. A `//` the run takes
+**closes** it, since it owns the rest of the OUTPUT line: without a jump no comment can
+follow a `//` on one source line and the rule is inert, with one it is what keeps
+`a() // c1⏎; /* c2 */` from welding. And the claim stays a PREFIX — an own-line comment in
+the gap stops the run, so a `;`-line comment behind it is handed forward *with* it, in
+authored order, where prettier splits the claim and reorders the two. Pinned by
+[syntax/comments/comment_after_detached_semicolon](../tests/fixtures/typescript/syntax/comments/comment_after_detached_semicolon/)
+[statements/empty_statement_line_trailing_comment](../tests/fixtures/typescript/statements/empty_statement_line_trailing_comment/)
+and, for the reorder boundary,
+[syntax/comments/comments_around_detached_semicolon](../tests/fixtures/typescript/syntax/comments/comments_around_detached_semicolon_prettier_divergence/).
+
+⚠️ **An ejected gap moves the BLANK question too, and the two cursors each see one side of
+it.** A leading run wholly inside the previous statement's terminator gap is hoisted past
+that `;` whichever side the author wrote the blank on — above the run
+(`a() // c1⏎⏎// c2⏎;⏎b()`, which only the COMMENT cursor reaches, the blank cursor being
+anchored at the statement's FULL end, below the whole run) or below the terminator
+(`a()⏎/* c */;⏎⏎b()`, which only the BLANK cursor does — the "rides above instead, the break
+it sat on is gone" reading). So that arm is a **disjunction over both cursors**, and one
+`literalline` either way, so a blank on both sides still prints once. The neighbouring
+reading is its opposite: a run that SPANS the terminator (`x // a⏎;⏎⏎// b`) has the blank
+*between* its own members, where the run's own separator already places it, and hoisting it
+as well prints the author's single blank TWICE. Both walks ask this through one predicate
+(`StatementBlankScan::blank_before_leading_run`) — they had drifted, the block walk bounding
+its scan on the in-source axis and the consequent on the first comment it *emits*, and
+neither could see the above-the-run side at all. Pinned by
+[statements/terminator_gap_comment_run_blank](../tests/fixtures/typescript/statements/terminator_gap_comment_run_blank/).
 
 The split decides only the one-line authoring, where the forced statement-per-line
 break must put the comment somewhere; both two-line authorings are dual-stable and

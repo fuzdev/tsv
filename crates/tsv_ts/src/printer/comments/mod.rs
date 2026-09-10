@@ -279,6 +279,74 @@ pub(in crate::printer) enum TrailingBlank {
     Drop,
 }
 
+/// A trailing run's **line reference** — the last source position whose PRINTED image is
+/// still on the run's line — stepped one comment at a time.
+///
+/// A trailing run asks about the OUTPUT line, not the author's, and three things put a
+/// comment on it that a bare `is_same_line(anchor, comment)` cannot see. They are one rule:
+/// the reference tracks what has been printed, so it advances over anything whose image
+/// lands on this line.
+///
+/// - A **multi-line block comment** the run took carries it to that comment's closing line.
+/// - The statement's own **`;`**, when the author detached it (`a()⏎; // c`), prints back up
+///   on the content's line, so the reference jumps to it.
+/// - A **dropped `EmptyStatement`** (`a();⏎; // c`) prints nothing at all, so it cannot begin
+///   a new output line either, and the same jump reaches past it.
+///
+/// The last two are one value, the statement's [`Printer::printed_tail`]; [`u32::MAX`] where
+/// the run's line is the author's line throughout, which is every caller but the statement
+/// trailing runs.
+///
+/// ⚠️ **A `//` the run takes CLOSES it.** It owns the rest of the output line, so nothing
+/// joins the run behind it. Without a jump the rule is inert — no comment can follow a `//`
+/// on one SOURCE line — and with one it is what stops `a() // c1⏎; /* c2 */` welding the two
+/// into a single comment.
+///
+/// Both trailing walks step this and neither spells the rule, because they are one predicate
+/// over two axes (`docs/comments.md` §the three axes):
+/// [`Printer::trailing_same_line_comments_through`] over what this emitter owes,
+/// [`Printer::find_end_with_trailing_comments`] over the bytes physically there — and the
+/// cursor the second returns has to land exactly past the run the first emits. A re-spelled
+/// copy is how two walks drift (see [`Printer::push_member_trailing_run`], whose own doc
+/// records the last time it happened).
+pub(in crate::printer) struct TrailingLineRef {
+    line_ref: u32,
+    printed_tail: u32,
+    closed: bool,
+}
+
+impl TrailingLineRef {
+    pub(in crate::printer) fn new(after_pos: u32, printed_tail: u32) -> Self {
+        Self {
+            line_ref: after_pos,
+            printed_tail,
+            closed: false,
+        }
+    }
+
+    /// Whether `comment` is on the run's line — advancing the reference over it when it is.
+    /// `false` ends the run.
+    pub(in crate::printer) fn take(&mut self, printer: &Printer<'_>, comment: &Comment) -> bool {
+        if self.closed {
+            return false;
+        }
+        if comment.span.start >= self.printed_tail {
+            self.line_ref = self.line_ref.max(self.printed_tail);
+        }
+        if !printer.is_same_line(self.line_ref, comment.span.start) {
+            return false;
+        }
+        if comment.is_block {
+            if !printer.is_same_line(comment.span.start, comment.span.end) {
+                self.line_ref = comment.span.end;
+            }
+        } else {
+            self.closed = true;
+        }
+        true
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Push one **block** comment with `spacing` applied to its outer edges — the single
     /// definition of what [`CommentSpacing`] means for a comment that does not end its

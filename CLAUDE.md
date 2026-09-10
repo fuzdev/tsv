@@ -1021,7 +1021,11 @@ full in docs/comments.md; here is the seam to reach for:
   [§Array family vs params family](docs/comments.md#array-family-vs-params-family-whether-the-soft-line-collapses).
 - **Trailing and dangling runs** take their separator BEFORE each comment, never after
   (`Printer::push_trailing_body_comments`, `Printer::push_dangling_comment_run`); a run's
-  **anchor advances** over each comment it emits; a trailing GAP inside a construct
+  **anchor advances** over each comment it emits; a statement's run reads its own
+  **printed tail** as a LINE reference, since neither a `;` the author put a line below the
+  content (it prints back up on it) nor a dropped `EmptyStatement` (it prints nothing)
+  begins a new output line (`Printer::printed_tail`, stepped by `TrailingLineRef`, and a
+  `//` the run takes closes that line); a trailing GAP inside a construct
   (`Printer::push_trailing_comments_in_range`) asks the source and carries the break **inside**
   the `line_suffix`. The kind-keyed "a block needs no break" formulation welds
   `/* c1 *//* c2 */` — lossless and idempotent, so blind to every gate but a prettier `compare`.
