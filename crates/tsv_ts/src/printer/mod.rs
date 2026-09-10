@@ -1486,6 +1486,95 @@ impl<'a> Printer<'a> {
         })
     }
 
+    /// **on page**: whether an **indentable** block comment leads the value in the
+    /// operator→value gap — prettier's `chooseLayout` fourth disjunct
+    /// (`hasComment(rightNode, Leading, isIndentableBlockComment)` →
+    /// `break-after-operator`), which sits ahead of every layout the value or the binding
+    /// would otherwise take.
+    ///
+    /// ⚠️ **The axis is LEADING-ness, not ownership**, and confusing the two is what this
+    /// exists to stop. A reading keyed on the comment the value OWNS resolves it from the
+    /// value's own first token, so anything standing between the two hides it — a grouping
+    /// paren the printer discards (`= /**⏎ */ (x)`), a second comment
+    /// (`= /**⏎ */ /* c */ x`), a JSDoc cast's retained `(`. Prettier asks the question of
+    /// every comment attached LEADING the value, and every comment in this gap is one, so
+    /// the gap is the range and the physical (on-page) axis is the reading: an owned member
+    /// is printed by the value's own doc but still occupies the page and still decides the
+    /// layout. That is why this subsumes the owned reading rather than sitting beside it —
+    /// an owned leading comment is whitespace-adjacent to the value's first token, hence
+    /// inside this range by construction.
+    ///
+    /// ⚠️ TODO: the hang is right, but the comment's hard break also propagates into the
+    /// VALUE's own group, so a value that would fit flat explodes with it
+    /// (`const a =⏎/** @type {A} */⏎(x) ? b : c` breaks the ternary; `= /**⏎ * c⏎ */ x + y +
+    /// z` breaks the binary chain). Prettier keeps them flat: its leading comment is printed
+    /// *outside* the value's group, while an owned one travels inside its node's doc by
+    /// construction — the property that keeps a synthesized paren from landing between the
+    /// two. Fixing it means either hoisting the comment to the OUTERMOST node starting at it
+    /// (giving up that property) or a hard break that ends its line without breaking the
+    /// group around it; neither is local, and both need their own fixture.
+    ///
+    /// ⚠️ **Distinct from [`Self::comment_hangs_value_after_operator`]**, the gap's other
+    /// hang rule, and NOT foldable into it: that one is prettier's
+    /// `hasLeadingOwnLineComment`, which every operator→value family asks (an arrow body,
+    /// a binding default, an enum member). This one belongs to `printAssignment` alone —
+    /// prettier hangs an indentable block at a declarator, an assignment expression, a
+    /// class field, an object property and a type alias, and keeps it inline at a binding
+    /// default (`AssignmentPattern` prints as a plain `[left, " = ", right]`) and an enum
+    /// member. Asking it at a gap outside that family hangs values prettier leaves alone.
+    ///
+    /// The *preserved* (non-indentable) multi-line block is the null control and needs no
+    /// rule of its own: its interior prints verbatim through `literalline`s, and the fits
+    /// walk charges its first line to the operator's line and ends the measure at its
+    /// newline (`CachedWidth::HasNewline`), so the width-decided layouts place it exactly as
+    /// prettier's opaque-string measure does — `const a = /* line1⏎line2 */ x;` stays when
+    /// that first line fits and hangs when it does not
+    /// (`preserved_multiline_block_comment_long`). ⚠️ [`DocArena::will_break`] cannot stand
+    /// in for the test: tsv emits a preserved interior through `literalline`s so `fits` sees
+    /// the newlines, and it therefore answers `true` for BOTH shapes. Keying the layout on
+    /// `multiline` (or on `will_break`) hangs values prettier leaves inline.
+    ///
+    /// Pinned by `operator_value_indentable_block_comment_hang` (every seam, and the gap
+    /// reading's own shapes), `chain_value_glued_multiline_block_comment`,
+    /// `binding_layout_glued_multiline_block_comment` and `pure_annotation_value_hang`.
+    pub(crate) fn indentable_block_leads_value(&self, start: u32, end: u32) -> bool {
+        self.any_comment_on_page(start, end, |c| self.block_comment_is_indentable(c))
+    }
+
+    /// Whether the comment leading `value` **hangs** it under the operator — the whole
+    /// operator→value hang question for the `printAssignment` family, in one place because
+    /// its two twins (`build_declarator_init_doc`'s cascade and
+    /// [`Self::build_assignment_layout`]) must never answer it differently. That drift is
+    /// the standing hazard on the declarator builder, and this rule is its likeliest
+    /// casualty: a fact added to one twin alone is invisible until a fixture happens to
+    /// spell the other's position.
+    ///
+    /// Two halves, and they key on different things:
+    ///
+    /// - `indentable_leads_value` — [`Self::indentable_block_leads_value`] over the gap,
+    ///   keyed on the COMMENT's print shape. Precomputed by the caller, which is the one
+    ///   that holds the gap's spans (`RhsCommentInfo::indentable_leads_value`,
+    ///   `DeclaratorEqGap::indentable_leads_value`);
+    /// - [`Self::is_own_line_jsdoc_cast`] — keyed on the CAST's shape instead, so it hangs a
+    ///   single-line cast comment too, and it is the one hang every value gap owes (a
+    ///   binding default and an enum member ask it alone). Indentability never enters
+    ///   there, which is why the two cannot be folded into one test.
+    ///
+    /// ⚠️ **No layout arm may sit ahead of this.** Prettier hangs under every layout the
+    /// value or the binding would otherwise take — a never-break `1`, a short key, a
+    /// complex destructuring pattern, a curried arrow chain — so a shape-keyed arm placed
+    /// first shadows the rule for exactly that shape. Both twins ask it early (the
+    /// declarator's cascade, and [`Self::build_assignment_layout`] overriding `BreakLhs` /
+    /// `Fluid`, each after the chain-line-comment override), and a value-shape arm prettier
+    /// answers `fluid` by default belongs ahead of it in neither.
+    pub(crate) fn value_hangs_under_operator(
+        &self,
+        indentable_leads_value: bool,
+        value: &internal::Expression<'_>,
+    ) -> bool {
+        indentable_leads_value || self.is_own_line_jsdoc_cast(value)
+    }
+
     /// Whether a comment in `(start, end)` is separated from what follows it (the
     /// next comment, or `end`) by a blank line. Used where a blank line after a
     /// comment is itself a break trigger — e.g. a ternary branch (`a ? /* c */⏎⏎b`),

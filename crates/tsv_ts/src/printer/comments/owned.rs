@@ -170,42 +170,17 @@ impl<'a> Printer<'a> {
     }
 }
 
-/// Whether the comment a value **owns** **hangs** the value onto its own line after the
-/// operator (`=` / `:`) — the break-after-operator layout, ahead of every layout the
-/// value or the binding would otherwise take (a never-break value, a short key, a
-/// break-lhs pattern, a fluid chain, a curried arrow chain), which is where prettier
-/// lands for it too. See [`Printer::owned_leading_comment_hangs`].
+/// Ownership's emitters and lookups — who PRINTS an owned comment, and where its content
+/// begins — plus the one LAYOUT question ownership still answers,
+/// [`Printer::is_own_line_jsdoc_cast`].
 ///
-/// The comment that hangs is the **indentable** multi-line block (`/**⏎ * c⏎ */`), whose
-/// reprint is hard lines the enclosing group must honor
-/// ([`Printer::block_comment_is_indentable`]). ⚠️ The glued shape is NOT prettier's
-/// `hasLeadingOwnLineComment` (no newline follows the comment), and prettier's hang for it
-/// is layout-independent — it hangs a `1` under a short key as readily as a call under a
-/// pattern — so no layout arm may sit ahead of this rule
-/// (`chain_value_glued_multiline_block_comment`,
-/// `binding_layout_glued_multiline_block_comment`, `pure_annotation_value_hang`).
-///
-/// A *preserved* (non-indentable) multi-line block does NOT hang and needs no rule of its
-/// own: its interior prints verbatim through `literalline`s, and the fits walk charges the
-/// comment's first line to the operator's line and ends the measure at its newline
-/// (`CachedWidth::HasNewline`), so the width-decided layouts place it exactly as prettier's
-/// opaque-string measure does — `const a = /* line1⏎line2 */ x;` stays when the first line
-/// fits and hangs when it does not (`preserved_multiline_block_comment_long`). A
-/// `Pins`-to-the-operator half used to sit beside the hang here, from when the walk answered
-/// "fits" at any newline-bearing text without charging its first line; it is gone with
-/// that premise.
-///
-/// TODO: the hang is right, but the comment's hard break also propagates into the
-/// VALUE's own group, so a value that would fit flat explodes with it
-/// (`const a =⏎/** @type {A} */⏎(x) ? b : c` breaks the ternary; `= /**⏎ * c⏎ */ x + y +
-/// z` breaks the binary chain). Prettier keeps them flat: its leading comment is printed
-/// *outside* the value's group, while tsv's is inside it by construction — an owned
-/// comment travels in its node's doc, which is the property that keeps a synthesized
-/// paren from landing between the two. Fixing it means either hoisting the comment to the
-/// OUTERMOST node starting at it (giving up that property) or a hard break that ends its
-/// line without breaking the group around it; neither is a local change, and both need
-/// their own fixture. Pre-dates the leftmost-leaf resolution above and is not specific to
-/// a cast — the general indentable block does it too.
+/// ⚠️ **The general operator→value hang rule is NOT here, and must not come back.** It is
+/// the gap's ([`Printer::indentable_block_leads_value`], prettier's `chooseLayout` fourth
+/// disjunct), and it subsumes every owned comment by construction: an owned comment is
+/// whitespace-adjacent to the value's first token, so it lies inside that range and the
+/// on-page axis counts it. A node-keyed retelling of the rule goes blind to every comment
+/// something stands in front of — a discarded grouping paren, a second comment, a cast's
+/// retained `(` — which is exactly the bug that retired the one that used to live here.
 impl<'a> Printer<'a> {
     /// Build `build()`'s doc with the owned comment at `start` marked as **already claimed
     /// by an enclosing node**, so nothing beginning there claims it again
@@ -354,69 +329,28 @@ impl<'a> Printer<'a> {
         d.concat(&[self.build_comment_doc(comment), separator, doc])
     }
 
-    /// **on page**: whether the comment `expr` owns hangs the value under the operator
-    /// (`=` / `:`) — `false` when nothing it owns changes the layout.
-    ///
-    /// An owned comment is glued to `expr`'s first token and travels *inside* `expr`'s doc,
-    /// so it never reaches the operator→value gap the assignment layout inspects — its
-    /// `rhs_comments` is `None`. But the comment is still on the page, and prettier's
-    /// `hasLeadingOwnLineComment` sees it, so the layout must ask the node instead of the
-    /// gap. This is the general rule; a cast-only `is_own_line_jsdoc_cast` node check
-    /// would be its special case.
-    ///
-    /// **The answer is what the comment PRINTS as, not how many lines it spans.** General
-    /// ownership binds only a **same-line glued** block (`CommentGlue::SameLine`,
-    /// `bind_leading_comment`), so every comment reaching the general arm below is a block
-    /// sitting on the value's own line — the "line comment" and "newline after it" arms of
-    /// the sibling gap rules are unreachable here, and `multiline` alone is *wrong*: a
-    /// preserved multi-line block is multiline and does not hang (its first line is
-    /// charged to the operator's line by the fits walk instead — see the type doc), so
-    /// answering with it hangs values prettier leaves inline.
-    pub(crate) fn owned_leading_comment_hangs(&self, expr: &Expression<'_>) -> bool {
-        // Document-level short-circuit: no owned comment anywhere ⇒ no hang (and no
-        // `JsdocCast` exists, since a cast's comment is always owned).
-        if !self.has_owned_comments {
-            return false;
-        }
-        // A JSDoc cast keeps its own hang rule, and must: it prints a hardline between the
-        // comment and its `(` on exactly the shape `Self::jsdoc_cast_comment_own_line`
-        // describes, and a hang without that hardline strands the `(` (see that
-        // function's doc — it is the single source of truth for both). The cast is resolved
-        // through [`Self::leading_jsdoc_cast`] rather than matched because it may lead the value
-        // from the LEFTMOST LEAF rather than from `expr` itself, a position the lookup below
-        // cannot ask about. (That lookup would otherwise find an own-line cast's comment —
-        // it takes ownership's UNION glue — so the cast's return is also what keeps the
-        // general arm from answering for a shape whose hang rule is the cast's.)
-        if let Some(cast) = self.leading_jsdoc_cast(expr) {
-            // ⚠️ A cast's own-line shape hangs; its **glued** shape never does, even when
-            // indentable — the comment prints against its own `(`, so it does not hang the
-            // value the way a general owned comment does, and the general arm below is not
-            // asked for it.
-            return self.jsdoc_cast_comment_own_line(cast);
-        }
-        self.owned_leading_comment_at(expr.span().start)
-            .is_some_and(|comment| self.block_comment_is_indentable(comment))
-    }
-
     /// **on page**: whether the comment leading `value` is a JSDoc cast's that the author gave
-    /// a line of its own — the one owned-comment shape whose HANG the enclosing layout has to
-    /// supply itself.
+    /// a line of its own — the hang **every** value gap owes, and the one comment shape
+    /// [`Printer::indentable_block_leads_value`] cannot answer.
     ///
-    /// A value gap that builds its own layout (a binding default, an enum member) rather than
-    /// routing through [`Printer::build_assignment_layout`] must ask this, because the cast
-    /// prints a **hardline** between its comment and its `(` on exactly this shape
-    /// ([`Self::jsdoc_cast_comment_own_line`], the source of truth for both halves) and a
+    /// The hang here is **structural, not a layout preference**: the cast prints a
+    /// **hardline** between its comment and its `(` on exactly this shape
+    /// ([`Self::jsdoc_cast_comment_own_line`], the source of truth for both halves), and a
     /// hardline with no hang leaves that `(` at the binding's own indent — a form the next
-    /// pass collapses, so the authoring has no fixed point.
+    /// pass collapses, so the authoring has no fixed point. That is why the test is the
+    /// cast's SHAPE and not its comment's: an own-line cast hangs whether its comment is
+    /// indentable or a single line, where the general rule keys on indentability alone.
     ///
-    /// ⚠️ **The NARROW twin of [`Self::owned_leading_comment_hangs`], deliberately.** That
-    /// one also hangs an *indentable* owned block (`= /*⏎ * c⏎ */ 1`), and prettier hangs such
-    /// a block at a declarator while keeping it inline at a binding default and an enum member
-    /// — where tsv matches it (`member_init_multiline_block_comment`). Only the cast's own
-    /// hardline makes the hang structural rather than a layout preference, which is why those
-    /// two sites take this test and the declarator keeps the wide one. Both read the same cast
-    /// off [`Self::leading_jsdoc_cast`], so the pair cannot disagree about WHICH cast leads a
-    /// value — and both take that lookup's document-level short-circuit.
+    /// ⚠️ **Asked by every value gap, and that uniformity is the point.** The gaps that
+    /// build their own layout (a binding default, an enum member) ask it because nothing
+    /// else will; the `printAssignment` family asks it *beside* the general rule, which
+    /// covers everything else its own reading used to. The families still differ, and the
+    /// difference is the general rule's alone: prettier hangs an indentable block at a
+    /// declarator and keeps it inline at a binding default and an enum member — where tsv
+    /// matches it (`member_init_multiline_block_comment`), because those gaps ask only this.
+    /// Every asker reads the same cast off [`Self::leading_jsdoc_cast`], so none can
+    /// disagree about WHICH cast leads a value, and all take that lookup's document-level
+    /// short-circuit.
     pub(crate) fn is_own_line_jsdoc_cast(&self, value: &Expression<'_>) -> bool {
         self.leading_jsdoc_cast(value)
             .is_some_and(|cast| self.jsdoc_cast_comment_own_line(cast))

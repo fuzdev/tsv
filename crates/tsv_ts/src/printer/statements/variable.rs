@@ -46,6 +46,11 @@ pub(in crate::printer) struct DeclaratorEqGap {
     pub has_comments_before_eq: bool,
     /// Whether the `=`→initializer gap holds a comment to emit.
     pub has_comments_after_eq: bool,
+    /// Whether an INDENTABLE block comment leads the initializer
+    /// ([`Printer::indentable_block_leads_value`]) — prettier's `chooseLayout` fourth
+    /// disjunct, which hangs the value under the `=`. **on page**, so a comment the value
+    /// owns counts: the gap emits nothing for it, but it still decides the layout.
+    pub indentable_leads_value: bool,
 }
 
 /// What [`Printer::build_declarator_init_doc`] needs from the position a declarator sits
@@ -111,6 +116,7 @@ impl<'a> Printer<'a> {
                     init_start,
                     has_comments_before_eq,
                     has_comments_after_eq,
+                    indentable_leads_value,
                 },
         } = inputs;
         // `can_break(id_doc)` — prettier's `canBreak(leftDoc)`, which decides the fluid arm.
@@ -313,13 +319,14 @@ impl<'a> Printer<'a> {
         let needs_break_after_op_layout =
             is_non_inline_binary || conditional_should_break_after_op(init);
 
-        // A comment the initializer *owns* (a JSDoc cast, a bundler annotation) is
-        // glued to its first token and travels inside its doc, so the gap probes
-        // above cannot see it. It is still on the page and still decides the `=`
-        // layout — this declarator builds its own layout rather than routing
-        // through `build_assignment_layout`, so it applies the rule itself; see
-        // `owned_leading_comment_hangs`.
-        let owned_comment_hangs = self.owned_leading_comment_hangs(init);
+        // The operator→value hang — prettier's `chooseLayout` fourth disjunct plus the
+        // own-line JSDoc cast beside it, both in [`Printer::value_hangs_under_operator`],
+        // stated once so this cascade and its twin cannot answer it differently. This
+        // declarator builds its own layout rather than routing through
+        // `build_assignment_layout`, so it applies the rule itself; the twin takes the
+        // indentable half through `RhsCommentInfo::indentable_leads_value` as this one
+        // takes it through `DeclaratorEqGap`.
+        let comment_hangs_value = self.value_hangs_under_operator(indentable_leads_value, init);
 
         // Every value-keyed hang, gated ONCE on layout eligibility: a value whose own line
         // comments expand it takes the never-break arm instead.
@@ -375,8 +382,8 @@ impl<'a> Printer<'a> {
         // literal text and a hang inside a declarator therefore landed at the statement's
         // column — the list is a doc-tree `indent` now
         // (`build_variable_declaration_doc`), so the hang sits one level past the
-        // declarator, where prettier puts it (`multiple/init_long`). The owned-comment
-        // hang has its own arm above this one (`owned_comment_hangs`).
+        // declarator, where prettier puts it (`multiple/init_long`). The leading-comment
+        // hang has its own arm above this one (`comment_hangs_value`).
         let needs_break_after_operator = is_break_after_op_rhs && !d.will_break(id_doc);
 
         // A curried chain whose heads trigger `arrow_chain_should_break` breaks
@@ -416,8 +423,8 @@ impl<'a> Printer<'a> {
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" ="));
             parts.push(d.indent_hardline(value()));
-        } else if owned_comment_hangs {
-            // The owned comment's hang (see `owned_comment_hangs`). The binding prints as
+        } else if comment_hangs_value {
+            // The leading comment's hang (see `comment_hangs_value`). The binding prints as
             // built — a pattern or a type annotation stays flat while it fits, prettier's
             // `group(leftDoc)` — and a curried chain takes the assignment-RHS chain layout,
             // as it does under every hang the twin builds.
@@ -878,6 +885,15 @@ impl<'a> Printer<'a> {
                         // trivially empty.
                         (init_start, false, false)
                     };
+                // prettier's `chooseLayout` fourth disjunct
+                // ([`Printer::indentable_block_leads_value`]), resolved here rather than in
+                // the layout builder because it rides the same zero-comment fast gate as
+                // its two siblings: with no comment anywhere in the name→value gap,
+                // `equals_pos` is a never-read sentinel and the scan would be over a
+                // degenerate range. **on page**, unlike `has_comments_after_eq` — a JSDoc
+                // cast's comment is OWNED and so emits nothing here, and it still hangs.
+                let indentable_leads_value = gap_has_comments
+                    && self.indentable_block_leads_value(equals_pos + 1, init_start);
 
                 // The `=`→initializer value head: an own-line directive there freezes the
                 // whole initializer. Rides the gap probe above — a directive is a comment,
@@ -931,6 +947,7 @@ impl<'a> Printer<'a> {
                             init_start,
                             has_comments_before_eq,
                             has_comments_after_eq,
+                            indentable_leads_value,
                         },
                     },
                     &|| self.build_init_value_doc(init, declarator.span.end, init_frozen),

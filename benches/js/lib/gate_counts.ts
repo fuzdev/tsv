@@ -451,7 +451,19 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// `…/jsdoc-nestled-dangling.js` arrive from `unknown` (75 → 73, which names the change and
 	// carries its measurement) — a byte-adjacent pair of indentable block comments is ONE
 	// comment, so no separator comes between them.
-	typescript: 5174,
+	//
+	// 5174 → 5175: `prettier/tests/format/js/comments-closure-typecast/closure-compiler-type-cast.js`
+	// arrives from `known` (`unknown` and `partial` both unmoved at 73 / 22) — the assignment
+	// seams gained prettier's FOURTH `chooseLayout` disjunct, `hasComment(rightNode, Leading,
+	// isIndentableBlockComment)`, so an indentable block leading the value hangs it even when a
+	// discarded grouping paren, a second comment, or a cast's retained `(` stands between the
+	// comment and the value's first token. ONE mover in the whole view, measured both ways: two
+	// `--profile corpus` CLIs (parent `56db1e366` in a detached worktree with its own
+	// `CARGO_TARGET_DIR`, and the tip) over the 11,491 `find`-enumerated corpus + prettier-suite
+	// files, per-file stdout / stderr / exit compared — one differing file, and the 950 shared
+	// rejects re-run at `--source-type script` move nothing either; then the `--all --json`
+	// bucket lists, where every other bucket is file-for-file identical and SAFETY stays 0.
+	typescript: 5175,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it

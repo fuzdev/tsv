@@ -860,6 +860,13 @@ pub struct RhsCommentInfo {
     /// the fits walk. `false` when the run has an own-line separator (a real hardline
     /// the value must sit under), or when `comments` is `None`.
     pub glued_through: bool,
+    /// An INDENTABLE block comment leads the RHS
+    /// ([`Printer::indentable_block_leads_value`]) — prettier's `chooseLayout` fourth
+    /// disjunct, which takes `BreakAfterOperator` ahead of every layout the value or the
+    /// left would otherwise choose. Resolved by the caller, which is the one that holds the
+    /// gap's spans; **on page**, so a comment the RHS owns counts even though `comments` is
+    /// `None` for it.
+    pub indentable_leads_value: bool,
     /// When `Some`, scan for trailing comments from stripped grouping parens between
     /// the RHS end and this boundary, wrapping in parens if found.
     pub boundary: Option<u32>,
@@ -877,6 +884,7 @@ impl RhsCommentInfo {
             comments: None,
             has_line_comment: false,
             glued_through: false,
+            indentable_leads_value: false,
             boundary: None,
             frozen,
         }
@@ -994,8 +1002,8 @@ impl<'a> Printer<'a> {
         // Keep the chain with `=` (NeverBreakAfterOperator) so it doesn't also break
         // after the operator, which would double-indent the broken chain.
         //
-        // Asked BEFORE the owned-comment rules below: an indentable comment the value
-        // owns hangs it whatever its chain holds — prettier hangs it too, and the chain
+        // Asked BEFORE the hang rule below: an indentable comment leading the value
+        // hangs it whatever its chain holds — prettier hangs it too, and the chain
         // then breaks at its own comment one level further in — and the declarator's
         // twin answers the same way (`chain_value_glued_multiline_block_comment`).
         if self.has_line_comments_in_member_chain(right_expr)
@@ -1004,15 +1012,24 @@ impl<'a> Printer<'a> {
         {
             layout = AssignmentLayout::NeverBreakAfterOperator;
         }
+        // The operator→RHS hang — prettier's `chooseLayout` fourth disjunct plus the
+        // own-line JSDoc cast, both in [`Printer::value_hangs_under_operator`], stated once
+        // so this and the declarator's twin cannot answer it differently. Its indentable
+        // half is resolved by the caller, which holds the gap's spans
+        // (`RhsCommentInfo::indentable_leads_value`).
+        //
+        // A separate arm from the `will_break` one above and not foldable into it: that one
+        // is width-adjacent and declines a run glued through to the value, where this rule
+        // fires ON the glue (`= /**⏎ */ (x)`, the comment glued to a paren the printer
+        // discards). A *preserved* multi-line block takes neither and is placed by width
+        // like any other text, its first line charged to the operator's line.
+        //
         // A comment the RHS *owns* (a JSDoc cast, a bundler annotation) is glued to its
         // first token and travels inside its doc, so it is never in `rhs_comments` — the
-        // gap emits nothing for it. It is still on the page and still decides the layout,
-        // so ask the node: an indentable owned comment hangs the value
-        // (`owned_leading_comment_hangs`); a preserved multi-line one takes no arm and is
-        // placed by width like any other text, its first line charged to the operator's
-        // line.
+        // gap emits nothing for it. The gap reading is **on page** and counts it anyway,
+        // which is why no owned companion is needed here.
         if layout != AssignmentLayout::BreakAfterOperator
-            && self.owned_leading_comment_hangs(right_expr)
+            && self.value_hangs_under_operator(rhs_info.indentable_leads_value, right_expr)
         {
             layout = AssignmentLayout::BreakAfterOperator;
         }
