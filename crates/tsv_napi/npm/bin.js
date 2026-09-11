@@ -55,17 +55,19 @@ if (bin === undefined) {
 		);
 		await import('./cli.js');
 	} else if (result.signal) {
-		// the child died by signal — re-raise it so the parent's exit status
-		// reports the same signal death (128+n) instead of a plain exit code. A
-		// signal this host cannot raise (a name it has no number for) must not turn
-		// into an unhandled exception with a stack trace: the shell's own spelling
-		// of a signal death, 128 + its number, is the fallback, and 1 past that.
-		try {
-			process.kill(process.pid, result.signal);
-		} catch {
-			const number = constants.signals[result.signal];
-			process.exit(number === undefined ? 1 : 128 + number);
+		// The child died by signal: re-raise it, so this process dies the same way. Not
+		// SIGUSR1, which starts Node's inspector instead; and a re-raise Node survives
+		// (SIGPIPE is ignored) or cannot make falls through to the shell's spelling of a
+		// signal death, 128 + its number — never exit 0.
+		const number = constants.signals[result.signal];
+		if (result.signal !== 'SIGUSR1') {
+			try {
+				process.kill(process.pid, result.signal);
+			} catch {
+				// a signal this host cannot raise — the exit below reports it
+			}
 		}
+		process.exit(number === undefined ? 1 : 128 + number);
 	} else {
 		process.exit(result.status ?? 1);
 	}

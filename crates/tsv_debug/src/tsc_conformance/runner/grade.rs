@@ -386,7 +386,7 @@ fn grade_test(
                 "parse_rejected"
             }
             ParseReport::Parsed(facts) => {
-                if facts.used_script_retry {
+                if facts.used_script_retry() {
                     report.script_retry += 1;
                 }
                 // Resolve this variant's lib set (cached) and merge the bound program

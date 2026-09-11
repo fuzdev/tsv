@@ -54,7 +54,7 @@
 //! thread.
 
 use crate::err_line;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Mutex, PoisonError};
 use std::thread;
 
 /// Stack reserved for every thread tsv runs language work on.
@@ -110,12 +110,14 @@ pub fn clamp_worker_count(requested: usize) -> usize {
 ///
 /// The name is not decoration: an overflow is uncatchable, so the runtime's
 /// `thread '<name>' has overflowed its stack` line is the *only* diagnostic the
-/// failure leaves behind, and an unnamed thread prints `<unknown>` there. Keep names
-/// under 15 bytes — Linux truncates past that.
+/// failure leaves behind, and an unnamed thread prints `<unknown>` there. That line
+/// prints the name in full; keep it to 15 bytes all the same, because the copy the OS
+/// keeps — what `ps`, `top`, `perf`, a debugger and a core dump show — is truncated
+/// past that on Linux.
 pub fn sized_thread(name: &str) -> thread::Builder {
     debug_assert!(
         name.len() < 16,
-        "thread name `{name}` is over the 15-byte Linux limit and would be truncated in the one diagnostic an overflow leaves"
+        "thread name `{name}` is over Linux's 15-byte limit, so `ps`, `perf` and a core dump would show it truncated"
     );
     thread::Builder::new()
         .stack_size(STACK_SIZE)
@@ -145,22 +147,23 @@ pub fn sized_thread(name: &str) -> thread::Builder {
 /// handed over in a cell the fallback can take it back out of.
 pub fn run_on_sized_stack<F, T>(f: F) -> T
 where
-    F: FnOnce() -> T + Send + 'static,
-    T: Send + 'static,
+    F: FnOnce() -> T + Send,
+    T: Send,
 {
-    let held = Arc::new(Mutex::new(Some(f)));
-    let claimed = Arc::clone(&held);
-    match sized_thread("tsv").spawn(move || take_and_run(&claimed)) {
-        Ok(handle) => handle
-            .join()
-            .unwrap_or_else(|_| std::process::exit(PANIC_EXIT_CODE)),
-        Err(e) => {
-            err_line!(
-                "warning: could not start the sized thread ({e}); running on the inherited stack"
-            );
-            take_and_run(&held)
-        }
-    }
+    let held = Mutex::new(Some(f));
+    thread::scope(
+        |scope| match sized_thread("tsv").spawn_scoped(scope, || take_and_run(&held)) {
+            Ok(handle) => handle
+                .join()
+                .unwrap_or_else(|_| std::process::exit(PANIC_EXIT_CODE)),
+            Err(e) => {
+                err_line!(
+                    "warning: could not start the sized thread ({e}); running on the inherited stack"
+                );
+                take_and_run(&held)
+            }
+        },
+    )
 }
 
 /// Take the closure out of the cell and run it.

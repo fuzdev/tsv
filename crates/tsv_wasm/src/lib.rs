@@ -495,7 +495,7 @@ impl OptionsSpec {
 /// retry — which is what lets an editor's bare `format_typescript(source)` format a
 /// legacy sloppy script. A SET value is exact on both.
 #[cfg(any(feature = "parse", feature = "format"))]
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 struct Options {
     #[cfg(feature = "parse")]
     locations: bool,
@@ -507,6 +507,7 @@ struct Options {
 /// decides over this enum alone, which is what lets `cargo test` grade the decision
 /// natively (a `JsValue` cannot be built off the wasm target).
 #[cfg(any(feature = "parse", feature = "format"))]
+#[cfg_attr(test, derive(Clone))]
 enum OptionValue {
     Undefined,
     Bool(bool),
@@ -774,15 +775,7 @@ mod tests {
     fn entries(pairs: &[(&str, OptionValue)]) -> Vec<(String, OptionValue)> {
         pairs
             .iter()
-            .map(|(k, v)| {
-                let v = match v {
-                    OptionValue::Undefined => OptionValue::Undefined,
-                    OptionValue::Bool(b) => OptionValue::Bool(*b),
-                    OptionValue::Str(s) => OptionValue::Str(s.clone()),
-                    OptionValue::Other => OptionValue::Other,
-                };
-                ((*k).to_owned(), v)
-            })
+            .map(|(k, v)| ((*k).to_owned(), v.clone()))
             .collect()
     }
 

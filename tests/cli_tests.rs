@@ -1280,8 +1280,8 @@ fn test_command_name_is_independent_of_argv0() {
 
 #[test]
 fn test_version_is_top_level_only() {
-    // Subcommands don't take --version — an unrecognized-argument error, like
-    // the JS mirror's strict parseArgs (exit 1).
+    // Subcommands don't take --version — argh's unrecognized-argument error, which
+    // the JS mirror's transcription of argh repeats word for word (exit 1).
     let output = tsv(&["format", "--version"]);
     assert_eq!(output.status.code(), Some(1));
     assert!(
@@ -2271,13 +2271,20 @@ fn test_source_type_refused_on_a_goalless_language() {
 ///
 /// A fresh tree per call, because a second run has nothing to report: the files are
 /// formatted in place, so the report that has to overflow the pipe exists only once.
-/// Test helper; panicking on IO failure is the desired behavior.
+#[cfg(unix)]
+fn pipe_overflow_tree(name: &str) -> TempTree {
+    long_name_tree(name, PIPE_TREE_FILES)
+}
+
+/// `count` unformatted files with 150-byte names — the lever the pipe and socket rows
+/// turn, since what has to overflow the buffer is the changed-path report. Test
+/// helper; panicking on IO failure is the desired behavior.
 #[cfg(unix)]
 #[allow(clippy::expect_used)]
-fn pipe_overflow_tree(name: &str) -> TempTree {
+fn long_name_tree(name: &str, count: usize) -> TempTree {
     let tree = temp_dir(name);
     let pad = "p".repeat(150);
-    for i in 0..PIPE_TREE_FILES {
+    for i in 0..count {
         fs::write(tree.path().join(format!("{pad}_{i}.ts")), UNFORMATTED_TS)
             .expect("write seed file");
     }
@@ -2503,19 +2510,22 @@ fn test_parse_closed_pipe_is_not_a_parse_error() {
 /// A **non-blocking** stdout is a slow consumer, not a failure: the run waits it out and
 /// every line arrives.
 ///
-/// Whether the fd blocks is a property of the open file description, which the parent
-/// owns — a Node parent that has initialized its own `process.stdout` on a pipe has
-/// flipped that description to non-blocking, and the `@fuzdev/tsv` loader execs this
-/// binary with exactly such an inherited fd. A full pipe then answers `EAGAIN` where a
+/// Whether the fd blocks is a property of the open file description, which the child
+/// shares with its parent — and a Node parent that opens its own piped
+/// `process.stdout` while `tsv` runs (a task runner logging beside an async child)
+/// flips that description to non-blocking under it. A full pipe then answers `EAGAIN` where a
 /// blocking one would park the write, and `write_all` panicked on it (exit 134 under
 /// `panic = "abort"`) after every file had already been rewritten — the same crash
 /// `cli.js`'s `write_fd` was fixed for. A `UnixStream` pair stands in for the flipped
 /// pipe: the child's end is set non-blocking before it is handed over as stdout, the
 /// reader holds the other end and drains late, and a socket's send buffer fills and
 /// answers `EAGAIN` exactly as a pipe's does — once it is full. A socket buffers
-/// ~200 KiB where a pipe buffers 64 KiB, so this tree is `SOCKET_TREE_FILES` deep
-/// rather than `PIPE_TREE_FILES`: the 1,200-file report fits in a socket whole, and the
-/// row then passes with the `EAGAIN` arm removed (it was checked; it did).
+/// ~200 KiB on Linux where a pipe buffers 64 KiB, so this tree is `SOCKET_TREE_FILES`
+/// deep rather than `PIPE_TREE_FILES`: the 1,200-file report fits in a socket whole, and
+/// the row then passes with the `EAGAIN` arm removed (it was checked; it did). The
+/// reader keys on the report itself rather than on a clock: its first byte arrives only
+/// once the report's first write has landed and filled the buffer, so however long the
+/// formatting took, the writer's next attempt meets a full socket.
 #[cfg(unix)]
 #[test]
 fn test_format_non_blocking_stdout_is_waited_out_not_a_crash() {
@@ -2525,12 +2535,7 @@ fn test_format_non_blocking_stdout_is_waited_out_not_a_crash() {
     use std::process::Stdio;
 
     const SOCKET_TREE_FILES: usize = 6000;
-    let tree = temp_dir("non_blocking_stdout");
-    let pad = "p".repeat(150);
-    for i in 0..SOCKET_TREE_FILES {
-        fs::write(tree.path().join(format!("{pad}_{i}.ts")), UNFORMATTED_TS)
-            .expect("write seed file");
-    }
+    let tree = long_name_tree("non_blocking_stdout", SOCKET_TREE_FILES);
     let (mut reader, writer) = UnixStream::pair().expect("socket pair");
     writer.set_nonblocking(true).expect("set O_NONBLOCK");
     let mut child = Command::new(built_tsv())
@@ -2540,9 +2545,14 @@ fn test_format_non_blocking_stdout_is_waited_out_not_a_crash() {
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn tsv");
-    // the slow consumer: nothing drains the socket until the writer has surely filled it
-    std::thread::sleep(std::time::Duration::from_millis(500));
-    let mut stdout = String::new();
+    // the slow consumer: take one byte, which comes only once the report's first write
+    // has filled the socket, then leave the rest undrained while the writer retries
+    let mut first = [0_u8; 1];
+    reader
+        .read_exact(&mut first)
+        .expect("the report's first byte");
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    let mut stdout = String::from_utf8(first.to_vec()).expect("an ASCII path byte");
     reader.read_to_string(&mut stdout).expect("drain stdout");
     let status = child.wait().expect("wait");
     let mut stderr = String::new();

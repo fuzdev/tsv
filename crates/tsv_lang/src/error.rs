@@ -207,7 +207,7 @@ impl ParseError {
     /// parse goal admits and the other refuses, so the error is evidence about the
     /// source's grammar rather than about a mistake in it. See
     /// [`ParseError::is_goal_gated`].
-    pub fn goal_gated(message: String, position: usize) -> Self {
+    pub fn goal_gate(message: String, position: usize) -> Self {
         ParseError::new(ParseErrorKind::InvalidSyntax {
             message,
             position,
@@ -216,7 +216,7 @@ impl ParseError {
         })
     }
 
-    /// Whether this error is a goal gate ([`ParseError::goal_gated`]).
+    /// Whether this error is a goal gate ([`ParseError::goal_gate`]).
     ///
     /// The format fallback holds two errors for one source when both goals reject it,
     /// and a *script* attempt that died on a goal gate has proved the source a module —
@@ -332,9 +332,10 @@ impl ParseError {
 
 impl ParseErrorKind {
     /// The position and context slots of a located error, `None` for the one
-    /// positionless kind (`FileTooLarge`). The single statement of which variants carry a
-    /// position — `position`, `shift_position` and `with_context` each read it rather
-    /// than restating the variant list, so a new variant is classified once, here.
+    /// positionless kind (`FileTooLarge`). Which variants carry a position is stated here
+    /// and in [`ParseErrorKind::located_mut`] — one match cannot lend both a shared and
+    /// an exclusive borrow — so `position`, `shift_position` and `with_context` restate
+    /// no variant list of their own, and a new variant is classified in these two.
     fn located(&self) -> Option<(&usize, &Option<ErrorContext>)> {
         match self {
             ParseErrorKind::UnexpectedToken {
@@ -351,7 +352,7 @@ impl ParseErrorKind {
         }
     }
 
-    /// [`ParseErrorKind::located`], mutably.
+    /// [`ParseErrorKind::located`], mutably — the same variant list, kept in step.
     fn located_mut(&mut self) -> Option<(&mut usize, &mut Option<ErrorContext>)> {
         match self {
             ParseErrorKind::UnexpectedToken {
@@ -372,6 +373,20 @@ impl ParseErrorKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The goal-gate mark rides the payload through the two rewrites a located error
+    /// takes on its way out of an embedded parse — the offset shift and the context
+    /// fill — and every other constructor leaves it unset.
+    #[test]
+    fn test_goal_gate_mark_survives_shift_and_context() {
+        let e = ParseError::goal_gate("'export' is only allowed in a module".to_string(), 0)
+            .shift_position(3)
+            .with_context("x; export {};");
+        assert!(e.is_goal_gated());
+        assert_eq!(e.position(), Some(3));
+        assert!(!ParseError::invalid_syntax("x".to_string(), 0).is_goal_gated());
+        assert!(!ParseError::unexpected_eof(0).is_goal_gated());
+    }
 
     /// `Display` forwards to the boxed kind, so the rendered message must be exactly
     /// what the enum's `#[error(...)]` attributes produce — both the bare

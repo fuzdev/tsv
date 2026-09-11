@@ -93,9 +93,9 @@ pub struct FileReport {
 pub enum ParseReport {
     /// The unit parsed (possibly via the `Goal::Script` retry).
     Parsed(ParsedFacts),
-    /// Both goals failed; `message` is the primary-goal (`Module`) error.
+    /// Both goals failed; `message` is the error the format fallback attributes.
     Rejected {
-        /// The `Goal::Module` parse error message.
+        /// The error `tsv_ts::parse_with_goal_or_fallback` reports when both goals fail.
         message: String,
     },
 }
@@ -105,12 +105,19 @@ pub enum ParseReport {
 pub struct ParsedFacts {
     /// The goal the unit parsed under.
     pub goal: Goal,
-    /// Whether the `Goal::Module` parse failed and the `Goal::Script` retry won.
-    pub used_script_retry: bool,
     /// The unit's module-vs-script indicator (import/export presence).
     pub module_ness: ModuleNess,
     /// The bound node count (0 when the program short-circuited before binding).
     pub node_count: u32,
+}
+
+impl ParsedFacts {
+    /// Whether the `Goal::Module` parse failed and the `Goal::Script` retry won — the
+    /// only way a unit parses at `Script`, since `parse_unit` names no goal.
+    #[must_use]
+    pub fn used_script_retry(&self) -> bool {
+        self.goal == Goal::Script
+    }
 }
 
 /// A parsed + bound program — variant-independent and fully owned
@@ -186,7 +193,7 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
     for (i, unit) in units.iter().enumerate() {
         let file = FileId(i as u32);
         match parse_unit(unit.source, arena) {
-            Ok((program, goal, used_script_retry)) => {
+            Ok(program) => {
                 let module_ness = module_ness(&program);
                 let bound = bind_file(&program, unit.source, file);
                 total_nodes += u64::from(bound.node_count);
@@ -211,8 +218,7 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
                     file,
                     name: unit.name.to_string(),
                     parse: ParseReport::Parsed(ParsedFacts {
-                        goal,
-                        used_script_retry,
+                        goal: program.goal,
                         module_ness,
                         node_count: bound.node_count,
                     }),
@@ -340,7 +346,7 @@ pub fn check_program_with_lib<'a>(
 /// goal (expected never for the bundled libs; the caller counts it as a carve-out).
 pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
     let arena = Bump::new();
-    let (program, _goal, _retry) = parse_unit(source, &arena)?;
+    let program = parse_unit(source, &arena)?;
     let bound = bind_file(&program, source, FileId::ROOT);
     // A lib contributes its globals through the merge either as an ambient script
     // (globals in `source_locals`) or, when the lib file is itself a module — e.g.
@@ -362,13 +368,10 @@ pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
 
 /// Parse a unit via the goal rule — `tsv_ts::parse_with_goal_or_fallback`, the same
 /// module-then-script fallback every format surface runs, so which error a double
-/// failure reports is stated once, there. Returns the program, the goal it parsed
-/// under (read back off the program, which records the grammar that produced it),
-/// and whether the `Script` retry won.
-fn parse_unit<'a>(source: &'a str, arena: &'a Bump) -> Result<(Program<'a>, Goal, bool), String> {
-    let program = parse_with_goal_or_fallback(source, None, arena).map_err(|e| e.to_string())?;
-    let goal = program.goal;
-    Ok((program, goal, goal == Goal::Script))
+/// failure reports is stated once, there. The program records the goal it parsed
+/// under (`Program::goal`), which is also how a caller learns the `Script` retry won.
+fn parse_unit<'a>(source: &'a str, arena: &'a Bump) -> Result<Program<'a>, String> {
+    parse_with_goal_or_fallback(source, None, arena).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -393,7 +396,7 @@ mod tests {
         match &result.files[0].parse {
             ParseReport::Parsed(facts) => {
                 assert_eq!(facts.goal, Goal::Module);
-                assert!(!facts.used_script_retry);
+                assert!(!facts.used_script_retry());
                 assert!(facts.node_count >= 3); // Program + decl + declarator (+ id)
             }
             ParseReport::Rejected { .. } => panic!("expected a clean parse"),
@@ -421,7 +424,7 @@ mod tests {
         match &result.files[0].parse {
             ParseReport::Parsed(facts) => {
                 assert_eq!(facts.goal, Goal::Script);
-                assert!(facts.used_script_retry);
+                assert!(facts.used_script_retry());
             }
             ParseReport::Rejected { .. } => panic!("expected the Script retry to win"),
         }

@@ -8,6 +8,7 @@ use crate::cli::out::{exit_with_error, write_stdout};
 use crate::cli::stack::{clamp_worker_count, sized_thread};
 use crate::err_line;
 use argh::FromArgs;
+use std::fmt::Write as _;
 use std::fs;
 use std::num::NonZeroUsize;
 use std::panic::{self, AssertUnwindSafe};
@@ -183,25 +184,19 @@ impl FormatCommand {
         // below which treats "nothing found" as a usage error. It wants the whole
         // set, so it takes the collecting walk.
         if self.list {
-            let discovered = match discover_files(&self.paths) {
-                Ok(discovered) => discovered,
-                Err(bad_args) => exit_bad_args(&bad_args),
-            };
-            report_discovery(
-                &discovered.diagnostics.errors,
-                &discovered.diagnostics.warnings,
-            );
+            let Discovered { files, diagnostics } =
+                discover_files(&self.paths).unwrap_or_else(|bad_args| exit_bad_args(&bad_args));
+            report_discovery(&diagnostics);
             // build the whole listing and emit it in one write: a per-path write
             // re-locks stdout and flushes for each of (potentially thousands of)
             // lines, which dominates `--list` on a large tree; one buffered write is
             // dramatically cheaper.
-            use std::fmt::Write as _;
             let mut listing = String::new();
-            for path in &discovered.files {
+            for path in &files {
                 let _ = writeln!(listing, "{}", path.display());
             }
             write_stdout(listing.as_bytes());
-            if !discovered.diagnostics.errors.is_empty() {
+            if !diagnostics.errors.is_empty() {
                 process::exit(2);
             }
             return;
@@ -232,7 +227,6 @@ impl FormatCommand {
         // dominates `--check` on a large unformatted tree. The common case (few
         // changes) keeps the buffer tiny. Errors stay per-line on stderr (rare,
         // and stderr is for immediate diagnostics).
-        use std::fmt::Write as _;
         let (mut changed, mut unchanged) = (0u32, 0u32);
         let mut errors = discovery_errors as u32;
         let mut changed_paths = String::new();
@@ -275,17 +269,17 @@ impl FormatCommand {
 /// Report the walk's diagnostics. Errors are counted by the caller; warnings
 /// (e.g. the heuristic-shadow no-op) go to stderr but have no effect on the exit
 /// code or stdout, so `--list` / `--check` output stays clean.
-fn report_discovery(errors: &[String], warnings: &[String]) {
-    for msg in errors {
+fn report_discovery(diagnostics: &Diagnostics) {
+    for msg in &diagnostics.errors {
         err_line!("error: {msg}");
     }
-    for msg in warnings {
+    for msg in &diagnostics.warnings {
         err_line!("warning: {msg}");
     }
 }
 
-/// An argument that resolved to neither a file nor a directory fails the whole
-/// run before anything is formatted.
+/// A bad path argument — neither a file nor a directory, or a file whose extension
+/// tsv doesn't handle — fails the whole run before anything is formatted.
 fn exit_bad_args(bad_args: &[String]) -> ! {
     for msg in bad_args {
         err_line!("error: {msg}");
@@ -318,7 +312,7 @@ fn exit_if_nothing_in_scope(file_count: usize, error_count: usize) {
 fn format_collected(paths: &[String], check: bool, jobs: usize) -> Formatted {
     let Discovered { files, diagnostics } =
         discover_files(paths).unwrap_or_else(|bad_args| exit_bad_args(&bad_args));
-    report_discovery(&diagnostics.errors, &diagnostics.warnings);
+    report_discovery(&diagnostics);
     exit_if_nothing_in_scope(files.len(), diagnostics.errors.len());
     let outcomes = format_files(&files, check, jobs);
     Formatted {
@@ -619,7 +613,7 @@ fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
         queue.finish();
         // ordering the results is this thread's work too, and the pool is still
         // draining, so it costs nothing on the wall
-        sink.keys.sort_by(|a, b| a.0.cmp(&b.0));
+        sink.keys.sort_unstable();
 
         // A pool the OS refused outright leaves this thread as the only worker. It
         // has already walked, so nothing streams — but the alternative is a run that
@@ -642,7 +636,7 @@ fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
     // the caller only streams a directory root, which always resolves, so the
     // bad-argument arm is unreachable here — handled anyway rather than asserted
     let diagnostics = discovery.unwrap_or_else(|bad_args| exit_bad_args(&bad_args));
-    report_discovery(&diagnostics.errors, &diagnostics.warnings);
+    report_discovery(&diagnostics);
     exit_if_nothing_in_scope(sink.keys.len(), diagnostics.errors.len());
 
     // slot by walk index, then read out in key order
@@ -697,7 +691,8 @@ fn drain_queue(queue: &FileQueue, check: bool) -> Vec<(usize, PathBuf, FileOutco
 
 /// Format one file into the worker's reusable arenas, writing in place when the
 /// output differs (unless `check`). Nothing borrowed from `arena`/`doc_arena`
-/// escapes, so the caller resets both after this returns (see `format_files`).
+/// escapes, so the caller resets both after this returns (see `drain_queue` /
+/// `drain_indexed`).
 fn format_file(
     path: &Path,
     check: bool,

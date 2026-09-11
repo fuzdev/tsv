@@ -39,8 +39,7 @@ impl TopLevel {
             // The subcommand is optional only so a bare `--version` parses;
             // a bare `tsv` must keep argh's required-subcommand behavior, so
             // this mirrors the exact text argh printed when the field was
-            // required (the npm cli.js pins the same contract: help-shaped
-            // stderr, exit 1).
+            // required (`cli.js` prints the same bytes, exit 1).
             None => out::exit_with_error(
                 1,
                 "One of the following subcommands must be present:\n    help\n    parse\n    format\n\nRun tsv --help for more information.",

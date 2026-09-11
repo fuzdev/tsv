@@ -52,7 +52,7 @@ import {
 	writeFileSync
 } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { constants as os_constants, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -178,6 +178,7 @@ rmSync(join(staged_no_binary, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_bi
 const posix = process.platform !== 'win32';
 let staged_bad_mode = '';
 let staged_signal = '';
+let staged_signal_usr1 = '';
 if (posix) {
 	// binary present but not executable — the spawn-EACCES fallback path
 	staged_bad_mode = stage(true);
@@ -190,6 +191,14 @@ if (posix) {
 	writeFileSync(
 		join(staged_signal, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name),
 		'#!/bin/sh\nkill -TERM $$\n',
+		{ mode: 0o755 }
+	);
+	// "binary" that dies by SIGUSR1 — whose re-raise would start Node's inspector
+	// rather than end the dispatcher, so it is reported instead
+	staged_signal_usr1 = stage(true);
+	writeFileSync(
+		join(staged_signal_usr1, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name),
+		'#!/bin/sh\nkill -USR1 $$\n',
 		{ mode: 0o755 }
 	);
 }
@@ -219,6 +228,7 @@ after(() => {
 		staged_no_binary,
 		staged_bad_mode,
 		staged_signal,
+		staged_signal_usr1,
 		empty_dir,
 		utf8_dir
 	]) {
@@ -1080,9 +1090,9 @@ describe('flag parity: the native CLI and cli.js recognize the same flags', () =
 // row: the two bins exit alike, on the code the row names; their stderr is
 // byte-identical; and it is still the message the row is about (without which a
 // row whose case stopped being reachable would pass on two identical
-// somethings). The rows deliberately stop where the messages stop being tsv's
-// own — argh and `parseArgs` word their own failures, and those agree on the
-// exit code alone.
+// somethings). argh's own parse failures are rows too — `cli.js` transcribes
+// argh's grammar and its words — and the rows stop only where the messages stop
+// being either's (the OS words its own errors).
 const USAGE_ROWS: Array<{ args: Array<string>; exit: number; says: string }> = [
 	// `format` — the single-input mode, in its validation order
 	{ args: ['format'], exit: 2, says: 'No input provided' },
@@ -1176,7 +1186,7 @@ const USAGE_ROWS: Array<{ args: Array<string>; exit: number; says: string }> = [
 		exit: 1,
 		says: "invalid --source-type 'bogus'"
 	},
-	// argh's own grammar, restated by the mirror ahead of `parseArgs` (`parse_argv`):
+	// argh's own grammar, transcribed by the mirror (`parse_argv`):
 	// no inline values, no short flags, a value-taking flag with nothing after it,
 	// and the extra positional refused before any value is looked at
 	{
@@ -1193,7 +1203,42 @@ const USAGE_ROWS: Array<{ args: Array<string>; exit: number; says: string }> = [
 		args: ['parse', 'a.ts', 'b.ts', '--source-type', 'bogus'],
 		exit: 1,
 		says: 'Unrecognized argument: b.ts'
-	}
+	},
+	// a help word sets a flag and parsing CONTINUES: a later flag refuses, an earlier
+	// bad value or a later extra positional still errors, and a help word ahead of the
+	// subcommand is handed down to it
+	{ args: ['format', 'help', '--check'], exit: 1, says: 'Trailing arguments are not allowed' },
+	{ args: ['--help', '--version'], exit: 1, says: 'Trailing arguments are not allowed' },
+	{ args: ['help', 'format', '--check'], exit: 1, says: 'Trailing arguments are not allowed' },
+	{
+		args: ['format', '--parser', 'bogus', 'help'],
+		exit: 1,
+		says: "Error parsing option '--parser' with value 'bogus'"
+	},
+	{ args: ['parse', 'a.ts', 'b.ts', 'help'], exit: 1, says: 'Unrecognized argument: b.ts' },
+	{ args: ['help', 'parse', 'a', 'b'], exit: 1, says: 'Unrecognized argument: b' },
+	// values are parsed with argv: a duplicate, an unparseable width, argv order kept
+	{
+		args: ['format', '--parser', 'ts', '--parser', 'css', '--bogus'],
+		exit: 1,
+		says: 'duplicate values provided'
+	},
+	{ args: ['format', '--jobs', 'abc', 'x.ts'], exit: 1, says: 'invalid digit found in string' },
+	{ args: ['parse', 'a.ts', 'b.ts', '--bogus'], exit: 1, says: 'Unrecognized argument: b.ts' },
+	{
+		args: ['parse', '--parser', 'bogus', 'a.ts', 'b.ts'],
+		exit: 1,
+		says: "Error parsing option '--parser' with value 'bogus'"
+	},
+	// a flag named like an `Object.prototype` key is as unrecognized as any other
+	{
+		args: ['format', '--constructor', 'a.ts'],
+		exit: 1,
+		says: 'Unrecognized argument: --constructor'
+	},
+	{ args: ['bogus'], exit: 1, says: 'Unrecognized argument: bogus' },
+	// no subcommand at all: argh's required-subcommand refusal, word for word
+	{ args: [], exit: 1, says: 'One of the following subcommands must be present' }
 ];
 
 /** Rows that SUCCEED on both bins with byte-identical stdout: the word `help` in a
@@ -1204,6 +1249,8 @@ const STDOUT_ROWS: Array<{ args: Array<string>; starts: string }> = [
 	{ args: ['format', 'help'], starts: 'Usage: tsv format' },
 	{ args: ['format', '--check', 'help', 'extra'], starts: 'Usage: tsv format' },
 	{ args: ['parse', 'help'], starts: 'Usage: tsv parse' },
+	{ args: ['help', 'help'], starts: 'Usage: tsv' },
+	{ args: ['--help', 'format'], starts: 'Usage: tsv format' },
 	{ args: ['format', '--content', '--check', '--parser', 'ts'], starts: '--check;\n' }
 ];
 
@@ -1388,12 +1435,12 @@ describe('invalid UTF-8 parity: both CLIs refuse, and neither rewrites the file'
 });
 
 // Repeated value-taking options. argh refuses a second `--content`/`--parser`/
-// `--source-type`/`--jobs` ("duplicate values provided", exit 1) where
-// `parseArgs` silently keeps the last, so `cli.js` restates the refusal — the
+// `--source-type`/`--jobs` ("duplicate values provided", exit 1), and `cli.js`,
+// parsing by argh's grammar, refuses the same way — the
 // `--jobs` grammar's sibling, and the sharper half: an unrefused
 // `--parser ts --parser css` does not merely pick, it formats the input under
-// a grammar the same invocation named against. The verdict is what is pinned,
-// not the message (each argument parser words its own parse failures), and the
+// a grammar the same invocation named against. The verdict and a refusal's words
+// are both pinned, and the
 // SWITCHES ride along as the control: argh counts a repeated `--check` without
 // complaint, which is what taking the last already means, so those must NOT be
 // refused by either bin.
@@ -1465,17 +1512,21 @@ describe('repeated-option parity: both CLIs refuse a second value, and neither r
 				native.status,
 				`cli.js ${mirror.status === 0 ? 'accepted' : 'refused'} what the native CLI did not: ${mirror.stderr || native.stderr}`
 			);
+			if (native.status !== 0) {
+				assert.equal(mirror.stderr, native.stderr, 'the two bins must word this refusal alike');
+			}
 		});
 	}
 });
 
 // `--jobs` is the one flag whose accepted SET is stated twice: argh parses it as
-// a Rust `usize`, `cli.js` re-states that with a regex. The messages are each
-// argument parser's own and will never match, so what is pinned here is the
-// verdict — a value one bin runs and the other refuses is the drift, and both
-// edges of `usize` are the ones a regex misses. `--list` is the probe because it
-// returns before the pool is ever sized: an accepted value does no work and a
-// refused one is an argument error, so the exit code is a clean yes/no.
+// a Rust `usize`, `cli.js` restates `usize::from_str` by hand (`usize_from_str`).
+// So the verdict is pinned — a value one bin runs and the other refuses is the
+// drift, and both edges of `usize` are the ones a restatement misses — and so are
+// a refusal's words, which the restatement carries from `ParseIntError`. `--list`
+// is the probe because it returns before the pool is ever sized: an accepted value
+// does no work and a refused one is an argument error, so the exit code is a clean
+// yes/no.
 describe('--jobs parity: both CLIs accept exactly what a Rust usize accepts', () => {
 	const rows: Array<{ value: string; accepted: boolean; why: string }> = [
 		{ value: '2', accepted: true, why: 'an ordinary count' },
@@ -1507,6 +1558,9 @@ describe('--jobs parity: both CLIs accept exactly what a Rust usize accepts', ()
 				native.status,
 				`cli.js ${mirror.status === 0 ? 'accepted' : 'refused'} what the native CLI did not: ${mirror.stderr || native.stderr}`
 			);
+			if (native.status !== 0) {
+				assert.equal(mirror.stderr, native.stderr, 'the two bins must word this refusal alike');
+			}
 		});
 	}
 });
@@ -1540,6 +1594,21 @@ describe('cli (bin.js): degraded-binary paths', { skip: !posix }, () => {
 			'SIGTERM',
 			`expected signal death, got status=${result.status} stderr=${result.stderr}`
 		);
+	});
+
+	// A re-raise that would not end the dispatcher: SIGUSR1 starts Node's inspector
+	// (a debugger port) instead of killing the process, which then fell off the end
+	// and exited 0 as if the child had succeeded. It is reported as the shell spells
+	// a signal death, 128 + its number, and never re-raised.
+	it('reports a signal whose re-raise would not end it as 128 + its number', () => {
+		const sig_bin = join(staged_signal_usr1, 'node_modules', '@fuzdev', 'tsv', 'bin.js');
+		const result = spawnSync(process.execPath, [sig_bin, 'help'], { encoding: 'utf-8' });
+		assert.equal(
+			result.status,
+			128 + os_constants.signals.SIGUSR1,
+			`signal=${result.signal} stderr=${result.stderr}`
+		);
+		assert.doesNotMatch(result.stderr, /Debugger listening/);
 	});
 });
 
