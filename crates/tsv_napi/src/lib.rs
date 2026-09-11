@@ -422,6 +422,22 @@ impl IgnoreStack {
         ))
     }
 
+    /// The warning for an in-tree `.gitignore` that is a symbolic link — which git does
+    /// not follow, so its rules are not applied. `path` is the link's path. Single source
+    /// of truth with the native CLI — the JS CLI never templates this string.
+    #[napi(js_name = "gitignore_symlink_warning", catch_unwind)]
+    pub fn gitignore_symlink_warning(&self, path: String) -> String {
+        tsv_discover::gitignore_symlink_warning(&path)
+    }
+
+    /// The traversal error for a relative directory root the working directory cannot
+    /// resolve (it was deleted). The receiver is unused — the refusal comes before any
+    /// matcher is assembled. Single source of truth with the native CLI.
+    #[napi(js_name = "unresolvable_root_error", catch_unwind)]
+    pub fn unresolvable_root_error(&self, root: String) -> String {
+        tsv_discover::unresolvable_root_error(&root)
+    }
+
     /// Whether no layer carries any rule — callers skip per-path matching.
     #[napi(js_name = "is_empty", catch_unwind)]
     pub fn is_empty(&self) -> bool {

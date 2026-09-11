@@ -264,6 +264,17 @@ pub struct Parser<'a, 'arena> {
     /// not an await-expression: under `Goal::Script` it is an ordinary
     /// identifier (`await_is_identifier`), under `Goal::Module` it is reserved.
     in_await: bool,
+    /// The `[Await]` context this position would have under `Goal::Module`: `true` at
+    /// top level, the enclosing function's own `is_async` inside one — replaced and
+    /// restored beside `in_await` by [`Parser::with_fn_context`]. At `Goal::Script`,
+    /// where `in_await` is `false` at top level, it is what says a name `await` stands
+    /// where a module would read an await expression.
+    in_await_if_module: bool,
+    /// Where the same-line token after the latest such name `await` starts — the
+    /// operand a module would have read. A Script error reported exactly there died
+    /// only because `await` is a name at this goal, so [`Parser::parse`] marks it a
+    /// goal gate for the format fallback (`ParseError::is_goal_gated`).
+    await_name_operand: Option<usize>,
     /// Whether the code being parsed is **strict**. Seeded from the goal — Module
     /// code is always strict, Script code starts sloppy — and turned on (never off)
     /// by a `"use strict"` directive prologue, by entering a class, and by
@@ -474,6 +485,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
             in_await: matches!(goal, Goal::Module),
+            // what `in_await` would be under `Goal::Module`, whose top level is `[+Await]`
+            in_await_if_module: true,
+            await_name_operand: None,
             // Module code is strict by definition (ecma262 sec-strict-mode-code);
             // Script code is strict only once a `"use strict"` prologue says so.
             strict: matches!(goal, Goal::Module),
@@ -1195,9 +1209,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
         let saved_await = std::mem::replace(&mut self.in_await, is_async);
+        let saved_await_if_module = std::mem::replace(&mut self.in_await_if_module, is_async);
         let saved_yield = std::mem::replace(&mut self.in_yield, is_generator);
         let result = f(self);
         self.in_await = saved_await;
+        self.in_await_if_module = saved_await_if_module;
         self.in_yield = saved_yield;
         result
     }
@@ -2338,6 +2354,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     pub fn parse(&mut self) -> Result<Program<'arena>, ParseError> {
+        self.parse_program()
+            .map_err(|error| self.mark_await_operand_gate(error))
+    }
+
+    /// Mark a Script error sitting exactly at the operand a module would have read after
+    /// a name `await` (`await_name_operand`, noted by `parse_await_name_reference`) as a
+    /// goal gate: the parse died there only because `await` is a name at this goal, so
+    /// the source was written as a module and the format fallback reports the module
+    /// attempt's error (`parse_with_goal_or_fallback`). Applied once, here, rather than
+    /// where the error is raised, because any kind of error can land on that token.
+    fn mark_await_operand_gate(&self, error: ParseError) -> ParseError {
+        if self.await_name_operand.is_some() && error.position() == self.await_name_operand {
+            error.into_goal_gate()
+        } else {
+            error
+        }
+    }
+
+    fn parse_program(&mut self) -> Result<Program<'arena>, ParseError> {
         let start = self.base_offset; // Start at base_offset for embedded contexts
 
         // The outermost strictness scope: a Script's `"use strict"` prologue turns
@@ -2347,7 +2382,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let mut body = p.bvec();
             let mut in_prologue = true;
             while p.current.kind != TokenKind::Eof {
-                let mut item = p.parse_module_item()?;
+                let mut item = p.parse_module_item(statement::ModuleItemContext::TopLevel)?;
                 if in_prologue {
                     in_prologue = p.note_directive(&mut item, &body)?;
                 }

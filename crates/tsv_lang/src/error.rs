@@ -115,12 +115,6 @@ enum ParseErrorKind {
         message: String,
         position: usize,
         context: Option<ErrorContext>,
-        /// The error is a **goal gate**: the construct is valid under one parse goal and
-        /// refused under the other (`import` / `export` / `import.meta` at `Script`), so the
-        /// rejection says which grammar the source was written against rather than that
-        /// it is broken. Read by the format fallback's attribution
-        /// ([`ParseError::is_goal_gated`]); false at every other site.
-        goal_gated: bool,
     },
     #[error("{}", format_error(&format!("Expected expression, found {found}"), *position, context.as_ref()))]
     InvalidExpression {
@@ -152,7 +146,22 @@ enum ParseErrorKind {
 /// `Display` and `Debug` forward to the inner kind, so rendered messages and debug output
 /// are exactly what the enum produces.
 #[derive(Clone, PartialEq, Eq)]
-pub struct ParseError(Box<ParseErrorKind>);
+pub struct ParseError(Box<Payload>);
+
+/// What a [`ParseError`] boxes: the error, and the one fact about it its message does
+/// not carry.
+#[derive(Clone, PartialEq, Eq)]
+struct Payload {
+    kind: ParseErrorKind,
+    /// The error is a **goal gate**: it fired on a construct one parse goal reads and the
+    /// other refuses (`import` / `export` / `import.meta`, or the operand of a top-level
+    /// `await`, at `Script`), so the rejection says which grammar the source was written
+    /// against rather than that it is broken. Beside the kind rather than on one variant,
+    /// because the refusal it marks can take any kind's shape — the `await` operand's is
+    /// whatever error the name reading hit there. Read by the format fallback's
+    /// attribution ([`ParseError::is_goal_gated`]).
+    goal_gated: bool,
+}
 
 // The whole point of the newtype — guard it. `Box` is non-null, so the niche also carries
 // `Result<(), ParseError>` down to a bare pointer.
@@ -162,14 +171,14 @@ const _: () = assert!(size_of::<Result<()>>() == size_of::<*const ()>());
 impl fmt::Display for ParseError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        self.0.kind.fmt(f)
     }
 }
 
 impl fmt::Debug for ParseError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        self.0.kind.fmt(f)
     }
 }
 
@@ -190,7 +199,10 @@ pub fn lex_err(message: impl Into<String>, position: usize) -> ParseError {
 impl ParseError {
     #[inline]
     fn new(kind: ParseErrorKind) -> Self {
-        ParseError(Box::new(kind))
+        ParseError(Box::new(Payload {
+            kind,
+            goal_gated: false,
+        }))
     }
 
     /// A general parse error at `position`.
@@ -199,7 +211,6 @@ impl ParseError {
             message,
             position,
             context: None,
-            goal_gated: false,
         })
     }
 
@@ -208,28 +219,27 @@ impl ParseError {
     /// source's grammar rather than about a mistake in it. See
     /// [`ParseError::is_goal_gated`].
     pub fn goal_gate(message: String, position: usize) -> Self {
-        ParseError::new(ParseErrorKind::InvalidSyntax {
-            message,
-            position,
-            context: None,
-            goal_gated: true,
-        })
+        ParseError::invalid_syntax(message, position).into_goal_gate()
+    }
+
+    /// This error, marked a goal gate — for a refusal no construct-specific constructor
+    /// builds: whatever error a name reading of `await` hit at the operand a module would
+    /// have read (`tsv_ts`'s `Parser::parse`). Message and position are untouched.
+    #[must_use]
+    pub fn into_goal_gate(mut self) -> Self {
+        self.0.goal_gated = true;
+        self
     }
 
     /// Whether this error is a goal gate ([`ParseError::goal_gate`]).
     ///
     /// The format fallback holds two errors for one source when both goals reject it,
     /// and a *script* attempt that died on a goal gate has proved the source a module —
-    /// it holds an `import` / `export` / `import.meta` — whatever position either error
-    /// reached, so the module attempt's error is the source's own.
+    /// it holds an `import` / `export` / `import.meta`, or a top-level `await` with an
+    /// operand — whatever position either error reached, so the module attempt's error is
+    /// the source's own.
     pub fn is_goal_gated(&self) -> bool {
-        matches!(
-            &*self.0,
-            ParseErrorKind::InvalidSyntax {
-                goal_gated: true,
-                ..
-            }
-        )
+        self.0.goal_gated
     }
 
     /// Found `found` where `expected` was required.
@@ -265,7 +275,7 @@ impl ParseError {
     /// `u32` cap. A caller holding two errors for one source reads this to say which got
     /// further — the format fallback's module-vs-script choice.
     pub fn position(&self) -> Option<usize> {
-        self.0.located().map(|(position, _)| *position)
+        self.0.kind.located().map(|(position, _)| *position)
     }
 
     /// Source exceeds the 4 GB cap the `u32` span offsets assume.
@@ -305,7 +315,7 @@ impl ParseError {
     #[inline(never)]
     pub fn shift_position(mut self, base_offset: usize) -> Self {
         // A positionless error has nothing to shift.
-        if let Some((position, _)) = self.0.located_mut() {
+        if let Some((position, _)) = self.0.kind.located_mut() {
             *position += base_offset;
         }
         self
@@ -323,7 +333,7 @@ impl ParseError {
         // Filling in place rather than rebuilding the variant: the payload is already
         // boxed, so this is a write through the pointer instead of a 96-byte move.
         // A positionless error has no line to excerpt.
-        if let Some((position, slot)) = self.0.located_mut() {
+        if let Some((position, slot)) = self.0.kind.located_mut() {
             *slot = ErrorContext::from_source(source, *position);
         }
         self
@@ -386,6 +396,20 @@ mod tests {
         assert_eq!(e.position(), Some(3));
         assert!(!ParseError::invalid_syntax("x".to_string(), 0).is_goal_gated());
         assert!(!ParseError::unexpected_eof(0).is_goal_gated());
+    }
+
+    /// `into_goal_gate` marks an error of any kind — the refusal a name `await` hits at
+    /// its operand is whatever the name reading raised there — and changes nothing the
+    /// error renders or reports.
+    #[test]
+    fn test_into_goal_gate_keeps_the_kind_and_its_message() {
+        let plain = ParseError::unexpected_token("';'".to_string(), "identifier".to_string(), 6)
+            .with_context("await x;");
+        let gated = plain.clone().into_goal_gate();
+        assert!(!plain.is_goal_gated());
+        assert!(gated.is_goal_gated());
+        assert_eq!(gated.to_string(), plain.to_string());
+        assert_eq!(gated.position(), Some(6));
     }
 
     /// `Display` forwards to the boxed kind, so the rendered message must be exactly

@@ -341,7 +341,8 @@ pub async fn parse_typescript(source: &str) -> Result<Value, DenoError> {
 /// `sourceType: 'script'`) — sloppy unless its own `"use strict"` prologue says
 /// otherwise, so it accepts `await` as an identifier, `with`, and the legacy
 /// literals, and rejects `import`/`export`/`import.meta` — matching tsv's own
-/// `Goal::Script` parse for standalone-script fixtures.
+/// `Goal::Script` parse for standalone-script fixtures everywhere but a TypeScript
+/// namespace body, whose `import`/`export` tsv keeps (a cataloged divergence).
 pub async fn parse_typescript_with_goal(
     source: &str,
     goal: tsv_ts::Goal,

@@ -60,7 +60,8 @@ pub const TSV_REJECTS_FILENAME: &str = "tsv_rejects.txt";
 /// present (containing `script`), the fixture's `input.ts` is parsed as a
 /// **Script** (`tsv_ts::Goal::Script`) rather than the default **Module** — by
 /// both tsv and the acorn `expected.json` oracle — so `await` is an ordinary
-/// identifier, `import`/`export`/`import.meta` are syntax errors, and the code
+/// identifier, top-level `import`/`export` and `import.meta` are syntax errors (tsv
+/// keeps a namespace body's, a cataloged divergence from acorn), and the code
 /// is sloppy unless its own `"use strict"` prologue makes it strict. Absent
 /// (the common case) means `Goal::Module`. Valid on `.ts` / `.svelte.ts`
 /// fixtures only (Svelte `<script>` and CSS have no goal); the structure

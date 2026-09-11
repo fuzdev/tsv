@@ -169,6 +169,10 @@ export class IgnoreStack {
 		has_prettierignore: boolean,
 		has_formatignore: boolean
 	): string | undefined;
+	/** The warning for an in-tree `.gitignore` that is a symbolic link (git does not follow one). */
+	gitignore_symlink_warning(path: string): string;
+	/** The traversal error for a relative root the working directory cannot resolve. */
+	unresolvable_root_error(root: string): string;
 	/** Whether no layer carries any rule. */
 	is_empty(): boolean;
 }

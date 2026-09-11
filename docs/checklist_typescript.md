@@ -825,7 +825,8 @@ diagnostics layer. See [CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-s
 Strictness and the *goal* (`Module` vs `Script`) are orthogonal, coupled only by
 Module ⟹ strict. tsv defaults to `Module` (Svelte hard-wires it); a `Script` goal is
 available (`parse_with_goal`, `--source-type script`), where `await` is an ordinary
-identifier and `import`/`export`/`import.meta` are errors. See
+identifier and top-level `import`/`export` and `import.meta` are errors (a namespace body
+keeps its `import`/`export`). See
 [conformance_test262.md](./conformance_test262.md#design-decision-module-strict-script-by-directive-annex-b-out).
 
 Rejected by the parser today — the first three only where the code is **strict**,

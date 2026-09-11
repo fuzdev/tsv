@@ -41,25 +41,66 @@ enum StatementPosition {
     Single,
 }
 
+/// Which `ModuleItem` list a declaration is parsed in — the one fact the `import` /
+/// `export` goal gate reads beyond the goal itself.
+///
+/// ecma262 has one such list, a `Module`'s body, where the goal decides. TypeScript adds
+/// the namespace and ambient-module body, a module-item context at **either** goal: tsc
+/// decides whether a file is a module from its top-level statements alone
+/// (`isFileProbablyExternalModule`), so `namespace N { export const a = 1; }` is a script
+/// holding an export, not a module. acorn-typescript refuses it at `sourceType: script` —
+/// base acorn's check, run before the plugin reads the body — a cataloged divergence
+/// (`docs/conformance_svelte.md` §TypeScript Corrections).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ModuleItemContext {
+    /// A `Program`'s own top level, where `Goal::Script` refuses the declaration.
+    TopLevel,
+    /// A TS `namespace` / `module` / `declare module` / `declare global` body.
+    NamespaceBody,
+}
+
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a `ModuleItem`: an import/export declaration or any
     /// `StatementListItem`. Import/export declarations are valid only here — at the
-    /// module top level (`parse`'s loop) and inside a TS `namespace`/`module` body.
-    /// Every other statement context uses `parse_statement`, which rejects bare
-    /// import/export, so a misplaced one is a syntax error (matching acorn's
+    /// module top level (`parse`'s loop) and inside a TS `namespace`/`module` body, as
+    /// `context` says ([`Parser::check_module_item_goal`]). Every other statement
+    /// context uses `parse_statement`, which rejects a bare import/export — a decorated
+    /// `export` included — so a misplaced one is a syntax error (matching acorn's
     /// "'import' and 'export' may only appear at the top level"). `import(…)` /
     /// `import.meta` are expressions and are left to `parse_statement`.
-    pub(crate) fn parse_module_item(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(crate) fn parse_module_item(
+        &mut self,
+        context: ModuleItemContext,
+    ) -> Result<Statement<'arena>, ParseError> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Export)) {
-            return self.parse_export_declaration();
+            return self.parse_export_declaration(context);
         }
         // `import …` declaration (but not the `import(…)` / `import.meta` expressions).
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Import))
             && !self.import_begins_expression()
         {
-            return self.parse_import_declaration();
+            return self.parse_import_declaration(context);
         }
-        self.parse_statement()
+        self.parse_statement_at(StatementPosition::List, Some(context))
+    }
+
+    /// Refuse a `ModuleItem`-only declaration — `keyword` names it — at `Goal::Script`
+    /// (the **goal gate**), unless it sits in a namespace body ([`ModuleItemContext`]).
+    /// `position` is the keyword, so the error points at the declaration's head. The one
+    /// statement of the rule for the three places such a declaration is built:
+    /// `parse_export_declaration`, `check_import_declaration_goal`, and the `export` of a
+    /// decorated class.
+    pub(super) fn check_module_item_goal(
+        &self,
+        context: ModuleItemContext,
+        keyword: &str,
+        position: usize,
+    ) -> Result<(), ParseError> {
+        if self.goal == crate::Goal::Module || context == ModuleItemContext::NamespaceBody {
+            return Ok(());
+        }
+        let message = format!("'{keyword}' is only allowed in a module");
+        Err(self.error_goal_gate_at(&message, position))
     }
 
     /// Whether an `import` keyword at the current position begins an expression —
@@ -78,7 +119,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// declaration beside a statement (a `Program`, a block, a function body, a
     /// `switch` case).
     pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
-        self.parse_statement_at(StatementPosition::List)
+        self.parse_statement_at(StatementPosition::List, None)
     }
 
     /// Parse the single `Statement` a nested position takes — an `if` arm, a `while` /
@@ -91,12 +132,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// production admits, and ASI closes the statement at it. acorn spells the same fork
     /// as the `context` parameter of `parseStatement` / `isLet`.
     pub(super) fn parse_nested_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
-        self.parse_statement_at(StatementPosition::Single)
+        self.parse_statement_at(StatementPosition::Single, None)
     }
 
+    /// `module_item` is the `ModuleItem` list the statement sits in — `None` everywhere
+    /// but `parse_module_item` — read only by the decorated-class arm: a decorator run
+    /// is the one statement head an `export` can follow.
     fn parse_statement_at(
         &mut self,
         position: StatementPosition,
+        module_item: Option<ModuleItemContext>,
     ) -> Result<Statement<'arena>, ParseError> {
         // A labeled statement, checked before the keyword dispatch below because a
         // `LabelIdentifier` may be a word the lexer turned into a `Keyword` token
@@ -385,7 +430,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::At => {
                 // Decorator: `@expression class Foo { }`
-                self.parse_decorated_class()
+                self.parse_decorated_class(module_item)
             }
             _ => self.parse_expression_statement(),
         }

@@ -12,6 +12,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
 use super::super::expression::ParsedExpr;
+use super::ModuleItemContext;
 
 /// Whose `DecoratorList` is being parsed — the axis that decides whether the run
 /// opens a class's strict scope. Named at every call site rather than inferred,
@@ -123,7 +124,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Decorators can be stacked: `@dec1 @dec2 class Foo { }`
     /// Decorator can be followed by `abstract class` or `export class`
-    pub(super) fn parse_decorated_class(&mut self) -> Result<Statement<'arena>, ParseError> {
+    ///
+    /// `module_item` is the `ModuleItem` list the statement sits in, `None` at a nested
+    /// statement position. The decorators do not make an `export` after them anything
+    /// but an export declaration, so it takes the undecorated form's two refusals: the
+    /// top-level rule where there is no module item, and the goal gate where there is.
+    pub(super) fn parse_decorated_class(
+        &mut self,
+        module_item: Option<ModuleItemContext>,
+    ) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Parse one or more decorators
@@ -131,6 +140,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for `export` before class
         let is_export = *self.current_kind() == TokenKind::Keyword(KeywordKind::Export);
+        if is_export {
+            let Some(context) = module_item else {
+                return Err(self.error_module_item_position());
+            };
+            self.check_module_item_goal(context, "export", self.current_pos().0)?;
+        }
         let is_default = if is_export {
             self.advance()?; // consume 'export'
             if *self.current_kind() == TokenKind::Keyword(KeywordKind::Default) {
