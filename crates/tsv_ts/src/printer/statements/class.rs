@@ -578,9 +578,15 @@ impl<'a> Printer<'a> {
         // binary value learns it: without it the comment arms printed a chain indented
         // while the no-comment arm printed the same property flush.
         self.mark_assignment_value(value);
+        // A multi-line comment the value owns is claimed here, beneath the clarity parens, so it
+        // prints outside the value's own group without leaving the pair: the `//` arm and the
+        // position-paren arm build their own run and never reach the layout builder's claim
+        // (`b = // c⏎/* y⏎*/ a ? b : c` exploded the conditional prettier keeps flat).
         let doc = match facts.frozen {
             Some(frozen) => self.build_frozen_expression_doc(value, frozen),
-            None => self.build_expression_doc(value),
+            None => self.build_value_with_outermost_owned_comment(value, || {
+                self.build_expression_doc(value)
+            }),
         };
         if facts.position_parens {
             self.d().parens(doc)

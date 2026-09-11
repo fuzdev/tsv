@@ -1563,8 +1563,13 @@ impl<'a> Printer<'a> {
             let hoisted_run = gap_has_comments
                 .then(|| self.hoisted_owned_value_gap_run_opt(eq_pos + 1, pattern.right))
                 .flatten();
+            // Where the hoist declines (a run the author broke after, `a = /* c1 */⏎/* c2⏎*/ v`)
+            // the value claims its owned multi-line comment itself, beneath the parens this
+            // position adds — `build_gap_value_doc` would prepend it outside the pair.
             let rhs_doc = self.build_value_under_hoist(hoisted_run, pattern.right, || {
-                let rhs_doc = self.build_expression_doc(pattern.right);
+                let rhs_doc = self.build_value_with_outermost_owned_comment(pattern.right, || {
+                    self.build_expression_doc(pattern.right)
+                });
                 if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
                     d.parens(rhs_doc)
                 } else {

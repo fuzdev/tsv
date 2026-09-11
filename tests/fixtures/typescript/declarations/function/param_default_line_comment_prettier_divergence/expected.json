@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 233,
+	"end": 402,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,88 @@
 					"column": 17
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A multi-line comment glued to the value below the line comment: the value keeps its own",
+			"start": 225,
+			"end": 315,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " layout.",
+			"start": 317,
+			"end": 327,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 350,
+			"end": 354,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 7
+				},
+				"end": {
+					"line": 17,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d\n ",
+			"start": 358,
+			"end": 369,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 3
+				},
+				"end": {
+					"line": 19,
+					"column": 6
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 232,
+		"end": 401,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 223,
+			"end": 392,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 13,
+					"line": 21,
 					"column": 9
 				}
 			},
@@ -416,6 +480,180 @@
 							"value": " Same with a type annotation; the union stays inline.",
 							"start": 123,
 							"end": 178
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 329,
+					"end": 391,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 338,
+						"end": 341,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 10
+							},
+							"end": {
+								"line": 16,
+								"column": 13
+							}
+						},
+						"name": "fn3"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 345,
+							"end": 385,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 19,
+									"column": 22
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 345,
+								"end": 347,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"name": "p3"
+							},
+							"right": {
+								"type": "ConditionalExpression",
+								"start": 370,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 22
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 370,
+									"end": 373,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 7
+										},
+										"end": {
+											"line": 19,
+											"column": 10
+										}
+									},
+									"name": "aaa"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 376,
+									"end": 379,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 13
+										},
+										"end": {
+											"line": 19,
+											"column": 16
+										}
+									},
+									"name": "bbb"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 382,
+									"end": 385,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 19
+										},
+										"end": {
+											"line": 19,
+											"column": 22
+										}
+									},
+									"name": "ccc"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 350,
+										"end": 354
+									},
+									{
+										"type": "Block",
+										"value": " d\n ",
+										"start": 358,
+										"end": 369
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 389,
+						"end": 391,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 3
+							},
+							"end": {
+								"line": 20,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line comment glued to the value below the line comment: the value keeps its own",
+							"start": 225,
+							"end": 315
+						},
+						{
+							"type": "Line",
+							"value": " layout.",
+							"start": 317,
+							"end": 327
 						}
 					]
 				}

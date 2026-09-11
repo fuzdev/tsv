@@ -33,6 +33,12 @@ parameter — a form both formatters then keep, pinned as `variant_hoisted.svelt
 whole authoring axis (glued / own-line) is deliberate: the two take different paths through the
 leading-comment run, so a change that only exercises the glued one can silently break the other.
 
+`fn2` carries both authorings with a **multi-line** comment glued to the value after the first
+one (`a2 = /* c1 */⏎/* c2⏎*/ b2 ? c2 : d2`). tsv reflows it onto the `=` line as above, and the
+multi-line comment prints outside the value's own group, so the conditional stays flat; prettier
+relocates `c1` before the `=` and hoists `c2` above the parameter, and both formatters keep those
+forms (the second cell of each `variant_*`).
+
 ## Reason
 
 **Design choice.** The break is unforced — a block comment does not run to end-of-line, so

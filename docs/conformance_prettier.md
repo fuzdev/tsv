@@ -412,6 +412,12 @@ they hang the value, and the gate is the shared `comment_hangs_next`:
   The same comment on its **own** line before a type that fits drops the type below it too,
   rather than gluing it to the comment's closing line —
   [type_value_own_line_multiline_comment](../tests/fixtures/typescript/syntax/comments/type_value_own_line_multiline_comment/).
+- A block glued to the head and broke after, followed by a comment that **owns its line**
+  (`= /* c1 */⏎/* c2 */⏎v`): the later comment forces the break, and the earlier one's break
+  goes with it, so the whole run hangs below the head (`=⏎/* c1 */⏎/* c2 */⏎v`) and an author
+  blank after `c1` survives — at the assignment `=`, the spread `...`, an arrow body and the
+  type alias as at the declarator —
+  [value_leading_run_own_line_second_comment](../tests/fixtures/typescript/syntax/comments/value_leading_run_own_line_second_comment/).
 
 A **blank line** inside the gap **yields with the break**. `A = /* c */⏎⏎1` formats to
 `A = /* c */ 1`, the same fixed point as the single-newline authoring. This is not a second

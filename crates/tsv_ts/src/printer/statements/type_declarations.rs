@@ -398,9 +398,13 @@ impl<'a> Printer<'a> {
             let mut inline_parts = DocBuf::new();
             let mut indent_comment_parts = DocBuf::new();
 
-            // Only the first single-line comment hugs the `=` line, and only when
-            // it was *authored* on that line (`type A = /* c */ B`). An own-line
-            // comment (`type A =⏎/* c */⏎B`) keeps its own line — prettier breaks
+            // Only the first single-line comment hugs the `=` line, only when it was
+            // *authored* on that line, and only in a run holding a line comment
+            // (`type A = /* c */ // d⏎B`), whose mandatory break is what keeps the head
+            // line open. A run of blocks alone (`type A = /* c1 */⏎/* c2 */⏎B`) is
+            // prettier's break-after-operator: every comment hangs below `=`, the first
+            // included, as the declarator's hang arm prints it. An
+            // own-line comment (`type A =⏎/* c */⏎B`) keeps its own line — prettier breaks
             // after `=` and never pulls it up. Multiline blocks (any position) and
             // every subsequent comment go on their own line in the indent. Two line
             // comments must not merge onto one line — the second `//` would stop
@@ -408,10 +412,11 @@ impl<'a> Printer<'a> {
             let comments: CommentVec<'_> = self
                 .comments_to_emit_between(eq_pos + 1, type_start)
                 .collect();
+            let run_has_line_comment = comments.iter().any(|c| !c.is_block);
             for (idx, comment) in comments.iter().enumerate() {
                 let multiline_block = comment.multiline;
                 let authored_on_eq_line = self.is_same_line(eq_pos, comment.span.start);
-                if idx == 0 && !multiline_block && authored_on_eq_line {
+                if idx == 0 && !multiline_block && authored_on_eq_line && run_has_line_comment {
                     inline_parts.push(d.text(" "));
                     inline_parts.push(self.build_comment_doc(comment));
                 } else {
@@ -1405,7 +1410,7 @@ impl<'a> Printer<'a> {
             // a value-head freeze needs an own-line directive, which never glues.
             let hoisted_run = self.hoisted_owned_value_gap_run_opt(eq_pos + 1, init);
             let init_doc = self.build_value_head_doc(eq_pos + 1, init, || {
-                self.build_value_under_hoist(hoisted_run, init, || self.build_expression_doc(init))
+                self.build_gap_value_doc(hoisted_run, init, || self.build_expression_doc(init))
             });
 
             // The post-`=` value content (shared by the inline and the continuation
