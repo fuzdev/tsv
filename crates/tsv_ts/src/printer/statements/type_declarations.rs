@@ -607,7 +607,17 @@ impl<'a> Printer<'a> {
             // breaks exactly when the `=` seam does — a value that FITS collapses to
             // the glued bytes in both formatters, so the flat render is unchanged.
             // (Own-line runs never reach this branch: `force_break` above owns them.)
-            if let Some(run) = self.broke_after_value_leading_run(eq_pos + 1, type_start) {
+            //
+            // ⚠️ Except a UNION whose run ends glued to it (`= /* c1 */⏎/* c2 */ A | B`): the
+            // glued comment belongs after the leading `|` its broken layout synthesizes, which
+            // only the union arm below can place (`build_union_value_doc`'s hand-off). This arm
+            // would print it ahead of the pipe (`/* c2 */ | A`), a form prettier never emits.
+            // TODO: prettier splits that run — `c1` leads the value, `c2` the first member —
+            // and neither arm does yet.
+            if let Some(run) = self.broke_after_value_leading_run(eq_pos + 1, type_start)
+                && !(matches!(value_type, TSType::Union(_))
+                    && run.last().is_some_and(|c| self.comment_hugs_next(c)))
+            {
                 let type_doc = build_value();
                 parts.push(self.break_or_hang_after_operator_run_doc(&run, type_start, type_doc));
             } else if indentable_leads_value {

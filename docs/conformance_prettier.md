@@ -416,6 +416,17 @@ survives exactly where the break survives, which is the **own-line** authoring
 (`= ⏎/* c */⏎⏎v`): there the comment does occupy its own line, the break is forced, and both
 the break and the blank are kept. An author who wants the blank writes that form.
 
+Neither side of that moves with the **value**. A value that breaks by **width** renders the
+break but does not force it, so the blank authoring still lands on the single-newline
+authoring's fixed point — the comment own-line under the operator, the value re-fitting below
+(`=⏎/* c */⏎v`) — rather than on a third form of its own
+([value_leading_comment_blank_width](../tests/fixtures/typescript/syntax/comments/value_leading_comment_blank_width_prettier_divergence/)).
+A value with a **hard** break of its own (a preserved-expanded object, a function body) does
+force it, and there the blank survives with the break, prettier's form too. The same holds
+for a run whose last comment is glued to the value and an earlier one broke
+(`= /* c1 */⏎/* c2 */ v`): the break lives between the two comments, and it renders — or
+collapses — exactly as a break before the value would.
+
 The rule holds at every value gap whose own-line authoring **hangs** the comment (the
 initializer family: declarator, class property, object value, enum member, and the `=`/`:`
 gaps that share their emitters).
