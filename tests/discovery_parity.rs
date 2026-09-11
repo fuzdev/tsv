@@ -59,7 +59,7 @@ fn materialize(root: &Path, tree: &serde_json::Map<String, Value>) {
 /// carries the **argument** errors that failed the run upfront (an unresolvable
 /// path, or a named file whose extension tsv doesn't format), which an `error`
 /// case asserts against.
-fn discover_case(root: &Path, target: &str) -> Result<Vec<String>, Vec<String>> {
+fn discover_case(root: &Path, target: &str) -> Result<(Vec<String>, Vec<String>), Vec<String>> {
     let arg = if target.is_empty() {
         root.to_path_buf()
     } else {
@@ -71,14 +71,15 @@ fn discover_case(root: &Path, target: &str) -> Result<Vec<String>, Vec<String>> 
     // pattern expects `/` — stripping the un-normalized string never matches
     // and every case reads back absolute.
     let prefix = format!("{}/", root.to_string_lossy().replace('\\', "/"));
-    Ok(discovered
+    let files = discovered
         .files
         .iter()
         .map(|p| {
             let s = p.to_string_lossy().replace('\\', "/");
             s.strip_prefix(&prefix).unwrap_or(&s).to_string()
         })
-        .collect())
+        .collect();
+    Ok((files, discovered.diagnostics.warnings))
 }
 
 fn expected_list(case: &Value) -> Vec<String> {
@@ -128,12 +129,25 @@ fn discovery_matches_shared_scenarios() {
                     "[{name}] target={target:?}\n     expected: {:?}\n     actual: run failed with {errors:?}",
                     expected_list(case)
                 )),
-                (None, Ok(files)) => {
+                (None, Ok((files, warnings))) => {
                     let expected = expected_list(case);
                     if files != expected {
                         failures.push(format!(
                             "[{name}] target={target:?}\n     expected: {expected:?}\n     actual:   {files:?}"
                         ));
+                    }
+                    // `warns`: substrings each of which some warning must carry — the
+                    // only pin on the WARNINGS channel as a walk product (the texts
+                    // themselves are `tsv_discover`'s unit tests')
+                    if let Some(needles) = case.get("warns").and_then(Value::as_array) {
+                        for needle in needles {
+                            let needle = needle.as_str().unwrap();
+                            if !warnings.iter().any(|w| w.contains(needle)) {
+                                failures.push(format!(
+                                    "[{name}] target={target:?}\n     expected a warning containing: {needle:?}\n     actual warnings:                {warnings:?}"
+                                ));
+                            }
+                        }
                     }
                 }
             }

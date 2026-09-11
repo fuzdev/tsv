@@ -115,6 +115,12 @@ enum ParseErrorKind {
         message: String,
         position: usize,
         context: Option<ErrorContext>,
+        /// The error is a **goal gate**: the construct is valid under one parse goal and
+        /// refused under the other (`import` / `export` / `import.meta` at `Script`), so the
+        /// rejection says which grammar the source was written against rather than that
+        /// it is broken. Read by the format fallback's attribution
+        /// ([`ParseError::is_goal_gated`]); false at every other site.
+        goal_gated: bool,
     },
     #[error("{}", format_error(&format!("Expected expression, found {found}"), *position, context.as_ref()))]
     InvalidExpression {
@@ -193,7 +199,37 @@ impl ParseError {
             message,
             position,
             context: None,
+            goal_gated: false,
         })
+    }
+
+    /// A general parse error at `position` that is a **goal gate** — a construct one
+    /// parse goal admits and the other refuses, so the error is evidence about the
+    /// source's grammar rather than about a mistake in it. See
+    /// [`ParseError::is_goal_gated`].
+    pub fn goal_gated(message: String, position: usize) -> Self {
+        ParseError::new(ParseErrorKind::InvalidSyntax {
+            message,
+            position,
+            context: None,
+            goal_gated: true,
+        })
+    }
+
+    /// Whether this error is a goal gate ([`ParseError::goal_gated`]).
+    ///
+    /// The format fallback holds two errors for one source when both goals reject it,
+    /// and a *script* attempt that died on a goal gate has proved the source a module —
+    /// it holds an `import` / `export` / `import.meta` — whatever position either error
+    /// reached, so the module attempt's error is the source's own.
+    pub fn is_goal_gated(&self) -> bool {
+        matches!(
+            &*self.0,
+            ParseErrorKind::InvalidSyntax {
+                goal_gated: true,
+                ..
+            }
+        )
     }
 
     /// Found `found` where `expected` was required.
@@ -229,13 +265,7 @@ impl ParseError {
     /// `u32` cap. A caller holding two errors for one source reads this to say which got
     /// further — the format fallback's module-vs-script choice.
     pub fn position(&self) -> Option<usize> {
-        match &*self.0 {
-            ParseErrorKind::UnexpectedToken { position, .. }
-            | ParseErrorKind::UnexpectedEof { position, .. }
-            | ParseErrorKind::InvalidSyntax { position, .. }
-            | ParseErrorKind::InvalidExpression { position, .. } => Some(*position),
-            ParseErrorKind::FileTooLarge { .. } => None,
-        }
+        self.0.located().map(|(position, _)| *position)
     }
 
     /// Source exceeds the 4 GB cap the `u32` span offsets assume.
@@ -274,13 +304,9 @@ impl ParseError {
     #[cold]
     #[inline(never)]
     pub fn shift_position(mut self, base_offset: usize) -> Self {
-        match &mut *self.0 {
-            ParseErrorKind::UnexpectedToken { position, .. }
-            | ParseErrorKind::UnexpectedEof { position, .. }
-            | ParseErrorKind::InvalidSyntax { position, .. }
-            | ParseErrorKind::InvalidExpression { position, .. } => *position += base_offset,
-            // No position to shift.
-            ParseErrorKind::FileTooLarge { .. } => {}
+        // A positionless error has nothing to shift.
+        if let Some((position, _)) = self.0.located_mut() {
+            *position += base_offset;
         }
         self
     }
@@ -296,7 +322,21 @@ impl ParseError {
     pub fn with_context(mut self, source: &str) -> Self {
         // Filling in place rather than rebuilding the variant: the payload is already
         // boxed, so this is a write through the pointer instead of a 96-byte move.
-        let (position, slot) = match &mut *self.0 {
+        // A positionless error has no line to excerpt.
+        if let Some((position, slot)) = self.0.located_mut() {
+            *slot = ErrorContext::from_source(source, *position);
+        }
+        self
+    }
+}
+
+impl ParseErrorKind {
+    /// The position and context slots of a located error, `None` for the one
+    /// positionless kind (`FileTooLarge`). The single statement of which variants carry a
+    /// position — `position`, `shift_position` and `with_context` each read it rather
+    /// than restating the variant list, so a new variant is classified once, here.
+    fn located(&self) -> Option<(&usize, &Option<ErrorContext>)> {
+        match self {
             ParseErrorKind::UnexpectedToken {
                 position, context, ..
             }
@@ -306,12 +346,26 @@ impl ParseError {
             }
             | ParseErrorKind::InvalidExpression {
                 position, context, ..
-            } => (*position, context),
-            // FileTooLarge doesn't need context
-            ParseErrorKind::FileTooLarge { .. } => return self,
-        };
-        *slot = ErrorContext::from_source(source, position);
-        self
+            } => Some((position, context)),
+            ParseErrorKind::FileTooLarge { .. } => None,
+        }
+    }
+
+    /// [`ParseErrorKind::located`], mutably.
+    fn located_mut(&mut self) -> Option<(&mut usize, &mut Option<ErrorContext>)> {
+        match self {
+            ParseErrorKind::UnexpectedToken {
+                position, context, ..
+            }
+            | ParseErrorKind::UnexpectedEof { position, context }
+            | ParseErrorKind::InvalidSyntax {
+                position, context, ..
+            }
+            | ParseErrorKind::InvalidExpression {
+                position, context, ..
+            } => Some((position, context)),
+            ParseErrorKind::FileTooLarge { .. } => None,
+        }
     }
 }
 

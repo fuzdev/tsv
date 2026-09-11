@@ -413,16 +413,18 @@ function stamp_character_locs(node, starts, source) {
  * @param {any} element
  * @param {{start: number}} comment
  * @param {string} source
- * @param {any[]} comments - the root comment list.
+ * @param {Map<number, any>} comments_by_start - the root comment list, keyed by
+ * `start` — one lookup per scanned character, where a `find` over the list made
+ * the scan O(characters × comments) per comment.
  * @returns {boolean}
  */
-function is_between_attributes(element, comment, source, comments) {
+function is_between_attributes(element, comment, source, comments_by_start) {
 	let i = element.start + 1; // past `<`
 	let depth = 0;
 	let quote = '';
 	while (i < source.length) {
 		if (quote === '') {
-			const here = comments.find((c) => c.start === i);
+			const here = comments_by_start.get(i);
 			if (here) {
 				if (i === comment.start) return depth === 0;
 				i = here.end;
@@ -465,6 +467,10 @@ function is_between_attributes(element, comment, source, comments) {
  * @mutates comments
  */
 function stamp_in_tag_comment_locs(comments, elements, starts, source) {
+	const comments_by_start = new Map();
+	for (const c of comments) {
+		if (typeof c?.start === 'number') comments_by_start.set(c.start, c);
+	}
 	for (const c of comments) {
 		if (typeof c?.start !== 'number' || typeof c.end !== 'number') continue;
 		// innermost = the containing element with the greatest start; an outer
@@ -475,7 +481,7 @@ function stamp_in_tag_comment_locs(comments, elements, starts, source) {
 				host = e;
 			}
 		}
-		if (host === null || !is_between_attributes(host, c, source, comments)) continue;
+		if (host === null || !is_between_attributes(host, c, source, comments_by_start)) continue;
 		c.loc = { start: name_loc_at(c.start, starts), end: name_loc_at(c.end, starts) };
 	}
 }

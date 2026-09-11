@@ -157,9 +157,12 @@ const MAX_WORKERS_PER_LOGICAL_CPU = 4;
  * `PARSERS` are keyed by the same names). */
 const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);
 
-/** Whether a WASM engine reinstantiation already failed this run — one warning,
- * not one per remaining file. Declared with the other module state above the
- * `main()` call: a `let` below it is dead-zoned for the whole run. */
+/** Whether a WASM engine reinstantiation already failed on this thread — one
+ * warning per thread, not one per remaining file (each worker is its own module
+ * instance with its own copy, so a pool of N can warn N times; the recovery
+ * itself is per-instance too, so the scope is the right one). Declared with the
+ * other module state above the `main()` call: a `let` below it is dead-zoned for
+ * the whole run. */
 let engine_recovery_failed = false;
 
 /**
@@ -272,6 +275,17 @@ Options:
  */
 const WRITE_BACKOFF = new Int32Array(new SharedArrayBuffer(4));
 
+/**
+ * The strict UTF-8 decoder every byte read takes — one spelling of the parity
+ * contract with Rust's `read_to_string` (`decode_source` says why), shared by the
+ * source reads and the ignore-file reads. `fatal` refuses invalid bytes instead of
+ * substituting U+FFFD; `ignoreBOM: true` *keeps* a leading BOM (the option name is
+ * inverted), as `read_to_string` does. A decoder built without `{stream: true}` is
+ * stateless across `decode` calls, so one instance serves the whole run — and it is
+ * declared here, above the top-level `await`, for the reason `WRITE_BACKOFF` is.
+ */
+const UTF8_STRICT = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+
 // the two roles this file plays: the CLI itself, and the worker it spawns for
 // path-mode formatting (see `format_files_parallel`)
 if (isMainThread) {
@@ -331,19 +345,64 @@ function run_help(args) {
 			print(PARSE_HELP);
 			break;
 		default:
-			eprint(`Unrecognized argument: ${args[0]}\n`);
-			process.exit(1);
+			exit_unrecognized(`Unrecognized argument: ${args[0]}`);
 	}
 }
 
-/** Parse argv with `parseArgs`, exiting 1 on unknown/malformed flags. */
+/**
+ * Parse argv with `parseArgs`, exiting 1 on unknown/malformed flags — after
+ * restating argh's grammar over the raw words, because the two disagree at every
+ * edge and each disagreement is an exit-code or message split between the two bins:
+ *
+ * - `help` as a positional prints the subcommand's help (exit 0) wherever it
+ *   appears ahead of `--` — argh's own help word, which `parseArgs` would hand
+ *   over as a path (and `tsv format help` then FORMATTED a directory named `help`);
+ * - `--flag=value` is refused as `Unrecognized argument` — argh takes no inline
+ *   values, `parseArgs` takes them everywhere;
+ * - a value-taking flag takes the NEXT word verbatim, `--check` included — argh's
+ *   rule, where `parseArgs` calls a flag-shaped value "ambiguous". Folded into the
+ *   inline form here, which `parseArgs` accepts with any leading `-`;
+ * - a missing value, an unknown `--flag`, a short `-x` (argh defines none) and a
+ *   lone `-` all read as argh spells them.
+ *
+ * Everything after `--` is positional, on both.
+ */
 function parse_argv(args, options, help) {
+	const normalized = [];
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === '--') {
+			normalized.push(...args.slice(i));
+			break;
+		}
+		if (arg === 'help') {
+			print(help);
+			process.exit(0);
+		}
+		if (arg.startsWith('-')) {
+			const name = arg.startsWith('--') ? arg.slice(2) : undefined;
+			const option = name === undefined || name.includes('=') ? undefined : options[name];
+			if (option === undefined) exit_unrecognized(`Unrecognized argument: ${arg}`);
+			if (option.type === 'string') {
+				if (i + 1 >= args.length) exit_unrecognized(`No value provided for option '${arg}'.`);
+				normalized.push(`${arg}=${args[i + 1]}`);
+				i++;
+				continue;
+			}
+		}
+		normalized.push(arg);
+	}
 	let parsed;
 	try {
-		parsed = parseArgs({ args, options, allowPositionals: true, strict: true, tokens: true });
+		parsed = parseArgs({
+			args: normalized,
+			options,
+			allowPositionals: true,
+			strict: true,
+			tokens: true
+		});
 	} catch (error) {
-		eprint(`Error: ${error.message}\n`);
-		process.exit(1);
+		exit_with_error(1, `Error: ${error.message}`);
 	}
 	if (parsed.values.help) {
 		print(help);
@@ -360,8 +419,7 @@ function parse_argv(args, options, help) {
 	for (const token of parsed.tokens) {
 		if (token.kind !== 'option' || options[token.name]?.type !== 'string') continue;
 		if (seen.has(token.name)) {
-			eprint(`Error: --${token.name} was given more than once\n`);
-			process.exit(1);
+			exit_with_error(1, `Error: --${token.name} was given more than once`);
 		}
 		seen.add(token.name);
 	}
@@ -374,8 +432,10 @@ function parse_argv(args, options, help) {
 function resolve_parser(name) {
 	const resolved = name === 'ts' ? 'typescript' : name;
 	if (!PARSER_NAMES.has(resolved)) {
-		eprint(`Error: Unknown parser type: '${name}'. Valid types: svelte, typescript, css\n`);
-		process.exit(1);
+		exit_with_error(
+			1,
+			`Error: Unknown parser type: '${name}'. Valid types: svelte, typescript, css`
+		);
 	}
 	return resolved;
 }
@@ -411,6 +471,23 @@ function refuse_source_type_language(parser, source_type, code) {
 }
 
 /** Extension-based parser detection, mirroring the native `ParserType::from_extension`. */
+/**
+ * The refusal for a file whose extension tsv does not handle, or `undefined` for one
+ * it does — `tsv_discover::unsupported_extension_error` through the binding, message
+ * and all, so this never hand-mirrors the native extension list. It rides the
+ * `IgnoreStack` class (the receiver is unused), so a throwaway stack is the whole
+ * cost of reaching it — freed on the spot, since no wasm-backed handle may outlive
+ * into a run that can `reinstantiate`.
+ */
+function unsupported_extension_error(path) {
+	const arg_policy = new IgnoreStack();
+	try {
+		return arg_policy.unsupported_extension_error(path);
+	} finally {
+		free_ignore_stack(arg_policy);
+	}
+}
+
 function parser_from_extension(path) {
 	if (path.endsWith('.svelte')) return 'svelte';
 	if (path.endsWith('.css')) return 'css';
@@ -463,12 +540,10 @@ async function run_format(args) {
 	// 32-bit native target would refuse lower, and this would have to ask.
 	if (values.jobs !== undefined) {
 		if (!/^\+?\d+$/.test(values.jobs)) {
-			eprint(`Error: --jobs expects an integer, got '${values.jobs}'\n`);
-			process.exit(1);
+			exit_with_error(1, `Error: --jobs expects an integer, got '${values.jobs}'`);
 		}
 		if (BigInt(values.jobs.replace(/^\+/, '')) > 18446744073709551615n) {
-			eprint(`Error: --jobs value '${values.jobs}' is too large\n`);
-			process.exit(1);
+			exit_with_error(1, `Error: --jobs value '${values.jobs}' is too large`);
 		}
 	}
 	if (values.content !== undefined || values.stdin) {
@@ -481,16 +556,19 @@ async function run_format(args) {
 /** `--content`/`--stdin` mode — format one input to stdout (or `--check` it). */
 function format_single(values, positionals, parser) {
 	if (positionals.length > 0) {
-		eprint('Error: --content/--stdin cannot be combined with file paths\n');
-		process.exit(2);
+		exit_with_error(2, 'Error: --content/--stdin cannot be combined with file paths');
 	}
 	if (values.jobs !== undefined) {
-		eprint('Error: --jobs applies to file paths; --content/--stdin format a single input\n');
-		process.exit(2);
+		exit_with_error(
+			2,
+			'Error: --jobs applies to file paths; --content/--stdin format a single input'
+		);
 	}
 	if (values.list) {
-		eprint('Error: --list applies to file paths; --content/--stdin format a single input\n');
-		process.exit(2);
+		exit_with_error(
+			2,
+			'Error: --list applies to file paths; --content/--stdin format a single input'
+		);
 	}
 	// --source-type is content/stdin-only and TypeScript-only; a bad value is a
 	// usage error (exit 2). Checked AFTER the paths/--jobs/--list refusals, in the
@@ -499,8 +577,7 @@ function format_single(values, positionals, parser) {
 	const source_type = resolve_source_type(values['source-type'], 2);
 	const flag = values.content !== undefined ? '--content' : '--stdin';
 	if (parser === undefined) {
-		eprint(`Error: ${flag} requires --parser <svelte|typescript|css>\n`);
-		process.exit(2);
+		exit_with_error(2, `Error: ${flag} requires --parser <svelte|typescript|css>`);
 	}
 	refuse_source_type_language(parser, source_type, 2);
 	const input = values.content !== undefined ? values.content : read_stdin(2);
@@ -510,13 +587,11 @@ function format_single(values, positionals, parser) {
 		// `source_type` undefined on the goalless languages, which reads as the default
 		formatted = FORMATTERS[parser](input, { sourceType: source_type });
 	} catch (error) {
-		eprint(`Parse error: ${error.message}\n`);
-		process.exit(2);
+		exit_with_error(2, `Parse error: ${error.message}`);
 	}
 	if (values.check) {
 		if (formatted !== input) {
-			eprint('would change\n');
-			process.exit(1);
+			exit_with_error(1, 'would change');
 		}
 	} else {
 		print(formatted);
@@ -527,12 +602,13 @@ function format_single(values, positionals, parser) {
  * `WORKER_FILE_THRESHOLD`), report in sorted order. */
 async function format_paths(values, positionals) {
 	if (positionals.length === 0) {
-		eprint('Error: No input provided. Use a file path, --content, or --stdin\n');
-		process.exit(2);
+		exit_with_error(2, 'Error: No input provided. Use a file path, --content, or --stdin');
 	}
 	if (values.parser !== undefined) {
-		eprint('Error: --parser applies to --content/--stdin; file paths use extension detection\n');
-		process.exit(2);
+		exit_with_error(
+			2,
+			'Error: --parser applies to --content/--stdin; file paths use extension detection'
+		);
 	}
 	// Path mode resolves the source type per file instead of taking one for the
 	// whole run: a Svelte or CSS file on the same command line has no source type to
@@ -540,15 +616,20 @@ async function format_paths(values, positionals) {
 	// its own extension settles one (`source_type_from_extension`). Mirrors the
 	// native CLI's refusal, word for word.
 	if (values['source-type'] !== undefined) {
-		eprint(
-			'Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script\n'
+		exit_with_error(
+			2,
+			'Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script'
 		);
-		process.exit(2);
 	}
 	if (values.list && values.check) {
-		eprint('Error: --list and --check cannot be combined\n');
-		process.exit(2);
+		exit_with_error(2, 'Error: --list and --check cannot be combined');
 	}
+	// An explicit `--jobs` is held to the machine's ceiling AHEAD of discovery, as the
+	// native CLI sizes its pool before it walks (`run_paths` in `commands/format.rs`):
+	// the clamp's warning then precedes the discovery diagnostics on both bins, and it
+	// fires on an empty scope too. `--list` sizes no pool and warns nothing, on both.
+	const explicit_jobs =
+		values.list || values.jobs === undefined ? undefined : clamp_worker_count(values.jobs);
 
 	const { files, errors: traversal_errors, warnings } = discover_files(positionals);
 	for (const msg of traversal_errors) {
@@ -564,12 +645,13 @@ async function format_paths(values, positionals) {
 	// result is a valid answer (exit 0), unlike the format action below which
 	// treats "nothing found" as a usage error.
 	if (values.list) {
-		// One write for the whole listing, as the native CLI does (`cli/format.rs`): a
-		// per-path write re-enters the writer and issues a syscall for each of
-		// (potentially thousands of) lines. It also decides what a closed reader costs
-		// — `write_fd` goes quiet on `EPIPE` by *catching* it, so a per-path loop pays
-		// a throw and a catch once per remaining path, where one write pays one.
-		print(files.map((path) => `${path}\n`).join(''));
+		// One write for the whole listing, as the native CLI does (`run_paths` in
+		// `commands/format.rs`): a per-path write re-enters the writer and issues a
+		// syscall for each of (potentially thousands of) lines. It also decides what a
+		// closed reader costs — `write_fd` goes quiet on `EPIPE` by *catching* it, so a
+		// per-path loop pays a throw and a catch once per remaining path, where one
+		// write pays one.
+		print(join_lines(files));
 		if (traversal_errors.length > 0) process.exit(2);
 		return;
 	}
@@ -578,13 +660,13 @@ async function format_paths(values, positionals) {
 		// .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css here" *or* "all of them are
 		// ignored" (e.g. a target under a gitignored dir), so don't imply a
 		// wrong-extension cause. `--list` reports the empty set and exits 0.
-		eprint(
-			'Error: No files to format — no unignored .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css files in scope\n'
+		exit_with_error(
+			2,
+			'Error: No files to format — no unignored .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css files in scope'
 		);
-		process.exit(2);
 	}
 
-	const jobs = resolve_jobs(values.jobs, files.length);
+	const jobs = resolve_jobs(explicit_jobs, files.length);
 	const outcomes =
 		jobs > 1
 			? await format_files_parallel(files, values.check, jobs)
@@ -600,20 +682,20 @@ async function format_paths(values, positionals) {
 	let changed = 0;
 	let unchanged = 0;
 	let errors = traversal_errors.length;
-	let changed_paths = '';
+	const changed_paths = [];
 	for (let i = 0; i < files.length; i++) {
 		const outcome = outcomes[i];
 		if (outcome.kind === 'unchanged') {
 			unchanged++;
 		} else if (outcome.kind === 'changed') {
 			changed++;
-			changed_paths += `${files[i]}\n`;
+			changed_paths.push(files[i]);
 		} else {
 			errors++;
 			eprint(`error: ${files[i]}: ${outcome.message}\n`);
 		}
 	}
-	print(changed_paths);
+	print(join_lines(changed_paths));
 
 	const action = values.check ? 'would change' : 'formatted';
 	const error_note = errors > 0 ? `, ${errors} errors` : '';
@@ -760,7 +842,9 @@ function cpu_list_len(list) {
 }
 
 /**
- * How many workers to actually spawn: 1 means "stay on this thread".
+ * How many workers to actually spawn: 1 means "stay on this thread". `explicit` is
+ * the `--jobs` value already held to the machine's ceiling (`clamp_worker_count`),
+ * or `undefined` when the flag was not given.
  *
  * `WORKER_FILE_THRESHOLD` governs the **default** only. An explicit `--jobs N`
  * bypasses it at any file count — the user asked, and an explicit width is also
@@ -774,11 +858,11 @@ function cpu_list_len(list) {
  * — matching the native clamp, which `--jobs 0` had escaped on its streaming
  * path (`format_streamed`).
  */
-function resolve_jobs(requested, file_count) {
-	if (requested === undefined) {
+function resolve_jobs(explicit, file_count) {
+	if (explicit === undefined) {
 		return file_count < WORKER_FILE_THRESHOLD ? 1 : clamp_jobs(default_jobs(), file_count);
 	}
-	return clamp_jobs(clamp_worker_count(Number.parseInt(requested, 10)), file_count);
+	return clamp_jobs(explicit, file_count);
 }
 
 /** A worker count clamped to what there is work for, floored at 1. */
@@ -804,13 +888,18 @@ function clamp_jobs(jobs, file_count) {
  * narrowing stays; this bound exists for the wall that refuses nothing until
  * it kills.
  */
-function clamp_worker_count(requested) {
+function clamp_worker_count(raw) {
+	// `raw` is the flag's validated text (`main` refused anything but `+?\d+` under
+	// `usize::MAX`). Compared and printed as a BigInt, not a Number: the warning restates
+	// what argh prints — the parsed `usize`, so `+5` and `005` read `5` — and a Number
+	// rounds past 2^53, where `--jobs 18446744073709551615` would print `…552000`.
+	const requested = BigInt(raw.replace(/^\+/, ''));
 	const ceiling = cpu_topology().logical * MAX_WORKERS_PER_LOGICAL_CPU;
-	if (requested > ceiling) {
+	if (requested > BigInt(ceiling)) {
 		eprint(`warning: --jobs ${requested} exceeds this machine's ceiling; using ${ceiling}\n`);
 		return ceiling;
 	}
-	return requested;
+	return Number(requested);
 }
 
 /**
@@ -822,12 +911,15 @@ function clamp_worker_count(requested) {
  * up only itself. That mirrors the native pool's claim-by-index design, and for
  * the same reason — a static split strands whole workers behind one large file.
  *
- * A pool that cannot be brought up at all falls back to this thread. A worker
- * that dies mid-run does not: every index left unfilled surfaces as an error,
- * because turning one worker's death into a silent "unchanged" would report a
- * clean run over files nobody formatted. A dying worker still posts what it
- * finished (see `run_format_worker`), so "unfilled" means genuinely unformatted
- * rather than "claimed by the worker that died".
+ * A pool that cannot be brought up at all falls back to this thread — whether
+ * `new Worker` refused, or every worker died before claiming a file (a torn
+ * install whose worker-side import or init rejects: construction succeeds and
+ * the death arrives as an `error` event). A worker that dies mid-run does not:
+ * every index left unfilled surfaces as an error, because turning one worker's
+ * death into a silent "unchanged" would report a clean run over files nobody
+ * formatted. A dying worker still posts what it finished (see
+ * `run_format_worker`), so "unfilled" means genuinely unformatted rather than
+ * "claimed by the worker that died".
  */
 async function format_files_parallel(files, check, jobs) {
 	const outcomes = new Array(files.length);
@@ -880,6 +972,18 @@ async function format_files_parallel(files, check, jobs) {
 				})
 		)
 	);
+
+	// The pool came up and then every worker died before claiming anything — the
+	// cursor never moved, so no file was touched. This thread is the floor under the
+	// pool here as it is under a refused spawn (the native `spawn_pool`'s callers
+	// drain on the calling thread when it comes up empty); the sweep below would
+	// instead report every file as unformatted and exit 2 having done no work. A
+	// cursor that moved means a worker may have written, and then the sweep is the
+	// honest answer.
+	if (Atomics.load(cursor, 0) === 0) {
+		eprint('warning: no format worker ran; formatting on one thread\n');
+		return format_files(files, check);
+	}
 
 	for (let i = 0; i < outcomes.length; i++) {
 		outcomes[i] ??= { kind: 'error', message: 'not formatted (worker failed)' };
@@ -937,45 +1041,56 @@ function run_parse(args) {
 		PARSE_HELP
 	);
 
+	// argh refuses the extra positional before it looks at any value, so this comes
+	// ahead of the flag validation below (`parse a.ts b.ts --source-type bogus` names
+	// `b.ts`, not the source type)
+	if (positionals.length > 1) {
+		exit_unrecognized(`Unrecognized argument: ${positionals[1]}`);
+	}
 	// validated before mode dispatch — a bad value exits 1 in every mode (argh parity)
 	const flag_parser = values.parser === undefined ? undefined : resolve_parser(values.parser);
 	// --source-type is validated upfront (exit 1) like the native CLI; it only
 	// affects the TypeScript parser (svelte is always a module, css has no goal).
 	const source_type = resolve_source_type(values['source-type'], 1);
-	if (positionals.length > 1) {
-		eprint(`Unrecognized argument: ${positionals[1]}\n`);
-		process.exit(1);
-	}
 
 	// Input precedence mirrors the native `InputArgs::resolve`: --content > --stdin > file.
 	let input;
 	let parser;
 	if (values.content !== undefined) {
 		if (flag_parser === undefined) {
-			eprint('Error: --content requires --parser <svelte|typescript|css>\n');
-			process.exit(1);
+			exit_with_error(1, 'Error: --content requires --parser <svelte|typescript|css>');
 		}
 		parser = flag_parser;
 		input = values.content;
 	} else if (values.stdin) {
 		if (flag_parser === undefined) {
-			eprint('Error: --stdin requires --parser <svelte|typescript|css>\n');
-			process.exit(1);
+			exit_with_error(1, 'Error: --stdin requires --parser <svelte|typescript|css>');
 		}
 		parser = flag_parser;
 		input = read_stdin(1);
 	} else if (positionals.length > 0) {
 		const path = positionals[0];
-		parser = flag_parser === undefined ? parser_from_extension(path) : flag_parser;
+		if (flag_parser === undefined) {
+			// The path's extension picks the parser, so it must be one tsv handles: the
+			// dispatch has no unknown arm, and a `.md` would otherwise parse as
+			// TypeScript and report a syntax error about prose. Same check, same message
+			// as `format <file>` and the native `InputArgs::resolve`; an explicit
+			// `--parser` is the override.
+			const unsupported = unsupported_extension_error(path);
+			if (unsupported !== undefined) {
+				exit_with_error(1, `Error: ${unsupported}`);
+			}
+			parser = parser_from_extension(path);
+		} else {
+			parser = flag_parser;
+		}
 		try {
 			input = decode_source(readFileSync(path));
 		} catch (error) {
-			eprint(`Error: Error reading file '${path}': ${error.message}\n`);
-			process.exit(1);
+			exit_with_error(1, `Error: Error reading file '${path}': ${error.message}`);
 		}
 	} else {
-		eprint('Error: No input provided. Use a file path, --content, or --stdin\n');
-		process.exit(1);
+		exit_with_error(1, 'Error: No input provided. Use a file path, --content, or --stdin');
 	}
 
 	refuse_source_type_language(parser, source_type, 1);
@@ -992,14 +1107,16 @@ function run_parse(args) {
 			sourceType: source_type
 		});
 	} catch (error) {
-		eprint(`Parse error: ${error.message}\n`);
-		process.exit(1);
+		exit_with_error(1, `Parse error: ${error.message}`);
 	}
 	if (values.pretty) {
-		// re-serializing through the engine isn't guaranteed byte-identical to the
-		// native CLI's to_json_with_tabs: number formatting diverges at extremes
-		// (ryu emits `1e21`, ECMA-262 emits `1e+21`); compact output (the default)
-		// is the verbatim wire string from Rust and exact
+		// A re-serialization, where the native CLI re-indents the compact bytes
+		// without ever reading them back — and byte-identical to it all the same: the
+		// wire writer spells every number in ECMAScript's own `Number::toString` form
+		// (so a `JSON.parse`/`stringify` round trip changes no token), emits no
+		// integer-like keys (so V8's key reordering never fires), and escapes exactly
+		// what `JSON.stringify` escapes. The package test pins the equality on both
+		// bins; the compact default is the verbatim wire string from Rust either way.
 		json = JSON.stringify(JSON.parse(json), null, '\t');
 	}
 	print(`${json}\n`);
@@ -1053,14 +1170,32 @@ function eprint(text) {
 	write_fd(2, text);
 }
 
+/** Print `message` as one stderr line and exit with `code` — the shape every
+ * argument refusal and single-input failure takes, mirroring the native
+ * `cli::out::exit_with_error`. The message is printed verbatim (the caller spells
+ * its own `Error:` / `Parse error:` prefix, as the native command does). */
+function exit_with_error(code, message) {
+	eprint(`${message}\n`);
+	process.exit(code);
+}
+
+/** An argument-parsing refusal in argh's exact shape: the message, a blank line,
+ * and the `Run tsv --help` pointer the native `main` appends to every early exit
+ * (exit 1). Used wherever this mirror spells an argh failure itself — the word
+ * `help`, an unrecognized or inline-valued flag, a missing value — so those
+ * refusals are byte-identical on both bins; `parseArgs`'s own failures keep their
+ * own wording and agree on the exit code alone. */
+function exit_unrecognized(message) {
+	exit_with_error(1, `${message}\n\nRun tsv --help for more information.`);
+}
+
 /** Read all of stdin, exiting with the calling command's error code on
  * failure (`format` uses 2, `parse` uses 1 — mirroring the native CLI). */
 function read_stdin(exit_code) {
 	try {
 		return decode_source(readFileSync(0));
 	} catch (error) {
-		eprint(`Error: Error reading from stdin: ${error.message}\n`);
-		process.exit(exit_code);
+		exit_with_error(exit_code, `Error: Error reading from stdin: ${error.message}`);
 	}
 }
 
@@ -1079,14 +1214,14 @@ function read_stdin(exit_code) {
  * decoded strictly for the same reason; the source path is where it costs
  * more.
  *
- * `ignoreBOM: true` *keeps* a leading BOM (the option name is inverted), so a
- * BOM-prefixed file decodes exactly as Rust's `read_to_string` leaves it.
- * The thrown message is Rust's own wording, so every caller's existing
- * `${error.message}` interpolation reproduces the native text byte for byte.
+ * The decoder is `UTF8_STRICT` (declared with the module state, which is why it
+ * keeps a BOM). The thrown message is Rust's own wording, so every caller's
+ * existing `${error.message}` interpolation reproduces the native text byte for
+ * byte.
  */
 function decode_source(buf) {
 	try {
-		return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buf);
+		return UTF8_STRICT.decode(buf);
 	} catch {
 		throw new Error('stream did not contain valid UTF-8');
 	}
@@ -1096,26 +1231,22 @@ function decode_source(buf) {
  * silently-dropped file and keep precedence by presence. Returns `{kind:
  * 'content', content}` on success, `{kind: 'absent'}` for ENOENT (missing, or
  * raced away after the listing — silent), or `{kind: 'unreadable'}` for any other
- * failure, pushing a non-fatal warning. **Strict UTF-8** (via `TextDecoder` with
- * `fatal`) to match Rust's `read_to_string` — Node's `readFileSync(path, 'utf-8')`
- * would lossily replace invalid bytes, silently applying a mangled ignore file the
- * native CLI drops. `ignoreBOM: true` *keeps* a leading BOM (the option name is
- * inverted) so a BOM-prefixed file decodes identically to Rust's `read_to_string`,
- * which doesn't strip it either. Mirrors the native `read_ignore_file`. */
+ * failure, pushing a non-fatal warning. **Strict UTF-8** (`decode_source`) to match
+ * Rust's `read_to_string` — Node's `readFileSync(path, 'utf-8')` would lossily
+ * replace invalid bytes, silently applying a mangled ignore file the native CLI
+ * drops — and, for invalid UTF-8, the same failure text, so that warning reads
+ * identically on both bins (the native one interpolates the `read_to_string` error,
+ * whose wording `decode_source` reproduces). Any OTHER read failure carries each
+ * runtime's own wording (`EACCES: permission denied, open '…'` here, `Permission
+ * denied (os error 13)` natively), as the traversal errors do — the parity
+ * contract covers the decision, not those texts. Mirrors the native
+ * `read_ignore_file`. */
 function read_ignore_file(path, warnings) {
-	let buf;
 	try {
-		buf = readFileSync(path);
+		return { kind: 'content', content: decode_source(readFileSync(path)) };
 	} catch (error) {
 		if (error.code === 'ENOENT') return { kind: 'absent' };
 		warnings.push(`could not read ${path} (${error.message}); its ignore rules are not applied`);
-		return { kind: 'unreadable' };
-	}
-	try {
-		const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
-		return { kind: 'content', content: decoder.decode(buf) };
-	} catch {
-		warnings.push(`could not read ${path} (invalid UTF-8); its ignore rules are not applied`);
 		return { kind: 'unreadable' };
 	}
 }
@@ -1196,21 +1327,14 @@ function discover_files(paths) {
 		}
 	});
 	// Both argument errors, reported together. The extension check applies only to
-	// *file* args (a directory is a scope, filtered by the walk) and comes from
-	// `tsv_discover` via the WASM binding, message and all, so this never
-	// hand-mirrors the native extension list. The receiver is unused there, so a
-	// throwaway stack is the whole cost of reaching it.
-	const arg_policy = new IgnoreStack();
+	// *file* args (a directory is a scope, filtered by the walk).
 	const bad = paths
 		.map((path, i) => {
 			if (stats[i]?.isDirectory()) return undefined;
-			if (stats[i]?.isFile()) return arg_policy.unsupported_extension_error(path);
+			if (stats[i]?.isFile()) return unsupported_extension_error(path);
 			return `${path}: not a file or directory`;
 		})
 		.filter((message) => message !== undefined);
-	// freed deterministically for the same reason as `collect_root`'s stack: no
-	// wasm-backed handle may outlive discovery into a run that can `reinstantiate`
-	free_ignore_stack(arg_policy);
 	if (bad.length > 0) {
 		for (const message of bad) eprint(`error: ${message}\n`);
 		process.exit(2);
@@ -1252,11 +1376,26 @@ function discover_files(paths) {
 			return true;
 		});
 	}
-	errors.sort();
-	// dedupe so a directory pruned via two overlapping roots warns at most once
-	warnings.sort();
-	const deduped_warnings = warnings.filter((w, i) => w !== warnings[i - 1]);
-	return { files, errors, warnings: deduped_warnings };
+	// both channels sorted and deduped, as the native `discover_into` does: overlapping
+	// roots re-walk the shared subtree, so the same unreadable path or pruned directory
+	// would otherwise report twice — and count twice in the summary's error total
+	return { files, errors: sort_dedup(errors), warnings: sort_dedup(warnings) };
+}
+
+/** `lines` sorted with exact duplicates removed (the strings are byte-identical only
+ * for the same underlying failure, so this collapses repeats without hiding a
+ * distinct one). */
+function sort_dedup(lines) {
+	lines.sort();
+	return lines.filter((line, i) => line !== lines[i - 1]);
+}
+
+/** `paths` as one newline-terminated block — the shape both bulk stdout writes
+ * take, so a listing and a changed-path report cannot drift apart. */
+function join_lines(paths) {
+	let block = '';
+	for (const path of paths) block += `${path}\n`;
+	return block;
 }
 
 /**
@@ -1268,6 +1407,42 @@ function discover_files(paths) {
  * repo, a `.prettierignore` it shadows per-directory), and `.gitignore` at each
  * level when in a repo. Mirrors the native `collect_root`.
  */
+/**
+ * The tsv layer one directory contributes, read by the precedence both walks
+ * share: `.formatignore` whenever present (every level, in or out of a repo);
+ * inside a repo, a `.prettierignore` is the drop-in fallback at every level
+ * (hierarchical, like `.formatignore`), used solely when no *sibling*
+ * `.formatignore` is present. Precedence is by PRESENCE, not readability — a
+ * present-but-unreadable `.formatignore` still shadows: read_ignore_file warns and
+ * yields no rules rather than silently falling through to `.prettierignore`.
+ *
+ * A shadowed `.prettierignore` is warned about here too (decision + text from
+ * Rust, single source of truth with the native CLI), at whichever directory the
+ * shadow sits — the ancestor preload and the descent both reach this, so the
+ * warning fires whether the shadowing directory is walked or only preloaded. One
+ * statement of the ladder, mirroring the native `tsv_layer_content`; the two
+ * callers differ only in how presence was learned (a listing, or an `existsSync`).
+ * @returns {string | null} the layer's content, or null for no layer
+ */
+function tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, stack, warnings) {
+	const warning = stack.prettierignore_shadowed_warning(
+		dir,
+		in_repo,
+		has_prettierignore,
+		has_formatignore
+	);
+	if (warning != null) warnings.push(warning);
+	if (has_formatignore) {
+		const r = read_ignore_file(join(dir, FORMATIGNORE_FILE), warnings);
+		return r.kind === 'content' ? r.content : null;
+	}
+	if (in_repo && has_prettierignore) {
+		const r = read_ignore_file(join(dir, PRETTIERIGNORE_FILE), warnings);
+		return r.kind === 'content' ? r.content : null;
+	}
+	return null;
+}
+
 function collect_root(root, cwd, files, errors, warnings) {
 	let root_abs;
 	try {
@@ -1292,25 +1467,20 @@ function collect_root(root, cwd, files, errors, warnings) {
 	// twice. Ancestors above `root` aren't listed, so they keep the direct open.
 	for (const ancestor of ancestor_chain(format_root, root_abs).slice(0, -1)) {
 		const anchor = rel_under(format_root, ancestor) ?? '';
-		// tsv layer: `.formatignore` everywhere; inside a repo, a `.prettierignore`
-		// it shadows per-directory (hierarchical, like `.formatignore` — deeper
-		// wins). No listing for ancestors, so the read outcome stands in for
-		// presence: a present-but-unreadable `.formatignore` (`unreadable`, warned)
-		// shadows `.prettierignore` just as in the listed case — only a genuinely
-		// `absent` one falls through.
-		let tsv = null;
-		if (in_repo) {
-			const fr = read_ignore_file(join(ancestor, FORMATIGNORE_FILE), warnings);
-			if (fr.kind === 'content') {
-				tsv = fr.content;
-			} else if (fr.kind === 'absent') {
-				const pr = read_ignore_file(join(ancestor, PRETTIERIGNORE_FILE), warnings);
-				if (pr.kind === 'content') tsv = pr.content;
-			}
-		} else {
-			const fr = read_ignore_file(join(ancestor, FORMATIGNORE_FILE), warnings);
-			if (fr.kind === 'content') tsv = fr.content;
-		}
+		// No listing for ancestors, so presence is learned by probing: a
+		// present-but-unreadable `.formatignore` still shadows (read_ignore_file
+		// warns and yields no rules rather than falling through), and only a
+		// genuinely absent one hands the level to `.prettierignore`.
+		const has_formatignore = existsSync(join(ancestor, FORMATIGNORE_FILE));
+		const has_prettierignore = in_repo && existsSync(join(ancestor, PRETTIERIGNORE_FILE));
+		const tsv = tsv_layer_content(
+			ancestor,
+			has_formatignore,
+			has_prettierignore,
+			in_repo,
+			stack,
+			warnings
+		);
 		if (tsv !== null) stack.push_tsv(anchor, tsv);
 		// `.gitignore` layer: only inside a git repo
 		if (in_repo) {
@@ -1327,9 +1497,13 @@ function collect_root(root, cwd, files, errors, warnings) {
 	// already cleared — true for everything the walk descends into, but not for
 	// `root` itself when it's under an ignored ancestor (e.g. `tsv format
 	// build/sub` with a gitignored `build/`). Gate it once with the full
-	// ancestor-walking is_ignored: an ignored root means nothing under it is in
-	// scope. Mirrors the native collect_root.
-	if (base_rel !== '' && stack.is_ignored(base_rel, true)) {
+	// ancestor-walking is_ignored, and with is_path_pruned, which replays the
+	// other two prunes (the safety nets and the build-output heuristic) over the
+	// root's ANCESTOR segments — so `tsv format dist/sub` and `node_modules/pkg`
+	// list what `tsv format .` lists for those subtrees: nothing. The root itself
+	// is the one the caller named and is not graded. Mirrors the native
+	// collect_root.
+	if (base_rel !== '' && (stack.is_path_pruned(base_rel) || stack.is_ignored(base_rel, true))) {
 		free_ignore_stack(stack);
 		return;
 	}
@@ -1413,42 +1587,25 @@ function collect_recursive(
 	let has_prettierignore = false;
 	let has_gitignore = false;
 	for (const e of entries) {
+		// a DIRECTORY named `.gitignore` is not an ignore file: reading it would fail
+		// with EISDIR and warn about rules that were never there
+		if (!e.isFile()) continue;
 		if (e.name === FORMATIGNORE_FILE) has_formatignore = true;
 		else if (e.name === PRETTIERIGNORE_FILE) has_prettierignore = true;
 		else if (in_repo && e.name === GITIGNORE_FILE) has_gitignore = true;
 	}
-	// tsv layer: `.formatignore` whenever present (every level, in or out of a
-	// repo); inside a repo, a `.prettierignore` is the drop-in fallback at every
-	// level (hierarchical, like `.formatignore`), used solely when no *sibling*
-	// `.formatignore` is present. Precedence is by presence (the listing), not
-	// readability — a present-but-unreadable `.formatignore` still shadows:
-	// read_ignore_file warns and yields no rules.
-	let tsv = null;
-	if (has_formatignore) {
-		const r = read_ignore_file(join(dir, FORMATIGNORE_FILE), warnings);
-		if (r.kind === 'content') tsv = r.content;
-	} else if (in_repo && has_prettierignore) {
-		const r = read_ignore_file(join(dir, PRETTIERIGNORE_FILE), warnings);
-		if (r.kind === 'content') tsv = r.content;
-	}
+	const tsv = tsv_layer_content(
+		dir,
+		has_formatignore,
+		has_prettierignore,
+		in_repo,
+		stack,
+		warnings
+	);
 	let tsv_pushed = false;
 	if (tsv !== null) {
 		stack.push_tsv(dir_rel, tsv);
 		tsv_pushed = true;
-	}
-	// inside a repo, a sibling `.formatignore` shadows this dir's `.prettierignore`
-	// (one tsv layer per directory) — its rules go unread here. Warn (decision +
-	// text from Rust, single source of truth with the native CLI), pointing at
-	// merging the patterns into `.formatignore`. Fires at every directory (a shadow
-	// is per-directory, not target-root like the outside-repo warning below).
-	{
-		const warning = stack.prettierignore_shadowed_warning(
-			dir,
-			in_repo,
-			has_prettierignore,
-			has_formatignore
-		);
-		if (warning != null) warnings.push(warning);
 	}
 	// outside a git repo a target-root `.prettierignore` is silently skipped (tsv
 	// reads `.formatignore` there) — warn (decision + text from Rust, single source

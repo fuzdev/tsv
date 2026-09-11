@@ -83,7 +83,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `export` declarations are reachable only via `ModuleItem` — a Script
         // goal has no export declarations.
         if self.goal != crate::Goal::Module {
-            return Err(self.error_msg("'export' is only allowed in a module"));
+            return Err(self.error_goal_gate("'export' is only allowed in a module"));
         }
 
         // Consume 'export' keyword
@@ -952,7 +952,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.goal == crate::Goal::Module {
             return Ok(());
         }
-        Err(self.error_msg_at("'import' is only allowed in a module", position))
+        Err(self.error_goal_gate_at("'import' is only allowed in a module", position))
     }
 
     /// Parse import declaration:

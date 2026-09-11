@@ -209,8 +209,18 @@ const registry_pattern = /new FinalizationRegistry\(ptr => wasm\.(\w+)\(ptr, 1\)
 const register_pattern = /(\w+)Finalization\.register\((\w+), \2\.__wbg_ptr, \2\)/g;
 const free_pattern =
 	/free\(\) \{\n(\s+)const ptr = this\.__destroy_into_raw\(\);\n\s+wasm\.(\w+)\(ptr, 0\);\n/g;
+// Every exported METHOD too — not only the two free paths. A method hands
+// `this.__wbg_ptr` to the live `wasm` binding, so a handle from a discarded
+// instance would read the new instance's memory at an offset that meant
+// something else entirely: a wrong `is_ignored` verdict, or a fresh trap, with
+// nothing said at the point of cause. The receiver is routed through
+// `__tsv_live`, one generation compare per call, which throws on a stale handle
+// instead. Both call shapes wasm-bindgen emits are covered: the receiver first,
+// or after the return-slot pointer (`retptr`) of a method returning a string.
+const method_pattern = /(wasm\.\w+\((?:retptr, )?)this\.__wbg_ptr/g;
 let registry_rewrites = 0;
 let free_rewrites = 0;
+let method_rewrites = 0;
 /** Register sites per class — the constructor's, plus `__wrap`'s if Rust ever
  * hands one back. The count is read twice below: as a rewrite tally, and as the
  * `__wrap` tripwire the lazy entries' guarded subclass needs. */
@@ -245,11 +255,31 @@ const patched_glue =
 				`${indent}// allocator, so this is a no-op for it\n` +
 				`${indent}if (this.__tsv_gen === __tsv_instance_generation) wasm.${free_fn}(ptr, 0);\n`
 			);
+		})
+		.replace(method_pattern, (_m, call) => {
+			method_rewrites++;
+			return `${call}__tsv_live(this).__wbg_ptr`;
 		}) +
 	`
 // ---- appended by patch_npm_package.ts ----
 
 let __tsv_instance_generation = 0;
+
+/**
+ * The receiver of every exported method, checked against the instance it was
+ * minted under: a handle that outlived a \`reinstantiate()\` points into a
+ * discarded linear memory, and calling into the live one with it would read
+ * unrelated bytes as the object. Throws instead. (\`free()\` on such a handle is
+ * a no-op rather than a throw — a finalizer or a cleanup path must not fail.)
+ */
+function __tsv_live(handle) {
+    if (handle.__tsv_gen !== __tsv_instance_generation) {
+        throw new Error(
+            'this handle belongs to a WASM instance that reinstantiate() discarded — rebuild it'
+        );
+    }
+    return handle;
+}
 
 /**
  * Discard the current WASM instance and synchronously initialize a fresh one
@@ -258,7 +288,8 @@ let __tsv_instance_generation = 0;
  * call throws \`memory access out of bounds\`). Reuses the compiled
  * \`WebAssembly.Module\`, so this never recompiles. Throws if the module was
  * never initialized. Objects backed by the old instance (e.g. \`IgnoreStack\`)
- * are invalidated — rebuild them after; \`free()\` on a stale one is a safe no-op.
+ * are invalidated — rebuild them after: every method on a stale one throws, and
+ * \`free()\` on it is a safe no-op.
  */
 export function reinstantiate() {
     if (wasm === undefined) {
@@ -270,6 +301,23 @@ export function reinstantiate() {
     initSync({ module });
 }
 `;
+// Every method site must be routed, and none may remain: a receiver handed to
+// `wasm` any other way is a stale-handle path the guard does not cover.
+if (classes.length > 0 && method_rewrites === 0) {
+	console.error(
+		`FAIL: found ${classes.length} exported class(es) in ${main_js} but no method site handing ` +
+			`\`this.__wbg_ptr\` to \`wasm\` — the method shape drifted from the pattern the ` +
+			`stale-handle guard rewrites`
+	);
+	Deno.exit(1);
+}
+if (/wasm\.\w+\([^)]*\bthis\.__wbg_ptr/.test(patched_glue)) {
+	console.error(
+		`FAIL: a method in ${main_js} still hands \`this.__wbg_ptr\` to \`wasm\` unguarded — a ` +
+			`call shape the stale-handle guard does not recognize`
+	);
+	Deno.exit(1);
+}
 if (registry_rewrites !== classes.length || free_rewrites !== classes.length) {
 	console.error(
 		`FAIL: rewrote ${registry_rewrites} FinalizationRegistry callback(s) and ${free_rewrites} ` +
@@ -515,7 +563,8 @@ export declare function init_sync(module: {
  * initialized.${
 		classes.length
 			? ` Objects backed by the old instance (e.g. \`${classes[0]}\`) are
- * invalidated — rebuild them after; \`free()\` on a stale one is a safe no-op.`
+ * invalidated — rebuild them after: every method on a stale one throws, and
+ * \`free()\` on it is a safe no-op.`
 			: ''
 	}
  */

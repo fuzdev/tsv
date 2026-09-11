@@ -3,7 +3,7 @@ use crate::deno;
 use crate::diff::{Color, ColorChoice, DiffOptions, diff_to_string};
 use crate::error;
 use argh::FromArgs;
-use tsv_cli::cli::format_source::format_source;
+use tsv_cli::cli::format_source::format_source_with_source_type;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
 /// Compare our printer output with prettier (shows diff).
@@ -48,6 +48,10 @@ pub struct CompareCommand {
 
 impl CompareCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
+        // A named path settles its own goal the way `tsv format <path>` does
+        // (`.mjs`/`.mts` are modules with no script retry); `--content`/`--stdin` take the
+        // fallback. Read here, ahead of the move, so "ours" is what the CLI would emit.
+        let goal = super::path_goal(self.file.as_deref());
         let (input, parser_type) = super::resolve_input_or_fail(
             InputArgs {
                 content: self.content,
@@ -62,6 +66,7 @@ impl CompareCommand {
         rt.block_on(run(
             &input,
             parser_type,
+            goal,
             self.quiet,
             self.verbose,
             self.json,
@@ -74,6 +79,7 @@ impl CompareCommand {
 async fn run(
     input: &Input,
     parser_type: ParserType,
+    goal: Option<tsv_ts::Goal>,
     quiet: bool,
     verbose: bool,
     json_output: bool,
@@ -88,7 +94,7 @@ async fn run(
     }
 
     // Run our formatter
-    let our_output = match format_source(content, parser_type) {
+    let our_output = match format_source_with_source_type(content, parser_type, goal) {
         Ok(output) => {
             if verbose {
                 println!("=== Our Formatter ===");

@@ -27,13 +27,15 @@ use wasm_bindgen::prelude::*;
 // (see `tsv_arena`'s §Abort safety — this is the target that made it necessary).
 // The goal-axis macros come from the same crate, so the three bindings share ONE
 // definition of which languages have a goal rather than three hand-synced copies.
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::goal_allowed;
+#[cfg(feature = "parse")]
+use tsv_arena::parse_ast;
 #[cfg(feature = "format")]
 use tsv_arena::parse_ast_for_format;
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
-#[cfg(any(feature = "parse", feature = "format"))]
-use tsv_arena::{goal_allowed, parse_ast};
 
 // WASM global allocator: talc replaces std's default dlmalloc on wasm32. The
 // format path is allocation-heavy (doc IR, output string, memo vecs) and
@@ -432,20 +434,6 @@ export function format_typescript(source: string, options?: TypeScriptFormatOpti
 export function format_css(source: string, options?: FormatOptions): string;
 "#;
 
-/// Parse a `sourceType` string (`"script"` / `"module"`), mirroring `tsv_cli`'s
-/// `parse_source_type_arg`. Used by the `sourceType` option of both export
-/// families — the parse goal (`Script` vs `Module`) is a TypeScript-only axis,
-/// since Svelte `<script>` is always a module and CSS has no goal. See
-/// `tsv format --source-type`.
-#[cfg(any(feature = "parse", feature = "format"))]
-fn source_type_from_str(source_type: &str) -> Result<tsv_ts::Goal, JsError> {
-    tsv_ts::Goal::from_source_type(source_type).ok_or_else(|| {
-        err(format!(
-            "invalid sourceType '{source_type}' (expected 'script' or 'module')"
-        ))
-    })
-}
-
 /// Which options bag one export accepts — the noun that names it in every
 /// error, plus the supported key set. Both families read `{sourceType?}`; only parse
 /// reads `{locations?}`, because that option selects a **wire** and format
@@ -507,10 +495,39 @@ impl OptionsSpec {
 /// retry — which is what lets an editor's bare `format_typescript(source)` format a
 /// legacy sloppy script. A SET value is exact on both.
 #[cfg(any(feature = "parse", feature = "format"))]
+#[derive(Debug)]
 struct Options {
     #[cfg(feature = "parse")]
     locations: bool,
     source_type: Option<tsv_ts::Goal>,
+}
+
+/// One option's value as the JS side handed it over, classified to the three shapes
+/// the reader distinguishes. The `JsValue` stops here: [`resolve_options`] below
+/// decides over this enum alone, which is what lets `cargo test` grade the decision
+/// natively (a `JsValue` cannot be built off the wasm target).
+#[cfg(any(feature = "parse", feature = "format"))]
+enum OptionValue {
+    Undefined,
+    Bool(bool),
+    Str(String),
+    /// Anything else — a number, an object, `null` — which no key accepts.
+    Other,
+}
+
+#[cfg(any(feature = "parse", feature = "format"))]
+impl OptionValue {
+    fn classify(value: &JsValue) -> Self {
+        if value.is_undefined() {
+            Self::Undefined
+        } else if let Some(b) = value.as_bool() {
+            Self::Bool(b)
+        } else if let Some(s) = value.as_string() {
+            Self::Str(s)
+        } else {
+            Self::Other
+        }
+    }
 }
 
 /// Read an `Options` off the raw `options` argument against `spec`
@@ -520,15 +537,12 @@ struct Options {
 ///
 /// One reader serves both export families so the two can't drift: the parse
 /// exports' documented semantics are the format exports' semantics, key for key.
+/// This half only reaches into the JS object — the shape test and the key/value
+/// walk; every decision about a key is [`resolve_options`]'s.
 #[cfg(any(feature = "parse", feature = "format"))]
 fn read_options(options: &JsValue, spec: OptionsSpec) -> Result<Options, JsError> {
-    let mut parsed = Options {
-        #[cfg(feature = "parse")]
-        locations: true,
-        source_type: None,
-    };
     if options.is_undefined() || options.is_null() {
-        return Ok(parsed);
+        return resolve_options(std::iter::empty(), spec).map_err(err);
     }
     // An array is `typeof 'object'` and yields no keys, so without the second
     // test a positional-style `parse_typescript(src, ['script'])` would read as
@@ -539,6 +553,7 @@ fn read_options(options: &JsValue, spec: OptionsSpec) -> Result<Options, JsError
         return Err(err(format!("{} options must be an object", spec.noun)));
     }
     let object: &js_sys::Object = options.unchecked_ref();
+    let mut entries = Vec::new();
     for key in js_sys::Object::keys(object).iter() {
         // `Object.keys` yields only string keys.
         let Some(name) = key.as_string() else {
@@ -546,6 +561,26 @@ fn read_options(options: &JsValue, spec: OptionsSpec) -> Result<Options, JsError
         };
         let value = js_sys::Reflect::get(options, &key)
             .map_err(|_| err(format!("failed to read {} option '{name}'", spec.noun)))?;
+        entries.push((name, OptionValue::classify(&value)));
+    }
+    resolve_options(entries, spec).map_err(err)
+}
+
+/// The decision behind [`read_options`], over the bag's entries in key order: which
+/// keys `spec` admits, what each accepts, and how each refusal is worded. Pure, so
+/// the unit tests below grade it on the native target — the only Rust-side gate on
+/// a reader the loader `crates/tsv_napi/npm/index.js` restates by hand.
+#[cfg(any(feature = "parse", feature = "format"))]
+fn resolve_options(
+    entries: impl IntoIterator<Item = (String, OptionValue)>,
+    spec: OptionsSpec,
+) -> Result<Options, String> {
+    let mut parsed = Options {
+        #[cfg(feature = "parse")]
+        locations: true,
+        source_type: None,
+    };
+    for (name, value) in entries {
         // A supported key explicitly set to `undefined` means that key's default
         // (the omitted-key JS convention) — decided per arm, AFTER the key match,
         // so an unknown key errors whatever its value (`{locatons: undefined}` is
@@ -558,33 +593,34 @@ fn read_options(options: &JsValue, spec: OptionsSpec) -> Result<Options, JsError
             // how `locations` reads on a format export.
             #[cfg(feature = "parse")]
             "locations" if spec.locations => {
-                if value.is_undefined() {
-                    continue;
-                }
-                parsed.locations = value.as_bool().ok_or_else(|| {
-                    err(format!(
-                        "{} option 'locations' must be a boolean",
-                        spec.noun
-                    ))
-                })?;
+                parsed.locations = match value {
+                    OptionValue::Undefined => continue,
+                    OptionValue::Bool(b) => b,
+                    OptionValue::Str(_) | OptionValue::Other => {
+                        return Err(format!(
+                            "{} option 'locations' must be a boolean",
+                            spec.noun
+                        ));
+                    }
+                };
             }
             "sourceType" => {
-                if value.is_undefined() {
+                if matches!(value, OptionValue::Undefined) {
                     continue;
                 }
                 if !spec.source_type {
-                    return Err(err(format!(
-                        "{} option 'sourceType' is only supported for TypeScript",
-                        spec.noun
-                    )));
+                    return Err(tsv_arena::source_type_unsupported_message(spec.noun));
                 }
-                let source_type = value.as_string().ok_or_else(|| {
-                    err(format!(
+                let OptionValue::Str(source_type) = value else {
+                    return Err(format!(
                         "{} option 'sourceType' must be 'script' or 'module'",
                         spec.noun
-                    ))
-                })?;
-                parsed.source_type = Some(source_type_from_str(&source_type)?);
+                    ));
+                };
+                parsed.source_type = Some(
+                    tsv_ts::Goal::from_source_type(&source_type)
+                        .ok_or_else(|| tsv_arena::invalid_source_type_message(&source_type))?,
+                );
             }
             other => {
                 let noun = spec.noun;
@@ -596,7 +632,7 @@ fn read_options(options: &JsValue, spec: OptionsSpec) -> Result<Options, JsError
                     // non-configurable and the source type is TypeScript's alone.
                     (false, false) => "this export takes no options",
                 };
-                return Err(err(format!("unknown {noun} option '{other}' ({detail})")));
+                return Err(format!("unknown {noun} option '{other}' ({detail})"));
             }
         }
     }
@@ -730,3 +766,128 @@ lang_bindings!(
     format_css,
     tsv_css,
 );
+
+#[cfg(all(test, any(feature = "parse", feature = "format")))]
+mod tests {
+    use super::{OptionValue, OptionsSpec, resolve_options};
+
+    fn entries(pairs: &[(&str, OptionValue)]) -> Vec<(String, OptionValue)> {
+        pairs
+            .iter()
+            .map(|(k, v)| {
+                let v = match v {
+                    OptionValue::Undefined => OptionValue::Undefined,
+                    OptionValue::Bool(b) => OptionValue::Bool(*b),
+                    OptionValue::Str(s) => OptionValue::Str(s.clone()),
+                    OptionValue::Other => OptionValue::Other,
+                };
+                ((*k).to_owned(), v)
+            })
+            .collect()
+    }
+
+    /// The reader the loader (`npm/index.js`) restates by hand: every refusal's
+    /// wording, and the two `undefined` conventions (an omitted or `undefined`
+    /// supported key is its default; an unknown key errors whatever its value).
+    #[test]
+    fn resolve_options_words_every_refusal_and_reads_undefined_as_default() {
+        #[cfg(feature = "parse")]
+        {
+            let spec = OptionsSpec::parse(true);
+            let parsed = resolve_options(std::iter::empty(), spec).unwrap();
+            assert!(parsed.locations);
+            assert!(parsed.source_type.is_none());
+
+            let parsed = resolve_options(
+                entries(&[
+                    ("locations", OptionValue::Bool(false)),
+                    ("sourceType", OptionValue::Str("script".to_owned())),
+                ]),
+                OptionsSpec::parse(true),
+            )
+            .unwrap();
+            assert!(!parsed.locations);
+            assert_eq!(parsed.source_type, Some(tsv_ts::Goal::Script));
+
+            // an explicit `undefined` is the omitted key
+            let parsed = resolve_options(
+                entries(&[
+                    ("locations", OptionValue::Undefined),
+                    ("sourceType", OptionValue::Undefined),
+                ]),
+                OptionsSpec::parse(false),
+            )
+            .unwrap();
+            assert!(parsed.locations);
+            assert!(parsed.source_type.is_none());
+
+            let refused = |pairs: &[(&str, OptionValue)], source_type: bool| {
+                resolve_options(entries(pairs), OptionsSpec::parse(source_type)).unwrap_err()
+            };
+            assert_eq!(
+                refused(&[("locations", OptionValue::Str("no".to_owned()))], true),
+                "parse option 'locations' must be a boolean"
+            );
+            assert_eq!(
+                refused(
+                    &[("sourceType", OptionValue::Str("module".to_owned()))],
+                    false
+                ),
+                "parse option 'sourceType' is only supported for TypeScript"
+            );
+            assert_eq!(
+                refused(&[("sourceType", OptionValue::Bool(true))], true),
+                "parse option 'sourceType' must be 'script' or 'module'"
+            );
+            assert_eq!(
+                refused(
+                    &[("sourceType", OptionValue::Str("sloppy".to_owned()))],
+                    true
+                ),
+                "invalid sourceType 'sloppy' (expected 'script' or 'module')"
+            );
+            assert_eq!(
+                refused(&[("locatons", OptionValue::Undefined)], true),
+                "unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
+            );
+            assert_eq!(
+                refused(
+                    &[
+                        ("sourceType", OptionValue::Undefined),
+                        ("x", OptionValue::Other)
+                    ],
+                    false
+                ),
+                "unknown parse option 'x' (expected 'locations')"
+            );
+        }
+        #[cfg(feature = "format")]
+        {
+            let refused = |pairs: &[(&str, OptionValue)], source_type: bool| {
+                resolve_options(entries(pairs), OptionsSpec::format(source_type)).unwrap_err()
+            };
+            // `locations` selects a wire, and a format emits none: unknown, not inert
+            assert_eq!(
+                refused(&[("locations", OptionValue::Bool(false))], true),
+                "unknown format option 'locations' (expected 'sourceType')"
+            );
+            assert_eq!(
+                refused(&[("anything", OptionValue::Bool(true))], false),
+                "unknown format option 'anything' (this export takes no options)"
+            );
+            assert_eq!(
+                refused(
+                    &[("sourceType", OptionValue::Str("script".to_owned()))],
+                    false
+                ),
+                "format option 'sourceType' is only supported for TypeScript"
+            );
+            let parsed = resolve_options(
+                entries(&[("sourceType", OptionValue::Str("module".to_owned()))]),
+                OptionsSpec::format(true),
+            )
+            .unwrap();
+            assert_eq!(parsed.source_type, Some(tsv_ts::Goal::Module));
+        }
+    }
+}

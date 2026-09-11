@@ -117,6 +117,16 @@ pub fn resolve_input_or_fail(
     })
 }
 
+/// The TypeScript goal a named input path settles, `None` for no path or an
+/// extension that settles nothing — what `tsv format <path>` reads
+/// (`tsv_ts::Goal::from_extension`: `.mjs`/`.mts` are modules with no script retry).
+/// The named-path commands that show "ours" (`compare`, `ast_diff`) read it so their
+/// output is what the shipped CLI would emit on the same file; a `--content`/`--stdin`
+/// input has no path and takes the module-then-script fallback like the bindings.
+pub fn path_goal(file: Option<&str>) -> Option<tsv_ts::Goal> {
+    file.and_then(tsv_ts::Goal::from_extension)
+}
+
 /// Walk `tests/fixtures`, returning [`CliError::Failed`] (after printing a
 /// message) on a missing directory or a walk error. The shared front door for
 /// every `fixtures_*` command.

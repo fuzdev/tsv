@@ -97,8 +97,14 @@ fn sidecar_runtime() -> &'static Runtime {
         // thread only drives the actor loops and the stdout/stderr readers.
         #[allow(clippy::expect_used)]
         // runtime build fails only on catastrophic OS resource exhaustion, with no recovery path
+        // The one reservation every tsv thread takes (`tsv_cli::cli::stack`): this
+        // thread reads the canonical AST back with the recursion limit disabled
+        // (`crate::json`), whose soundness argument is precisely that every reader
+        // runs on a `STACK_SIZE` stack — tokio's 2 MiB default would be a route
+        // ~16x shallower than every other.
         Builder::new_multi_thread()
             .worker_threads(1)
+            .thread_stack_size(tsv_cli::cli::stack::STACK_SIZE)
             .enable_all()
             .thread_name("tsv-deno-sidecar")
             .build()

@@ -4,7 +4,7 @@ use crate::diff::{DiffOptions, diff_to_string};
 use crate::error;
 use crate::render_normalize::normalize_pair;
 use argh::FromArgs;
-use tsv_cli::cli::format_source::format_source;
+use tsv_cli::cli::format_source::format_source_with_source_type;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
 /// Compare ASTs to verify semantic equivalence (round-trip or two-file).
@@ -66,6 +66,9 @@ impl AstDiffCommand {
                 file: Some(first),
             }
         };
+        // The round trip formats as `tsv format <path>` would: a named path's extension
+        // may settle the goal (`.mjs`/`.mts`), `--content`/`--stdin` take the fallback.
+        let goal = super::path_goal(primary.file.as_deref());
         let (input1, parser_type) = super::resolve_input_or_fail(primary, CliError::Failed)?;
 
         // Optional second file for direct comparison mode
@@ -92,7 +95,7 @@ impl AstDiffCommand {
             ))
         } else {
             // Single input mode: parse → format → parse → compare
-            rt.block_on(compare_round_trip(&input1, parser_type, self.render))
+            rt.block_on(compare_round_trip(&input1, parser_type, goal, self.render))
         };
 
         match result {
@@ -132,6 +135,7 @@ async fn compare_two_inputs(
 async fn compare_round_trip(
     input: &Input,
     parser_type: ParserType,
+    goal: Option<tsv_ts::Goal>,
     render: bool,
 ) -> error::Result<bool> {
     let content = input.content();
@@ -140,7 +144,8 @@ async fn compare_round_trip(
     let ast1 = parse_to_value(content, parser_type).await?;
 
     // Format
-    let formatted = format_content(content, parser_type)?;
+    let formatted = format_source_with_source_type(content, parser_type, goal)
+        .map_err(error::DebugError::Command)?;
 
     // Parse formatted
     let ast2 = parse_to_value(&formatted, parser_type).await?;
@@ -154,11 +159,6 @@ async fn parse_to_value(
     parser_type: ParserType,
 ) -> error::Result<serde_json::Value> {
     Ok(deno::parse_by_type(content, parser_type).await?)
-}
-
-/// Format content using our Rust printer
-fn format_content(content: &str, parser_type: ParserType) -> error::Result<String> {
-    format_source(content, parser_type).map_err(error::DebugError::Command)
 }
 
 /// Compare two ASTs (ignoring spans/locations).

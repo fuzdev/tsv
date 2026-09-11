@@ -1,9 +1,7 @@
 use crate::cli::input::{InputArgs, ParserType};
-use crate::cli::out::write_stdout;
-use crate::err_line;
+use crate::cli::out::{exit_with_error, write_stdout};
 use crate::json_utils::indent_json_with_tabs;
 use argh::FromArgs;
-use std::process;
 
 /// Parse source code into AST JSON.
 #[derive(FromArgs, Debug)]
@@ -51,59 +49,43 @@ impl ParseCommand {
         // `Program.sourceType`, a claim about which grammar produced the AST, so
         // one settled goal has to produce it (`format`, which exposes neither the
         // AST nor the source type, reads the same absence as its fallback).
-        let goal = match parse_source_type_arg(self.source_type.as_deref()) {
-            Ok(g) => g.unwrap_or(tsv_ts::Goal::Module),
-            Err(e) => {
-                err_line!("Error: {e}");
-                process::exit(1);
-            }
-        };
+        let goal = parse_source_type_arg(self.source_type.as_deref())
+            .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")))
+            .unwrap_or(tsv_ts::Goal::Module);
         let input_args = InputArgs {
             content: self.content,
             stdin: self.stdin,
             parser: self.parser,
             file: self.file,
         };
-        let (input, parser_type) = match input_args.resolve() {
-            Ok(pair) => pair,
-            Err(e) => {
-                err_line!("Error: {e}");
-                process::exit(1);
-            }
-        };
+        let (input, parser_type) = input_args
+            .resolve()
+            .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")));
         if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
-            err_line!("Error: {e}");
-            process::exit(1);
+            exit_with_error(1, format_args!("Error: {e}"));
         }
 
-        match parse_to_json(
+        let json = parse_to_json(
             input.content(),
             self.pretty,
             parser_type,
             goal,
             !self.no_locations,
-        ) {
-            Ok(json) => {
-                // The wire bytes are UTF-8 by construction; writing them directly skips
-                // the O(output) validation a `String` round trip would pay on
-                // ~15×-source-sized JSON. The newline is a second write rather than a
-                // `push` onto the same buffer: the writer sizes its `Vec` from an
-                // estimate (`estimated_json_capacity`), so a wire that lands exactly on
-                // its capacity would pay a realloc and a full copy of the output for
-                // one byte — and two writes cost the same syscalls either way.
-                //
-                // A consumer that closed the pipe stops the write without failing the
-                // run — the rule `write_stdout` holds for both commands. This used to
-                // `exit(1)` there, reporting a closed reader as the parse error it
-                // wasn't.
-                write_stdout(&json);
-                write_stdout(b"\n");
-            }
-            Err(e) => {
-                err_line!("Parse error: {e}");
-                process::exit(1);
-            }
-        }
+        )
+        .unwrap_or_else(|e| exit_with_error(1, format_args!("Parse error: {e}")));
+        // The wire bytes are UTF-8 by construction; writing them directly skips the
+        // O(output) validation a `String` round trip would pay on ~15×-source-sized
+        // JSON. The newline is a second write rather than a `push` onto the same
+        // buffer: the writer sizes its `Vec` from an estimate
+        // (`estimated_json_capacity`), so a wire that lands exactly on its capacity
+        // would pay a realloc and a full copy of the output for one byte — and two
+        // writes cost the same syscalls either way.
+        //
+        // A consumer that closed the pipe stops the write without failing the run —
+        // the rule `write_stdout` holds for both commands. This used to `exit(1)`
+        // there, reporting a closed reader as the parse error it wasn't.
+        write_stdout(&json);
+        write_stdout(b"\n");
     }
 }
 
@@ -165,15 +147,6 @@ fn parse_to_json(
     // bump's chunk-doubling tail on the parse.
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
 
-    // Shared tail; a no-locations pretty print rides the same bytes.
-    let finish = |bytes: Vec<u8>| -> Result<Vec<u8>, String> {
-        if pretty {
-            Ok(indent_json_with_tabs(&bytes))
-        } else {
-            Ok(bytes)
-        }
-    };
-
     // The goal applies only to TypeScript; svelte is always a module and css has
     // no goal.
     let bytes = match parser_type {
@@ -202,5 +175,10 @@ fn parse_to_json(
             }
         }
     };
-    finish(bytes)
+    // A no-locations pretty print rides the same bytes.
+    Ok(if pretty {
+        indent_json_with_tabs(&bytes)
+    } else {
+        bytes
+    })
 }

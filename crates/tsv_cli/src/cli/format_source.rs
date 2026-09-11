@@ -13,13 +13,16 @@
 //! [`format_source`] — parses at `Module` and retries at `Script` only if that
 //! *fails* (`tsv_ts::parse_with_goal_or_fallback`), so a legacy sloppy script formats
 //! without anyone naming a grammar, and a module-valid source is never reinterpreted.
-//! When both attempts fail the error that reached further into the source is the reported
-//! one, the module's on a tie (`tsv_ts::parse_with_goal_or_fallback`).
+//! When both attempts fail the module's error is reported if the script retry died on a
+//! goal gate (`import`/`export`/`import.meta`), else the one that reached further into the
+//! source, the module's on a tie (`tsv_ts::parse_with_goal_or_fallback`).
 //!
-//! `tsv format <path>` is the one caller that names a goal without being told one:
-//! it reads the path's extension (`tsv_ts::Goal::from_extension`), which settles the
-//! goal for `.mjs`/`.mts` and nothing else. A file that is an ES module by name has
-//! no legacy sloppy script to fall back to.
+//! `tsv format <path>` names a goal without being told one: it reads the path's
+//! extension (`tsv_ts::Goal::from_extension`), which settles the goal for `.mjs`/`.mts`
+//! and nothing else. A file that is an ES module by name has no legacy sloppy script to
+//! fall back to. `tsv_debug`'s named-path tools (`compare`, `ast_diff`) read the same
+//! extension so "ours" there is what the CLI would emit on the file; the fixture-tree
+//! audits deliberately do not (every seed takes the fallback — `docs/audits.md`).
 
 use crate::cli::input::ParserType;
 

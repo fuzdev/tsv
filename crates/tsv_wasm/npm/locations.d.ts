@@ -29,7 +29,7 @@ export interface LocationOptions {
 	 * `locations.js` for why the wire deliberately does not carry what would make
 	 * these derivable.
 	 */
-	language?: LocationLanguage;
+	language?: LocationLanguage | undefined;
 }
 
 /**

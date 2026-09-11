@@ -8,9 +8,10 @@ tsv's style is non-configurable, but gitignore-shaped files decide which files
 files, resolving relative paths, and walking directories belong to the callers.
 
 Two layers: `IgnoreRules` matches one file's rules against root-relative paths
-(the primitive); `IgnoreStack` layers many per-directory files into a
-hierarchical, git-faithful evaluator (the surface the CLI / WASM / extension
-actually use for `.gitignore`-aware discovery).
+(the primitive — crate-private, since every consumer reaches it through the
+stack); `IgnoreStack` layers many per-directory files into a hierarchical,
+git-faithful evaluator (the surface the CLI / WASM / extension actually use for
+`.gitignore`-aware discovery).
 
 ## Architecture Position
 
@@ -51,12 +52,13 @@ re-deriving it from these primitives.
 
 ## Public API
 
-`IgnoreRules` — the single-file primitive:
+`IgnoreRules` — the single-file primitive behind each layer, `pub(crate)`:
 
-- `IgnoreRules::parse(content)` — compile one ignore file's text.
-- `IgnoreRules::is_empty()` — callers skip per-file matching when true.
+- `IgnoreRules::parse(content)` — compile one ignore file's text (a leading UTF-8
+  BOM is skipped, as git does).
+- `IgnoreRules::is_empty()` — the stack skips per-file matching when true.
 - `IgnoreRules::is_ignored(path, is_dir)` — `path` relative to the ignore-file
-  root, `/`-separated.
+  root, `/`-separated; test-only, since the stack layers `last_match` itself.
 
 `IgnoreStack` — the hierarchical, git-faithful evaluator the surfaces use. It
 holds two parallel per-directory layer stacks (`.gitignore` and tsv):

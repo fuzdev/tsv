@@ -342,12 +342,16 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 	// stamp can't be driven deterministically here; this pins the explicit path and
 	// that a fresh handle is fully usable after any number of recoveries.
 	it(
-		'reinstantiate: a stale IgnoreStack frees as a no-op, a fresh one works',
+		'reinstantiate: a stale IgnoreStack throws on use, frees as a no-op; a fresh one works',
 		{ skip: !has_format },
 		() => {
 			const stale = new node_entry.IgnoreStack();
 			stale.push_gitignore('', 'build/\n');
 			node_entry.reinstantiate();
+			// its pointer names bytes in a discarded memory: a method must refuse
+			// rather than read whatever the fresh instance put there
+			assert.throws(() => stale.is_ignored('build/out.js', false), /reinstantiate\(\) discarded/);
+			assert.throws(() => stale.push_tsv('', 'x\n'), /reinstantiate\(\) discarded/);
 			assert.doesNotThrow(() => stale.free());
 			const fresh = new node_entry.IgnoreStack();
 			fresh.push_gitignore('', 'build/\n');
@@ -372,8 +376,8 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// A module-valid source is never reinterpreted (the retry only runs on failure).
 		assert.equal(node_entry.format_typescript('export const   x=1'), 'export const x = 1;\n');
 		// Broken under BOTH grammars: `with` fails the module parse, the `import`
-		// declaration fails the script retry, and the further-reaching error is the reported
-		// one — here the module's (line 2; the script retry died at line 1).
+		// declaration fails the script retry — a goal gate, which settles the file as a
+		// module — so the module's error is the reported one (line 2).
 		assert.throws(
 			() => node_entry.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n"),
 			/The 'with' statement is not allowed in strict mode/
@@ -406,10 +410,19 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			);
 			// svelte/css formatting is non-configurable and the source type is
 			// TypeScript's alone, so their bags carry no key at all
-			assert.throws(
-				() => node_entry.format_svelte('<div>x</div>', { sourceType: 'script' }),
-				/only supported for TypeScript/
-			);
+			// both goalless languages, and even `'module'` — the value they would have
+			// used — since the rejection is of the axis; the whole sentence, noun
+			// included, because `@fuzdev/tsv`'s loader restates it by hand
+			for (const [format, source] of [
+				[node_entry.format_svelte, '<div>x</div>'],
+				[node_entry.format_css, 'a { color: red }']
+			] as const) {
+				for (const sourceType of ['script', 'module']) {
+					assert.throws(() => format(source, { sourceType }), {
+						message: "format option 'sourceType' is only supported for TypeScript"
+					});
+				}
+			}
 			assert.throws(
 				() => node_entry.format_svelte('<div>x</div>', { locations: false }),
 				/takes no options/
@@ -537,10 +550,16 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			() => node_entry.parse_typescript('x;', { locatons: false }),
 			/unknown parse option 'locatons'/
 		);
-		assert.throws(
-			() => node_entry.parse_svelte('<div>x</div>', { sourceType: 'script' }),
-			/only supported for TypeScript/
-		);
+		for (const [parse, source] of [
+			[node_entry.parse_svelte, '<div>x</div>'],
+			[node_entry.parse_css, 'a { color: red }']
+		] as const) {
+			for (const sourceType of ['script', 'module']) {
+				assert.throws(() => parse(source, { sourceType }), {
+					message: "parse option 'sourceType' is only supported for TypeScript"
+				});
+			}
+		}
 		assert.throws(
 			() => node_entry.parse_typescript('x;', { locations: 'yes' }),
 			/'locations' must be a boolean/
@@ -1049,6 +1068,39 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			cwd
 		});
 
+	/** How many unformatted files the pipe rows seed, and the name padding that
+	 * makes their changed-path report overflow a pipe. Both thresholds have to be
+	 * crossed at once, and they are separate numbers: >768 files so the pool spawns
+	 * (which is what flips fd 1 to non-blocking — `WORKER_FILE_THRESHOLD` on the WASM
+	 * engine), and >64 KiB of changed-path text so the pipe actually fills. 1200 files
+	 * with ordinary names gave ~54 KB and the bug did NOT reproduce — hence the
+	 * deliberately long name, worth ~190 KB. The native rows in `tests/cli_tests.rs`
+	 * are shaped by the same pair. */
+	const PIPE_TREE_FILES = 1200;
+	const PIPE_TREE_PAD = 'p'.repeat(150);
+	/** A fresh pipe-overflow tree — fresh per row, since a formatted tree has nothing
+	 * left to report; `f(tree)` runs inside the cleanup guard. */
+	const with_pipe_tree = (prefix: string, f: (tree: string) => void) => {
+		const tree = mkdtempSync(join(tmpdir(), prefix));
+		try {
+			for (let i = 0; i < PIPE_TREE_FILES; i++) {
+				writeFileSync(join(tree, `${PIPE_TREE_PAD}_${i}.ts`), 'const   x=1\n');
+			}
+			f(tree);
+		} finally {
+			rmSync(tree, { recursive: true, force: true });
+		}
+	};
+	/** `tsv <args> <pipeline>` through `sh`, with `tree` as the cwd — a pipe needs a
+	 * shell, since the condition under test is a second process that drains late or
+	 * leaves early. */
+	const run_piped = (tree: string, args: string, pipeline: string) =>
+		spawnSync(
+			'sh',
+			['-c', `${JSON.stringify(process.execPath)} ${JSON.stringify(cli_path)} ${args} ${pipeline}`],
+			{ encoding: 'utf-8', cwd: tree, maxBuffer: 64 * 1024 * 1024 }
+		);
+
 	// Output to a NON-BLOCKING pipe. Sync writes are required here (an async
 	// `process.stdout.write` before `process.exit` truncates), but a bare
 	// `writeFileSync(1, …)` only survives while fd 1 stays BLOCKING — and this
@@ -1064,24 +1116,8 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// wrapper supplies the third; `--jobs` is left at its default so the pool
 	// actually spawns.
 	it('a slow pipe consumer gets every line, with no crash', { skip: !posix }, () => {
-		const tree = mkdtempSync(join(tmpdir(), 'tsv-pipe-'));
-		try {
-			// Both thresholds have to be crossed at once, and they are separate
-			// numbers: >768 files so the pool spawns (which is what flips fd 1 to
-			// non-blocking), and >64 KiB of changed-path text so the pipe actually
-			// fills. 1200 files with ordinary names gave ~54 KB and the bug did
-			// NOT reproduce — hence the deliberately long name, worth ~190 KB.
-			const count = 1200;
-			const pad = 'p'.repeat(150);
-			for (let i = 0; i < count; i++) {
-				writeFileSync(join(tree, `${pad}_${i}.ts`), 'const   x=1\n');
-			}
-			const quoted = JSON.stringify(cli_path);
-			const result = spawnSync(
-				'sh',
-				['-c', `${JSON.stringify(process.execPath)} ${quoted} format . | { sleep 1; cat; }`],
-				{ encoding: 'utf-8', cwd: tree, maxBuffer: 64 * 1024 * 1024 }
-			);
+		with_pipe_tree('tsv-pipe-', (tree) => {
+			const result = run_piped(tree, 'format .', '| { sleep 1; cat; }');
 			assert.equal(result.status, 0, `the run died: ${result.stderr}`);
 			assert.doesNotMatch(
 				result.stderr,
@@ -1090,13 +1126,11 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			);
 			assert.equal(
 				result.stdout.trim().split('\n').length,
-				count,
+				PIPE_TREE_FILES,
 				'the changed-path list was truncated'
 			);
-			assert.match(result.stderr, new RegExp(`${count} formatted`));
-		} finally {
-			rmSync(tree, { recursive: true, force: true });
-		}
+			assert.match(result.stderr, new RegExp(`${PIPE_TREE_FILES} formatted`));
+		});
 	});
 
 	// The other end of the same rule: a consumer that goes away mid-stream is
@@ -1104,28 +1138,14 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// throw. The native CLI answers the same way (`tsv_cli`'s `cli/out.rs`), with
 	// its own rows in `tests/cli_tests.rs` — see docs/cli.md §Multi-File Formatting.
 	it('a consumer that exits early is not a crash', { skip: !posix }, () => {
-		const tree = mkdtempSync(join(tmpdir(), 'tsv-pipe-head-'));
-		try {
-			const pad = 'p'.repeat(150);
-			for (let i = 0; i < 1200; i++) {
-				writeFileSync(join(tree, `${pad}_${i}.ts`), 'const   x=1\n');
-			}
-			const result = spawnSync(
-				'sh',
-				[
-					'-c',
-					`${JSON.stringify(process.execPath)} ${JSON.stringify(cli_path)} format . | head -2`
-				],
-				{ encoding: 'utf-8', cwd: tree }
-			);
+		with_pipe_tree('tsv-pipe-head-', (tree) => {
+			const result = run_piped(tree, 'format .', '| head -2');
 			assert.doesNotMatch(
 				result.stderr,
 				/EPIPE|EAGAIN|ReferenceError|^\s*at /m,
 				`the CLI crashed on a closed pipe: ${result.stderr}`
 			);
-		} finally {
-			rmSync(tree, { recursive: true, force: true });
-		}
+		});
 	});
 
 	// `--list` is the one stdout path that used to write once per line. It now builds
@@ -1133,33 +1153,28 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// decides the cost of a closed reader here: `write_fd` absorbs `EPIPE` by CATCHING
 	// it, so a per-path loop paid a throw and a catch for every remaining path. This
 	// row grades the write shape's observable half: the listing still arrives, and a
-	// reader that leaves mid-stream is not a crash.
-	it('--list survives a consumer that exits early, and is otherwise complete', () => {
-		const tree = mkdtempSync(join(tmpdir(), 'tsv-pipe-list-'));
-		try {
-			const pad = 'p'.repeat(150);
-			for (let i = 0; i < 1200; i++) {
-				writeFileSync(join(tree, `${pad}_${i}.ts`), 'const   x=1\n');
-			}
-			const quoted = JSON.stringify(cli_path);
-			const node = JSON.stringify(process.execPath);
-			const piped = spawnSync('sh', ['-c', `${node} ${quoted} format --list . | head -2`], {
-				encoding: 'utf-8',
-				cwd: tree
+	// reader that leaves mid-stream is not a crash. Note what it does NOT reach:
+	// `--list` returns before any worker is spawned, so fd 1 stays blocking and the
+	// `EAGAIN` retry never fires here — this row exercises the plain-`EPIPE` branch
+	// alone, and the pool's non-blocking half is the slow-consumer row's.
+	it(
+		'--list survives a consumer that exits early, and is otherwise complete',
+		{ skip: !posix },
+		() => {
+			with_pipe_tree('tsv-pipe-list-', (tree) => {
+				const piped = run_piped(tree, 'format --list .', '| head -2');
+				assert.doesNotMatch(
+					piped.stderr,
+					/EPIPE|ReferenceError|^\s*at /m,
+					`--list crashed on a closed pipe: ${piped.stderr}`
+				);
+				// and unpiped, every path is still there
+				const whole = run_cli(['format', '--list', '.'], undefined, tree);
+				assert.equal(whole.status, 0, whole.stderr);
+				assert.equal(whole.stdout.trim().split('\n').length, PIPE_TREE_FILES);
 			});
-			assert.doesNotMatch(
-				piped.stderr,
-				/EPIPE|EAGAIN|ReferenceError|^\s*at /m,
-				`--list crashed on a closed pipe: ${piped.stderr}`
-			);
-			// and unpiped, every path is still there
-			const whole = run_cli(['format', '--list', '.'], undefined, tree);
-			assert.equal(whole.status, 0, whole.stderr);
-			assert.equal(whole.stdout.trim().split('\n').length, 1200);
-		} finally {
-			rmSync(tree, { recursive: true, force: true });
 		}
-	});
+	);
 
 	it('format --content prints formatted source', () => {
 		const result = run_cli(['format', '--content', 'const   x=1', '--parser', 'typescript']);
@@ -1791,6 +1806,18 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	/** `MAX_WORKERS_PER_LOGICAL_CPU` as cli.js spells it (the row below gates it
+	 * against `cli/stack.rs`). */
+	const MAX_WORKERS_PER_LOGICAL_CPU_JS = (): number => {
+		const source = readFileSync(new URL(`../${pkg_dir}/cli.js`, import.meta.url), 'utf-8');
+		const match = /const MAX_WORKERS_PER_LOGICAL_CPU = (\d+);/.exec(source);
+		assert.ok(
+			match,
+			'could not read MAX_WORKERS_PER_LOGICAL_CPU out of cli.js — did it get renamed?'
+		);
+		return Number(match[1]);
+	};
+
 	// An explicit `--jobs` past the machine ceiling — the native CLI's
 	// `4 × logical`, restated in cli.js as MAX_WORKERS_PER_LOGICAL_CPU — is
 	// clamped with the native CLI's warning rather than obeyed, so the mirror
@@ -1829,6 +1856,54 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 				new RegExp(`^warning: --jobs 100000 exceeds this machine's ceiling; using ${ceiling}$`, 'm')
 			);
 			assert.match(result.stderr, /1 would change, 0 unchanged$/m);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// The warning restates the number argh prints — the parsed `usize` — so a `+`
+	// or leading zeros drop out, and the digits are EXACT past 2^53, where a Number
+	// would round `18446744073709551615` to `…552000` (`clamp_worker_count` compares
+	// and prints a BigInt for exactly this). And the clamp runs ahead of discovery, as
+	// the native pool is sized before the walk: the warning precedes the discovery
+	// diagnostics and fires on an empty scope, where `--list` never warns at all.
+	it('format --jobs clamp prints the parsed digits, ahead of discovery', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const x = 1;\n');
+			const ceiling = MAX_WORKERS_PER_LOGICAL_CPU_JS() * availableParallelism();
+			for (const [raw, printed] of [
+				['+0100000', '100000'],
+				['18446744073709551615', '18446744073709551615']
+			]) {
+				const result = run_cli(['format', '--check', '--jobs', raw, dir]);
+				assert.equal(result.status, 0, result.stderr);
+				assert.match(
+					result.stderr,
+					new RegExp(
+						`^warning: --jobs ${printed} exceeds this machine's ceiling; using ${ceiling}$`,
+						'm'
+					),
+					`--jobs ${raw}: ${result.stderr}`
+				);
+			}
+			// an empty scope still warns, and the warning comes first
+			const empty = mkdtempSync(join(tmpdir(), 'tsv-cli-test-empty-'));
+			try {
+				const result = run_cli(['format', '--jobs', '100000', empty]);
+				assert.equal(result.status, 2, result.stderr);
+				const warning_at = result.stderr.indexOf('warning: --jobs 100000 exceeds');
+				const error_at = result.stderr.indexOf('Error: No files to format');
+				assert.ok(warning_at !== -1, `no clamp warning on an empty scope: ${result.stderr}`);
+				assert.ok(error_at !== -1, result.stderr);
+				assert.ok(warning_at < error_at, `the clamp warns after discovery: ${result.stderr}`);
+				// `--list` sizes no pool, so it warns nothing
+				const listed = run_cli(['format', '--list', '--jobs', '100000', empty]);
+				assert.equal(listed.status, 0, listed.stderr);
+				assert.doesNotMatch(listed.stderr, /exceeds this machine's ceiling/);
+			} finally {
+				rmSync(empty, { recursive: true, force: true });
+			}
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}

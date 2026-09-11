@@ -33,13 +33,15 @@ use napi::bindgen_prelude::{Either, Undefined};
 // native bindings — see its module docs for the reuse rationale + soundness).
 // The goal-axis macros come from the same crate, so the three bindings share ONE
 // definition of which languages have a goal rather than three hand-synced copies.
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::goal_allowed;
+#[cfg(feature = "parse")]
+use tsv_arena::parse_ast;
 #[cfg(feature = "format")]
 use tsv_arena::parse_ast_for_format;
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
-#[cfg(any(feature = "parse", feature = "format"))]
-use tsv_arena::{goal_allowed, parse_ast};
 
 /// Decode the optional `sourceType` argument (`"script"` / `"module"`); omitted
 /// or `undefined` stays **unset**.
@@ -59,21 +61,23 @@ use tsv_arena::{goal_allowed, parse_ast};
 fn napi_source_type(
     source_type: Option<String>,
     allowed: bool,
+    noun: &str,
 ) -> napi::Result<Option<tsv_ts::Goal>> {
     let Some(source_type) = source_type else {
         return Ok(None);
     };
     if !allowed {
+        // `noun` names the export family (`parse` / `format`), as the loader's own
+        // `read_options` and `tsv_wasm` spell it — this addon is published on its own
+        // (`@fuzdev/tsv-<triple>`), so it says the whole sentence itself
         return Err(napi::Error::from_reason(
-            "option 'sourceType' is only supported for TypeScript".to_string(),
+            tsv_arena::source_type_unsupported_message(noun),
         ));
     }
     tsv_ts::Goal::from_source_type(&source_type)
         .map(Some)
         .ok_or_else(|| {
-            napi::Error::from_reason(format!(
-                "invalid sourceType '{source_type}' (expected 'script' or 'module')"
-            ))
+            napi::Error::from_reason(tsv_arena::invalid_source_type_message(&source_type))
         })
 }
 
@@ -154,7 +158,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_js, catch_unwind)]
         pub fn $parse_fn(source: String, source_type: Option<String>) -> napi::Result<String> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness))?
+            let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
                 .unwrap_or(tsv_ts::Goal::Module);
             parse_convert!($goalness, $lang, convert_ast_json_string, &source, goal)
         }
@@ -167,7 +171,7 @@ macro_rules! lang_bindings {
             source: String,
             source_type: Option<String>,
         ) -> napi::Result<String> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness))?
+            let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
                 .unwrap_or(tsv_ts::Goal::Module);
             parse_convert!(
                 $goalness,
@@ -184,7 +188,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_internal_js, catch_unwind)]
         pub fn $parse_internal_fn(source: String, source_type: Option<String>) -> napi::Result<()> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness))?
+            let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
                 .unwrap_or(tsv_ts::Goal::Module);
             parse_internal!($goalness, $lang, &source, goal)
         }
@@ -195,7 +199,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "format")]
         #[napi(js_name = $format_js, catch_unwind)]
         pub fn $format_fn(source: String, source_type: Option<String>) -> napi::Result<String> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness))?;
+            let goal = napi_source_type(source_type, goal_allowed!($goalness), "format")?;
             parse_format!($goalness, $lang, &source, goal)
         }
     };
@@ -587,12 +591,20 @@ mod tests {
         for (label, f, src) in cases {
             // Even `"module"` — the value they would have used — is refused: the
             // rejection is of the AXIS, so a caller cannot read agreement into it.
+            // The whole sentence is asserted, noun included: this addon is
+            // published on its own, and the loader and `tsv_wasm` spell it with the
+            // export family up front.
+            let noun = if label.contains("format") {
+                "format"
+            } else {
+                "parse"
+            };
             for goal in ["script", "module"] {
                 let err = at_goal(f, src, goal).unwrap_err();
-                assert!(
-                    err.reason.contains("only supported for TypeScript"),
-                    "{label} at {goal}: {}",
-                    err.reason
+                assert_eq!(
+                    err.reason,
+                    tsv_arena::source_type_unsupported_message(noun),
+                    "{label} at {goal}"
                 );
             }
             at_default(f, src).unwrap_or_else(|e| panic!("{label}: {}", e.reason));
@@ -609,10 +621,10 @@ mod tests {
         for (label, f, src) in internal {
             for goal in ["script", "module"] {
                 let err = f(src.to_owned(), Some(goal.to_owned())).unwrap_err();
-                assert!(
-                    err.reason.contains("only supported for TypeScript"),
-                    "{label} at {goal}: {}",
-                    err.reason
+                assert_eq!(
+                    err.reason,
+                    tsv_arena::source_type_unsupported_message("parse"),
+                    "{label} at {goal}"
                 );
             }
             f(src.to_owned(), None).unwrap_or_else(|e| panic!("{label}: {}", e.reason));

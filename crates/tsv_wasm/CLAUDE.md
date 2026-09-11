@@ -96,9 +96,12 @@ Consumers that loop over files on one instance should do the same. Wasm-backed
 objects from before the swap (`IgnoreStack`) are invalidated — rebuild them after.
 The patcher stamps every handle with the instance generation it was minted under
 (on the object for `free()`, in the `FinalizationRegistry` held value for the GC
-callback), and both free paths no-op on a stale stamp, so a handle from a discarded
+callback); both free paths no-op on a stale stamp, so a handle from a discarded
 instance leaks its old bytes instead of freeing a stale pointer into the fresh
-instance's allocator — while handles minted after the swap free normally. (A
+instance's allocator, and every exported **method** routes its receiver through the
+same compare (`__tsv_live`) and throws on a stale one, since its pointer would
+otherwise read the fresh memory's unrelated bytes as the object — while handles
+minted after the swap free and work normally. (A
 module-level "has any reinstantiation happened" check is the wrong shape: a one-way
 fuse that leaks every handle after the first recovery, fresh ones included.) Gated by
 `scripts/test_npm.ts` (the poison-then-recover API contract + both CLI paths) and
@@ -136,7 +139,7 @@ argument errors, arrays included.
 families.** `read_options` decodes it to `None` rather than `Module`, and the format
 exports hand that to `parse_ast_for_format!` → `tsv_ts::parse_with_goal_or_fallback`:
 the module grammar, retried as a script only if that parse *fails*, reporting the
-further-reaching error when both do (the module's on a tie). That is what lets `format_typescript(source)` with no bag
+module's error when both do if the script retry died on an `import`/`export`/`import.meta`, else the further-reaching one (the module's on a tie). That is what lets `format_typescript(source)` with no bag
 — an editor's whole call, and `npm/cli.js`'s path mode — format a legacy sloppy
 script (`with`, a leading-zero literal or escape, `await` as a name). A **set** value
 is exact, so `{sourceType: 'module'}` still refuses one; nothing the module grammar

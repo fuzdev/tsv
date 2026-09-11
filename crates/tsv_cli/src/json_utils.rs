@@ -16,8 +16,11 @@
 /// `compact` is a valid JSON document with no whitespace outside strings — the
 /// writer's wire, or any `serde_json::to_vec` output. Whitespace outside strings
 /// is skipped rather than assumed absent, so a hand-written document re-indents
-/// too. The output is byte-identical to serializing the parsed `Value` with the
-/// tab formatter (the fixture tree's `expected.json` shape): `,` becomes `,` +
+/// too. For any document `serde_json` itself emitted — which is what the writer
+/// emits — the output is byte-identical to serializing the parsed `Value` with the
+/// tab formatter (the fixture tree's `expected.json` shape); a hand-written one
+/// keeps what serde would normalize (a `\u0041` stays an escape, a duplicate key
+/// stays doubled), since strings are copied, not decoded: `,` becomes `,` +
 /// newline + indent, `:` becomes `: `, an opening bracket newlines and indents
 /// before its first member, a closing bracket newlines and dedents after its
 /// last, and an empty container stays `[]` / `{}`. Strings are copied verbatim,
@@ -25,7 +28,10 @@
 ///
 /// Linear in the input, recursion-free, and the only state is the nesting
 /// depth, so there is no depth at which this can fail: a document the parser
-/// could emit is a document this can indent.
+/// could emit is a document this can indent. Malformed input is garbage in,
+/// garbage out, never a panic — the walk is bounds-checked at every step (the
+/// escape skip clamps to the end, an unbalanced closer saturates the depth), which
+/// a caller fed only the writer's own bytes never needs and a fuzzed one does.
 pub fn indent_json_with_tabs(compact: &[u8]) -> Vec<u8> {
     // Each member costs a newline plus its indent; a generous guess that avoids
     // the early doublings on the ~15×-source-sized wire.
@@ -165,6 +171,28 @@ mod tests {
     /// Depth costs a counter, not a frame: nesting far past any deserializer's
     /// recursion limit indents in one pass. (The output is quadratic in the depth —
     /// every level's closer carries its full indent — so the depth stays modest.)
+    /// The no-panic contract over input the writer would never emit — an unterminated
+    /// string, a backslash at the end, unbalanced closers, an empty document — which
+    /// is what the bounds-checked escape skip and the saturating depth exist for.
+    #[test]
+    fn malformed_input_never_panics() {
+        for junk in [
+            "",
+            "\"",
+            "\\",
+            "{\"a",
+            "{\"a\\",
+            "{\"a\":\"x\\",
+            "[[[",
+            "]]]",
+            "{,}",
+            "{\"a\":",
+            "[1,2",
+        ] {
+            let _ = indent_json_with_tabs(junk.as_bytes());
+        }
+    }
+
     #[test]
     fn depth_is_not_bounded() {
         let n = 3_000;

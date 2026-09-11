@@ -1404,6 +1404,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ParseError::invalid_syntax(message.to_string(), position)
     }
 
+    /// Create a **goal-gate** error at `position`: the construct is a `ModuleItem`
+    /// (`import` / `export` / `import.meta`) met at `Goal::Script`. Marked so the format
+    /// fallback can read the script attempt's death here as proof the source is a
+    /// module rather than as one more position to compare
+    /// (`ParseError::is_goal_gated`; `parse_with_goal_or_fallback`).
+    pub(super) fn error_goal_gate_at(&self, message: &str, position: usize) -> ParseError {
+        ParseError::goal_gated(message.to_string(), position)
+    }
+
+    /// [`Parser::error_goal_gate_at`] at the current position.
+    pub(super) fn error_goal_gate(&self, message: &str) -> ParseError {
+        self.error_goal_gate_at(message, self.current_pos().0)
+    }
+
     /// Create an error: "Expected X"
     pub(super) fn error_expected(&self, what: &str) -> ParseError {
         ParseError::invalid_syntax(format!("Expected {what}"), self.current_pos().0)
@@ -1449,7 +1463,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )
     }
 
-    /// Create an error: "Expected 'X' or 'Y' after list element, found Z"
+    /// Create an error: `Expected ',' or '}' after list element, found …` — the quotes
+    /// come from the punctuators' own `Display`, not from this template.
     pub(super) fn error_list_separator(
         &self,
         separator: &TokenKind,

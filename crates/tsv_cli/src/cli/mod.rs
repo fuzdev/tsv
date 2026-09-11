@@ -5,7 +5,7 @@ pub mod input;
 pub mod out;
 pub mod stack;
 
-use crate::{err_line, out_line};
+use crate::out_line;
 use argh::FromArgs;
 use commands::{format::FormatCommand, parse::ParseCommand};
 
@@ -41,12 +41,10 @@ impl TopLevel {
             // this mirrors the exact text argh printed when the field was
             // required (the npm cli.js pins the same contract: help-shaped
             // stderr, exit 1).
-            None => {
-                err_line!(
-                    "One of the following subcommands must be present:\n    help\n    parse\n    format\n\nRun tsv --help for more information."
-                );
-                std::process::exit(1);
-            }
+            None => out::exit_with_error(
+                1,
+                "One of the following subcommands must be present:\n    help\n    parse\n    format\n\nRun tsv --help for more information.",
+            ),
         }
     }
 }
