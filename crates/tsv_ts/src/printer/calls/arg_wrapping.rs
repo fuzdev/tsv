@@ -409,9 +409,7 @@ impl Printer<'_> {
     /// multi-argument states build their body plainly: no authoring reaches either as the
     /// printed state of a ternary body, so a claim there could not be pinned.)
     pub(super) fn build_arrow_arg_body_doc(&self, body_expr: &internal::Expression<'_>) -> DocId {
-        self.build_value_with_outermost_owned_comment(body_expr, || {
-            self.build_expression_doc(body_expr)
-        })
+        self.build_expression_doc_claiming_outermost(body_expr)
     }
 }
 

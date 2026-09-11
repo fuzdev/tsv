@@ -1,0 +1,216 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 196,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a multi-line comment glued to the value prints outside the value's own group, so the",
+			"start": 20,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " value keeps its own layout",
+			"start": 109,
+			"end": 138,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\n * d ",
+			"start": 155,
+			"end": 168,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 16
+				},
+				"end": {
+					"line": 5,
+					"column": 8
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 195,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 140,
+					"end": 185,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 25
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "ConditionalExpression",
+						"start": 169,
+						"end": 184,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 9
+							},
+							"end": {
+								"line": 5,
+								"column": 24
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 169,
+							"end": 172,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 9
+								},
+								"end": {
+									"line": 5,
+									"column": 12
+								}
+							},
+							"name": "aaa"
+						},
+						"consequent": {
+							"type": "Identifier",
+							"start": 175,
+							"end": 178,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 15
+								},
+								"end": {
+									"line": 5,
+									"column": 18
+								}
+							},
+							"name": "bbb"
+						},
+						"alternate": {
+							"type": "Identifier",
+							"start": 181,
+							"end": 184,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 21
+								},
+								"end": {
+									"line": 5,
+									"column": 24
+								}
+							},
+							"name": "ccc"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c\n * d ",
+								"start": 155,
+								"end": 168
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multi-line comment glued to the value prints outside the value's own group, so the",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " value keeps its own layout",
+							"start": 109,
+							"end": 138
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

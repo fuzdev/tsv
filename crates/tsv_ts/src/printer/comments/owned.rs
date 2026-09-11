@@ -54,6 +54,19 @@ fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> 
     })
 }
 
+/// The node a VALUE-keyed outermost claim would take the comment from — [`left_spine_child`],
+/// except for a **sequence**, which prints its own paren envelope ahead of its first operand
+/// and claims inside it ([`Printer::build_doc_with_outermost_owned_comment_at`]). Taken from
+/// outside, the comment would leave that required pair (`(/* c⏎d */ b, c)` →
+/// `/* c⏎d */ (b, c)`), the relocation the required-pair catalog entry refuses — and a
+/// multi-line `@type` block hoisted in front of a `(` becomes a JSDoc cast.
+fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression<'x>> {
+    match value {
+        Expression::SequenceExpression(_) => None,
+        _ => left_spine_child(value),
+    }
+}
+
 /// The [`internal::JsdocCast`] whose comment is the FIRST thing `expr` prints — `expr`
 /// itself, or the leftmost leaf reached through [`left_spine_child`].
 ///
@@ -454,9 +467,21 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         self.build_doc_with_outermost_owned_comment_at(
             value.span().start,
-            left_spine_child(value),
+            outermost_claim_child(value),
             build_value,
         )
+    }
+
+    /// [`Self::build_value_with_outermost_owned_comment`] over the plain
+    /// [`Printer::build_expression_doc`] — the spelling of every seam that builds its value
+    /// directly (a statement head's condition, a `case` test, a computed key or index, a
+    /// template interpolation, the `export` values, …). A seam that builds through a different
+    /// builder passes that builder to the value form instead.
+    pub(in crate::printer) fn build_expression_doc_claiming_outermost(
+        &self,
+        expr: &Expression<'_>,
+    ) -> DocId {
+        self.build_value_with_outermost_owned_comment(expr, || self.build_expression_doc(expr))
     }
 
     /// The **span-keyed** form of [`Self::build_value_with_outermost_owned_comment`], for a
@@ -505,7 +530,7 @@ impl<'a> Printer<'a> {
         build: impl FnOnce() -> (DocId, DocId),
     ) -> (DocId, DocId) {
         let start = value.span().start;
-        if !self.outermost_owned_claim_applies(start, left_spine_child(value)) {
+        if !self.outermost_owned_claim_applies(start, outermost_claim_child(value)) {
             return build();
         }
         let (flat, broken) = self.with_owned_comment_claimed_above(start, build);

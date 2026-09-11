@@ -357,7 +357,7 @@ fn build_import_args_doc(
         || {
             printer.wrap_for_init_in(
                 import_expr.source,
-                printer.build_expression_doc(import_expr.source),
+                printer.build_expression_doc_claiming_outermost(import_expr.source),
             )
         },
         |frozen| printer.build_frozen_arg_doc(import_expr.source, frozen),

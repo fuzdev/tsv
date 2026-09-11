@@ -322,7 +322,7 @@ impl<'a> Printer<'a> {
                     // prettier's exempt lists — only a switch's DISCRIMINANT is
                     // `isInsideParenthesis`). The frozen arm below emits the author's
                     // bytes, where no layout rule applies.
-                    || self.build_expression_doc(test),
+                    || self.build_expression_doc_claiming_outermost(test),
                     |frozen| self.build_frozen_expression_doc(test, frozen),
                 ),
             );
@@ -333,7 +333,16 @@ impl<'a> Printer<'a> {
             // (`case /* c */ (a, b):`), or an earlier block in a run
             // (`case /* p */ /* q */ b:`) — so without this it is dropped. Emitted ahead of
             // any paren this position synthesizes, which is prettier's placement too.
-            if frozen.is_some() || self.has_line_comments_between(test_gap_start, test_start) {
+            // A run the author broke after whose break is FORCED hangs too — by a multi-line
+            // comment glued to the test, or by the test's own hard break — as at the
+            // `export default` and `export =` values: the inline arm below would weld the run
+            // onto the `case` line.
+            if frozen.is_some()
+                || self.has_line_comments_between(test_gap_start, test_start)
+                || self
+                    .breaking_value_leading_run(test_gap_start, test_start, || test_doc)
+                    .is_some()
+            {
                 // A `//` here runs to end-of-line, so emitting the gap inline would swallow
                 // the test AND its `:` into the comment (`case // c x:`, which does not
                 // reparse) — the head→`:` gap's argument one construct earlier. Where the

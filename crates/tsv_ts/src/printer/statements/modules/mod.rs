@@ -56,32 +56,48 @@ impl<'a> Printer<'a> {
         // it with whatever already trails that line. Decided ahead of the header, because
         // the shell wraps the VALUE and the value is built inside the closure below.
         let shell_close = self.value_paren_line_comment_close(argument_end, decl.span.end);
-        let head = self.build_keyword_header_doc_with(
-            &["export", "="],
-            decl.span.start,
-            value_span.start,
-            |keyword_end| {
-                let value = self.build_value_head_doc(keyword_end, &decl.expression, || {
-                    self.build_expression_doc(&decl.expression)
-                });
-                // An assignment as the exported value takes clarity parens, the same
-                // answer every other value position gives (`ParenContext::ExportAssignment`).
-                // Inside the freeze closure so a frozen value keeps the position's pair,
-                // exactly as `export default` does.
-                let value = if needs_parens(&decl.expression, ParenContext::ExportAssignment, false)
-                {
-                    d.parens(value)
-                } else {
-                    value
-                };
-                match shell_close {
-                    Some(close) => self
-                        .build_paren_operand_comment_doc(argument_end, close, value, value, ")")
-                        .unwrap_or(value),
-                    None => value,
-                }
-            },
-        );
+        let (keyword_doc, keyword_end) =
+            self.build_keyword_words_doc(&["export", "="], decl.span.start, value_span.start);
+        let value = self.build_value_head_doc(keyword_end, &decl.expression, || {
+            self.build_expression_doc_claiming_outermost(&decl.expression)
+        });
+        // An assignment as the exported value takes clarity parens, the same answer every
+        // other value position gives (`ParenContext::ExportAssignment`) — outside the freeze
+        // head, so a frozen value keeps the position's pair, exactly as `export default` does.
+        let value = if needs_parens(&decl.expression, ParenContext::ExportAssignment, false) {
+            d.parens(value)
+        } else {
+            value
+        };
+        let value = match shell_close {
+            Some(close) => self
+                .build_paren_operand_comment_doc(argument_end, close, value, value, ")")
+                .unwrap_or(value),
+            None => value,
+        };
+        // The keyword→value gate `export default` asks (`comments_force_own_line_between`), plus
+        // a run the author broke after whose break is FORCED: both hang the value, since the
+        // inline continuation would weld the run onto the keyword's line — and, for a `//` run
+        // ending in a block glued to a paren, weld the value onto the block's `*/`.
+        let head = if self.comments_force_own_line_between(keyword_end, value_span.start)
+            || self
+                .breaking_value_leading_run(keyword_end, value_span.start, || value)
+                .is_some()
+        {
+            let mut parts: DocBuf = smallvec![keyword_doc];
+            self.append_keyword_value_line_comments(
+                &mut parts,
+                keyword_end,
+                value_span.start,
+                value,
+            );
+            d.concat(&parts)
+        } else {
+            d.concat(&[
+                keyword_doc,
+                self.build_keyword_to_name_continuation(keyword_end, value_span.start, value),
+            ])
+        };
         let gap_start = shell_close.map_or(argument_end, |close| {
             Self::past_grouping_close(close, decl.span.end)
         });
@@ -409,7 +425,19 @@ impl<'a> Printer<'a> {
         let left_spine_run = matches!(&decl.declaration,
             internal::ExportDefaultValue::Expression(expr)
                 if self.left_spine_shell_has_own_line_comment(expr));
-        if left_spine_run || self.comments_force_own_line_between(keyword_end, decl_start) {
+        // A run the author broke after whose break is FORCED hangs too — by a multi-line comment
+        // glued to the value (`export default /* x */⏎/* y⏎*/ v`), which cannot share the line of
+        // one that broke before it, or by the value's own hard break. The inline continuation
+        // below would weld the run onto one line, and the paren spelling's first pass already
+        // lands here, so the two spellings had two fixed points one pass apart.
+        let forced_broke_after_run = || {
+            self.breaking_value_leading_run(keyword_end, decl_start, || value_doc)
+                .is_some()
+        };
+        if left_spine_run
+            || self.comments_force_own_line_between(keyword_end, decl_start)
+            || forced_broke_after_run()
+        {
             let mut parts: DocBuf = smallvec![keyword_doc];
             self.append_keyword_value_line_comments(&mut parts, keyword_end, decl_start, value_doc);
             return d.concat(&parts);
@@ -439,8 +467,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match &decl.declaration {
             internal::ExportDefaultValue::Expression(expr) => {
-                let mut expr_doc = self
-                    .build_value_head_doc(keyword_end, expr, || self.build_expression_doc(expr));
+                // A multi-line comment the value owns prints outside the value's own group (the
+                // keyword gap's run never sees it), beneath the clarity parens added below.
+                let mut expr_doc = self.build_value_head_doc(keyword_end, expr, || {
+                    self.build_expression_doc_claiming_outermost(expr)
+                });
                 // Prettier wraps the exported expression when its leftmost
                 // (first-printed) token is a function/class keyword — else
                 // `export default function () {}.m()` reparses the function as a
