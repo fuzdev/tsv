@@ -398,28 +398,25 @@ impl IgnoreStack {
     /// an argument NAMED, to say which directory put the path out of scope and which
     /// file's rule did.
     pub fn exclusion(&self, path: &str, is_dir: bool) -> Option<Exclusion> {
-        first_excluded_prefix(path, is_dir, |prefix, dir| {
-            self.last_match_layer_at(prefix, dir)
-        })
-        .map(|(depth, layer)| Exclusion {
-            depth,
-            anchor_depth: layer.anchor.len(),
-            source: layer.source,
+        first_exclusion(path, is_dir, |prefix, dir| {
+            last_match_layer(self.gitignore.iter().chain(&self.tsv), prefix, dir)
         })
     }
 
-    /// [`last_match_at`](Self::last_match_at) keeping the layer that spoke, over the same
-    /// layers in the same order. Kept apart from that per-level primitive, which discovery
-    /// asks per entry and which has no use for the layer.
-    fn last_match_layer_at(&self, prefix: &[PathSeg<'_>], is_dir: bool) -> Option<(bool, &Layer)> {
-        self.gitignore
-            .iter()
-            .chain(&self.tsv)
-            .rev()
-            .find_map(|layer| {
-                let ignored = layer.rules.last_match(layer.relativize(prefix)?, is_dir)?;
-                Some((ignored, layer))
-            })
+    /// [`exclusion`](Self::exclusion) over the tsv layers alone: where `path` would be
+    /// ignored with every `.gitignore` layer set aside, and which `.formatignore` or
+    /// `.prettierignore` rule ignored it. `Some` only where `exclusion` is — a tsv layer is
+    /// read after every `.gitignore`, so a tsv rule excluding a prefix excludes it in the
+    /// whole stack too — and the same answer wherever `exclusion`'s witness is a tsv layer.
+    ///
+    /// A diagnostic query, off the discovery hot path: tsv's discovery asks it of a path an
+    /// argument NAMED, since a tsv rule excluding the path is the one to report even where a
+    /// `.gitignore` excludes it first — re-including the path past the `.gitignore` would
+    /// leave that rule standing.
+    pub fn tsv_exclusion(&self, path: &str, is_dir: bool) -> Option<Exclusion> {
+        first_exclusion(path, is_dir, |prefix, dir| {
+            last_match_layer(self.tsv.iter(), prefix, dir)
+        })
     }
 
     /// The file the tsv layer anchored at `anchor` (`/`-separated, `""` = the format root)
@@ -536,10 +533,9 @@ fn path_segments(path: &str) -> Vec<PathSeg<'_>> {
 /// `!` is ever consulted — git's parent-directory rule; a negative match (re-included
 /// here) and `None` (no rule here) fall through to let deeper levels decide. `polarity` is
 /// the per-prefix last-match lookup — one file's rules (`IgnoreRules::last_match`) or a
-/// whole stack of layers (`IgnoreStack::last_match_layer_at`, whose witness is the layer
-/// that spoke). Every prefix shorter than the full path is an ancestor directory; `is_dir`
-/// marks only the leaf. The shared spine of both `is_ignored` methods and of
-/// [`IgnoreStack::exclusion`].
+/// run of layers ([`last_match_layer`], whose witness is the layer that spoke). Every
+/// prefix shorter than the full path is an ancestor directory; `is_dir` marks only the
+/// leaf. The shared spine of both `is_ignored` methods and of [`first_exclusion`].
 fn first_excluded_prefix<T>(
     path: &str,
     is_dir: bool,
@@ -550,6 +546,36 @@ fn first_excluded_prefix<T>(
     (0..segments.len()).find_map(|k| match polarity(&segments[..=k], k < last || is_dir) {
         Some((true, witness)) => Some((k + 1, witness)),
         _ => None,
+    })
+}
+
+/// [`first_excluded_prefix`] over a run of layers, as the [`Exclusion`] its witness layer
+/// makes — the shared body of [`IgnoreStack::exclusion`] and
+/// [`IgnoreStack::tsv_exclusion`], which differ only in the layers `polarity` reads.
+fn first_exclusion<'a>(
+    path: &str,
+    is_dir: bool,
+    polarity: impl Fn(&[PathSeg<'_>], bool) -> Option<(bool, &'a Layer)>,
+) -> Option<Exclusion> {
+    first_excluded_prefix(path, is_dir, polarity).map(|(depth, layer)| Exclusion {
+        depth,
+        anchor_depth: layer.anchor.len(),
+        source: layer.source,
+    })
+}
+
+/// The last of `layers` (pushed shallowest-first, each kind after the kind it overrides)
+/// to speak at `prefix`: its polarity and the layer, read as
+/// [`IgnoreStack::last_match_at`] reads the whole stack. Kept apart from that per-level
+/// primitive, which discovery asks per entry and which has no use for the layer.
+fn last_match_layer<'a>(
+    layers: impl DoubleEndedIterator<Item = &'a Layer>,
+    prefix: &[PathSeg<'_>],
+    is_dir: bool,
+) -> Option<(bool, &'a Layer)> {
+    layers.rev().find_map(|layer| {
+        let ignored = layer.rules.last_match(layer.relativize(prefix)?, is_dir)?;
+        Some((ignored, layer))
     })
 }
 
@@ -674,6 +700,14 @@ mod tests {
 
     fn ig(content: &str) -> IgnoreRules {
         IgnoreRules::parse(content)
+    }
+
+    fn excluded(depth: usize, anchor_depth: usize, source: IgnoreSource) -> Option<Exclusion> {
+        Some(Exclusion {
+            depth,
+            anchor_depth,
+            source,
+        })
     }
 
     #[test]
@@ -1389,13 +1423,6 @@ mod tests {
 
     #[test]
     fn stack_exclusion_names_the_shallowest_excluded_prefix_and_its_file() {
-        let excluded = |depth, anchor_depth, source| {
-            Some(Exclusion {
-                depth,
-                anchor_depth,
-                source,
-            })
-        };
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "build/\n*.log\n");
         stack.push_gitignore("sub", "deep/\n");
@@ -1452,6 +1479,41 @@ mod tests {
             overridden.exclusion("keep.ts", false),
             excluded(1, 0, IgnoreSource::Prettierignore)
         );
+    }
+
+    #[test]
+    fn stack_tsv_exclusion_sets_the_gitignore_layers_aside() {
+        let mut stack = IgnoreStack::new();
+        stack.push_gitignore("", "vendor/\n");
+        stack.push_formatignore("", "vendor/x.ts\n");
+        stack.push_prettierignore("pkg", "out/*.ts\n");
+        // the whole stack's witness is the `.gitignore`'d directory above the file…
+        assert_eq!(
+            stack.exclusion("vendor/x.ts", false),
+            excluded(1, 0, IgnoreSource::Gitignore)
+        );
+        // …while the tsv layers alone exclude the file itself
+        assert_eq!(
+            stack.tsv_exclusion("vendor/x.ts", false),
+            excluded(2, 0, IgnoreSource::Formatignore)
+        );
+        // a path only the `.gitignore` excludes
+        assert_eq!(stack.tsv_exclusion("vendor/y.ts", false), None);
+        // wherever the whole stack's witness is a tsv layer, the answers agree
+        assert_eq!(
+            stack.tsv_exclusion("pkg/out/a.ts", false),
+            excluded(3, 1, IgnoreSource::Prettierignore)
+        );
+        assert_eq!(
+            stack.tsv_exclusion("pkg/out/a.ts", false),
+            stack.exclusion("pkg/out/a.ts", false)
+        );
+        // a tsv negation re-including a `.gitignore`'d directory excludes nothing either way
+        let mut reincluded = IgnoreStack::new();
+        reincluded.push_gitignore("", "build/\n");
+        reincluded.push_formatignore("", "!build/\n");
+        assert_eq!(reincluded.tsv_exclusion("build/a.ts", false), None);
+        assert_eq!(reincluded.exclusion("build/a.ts", false), None);
     }
 
     #[test]

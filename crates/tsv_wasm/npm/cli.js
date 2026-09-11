@@ -1700,14 +1700,15 @@ function push_tsv_layer(stack, anchor, layer) {
 
 /**
  * Load `stack` with the ignore layers of `dirs` — a directory root's ancestors, from
- * `format_root` down to its parent (`collect_root`) — returning whether the build-output
- * heuristic is still on below them (no `.gitignore` among them was read). Mirrors the
- * native `preload_ancestors`.
+ * `format_root` down to its parent (`collect_root`), reading nothing inside one a rule
+ * excludes (`push_dir_layers`), which puts the root out of scope — returning whether the
+ * build-output heuristic is still on below them (no `.gitignore` among them was read).
+ * Mirrors the native `preload_ancestors`.
  */
 function preload_ancestors(stack, dirs, format_root, in_repo, warnings) {
 	let heuristic_active = true;
 	for (const dir of dirs) {
-		if (push_dir_layers(stack, dir, format_root, in_repo, warnings).gitignore) {
+		if (push_dir_layers(stack, dir, format_root, in_repo, warnings)?.gitignore) {
 			heuristic_active = false;
 		}
 	}
@@ -1716,14 +1717,19 @@ function preload_ancestors(stack, dirs, format_root, in_repo, warnings) {
 
 /**
  * Push the ignore layers of `dir` — a directory no listing is held for — onto `stack`,
- * anchored relative to `format_root`, returning which layers it pushed. The one preload a
- * named path gets: for a directory root's ancestors (`preload_ancestors`), and for each
- * directory a file argument's scope moves into (`enter_file_scope`). Mirrors the native
- * `push_dir_layers`.
- * @returns {{tsv: boolean, gitignore: boolean}}
+ * anchored relative to `format_root`, returning which layers it pushed, or `null`,
+ * reading nothing, when a rule in the layers already pushed excludes `dir`, itself or
+ * through an ancestor: the walk prunes such a directory without listing it, so it never
+ * reads — nor warns about — the ignore files inside, and a named file's quiet skip
+ * depends on that. The one preload a named path gets, for a directory root's ancestors
+ * (`preload_ancestors`) and for each directory a file argument's scope moves into
+ * (`enter_file_scope`); `stack` must already hold what this pushed for every ancestor of
+ * `dir`. Mirrors the native `push_dir_layers`.
+ * @returns {{tsv: boolean, gitignore: boolean} | null}
  */
 function push_dir_layers(stack, dir, format_root, in_repo, warnings) {
 	const anchor = rel_under(format_root, dir) ?? '';
+	if (stack.is_ignored(anchor, true)) return null;
 	// No listing, so presence is probed — by the descent's own rule (is_ignore_file), so a
 	// directory reads the same files whether it is walked or preloaded. A
 	// present-but-unreadable `.formatignore` still shadows (read_ignore_file warns and
@@ -1797,7 +1803,9 @@ function format_root_of(dir) {
  * through the directory the latest file argument sat in. Each argument moves it to its
  * own directory (`enter_file_scope`) — popping back to the two directories' common
  * ancestor and pushing down — so an ignore file above many named files is read and parsed
- * once. The caller frees it (`free_file_scope`). Mirrors the native `FileScope`.
+ * once, and none inside a directory a rule excludes is read at all (`push_dir_layers`,
+ * whose `null` a directory's `pushed` holds then, as does every one below it). The caller
+ * frees it (`free_file_scope`). Mirrors the native `FileScope`.
  */
 function new_file_scope() {
 	return { format_root: null, in_repo: false, stack: null, dirs: [] };
@@ -1826,8 +1834,8 @@ function enter_file_scope(scope, dir, warnings) {
 	}
 	while (scope.dirs.length > shared) {
 		const { pushed } = scope.dirs.pop();
-		if (pushed.tsv) scope.stack.pop_tsv();
-		if (pushed.gitignore) scope.stack.pop_gitignore();
+		if (pushed?.tsv) scope.stack.pop_tsv();
+		if (pushed?.gitignore) scope.stack.pop_gitignore();
 	}
 	for (const level of chain.slice(shared)) {
 		scope.dirs.push({

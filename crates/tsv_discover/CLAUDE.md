@@ -113,16 +113,23 @@ crates (the open-convention stance):
   while an ignore rule bounds a named path through any ancestor or at itself, exactly
   as it bounds the walk. This decides whether saying so helps. `None` when no rule
   excludes the path, and for a named **file** a `.formatignore`/`.prettierignore` rule
-  excludes — skipped quietly, as prettier skips it, since a pre-commit hook would
-  otherwise warn about such a file on every commit that stages it. Every other
-  exclusion warns, naming the file the rule sits in (`IgnoreStack::exclusion`'s
-  `IgnoreSource` and `anchor_depth`): a `.gitignore`'d path gets the exact anchored
-  lines that re-include it and nothing beside it (`!/build/`, `/build/*`,
-  `!/build/a.ts`), for the file the repo root reads (`IgnoreStack::tsv_layer_source` —
-  its `.prettierignore` where it has no `.formatignore`, since creating one would shadow
-  it); a tsv rule excluding a directory is the user's to narrow. `loose_root` is the
-  format root's display path outside a repo, where paths are named absolutely; inside
-  one (`None`) they read relative to the repo root.
+  excludes, whether or not a `.gitignore` does too — skipped quietly, as prettier skips
+  it, since a pre-commit hook would otherwise warn about such a file on every commit that
+  stages it. Every other exclusion warns, naming the file the rule sits in
+  (`IgnoreStack::exclusion`'s `IgnoreSource` and `anchor_depth`). A tsv rule excluding
+  the path at all is the one named (`IgnoreStack::tsv_exclusion`, preferred over the
+  whole stack's witness), since re-including past a `.gitignore` would leave it standing
+  — and, added to the same file, override it; a tsv rule excluding a directory is the
+  user's to narrow. A path only a `.gitignore` excludes gets the anchored lines that
+  re-include it and nothing beside it (`!/build/`, `/build/*`, `!/build/a.ts`), every
+  path spelled literally (`pattern_path` escapes `*`, `?`, `[`, `]`, `\` and trailing
+  spaces, so a `[slug]` directory is no character class), for the file the repo root
+  reads (`IgnoreStack::tsv_layer_source` — its `.prettierignore` where it has no
+  `.formatignore`, since creating one would shadow it). The callers' stack stops at a
+  directory a rule excludes, as the walk reads no ignore file inside one, so a rule in
+  such a file can still exclude the path once the directory is re-included.
+  `loose_root` is the format root's display path outside a repo, where paths are named
+  absolutely; inside one (`None`) they read relative to the repo root.
 - `DirVerdict { Descend, Prune, PruneWithWarning }` — on `PruneWithWarning` the
   caller fetches the text from `heuristic_shadow_warning`, which takes display context
   (`loose_root`) the per-directory verdict has no other use for — the same fetch

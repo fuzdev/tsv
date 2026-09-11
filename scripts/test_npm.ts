@@ -2308,6 +2308,49 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	// a named path reads no ignore file inside a directory a rule excludes, as the walk that
+	// prunes the directory reads none: a named file there is skipped quietly despite the
+	// shadowed .prettierignore beside that directory's .formatignore (and, off Windows, a
+	// symlinked .gitignore below it), and a named directory under it warns only that it is
+	// excluded. Mirrors tests/cli_tests.rs
+	it('format --list reads no ignore file inside an excluded directory', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			mkdirSync(join(dir, '.git'));
+			mkdirSync(join(dir, 'vendor', 'sub'), { recursive: true });
+			writeFileSync(join(dir, '.formatignore'), 'vendor/\n');
+			writeFileSync(join(dir, 'vendor', '.formatignore'), '');
+			writeFileSync(join(dir, 'vendor', '.prettierignore'), '');
+			if (process.platform !== 'win32') {
+				symlinkSync('../../.formatignore', join(dir, 'vendor', 'sub', '.gitignore'));
+			}
+			for (const file of ['keep.ts', 'vendor/x.ts', 'vendor/sub/y.ts']) {
+				writeFileSync(join(dir, file), 'x');
+			}
+			// the walk prunes vendor/ without a word…
+			const walked = run_cli(['format', '--list', dir]);
+			assert.equal(walked.status, 0, walked.stderr);
+			assert.doesNotMatch(walked.stderr, /warning/);
+			// …a named file under it is skipped as quietly…
+			const files = run_cli([
+				'format',
+				'--list',
+				join(dir, 'vendor', 'x.ts'),
+				join(dir, 'vendor', 'sub', 'y.ts')
+			]);
+			assert.equal(files.status, 0, files.stderr);
+			assert.equal(files.stdout, '');
+			assert.doesNotMatch(files.stderr, /warning/);
+			// …and a named directory under it warns that it is excluded, and of nothing inside
+			const named_dir = run_cli(['format', '--list', join(dir, 'vendor', 'sub')]);
+			assert.equal(named_dir.status, 0, named_dir.stderr);
+			assert.match(named_dir.stderr, /which a rule in the repo-root \.formatignore excludes/);
+			assert.doesNotMatch(named_dir.stderr, /shadowed|symbolic link/);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	it('parse --content prints compact JSON with trailing newline', () => {
 		const result = run_cli(['parse', '--content', 'const x = 1;', '--parser', 'typescript']);
 		assert.equal(result.status, 0);

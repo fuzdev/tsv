@@ -148,6 +148,41 @@
 			]
 		},
 		{
+			"name": "explicit_path_reads_no_ignore_file_inside_an_excluded_directory",
+			"note": "a named path reads no ignore file inside a directory a rule excludes, as the walk that prunes the directory reads none: a named file there is skipped quietly despite the .prettierignore its directory's .formatignore shadows, and a named directory under it warns only that it is excluded",
+			"tree": {
+				".git/": null,
+				".formatignore": "vendor/\n",
+				"vendor/.formatignore": "",
+				"vendor/.prettierignore": "",
+				"vendor/x.ts": "x",
+				"vendor/sub/y.ts": "x",
+				"keep.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["keep.ts"], "no_warns": ["shadowed"]},
+				{"target": "vendor/x.ts", "expected": [], "no_warns": ["shadowed", "excluded"]},
+				{"target": "vendor/sub", "expected": [], "warns": ["vendor/sub is inside vendor, which a rule in the repo-root .formatignore excludes, so nothing under it is formatted; narrow or negate that rule to format it"], "no_warns": ["shadowed"]}
+			]
+		},
+		{
+			"name": "explicit_path_a_tsv_rule_also_excludes_names_that_rule",
+			"note": "a .formatignore rule excluding a named path is the one reported even where a .gitignore excludes the path first — re-including past the .gitignore would leave that rule standing, and, added to the same file, override it: a file it excludes is skipped quietly, a directory names it, and a path only the .gitignore excludes still gets the lines that re-include it",
+			"tree": {
+				".git/": null,
+				".gitignore": "vendor/\n",
+				".formatignore": "vendor/x.ts\nvendor/lib/\n",
+				"vendor/x.ts": "x",
+				"vendor/y.ts": "x",
+				"vendor/lib/z.ts": "x"
+			},
+			"cases": [
+				{"target": "vendor/x.ts", "expected": [], "no_warns": ["excluded"]},
+				{"target": "vendor/lib", "expected": [], "warns": ["vendor/lib is excluded by a rule in the repo-root .formatignore, so nothing under it is formatted; narrow or negate that rule to format it"]},
+				{"target": "vendor/y.ts", "expected": [], "warns": ["vendor/y.ts is inside vendor, which a rule in the repo-root .gitignore excludes, so it is not formatted; re-include it by adding `!/vendor/`, `/vendor/*` and `!/vendor/y.ts`, in that order, to the repo-root .formatignore"]}
+			]
+		},
+		{
 			"name": "explicit_file_does_not_bypass_the_extension",
 			"note": "a named FILE is checked for its extension before anything else: an unsupported one is an argument error, because the parser dispatch behind a path has no unknown arm (everything that isn't .svelte/.css goes to the TypeScript parser) — a named .json would be parsed as TS, and a top-level-array one silently rewritten into invalid JSON. A DIRECTORY arg is a scope rather than a target, so the same files inside it are simply filtered out by the walk",
 			"tree": {

@@ -45,7 +45,7 @@ always-pruned safety nets, the formattable-extension check, the heuristic-shadow
 warning — lives one layer up in [`tsv_discover`](../tsv_discover/CLAUDE.md), which
 builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
 `negation_under` / `has_gitignore_layers` / `gitignore_anchors`, and `is_ignored` /
-`exclusion` — the ancestor-walking answer and its witness — with `tsv_layer_source` and
+`exclusion` / `tsv_exclusion` — the ancestor-walking answer and its witnesses — with `tsv_layer_source` and
 `split_segments`, to bound and warn about a path an argument named). Keeping that policy out of here is deliberate: `IgnoreStack`
 stays a pure gitignore(5) matcher, reusable beyond tsv's own discovery rules, and
 the three surfaces share the prune *decision* through `tsv_discover` rather than
@@ -112,6 +112,12 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   (`IgnoreSource::{Gitignore, Formatignore, Prettierignore}`, with `file_name()`). A
   diagnostic query off the hot path: `tsv_discover` reads it for a path an argument
   named, to warn which directory put the path out of scope and whose rule did.
+- `IgnoreStack::tsv_exclusion(path, is_dir) -> Option<Exclusion>` — `exclusion` over the
+  tsv layers alone, every `.gitignore` layer set aside. `Some` only where `exclusion` is
+  (tsv layers are read last), and the same answer wherever `exclusion`'s witness is a tsv
+  layer. `tsv_discover` prefers it for a named path: a `.formatignore`/`.prettierignore`
+  rule excluding the path is the one to report even where a `.gitignore` excludes it
+  first, since re-including past the `.gitignore` would leave that rule standing.
 - `IgnoreStack::tsv_layer_source(anchor) -> Option<IgnoreSource>` — which file the tsv
   layer at `anchor` was read from. `tsv_discover` asks it of the format root, so a
   remedy names the file the root reads rather than one whose creation would shadow it.
