@@ -258,7 +258,8 @@ impl LeadingGlue {
 /// keeps its space in both.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum BrokeAfterBreak {
-    /// The run is forced open by the value's own hard break, so every separator the author
+    /// The run is forced open — by the value's own hard break, or by a multi-line comment in
+    /// the run ([`Printer::broke_after_run_break_is_forced`]) — so every separator the author
     /// broke renders as the break prettier's `propagateBreaks` makes of its `line`: a
     /// blank-preserving `hardline` ([`Printer::push_leading_run_separator`]).
     Forced,
@@ -718,9 +719,51 @@ impl<'a> Printer<'a> {
     /// ([`printing::has_blank_line_between_strict`], the shared statement of the
     /// intervening-line rule), over a gap that is whitespace and at most a delimiter or
     /// two.
+    ///
+    /// ⚠️ **A stripped paren's HEAD in front of content is not part of the gap.** When `next`
+    /// is where content starts rather than a comment, the `(` run directly ahead of it is a
+    /// shell the printer erases (`/* c */⏎(⏎⏎v)`), and a blank inside that run is shell
+    /// structure — prettier's `printLeadingComment` measures forward from the comment and
+    /// stops at the `(`. So the scan ends at the run's first `(` ([`Self::shell_head_start`]).
+    /// A blank the author wrote there ahead of a **comment** (`/* c1 */⏎(⏎⏎/* c2 */`) is
+    /// authorship instead and keeps the whole gap: the sanctioned shell-head divergence
+    /// (`conformance_prettier_ts_comments.md` §Comment relocation), the line the element-comma
+    /// seam draws with [`Self::element_shell_end`]. Reading the paren's blank moved layout at
+    /// every leading run a stripped paren can follow — a call opened around a lone argument
+    /// (`fn(/* c */⏎(⏎⏎b))`), a ternary broke — each form its own fixed point.
     pub(in crate::printer) fn has_blank_line_between_strict(&self, from: u32, next: u32) -> bool {
         self.has_blank_line_between(from, next)
-            && printing::has_blank_line_between_strict(self.source, from, next)
+            && printing::has_blank_line_between_strict(
+                self.source,
+                from,
+                self.shell_head_start(from, next),
+            )
+    }
+
+    /// Where the stripped paren shell in front of `next` begins: the first `(` of the run of
+    /// `(` and whitespace that ends at `next`, or `next` itself when that run holds no `(`,
+    /// when `next` starts a comment (see [`Self::has_blank_line_between_strict`]), or where
+    /// the run is cut short at `from`.
+    ///
+    /// The whitespace class is ASCII only, deliberately: any other byte ends the run, which
+    /// falls back to measuring the whole gap — the reading this refines.
+    fn shell_head_start(&self, from: u32, next: u32) -> u32 {
+        let bytes = self.source.as_bytes();
+        let end = (next as usize).min(bytes.len());
+        if bytes[end..].starts_with(b"/*") || bytes[end..].starts_with(b"//") {
+            return next;
+        }
+        let mut head = next;
+        let mut i = end;
+        while i > from as usize {
+            match bytes[i - 1] {
+                b'(' => head = (i - 1) as u32,
+                b' ' | b'\t' | b'\n' | b'\r' => {}
+                _ => break,
+            }
+            i -= 1;
+        }
+        head
     }
 
     /// Emit the separator after one comment in a leading run, toward the **physical**
@@ -742,8 +785,9 @@ impl<'a> Printer<'a> {
     /// hand-rolled callers sit past a `//` that has taken the line, inside an
     /// `indent_hardline` / forced continuation, where prettier's third separator — the soft
     /// `line` — would render as the hardline anyway; so does the forced half of a broke-after
-    /// value run ([`Self::push_leading_run_before_breaking_value`]), whose value's own hard
-    /// break is what prettier's `propagateBreaks` turns every `line` in that run into. A site
+    /// value run ([`Self::push_leading_run_before_breaking_value`]), whose forced break — the
+    /// value's own, or a multi-line comment's — is what prettier's `propagateBreaks` turns every
+    /// `line` in that run into. A site
     /// whose enclosing group can still be flat needs
     /// [`push_leading_comment_run`](Self::push_leading_comment_run) instead: reaching for
     /// this one there forces the group open around a run prettier keeps inline, which is
@@ -2252,19 +2296,20 @@ impl<'a> Printer<'a> {
 
     /// Push a leading block-comment run the author broke after
     /// ([`Self::broke_after_value_leading_run`]: `/* c */⏎<value>`, or
-    /// `/* c1 */⏎/* c2 */ <value>`) ahead of a value whose doc **will break** — the
-    /// break-materialized form of prettier's `printLeadingComment` newline-after
-    /// soft `line`. Prettier gets the materialization free from `propagateBreaks`
-    /// (the value's hard break marks every enclosing group broken, so each `line`
+    /// `/* c1 */⏎/* c2 */ <value>`) whose break is **forced** — the value's doc will break,
+    /// or a comment in the run is multi-line — the break-materialized form of prettier's
+    /// `printLeadingComment` newline-after soft `line`. Prettier gets the materialization free
+    /// from `propagateBreaks` (a hard break marks every enclosing group broken, so each `line`
     /// renders as a break); tsv has no `propagateBreaks`, so the caller asks
-    /// `will_break` of the value doc and routes here only when it holds — every
+    /// [`Self::broke_after_run_break_is_forced`] and routes here only when it holds — every
     /// separator the author broke is a (blank-preserving) `hardline` because the break
     /// is already forced, and forced is what lets it carry an author blank. The
-    /// width-driven half of the same rule — no hard break, the seam itself
+    /// width-driven half of the same rule — nothing forced, the seam itself
     /// deciding — is [`hang_after_operator_run_doc`](Self::hang_after_operator_run_doc),
     /// whose soft `line` rides the seam's own hang group and absorbs the blank
-    /// with the unforced break. A value that FITS collapses the `line` to a space
-    /// in both formatters, so the caller's glued path already renders that case.
+    /// with the unforced break. A value that FITS behind single-line comments collapses the
+    /// `line` to a space in both formatters, so the caller's glued path already renders that
+    /// case.
     ///
     /// Every separator is asked of the comment's own neighbour
     /// ([`Self::push_leading_run_separator`]), never of the value: a pair the author
@@ -2358,7 +2403,8 @@ impl<'a> Printer<'a> {
     }
 
     /// The width-keyed sibling of [`Self::break_after_operator_run_doc`], for a
-    /// broke-after run before a value whose doc carries NO hard break: the run,
+    /// broke-after run whose break is NOT forced ([`Self::broke_after_run_break_is_forced`]:
+    /// no hard break in the value, no multi-line comment in the run): the run,
     /// its newline-after soft `line`, and the value inside ONE
     /// `hang_after_operator` group, so the separator materializes exactly when
     /// the operator seam itself breaks — prettier's `printLeadingComment` `line`,
@@ -2428,8 +2474,9 @@ impl<'a> Printer<'a> {
     }
 
     /// [`Self::break_after_operator_run_doc`] or
-    /// [`Self::hang_after_operator_run_doc`], chosen by the value's own hard
-    /// break — the two-half dispatch the operator seams share (the type-alias,
+    /// [`Self::hang_after_operator_run_doc`], chosen by whether the run's break is forced
+    /// ([`Self::broke_after_run_break_is_forced`]) — the two-half dispatch the operator seams
+    /// share (the type-alias,
     /// declarator, and assignment `=`). The arrow's hug arm asks the hard half
     /// alone: its glued hug already renders the width case.
     pub(crate) fn break_or_hang_after_operator_run_doc(
@@ -2438,7 +2485,7 @@ impl<'a> Printer<'a> {
         value_start: u32,
         value_doc: DocId,
     ) -> DocId {
-        if self.d().will_break(value_doc) || self.run_ends_in_glued_multiline_block(run) {
+        if self.broke_after_run_break_is_forced(run, value_doc) {
             self.break_after_operator_run_doc(run, value_start, value_doc)
         } else {
             self.hang_after_operator_run_doc(run, value_doc)
@@ -2451,11 +2498,13 @@ impl<'a> Printer<'a> {
     /// ([`Self::broke_after_value_leading_run`]), the value built through the
     /// caller's own builder, then `Some(rhs_doc)` when either half applies —
     /// a value carrying a hard break takes the blank-preserving hardline emitter
-    /// (any run authoring: the own-line emission is the preserved own-line shape),
+    /// (any run authoring: the own-line emission is the preserved own-line shape), as does a
+    /// run holding a multi-line comment ([`Self::broke_after_run_break_is_forced`]);
     /// anything else one hang group whose soft `line` breaks exactly when the
     /// operator seam does, restricted to a run that may ride a soft separator
     /// ([`Self::no_comment_owns_its_line`]: no comment in it owns its line).
-    /// A value that FITS collapses to the glued bytes in both formatters; a
+    /// A value that FITS behind single-line comments collapses to the glued bytes in both
+    /// formatters; a
     /// width-broken one holds the run on its own line with the value re-fitting
     /// below instead of stranding it mid-line (`⏎\t/* c */ aaa +`, a form
     /// prettier never emits). An author blank yields with the soft half's break. Declines
@@ -2589,9 +2638,10 @@ impl<'a> Printer<'a> {
                 .all(|b| matches!(b, b' ' | b'\t' | b'\n' | b'('))
     }
 
-    /// [`Self::broke_after_value_leading_run`] plus the hard-break question:
-    /// `Some((run, value_doc))` only when the value doc (built here, via the
-    /// caller's builder) **will break** — the gate for
+    /// [`Self::broke_after_value_leading_run`] plus the forced-break question:
+    /// `Some((run, value_doc))` only when the run's break is forced
+    /// ([`Self::broke_after_run_break_is_forced`] — the value doc, built here via the
+    /// caller's builder, **will break**, or the run holds a multi-line comment) — the gate for
     /// [`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value)
     /// at the seams whose remaining layouts already render the width-driven case
     /// (the simple `:` annotation, the spread's dots→argument gap, the `await`
@@ -2612,25 +2662,61 @@ impl<'a> Printer<'a> {
     ) -> Option<(CommentVec<'a>, DocId)> {
         let comments = self.broke_after_value_leading_run(gap_start, value_start)?;
         let value_doc = build_value();
-        if self.d().will_break(value_doc) || self.run_ends_in_glued_multiline_block(&comments) {
-            Some((comments, value_doc))
-        } else {
-            None
-        }
+        self.broke_after_run_break_is_forced(&comments, value_doc)
+            .then_some((comments, value_doc))
     }
 
-    /// Whether a broke-after run ([`Self::broke_after_value_leading_run`]) ENDS in a
-    /// multi-line block glued to the value (`: /* x */⏎/* y⏎*/ B`) — a hard break the run
-    /// carries on its own, whatever the value does. Prettier breaks the separator before
-    /// such a comment and keeps an author blank there, so each dispatcher between the forced
-    /// and the soft half asks this beside `will_break(value)`.
+    /// Whether a broke-after run's break is FORCED — by a hard break of the value's own
+    /// (`will_break`), or by a multi-line block in the run
+    /// ([`Self::run_holds_multiline_block`]). The one question every dispatcher between the run's
+    /// forced emitter ([`Self::push_leading_run_before_breaking_value`]) and its soft half asks:
+    /// forced is what lets an author blank after the run survive, where the soft separator
+    /// yields it with an unforced break.
+    pub(crate) fn broke_after_run_break_is_forced(
+        &self,
+        run: &[&Comment],
+        value_doc: DocId,
+    ) -> bool {
+        self.d().will_break(value_doc) || self.run_holds_multiline_block(run)
+    }
+
+    /// The forced broke-after run and the value it leads, as one doc —
+    /// [`Self::push_leading_run_before_breaking_value`] for a caller with no parts of its own
+    /// to push into.
+    pub(crate) fn leading_run_before_breaking_value_doc(
+        &self,
+        run: &[&'a Comment],
+        value_start: u32,
+        value_doc: DocId,
+    ) -> DocId {
+        let mut parts = DocBuf::new();
+        self.push_leading_run_before_breaking_value(&mut parts, run, value_start);
+        parts.push(value_doc);
+        self.d().concat(&parts)
+    }
+
+    /// Whether a broke-after run ([`Self::broke_after_value_leading_run`]) holds a MULTI-line
+    /// block — a comment that cannot print flat, so the run carries a hard break of its own
+    /// whatever the value does. Prettier breaks the run's separators around such a comment and
+    /// keeps an author blank after it. The dispatchers ask it through
+    /// [`Self::broke_after_run_break_is_forced`]; the annotation union's hang asks it alone,
+    /// since a hard break in the union's own doc is that hang's to render.
     ///
-    /// Only an UN-owned tail reaches it — a type position, or a comment glued to a stripped
-    /// paren — since it rides in the run. An OWNED tail is printed by the value's doc, whose
-    /// `will_break` already answers for it.
-    pub(crate) fn run_ends_in_glued_multiline_block(&self, run: &[&Comment]) -> bool {
-        run.last()
-            .is_some_and(|c| c.multiline && self.comment_hugs_next(c))
+    /// ⚠️ **Any comment in the run, not only a tail glued to the value.** The glued-tail reading
+    /// (`: /* x */⏎/* y⏎*/ B`) left the commonest shape on the soft half — a lone multi-line
+    /// comment the author broke after (`= /* x⏎y */⏎⏎b`) — whose unforced separator dropped the
+    /// blank at the declarator and assignment `=`, and at the annotation `:` glued the type onto
+    /// the comment's closing line (`let v: /* x⏎y */ B;`), while the arrow body and the type
+    /// alias already kept both. The frame's own rule (`conformance_prettier.md` §Authored breaks
+    /// in value position): the blank survives wherever the break does, and here the comment
+    /// forces the break.
+    ///
+    /// Only an UN-owned comment reaches it — every comment of an expression run the value's
+    /// node does not print, a type position's whole run, a comment glued to a stripped paren —
+    /// since it rides in the run. An OWNED tail is printed by the value's doc, whose `will_break`
+    /// already answers for it.
+    pub(crate) fn run_holds_multiline_block(&self, run: &[&Comment]) -> bool {
+        run.iter().any(|c| c.multiline)
     }
 
     /// Build a leading-comment run over `[start, end)` into a fresh `DocBuf`,

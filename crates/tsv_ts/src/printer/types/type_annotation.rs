@@ -356,12 +356,13 @@ impl<'a> Printer<'a> {
             return d.concat(&parts);
         }
         // A block run the author broke AFTER, before a type that actually breaks
-        // (`let x: /* c */⏎{ …multiline… }`): the run keeps the head line and the
+        // (`let x: /* c */⏎{ …multiline… }`) or holding a multi-line comment
+        // (`let x: /* c⏎d */⏎B`): the run keeps the head line and the
         // type opens on the next, un-indented — prettier's `printLeadingComment`
-        // newline-after `line`, materialized by the type's own break (the
+        // newline-after `line`, materialized by that forced break (the
         // annotation adds no indent group, so the type lands at the statement's
-        // level). A type that FITS collapses that `line` to a space in both
-        // formatters — the glued path below. The gate is the shared
+        // level). A type that FITS behind single-line comments collapses that `line` to a
+        // space in both formatters — the glued path below. The gate is the shared
         // [`Printer::breaking_value_leading_run`] — including its physical-next
         // decline, so an OWNED comment glued to the type keeps the glued path here
         // exactly as it does at the `=` seams.
@@ -516,10 +517,18 @@ impl<'a> Printer<'a> {
         gap_run: bool,
     ) -> DocId {
         let d = self.d();
-        let hung = if gap_run {
-            self.prepend_rhs_comments(type_doc, colon_end, type_start)
-        } else {
+        let hung = if !gap_run {
             type_doc
+        } else if let Some(run) = self.broke_after_value_leading_run(colon_end, type_start)
+            && self.run_holds_multiline_block(&run)
+        {
+            // A multi-line comment carries its own hard break, so the run's separators are
+            // forced and an author blank after it survives — the soft value-gap emitter below
+            // would yield it (`: /* x⏎y */⏎⏎| A⏎| B`), as the non-union `:` arm no longer does
+            // ([`Printer::breaking_value_leading_run`]).
+            self.leading_run_before_breaking_value_doc(&run, type_start, type_doc)
+        } else {
+            self.prepend_rhs_comments(type_doc, colon_end, type_start)
         };
         d.concat(&[d.text(":"), hang_after_operator(d, hung)])
     }

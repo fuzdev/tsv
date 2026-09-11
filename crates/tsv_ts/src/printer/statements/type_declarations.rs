@@ -601,8 +601,9 @@ impl<'a> Printer<'a> {
             // `hasLeadingOwnLineComment` arm wins ahead of the per-kind layouts, so it
             // is asked FIRST here: left to the arms below, the run glues onto a value
             // whose width-driven expansion then strands it mid-line (`⏎\t/* c */ | A`,
-            // a form prettier never emits). A value that already carries a hard break
-            // materializes the run's newline-after `line` as a blank-preserving
+            // a form prettier never emits). A forced break — a value that already carries a
+            // hard break, or a multi-line comment in the run — materializes the run's
+            // newline-after `line` as a blank-preserving
             // hardline; anything else rides one hang group with a soft `line`, which
             // breaks exactly when the `=` seam does — a value that FITS collapses to
             // the glued bytes in both formatters, so the flat render is unchanged.

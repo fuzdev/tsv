@@ -405,6 +405,13 @@ they hang the value, and the gate is the shared `comment_hangs_next`:
   Indent](#uniform-forced-continuation-indent).
 - A **multiline** block the author broke after (`kw /* …⏎… */⏎v`) hangs the value; one whose
   value shares its closing line (`kw /* …⏎… */ v`) stays inline, the way prettier keeps it.
+  The comment cannot print flat, so the break after it is its own, and an author blank there
+  survives with it (`= /* x⏎y */⏎⏎v`) at every value position — the declarator and assignment
+  `=`, the type alias, an arrow body, the annotation `:` and the return type alike —
+  [value_leading_multiline_comment_blank](../tests/fixtures/typescript/syntax/comments/value_leading_multiline_comment_blank/).
+  The same comment on its **own** line before a type that fits drops the type below it too,
+  rather than gluing it to the comment's closing line —
+  [type_value_own_line_multiline_comment](../tests/fixtures/typescript/syntax/comments/type_value_own_line_multiline_comment/).
 
 A **blank line** inside the gap **yields with the break**. `A = /* c */⏎⏎1` formats to
 `A = /* c */ 1`, the same fixed point as the single-newline authoring. This is not a second

@@ -529,12 +529,13 @@ impl<'a> Printer<'a> {
         // gets the continuation indent. Non-binary arguments are unaffected.
         let arg_doc = self.build_expression_doc_with_indent_on_break(spread.argument);
 
-        // A block run the author broke AFTER, before an argument that WILL BREAK,
-        // keeps its break — prettier's `printLeadingComment` newline-after `line`,
-        // materialized by the argument's own break (`.../*#__PURE__*/⏎fn({…})` stays
+        // A block run the author broke AFTER, before an argument that WILL BREAK or holding a
+        // multi-line comment, keeps its break — prettier's `printLeadingComment` newline-after
+        // `line`, materialized by that forced break (`.../*#__PURE__*/⏎fn({…})` stays
         // broken, the argument opening un-indented at the `...`'s level). The gate is
-        // the shared `breaking_value_leading_run` (geometry + `will_break` + the
-        // owned-comment decline); an argument that FITS declines into the glued path
+        // the shared `breaking_value_leading_run` (geometry + the forced-break question + the
+        // owned-comment decline); an argument that FITS behind single-line comments declines
+        // into the glued path
         // below, whose flat render is the same bytes prettier's collapsed `line`
         // produces. An argument that NEEDS parens keeps the glued path too — the compound
         // is unprobed, and the hug is that path's existing answer there (the run is emitted
