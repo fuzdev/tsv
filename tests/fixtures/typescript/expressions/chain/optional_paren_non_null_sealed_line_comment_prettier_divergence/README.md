@@ -22,6 +22,13 @@ unlike the block-comment case — which stays inline and matches prettier, see
 [optional_paren_non_null_sealed_comment](../optional_paren_non_null_sealed_comment/)
 — it forces the operand onto its own line.
 
+The last case adds a **multi-line block the base OWNS** to the same pair. That is the
+one authoring in this family where the pair prints its BROKEN body — a second rendering
+of the same operand, chosen because the trailing gap holds the `//` — so it is the cell
+that says the owned comment reaches *both* renderings. Its sibling claim, that the
+operand stays flat under such a comment, is
+[required_pair_multiline_leading_comment](../../../syntax/comments/required_pair_multiline_leading_comment_prettier_divergence/).
+
 Reason: comment preservation. See
 [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Non-null grouped operand) and

@@ -11,4 +11,12 @@
 		(a
 			?.b)! // c
 		.ccc;
+	// A multi-line block the base OWNS, in the same pair, with the `//` still in the
+	// trailing gap: the pair prints its BROKEN body here, a second rendering of the same
+	// operand, and the comment survives in it.
+	const n =
+		(/* a
+b */ a
+			?.b)! // c
+		.ccc;
 </script>

@@ -1078,9 +1078,20 @@ impl<'a> Printer<'a> {
             body.push(run);
         }
         body.push(match expr {
-            // Bare: the shell composed below IS the sequence's required pair.
+            // Bare: the shell composed below IS the sequence's required pair. Its own
+            // printer takes the owned-comment claim ([`Self::build_sequence_doc_bare`] →
+            // the run form), so this arm needs none.
             internal::Expression::SequenceExpression(seq) => self.build_sequence_doc_bare(seq),
-            _ => self.build_expression_doc(expr),
+            // A MULTI-LINE block the operand OWNS prints just inside this shell's `(`,
+            // outside the operand's own group
+            // ([`Printer::build_value_with_outermost_owned_comment`]). This shell is the
+            // required pair at the seams that reach it, so it owes the family's rule like
+            // every other emitter of one — and it is the arm the plain
+            // `(/* c⏎d */ x) as T` path never reaches, since the shell is built only when
+            // the gap holds a comment the EMIT axis can see (an un-owned run member) or
+            // the operand→keyword gap needs the parens for ASI.
+            _ => self
+                .build_value_with_outermost_owned_comment(expr, || self.build_expression_doc(expr)),
         });
         if let Some((trailing, _needs_break)) =
             self.trailing_paren_comment_parts(expr_end, inner_end)

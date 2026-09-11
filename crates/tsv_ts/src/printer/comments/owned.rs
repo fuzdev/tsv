@@ -215,11 +215,11 @@ impl<'a> Printer<'a> {
     /// Save/restore rather than set/clear, so an enclosing mark survives — and so nothing
     /// leaks past the parameter into the arrow's body, where a nested arrow's own owned
     /// comment lives ([`Printer::with_jsdoc_cast_cannot_hang_gap`] is the same shape).
-    pub(in crate::printer) fn with_owned_comment_claimed_above(
+    pub(in crate::printer) fn with_owned_comment_claimed_above<T>(
         &self,
         start: u32,
-        build: impl FnOnce() -> DocId,
-    ) -> DocId {
+        build: impl FnOnce() -> T,
+    ) -> T {
         let saved = self.claimed_owned_comment_start.replace(Some(start));
         let doc = build();
         self.claimed_owned_comment_start.set(saved);
@@ -374,19 +374,47 @@ impl<'a> Printer<'a> {
     /// own group, where prettier's `printComments` puts it.
     ///
     /// The **no-gap** sibling of [`Self::hoist_owned_value_gap_run`], for a seam that has no
-    /// run of its own to replace: a call argument, an array element and an expression
-    /// statement each get their leading run from the LIST they sit in, which emits it on the
-    /// **to emit** axis and so never sees the owned member at all. There is nothing to
-    /// hoist *from* the gap — the only comment the value carries is the one it owns — so
-    /// this claims exactly that one, and the list's own run is untouched and cannot
-    /// double-print.
+    /// run of its own to replace. Two families reach it, and neither can hoist *from* a
+    /// gap — the only comment in play is the one the value owns:
     ///
-    /// Why these three seams and not `build_expression_doc` generally: innermost-wins is
+    /// - a **list member** — a call argument, an array element, an expression statement —
+    ///   whose leading run comes from the LIST it sits in, emitted on the **to emit** axis,
+    ///   which never sees the owned member at all;
+    /// - a **REQUIRED paren pair's operand** — an `as`/`satisfies` operand, an angle-bracket
+    ///   assertion operand, a non-null operand, a binary/logical operand, a unary operand,
+    ///   an `await` operand, a chain base, a sequence's own operand run, a `for` header's
+    ///   sequence clause, and the ASI operand shell ([`Self::build_asi_operand_shell_doc`]).
+    ///   Those emitters DO scan the pair's leading gap
+    ///   ([`Self::build_required_pair_leading_shell_doc`] and the folded twin), but on the
+    ///   **to emit** axis, which skips the owned comment by definition — so their run and
+    ///   this claim partition the gap rather than competing for it, and the two print in
+    ///   source order (the seam's run first, then the operand's doc, which now opens with
+    ///   the comment it owns).
+    ///
+    /// Either way this claims exactly that one comment, and the seam's own run is untouched
+    /// and cannot double-print.
+    ///
+    /// Why these seams and not `build_expression_doc` generally: innermost-wins is
     /// what keeps a paren a *parent* synthesizes from landing between a comment and its
     /// token, and that property is worth keeping everywhere it is not actively wrong. It is
     /// wrong exactly where the comment's reprinted body force-breaks a group the value would
     /// otherwise keep flat, which is the multi-line case — hence the `multiline` gate — and
     /// only at a seam whose value can carry such a group.
+    ///
+    /// ⚠️ **A required pair asks this only where the pair is KEPT.** Bare, the comment leads
+    /// the *enclosing* construct's value and that seam already decides its position; taking
+    /// the claim there would move a comment no pair encloses. The one member of that list
+    /// with no pair of its own is the `for` header's sequence clause, which is there for the
+    /// BREAK alone: the header strips the author's grouping parens, so the comment simply
+    /// leads the clause — where prettier prints it too — and the operand's own group was the
+    /// whole of the question.
+    ///
+    /// ⚠️ **The gap gate is what selects the emitter, so the seam list cannot be read off
+    /// `needs_parens`.** An un-owned second comment in the same gap makes it non-empty on
+    /// the **to emit** axis, which routes an `as` operand to
+    /// [`Self::build_asi_operand_shell_doc`] instead of its plain arm — a different emitter
+    /// printing its own pair and its own operand doc. Every single-comment probe cell is
+    /// green while that one is unclaimed; a two-comment RUN is what reaches it.
     ///
     /// Declines when nothing below would claim (no left-spine child starts here, so `value`
     /// is already the outermost claimant and `build_expression_doc` prints the comment
@@ -398,29 +426,97 @@ impl<'a> Printer<'a> {
         value: &Expression<'_>,
         build_value: impl FnOnce() -> DocId,
     ) -> DocId {
-        if !self.has_owned_comments {
-            return build_value();
+        self.build_doc_with_outermost_owned_comment_at(
+            value.span().start,
+            left_spine_child(value),
+            build_value,
+        )
+    }
+
+    /// The **span-keyed** form of [`Self::build_value_with_outermost_owned_comment`], for a
+    /// seam with no enclosing `Expression` to key the claim on: a **sequence**, which prints
+    /// its own paren envelope (and, in a `for` header, no parens at all), so the thing the
+    /// claim sits outside is the comma-joined operand RUN rather than an operand node.
+    ///
+    /// `start` is where the run's first token begins — the sequence's own span start, which
+    /// is also its first operand's — and `first_child` the node that would otherwise claim
+    /// there. Both gates read the same way as the value form: `first_child` starting LATER
+    /// than `start` means the seam prints something ahead of it, so nothing below leads the
+    /// run.
+    ///
+    /// The gates live in one place ([`Self::outermost_owned_claim_applies`]) so the three
+    /// forms cannot answer them differently, and the suppression and the prepend are one
+    /// call in each — suppressing where nothing prepends is a DROP and
+    /// prepending without suppressing a DOUBLE-PRINT (`docs/comments.md` hazard 1), and a
+    /// hand-rolled copy of this pairing double-printed every JSDoc cast in a sequence.
+    pub(in crate::printer) fn build_doc_with_outermost_owned_comment_at(
+        &self,
+        start: u32,
+        first_child: Option<&Expression<'_>>,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        if !self.outermost_owned_claim_applies(start, first_child) {
+            return build();
         }
+        let doc = self.with_owned_comment_claimed_above(start, build);
+        self.prepend_owned_leading_comment_at(start, doc)
+    }
+
+    /// The **two-body** form, for a pair emitter that takes a FLAT and a BROKEN rendering of
+    /// the same operand ([`Self::build_owned_required_pair_doc`]'s chain-base caller).
+    ///
+    /// ⚠️ **Both bodies need the prepend, and the single-body form cannot give it to them.**
+    /// The bodies are two docs, not one — the flat one shaped by the position, the broken one
+    /// the operand's plain doc — and a caller that claims around only the shaped one leaves
+    /// the other built under the SUPPRESSION with nothing printing the comment: a DROP
+    /// (`docs/comments.md` hazard 1). Worse, a memoized `inner()` shared by the two arms
+    /// makes the drop invisible from the call site, because the suppressed doc is what the
+    /// memo already holds. `gaps:audit` is what found it — the shape needs a `//` in the
+    /// pair's TRAILING gap, which is what makes the trailing emitter pick the broken body.
+    pub(in crate::printer) fn build_value_pair_with_outermost_owned_comment(
+        &self,
+        value: &Expression<'_>,
+        build: impl FnOnce() -> (DocId, DocId),
+    ) -> (DocId, DocId) {
         let start = value.span().start;
+        if !self.outermost_owned_claim_applies(start, left_spine_child(value)) {
+            return build();
+        }
+        let (flat, broken) = self.with_owned_comment_claimed_above(start, build);
+        (
+            self.prepend_owned_leading_comment_at(start, flat),
+            self.prepend_owned_leading_comment_at(start, broken),
+        )
+    }
+
+    /// The four gates of the outermost-owned claim, in one place so the three forms above
+    /// cannot answer them differently.
+    fn outermost_owned_claim_applies(
+        &self,
+        start: u32,
+        first_child: Option<&Expression<'_>>,
+    ) -> bool {
+        if !self.has_owned_comments {
+            return false;
+        }
         // Nothing below claims, so the seam has nothing to take over.
-        if left_spine_child(value).is_none_or(|c| c.span().start != start) {
-            return build_value();
+        if first_child.is_none_or(|c| c.span().start != start) {
+            return false;
         }
         // An ENCLOSING seam already claims this comment; taking it again double-prints.
         if self.claimed_owned_comment_start.get() == Some(start) {
-            return build_value();
+            return false;
         }
         if !self
             .owned_leading_comment_at(start)
             .is_some_and(|c| c.multiline)
         {
-            return build_value();
+            return false;
         }
-        if self.leading_jsdoc_cast(value).is_some() {
-            return build_value();
-        }
-        let doc = self.with_owned_comment_claimed_above(start, build_value);
-        self.prepend_owned_leading_comment_at(start, doc)
+        // The left-spine walk, entered at the child rather than at the node above it: both
+        // start at `start`, so the two readings are the same one, and the span-keyed form has
+        // no node above to enter at.
+        first_child.is_none_or(|c| self.leading_jsdoc_cast(c).is_none())
     }
 
     /// Prepend the comment `expr` owns, glued to its own first token.

@@ -1001,37 +1001,49 @@ impl<'a> Printer<'a> {
         seq: &internal::SequenceExpression<'_>,
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
-        let mut docs = DocBuf::new();
-        // Where the FIRST operand's docs end — `build_sequence_layout_doc`'s `first_end`,
-        // tracked rather than assumed to be 1 so the layout does not depend on how many
-        // docs an operand pushes.
-        let mut first_end = 0;
-        for (i, e) in seq.expressions.iter().enumerate() {
-            let frozen = if i > 0 {
-                let prev_end = seq.expressions[i - 1].span().end;
-                self.push_for_clause_comma_gap(&mut docs, prev_end, e.span().start);
-                // Rule A, the same as the general sequence printer's: an own-line
-                // directive in the comma gap freezes the FOLLOWING operand. The `[~In]`
-                // wrap `build_elem` may apply is moot on a verbatim slice.
-                self.gap_frozen_span(prev_end, e.span())
-            } else {
-                None
-            };
-            docs.push(frozen.map_or_else(
-                || build_elem(e),
-                |frozen| self.build_frozen_expression_doc(e, frozen),
-            ));
-            if i == 0 {
-                first_end = docs.len();
-            }
-        }
-        // Prettier's `ForStatement` arm of `printSequenceExpression` — the same geometry
-        // the general sequence printer states once, so this clause cannot answer it
-        // differently: the indent starts AFTER the first operand, and an operand that
-        // breaks internally keeps its own lines at the clause's base column. Wrapping the
-        // whole run instead added a level to the FIRST operand's internals, visible on a
-        // plain call (`for (fn(⏎…⏎), cc; ;)`) as well as on a binary.
-        self.build_sequence_layout_doc(&docs, first_end, SeqLayout::Indented)
+        // A MULTI-LINE block the FIRST operand OWNS prints ahead of the run, outside the
+        // layout's group ([`Printer::build_doc_with_outermost_owned_comment_at`]) — the
+        // general sequence printer's rule, at the clause that keeps its own copy of the
+        // run. There is no pair here at all: the author's grouping parens are stripped in
+        // a for header, so the comment simply leads the clause, which is where prettier
+        // prints it too. Only the BREAK differs, and the two agree once it is gone.
+        self.build_doc_with_outermost_owned_comment_at(
+            seq.span.start,
+            seq.expressions.first(),
+            || {
+                let mut docs = DocBuf::new();
+                // Where the FIRST operand's docs end — `build_sequence_layout_doc`'s `first_end`,
+                // tracked rather than assumed to be 1 so the layout does not depend on how many
+                // docs an operand pushes.
+                let mut first_end = 0;
+                for (i, e) in seq.expressions.iter().enumerate() {
+                    let frozen = if i > 0 {
+                        let prev_end = seq.expressions[i - 1].span().end;
+                        self.push_for_clause_comma_gap(&mut docs, prev_end, e.span().start);
+                        // Rule A, the same as the general sequence printer's: an own-line
+                        // directive in the comma gap freezes the FOLLOWING operand. The `[~In]`
+                        // wrap `build_elem` may apply is moot on a verbatim slice.
+                        self.gap_frozen_span(prev_end, e.span())
+                    } else {
+                        None
+                    };
+                    docs.push(frozen.map_or_else(
+                        || build_elem(e),
+                        |frozen| self.build_frozen_expression_doc(e, frozen),
+                    ));
+                    if i == 0 {
+                        first_end = docs.len();
+                    }
+                }
+                // Prettier's `ForStatement` arm of `printSequenceExpression` — the same geometry
+                // the general sequence printer states once, so this clause cannot answer it
+                // differently: the indent starts AFTER the first operand, and an operand that
+                // breaks internally keeps its own lines at the clause's base column. Wrapping the
+                // whole run instead added a level to the FIRST operand's internals, visible on a
+                // plain call (`for (fn(⏎…⏎), cc; ;)`) as well as on a binary.
+                self.build_sequence_layout_doc(&docs, first_end, SeqLayout::Indented)
+            },
+        )
     }
 
     /// Render a for-header init/update clause expression. A `SequenceExpression`

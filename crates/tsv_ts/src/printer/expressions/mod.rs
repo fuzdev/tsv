@@ -27,6 +27,12 @@ pub(in crate::printer) mod operators;
 mod patterns;
 mod template_literal;
 
+/// The chain printer's one reach into this module's private `conditional`: a
+/// parenthesized chain base asks what its left-spine ternary wants from the parens
+/// around it. Re-exported rather than opening the module, which holds a good deal
+/// more than the chain has any business seeing.
+pub(in crate::printer) use self::conditional::ChainBaseTernary;
+
 use self::operators::{OperatorBuf, SeqLayout};
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::ShareTag;
@@ -847,10 +853,23 @@ impl<'a> Printer<'a> {
         // indent one gives — the non-null operand's rule. Without it a binary operand's
         // continuation lines snap back to the enclosing indent, outside the `(` that is
         // now being printed around them.
-        let inner_expr = if retains_shell {
-            self.build_expression_doc_with_indent_on_break(type_assert.expression)
+        let build_inner = || {
+            if retains_shell {
+                self.build_expression_doc_with_indent_on_break(type_assert.expression)
+            } else {
+                self.build_expression_doc(type_assert.expression)
+            }
+        };
+        // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
+        // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
+        // BOTH pairs count: the precedence one below and the shell the operand→`)` gap
+        // retains — either encloses the comment, and the shell's body is the one the
+        // `retains_shell` branch prints, so a claim taken only for `expr_needs_parens`
+        // would miss `<T>(/* c⏎d */ b + c + d /* t */)`.
+        let inner_expr = if retains_shell || expr_needs_parens {
+            self.build_value_with_outermost_owned_comment(type_assert.expression, build_inner)
         } else {
-            self.build_expression_doc(type_assert.expression)
+            build_inner()
         };
         let expr_doc = if expr_needs_parens {
             d.parens(inner_expr)
@@ -1070,7 +1089,17 @@ impl<'a> Printer<'a> {
             // an arrow body, an inner `await`) re-marks the target, so a read afterwards
             // would see the nested answer instead of this operand's.
             let expands = needs_parens && self.ternary_takes_extra_indent(expression);
-            let operand = self.build_expression_doc(expression);
+            // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
+            // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]);
+            // left inside, its body's forced break explodes an operand prettier keeps flat.
+            // Asked only where the pair is KEPT — see that seam's ⚠️.
+            let operand = if needs_parens {
+                self.build_value_with_outermost_owned_comment(expression, || {
+                    self.build_expression_doc(expression)
+                })
+            } else {
+                self.build_expression_doc(expression)
+            };
             parts.push(if expands {
                 self.build_expanding_parens_body_doc(operand)
             } else {
@@ -1361,8 +1390,12 @@ impl<'a> Printer<'a> {
             // it `(t)!` and `(t)!.prop` disagree about the very same base. Asked BEFORE
             // the operand is built, for the re-marking reason given at the cast site.
             let expands = self.ternary_takes_extra_indent(non_null_expr.expression);
-            let inner_doc =
-                self.build_expression_doc_with_indent_on_break(non_null_expr.expression);
+            // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
+            // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
+            let inner_doc = self
+                .build_value_with_outermost_owned_comment(non_null_expr.expression, || {
+                    self.build_expression_doc_with_indent_on_break(non_null_expr.expression)
+                });
             let argument_end = non_null_expr.expression.span().end;
             // A leading run that occupies a line — a `//`, an own-line block — takes
             // the family's expanded shell: `( // c` glue, the operand one indent in,

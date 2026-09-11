@@ -353,10 +353,17 @@ impl<'a> Printer<'a> {
             // — the term that covers the COMMENTED operand, the uncommented one taking the
             // early return the sibling arm below spells). The shell's own `indent` supplies
             // the one level, so the chain inside it stays flush.
-            let inner = match frozen {
-                Some(frozen) => self.build_frozen_expression_doc(unary.argument, frozen),
-                None => self.build_flat_chain_expression_doc(unary.argument),
-            };
+            // A MULTI-LINE block the operand OWNS prints just inside this shell's `(`,
+            // outside the operand's own group
+            // ([`Printer::build_value_with_outermost_owned_comment`]). The shell itself
+            // still breaks — the comment's body forces it, as prettier's does — but the
+            // operand inside it stays flat. The claim wraps the BUILD, not the finished
+            // doc: prepending without suppressing double-prints.
+            let inner =
+                self.build_value_with_outermost_owned_comment(unary.argument, || match frozen {
+                    Some(frozen) => self.build_frozen_expression_doc(unary.argument, frozen),
+                    None => self.build_flat_chain_expression_doc(unary.argument),
+                });
             // The outer comment-holder parens already group the operand, so the inner
             // needs_parens layer is redundant for a binary/logical operand — prettier
             // strips it (`!(x + y /* c */)`). Assignment/ternary operands keep their
@@ -1318,11 +1325,15 @@ impl<'a> Printer<'a> {
         // either way, and the two shapes are output-identical over the full
         // fixture corpus, so the mode split retired with the depth-blind
         // `is_embedded()` keying.
-        let operand_doc = self.build_chain_aware_operand_doc(operand);
+        // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
+        // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
+        // Asked only where the pair is KEPT — see that seam's ⚠️.
         if self.needs_parens(operand, ctx) {
-            d.parens(operand_doc)
+            d.parens(self.build_value_with_outermost_owned_comment(operand, || {
+                self.build_chain_aware_operand_doc(operand)
+            }))
         } else {
-            operand_doc
+            self.build_chain_aware_operand_doc(operand)
         }
     }
 
@@ -1432,7 +1443,17 @@ impl<'a> Printer<'a> {
             // shell is not optional here: `await`'s own span covers the `)`, so a stripped
             // form hands the comment to the enclosing terminator gap on reparse and the
             // authoring has no fixed point at all. Mirrors `build_spread_doc`.
-            let inner = operand_doc();
+            // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
+            // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
+            // The retained trailing shell is a pair too, but it is the PRINTER's rather
+            // than the author's and its `(` is re-added around this body either way, so
+            // the precedence pair is what the claim is keyed on.
+            let needs_parens = self.needs_parens(await_expr.argument, ParenContext::AwaitArgument);
+            let inner = if needs_parens {
+                self.build_value_with_outermost_owned_comment(await_expr.argument, operand_doc)
+            } else {
+                operand_doc()
+            };
             if let Some(shell) = self.build_paren_operand_comment_doc(
                 argument_end,
                 await_expr.span.end,
@@ -1441,13 +1462,15 @@ impl<'a> Printer<'a> {
                 ")",
             ) {
                 shell
-            } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
+            } else if needs_parens {
                 d.parens(inner)
             } else {
                 inner
             }
         } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
-            d.concat(&[d.text("("), operand_doc(), d.text(")")])
+            let inner =
+                self.build_value_with_outermost_owned_comment(await_expr.argument, operand_doc);
+            d.concat(&[d.text("("), inner, d.text(")")])
         } else {
             operand_doc()
         };
@@ -1787,6 +1810,51 @@ impl<'a> Printer<'a> {
             return self.build_sequence_doc_with_line_comments(seq, trailing_end, parens, layout);
         }
 
+        // A MULTI-LINE block the FIRST operand OWNS prints ahead of the run, outside the
+        // layout's group — inside the envelope's `(`, where the author wrote it. Left
+        // inside, its body forces the layout group and the operands break one per line
+        // where prettier keeps them on one. The **span-keyed** form
+        // ([`Printer::build_doc_with_outermost_owned_comment_at`]): the pair here is the
+        // sequence's OWN envelope, so there is no enclosing operand node to key on.
+        //
+        // ⚠️ Below the line-comment branch on purpose, and the twin takes the SAME claim over
+        // its own run ([`Self::build_sequence_doc_with_line_comments`]) — one claim per run
+        // builder, never one above the branch for both. The two build different runs, and a
+        // claim hoisted above the branch would suppress the first operand's own print for a
+        // run this closure never assembles.
+        let body = self.build_doc_with_outermost_owned_comment_at(
+            seq.span.start,
+            seq.expressions.first(),
+            || {
+                self.build_sequence_operand_run_doc(
+                    seq,
+                    interior_start,
+                    last_operand_end,
+                    trailing_end,
+                    keep_trailing_inside,
+                    layout,
+                )
+            },
+        );
+        self.build_sequence_envelope_doc(seq, body, parens)
+    }
+
+    /// The comma-joined operand RUN a sequence's block-comment path builds — the layout's
+    /// group, without the paren envelope around it ([`Self::build_sequence_envelope_doc`]).
+    ///
+    /// Extracted so the owned-comment claim at the call site wraps a named call: the claim
+    /// has to cover the whole run build (its suppression is what stops the first operand
+    /// printing the comment itself), and inlining the loop into that closure buried it two
+    /// levels in. The line-comment twin assembles its own run and takes no claim.
+    fn build_sequence_operand_run_doc(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+        interior_start: u32,
+        last_operand_end: u32,
+        trailing_end: u32,
+        keep_trailing_inside: bool,
+        layout: SeqLayout,
+    ) -> DocId {
         let d = self.d();
         let n = seq.expressions.len();
         // The comma-joined operand run the layout shapes; the parens and the floated edge
@@ -1857,8 +1925,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let body = self.build_sequence_layout_doc(&inner, first_end, layout);
-        self.build_sequence_envelope_doc(seq, body, parens)
+        self.build_sequence_layout_doc(&inner, first_end, layout)
     }
 
     /// Emit the first operand's leading-edge comments, floated out before the
@@ -1938,6 +2005,46 @@ impl<'a> Printer<'a> {
     }
 
     fn build_sequence_doc_with_line_comments(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+        trailing_end: u32,
+        parens: SeqParens,
+        layout: SeqLayout,
+    ) -> DocId {
+        // The claim the block path takes, at the twin that shares the question
+        // ([`Printer::build_doc_with_outermost_owned_comment_at`]). Without it the twin
+        // leaves a multi-line owned block inside the layout group and breaks the operands,
+        // while the NEXT pass — the `//` now deferred past the `)`, so the block path runs
+        // — keeps them flat: an F1 wobble at a fixed point neither formatter has (prettier
+        // settles flat too). The twin prepends nothing of its own, so the claim has to wrap
+        // its whole run build exactly as the block path's does.
+        //
+        // ⚠️ **Not under [`SeqLayout::Hanging`]**, whose run has no group of its own: the
+        // layout IS the expanding-parens body ([`Printer::build_expanding_parens_body_doc`]),
+        // so the claim would lift the comment out of the `(`-softline and weld it to the `(`
+        // line, where prettier puts it one indent in — and the next pass, reading it from
+        // there, lays the operands out differently again. The break this claim exists to
+        // prevent is not reachable there either: with no operand group to force, the body's
+        // own break is the layout's to make.
+        let body = if matches!(layout, SeqLayout::Hanging) {
+            self.build_sequence_line_comment_run_doc(seq, trailing_end, parens, layout)
+        } else {
+            self.build_doc_with_outermost_owned_comment_at(
+                seq.span.start,
+                seq.expressions.first(),
+                || self.build_sequence_line_comment_run_doc(seq, trailing_end, parens, layout),
+            )
+        };
+        self.build_sequence_envelope_doc(seq, body, parens)
+    }
+
+    /// The comma-joined operand RUN the line-comment twin builds — the layout's group,
+    /// without the paren envelope ([`Self::build_sequence_envelope_doc`]).
+    ///
+    /// Split from its caller for the same reason the block path's run is
+    /// ([`Self::build_sequence_operand_run_doc`]): the owned-comment claim has to cover the
+    /// whole build, and the two paths must answer that the same way.
+    fn build_sequence_line_comment_run_doc(
         &self,
         seq: &internal::SequenceExpression<'_>,
         trailing_end: u32,
@@ -2059,8 +2166,7 @@ impl<'a> Printer<'a> {
             inner.push(d.concat(&od));
         }
 
-        let body = self.build_sequence_layout_doc(&inner, first_end, layout);
-        self.build_sequence_envelope_doc(seq, body, parens)
+        self.build_sequence_layout_doc(&inner, first_end, layout)
     }
 }
 
