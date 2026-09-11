@@ -268,7 +268,8 @@ pub struct Parser<'a, 'arena> {
     /// top level, the enclosing function's own `is_async` inside one — replaced and
     /// restored beside `in_await` by [`Parser::with_fn_context`]. At `Goal::Script`,
     /// where `in_await` is `false` at top level, it is what says a name `await` stands
-    /// where a module would read an await expression.
+    /// where a module would read an await expression, and a `for await` where a module
+    /// would take the loop (`parse_for_statement`'s goal gate).
     in_await_if_module: bool,
     /// Where the same-line token after the latest such name `await` starts — the
     /// operand a module would have read. A Script error reported exactly there died
@@ -1420,8 +1421,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ParseError::invalid_syntax(message.to_string(), position)
     }
 
-    /// Create a **goal-gate** error at `position`: the construct is a `ModuleItem`
-    /// (`import` / `export` / `import.meta`) met at `Goal::Script`. Marked so the format
+    /// Create a **goal-gate** error at `position`: the construct is one only a module
+    /// holds (`import` / `export` / `import.meta`, a top-level `for await`) met at
+    /// `Goal::Script`. Marked so the format
     /// fallback can read the script attempt's death here as proof the source is a
     /// module rather than as one more position to compare
     /// (`ParseError::is_goal_gated`; `parse_with_goal_or_fallback`).

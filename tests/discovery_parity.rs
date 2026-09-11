@@ -7,7 +7,7 @@
 //! a divergence fails one side or the other. The matcher itself is pinned
 //! against real `git check-ignore` by `tsv_ignore`'s `git_oracle`; this suite
 //! pins the *walk* — repo-root detection, hierarchical layering, the
-//! build-output heuristic, explicit-arg bypass, and the `.git` boundary —
+//! build-output heuristic, explicit-arg scope, and the `.git` boundary —
 //! which has no external oracle. `expected` is hand-authored (not generated
 //! from this impl), so it pins correctness for both surfaces, not mere
 //! agreement.

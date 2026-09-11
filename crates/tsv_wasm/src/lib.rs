@@ -273,6 +273,31 @@ impl IgnoreStack {
         tsv_discover::unresolvable_root_error(root)
     }
 
+    /// The warning for a path an argument named — a file, or a directory root — that an
+    /// ignore file puts out of scope, delegating to
+    /// `tsv_discover::excluded_argument_warning`; `undefined` (the JS view of `None`) when
+    /// no rule excludes it, which is also the scope decision. `display` is the argument as
+    /// given, `rel` its format-root-relative path, `format_root` the format root's display
+    /// path. Single source of truth with the native CLI — the JS CLI never templates this
+    /// string.
+    pub fn excluded_argument_warning(
+        &self,
+        display: &str,
+        rel: &str,
+        is_dir: bool,
+        in_repo: bool,
+        format_root: &str,
+    ) -> Option<String> {
+        tsv_discover::excluded_argument_warning(
+            display,
+            rel,
+            is_dir,
+            in_repo,
+            format_root,
+            &self.inner,
+        )
+    }
+
     /// Whether no layer carries any rule — callers skip per-path matching.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()

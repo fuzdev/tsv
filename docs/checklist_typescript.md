@@ -312,7 +312,7 @@ written in the flags position) is not a flags production at all and is rejected,
 - `for` loop
 - `for...in` loop
 - `for...of` loop - ES2015
-- `for await...of` loop - ES2018 — `await` heads the of-form alone (`ForInOfStatement`'s `for await ( … of … )`), so `for await (x in o)` and `for await (x; ;)` are syntax errors, as they are for acorn
+- `for await...of` loop - ES2018 — `await` heads the of-form alone (`ForInOfStatement`'s `for await ( … of … )`), so `for await (x in o)` and `for await (x; ;)` are syntax errors, as they are for acorn; at `Goal::Script` a top-level `for await` is refused as a goal gate (only a module takes the loop there), while one in a non-async function body is the deferred early error at both goals
 
 ### Jump Statements
 

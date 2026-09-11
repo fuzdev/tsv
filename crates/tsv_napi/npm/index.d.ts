@@ -173,6 +173,14 @@ export class IgnoreStack {
 	gitignore_symlink_warning(path: string): string;
 	/** The traversal error for a relative root the working directory cannot resolve. */
 	unresolvable_root_error(root: string): string;
+	/** The warning for a named path an ignore file excludes, else `undefined` (the scope decision). */
+	excluded_argument_warning(
+		display: string,
+		rel: string,
+		is_dir: boolean,
+		in_repo: boolean,
+		format_root: string
+	): string | undefined;
 	/** Whether no layer carries any rule. */
 	is_empty(): boolean;
 }

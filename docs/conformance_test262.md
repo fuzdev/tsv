@@ -501,7 +501,7 @@ constructs:
 | construct | `Module` | `Script` |
 | --- | --- | --- |
 | `await` as identifier / binding / label / class name / param | reserved | **identifier** (`[~Await]`) |
-| top-level `await` *expression* | allowed | error |
+| top-level `await` — an *expression*, or a `for await` loop | allowed | error |
 | `import.meta` | allowed | error |
 | top-level `import` / `export` *declarations* | allowed | error |
 

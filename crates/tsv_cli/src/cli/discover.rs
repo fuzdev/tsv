@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -66,11 +66,16 @@ pub struct Diagnostics {
     /// heuristic-shadow warning ([`tsv_discover::heuristic_shadow_warning`]), the
     /// `.prettierignore`-shadowed-by-a-sibling-`.formatignore` warning
     /// ([`prettierignore_shadowed_warning`]), the `.prettierignore`-outside-a-repo
-    /// warning ([`prettierignore_outside_repo_warning`]), and the
-    /// unreadable-ignore-file warning (a present
-    /// `.gitignore`/`.formatignore`/`.prettierignore` whose read failed; see
-    /// [`read_ignore_file`]).
+    /// warning ([`prettierignore_outside_repo_warning`]), the excluded-argument warning
+    /// for a named path an ignore file puts out of scope
+    /// ([`tsv_discover::excluded_argument_warning`]), and the unreadable-ignore-file
+    /// warning (a present `.gitignore`/`.formatignore`/`.prettierignore` whose read
+    /// failed; see [`read_ignore_file`]).
     pub warnings: Vec<String>,
+    /// How many file arguments an ignore file excluded, each with its warning — what lets
+    /// a caller tell a run whose every argument was such a file (not an error: a
+    /// lint-staged run with only ignored files staged) from one that found nothing.
+    pub excluded_files: usize,
 }
 
 /// Result of expanding path arguments: the files to format, sorted and deduplicated,
@@ -89,15 +94,16 @@ pub struct Discovered {
 /// a valid root are non-fatal — collected in `Discovered::diagnostics` while the rest
 /// of the tree continues.
 ///
-/// Explicit file arguments are always included regardless of the ignore files (the
-/// caller named them, so the ignore files — which govern *discovery* — don't
-/// apply), but **not** regardless of extension: the parser dispatch behind them
-/// has no unknown arm, so an unsupported extension is an argument error rather
-/// than a silent TypeScript parse. A **directory** argument is a scope, not a
-/// target, so the extension check doesn't apply to it — its contents are filtered
-/// by the walk. Directories recurse with the extension filter. Symlinks inside
-/// directories are not followed (cycle safety) — pass them explicitly to format
-/// their targets.
+/// A path an argument names is bounded by the ignore files alone: a file or directory
+/// root a rule excludes — through an ancestor directory, or at itself — is skipped with a
+/// warning ([`tsv_discover::excluded_argument_warning`]), while the safety nets and the
+/// build-output heuristic, which prune what a walk *discovers*, never grade one. A file
+/// argument is held to its extension first: the parser dispatch behind it has no unknown
+/// arm, so an unsupported extension is an argument error rather than a silent TypeScript
+/// parse. A **directory** argument is a scope, not a target, so the extension check
+/// doesn't apply to it — its contents are filtered by the walk. Directories recurse with
+/// the extension filter. Symlinks inside directories are not followed (cycle safety) —
+/// pass them explicitly to format their targets.
 ///
 /// # Ignore semantics (two regimes, keyed on `.git`)
 ///
@@ -125,7 +131,7 @@ pub struct Discovered {
 /// Inside a repo both `.formatignore` and `.prettierignore` are hierarchical (a
 /// file in any directory governs its subtree, deeper wins; a `.prettierignore` is
 /// shadowed by a sibling `.formatignore`). The **safety nets**
-/// (`tsv_discover::SAFETY_NET_DIRS`) are always pruned.
+/// (`tsv_discover::SAFETY_NET_DIRS`) are pruned wherever a walk finds them.
 ///
 /// When a `.gitignore` governs a directory, that is the authority and the
 /// `tsv_discover::HEURISTIC_DIRS` + hidden-directory **heuristic is off** — so a real source
@@ -136,8 +142,8 @@ pub struct Discovered {
 /// the fallback "not source" guess, except that an explicit tsv-layer `!`
 /// re-include overrides it. Because the format root is found by
 /// walking up, the repo-root ignore files apply even when tsv is invoked on a
-/// subdirectory, and formatting a subdirectory directly gives the same result as
-/// formatting it via an ancestor.
+/// subdirectory, and a subdirectory named directly is bounded by the same ignore
+/// rules as when it is reached via an ancestor.
 ///
 /// With multiple roots, overlapping spellings of the same file (`src` vs
 /// `./src`, absolute vs relative, symlink aliases) are deduplicated by canonical
@@ -215,10 +221,10 @@ pub fn discover_into(
 /// Both argument errors fail the run upfront, all reported, nothing written: a path
 /// that resolves to neither a file nor a directory, and a **file** argument tsv
 /// doesn't format. The extension check applies only to file arguments — a directory
-/// is a scope, and its contents are filtered by the walk — and it is the one thing a
-/// file argument does *not* get to bypass (see `unsupported_extension_error`: the
-/// parser dispatch behind it has no unknown arm, so an unsupported extension would be
-/// parsed as TypeScript). `Ok` carries every argument, in order.
+/// is a scope, and its contents are filtered by the walk — and a file argument is held
+/// to it first, before the ignore files (see `unsupported_extension_error`: the parser
+/// dispatch behind it has no unknown arm, so an unsupported extension would be parsed
+/// as TypeScript). `Ok` carries every argument, in order.
 fn classify_args(paths: &[String]) -> Result<Vec<Arg<'_>>, Vec<String>> {
     let mut args = Vec::with_capacity(paths.len());
     let mut bad = Vec::new();
@@ -236,7 +242,7 @@ fn classify_args(paths: &[String]) -> Result<Vec<Arg<'_>>, Vec<String>> {
 }
 
 /// The walk over the arguments [`classify_args`] accepted: a file argument goes to
-/// `sink` as named, a directory is walked.
+/// `sink` unless an ignore file excludes it ([`collect_file`]), a directory is walked.
 fn walk_args(args: &[Arg<'_>], sink: &mut dyn FileSink) -> Diagnostics {
     // canonical cwd so it compares cleanly with canonicalized roots below; `None` when it
     // cannot be resolved (a deleted working directory), which only a relative root that
@@ -250,11 +256,18 @@ fn walk_args(args: &[Arg<'_>], sink: &mut dyn FileSink) -> Diagnostics {
         errors: Vec::new(),
         warnings: Vec::new(),
     };
+    // each directory a file argument sits in is scoped once: a hook or a lint-staged run
+    // names many files in few directories
+    let mut file_scopes: HashMap<PathBuf, FileScope> = HashMap::new();
+    let mut excluded_files = 0;
     for &arg in args {
         match arg {
-            // explicit file argument — bypasses the ignore files (not the
-            // extension check, which `classify_args` already applied)
-            Arg::File(path) => out.files.push(PathBuf::from(path)),
+            // the extension check is `classify_args`'s, already applied
+            Arg::File(path) => {
+                if collect_file(path, cwd.as_deref(), &mut file_scopes, &mut out) {
+                    excluded_files += 1;
+                }
+            }
             Arg::Dir(path) => collect_root(Path::new(path), cwd.as_deref(), &mut out),
         }
     }
@@ -270,6 +283,7 @@ fn walk_args(args: &[Arg<'_>], sink: &mut dyn FileSink) -> Diagnostics {
     Diagnostics {
         errors: out.errors,
         warnings: out.warnings,
+        excluded_files,
     }
 }
 
@@ -293,27 +307,14 @@ enum Arg<'a> {
 /// spelling is preserved for the emitted paths; matching uses the
 /// format-root-relative path threaded down the walk.
 fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
-    let Some(root_abs) = fs::canonicalize(root)
-        .ok()
-        .or_else(|| absolutize(root, cwd))
-    else {
-        // a relative root that will not canonicalize, with no working directory to join
-        // it onto: walked anyway, it would anchor on no format root and read no
-        // ancestor's ignore files, silently widening the scope
+    let Some(root_abs) = absolute_named_path(root, cwd) else {
         out.errors.push(tsv_discover::unresolvable_root_error(
             &root.to_string_lossy(),
         ));
         return;
     };
-    // inside a git repo, the repo root is the boundary (reproducible: nothing
-    // above it is read); outside one, the filesystem root (so an ancestor
-    // `.formatignore` is honored — the filesystem is the API for loose files).
-    let repo_root = find_repo_root(&root_abs);
-    let in_repo = repo_root.is_some();
-    let format_root = repo_root.unwrap_or_else(|| filesystem_root(&root_abs));
+    let (format_root, in_repo) = format_root_of(&root_abs);
 
-    let mut stack = IgnoreStack::new();
-    let mut heuristic_active = true;
     // `root` relative to the format root (an ancestor-or-self of `root_abs`, so
     // this never fails; `""` means `root` *is* the format root).
     let base_rel = rel_to(&format_root, &root_abs);
@@ -322,73 +323,36 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
     // itself is excluded: `collect_recursive` reads its ignore files from the
     // listing it fetches anyway.
     let chain = ancestor_chain(&format_root, &root_abs);
-    for ancestor in &chain[..chain.len() - 1] {
-        let anchor = rel_to(&format_root, ancestor);
-        // No listing for ancestors, so presence is probed — by the descent's own rule
-        // (`is_ignore_file`), so a directory reads the same files whether it is walked
-        // or preloaded. A present-but-unreadable `.formatignore` still shadows
-        // (`read_ignore_file` warns and yields no rules rather than falling through),
-        // and only an absent one hands the level to `.prettierignore`.
-        let has_formatignore = is_ignore_file(&ancestor.join(FORMATIGNORE_FILE));
-        let has_prettierignore = in_repo && is_ignore_file(&ancestor.join(PRETTIERIGNORE_FILE));
-        if let Some(content) = tsv_layer_content(
-            ancestor,
-            has_formatignore,
-            has_prettierignore,
-            in_repo,
-            &mut out.warnings,
-        ) {
-            stack.push_tsv(&anchor, &content);
-        }
-        // `.gitignore` layer: only inside a git repo, and never through a symlink, which
-        // git does not follow (`GitignorePresence`)
-        if in_repo {
-            let gitignore = ancestor.join(GITIGNORE_FILE);
-            match GitignorePresence::at(&gitignore) {
-                GitignorePresence::Absent => {}
-                GitignorePresence::Symlink => out.warnings.push(
-                    tsv_discover::gitignore_symlink_warning(&gitignore.to_string_lossy()),
-                ),
-                GitignorePresence::File => {
-                    if let IgnoreRead::Content(content) =
-                        read_ignore_file(&gitignore, &mut out.warnings)
-                    {
-                        stack.push_gitignore(&anchor, &content);
-                        heuristic_active = false;
-                    }
-                }
-            }
-        }
-    }
+    let (mut stack, heuristic_active) = preload_ancestors(
+        &chain[..chain.len() - 1],
+        &format_root,
+        in_repo,
+        &mut out.warnings,
+    );
 
-    // The recursion uses the leaf-only matcher query (`tsv_discover` calls
-    // `is_ignored_leaf`), which is exact only when an entry's ancestors are
-    // already cleared. That holds for everything the walk *descends* into, but
-    // NOT for `root` itself when it sits under an ignored ancestor (e.g.
-    // `tsv format build/sub` with a gitignored `build/`). Gate it once here with
-    // the full, ancestor-walking `is_ignored`: an ignored root means nothing
-    // under it is in scope. (The format root itself — `base_rel` empty — has no
-    // ancestors to clear and is never ignored.)
+    // A named root is bounded by the ignore files alone, gated here once with the full,
+    // ancestor-walking matcher: a root a rule excludes — through an ancestor (`tsv format
+    // build/sub` with a gitignored `build/`) or at itself — puts nothing under it in
+    // scope, and the run says so. The recursion's leaf-only query (`tsv_discover` calls
+    // `is_ignored_leaf`) is exact only once an entry's ancestors are cleared, which holds
+    // for everything the walk descends into but not for `root`, so this gate is also
+    // what keeps that query sound. (The format root itself — `base_rel` empty — has no
+    // ancestors and is never excluded.)
     //
-    // The matcher is one of three things an ancestor can be pruned by; the safety
-    // nets and the build-output heuristic are the other two, and inside a repo
-    // `is_path_pruned` replays all three over `root`'s ANCESTOR segments exactly as
-    // the walk down from the repo root would have decided them — so `tsv format
-    // dist/sub` under an un-gitignored `dist/`, or `node_modules/pkg`, lists what
-    // `tsv format .` lists for that subtree: nothing. That is the subtree-consistency
-    // promise. Only the ancestors are graded: the root ITSELF is the one a caller
-    // named, and a hidden or heuristic directory passed explicitly recurses by design.
-    //
-    // Outside a repo those two prunes grade no ancestor. The format root is then the
-    // filesystem root, which is where `.formatignore` reading starts rather than a
-    // project, so replaying them over every absolute segment would put a loose
-    // project under a hidden or heuristic directory — `~/.cache/proj`, a `/build`
-    // sandbox — out of scope entirely. The matcher still gates the root in both
-    // regimes: its rules are ones the user wrote.
-    if !base_rel.is_empty()
-        && ((in_repo && tsv_discover::is_path_pruned(&base_rel, &stack))
-            || stack.is_ignored(&base_rel, true))
-    {
+    // The safety nets and the build-output heuristic grade neither the root nor its
+    // ancestors, in either regime: they prune what a walk discovers, and the caller
+    // named this directory — so `tsv format node_modules/pkg` or `dist/sub` walks what
+    // `tsv format node_modules` or `dist` walks there. Below the root they classify every
+    // child as usual.
+    if let Some(warning) = tsv_discover::excluded_argument_warning(
+        &root.to_string_lossy(),
+        &base_rel,
+        true,
+        in_repo,
+        &format_root.to_string_lossy(),
+        &stack,
+    ) {
+        out.warnings.push(warning);
         return;
     }
 
@@ -404,6 +368,134 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
         heuristic_active,
         out,
     );
+}
+
+/// A stack loaded with the ignore layers of `dirs` — directories from `format_root` down,
+/// shallowest first — and whether the build-output heuristic is still on below them (no
+/// `.gitignore` among them was read). The one preload a named path gets: a directory
+/// root's ancestors ([`collect_root`]), or a file argument's directory and everything
+/// above it ([`collect_file`]).
+fn preload_ancestors(
+    dirs: &[PathBuf],
+    format_root: &Path,
+    in_repo: bool,
+    warnings: &mut Vec<String>,
+) -> (IgnoreStack, bool) {
+    let mut stack = IgnoreStack::new();
+    let mut heuristic_active = true;
+    for dir in dirs {
+        let anchor = rel_to(format_root, dir);
+        // No listing for a preloaded directory, so presence is probed — by the descent's
+        // own rule (`is_ignore_file`), so a directory reads the same files whether it is
+        // walked or preloaded. A present-but-unreadable `.formatignore` still shadows
+        // (`read_ignore_file` warns and yields no rules rather than falling through),
+        // and only an absent one hands the level to `.prettierignore`.
+        let has_formatignore = is_ignore_file(&dir.join(FORMATIGNORE_FILE));
+        let has_prettierignore = in_repo && is_ignore_file(&dir.join(PRETTIERIGNORE_FILE));
+        if let Some(content) =
+            tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, warnings)
+        {
+            stack.push_tsv(&anchor, &content);
+        }
+        // `.gitignore` layer: only inside a git repo, and never through a symlink, which
+        // git does not follow (`GitignorePresence`)
+        if in_repo {
+            let gitignore = dir.join(GITIGNORE_FILE);
+            match GitignorePresence::at(&gitignore) {
+                GitignorePresence::Absent => {}
+                GitignorePresence::Symlink => warnings.push(
+                    tsv_discover::gitignore_symlink_warning(&gitignore.to_string_lossy()),
+                ),
+                GitignorePresence::File => {
+                    if let IgnoreRead::Content(content) = read_ignore_file(&gitignore, warnings) {
+                        stack.push_gitignore(&anchor, &content);
+                        heuristic_active = false;
+                    }
+                }
+            }
+        }
+    }
+    (stack, heuristic_active)
+}
+
+/// The ignore scope of the directory a file argument sits in: its format root and
+/// regime, and the layers from the format root down through the directory.
+struct FileScope {
+    format_root: PathBuf,
+    in_repo: bool,
+    stack: IgnoreStack,
+}
+
+/// One file argument: into the sink unless an ignore file excludes it — through an
+/// ancestor directory or at the file itself, as it would exclude the file from the walk
+/// that reached it — in which case the run warns and the file is skipped. Returns whether
+/// an ignore rule excluded it. The safety nets and the build-output heuristic never
+/// apply: they prune what a walk discovers, and the caller named this file.
+///
+/// The scope is the file's canonical directory's, resolved as a directory root's is
+/// ([`collect_root`]) and built once per directory into `scopes`.
+fn collect_file(
+    path: &str,
+    cwd: Option<&Path>,
+    scopes: &mut HashMap<PathBuf, FileScope>,
+    out: &mut Walk<'_>,
+) -> bool {
+    let file = Path::new(path);
+    let Some(file_abs) = absolute_named_path(file, cwd) else {
+        out.errors.push(tsv_discover::unresolvable_root_error(path));
+        return false;
+    };
+    let Some(dir_abs) = file_abs.parent() else {
+        // an absolute path to a file always has a parent; the arm keeps the walk total
+        out.files.push(PathBuf::from(path));
+        return false;
+    };
+    let scope = scopes.entry(dir_abs.to_path_buf()).or_insert_with(|| {
+        let (format_root, in_repo) = format_root_of(dir_abs);
+        let chain = ancestor_chain(&format_root, dir_abs);
+        let (stack, _) = preload_ancestors(&chain, &format_root, in_repo, &mut out.warnings);
+        FileScope {
+            format_root,
+            in_repo,
+            stack,
+        }
+    });
+    let rel = rel_to(&scope.format_root, &file_abs);
+    if let Some(warning) = tsv_discover::excluded_argument_warning(
+        path,
+        &rel,
+        false,
+        scope.in_repo,
+        &scope.format_root.to_string_lossy(),
+        &scope.stack,
+    ) {
+        out.warnings.push(warning);
+        return true;
+    }
+    out.files.push(PathBuf::from(path));
+    false
+}
+
+/// A named path made absolute: canonicalized, or joined onto the working directory
+/// ([`absolutize`]) when it will not canonicalize. `None` is a relative path with no
+/// working directory to join it onto, which the caller refuses
+/// ([`tsv_discover::unresolvable_root_error`]): taken as named, it would anchor on no
+/// format root and read none of its ancestors' ignore files, silently widening the scope.
+fn absolute_named_path(path: &Path, cwd: Option<&Path>) -> Option<PathBuf> {
+    fs::canonicalize(path)
+        .ok()
+        .or_else(|| absolutize(path, cwd))
+}
+
+/// The format root above `dir` and whether it is a repo root: inside a git repo the repo
+/// root is the boundary (reproducible — nothing above it is read); outside one, the
+/// filesystem root (so an ancestor `.formatignore` is honored — the filesystem is the API
+/// for loose files).
+fn format_root_of(dir: &Path) -> (PathBuf, bool) {
+    match find_repo_root(dir) {
+        Some(repo_root) => (repo_root, true),
+        None => (filesystem_root(dir), false),
+    }
 }
 
 /// The tsv layer one directory contributes, read by the precedence the two walks

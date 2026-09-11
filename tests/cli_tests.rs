@@ -914,8 +914,57 @@ fn test_format_help_extension_list_is_rendered_from_the_const() {
     );
 }
 
-/// An explicitly named file bypasses the ignore files, but **not** the extension
-/// check: the parser dispatch behind a path has no unknown arm, so without this
+/// An explicitly named file is bounded by the ignore files, as the walk that would reach it
+/// is: one a rule excludes is skipped with a warning and left untouched, and a run whose
+/// every argument was such a file is not the empty-run error (a lint-staged run with only
+/// ignored files staged). A directory the rules exclude still is. Mirrored by
+/// `scripts/test_npm.ts`.
+#[test]
+fn test_format_explicit_file_an_ignore_rule_excludes_is_skipped_with_a_warning() {
+    let dir = temp_dir("excluded_explicit_file");
+    fs::write(dir.join(".formatignore"), "b.ts\ngen/\n").unwrap();
+    let gen_dir = dir.join("gen");
+    fs::create_dir_all(&gen_dir).unwrap();
+    let b = dir.join("b.ts");
+    let c = dir.join("c.ts");
+    let d = gen_dir.join("d.ts");
+    for path in [&b, &c, &d] {
+        fs::write(path, "const   x=1").unwrap();
+    }
+
+    let output = tsv(&["format", b.to_str().unwrap()]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
+    assert!(
+        stderr.contains(
+            "b.ts is excluded by a .formatignore or .prettierignore rule, so it is not formatted"
+        ),
+        "stderr: {stderr}"
+    );
+    assert_eq!(fs::read_to_string(&b).unwrap(), "const   x=1");
+
+    // beside a file that formats, the run is the ordinary one
+    let output = tsv(&["format", b.to_str().unwrap(), c.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&c).unwrap(), "const x = 1;\n");
+    assert_eq!(fs::read_to_string(&b).unwrap(), "const   x=1");
+
+    // a directory the rules exclude is still the empty-run error, warned
+    let output = tsv(&["format", gen_dir.to_str().unwrap()]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(2), "stderr: {stderr}");
+    assert!(
+        stderr.contains(
+            "is excluded by a .formatignore or .prettierignore rule, so nothing under it is formatted"
+        ),
+        "stderr: {stderr}"
+    );
+    assert!(stderr.contains("No files to format"), "stderr: {stderr}");
+    assert_eq!(fs::read_to_string(&d).unwrap(), "const   x=1");
+}
+
+/// An explicitly named file is held to the extension check before anything else: the
+/// parser dispatch behind a path has no unknown arm, so without this
 /// gate a `.json` file is parsed as TypeScript — usually a baffling syntax error,
 /// and for a top-level-array JSON a *successful* rewrite into a TS expression
 /// statement (semicolon and all), which is no longer valid JSON.

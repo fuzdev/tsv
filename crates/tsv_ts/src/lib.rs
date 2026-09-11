@@ -215,10 +215,11 @@ pub fn parse_with_goal<'arena>(
 /// name) formats from a bare path while a module-valid source is never reinterpreted.
 /// When both attempts fail, the reported error is the attempt's whose grammar the file
 /// was written against, decided in two steps. **A script attempt that died on a goal
-/// gate** — a top-level `import` / `export`, an `import.meta`, or the operand a module
-/// reads after a top-level `await` (where a Script's name reading of the word fails), the
-/// constructs only a module holds ([`ParseError::is_goal_gated`]) — has proved the file a
-/// module whatever else is in it, so the module attempt's error is the file's own: a
+/// gate** — a top-level `import` / `export`, an `import.meta`, a top-level `for await`, or
+/// the operand a module reads after a top-level `await` (where a Script's name reading of
+/// the word fails), the constructs only a module holds ([`ParseError::is_goal_gated`]) —
+/// has proved the file a module whatever else is in it, so the module attempt's error is
+/// the file's own: a
 /// broken module's script attempt dies there at its first module-only construct, even one
 /// that sits *after* the real error (definitions first, `export` at the bottom).
 /// **Otherwise the error that reached furthest into the source** is the file's own, the

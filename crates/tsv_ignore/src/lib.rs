@@ -361,6 +361,77 @@ impl IgnoreStack {
             .rev()
             .find_map(|layer| layer.rules.last_match(layer.relativize(prefix)?, is_dir))
     }
+
+    /// Where `path` is ignored, and which kind of layer's rule ignored it — the witness
+    /// behind [`is_ignored`](Self::is_ignored), walking `path`'s prefixes shallow→deep the
+    /// same way, so it is `Some` exactly when `is_ignored(path, is_dir)` is `true`. The
+    /// shallowest excluded prefix is the one reported: an excluded directory prunes
+    /// everything under it (git's parent-directory rule), so no deeper rule is consulted.
+    ///
+    /// A diagnostic query, off the discovery hot path: tsv's discovery asks it once per
+    /// path an argument NAMED, to say which directory put the path out of scope and which
+    /// kind of file's rule did.
+    pub fn exclusion(&self, path: &str, is_dir: bool) -> Option<Exclusion> {
+        let segments = path_segments(path);
+        let last = segments.len().checked_sub(1)?;
+        (0..segments.len()).find_map(|k| {
+            let component_is_dir = k < last || is_dir;
+            match self.last_match_source_at(&segments[..=k], component_is_dir) {
+                Some((true, source)) => Some(Exclusion {
+                    depth: k + 1,
+                    source,
+                }),
+                _ => None,
+            }
+        })
+    }
+
+    /// [`last_match_at`](Self::last_match_at) keeping which kind of layer spoke. The same
+    /// reading order — every tsv layer deep→shallow, then every `.gitignore` layer
+    /// deep→shallow, since the last layer to speak wins — kept apart from that per-level
+    /// primitive, which discovery asks per entry and the second field would only slow.
+    fn last_match_source_at(
+        &self,
+        prefix: &[PathSeg<'_>],
+        is_dir: bool,
+    ) -> Option<(bool, IgnoreSource)> {
+        let speak = |layer: &Layer| layer.rules.last_match(layer.relativize(prefix)?, is_dir);
+        self.tsv
+            .iter()
+            .rev()
+            .find_map(speak)
+            .map(|matched| (matched, IgnoreSource::Tsv))
+            .or_else(|| {
+                self.gitignore
+                    .iter()
+                    .rev()
+                    .find_map(speak)
+                    .map(|matched| (matched, IgnoreSource::Gitignore))
+            })
+    }
+}
+
+/// Which kind of layer made a match — the distinction a diagnostic about an ignored path
+/// needs, because the two kinds are undone differently: a `.gitignore`'d path is
+/// re-included from a tsv layer, which is read after every `.gitignore`, while a tsv
+/// layer's own rule is the user's to narrow.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IgnoreSource {
+    /// A `.gitignore` layer ([`IgnoreStack::push_gitignore`]).
+    Gitignore,
+    /// A tsv layer ([`IgnoreStack::push_tsv`]): a `.formatignore`, or the `.prettierignore`
+    /// a caller reads in its place.
+    Tsv,
+}
+
+/// Where [`IgnoreStack::exclusion`] found a path ignored.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Exclusion {
+    /// How many leading segments of the queried path name the excluded path: all of them
+    /// when a rule excluded the path itself, fewer when it excluded an ancestor directory.
+    pub depth: usize,
+    /// The kind of layer whose rule made the exclusion.
+    pub source: IgnoreSource,
 }
 
 /// Whether one `/`-delimited component of a path is a meaningful segment. Empty
@@ -542,7 +613,7 @@ fn strip_trailing_spaces(line: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::{IgnoreRules, IgnoreStack};
+    use super::{Exclusion, IgnoreRules, IgnoreSource, IgnoreStack};
 
     fn ig(content: &str) -> IgnoreRules {
         IgnoreRules::parse(content)
@@ -1219,5 +1290,74 @@ mod tests {
         assert!(stack.is_ignored("a/b/x.log", false));
         assert!(stack.is_ignored_leaf("a/b/x.log", false));
         assert!(!stack.is_ignored_leaf("a/b/x.ts", false));
+    }
+
+    #[test]
+    fn stack_exclusion_names_the_shallowest_excluded_prefix_and_its_layer() {
+        let gitignore = |depth| {
+            Some(Exclusion {
+                depth,
+                source: IgnoreSource::Gitignore,
+            })
+        };
+        let tsv = |depth| {
+            Some(Exclusion {
+                depth,
+                source: IgnoreSource::Tsv,
+            })
+        };
+        let mut stack = IgnoreStack::new();
+        stack.push_gitignore("", "build/\n*.log\n");
+        stack.push_gitignore("sub", "deep/\n");
+        stack.push_tsv("", "gen/\nbuild/keep/\n");
+        // an excluded ancestor: the shallowest excluded prefix, however deep the path runs
+        assert_eq!(stack.exclusion("build/sub/a.ts", false), gitignore(1));
+        // a rule under an excluded directory is never the one reported
+        assert_eq!(stack.exclusion("build/keep/a.ts", false), gitignore(1));
+        // the path itself, at any depth
+        assert_eq!(stack.exclusion("build", true), gitignore(1));
+        assert_eq!(stack.exclusion("a/b/x.log", false), gitignore(3));
+        // a nested layer's rule
+        assert_eq!(stack.exclusion("sub/deep/a.ts", false), gitignore(2));
+        // a tsv layer's rule
+        assert_eq!(stack.exclusion("gen/sub", true), tsv(1));
+        // nothing excludes it
+        assert_eq!(stack.exclusion("src/a.ts", false), None);
+        assert_eq!(stack.exclusion("", true), None);
+
+        // a tsv negation re-including a `.gitignore`'d directory: the last layer to speak
+        let mut reincluded = IgnoreStack::new();
+        reincluded.push_gitignore("", "build/\n");
+        reincluded.push_tsv("", "!build/\n");
+        assert_eq!(reincluded.exclusion("build/sub", true), None);
+        // …and a tsv rule over a `.gitignore` negation
+        let mut overridden = IgnoreStack::new();
+        overridden.push_gitignore("", "!keep.ts\n");
+        overridden.push_tsv("", "keep.ts\n");
+        assert_eq!(overridden.exclusion("keep.ts", false), tsv(1));
+
+        // the witness agrees with `is_ignored` on every path it is asked about
+        for stack in [&stack, &reincluded, &overridden] {
+            for (path, is_dir) in [
+                ("build", true),
+                ("build/sub", true),
+                ("build/sub/a.ts", false),
+                ("build/keep/a.ts", false),
+                ("a/b/x.log", false),
+                ("a/b/x.ts", false),
+                ("sub/deep", true),
+                ("sub/deep/a.ts", false),
+                ("gen", true),
+                ("gen/a.ts", false),
+                ("keep.ts", false),
+                ("src/a.ts", false),
+            ] {
+                assert_eq!(
+                    stack.exclusion(path, is_dir).is_some(),
+                    stack.is_ignored(path, is_dir),
+                    "{path}"
+                );
+            }
+        }
     }
 }
