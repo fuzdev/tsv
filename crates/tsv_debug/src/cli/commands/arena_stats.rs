@@ -1,5 +1,4 @@
 use argh::FromArgs;
-use std::path::Path;
 
 use crate::cli::CliError;
 use crate::cli::commands::profile::{percentile, resolve_profile_files};
@@ -41,8 +40,8 @@ pub struct ArenaStatsCommand {
     #[argh(switch)]
     reuse: bool,
 
-    /// print the path + parse error for every file that failed to parse (the files
-    /// the corpus walk silently skips), then the normal report
+    /// print the path + error for every file the corpus walk silently skips (a
+    /// `parse-fail` or an unreadable `read-fail`), then the normal report
     #[argh(switch)]
     list_errors: bool,
 
@@ -131,15 +130,25 @@ impl ArenaStatsCommand {
         let (files, _skipped) = resolve_profile_files(&self.paths, |_| true)?;
 
         if self.reuse {
-            return run_reuse(&files);
+            return run_reuse(&files, self.list_errors);
         }
 
         let mut stats = Stats::default();
-        let mut parse_errors = 0usize;
+        let (mut parse_errors, mut read_errors) = (0usize, 0usize);
 
         for path in &files {
             let parser = ParserType::from_extension(&path.to_string_lossy());
-            if let Err(e) = collect_file(path, parser, &mut stats) {
+            let source = match std::fs::read_to_string(path) {
+                Ok(source) => source,
+                Err(e) => {
+                    read_errors += 1;
+                    if self.list_errors {
+                        eprintln!("read-fail   {}  [{parser:?}]  {e}", path.display());
+                    }
+                    continue;
+                }
+            };
+            if let Err(e) = collect_file(&source, parser, &mut stats) {
                 parse_errors += 1;
                 if self.list_errors {
                     eprintln!("parse-fail  {}  [{parser:?}]  {e}", path.display());
@@ -147,8 +156,20 @@ impl ArenaStatsCommand {
             }
         }
 
+        // `resolve_profile_files` fails outright when no supported file resolves, so the
+        // only way `files` is empty here is its `input_invalid_*` filter taking every
+        // entry; otherwise each entry lands in exactly one of `stats.files` /
+        // `parse_errors` / `read_errors`, so collecting none means they all failed.
         if stats.files == 0 {
-            eprintln!("No formattable files found (.ts / .svelte.ts / .svelte / .css).");
+            eprintln!(
+                "No file could be formatted ({parse_errors} parse errors, {read_errors} unreadable)."
+            );
+            // Under `--json` the empty run still emits a document — a consumer that
+            // parses stdout reads `files: 0` plus the two counts, where an empty
+            // stdout would reach it as a JSON error of its own.
+            if self.json {
+                print_json(&stats, parse_errors, read_errors);
+            }
             return Ok(());
         }
 
@@ -158,9 +179,9 @@ impl ArenaStatsCommand {
         stats.bump_demand.sort_by(f64::total_cmp);
 
         if self.json {
-            print_json(&stats, parse_errors);
+            print_json(&stats, parse_errors, read_errors);
         } else {
-            print_report(&stats, parse_errors);
+            print_report(&stats, parse_errors, read_errors);
         }
         Ok(())
     }
@@ -171,16 +192,27 @@ impl ArenaStatsCommand {
 /// capacity — the `reset()` high-water. It is bounded by the single largest file's
 /// actual usage (not the per-file hint), so lowering the pre-size hint can only
 /// leave it flat or shrink it; this prints the number that proves it.
-fn run_reuse(files: &[std::path::PathBuf]) -> Result<(), CliError> {
+///
+/// `list_errors` lists every file this walk skips on the same two labels the main
+/// path prints — `read-fail` for an unreadable file, `parse-fail` for one the parser
+/// rejected — so the flag reads the same on both paths.
+fn run_reuse(files: &[std::path::PathBuf], list_errors: bool) -> Result<(), CliError> {
     let mut arena: Option<DocArena> = None;
     let (mut max_node_cap, mut max_child_cap) = (0usize, 0usize);
     let (mut max_node_len, mut max_child_len) = (0usize, 0usize);
     let (mut n, mut parse_errors, mut read_errors) = (0u64, 0usize, 0usize);
 
     for path in files {
-        let Ok(source) = std::fs::read_to_string(path) else {
-            read_errors += 1;
-            continue;
+        let parser = ParserType::from_extension(&path.to_string_lossy());
+        let source = match std::fs::read_to_string(path) {
+            Ok(source) => source,
+            Err(e) => {
+                read_errors += 1;
+                if list_errors {
+                    eprintln!("read-fail   {}  [{parser:?}]  {e}", path.display());
+                }
+                continue;
+            }
         };
         match &mut arena {
             None => arena = Some(DocArena::for_source(&source)),
@@ -190,25 +222,28 @@ fn run_reuse(files: &[std::path::PathBuf]) -> Result<(), CliError> {
         // just avoids an `expect`/`unwrap` on the hot path).
         let Some(a) = arena.as_ref() else { continue };
         let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
-        let ok = match ParserType::from_extension(&path.to_string_lossy()) {
+        let formatted = match parser {
             ParserType::TypeScript => tsv_ts::parse(&source, &bump)
                 .map(|ast| {
                     let _ = tsv_ts::format_in(&ast, &source, a);
                 })
-                .is_ok(),
+                .map_err(|e| format!("{e}")),
             ParserType::Svelte => tsv_svelte::parse(&source, &bump)
                 .map(|ast| {
                     let _ = tsv_svelte::format_in(&ast, &source, a);
                 })
-                .is_ok(),
+                .map_err(|e| format!("{e}")),
             ParserType::Css => tsv_css::parse(&source, &bump)
                 .map(|ast| {
                     let _ = tsv_css::format_in(&ast, &source, a);
                 })
-                .is_ok(),
+                .map_err(|e| format!("{e}")),
         };
-        if !ok {
+        if let Err(e) = formatted {
             parse_errors += 1;
+            if list_errors {
+                eprintln!("parse-fail  {}  [{parser:?}]  {e}", path.display());
+            }
             continue;
         }
         n += 1;
@@ -262,26 +297,26 @@ fn measure_bump_demand(source: &str, parser: ParserType) -> u64 {
     if ok { bump.allocated_bytes() as u64 } else { 0 }
 }
 
-/// Format one file into a fresh arena and fold its node population into `stats`.
-/// Parse failures return `Err(msg)` (counted/listed by the caller), never abort the walk.
+/// Format one already-read file into a fresh arena and fold its node population into
+/// `stats`. A parse failure returns `Err(msg)` (counted/listed by the caller, which also
+/// owns the read and counts an unreadable file apart), never aborting the walk.
 #[allow(clippy::cast_precision_loss)]
-fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<(), String> {
-    let source = std::fs::read_to_string(path).map_err(|e| format!("read: {e}"))?;
+fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(), String> {
     let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
-    let arena = DocArena::for_source(&source);
+    let arena = DocArena::for_source(source);
 
     let output = match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(&source, &bump).map_err(|e| format!("{e}"))?;
-            tsv_ts::format_in(&ast, &source, &arena)
+            let ast = tsv_ts::parse(source, &bump).map_err(|e| format!("{e}"))?;
+            tsv_ts::format_in(&ast, source, &arena)
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse(&source, &bump).map_err(|e| format!("{e}"))?;
-            tsv_svelte::format_in(&ast, &source, &arena)
+            let ast = tsv_svelte::parse(source, &bump).map_err(|e| format!("{e}"))?;
+            tsv_svelte::format_in(&ast, source, &arena)
         }
         ParserType::Css => {
-            let ast = tsv_css::parse(&source, &bump).map_err(|e| format!("{e}"))?;
-            tsv_css::format_in(&ast, &source, &arena)
+            let ast = tsv_css::parse(source, &bump).map_err(|e| format!("{e}"))?;
+            tsv_css::format_in(&ast, source, &arena)
         }
     };
     stats.output_bytes += output.len() as u64;
@@ -295,7 +330,7 @@ fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<()
     // (≤2× the true demand via chunk doubling), not the production pre-size the
     // `bump` above carries. Second parse; the AST is discarded. Parse already
     // succeeded above, so this cannot fail.
-    let demand = measure_bump_demand(&source, parser);
+    let demand = measure_bump_demand(source, parser);
 
     let nodes = arena.borrow_nodes();
     let children = arena.borrow_children();
@@ -432,9 +467,9 @@ fn density_line(label: &str, sorted: &[f64]) {
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn print_report(s: &Stats, parse_errors: usize) {
+fn print_report(s: &Stats, parse_errors: usize, read_errors: usize) {
     eprintln!(
-        "DocArena node stats — {} files, {} bytes ({parse_errors} parse errors)\n",
+        "DocArena node stats — {} files, {} bytes ({parse_errors} parse errors, {read_errors} unreadable)\n",
         s.files, s.bytes
     );
     eprintln!(
@@ -534,7 +569,7 @@ fn print_report(s: &Stats, parse_errors: usize) {
     );
 }
 
-fn print_json(s: &Stats, parse_errors: usize) {
+fn print_json(s: &Stats, parse_errors: usize, read_errors: usize) {
     let hist_json = |kinds: &[&str], h: &std::collections::HashMap<&'static str, u64>| {
         let entries: Vec<String> = kinds
             .iter()
@@ -565,7 +600,7 @@ fn print_json(s: &Stats, parse_errors: usize) {
         s.group_of_group,
     );
     println!(
-        "{{\"files\":{},\"bytes\":{},\"nodes\":{},\"capacity\":{},\"children\":{},\"children_capacity\":{},\"output_bytes\":{},\"output_capacity\":{},\"output_estimated\":{},\"bump_allocated\":{},\"node_density\":{},\"children_density\":{},\"output_per_node\":{},\"bump_demand\":{},\"parse_errors\":{parse_errors},\"node_variants\":{},\"text_variants\":{},\"degeneracy\":{}}}",
+        "{{\"files\":{},\"bytes\":{},\"nodes\":{},\"capacity\":{},\"children\":{},\"children_capacity\":{},\"output_bytes\":{},\"output_capacity\":{},\"output_estimated\":{},\"bump_allocated\":{},\"node_density\":{},\"children_density\":{},\"output_per_node\":{},\"bump_demand\":{},\"parse_errors\":{parse_errors},\"read_errors\":{read_errors},\"node_variants\":{},\"text_variants\":{},\"degeneracy\":{}}}",
         s.files,
         s.bytes,
         s.nodes,
