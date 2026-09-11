@@ -44,7 +44,7 @@ this path." tsv's discovery *policy* — the build-output heuristic, the
 always-pruned safety nets, the formattable-extension check, the heuristic-shadow
 warning — lives one layer up in [`tsv_discover`](../tsv_discover/CLAUDE.md), which
 builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
-`has_negation_under` / `has_gitignore_layers` / `gitignore_anchors`, and `is_ignored` /
+`negation_under` / `has_gitignore_layers` / `gitignore_anchors`, and `is_ignored` /
 `exclusion` — the ancestor-walking answer and its witness — with `tsv_layer_source` and
 `split_segments`, to bound and warn about a path an argument named). Keeping that policy out of here is deliberate: `IgnoreStack`
 stays a pure gitignore(5) matcher, reusable beyond tsv's own discovery rules, and
@@ -85,12 +85,16 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   tree). A sharp contract — see Known edges.
 - `IgnoreStack::is_reincluded(path, is_dir)` — the per-path `!`-negation polarity
   (no ancestor prune), so a caller's heuristic can defer to an explicit re-include.
-- `IgnoreStack::has_negation_under(prefix)` — whether some **tsv-layer** rule is a
-  negation anchored *strictly under* `prefix` (its layer anchor + leading literal
-  segments has `prefix` as a strict prefix). Only anchored negations count — a
-  floating `!keep.ts` (leading `**`) and a dir-self `!dist/` both return false. Lets
-  a caller warn when its heuristic prunes a directory a `!dir/<file>` re-include was
-  targeting (a no-op). `.gitignore` layers are not consulted.
+- `IgnoreStack::negation_under(prefix) -> Option<Negation>` — the deepest **tsv
+  layer** holding a negation anchored *strictly under* `prefix` (its layer anchor +
+  leading literal segments has `prefix` as a strict prefix), as `Negation {
+  anchor_depth, source }`: the directory holding the rule's file, and the file. Only
+  anchored negations count — a floating `!keep.ts` (leading `**`) and a dir-self
+  `!dist/` both return `None` — and only layers anchored strictly above `prefix` (a
+  walk pruning `prefix` never reads the files at or below it). Lets a caller warn when
+  its heuristic prunes a directory a `!dir/<file>` re-include was targeting (a no-op),
+  naming the file the escape belongs in — the deepest, whose rules are read last.
+  `.gitignore` layers are not consulted.
 - `IgnoreStack::has_gitignore_layers()` — whether any `.gitignore` layer is pushed
   (true even for an empty one — mere presence turns a caller's heuristic off, as in
   git). `tsv_discover` uses it to assert its `heuristic_active ⟹ no .gitignore layer`
@@ -207,10 +211,12 @@ the file only so a diagnostic can name it.
   parent-directory rule in the `.gitignore` regime — a `.gitignore` `dist/`
   likewise blocks a later `!dist/keep/` (the parent must be re-included first).
   **The idiom to selectively re-include under a pruned/ignored directory is
-  `!dir/` first** (admit the directory), then `dir/*` + `!dir/keep.ts` to narrow
-  it back down. A bare `!dir/keep.ts` is a no-op; `tsv_discover` uses
-  [`has_negation_under`](#public-api) to detect that case and warn (pointing at
-  this `!dir/` escape) when the build-output heuristic is what pruned `dir`.
+  `!/dir/` first** (admit the directory, anchored to the ignore file's own directory
+  — an unanchored one-segment `!dir/` admits a `dir` at every depth), then `/dir/*` +
+  `!/dir/keep.ts` to narrow it back down. A bare `!dir/keep.ts` is a no-op;
+  `tsv_discover` uses [`negation_under`](#public-api) to detect that case and warn
+  (pointing at this `!/dir/` escape, spelled for the file holding the rule) when the
+  build-output heuristic is what pruned `dir`.
 
 - **`is_ignored_leaf` omits the ancestor prune** — it reports only the query
   path's *own* last-match exclusion, so a file under an excluded `build/` reads as

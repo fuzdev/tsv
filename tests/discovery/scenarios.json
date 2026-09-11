@@ -426,6 +426,24 @@
 				{"target": "", "expected": ["g.ts", "keep.ts", "sub/deep/g.ts", "sub/deep/keep.ts"], "warns": ["sub/.gitignore is a symbolic link, which git does not follow"]},
 				{"target": "sub/deep", "expected": ["sub/deep/g.ts", "sub/deep/keep.ts"], "warns": ["sub/.gitignore is a symbolic link, which git does not follow"]}
 			]
+		},
+		{
+			"name": "heuristic_shadow_warning_names_the_rules_file",
+			"note": "the build-output heuristic prunes a dist/ that a tsv-layer `!` re-include was written under, and the warning names the file holding that rule, with the directory re-include spelled for that file — anchored and relative to its directory, since a repo-root-relative `!pkg/dist/` pasted into pkg/.formatignore is anchored to pkg and does nothing. Applied (fix/.prettierignore), the anchored lines admit fix/dist and select keep.ts in it, while fix/sub/dist — which an unanchored `!dist/` would re-include too — stays pruned, and unwarned",
+			"tree": {
+				".git/": null,
+				"pkg/.formatignore": "!dist/keep.ts\n",
+				"pkg/a.ts": "x",
+				"pkg/dist/keep.ts": "x",
+				"fix/.prettierignore": "!/dist/\n/dist/*\n!/dist/keep.ts\n",
+				"fix/dist/keep.ts": "x",
+				"fix/dist/other.ts": "x",
+				"fix/sub/dist/x.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["fix/dist/keep.ts", "pkg/a.ts"], "warns": ["pkg/dist is skipped by tsv's build-output heuristic, so a re-include under it in pkg/.formatignore does nothing; re-include the directory itself there with `!/dist/` (then `/dist/*` + `!/dist/<file>` to select files within it)"], "no_warns": ["fix/"]},
+				{"target": "pkg", "expected": ["pkg/a.ts"], "warns": ["pkg/dist is skipped by tsv's build-output heuristic, so a re-include under it in pkg/.formatignore"]}
+			]
 		}
 	]
 }

@@ -371,7 +371,7 @@ the file a warning names), then queries:
 - `classify_dir(name, child_rel, heuristic_active) -> 'descend' | 'prune' |
   'prune_warn'` — the shared per-directory verdict (`tsv_discover::classify_dir`:
   safety nets, the build-output heuristic, the matcher). On `'prune_warn'` fetch
-  the message via `heuristic_shadow_warning(dir)`.
+  the message via `heuristic_shadow_warning(dir, loose_root?)`.
 - `should_format_file(name, child_rel) -> bool` — the per-file verdict (a
   formattable extension and not ignored).
 - `is_path_pruned(rel) -> bool` — the per-file form of the directory-prune verdict
@@ -388,7 +388,8 @@ the file a warning names), then queries:
   excludes (skipped quietly). The scope decision is `is_ignored(rel, is_dir)`, which
   `npm/cli.js` gates every named path on alone (the safety nets and the heuristic grade
   no named path). `loose_root` is the format root's display path outside a repo.
-- `heuristic_shadow_warning(dir) -> string`, `prettierignore_outside_repo_warning`,
+- `heuristic_shadow_warning(dir, loose_root?) -> string | undefined` (naming the file
+  holding the re-include it read from the stack), `prettierignore_outside_repo_warning`,
   `prettierignore_shadowed_warning`, and `gitignore_symlink_warning(path)` — the four
   warning templates, beside `unresolvable_root_error(root)`'s traversal error (methods,
   not free functions, so they ride the class re-export; single source of truth
@@ -409,7 +410,7 @@ the other lacks — a suite `deno task check` does not run, so add the twin in t
 
 The string-tag return for `classify_dir` (rather than a wasm-bindgen enum or a
 returned struct) needs no `patch_npm_package.ts` change and allocates no JS object
-on the common descend path. The `is_reincluded` / `has_negation_under`
+on the common descend path. The `is_reincluded` / `negation_under`
 primitives are not exported across the WASM boundary — they're folded inside
 `classify_dir` (and stay public on the Rust `tsv_ignore::IgnoreStack`), so
 JS callers consume the verdict instead of re-deriving the prune decision.

@@ -346,12 +346,13 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
     // named this directory — so `tsv format node_modules/pkg` or `dist/sub` walks what
     // `tsv format node_modules` or `dist` walks there. Below the root they classify every
     // child as usual.
+    let loose_root = loose_root(&format_root, in_repo);
     if stack.is_ignored(&base_rel, true) {
         if let Some(warning) = tsv_discover::excluded_argument_warning(
             &root.to_string_lossy(),
             &base_rel,
             true,
-            loose_root(&format_root, in_repo).as_deref(),
+            loose_root.as_deref(),
             &stack,
         ) {
             out.warnings.push(warning);
@@ -366,7 +367,7 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
         },
         &base_rel,
         true,
-        in_repo,
+        loose_root.as_deref(),
         &mut stack,
         heuristic_active,
         out,
@@ -667,8 +668,10 @@ fn collect_recursive(
     // false for every descendant — gates the target-root-only
     // `.prettierignore`-outside-a-repo warning.
     is_target_root: bool,
-    // whether the format root is a git repo — `.gitignore` is read only then.
-    in_repo: bool,
+    // the format root's display path outside a git repo, `None` inside one — what a
+    // warning names a path by, and so also whether the format root is a git repo
+    // (`.gitignore` is read only then)
+    loose_root: Option<&str>,
     stack: &mut IgnoreStack,
     // whether the build-output heuristic is active at *this* dir's level (no
     // `.gitignore` governs `dir` or above). `dir`'s own `.gitignore`, read below,
@@ -676,6 +679,7 @@ fn collect_recursive(
     heuristic_active: bool,
     out: &mut Walk<'_>,
 ) {
+    let in_repo = loose_root.is_none();
     // Materialize the listing once: it's used twice — to read THIS dir's own
     // ignore files (opening one only when the listing actually contains it, so an
     // ignore-file-free dir costs zero speculative `open`s) before classifying its
@@ -813,8 +817,10 @@ fn collect_recursive(
             // here.
             match classify_dir(&name, &child_rel, child_heuristic, stack) {
                 DirVerdict::Prune => continue,
-                DirVerdict::PruneWithWarning(warning) => {
-                    out.warnings.push(warning);
+                DirVerdict::PruneWithWarning => {
+                    out.warnings.extend(tsv_discover::heuristic_shadow_warning(
+                        &child_rel, loose_root, stack,
+                    ));
                     continue;
                 }
                 DirVerdict::Descend => {}
@@ -831,7 +837,7 @@ fn collect_recursive(
                 },
                 &child_rel,
                 false,
-                in_repo,
+                loose_root,
                 stack,
                 child_heuristic,
                 out,

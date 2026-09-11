@@ -342,7 +342,7 @@ impl IgnoreStack {
         match tsv_discover::classify_dir(&name, &child_rel, heuristic_active, &self.inner) {
             tsv_discover::DirVerdict::Descend => "descend".to_string(),
             tsv_discover::DirVerdict::Prune => "prune".to_string(),
-            tsv_discover::DirVerdict::PruneWithWarning(_) => "prune_warn".to_string(),
+            tsv_discover::DirVerdict::PruneWithWarning => "prune_warn".to_string(),
         }
     }
 
@@ -379,12 +379,22 @@ impl IgnoreStack {
     }
 
     /// The heuristic-shadow warning text for a pruned directory `dir`
-    /// (format-root relative). A method (not a free function) so it rides the
-    /// class through the package facade; the receiver is unused. Single source
-    /// of truth with the native CLI — the JS CLI never templates this string.
+    /// (format-root relative); `undefined` when no tsv-layer re-include is written under
+    /// `dir`. The text names the file holding that rule, which it reads from this stack.
+    /// `loose_root` is the format root's display path outside a git repo (`undefined`
+    /// inside one). Single source of truth with the native CLI — the JS CLI never
+    /// templates this string.
     #[napi(js_name = "heuristic_shadow_warning", catch_unwind)]
-    pub fn heuristic_shadow_warning(&self, dir: String) -> String {
-        tsv_discover::heuristic_shadow_warning(&dir)
+    pub fn heuristic_shadow_warning(
+        &self,
+        dir: String,
+        loose_root: Option<String>,
+    ) -> Either<String, Undefined> {
+        or_undefined(tsv_discover::heuristic_shadow_warning(
+            &dir,
+            loose_root.as_deref(),
+            &self.inner,
+        ))
     }
 
     /// The `.prettierignore`-outside-a-repo warning for the target root `dir`

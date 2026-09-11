@@ -68,7 +68,7 @@ impl Seg {
     /// The exact string this segment matches, or `None` if it carries any
     /// wildcard (`*`, `?`, `[...]`) or is a `**` segment. Used to resolve a
     /// rule's fixed leading path — the run of literal directory names before any
-    /// glob — for the heuristic-shadow diagnostic (`IgnoreStack::has_negation_under`).
+    /// glob — for the heuristic-shadow diagnostic (`IgnoreStack::negation_under`).
     pub(crate) fn literal(&self) -> Option<String> {
         match self {
             Seg::DoubleStar => None,

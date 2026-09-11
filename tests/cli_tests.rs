@@ -1578,15 +1578,17 @@ fn test_format_heuristic_shadow_warns_for_anchored_negation() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("warning:"), "stderr: {stderr}");
-    // names the pruned dir + the heuristic, and points at the dir-level escape.
-    // (the dir is named format-root-relative, so outside a repo it carries the
-    // path from the filesystem root — assert on the stable phrasing, not `!build/`)
+    // names the pruned dir + the heuristic, and points at the dir-level escape in the
+    // file the re-include was written in. Outside a repo both paths read absolutely,
+    // while the line stays relative to that file's directory and anchored
     assert!(
         stderr.contains("build is skipped by tsv's build-output heuristic"),
         "stderr: {stderr}"
     );
     assert!(
-        stderr.contains("re-include the directory itself"),
+        stderr.contains(
+            "/.formatignore does nothing; re-include the directory itself there with `!/build/`"
+        ),
         "stderr: {stderr}"
     );
 }

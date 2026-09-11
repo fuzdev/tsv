@@ -97,8 +97,8 @@ crates (the open-convention stance):
   `classify_dir` half: the full-stack assembly can't satisfy the incremental walk's
   `heuristic_active ⟹ no .gitignore layer` invariant, yet stays faithful because the
   matcher's per-level query ignores layers anchored below the queried directory (a
-  deeper layer fails to `relativize`), and the one place a deeper layer *is*
-  consulted picks only `Prune` vs `PruneWithWarning`, which a boolean collapses.
+  deeper layer fails to `relativize`), as does the `negation_under` query picking
+  `Prune` vs `PruneWithWarning`, which reads only layers anchored above the directory.
   Pair with `IgnoreStack::is_ignored(rel, false)` for the file-level match.
   `classify_dir` stays the primitive for real traversers, which thread
   `heuristic_active` naturally as they descend. The CLIs never ask it of a path an
@@ -123,13 +123,21 @@ crates (the open-convention stance):
   it); a tsv rule excluding a directory is the user's to narrow. `loose_root` is the
   format root's display path outside a repo, where paths are named absolutely; inside
   one (`None`) they read relative to the repo root.
-- `DirVerdict { Descend, Prune, PruneWithWarning(String) }` — `PruneWithWarning`
-  carries the full warning string, so the native caller reports it without
-  re-deriving.
-- `heuristic_shadow_warning(d) -> String` — the one warning template. Produced
-  once here; `classify_dir` carries it in `PruneWithWarning`. Exposed `pub`
-  because the WASM binding fetches it directly (the JS↔WASM boundary can't carry
-  a tagged-union payload as one primitive — see below).
+- `DirVerdict { Descend, Prune, PruneWithWarning }` — on `PruneWithWarning` the
+  caller fetches the text from `heuristic_shadow_warning`, which takes display context
+  (`loose_root`) the per-directory verdict has no other use for — the same fetch
+  `npm/cli.js` makes across the binding boundary (which can't carry a tagged-union
+  payload as one primitive — see below).
+- `heuristic_shadow_warning(d, loose_root, &IgnoreStack) -> Option<String>` — the
+  warning when the heuristic prunes a directory a tsv-layer `!` re-include was written
+  under; `None` when none is (`IgnoreStack::negation_under`, the query behind
+  `PruneWithWarning`). It names the file holding the rule (the deepest, whose rules are
+  read last) and spells the directory escape for that file, anchored and relative to
+  its directory — `!/dist/` (then `/dist/*` + `!/dist/<file>`) in `pkg/.formatignore`
+  for a pruned `pkg/dist` — because a root-relative line does nothing in a nested file,
+  and outside a repo (format root = filesystem root) in any file, while an unanchored
+  one-segment `!dist/` re-includes a `dist` at every depth. `loose_root` is
+  `excluded_argument_warning`'s. Produced once here; both bindings fetch it directly.
 - `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
   has_formatignore) -> Option<String>` — the heads-up when, **outside a git
   repo**, a `.prettierignore` sits in the **target root** with no sibling
@@ -158,7 +166,8 @@ crates (the open-convention stance):
   validation, `unsupported_extension_error` rejects a named file tsv doesn't
   format (alongside the not-a-file-or-directory check, so the run fails before
   anything is written); and in `collect_recursive`: matches
-  `classify_dir`'s `DirVerdict` and pushes any `PruneWithWarning` text into the
+  `classify_dir`'s `DirVerdict` and, on `PruneWithWarning`, pushes
+  `heuristic_shadow_warning`'s text into the
   `Discovered::warnings` channel; uses `should_format_file` for the file branch;
   pushes any `prettierignore_shadowed_warning` per directory; and, at the target
   root only, pushes any `prettierignore_outside_repo_warning` into the same
@@ -169,7 +178,8 @@ crates (the open-convention stance):
   `classify_dir(name, child_rel, heuristic_active) -> string`
   (`"descend"|"prune"|"prune_warn"`), `should_format_file(name, child_rel) ->
   bool`, `is_path_pruned(rel) -> bool`, `excluded_argument_warning(display, rel, is_dir,
-  loose_root?) -> string | undefined`, `heuristic_shadow_warning(dir) -> string`,
+  loose_root?) -> string | undefined`, `heuristic_shadow_warning(dir, loose_root?) ->
+  string | undefined`,
   `unsupported_extension_error(path) -> string | undefined`,
   `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
   has_formatignore) -> string | undefined`, and the sibling
