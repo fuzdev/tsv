@@ -466,7 +466,9 @@ enum ChainShape {
 /// correct one. Where no single-form marker can express prettier's output —
 /// `UnstableNotConverging` (two or more distinct intermediates), or a stable first pass tsv
 /// cannot ingest — the chain goes into `audit_signature_<suffix>.txt` instead, the marker of
-/// last resort (N12).
+/// last resort (N12). Any other unpinned stable first pass is declined: a note in a
+/// README-only fixture, and a failure that keeps any existing signature in one that
+/// documents a stable form, where N10 blocks on it.
 async fn update_intermediate_files(
     fixture: &fixtures::Fixture,
     input_ext: &str,
@@ -597,19 +599,47 @@ async fn update_intermediate_files(
         };
         let needs_chain_pin = first_pass_unpinned && no_single_form_marker;
 
-        // Say what was declined and why — an unpinned output that regenerates silently reads
-        // as "nothing to do" when the answer is a one-file addition the tool already knows.
-        if let Some(marker) = stable_form {
-            if let Some(prefix) = marker.file_prefix() {
+        // The stable first pass declined above: a single-form marker could express it, or
+        // tsv formats it non-idempotently. Say what was declined and why — an unpinned output
+        // that regenerates silently reads as "nothing to do" when the answer is a one-file
+        // addition the tool already knows. In a README-only fixture that is a note, since N10
+        // only reports such an output. In a fixture that documents a stable form it is a
+        // FAILURE: N10's blocking arm asks the same `has_documented_forms` before classifying
+        // the shape, and blocks on every output no documented form holds, whatever marker
+        // could express it. An existing chain pin is kept rather than removed below: deleting
+        // it would fail N10 with the fix still unmade.
+        let declined = stable_form.filter(|marker| !marker.requires_chain_pin());
+        let decline_fails_n10 = declined.is_some() && pins.has_documented_forms();
+        if let Some(marker) = declined {
+            let file = marker
+                .file_prefix()
+                .map(|prefix| format!("{prefix}{suffix}{input_ext}"));
+            let finding = match &file {
+                Some(file) => format!(
+                    "prettier's output is a stable form no sibling holds — add {file} (not auto-generated: it is a claim about tsv, not a prettier chain)"
+                ),
+                // The one decline with no file to name: pinning would paper over a tsv bug.
+                None => "prettier's stable output is one tsv formats NON-IDEMPOTENTLY — a tsv bug, not a pin choice; fix tsv rather than pinning".to_string(),
+            };
+            if decline_fails_n10 {
+                let consequence = if chain_signature_path.exists() {
+                    format!(
+                        "kept {chain_signature_filename} rather than deleting it, since removing it fails N10"
+                    )
+                } else if let Some(file) = &file {
+                    format!("N10 fails until {file} lands")
+                } else {
+                    "N10 fails until tsv is fixed and a marker holds the output".to_string()
+                };
+                results.push(IntermediateOutput::File(
+                    variant_name.clone(),
+                    FormattedResult::Failed(format!(
+                        "{finding}; {consequence} (this fixture has an output_prettier.* or *variant_* file)"
+                    )),
+                ));
+            } else {
                 results.push(IntermediateOutput::Note(format!(
-                    "- {}/{variant_name}: prettier's output is a stable form no sibling holds — add {prefix}{suffix}{input_ext} (not auto-generated: it is a claim about tsv, not a prettier chain)",
-                    fixture.relative_path
-                )));
-            } else if marker == StableFormMarker::OursNotIdempotent {
-                // The one decline with no file to name: pinning would paper over a tsv
-                // bug, so say what was found instead of regenerating silently.
-                results.push(IntermediateOutput::Note(format!(
-                    "- {}/{variant_name}: prettier's stable output is one tsv formats NON-IDEMPOTENTLY — a tsv bug, not a pin choice; fix tsv rather than pinning",
+                    "- {}/{variant_name}: {finding}",
                     fixture.relative_path
                 )));
             }
@@ -667,6 +697,11 @@ async fn update_intermediate_files(
                     // fixture's README and clean up any stale intermediate files. Not a failure:
                     // there's no chain to record, and `fixtures:validate` is the authoritative
                     // green-light for the fixture as a whole.
+                    // TODO: in a fixture that documents a stable form, N10 blocks on an
+                    // unmatched first pass whatever its shape, so this note leaves a fixture
+                    // that cannot validate. No marker can pin a truncated chain; the fix is to
+                    // change the source. Unreachable today: every in-tree source whose first
+                    // pass reaches here lands on its fixture's `output_prettier.*`.
                     results.push(IntermediateOutput::Note(format!(
                         "- {}/{}: prettier produced invalid syntax on first pass (prettier bug, see README): {prettier_err}",
                         fixture.relative_path, variant_name
@@ -732,6 +767,10 @@ async fn update_intermediate_files(
                 ),
                 Err(e) => FormattedResult::Failed(e),
             }
+        } else if decline_fails_n10 {
+            // Declined in a fixture N10 blocks on: the failure above names the fix, and an
+            // existing signature is kept, since removing it fails N10.
+            FormattedResult::NotNeeded
         } else {
             remove_if_present(&chain_signature_path)
         };

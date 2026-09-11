@@ -1134,6 +1134,8 @@ async fn validate_n10_cross_path_discovery(
             // unmatched output means prettier drifted or the target is
             // undocumented, so block. Fixtures that document the divergence by
             // README alone (no stable-form files) keep this informational.
+            // `fixtures_update_formatted`'s `update_intermediate_files` fails a declined
+            // stable first pass on this same condition.
             if pins.has_documented_forms() {
                 result.add_error(ValidationError::UndocumentedPrettierOutput(source_file));
             } else {

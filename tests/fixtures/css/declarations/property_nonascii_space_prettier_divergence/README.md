@@ -16,6 +16,16 @@ Prettier keeps a run glued to what precedes it (`color<NBSP>: red`, `left<NBSP>/
 but **drops** one an ASCII space separates from the name (`top <NBSP>: 0` → `top: 0`), and
 drops the space before a property comment — the `in_property_value_before_colon` rule.
 
+`divergent_variant_compact.svelte` and `divergent_variant_spaces.svelte` are what that costs.
+Prettier's form of either authoring has dropped `top`'s run (`top: 0`) and glued each
+property comment to what precedes it (`left<NBSP>/* comment */`, `right/* comment */`), while
+it keeps the authored whitespace between the comment — or the run after it — and the colon
+verbatim: `/* comment */: 0` from the compact source, `/* comment */   : 0` from the spaced
+one, the only bytes the two variants differ in. tsv reads either form, puts back one space
+ahead of each property comment and ahead of its colon, and lands on one third form neither
+formatter started from — the input without `top`'s run. The drop is not recoverable,
+because nothing in the emitted text says the run was ever there.
+
 ## Reason
 
 Content preservation, plus the comment-spacing rule. Dropping a character the author wrote
