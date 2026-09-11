@@ -5,4 +5,11 @@
 		/* c */
 		a = 1
 	) {}
+
+	// a multi-line comment glued to the value below the block: same, and the value stays flat
+	function fn2(
+		/* c1 */
+		/* c2
+		 */ a2 = b2 ? c2 : d2
+	) {}
 </script>

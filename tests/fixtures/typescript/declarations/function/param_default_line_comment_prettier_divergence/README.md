@@ -31,4 +31,10 @@ zero-width, so it never forces the union to break). The same float applies to
 arrow-function and method parameters. A same-line block comment
 (`p = /* c */ v`) stays inline in both formatters and is not a divergence.
 
+`fn3` adds a multi-line comment glued to the value below the line comment
+(`p3 = // c⏎/* d⏎*/ aaa ? bbb : ccc`): tsv keeps both where they were written and
+the conditional stays flat, since the multi-line comment prints outside the value's
+own group; prettier floats `// c` past the value and hoists `/* d */` above the
+parameter.
+
 See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

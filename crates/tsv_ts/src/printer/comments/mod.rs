@@ -2118,8 +2118,27 @@ impl<'a> Printer<'a> {
     /// `return`/`throw` arguments pull up here too, but for a stronger reason than
     /// layout: they are restricted productions, so keeping the break would be ASI and
     /// would change the program. See `build_keyword_argument_doc`.
+    ///
+    /// ⚠️ **The pull-up is prettier's soft `line` collapsing, so it holds only while the run
+    /// can print flat.** A run that pushes a hardline of its own — a comment after the glued
+    /// one owning its line (`= /* c1 */⏎/* c2 */⏎v`), or a `//` — breaks the group that
+    /// `line` rides, and prettier's `propagateBreaks` breaks it too
+    /// (`=⏎/* c1 */⏎/* c2 */⏎v`, an author blank after `c1` kept). Such a run is rebuilt
+    /// in the plain [`LeadingGlue::Adjacent`] mode, whose `line` breaks with the hardline
+    /// beside it in the same concat. Welding it instead merged the pair on one pass
+    /// (`= /* c1 */ /* c2 */⏎v`) and collapsed the value onto it on the next.
     pub(crate) fn build_rhs_comments_glued_opt(&self, start: u32, end: u32) -> Option<DocId> {
-        self.build_leading_comment_run_opt(start, end, LeadingGlue::AdjacentGlued)
+        let (doc, forces_break) = self.build_leading_comment_run_with_break(
+            start,
+            end,
+            LeadingGlue::AdjacentGlued,
+            None,
+        )?;
+        if forces_break {
+            self.build_leading_comment_run_opt(start, end, LeadingGlue::Adjacent)
+        } else {
+            Some(doc)
+        }
     }
 
     /// Emit a run of leading comments before `terminal_pos` — the value, member,

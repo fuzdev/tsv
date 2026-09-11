@@ -130,6 +130,17 @@ z */ aaa ? bbb : ccc;
 			 */ aaa ? bbb : ccc;
 	}
 
+	// class property with a line comment on the operator's line, and on a line of its own
+	class B {
+		c1 = // x
+			/* y
+			 */ aaa ? bbb : ccc;
+		c2 =
+			// x
+			/* y
+			 */ aaa ? bbb : ccc;
+	}
+
 	// variable type annotation: the first comment keeps the head line
 	let a10: /* x */
 	/* y
