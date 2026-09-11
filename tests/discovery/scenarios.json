@@ -116,7 +116,7 @@
 		},
 		{
 			"name": "explicit_file_is_bounded_by_the_ignore_files",
-			"note": "a named FILE is bounded by the ignore files as the walk that reaches it is: one a rule excludes — itself, or through an ancestor directory, in either kind of layer — is skipped with a warning naming that kind, and one no rule excludes is in scope",
+			"note": "a named FILE is bounded by the ignore files as the walk that reaches it is: one a rule excludes — itself, or through an ancestor directory — is skipped, and one no rule excludes is in scope. A .prettierignore (or .formatignore) rule's skip is quiet; a .gitignore rule's warns with the exact lines that re-include the file, for the file the repo root reads — here its .prettierignore, since a .formatignore created beside it would shadow every rule in it",
 			"tree": {
 				".git/": null,
 				".gitignore": "gen/\n",
@@ -128,8 +128,23 @@
 			"cases": [
 				{"target": "", "expected": ["keep.ts"]},
 				{"target": "keep.ts", "expected": ["keep.ts"], "no_warns": ["excluded"]},
-				{"target": "skip.ts", "expected": [], "warns": ["skip.ts is excluded by a .formatignore or .prettierignore rule, so it is not formatted"]},
-				{"target": "gen/g.ts", "expected": [], "warns": ["gen/g.ts is inside gen, which .gitignore excludes, so it is not formatted"]}
+				{"target": "skip.ts", "expected": [], "no_warns": ["excluded"]},
+				{"target": "gen/g.ts", "expected": [], "warns": ["gen/g.ts is inside gen, which a rule in the repo-root .gitignore excludes, so it is not formatted; re-include it by adding `!/gen/`, `/gen/*` and `!/gen/g.ts`, in that order, to the repo-root .prettierignore"]}
+			]
+		},
+		{
+			"name": "explicit_dir_a_tsv_rule_excludes_names_the_rules_file",
+			"note": "a named DIRECTORY a .formatignore or .prettierignore rule excludes warns, naming the file the rule sits in — a nested .prettierignore by its repo-relative path — while a named FILE the same rule excludes is skipped quietly",
+			"tree": {
+				".git/": null,
+				"pkg/.prettierignore": "gen/\n",
+				"pkg/b.ts": "x",
+				"pkg/gen/a.ts": "x"
+			},
+			"cases": [
+				{"target": "pkg", "expected": ["pkg/b.ts"]},
+				{"target": "pkg/gen", "expected": [], "warns": ["pkg/gen is excluded by a rule in pkg/.prettierignore, so nothing under it is formatted; narrow or negate that rule to format it"]},
+				{"target": "pkg/gen/a.ts", "expected": [], "no_warns": ["excluded"]}
 			]
 		},
 		{
@@ -170,8 +185,8 @@
 				"build/sub/app.ts": "x"
 			},
 			"cases": [
-				{"target": "build", "expected": [], "warns": ["build is excluded by .gitignore, so nothing under it is formatted; re-include it with `!build/` in the repo-root .formatignore"]},
-				{"target": "build/sub", "expected": [], "warns": ["build/sub is inside build, which .gitignore excludes, so nothing under it is formatted; re-include that directory with `!build/` in the repo-root .formatignore"]}
+				{"target": "build", "expected": [], "warns": ["build is excluded by a rule in the repo-root .gitignore, so nothing under it is formatted; re-include it by adding `!/build/` to the repo-root .formatignore"]},
+				{"target": "build/sub", "expected": [], "warns": ["build/sub is inside build, which a rule in the repo-root .gitignore excludes, so nothing under it is formatted; re-include it by adding `!/build/`, `/build/*` and `!/build/sub/`, in that order, to the repo-root .formatignore"]}
 			]
 		},
 		{
@@ -303,15 +318,17 @@
 		},
 		{
 			"name": "ancestor_formatignore_applies_outside_repo",
-			"note": "outside any repo, an ancestor .formatignore governs descendants (filesystem-as-API / global config)",
+			"note": "outside any repo, an ancestor .formatignore governs descendants (filesystem-as-API / global config): a named file it excludes is skipped quietly, and a named directory it excludes warns, naming the .formatignore by its absolute path",
 			"tree": {
-				".formatignore": "*.gen.ts\n",
+				".formatignore": "*.gen.ts\ngen/\n",
 				"proj/a.gen.ts": "x",
-				"proj/main.ts": "x"
+				"proj/main.ts": "x",
+				"proj/gen/b.ts": "x"
 			},
 			"cases": [
 				{"target": "proj", "expected": ["proj/main.ts"]},
-				{"target": "proj/a.gen.ts", "expected": [], "warns": ["a.gen.ts is excluded by a .formatignore or .prettierignore rule, so it is not formatted; narrow or negate that rule to format it"]}
+				{"target": "proj/a.gen.ts", "expected": [], "no_warns": ["excluded"]},
+				{"target": "proj/gen", "expected": [], "warns": [".formatignore, so nothing under it is formatted; narrow or negate that rule to format it"]}
 			]
 		},
 		{

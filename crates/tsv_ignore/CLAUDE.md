@@ -44,8 +44,9 @@ this path." tsv's discovery *policy* — the build-output heuristic, the
 always-pruned safety nets, the formattable-extension check, the heuristic-shadow
 warning — lives one layer up in [`tsv_discover`](../tsv_discover/CLAUDE.md), which
 builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
-`has_negation_under` / `has_gitignore_layers` / `gitignore_anchors`, and `exclusion` — the
-ancestor-walking answer with its witness — to bound and warn about a path an argument named). Keeping that policy out of here is deliberate: `IgnoreStack`
+`has_negation_under` / `has_gitignore_layers` / `gitignore_anchors`, and `is_ignored` /
+`exclusion` — the ancestor-walking answer and its witness — with `tsv_layer_source` and
+`split_segments`, to bound and warn about a path an argument named). Keeping that policy out of here is deliberate: `IgnoreStack`
 stays a pure gitignore(5) matcher, reusable beyond tsv's own discovery rules, and
 the three surfaces share the prune *decision* through `tsv_discover` rather than
 re-deriving it from these primitives.
@@ -67,11 +68,14 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
 - `IgnoreStack::push_gitignore(anchor, content)` / `pop_gitignore()` — add/drop
   one directory's `.gitignore`, anchored at `anchor` (relative to the format
   root, `""` = root). Push shallow-first; pop on a DFS unwind.
-- `IgnoreStack::push_tsv(anchor, content)` / `pop_tsv()` — add/drop one
-  directory's tsv layer, evaluated after every `.gitignore`.
+- `IgnoreStack::push_formatignore(anchor, content)` /
+  `push_prettierignore(anchor, content)` / `pop_tsv()` — add/drop one directory's tsv
+  layer, evaluated after every `.gitignore`. The two pushes match identically; the
+  layer records which file it was read from, for a diagnostic to name.
 - `IgnoreStack::is_ignored(path, is_dir)` — `path` relative to the format root;
   walks the ancestor prefixes (git's parent-directory prune). The arbitrary-path
-  query.
+  query, and `exclusion` with its witness dropped — one prefix walk
+  (`first_excluded_prefix`) serves both.
 - `IgnoreStack::is_ignored_leaf(path, is_dir)` — like `is_ignored` but evaluates
   only `path`'s **own** last-match, **no ancestor walk**. Equivalent to
   `is_ignored` *only when every ancestor is already known not-ignored* — which
@@ -98,18 +102,25 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   the heuristic is off at a level once a `.gitignore` anchored above it is present.
 - `IgnoreStack::is_empty()` — callers skip per-path matching when true.
 - `IgnoreStack::exclusion(path, is_dir) -> Option<Exclusion>` — the witness behind
-  `is_ignored`: the shallowest excluded prefix of `path` (`Exclusion::depth`, in
-  segments) and the kind of layer whose rule excluded it
-  (`IgnoreSource::{Gitignore, Tsv}`), `Some` exactly when `is_ignored` is `true`. A
-  diagnostic query off the hot path: `tsv_discover` reads it once per path an argument
+  `is_ignored`: the shallowest excluded prefix of `path` (`Exclusion::depth`), the
+  directory holding the excluding rule's file (`anchor_depth`), both counted in
+  `split_segments` segments, and the file itself
+  (`IgnoreSource::{Gitignore, Formatignore, Prettierignore}`, with `file_name()`). A
+  diagnostic query off the hot path: `tsv_discover` reads it for a path an argument
   named, to warn which directory put the path out of scope and whose rule did.
+- `IgnoreStack::tsv_layer_source(anchor) -> Option<IgnoreSource>` — which file the tsv
+  layer at `anchor` was read from. `tsv_discover` asks it of the format root, so a
+  remedy names the file the root reads rather than one whose creation would shadow it.
+- `split_segments(path) -> Vec<&str>` — a path's meaningful segments (empty and `.`
+  components dropped): the unit every query splits a path into and `Exclusion`'s
+  depths count in, public so a caller slicing by those depths splits the same way.
 
 **Which** files feed the stack is the caller's choice. tsv reads `.formatignore`
 hierarchically (one tsv layer per directory) and, inside a git repo,
 `.prettierignore` hierarchically too — each shadowed by a *sibling* `.formatignore`
 in the same directory; `.gitignore` layers are pushed only inside a git repo. The
-crate itself is layer-agnostic — a tsv layer is a tsv layer, whichever file it came
-from.
+crate matches every tsv layer the same way, whichever file it came from; it records
+the file only so a diagnostic can name it.
 
 ## Distinctives
 

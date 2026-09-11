@@ -665,6 +665,9 @@ cargo run --profile corpus -p tsv_debug --features audits ignore_audit ../corpor
 # placement. A closed line at a single-child head (e.g. `TSTypeAliasDeclaration.typeAnnotation`)
 # means only its non-composite sites honor; union-typed LIST members (whole-member freezes) also go
 # untested by the skip and ride on the member-freeze fixtures.
+# A statement whose declaration's decorators precede it (a decorator-first `@dec⏎export class C {}`
+# or `@dec⏎export declare class C {}`) is excluded too: the gap before `export` is inside the decorated declaration, where a directive is
+# inert in prettier and tsv alike (conformance_prettier_ignore.md, the decorator→declaration gap).
 # Scope: JS positions only (the TS `//` directive over code_regions — standalone .ts/.svelte.ts +
 # Svelte <script>/{expr}); CSS `/* prettier-ignore */` and Svelte template `<!-- prettier-ignore -->`
 # are a follow-up — and the template one has the most reach of any uncovered surface, because there

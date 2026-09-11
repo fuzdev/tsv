@@ -353,7 +353,7 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			// its pointer names bytes in a discarded memory: a method must refuse
 			// rather than read whatever the fresh instance put there
 			assert.throws(() => stale.is_ignored('build/out.js', false), /reinstantiate\(\) discarded/);
-			assert.throws(() => stale.push_tsv('', 'x\n'), /reinstantiate\(\) discarded/);
+			assert.throws(() => stale.push_formatignore('', 'x\n'), /reinstantiate\(\) discarded/);
 			assert.doesNotThrow(() => stale.free());
 			const fresh = new node_entry.IgnoreStack();
 			fresh.push_gitignore('', 'build/\n');
@@ -2236,17 +2236,14 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			assert.match(explicit.stderr, /unsupported file extension/);
 			assert.equal(readFileSync(join(dir, 'a.txt'), 'utf-8'), 'const   x=1');
 
-			// the ignore files bound it as they bound the walk: an excluded named file is
-			// skipped with a warning and left untouched, and a run whose every argument was
-			// such a file is not the empty-run error…
+			// the ignore files bound it as they bound the walk: a named file a .formatignore
+			// rule excludes is skipped quietly and left untouched, and a run whose every
+			// argument was such a file is not the empty-run error…
 			writeFileSync(join(dir, '.formatignore'), 'b.ts\ngen*/\n');
 			writeFileSync(join(dir, 'b.ts'), 'const   x=1');
 			const ignored = run_cli(['format', join(dir, 'b.ts')]);
 			assert.equal(ignored.status, 0);
-			assert.match(
-				ignored.stderr,
-				/b\.ts is excluded by a \.formatignore or \.prettierignore rule, so it is not formatted/
-			);
+			assert.doesNotMatch(ignored.stderr, /warning/);
 			assert.equal(readFileSync(join(dir, 'b.ts'), 'utf-8'), 'const   x=1');
 			// …beside a file that formats, the run is the ordinary one…
 			writeFileSync(join(dir, 'c.ts'), 'const   x=1');
@@ -2254,17 +2251,53 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			assert.equal(mixed.status, 0);
 			assert.equal(readFileSync(join(dir, 'c.ts'), 'utf-8'), 'const x = 1;\n');
 			assert.equal(readFileSync(join(dir, 'b.ts'), 'utf-8'), 'const   x=1');
-			// …and a directory the rules exclude is still the empty-run error, warned
+			// …and a directory the rules exclude is still the empty-run error, warned with the
+			// rule's file
 			const gen = mkdtempSync(join(dir, 'gen'));
 			writeFileSync(join(gen, 'd.ts'), 'const   x=1');
 			const excluded_dir = run_cli(['format', gen]);
 			assert.equal(excluded_dir.status, 2);
 			assert.match(
 				excluded_dir.stderr,
-				/is excluded by a \.formatignore or \.prettierignore rule, so nothing under it is formatted/
+				/\.formatignore, so nothing under it is formatted; narrow or negate that rule to format it/
 			);
 			assert.match(excluded_dir.stderr, /No files to format/);
 			assert.equal(readFileSync(join(gen, 'd.ts'), 'utf-8'), 'const   x=1');
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// file arguments share one ignore scope, moved from each argument's directory to the
+	// next's: a directory's own .gitignore applies to the files under it and to nothing the
+	// scope moves on to, whatever order the arguments come in, and a nested repository is
+	// its own format root. Mirrors tests/cli_tests.rs
+	it('format --list scopes each file argument by its own directory', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			mkdirSync(join(dir, '.git'));
+			mkdirSync(join(dir, 'inner', '.git'), { recursive: true });
+			writeFileSync(join(dir, '.gitignore'), '*.gen.ts\n');
+			for (const file of [
+				'a/x.ts',
+				'a/y.ts',
+				'a/sub/x.ts',
+				'b/x.ts',
+				'r.gen.ts',
+				'inner/q.gen.ts'
+			]) {
+				mkdirSync(dirname(join(dir, file)), { recursive: true });
+				writeFileSync(join(dir, file), 'x');
+			}
+			writeFileSync(join(dir, 'a', '.gitignore'), 'x.ts\n');
+			// out of order, so the scope pops back out of `a/` and re-enters it
+			const order = ['a/x.ts', 'inner/q.gen.ts', 'b/x.ts', 'a/sub/x.ts', 'r.gen.ts', 'a/y.ts'];
+			const result = run_cli(['format', '--list', ...order.map((file) => join(dir, file))]);
+			assert.equal(result.status, 0, result.stderr);
+			assert.deepEqual(
+				result.stdout.trim().split('\n'),
+				['a/y.ts', 'b/x.ts', 'inner/q.gen.ts'].map((file) => join(dir, file))
+			);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}

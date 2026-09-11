@@ -362,10 +362,11 @@ package; `tsv_ignore` **and** `tsv_discover` are **optional** deps pulled in by
 same matcher *and* prune decision as the native CLI, so all three agree by
 construction. The caller builds it up: `new IgnoreStack()`, then
 `push_gitignore(anchor, content)` per discovered `.gitignore` and
-`push_tsv(anchor, content)` per discovered `.formatignore` (and, inside a repo,
-`.prettierignore` — each shadowed by a sibling `.formatignore`) (both
-shallowest-first; `pop_gitignore()`/`pop_tsv()` to unwind a DFS — tsv layers are
-hierarchical), then queries:
+`push_formatignore(anchor, content)` per discovered `.formatignore` and, inside a repo,
+`push_prettierignore(anchor, content)` per `.prettierignore` a directory reads in its
+place (all shallowest-first; `pop_gitignore()`/`pop_tsv()` to unwind a DFS — tsv
+layers are hierarchical, and the two tsv pushes match identically, differing only in
+the file a warning names), then queries:
 
 - `classify_dir(name, child_rel, heuristic_active) -> 'descend' | 'prune' |
   'prune_warn'` — the shared per-directory verdict (`tsv_discover::classify_dir`:
@@ -380,12 +381,13 @@ hierarchical), then queries:
   `.gitignore` anchors, so it takes no extra arguments; pair it with
   `is_ignored(rel, false)` for the file-level match. (`classify_dir` stays the
   primitive for `npm/cli.js`, which threads `heuristic_active` down a real walk.)
-- `excluded_argument_warning(display, rel, is_dir, in_repo, format_root) -> string |
-  undefined` — the warning for a path an argument named (a file, or a directory root)
-  that an ignore file puts out of scope, naming the kind of file whose rule did it;
-  `undefined` when no rule excludes the path, which is also the scope decision, so
-  `npm/cli.js` gates every named path on it alone (the safety nets and the heuristic
-  grade no named path).
+- `excluded_argument_warning(display, rel, is_dir, loose_root?) -> string | undefined`
+  — the warning for a path an argument named (a file, or a directory root) that an
+  ignore file puts out of scope, naming the file whose rule did it; `undefined` when no
+  rule excludes the path, and for a named file a `.formatignore`/`.prettierignore` rule
+  excludes (skipped quietly). The scope decision is `is_ignored(rel, is_dir)`, which
+  `npm/cli.js` gates every named path on alone (the safety nets and the heuristic grade
+  no named path). `loose_root` is the format root's display path outside a repo.
 - `heuristic_shadow_warning(dir) -> string`, `prettierignore_outside_repo_warning`,
   `prettierignore_shadowed_warning`, and `gitignore_symlink_warning(path)` — the four
   warning templates, beside `unresolvable_root_error(root)`'s traversal error (methods,

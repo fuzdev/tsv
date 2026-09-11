@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet};
+use std::borrow::Cow;
+use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -72,10 +73,10 @@ pub struct Diagnostics {
     /// warning (a present `.gitignore`/`.formatignore`/`.prettierignore` whose read
     /// failed; see [`read_ignore_file`]).
     pub warnings: Vec<String>,
-    /// How many file arguments an ignore file excluded, each with its warning — what lets
-    /// a caller tell a run whose every argument was such a file (not an error: a
-    /// lint-staged run with only ignored files staged) from one that found nothing.
-    pub excluded_files: usize,
+    /// Whether every argument was a named file an ignore rule excluded — what lets a caller
+    /// tell such a run (not an error: a pre-commit hook with only ignored files staged)
+    /// from one that found nothing.
+    pub all_arguments_excluded: bool,
 }
 
 /// Result of expanding path arguments: the files to format, sorted and deduplicated,
@@ -95,8 +96,9 @@ pub struct Discovered {
 /// of the tree continues.
 ///
 /// A path an argument names is bounded by the ignore files alone: a file or directory
-/// root a rule excludes — through an ancestor directory, or at itself — is skipped with a
-/// warning ([`tsv_discover::excluded_argument_warning`]), while the safety nets and the
+/// root a rule excludes — through an ancestor directory, or at itself — is skipped, with the
+/// warning [`tsv_discover::excluded_argument_warning`] calls for (none for a file a
+/// `.formatignore` or `.prettierignore` rule excludes), while the safety nets and the
 /// build-output heuristic, which prune what a walk *discovers*, never grade one. A file
 /// argument is held to its extension first: the parser dispatch behind it has no unknown
 /// arm, so an unsupported extension is an argument error rather than a silent TypeScript
@@ -256,15 +258,15 @@ fn walk_args(args: &[Arg<'_>], sink: &mut dyn FileSink) -> Diagnostics {
         errors: Vec::new(),
         warnings: Vec::new(),
     };
-    // each directory a file argument sits in is scoped once: a hook or a lint-staged run
-    // names many files in few directories
-    let mut file_scopes: HashMap<PathBuf, FileScope> = HashMap::new();
+    // every file argument is graded in one scope, moved from each one's directory to the
+    // next's rather than rebuilt per directory
+    let mut file_scope = FileScope::default();
     let mut excluded_files = 0;
     for &arg in args {
         match arg {
             // the extension check is `classify_args`'s, already applied
             Arg::File(path) => {
-                if collect_file(path, cwd.as_deref(), &mut file_scopes, &mut out) {
+                if collect_file(path, cwd.as_deref(), &mut file_scope, &mut out) {
                     excluded_files += 1;
                 }
             }
@@ -283,7 +285,7 @@ fn walk_args(args: &[Arg<'_>], sink: &mut dyn FileSink) -> Diagnostics {
     Diagnostics {
         errors: out.errors,
         warnings: out.warnings,
-        excluded_files,
+        all_arguments_excluded: !args.is_empty() && excluded_files == args.len(),
     }
 }
 
@@ -344,15 +346,16 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
     // named this directory — so `tsv format node_modules/pkg` or `dist/sub` walks what
     // `tsv format node_modules` or `dist` walks there. Below the root they classify every
     // child as usual.
-    if let Some(warning) = tsv_discover::excluded_argument_warning(
-        &root.to_string_lossy(),
-        &base_rel,
-        true,
-        in_repo,
-        &format_root.to_string_lossy(),
-        &stack,
-    ) {
-        out.warnings.push(warning);
+    if stack.is_ignored(&base_rel, true) {
+        if let Some(warning) = tsv_discover::excluded_argument_warning(
+            &root.to_string_lossy(),
+            &base_rel,
+            true,
+            loose_root(&format_root, in_repo).as_deref(),
+            &stack,
+        ) {
+            out.warnings.push(warning);
+        }
         return;
     }
 
@@ -370,11 +373,9 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
     );
 }
 
-/// A stack loaded with the ignore layers of `dirs` — directories from `format_root` down,
-/// shallowest first — and whether the build-output heuristic is still on below them (no
-/// `.gitignore` among them was read). The one preload a named path gets: a directory
-/// root's ancestors ([`collect_root`]), or a file argument's directory and everything
-/// above it ([`collect_file`]).
+/// A stack loaded with the ignore layers of `dirs` — a directory root's ancestors, from
+/// `format_root` down to its parent ([`collect_root`]) — and whether the build-output
+/// heuristic is still on below them (no `.gitignore` among them was read).
 fn preload_ancestors(
     dirs: &[PathBuf],
     format_root: &Path,
@@ -384,62 +385,141 @@ fn preload_ancestors(
     let mut stack = IgnoreStack::new();
     let mut heuristic_active = true;
     for dir in dirs {
-        let anchor = rel_to(format_root, dir);
-        // No listing for a preloaded directory, so presence is probed — by the descent's
-        // own rule (`is_ignore_file`), so a directory reads the same files whether it is
-        // walked or preloaded. A present-but-unreadable `.formatignore` still shadows
-        // (`read_ignore_file` warns and yields no rules rather than falling through),
-        // and only an absent one hands the level to `.prettierignore`.
-        let has_formatignore = is_ignore_file(&dir.join(FORMATIGNORE_FILE));
-        let has_prettierignore = in_repo && is_ignore_file(&dir.join(PRETTIERIGNORE_FILE));
-        if let Some(content) =
-            tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, warnings)
-        {
-            stack.push_tsv(&anchor, &content);
-        }
-        // `.gitignore` layer: only inside a git repo, and never through a symlink, which
-        // git does not follow (`GitignorePresence`)
-        if in_repo {
-            let gitignore = dir.join(GITIGNORE_FILE);
-            match GitignorePresence::at(&gitignore) {
-                GitignorePresence::Absent => {}
-                GitignorePresence::Symlink => warnings.push(
-                    tsv_discover::gitignore_symlink_warning(&gitignore.to_string_lossy()),
-                ),
-                GitignorePresence::File => {
-                    if let IgnoreRead::Content(content) = read_ignore_file(&gitignore, warnings) {
-                        stack.push_gitignore(&anchor, &content);
-                        heuristic_active = false;
-                    }
-                }
-            }
+        if push_dir_layers(dir, format_root, in_repo, &mut stack, warnings).gitignore {
+            heuristic_active = false;
         }
     }
     (stack, heuristic_active)
 }
 
-/// The ignore scope of the directory a file argument sits in: its format root and
-/// regime, and the layers from the format root down through the directory.
+/// Push the ignore layers of `dir` — a directory no listing is held for — onto `stack`,
+/// anchored relative to `format_root`. The one preload a named path gets: for a directory
+/// root's ancestors ([`preload_ancestors`]), and for each directory a file argument's
+/// scope moves into ([`FileScope::enter`]).
+fn push_dir_layers(
+    dir: &Path,
+    format_root: &Path,
+    in_repo: bool,
+    stack: &mut IgnoreStack,
+    warnings: &mut Vec<String>,
+) -> PushedLayers {
+    let anchor = rel_to(format_root, dir);
+    // No listing, so presence is probed — by the descent's own rule (`is_ignore_file`), so
+    // a directory reads the same files whether it is walked or preloaded. A
+    // present-but-unreadable `.formatignore` still shadows (`read_ignore_file` warns and
+    // yields no rules rather than falling through), and only an absent one hands the level
+    // to `.prettierignore`.
+    let has_formatignore = is_ignore_file(&dir.join(FORMATIGNORE_FILE));
+    let has_prettierignore = in_repo && is_ignore_file(&dir.join(PRETTIERIGNORE_FILE));
+    let mut pushed = PushedLayers::default();
+    if let Some(layer) =
+        tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, warnings)
+    {
+        layer.push_onto(stack, &anchor);
+        pushed.tsv = true;
+    }
+    // `.gitignore` layer: only inside a git repo, and never through a symlink, which git
+    // does not follow (`GitignorePresence`)
+    if in_repo {
+        let gitignore = dir.join(GITIGNORE_FILE);
+        match GitignorePresence::at(&gitignore) {
+            GitignorePresence::Absent => {}
+            GitignorePresence::Symlink => warnings.push(tsv_discover::gitignore_symlink_warning(
+                &gitignore.to_string_lossy(),
+            )),
+            GitignorePresence::File => {
+                if let IgnoreRead::Content(content) = read_ignore_file(&gitignore, warnings) {
+                    stack.push_gitignore(&anchor, &content);
+                    pushed.gitignore = true;
+                }
+            }
+        }
+    }
+    pushed
+}
+
+/// Which layers one directory pushed onto a stack — what taking it back off pops.
+#[derive(Clone, Copy, Default)]
+struct PushedLayers {
+    tsv: bool,
+    gitignore: bool,
+}
+
+impl PushedLayers {
+    fn pop_from(self, stack: &mut IgnoreStack) {
+        if self.tsv {
+            stack.pop_tsv();
+        }
+        if self.gitignore {
+            stack.pop_gitignore();
+        }
+    }
+}
+
+/// The ignore scope file arguments are graded in: the layers from a format root down
+/// through the directory the latest file argument sat in. Each argument moves it to its
+/// own directory — popping back to the two directories' common ancestor and pushing
+/// down — so an ignore file above many named files is read and parsed once, where a
+/// scope built per directory re-read every ancestor's for each (a hook naming files
+/// spread over many directories parsed the repo-root `.gitignore` once per directory).
+#[derive(Default)]
 struct FileScope {
+    /// Empty until the first file argument moves the scope.
     format_root: PathBuf,
     in_repo: bool,
     stack: IgnoreStack,
+    /// The directories whose layers `stack` holds, format root first, with what each pushed.
+    dirs: Vec<(PathBuf, PushedLayers)>,
 }
 
-/// One file argument: into the sink unless an ignore file excludes it — through an
+impl FileScope {
+    /// Move the scope to `dir`, a file argument's canonical directory.
+    fn enter(&mut self, dir: &Path, warnings: &mut Vec<String>) {
+        if self.dirs.last().is_some_and(|(held, _)| held == dir) {
+            return;
+        }
+        let (format_root, in_repo) = format_root_of(dir);
+        if format_root != self.format_root || in_repo != self.in_repo {
+            *self = Self {
+                format_root,
+                in_repo,
+                ..Self::default()
+            };
+        }
+        let chain = ancestor_chain(&self.format_root, dir);
+        let shared = self
+            .dirs
+            .iter()
+            .zip(&chain)
+            .take_while(|((held, _), wanted)| held == *wanted)
+            .count();
+        for (_, pushed) in self.dirs.drain(shared..).rev() {
+            pushed.pop_from(&mut self.stack);
+        }
+        for level in chain.into_iter().skip(shared) {
+            let pushed = push_dir_layers(
+                &level,
+                &self.format_root,
+                self.in_repo,
+                &mut self.stack,
+                warnings,
+            );
+            self.dirs.push((level, pushed));
+        }
+    }
+}
+
+/// One file argument: into the sink unless an ignore rule excludes it — through an
 /// ancestor directory or at the file itself, as it would exclude the file from the walk
-/// that reached it — in which case the run warns and the file is skipped. Returns whether
-/// an ignore rule excluded it. The safety nets and the build-output heuristic never
-/// apply: they prune what a walk discovers, and the caller named this file.
+/// that reached it — in which case it is skipped, with the warning the rule's file calls
+/// for ([`tsv_discover::excluded_argument_warning`], which keeps a `.formatignore` or
+/// `.prettierignore` rule's skip quiet). Returns whether a rule excluded it. The safety
+/// nets and the build-output heuristic never apply: they prune what a walk discovers, and
+/// the caller named this file.
 ///
 /// The scope is the file's canonical directory's, resolved as a directory root's is
-/// ([`collect_root`]) and built once per directory into `scopes`.
-fn collect_file(
-    path: &str,
-    cwd: Option<&Path>,
-    scopes: &mut HashMap<PathBuf, FileScope>,
-    out: &mut Walk<'_>,
-) -> bool {
+/// ([`collect_root`]) and moved there from the previous file argument's ([`FileScope`]).
+fn collect_file(path: &str, cwd: Option<&Path>, scope: &mut FileScope, out: &mut Walk<'_>) -> bool {
     let file = Path::new(path);
     let Some(file_abs) = absolute_named_path(file, cwd) else {
         out.errors.push(tsv_discover::unresolvable_root_error(path));
@@ -450,30 +530,29 @@ fn collect_file(
         out.files.push(PathBuf::from(path));
         return false;
     };
-    let scope = scopes.entry(dir_abs.to_path_buf()).or_insert_with(|| {
-        let (format_root, in_repo) = format_root_of(dir_abs);
-        let chain = ancestor_chain(&format_root, dir_abs);
-        let (stack, _) = preload_ancestors(&chain, &format_root, in_repo, &mut out.warnings);
-        FileScope {
-            format_root,
-            in_repo,
-            stack,
-        }
-    });
+    scope.enter(dir_abs, &mut out.warnings);
     let rel = rel_to(&scope.format_root, &file_abs);
+    if !scope.stack.is_ignored(&rel, false) {
+        out.files.push(PathBuf::from(path));
+        return false;
+    }
     if let Some(warning) = tsv_discover::excluded_argument_warning(
         path,
         &rel,
         false,
-        scope.in_repo,
-        &scope.format_root.to_string_lossy(),
+        loose_root(&scope.format_root, scope.in_repo).as_deref(),
         &scope.stack,
     ) {
         out.warnings.push(warning);
-        return true;
     }
-    out.files.push(PathBuf::from(path));
-    false
+    true
+}
+
+/// The format root's display path when it is the filesystem root — outside a git repo,
+/// where a warning names a path absolutely ([`tsv_discover::excluded_argument_warning`]) —
+/// and `None` inside one.
+fn loose_root(format_root: &Path, in_repo: bool) -> Option<Cow<'_, str>> {
+    (!in_repo).then(|| format_root.to_string_lossy())
 }
 
 /// A named path made absolute: canonicalized, or joined onto the working directory
@@ -526,7 +605,7 @@ fn tsv_layer_content(
     has_prettierignore: bool,
     in_repo: bool,
     warnings: &mut Vec<String>,
-) -> Option<String> {
+) -> Option<TsvLayer> {
     if let Some(warning) = prettierignore_shadowed_warning(
         &dir.to_string_lossy(),
         in_repo,
@@ -535,12 +614,35 @@ fn tsv_layer_content(
     ) {
         warnings.push(warning);
     }
-    if has_formatignore {
-        read_ignore_file(&dir.join(FORMATIGNORE_FILE), warnings).content()
+    let (file, prettierignore) = if has_formatignore {
+        (FORMATIGNORE_FILE, false)
     } else if in_repo && has_prettierignore {
-        read_ignore_file(&dir.join(PRETTIERIGNORE_FILE), warnings).content()
+        (PRETTIERIGNORE_FILE, true)
     } else {
-        None
+        return None;
+    };
+    let content = read_ignore_file(&dir.join(file), warnings).content()?;
+    Some(TsvLayer {
+        content,
+        prettierignore,
+    })
+}
+
+/// One directory's tsv layer: its content, and which of the two files it was read from —
+/// the file a warning about one of its rules names.
+struct TsvLayer {
+    content: String,
+    prettierignore: bool,
+}
+
+impl TsvLayer {
+    /// Push the layer onto `stack` at `anchor`, as the file it was read from.
+    fn push_onto(&self, stack: &mut IgnoreStack, anchor: &str) {
+        if self.prettierignore {
+            stack.push_prettierignore(anchor, &self.content);
+        } else {
+            stack.push_formatignore(anchor, &self.content);
+        }
     }
 }
 
@@ -636,14 +738,14 @@ fn collect_recursive(
         *present =
             file_type.is_file() || (file_type.is_symlink() && is_ignore_file(&dir.abs.join(n)));
     }
-    let tsv_pushed = if let Some(content) = tsv_layer_content(
+    let tsv_pushed = if let Some(layer) = tsv_layer_content(
         dir.abs,
         has_formatignore,
         has_prettierignore,
         in_repo,
         &mut out.warnings,
     ) {
-        stack.push_tsv(dir_rel, &content);
+        layer.push_onto(stack, dir_rel);
         true
     } else {
         false

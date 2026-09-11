@@ -915,12 +915,12 @@ fn test_format_help_extension_list_is_rendered_from_the_const() {
 }
 
 /// An explicitly named file is bounded by the ignore files, as the walk that would reach it
-/// is: one a rule excludes is skipped with a warning and left untouched, and a run whose
-/// every argument was such a file is not the empty-run error (a lint-staged run with only
-/// ignored files staged). A directory the rules exclude still is. Mirrored by
-/// `scripts/test_npm.ts`.
+/// is: one a `.formatignore` rule excludes is skipped quietly and left untouched, and a run
+/// whose every argument was such a file is not the empty-run error (a pre-commit hook with
+/// only ignored files staged). A directory the rules exclude still is, and warns, naming
+/// the rule's file. Mirrored by `scripts/test_npm.ts`.
 #[test]
-fn test_format_explicit_file_an_ignore_rule_excludes_is_skipped_with_a_warning() {
+fn test_format_explicit_file_an_ignore_rule_excludes_is_skipped() {
     let dir = temp_dir("excluded_explicit_file");
     fs::write(dir.join(".formatignore"), "b.ts\ngen/\n").unwrap();
     let gen_dir = dir.join("gen");
@@ -935,12 +935,7 @@ fn test_format_explicit_file_an_ignore_rule_excludes_is_skipped_with_a_warning()
     let output = tsv(&["format", b.to_str().unwrap()]);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
-    assert!(
-        stderr.contains(
-            "b.ts is excluded by a .formatignore or .prettierignore rule, so it is not formatted"
-        ),
-        "stderr: {stderr}"
-    );
+    assert!(!stderr.contains("warning"), "stderr: {stderr}");
     assert_eq!(fs::read_to_string(&b).unwrap(), "const   x=1");
 
     // beside a file that formats, the run is the ordinary one
@@ -955,12 +950,65 @@ fn test_format_explicit_file_an_ignore_rule_excludes_is_skipped_with_a_warning()
     assert_eq!(output.status.code(), Some(2), "stderr: {stderr}");
     assert!(
         stderr.contains(
-            "is excluded by a .formatignore or .prettierignore rule, so nothing under it is formatted"
+            ".formatignore, so nothing under it is formatted; narrow or negate that rule to format it"
         ),
         "stderr: {stderr}"
     );
     assert!(stderr.contains("No files to format"), "stderr: {stderr}");
     assert_eq!(fs::read_to_string(&d).unwrap(), "const   x=1");
+}
+
+/// File arguments share one ignore scope, moved from each argument's directory to the
+/// next's: a directory's own `.gitignore` applies to the files under it and to nothing the
+/// scope moves on to, whatever order the arguments come in, and a nested repository is its
+/// own format root. Mirrored by `scripts/test_npm.ts`.
+#[test]
+fn test_format_list_scopes_each_file_argument_by_its_own_directory() {
+    let dir = temp_dir("file_argument_scopes");
+    fs::create_dir_all(dir.join(".git")).unwrap();
+    fs::create_dir_all(dir.join("inner/.git")).unwrap();
+    fs::write(dir.join(".gitignore"), "*.gen.ts\n").unwrap();
+    let files = [
+        "a/x.ts",
+        "a/y.ts",
+        "a/sub/x.ts",
+        "b/x.ts",
+        "r.gen.ts",
+        "inner/q.gen.ts",
+    ];
+    for file in files {
+        let path = dir.join(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "x").unwrap();
+    }
+    fs::write(dir.join("a/.gitignore"), "x.ts\n").unwrap();
+    let arg = |file: &str| dir.join(file).to_string_lossy().into_owned();
+
+    // out of order, so the scope pops back out of `a/` and re-enters it
+    let mut args = vec!["format".to_string(), "--list".to_string()];
+    for file in [
+        "a/x.ts",
+        "inner/q.gen.ts",
+        "b/x.ts",
+        "a/sub/x.ts",
+        "r.gen.ts",
+        "a/y.ts",
+    ] {
+        args.push(arg(file));
+    }
+    let output = tsv(&args.iter().map(String::as_str).collect::<Vec<_>>());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
+    let expected: Vec<String> = ["a/y.ts", "b/x.ts", "inner/q.gen.ts"]
+        .iter()
+        .map(|file| arg(file))
+        .collect();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(
+        stdout.lines().collect::<Vec<_>>(),
+        expected,
+        "stderr: {stderr}"
+    );
 }
 
 /// An explicitly named file is held to the extension check before anything else: the

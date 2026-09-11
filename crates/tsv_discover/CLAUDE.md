@@ -83,7 +83,7 @@ crates (the open-convention stance):
   initial `root` with the full ancestor-walking answer** (a directory under an
   ignored ancestor, e.g. `tsv format build/sub` with a gitignored `build/`, isn't
   walk-cleared) — `tsv_cli`'s `collect_root` and `cli.js`'s do exactly that, through
-  `excluded_argument_warning`. See
+  `IgnoreStack::is_ignored`. See
   `is_ignored_leaf`'s contract in [`tsv_ignore`](../tsv_ignore/CLAUDE.md).
 - `is_path_pruned(rel, &IgnoreStack) -> bool` — the per-file companion to
   `classify_dir` for a consumer with **no top-down traversal** (the VS Code
@@ -103,20 +103,26 @@ crates (the open-convention stance):
   `classify_dir` stays the primitive for real traversers, which thread
   `heuristic_active` naturally as they descend. The CLIs never ask it of a path an
   argument named: see the next entry.
-- `excluded_argument_warning(display, rel, is_dir, in_repo, format_root, &IgnoreStack)
+- `excluded_argument_warning(display, rel, is_dir, loose_root, &IgnoreStack)
   -> Option<String>` — the warning for a path an argument **named** (a file, or a
-  directory root) that an ignore file puts out of scope, `None` when no rule excludes
-  it — which is also the scope decision: a named path is bounded by the ignore files
-  alone. The safety nets and the build-output heuristic prune what a walk *discovers*,
-  so they grade neither a named path nor its ancestors, while an ignore rule bounds a
-  named path through any ancestor or at itself, exactly as it bounds the walk. The
-  text names the kind of file whose rule excluded the path
-  (`IgnoreStack::exclusion`'s `IgnoreSource`), since the remedies differ: a
-  `.gitignore`'d path is re-included from the repo-root `.formatignore`, a tsv-layer
-  rule is the user's to narrow. An excluding ancestor reads relative to the format
-  root inside a repo and absolute outside one. Both CLIs gate every named path on it
-  (`collect_root`, `collect_file`), which is also what keeps the walk's leaf-only
-  matcher query sound for the root.
+  directory root) that an ignore file puts out of scope. Whether it IS out of scope is
+  the matcher's answer alone (`IgnoreStack::is_ignored`), which both CLIs gate every
+  named path on (`collect_root`, `collect_file`) — also what keeps the walk's leaf-only
+  matcher query sound for the root: the safety nets and the build-output heuristic
+  prune what a walk *discovers*, so they grade neither a named path nor its ancestors,
+  while an ignore rule bounds a named path through any ancestor or at itself, exactly
+  as it bounds the walk. This decides whether saying so helps. `None` when no rule
+  excludes the path, and for a named **file** a `.formatignore`/`.prettierignore` rule
+  excludes — skipped quietly, as prettier skips it, since a pre-commit hook would
+  otherwise warn about such a file on every commit that stages it. Every other
+  exclusion warns, naming the file the rule sits in (`IgnoreStack::exclusion`'s
+  `IgnoreSource` and `anchor_depth`): a `.gitignore`'d path gets the exact anchored
+  lines that re-include it and nothing beside it (`!/build/`, `/build/*`,
+  `!/build/a.ts`), for the file the repo root reads (`IgnoreStack::tsv_layer_source` —
+  its `.prettierignore` where it has no `.formatignore`, since creating one would shadow
+  it); a tsv rule excluding a directory is the user's to narrow. `loose_root` is the
+  format root's display path outside a repo, where paths are named absolutely; inside
+  one (`None`) they read relative to the repo root.
 - `DirVerdict { Descend, Prune, PruneWithWarning(String) }` — `PruneWithWarning`
   carries the full warning string, so the native caller reports it without
   re-deriving.
@@ -163,7 +169,7 @@ crates (the open-convention stance):
   `classify_dir(name, child_rel, heuristic_active) -> string`
   (`"descend"|"prune"|"prune_warn"`), `should_format_file(name, child_rel) ->
   bool`, `is_path_pruned(rel) -> bool`, `excluded_argument_warning(display, rel, is_dir,
-  in_repo, format_root) -> string | undefined`, `heuristic_shadow_warning(dir) -> string`,
+  loose_root?) -> string | undefined`, `heuristic_shadow_warning(dir) -> string`,
   `unsupported_extension_error(path) -> string | undefined`,
   `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
   has_formatignore) -> string | undefined`, and the sibling

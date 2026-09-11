@@ -42,7 +42,7 @@
 //! ```
 
 use std::path::Path;
-use tsv_ignore::IgnoreStack;
+use tsv_ignore::{IgnoreSource, IgnoreStack};
 
 /// Directory names skipped during discovery in **every** mode — VCS metadata and
 /// `node_modules`. Catastrophic or pointless to recurse, and not reliably listed
@@ -268,7 +268,7 @@ fn classify_dir_inner(
 /// [`classify_dir_inner`] so the full-stack assembly skips the incremental-walk
 /// assert; see that fn for why the assembled stack stays faithful.
 pub fn is_path_pruned(rel: &str, stack: &IgnoreStack) -> bool {
-    let segments = path_segments(rel);
+    let segments = tsv_ignore::split_segments(rel);
     // a root-level file (or empty path) has no ancestor directories to prune
     if segments.len() < 2 {
         return false;
@@ -432,95 +432,144 @@ pub fn unresolvable_root_error(root: &str) -> String {
 }
 
 /// The stderr warning for a path an argument **named** — a file, or a directory root —
-/// that an ignore file puts out of scope, or `None` when no rule does. `None` is also the
-/// scope decision: a named path is bounded by the ignore files alone.
+/// that an ignore file puts out of scope, or `None`: when no rule excludes it, and when
+/// the skip is one to keep quiet.
 ///
-/// The safety nets and the build-output heuristic prune only what a walk *discovers* — a
-/// guess tsv makes about a tree never overrides a path someone typed — while an ignore
-/// rule is one the user or their repo wrote, and it bounds a named path exactly as it
-/// bounds the walk that would have reached it: through any ancestor directory, and at the
-/// path itself. So a named path the rules exclude is skipped, and this says why and how
-/// to undo it, which depends on the kind of file whose rule did it
-/// ([`IgnoreSource`](tsv_ignore::IgnoreSource)): a `.gitignore`'d path is re-included
-/// from the repo-root `.formatignore` (the tsv layer is read after every `.gitignore`, so
-/// its `!` wins), while a `.formatignore` / `.prettierignore` rule is the user's own to
-/// narrow.
+/// Whether a named path is in scope is the matcher's answer alone
+/// ([`IgnoreStack::is_ignored`]). The safety nets and the build-output heuristic prune
+/// only what a walk *discovers* — a guess tsv makes about a tree never overrides a path
+/// someone typed — while an ignore rule is one the user or their repo wrote, and it bounds
+/// a named path exactly as it bounds the walk that would have reached it: through any
+/// ancestor directory, and at the path itself.
+///
+/// What this decides is whether saying so helps. A named **file** a `.formatignore` or
+/// `.prettierignore` excludes is skipped quietly, as prettier skips it: those files exist
+/// to say what not to format, and a pre-commit hook handing over its staged files names
+/// such a file on every commit that touches one. Every other exclusion warns — a
+/// `.gitignore` rule is about version control, so one excluding a named file is a
+/// surprise, and a named directory is a scope someone typed — naming the file whose rule
+/// did it and how to undo it. A `.gitignore`'d path gets the exact lines that re-include
+/// it and nothing beside it, for the repo root's own tsv file (read after every
+/// `.gitignore`, so its `!` wins; its `.prettierignore` where that is the file the root
+/// reads, since a `.formatignore` created beside it would shadow every rule in it); a tsv
+/// rule is the user's to narrow.
 ///
 /// `display` is the argument as given; `rel` is the path relative to the format root,
 /// `/`-separated; `is_dir` says which kind of argument it is; `stack` holds the layers
-/// from the format root down through the path's parent directory. An excluding ancestor
-/// is named relative to the format root inside a repo, and by its absolute path outside
-/// one, where the format root is the filesystem root (`format_root`, its display path).
-/// Produced **once**, here, so the native CLI and the WASM binding emit the identical text.
+/// from the format root down through the path's parent directory. `loose_root` is the
+/// format root's display path outside a git repo, where the format root is the
+/// filesystem root and a path is named absolutely; inside one it is `None`, and paths read
+/// relative to the repo root. Produced **once**, here, so the native CLI and the WASM
+/// binding emit the identical text.
 pub fn excluded_argument_warning(
     display: &str,
     rel: &str,
     is_dir: bool,
-    in_repo: bool,
-    format_root: &str,
+    loose_root: Option<&str>,
     stack: &IgnoreStack,
 ) -> Option<String> {
     let exclusion = stack.exclusion(rel, is_dir)?;
-    let segments = path_segments(rel);
-    let excluded = segments[..exclusion.depth].join("/");
-    let at_the_path = exclusion.depth == segments.len();
+    let by_gitignore = exclusion.source == IgnoreSource::Gitignore;
+    if !is_dir && !by_gitignore {
+        return None;
+    }
+    let segments = tsv_ignore::split_segments(rel);
     let consequence = if is_dir {
         "so nothing under it is formatted"
     } else {
         "so it is not formatted"
     };
-    let (by, remedy) = match exclusion.source {
-        tsv_ignore::IgnoreSource::Gitignore => {
-            // the excluded path is a directory unless it is the named file itself
-            let (what, slash) = match (at_the_path, is_dir) {
-                (true, false) => ("it", ""),
-                (true, true) => ("it", "/"),
-                (false, _) => ("that directory", "/"),
-            };
-            (
-                ".gitignore",
-                format!(
-                    "re-include {what} with `!{excluded}{slash}` in the repo-root .formatignore"
-                ),
-            )
-        }
-        tsv_ignore::IgnoreSource::Tsv => (
-            "a .formatignore or .prettierignore rule",
-            "narrow or negate that rule to format it".to_string(),
-        ),
-    };
-    Some(if at_the_path {
-        format!("{display} is excluded by {by}, {consequence}; {remedy}")
+    let rule_file = ignore_file_display(
+        &segments[..exclusion.anchor_depth],
+        exclusion.source,
+        loose_root,
+    );
+    let remedy = if by_gitignore {
+        let root_file = stack
+            .tsv_layer_source("")
+            .unwrap_or(IgnoreSource::Formatignore)
+            .file_name();
+        let lines = reinclude_lines(&segments, exclusion.depth, is_dir);
+        let order = if lines.len() > 1 {
+            ", in that order,"
+        } else {
+            ""
+        };
+        format!(
+            "re-include it by adding {}{order} to the repo-root {root_file}",
+            quoted_list(&lines)
+        )
     } else {
-        let dir = display_under(format_root, &excluded, in_repo);
-        format!("{display} is inside {dir}, which {by} excludes, {consequence}; {remedy}")
+        "narrow or negate that rule to format it".to_string()
+    };
+    Some(if exclusion.depth == segments.len() {
+        format!("{display} is excluded by a rule in {rule_file}, {consequence}; {remedy}")
+    } else {
+        let dir = path_display(&segments[..exclusion.depth], loose_root);
+        format!(
+            "{display} is inside {dir}, which a rule in {rule_file} excludes, {consequence}; {remedy}"
+        )
     })
 }
 
-/// A format-root-relative, `/`-separated path's meaningful segments — empty and `.`
-/// components dropped, as the matcher drops them — so a count here is in the unit
-/// `IgnoreStack::exclusion` reports its depth in.
-fn path_segments(rel: &str) -> Vec<&str> {
-    rel.split('/')
-        .filter(|s| !s.is_empty() && *s != ".")
-        .collect()
+/// The ignore-file lines that put `segments` — a path whose first `depth` segments name
+/// the directory or file a `.gitignore` rule excluded — back in scope and nothing beside
+/// it, for a tsv layer at the format root. A path the rule matched itself takes one line
+/// (`!/src/a.gen.ts`); one under an excluded directory takes that directory re-included,
+/// its contents excluded again, and so on one level at a time down to the path
+/// (`!/build/`, `/build/*`, `!/build/a.ts`), because git's parent-directory rule ignores a
+/// `!` under a directory that is still excluded. Every line is anchored with a leading
+/// `/`: without it a one-segment pattern matches at every depth.
+fn reinclude_lines(segments: &[&str], depth: usize, is_dir: bool) -> Vec<String> {
+    let anchored = |len: usize| {
+        let slash = if len < segments.len() || is_dir {
+            "/"
+        } else {
+            ""
+        };
+        format!("/{}{slash}", segments[..len].join("/"))
+    };
+    let mut lines = vec![format!("!{}", anchored(depth))];
+    for len in depth..segments.len() {
+        lines.push(format!("/{}/*", segments[..len].join("/")));
+        lines.push(format!("!{}", anchored(len + 1)));
+    }
+    lines
 }
 
-/// A format-root-relative, `/`-separated path as a user reads it: unchanged inside a repo,
-/// where the format root is the repo root, and joined onto `format_root` outside one,
-/// where the format root is the filesystem root and the relative form would read as a
-/// path under the working directory.
-fn display_under(format_root: &str, rel: &str, in_repo: bool) -> String {
-    if in_repo {
-        return rel.to_string();
+/// `items` backticked and joined as prose: `` `a` ``, `` `a` and `b` ``,
+/// `` `a`, `b` and `c` ``.
+fn quoted_list(items: &[String]) -> String {
+    let quoted: Vec<String> = items.iter().map(|item| format!("`{item}`")).collect();
+    match quoted.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+        _ => quoted.concat(),
     }
-    let separator = if format_root.contains('\\') {
-        '\\'
-    } else {
-        '/'
+}
+
+/// The ignore file `source` names in the directory `dir` (format-root-relative segments),
+/// as a user reads it: `the repo-root .gitignore` or `src/.formatignore` inside a repo, and
+/// by its absolute path outside one.
+fn ignore_file_display(dir: &[&str], source: IgnoreSource, loose_root: Option<&str>) -> String {
+    if loose_root.is_none() && dir.is_empty() {
+        return format!("the repo-root {}", source.file_name());
+    }
+    let mut segments = dir.to_vec();
+    segments.push(source.file_name());
+    path_display(&segments, loose_root)
+}
+
+/// Format-root-relative segments as a user reads them: `/`-joined inside a repo, where
+/// the format root is the repo root, and joined onto `loose_root` outside one, where the
+/// format root is the filesystem root and the relative form would read as a path under
+/// the working directory.
+fn path_display(segments: &[&str], loose_root: Option<&str>) -> String {
+    let Some(root) = loose_root else {
+        return segments.join("/");
     };
-    let mut display = format_root.trim_end_matches(['/', '\\']).to_string();
-    for segment in rel.split('/') {
+    let separator = if root.contains('\\') { '\\' } else { '/' };
+    let mut display = root.trim_end_matches(['/', '\\']).to_string();
+    for segment in segments {
         display.push(separator);
         display.push_str(segment);
     }
@@ -533,7 +582,7 @@ mod tests {
 
     fn tsv_stack(content: &str) -> IgnoreStack {
         let mut stack = IgnoreStack::new();
-        stack.push_tsv("", content);
+        stack.push_formatignore("", content);
         stack
     }
 
@@ -782,67 +831,164 @@ mod tests {
     fn excluded_argument_warning_text_is_stable() {
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "build/\n*.gen.ts\n");
-        stack.push_tsv("", "vendor/\nskip.ts\n");
-        let warn = |display, rel, is_dir| {
-            excluded_argument_warning(display, rel, is_dir, true, "/repo", &stack)
-        };
-        assert_eq!(
-            warn("build/sub", "build/sub", true).as_deref(),
-            Some(
-                "build/sub is inside build, which .gitignore excludes, so nothing under it is formatted; re-include that directory with `!build/` in the repo-root .formatignore"
-            )
-        );
+        stack.push_gitignore("pkg", "out/\n");
+        stack.push_formatignore("", "vendor/\n");
+        stack.push_prettierignore("lib", "gen/\n");
+        let warn =
+            |display, rel, is_dir| excluded_argument_warning(display, rel, is_dir, None, &stack);
         assert_eq!(
             warn("build", "build", true).as_deref(),
             Some(
-                "build is excluded by .gitignore, so nothing under it is formatted; re-include it with `!build/` in the repo-root .formatignore"
+                "build is excluded by a rule in the repo-root .gitignore, so nothing under it is formatted; re-include it by adding `!/build/` to the repo-root .formatignore"
+            )
+        );
+        assert_eq!(
+            warn("build/sub", "build/sub", true).as_deref(),
+            Some(
+                "build/sub is inside build, which a rule in the repo-root .gitignore excludes, so nothing under it is formatted; re-include it by adding `!/build/`, `/build/*` and `!/build/sub/`, in that order, to the repo-root .formatignore"
             )
         );
         assert_eq!(
             warn("build/a.ts", "build/a.ts", false).as_deref(),
             Some(
-                "build/a.ts is inside build, which .gitignore excludes, so it is not formatted; re-include that directory with `!build/` in the repo-root .formatignore"
+                "build/a.ts is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; re-include it by adding `!/build/`, `/build/*` and `!/build/a.ts`, in that order, to the repo-root .formatignore"
             )
         );
         assert_eq!(
             warn("src/a.gen.ts", "src/a.gen.ts", false).as_deref(),
             Some(
-                "src/a.gen.ts is excluded by .gitignore, so it is not formatted; re-include it with `!src/a.gen.ts` in the repo-root .formatignore"
+                "src/a.gen.ts is excluded by a rule in the repo-root .gitignore, so it is not formatted; re-include it by adding `!/src/a.gen.ts` to the repo-root .formatignore"
             )
         );
+        // a nested `.gitignore` is named where it sits; the lines still go to the root
+        assert_eq!(
+            warn("pkg/out/a.ts", "pkg/out/a.ts", false).as_deref(),
+            Some(
+                "pkg/out/a.ts is inside pkg/out, which a rule in pkg/.gitignore excludes, so it is not formatted; re-include it by adding `!/pkg/out/`, `/pkg/out/*` and `!/pkg/out/a.ts`, in that order, to the repo-root .formatignore"
+            )
+        );
+        // a directory a tsv rule excludes names that rule's file
         assert_eq!(
             warn("vendor/lib", "vendor/lib", true).as_deref(),
             Some(
-                "vendor/lib is inside vendor, which a .formatignore or .prettierignore rule excludes, so nothing under it is formatted; narrow or negate that rule to format it"
+                "vendor/lib is inside vendor, which a rule in the repo-root .formatignore excludes, so nothing under it is formatted; narrow or negate that rule to format it"
+            )
+        );
+        assert_eq!(
+            warn("lib/gen", "lib/gen", true).as_deref(),
+            Some(
+                "lib/gen is excluded by a rule in lib/.prettierignore, so nothing under it is formatted; narrow or negate that rule to format it"
             )
         );
         // `display` is the argument as given, whatever `rel` normalized it to
-        assert_eq!(
-            warn("./skip.ts", "skip.ts", false).as_deref(),
-            Some(
-                "./skip.ts is excluded by a .formatignore or .prettierignore rule, so it is not formatted; narrow or negate that rule to format it"
-            )
+        assert!(
+            warn("./build", "build", true)
+                .is_some_and(|warning| warning.starts_with("./build is excluded by"))
         );
     }
 
     #[test]
-    fn excluded_argument_warning_names_an_ancestor_by_its_absolute_path_outside_a_repo() {
+    fn excluded_argument_warning_keeps_a_file_a_tsv_rule_excludes_quiet() {
         let mut stack = IgnoreStack::new();
-        stack.push_tsv("home/u", "gen/\n");
+        stack.push_formatignore("", "skip.ts\ngen/\n");
+        stack.push_prettierignore("lib", "p.ts\n");
+        for rel in ["skip.ts", "gen/a.ts", "lib/p.ts"] {
+            // still out of scope — only the warning is withheld
+            assert!(stack.is_ignored(rel, false), "{rel}");
+            assert_eq!(
+                excluded_argument_warning(rel, rel, false, None, &stack),
+                None,
+                "{rel}"
+            );
+        }
+        // a directory the same rules exclude still warns
+        assert!(excluded_argument_warning("gen", "gen", true, None, &stack).is_some());
+    }
+
+    #[test]
+    fn excluded_argument_warning_names_the_repo_roots_own_tsv_file() {
+        // a root reading `.prettierignore` is not told to create a `.formatignore` beside it,
+        // which would shadow every rule in that `.prettierignore`
+        let mut stack = IgnoreStack::new();
+        stack.push_gitignore("", "build/\n");
+        stack.push_prettierignore("", "vendor/\n");
         assert_eq!(
-            excluded_argument_warning("gen/sub", "home/u/gen/sub", true, false, "/", &stack)
+            excluded_argument_warning("build", "build", true, None, &stack).as_deref(),
+            Some(
+                "build is excluded by a rule in the repo-root .gitignore, so nothing under it is formatted; re-include it by adding `!/build/` to the repo-root .prettierignore"
+            )
+        );
+        // a nested directory's `.prettierignore` is not the root's file
+        let mut nested = IgnoreStack::new();
+        nested.push_gitignore("", "build/\n");
+        nested.push_prettierignore("src", "x\n");
+        assert!(
+            excluded_argument_warning("build", "build", true, None, &nested)
+                .is_some_and(|warning| warning.ends_with("to the repo-root .formatignore"))
+        );
+    }
+
+    #[test]
+    fn excluded_argument_warning_lines_readmit_exactly_the_named_path() {
+        // appended to the repo-root tsv file, the suggested lines put the named path back in
+        // scope and leave everything beside it out, at every depth below the exclusion
+        const GITIGNORE: &str = "build/\n*.gen.ts\n";
+        let cases: [(&str, bool, &[&str]); 6] = [
+            ("build", true, &[]),
+            ("build/a.ts", false, &["build/b.ts", "build/sub/a.ts"]),
+            ("build/sub", true, &["build/a.ts", "build/other/a.ts"]),
+            (
+                "build/sub/deep/a.ts",
+                false,
+                &[
+                    "build/a.ts",
+                    "build/sub/a.ts",
+                    "build/sub/deep/b.ts",
+                    "build/sub/other/a.ts",
+                ],
+            ),
+            ("src/x.gen.ts", false, &["src/y.gen.ts", "x.gen.ts"]),
+            // a root-level file: the leading `/` keeps the line from matching at depth
+            ("x.gen.ts", false, &["src/x.gen.ts"]),
+        ];
+        for (rel, is_dir, still_excluded) in cases {
+            let mut stack = IgnoreStack::new();
+            stack.push_gitignore("", GITIGNORE);
+            let warning = excluded_argument_warning(rel, rel, is_dir, None, &stack)
+                .unwrap_or_else(|| panic!("{rel}: no warning"));
+            // the backticked spans are the lines, in order
+            let lines: Vec<&str> = warning.split('`').skip(1).step_by(2).collect();
+            let mut fixed = IgnoreStack::new();
+            fixed.push_gitignore("", GITIGNORE);
+            fixed.push_formatignore("", &lines.join("\n"));
+            assert!(!fixed.is_ignored(rel, is_dir), "{rel}: {lines:?}");
+            if is_dir {
+                assert!(!fixed.is_ignored(&format!("{rel}/z.ts"), false), "{rel}");
+            }
+            for other in still_excluded {
+                assert!(fixed.is_ignored(other, false), "{rel}: {other} {lines:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn excluded_argument_warning_names_paths_absolutely_outside_a_repo() {
+        let mut stack = IgnoreStack::new();
+        stack.push_formatignore("home/u", "gen/\n");
+        assert_eq!(
+            excluded_argument_warning("gen/sub", "home/u/gen/sub", true, Some("/"), &stack)
                 .as_deref(),
             Some(
-                "gen/sub is inside /home/u/gen, which a .formatignore or .prettierignore rule excludes, so nothing under it is formatted; narrow or negate that rule to format it"
+                "gen/sub is inside /home/u/gen, which a rule in /home/u/.formatignore excludes, so nothing under it is formatted; narrow or negate that rule to format it"
             )
         );
         let mut windows = IgnoreStack::new();
-        windows.push_tsv("Users/u", "gen/\n");
+        windows.push_formatignore("Users/u", "gen/\n");
         assert_eq!(
-            excluded_argument_warning("gen\\sub", "Users/u/gen/sub", true, false, "C:\\", &windows)
+            excluded_argument_warning("gen\\sub", "Users/u/gen/sub", true, Some("C:\\"), &windows)
                 .as_deref(),
             Some(
-                "gen\\sub is inside C:\\Users\\u\\gen, which a .formatignore or .prettierignore rule excludes, so nothing under it is formatted; narrow or negate that rule to format it"
+                "gen\\sub is inside C:\\Users\\u\\gen, which a rule in C:\\Users\\u\\.formatignore excludes, so nothing under it is formatted; narrow or negate that rule to format it"
             )
         );
     }
@@ -859,8 +1005,9 @@ mod tests {
             (".cache/x/a.ts", false),
             ("build/a.ts", false),
         ] {
+            assert!(!empty.is_ignored(rel, is_dir), "{rel}");
             assert_eq!(
-                excluded_argument_warning(rel, rel, is_dir, true, "/repo", &empty),
+                excluded_argument_warning(rel, rel, is_dir, None, &empty),
                 None,
                 "{rel}"
             );
@@ -868,9 +1015,10 @@ mod tests {
         // a `.gitignore`'d directory a tsv layer re-includes is in scope
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "build/\n");
-        stack.push_tsv("", "!build/\n");
+        stack.push_formatignore("", "!build/\n");
+        assert!(!stack.is_ignored("build/sub", true));
         assert_eq!(
-            excluded_argument_warning("build/sub", "build/sub", true, true, "/repo", &stack),
+            excluded_argument_warning("build/sub", "build/sub", true, None, &stack),
             None
         );
     }
@@ -891,7 +1039,7 @@ mod tests {
             stack.push_gitignore(anchor, content);
         }
         for (anchor, content) in tsvs {
-            stack.push_tsv(anchor, content);
+            stack.push_formatignore(anchor, content);
         }
         stack
     }
