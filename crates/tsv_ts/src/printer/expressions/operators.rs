@@ -1389,13 +1389,14 @@ impl<'a> Printer<'a> {
             )
         };
 
-        // A block run the author broke AFTER, before an argument that WILL BREAK,
-        // keeps its break — prettier's `printLeadingComment` newline-after `line`,
-        // materialized by the argument's own break (`await /* c */⏎fn({…})` stays
+        // A block run the author broke AFTER, before an argument that WILL BREAK or holding a
+        // multi-line comment, keeps its break — prettier's `printLeadingComment` newline-after
+        // `line`, materialized by that forced break (`await /* c */⏎fn({…})` stays
         // broken, the argument opening un-indented on the next line; `await` is not a
         // restricted production, so the break is layout, not ASI — contrast `yield`).
-        // The gate is the shared `breaking_value_leading_run`; an argument that FITS
-        // declines into the glued pull-up below. Mirrors `build_spread_doc`; a
+        // The gate is the shared `breaking_value_leading_run`; an argument that FITS behind
+        // single-line comments declines into the glued pull-up below. Mirrors
+        // `build_spread_doc`; a
         // parenthesized argument keeps the glued path (the compound is unprobed).
         //
         // ⚠️ A FROZEN operand declines this arm outright. The arm glues the run to the

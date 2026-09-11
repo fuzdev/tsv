@@ -52,6 +52,7 @@ UNHONORED	MethodDefinition.value
 UNHONORED	TSAsExpression.expression
 UNHONORED	TSImportEqualsDeclaration.moduleReference
 UNHONORED	TSInstantiationExpression.expression
+UNHONORED	TSModuleBlock.body
 UNHONORED	TSModuleDeclaration.body
 UNHONORED	TSNonNullExpression.expression
 UNHONORED	TSParenthesizedType.typeAnnotation

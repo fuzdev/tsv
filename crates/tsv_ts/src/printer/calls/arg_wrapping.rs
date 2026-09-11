@@ -145,20 +145,16 @@ pub(super) fn prepend_arrow_body_comments(
     body_doc: DocId,
 ) -> DocId {
     let arrow_end = arrow_token_end(arrow);
-    let d = printer.d();
 
     // A run the author broke AFTER keeps its breaks before a body that breaks — by a hard
-    // break of its own, or by the multi-line comment the run ends in — exactly as the arrow's
-    // own arms answer it (`Printer::break_or_hang_after_operator_run_doc`). The body sits below
+    // break of its own, or by a multi-line comment in the run — exactly as the arrow's own
+    // arms answer it (`Printer::break_or_hang_after_operator_run_doc`). The body sits below
     // `=>` in every state this doc reaches, so the forced emitter is the rendering the run
     // needs; glued, it welded the run onto the body (`/* x */ /* y */ fn(`).
     if let Some(run) = printer.broke_after_value_leading_run(arrow_end, body_start)
-        && (d.will_break(body_doc) || printer.run_ends_in_glued_multiline_block(&run))
+        && printer.broke_after_run_break_is_forced(&run, body_doc)
     {
-        let mut parts = DocBuf::new();
-        printer.push_leading_run_before_breaking_value(&mut parts, &run, body_start);
-        parts.push(body_doc);
-        return d.concat(&parts);
+        return printer.leading_run_before_breaking_value_doc(&run, body_start, body_doc);
     }
     prepend_hugged_arrow_body_comments(printer, arrow, body_start, body_doc)
 }

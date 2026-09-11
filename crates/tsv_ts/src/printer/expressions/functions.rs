@@ -948,7 +948,7 @@ impl<'a> Printer<'a> {
             // ([`Printer::break_or_hang_after_operator_run_doc`]).
             let soft_run = self.value_gap_soft_broke_after_run(arrow_end, body_start);
             if let Some(run) = &soft_run
-                && (d.will_break(body_doc) || self.run_ends_in_glued_multiline_block(run))
+                && self.broke_after_run_break_is_forced(run, body_doc)
             {
                 parts.push(self.break_after_operator_run_doc(run, body_start, body_doc));
             } else {
