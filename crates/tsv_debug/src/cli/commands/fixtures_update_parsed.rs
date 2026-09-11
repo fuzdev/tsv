@@ -1,8 +1,6 @@
 use crate::cli::CliError;
-use crate::deno::{self, DenoError};
 use crate::fixtures::validation::parsed_input::{input_ast_paths, parse_input};
-use crate::fixtures::{self, InputType, WriteOutcome};
-use crate::json::to_json_with_tabs;
+use crate::fixtures::{self, CanonicalParseError, WriteOutcome};
 use argh::FromArgs;
 use futures_util::StreamExt;
 
@@ -130,44 +128,6 @@ fn uses_divergence_pattern(fixture: &fixtures::Fixture) -> bool {
     fixture.has_expected_ours() || fixture.is_svelte_divergence()
 }
 
-/// The canonical parser for a fixture's input, as `(language, parser)` names for messages.
-fn canonical_labels(input_type: InputType) -> (&'static str, &'static str) {
-    match input_type {
-        InputType::SvelteTs | InputType::TypeScript => ("TypeScript", "acorn-typescript"),
-        InputType::Css => ("CSS", "parseCss"),
-        InputType::Svelte => ("Svelte", "Svelte"),
-    }
-}
-
-/// A canonical parse of a fixture input, ready to store.
-enum CanonicalJson {
-    /// The AST, tab-indented with a trailing newline — the bytes an `expected*.json` holds.
-    Json(String),
-    /// The canonical parser rejected the input.
-    Rejected(DenoError),
-    /// The AST parsed but did not serialize; the message is worded for the fixture result.
-    Unserializable(String),
-}
-
-/// Parse a fixture input with its canonical parser (Svelte, acorn-typescript, or `parseCss`)
-/// at the fixture's parse goal.
-async fn canonical_json(fixture: &fixtures::Fixture, source: &str) -> CanonicalJson {
-    let input_type = fixture.input_type();
-    let parsed =
-        deno::parse_by_type_with_goal(source, input_type.parser_type(), fixture.goal()).await;
-    let ast = match parsed {
-        Ok(ast) => ast,
-        Err(e) => return CanonicalJson::Rejected(e),
-    };
-    match to_json_with_tabs(&ast) {
-        Ok(json) => CanonicalJson::Json(format!("{json}\n")),
-        Err(e) => CanonicalJson::Unserializable(format!(
-            "Failed to serialize {} AST: {e}",
-            canonical_labels(input_type).0
-        )),
-    }
-}
-
 /// Our parser's AST for a fixture input, in the exact bytes an `expected_ours.json` holds —
 /// the same derivation the validator's parser phases compare against.
 fn our_json(fixture: &fixtures::Fixture, source: &str) -> Result<String, String> {
@@ -198,13 +158,19 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> Result<WriteO
     }
 
     // Generate expected.json from the input type's canonical parser
-    let json = match canonical_json(fixture, &source).await {
-        CanonicalJson::Json(json) => json,
-        CanonicalJson::Rejected(e) => {
-            let (language, _) = canonical_labels(fixture.input_type());
-            return Err(format!("{language} parse error: {e}"));
+    let input_type = fixture.input_type();
+    let json = match fixtures::canonical_expected_json(&source, input_type, fixture.goal()).await {
+        Ok(json) => json,
+        Err(CanonicalParseError::Rejected(message)) => {
+            return Err(format!(
+                "{} parse error: {message}",
+                input_type.language_name()
+            ));
         }
-        CanonicalJson::Unserializable(message) => return Err(message),
+        Err(CanonicalParseError::Sidecar(e)) => {
+            return Err(fixtures::canonical_sidecar_failure(input_type, &e));
+        }
+        Err(CanonicalParseError::Unserializable(message)) => return Err(message),
     };
 
     fixtures::write_if_changed(&fixture.expected_path(), &json)
@@ -222,16 +188,22 @@ async fn generate_tsv_rejects_fixture(
     fixture: &fixtures::Fixture,
     source: &str,
 ) -> Result<WriteOutcome, String> {
-    let svelte_json = match canonical_json(fixture, source).await {
-        CanonicalJson::Json(json) => json,
-        CanonicalJson::Rejected(e) => {
-            let (_, parser) = canonical_labels(fixture.input_type());
+    let input_type = fixture.input_type();
+    let svelte_json = match fixtures::canonical_expected_json(source, input_type, fixture.goal())
+        .await
+    {
+        Ok(json) => json,
+        Err(CanonicalParseError::Rejected(message)) => {
             return Err(format!(
-                "canonical parser ({parser}) REJECTED a tsv_rejects input — the divergence is dead \
-                (both parsers reject now). Convert the fixture to input_invalid_*. Error: {e}"
+                "canonical parser ({}) REJECTED a tsv_rejects input — the divergence is dead \
+                    (both parsers reject now). Convert the fixture to input_invalid_*. Error: {message}",
+                input_type.canonical_parser_name()
             ));
         }
-        CanonicalJson::Unserializable(message) => return Err(message),
+        Err(CanonicalParseError::Sidecar(e)) => {
+            return Err(fixtures::canonical_sidecar_failure(input_type, &e));
+        }
+        Err(CanonicalParseError::Unserializable(message)) => return Err(message),
     };
 
     fixtures::write_if_changed(&fixture.expected_svelte_path(), &svelte_json)
@@ -248,11 +220,18 @@ async fn generate_divergence_fixture(
     };
 
     // Generate expected_svelte.json from the external canonical parser
-    // (Svelte, acorn-typescript, or parseCss), falling back to the error marker.
-    let svelte_json = match canonical_json(fixture, source).await {
-        CanonicalJson::Json(json) => json,
-        CanonicalJson::Rejected(_) => fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string(),
-        CanonicalJson::Unserializable(message) => return Err(message),
+    // (Svelte, acorn-typescript, or parseCss), falling back to the error marker only
+    // for the parser's own rejection — a sidecar fault writes nothing.
+    let input_type = fixture.input_type();
+    let svelte_json = match fixtures::canonical_expected_json(source, input_type, fixture.goal())
+        .await
+    {
+        Ok(json) => json,
+        Err(CanonicalParseError::Rejected(_)) => fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string(),
+        Err(CanonicalParseError::Sidecar(e)) => {
+            return Err(fixtures::canonical_sidecar_failure(input_type, &e));
+        }
+        Err(CanonicalParseError::Unserializable(message)) => return Err(message),
     };
 
     let ours = match fixtures::write_if_changed(&fixture.expected_ours_path(), &our_json) {

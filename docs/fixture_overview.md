@@ -205,7 +205,7 @@ No exceptions — save one deliberate opt-out: a `tsv_rejects.txt` fixture, whos
 
 ```
 Need to test parser?
-├─ Our parser matches Svelte → use expected.json (default)
+├─ Our parser matches the canonical parser → use expected.json (default)
 ├─ Intentional AST difference (both parsers accept) → use expected_ours.json + expected_svelte.json
 ├─ The canonical parser REJECTS but tsv accepts (a tsv over-acceptance) → the same pair, with
 │    expected_svelte.json = {"error": "failed to parse"} (see below)
@@ -254,7 +254,7 @@ Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
 
 #### Pattern Usage Summary
 
-- `expected.json` — Default - our parser matches Svelte
+- `expected.json` — Default - our parser matches the canonical parser
 - `expected_ours.json` + `expected_svelte.json` — **Intentional, permanent** parser differences (NOT implementation gaps)
 - `output_prettier.svelte` — **Intentional, permanent** formatter differences (**NEVER** "not implemented" - that's a bug to fix!)
   - ⚠️ **It must also be a tsv fixed point** — not an F/S rule of this validator (which grades it by F2 alone: it IS prettier's output of `input`), but `deno task authoring:audit` scans every fixture `.svelte` and fails a **base-non-idempotent** file, so a `_prettier_divergence` whose prettier form tsv rewrites passes `fixtures:validate` and fails `deno task check` several gates later. It bites when prettier's form is *mangled* rather than merely different — tsv often re-mangles it. Choose the case so prettier's own output is stable on both sides; see [audits.md §Authoring-Independence Audit](./audits.md#authoring-independence-audit-authoringaudit)
@@ -378,10 +378,10 @@ prettier-svelte for formatting; variants use `.svelte.ts`).
 
 **Parser validations (P)** - Expected ASTs match parser outputs:
 
-- **P1**: `expected.json` matches Svelte parser output
+- **P1**: `expected.json` matches the canonical parser's output — Svelte's parser for `.svelte`, acorn-typescript at the fixture's goal for `.ts` / `.svelte.ts`, Svelte's `parseCss` for `.css`. The canonical parser must accept the input; a rejection fails P1. A sidecar failure (the parser never answered) is reported as an error and grades neither P1 nor P3
 - **P2**: `expected_ours.json` matches our parser output (divergence fixtures)
 - **P2b**: our parser output (the writer's wire JSON, tab-indented by the CLI's `--pretty` re-indenter and read back unbounded for the field-order triage) matches `expected.json` — the gate on the emission path (non-divergence fixtures)
-- **P3**: `expected_svelte.json` matches Svelte parser output
+- **P3**: `expected_svelte.json` matches the same canonical parser, for every input type: it holds the canonical AST, or `{"error": "failed to parse"}` exactly when the canonical parser rejects the input — the marker on an input the parser accepts fails, and so does an AST on one it rejects. A sidecar failure is an error, never read as a rejection
 
 The writer (`convert_ast_json_bytes`) is the sole emission path, so P2/P2b
 compare the *writer's* wire JSON against the canonical parsers' `expected.json`
@@ -860,7 +860,7 @@ nth_child_of_svelte_prettier_divergence/
 └── README.md                 # Spec compliance vs Svelte behavior
 ```
 
-When Svelte's parser is expected to fail: `expected_svelte.json` contains `{ "error": "failed to parse" }`.
+When the canonical parser is expected to fail (tsv over-accepts): `expected_svelte.json` contains `{"error": "failed to parse"}`. P3 grades the marker live, so it holds only while the canonical parser still rejects.
 
 **tsv over-rejection (`tsv_rejects.txt`)**: the *inverse* case — tsv rejects an
 input the canonical parser **accepts** (a spec-stricter parse than acorn's). tsv
@@ -1098,8 +1098,8 @@ Every pattern's validations are the rules in
 **Three-tier command structure:**
 
 - **`fixtures_update_parsed`** - Updates parser expectations
-  - Generates `expected.json` using Svelte parser (default)
-  - Generates `expected_ours.json` + `expected_svelte.json` when divergence exists
+  - Generates `expected.json` from the input type's canonical parser — Svelte's parser, acorn-typescript at the fixture's goal, or `parseCss` (default)
+  - Generates `expected_ours.json` + `expected_svelte.json` when divergence exists (`expected_svelte.json` takes the error marker only when the canonical parser rejects; a sidecar failure fails the fixture and writes nothing)
   - Generates `expected_svelte.json` alone for a `tsv_rejects.txt` fixture (canonical parser only — tsv emits no AST; fails loudly if the canonical parser rejects, i.e. the divergence is dead)
 
 - **`fixtures_update_formatted`** - Updates formatter outputs

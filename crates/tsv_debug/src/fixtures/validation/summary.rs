@@ -174,13 +174,16 @@ impl ValidationSummary {
         self.count_failures_matching(|msg| msg.contains(head))
     }
 
-    /// Fixtures carrying a formatter or parser error whose message satisfies `matches`.
+    /// Fixtures carrying a formatter, parser, or canonical-parser sidecar error whose message
+    /// satisfies `matches`.
     fn count_failures_matching(&self, matches: impl Fn(&str) -> bool) -> usize {
         self.results
             .iter()
             .filter(|r| {
                 r.errors.iter().any(|e| {
-                    matches!(e, ValidationError::FormatterError(msg) | ValidationError::ParserError(msg)
+                    matches!(e, ValidationError::FormatterError(msg)
+                        | ValidationError::ParserError(msg)
+                        | ValidationError::CanonicalParserSidecarFailure(msg)
                         if matches(msg))
                 })
             })
@@ -453,6 +456,39 @@ mod tests {
 
         let mut timeouts = ValidationSummary::new();
         timeouts.add(failed_with(&DenoError::Timeout { seconds: 30 }.to_string()));
+        assert_eq!(timeouts.count_timeout_failures(), 1);
+        assert_eq!(timeouts.count_sidecar_failures(), 0);
+    }
+
+    /// A validation result carrying one canonical-parser sidecar failure around `fault`, the way
+    /// the P1 / P3 / F7 / `input_invalid_*` checks report one.
+    fn failed_at_canonical_parser(fault: &DenoError) -> FixtureValidation {
+        let mut result = FixtureValidation::new("fixture".to_string());
+        result.add_error(ValidationError::CanonicalParserSidecarFailure(
+            crate::fixtures::canonical_sidecar_failure(crate::fixtures::InputType::Svelte, fault),
+        ));
+        result
+    }
+
+    /// The counters read the canonical-parser sidecar variant too, through the real message
+    /// builder, so a fault at those checks still trips the integration test's guard.
+    #[test]
+    fn canonical_parser_sidecar_faults_reach_the_counters() {
+        for fault in [
+            DenoError::ActorShutdown,
+            DenoError::SidecarCrashed,
+            DenoError::EmptyOutput,
+        ] {
+            let mut summary = ValidationSummary::new();
+            summary.add(failed_at_canonical_parser(&fault));
+            assert_eq!(summary.count_sidecar_failures(), 1, "{fault}");
+            assert_eq!(summary.count_timeout_failures(), 0, "{fault}");
+        }
+
+        let mut timeouts = ValidationSummary::new();
+        timeouts.add(failed_at_canonical_parser(&DenoError::Timeout {
+            seconds: 30,
+        }));
         assert_eq!(timeouts.count_timeout_failures(), 1);
         assert_eq!(timeouts.count_sidecar_failures(), 0);
     }

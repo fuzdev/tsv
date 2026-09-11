@@ -85,6 +85,11 @@ pub enum ValidationError {
     ParserError(String),
     #[error("Parser error (svelte_divergence): {0}")]
     ParserErrorInDivergence(String),
+    /// A sidecar fault kept the canonical parser from answering (P1, P3, F7, input_invalid_*):
+    /// no verdict on the input, so nothing was graded. The message embeds the fault's own text,
+    /// which the summary's sidecar-health counters match on.
+    #[error("{0}")]
+    CanonicalParserSidecarFailure(String),
 
     // Formatter
     #[error("{0} doesn't format to itself")]
@@ -370,6 +375,9 @@ impl ValidationError {
             Self::ParserErrorInDivergence(_) => {
                 "Fix the parser to support this syntax (svelte_divergence fixture)"
             }
+            Self::CanonicalParserSidecarFailure(_) => {
+                "Re-run; if it persists, check the sidecar: cargo run -p tsv_debug check"
+            }
             Self::FormatterInputNotIdempotent(input_file) => {
                 // Return static str - the dynamic path is shown in the error message itself
                 match InputType::from_filepath(input_file) {
@@ -624,6 +632,7 @@ impl ValidationError {
             | Self::ParserExpectedSvelteOutdated
             | Self::ParserError(_)
             | Self::ParserErrorInDivergence(_)
+            | Self::CanonicalParserSidecarFailure(_)
             | Self::TsvRejectsMarkerButTsvAccepts(_)
             | Self::TsvRejectsMarkerWrongMessage { .. }
             | Self::TsvRejectsMarkerEmpty(_)
@@ -741,13 +750,15 @@ impl fmt::Display for ValidationSuccess {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StructureValid(n) => write!(f, "{n} structure checks passed"),
-            Self::ParserExpectedJsonMatches => write!(f, "expected.json matches Svelte parser"),
+            Self::ParserExpectedJsonMatches => {
+                write!(f, "expected.json matches the canonical parser")
+            }
             Self::ParserExpectedOursMatches => write!(f, "expected_ours.json matches our parser"),
             Self::ParserOursMatchesExpected => {
                 write!(f, "our parser output matches expected.json")
             }
             Self::ParserExpectedSvelteMatches => {
-                write!(f, "expected_svelte.json matches Svelte parser")
+                write!(f, "expected_svelte.json matches the canonical parser")
             }
             Self::FormatterInputIdempotent => write!(f, "input file is idempotent"),
             Self::FormatterMatchesPrettier => write!(f, "input file matches prettier"),

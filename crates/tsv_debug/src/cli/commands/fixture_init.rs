@@ -1,8 +1,7 @@
 use crate::cli::CliError;
 use crate::deno;
 use crate::diff::LINE_WIDTH_THRESHOLD;
-use crate::fixtures::{self, GOAL_FILENAME, InputType, find_input_file};
-use crate::json::to_json_with_tabs;
+use crate::fixtures::{self, CanonicalParseError, GOAL_FILENAME, InputType, find_input_file};
 use argh::FromArgs;
 use std::path::Path;
 use tsv_lang::printing::visual_width;
@@ -144,33 +143,38 @@ impl FixtureInitCommand {
         print_line_width_summary(&formatted, &self.dir);
 
         // Generate expected.json from canonical parser
-        let parse_result =
-            deno::parse_by_type_with_goal(&formatted, input_type.parser_type(), goal).await;
+        let canonical = fixtures::canonical_expected_json(&formatted, input_type, goal).await;
 
-        let expected_written = match parse_result {
-            Ok(ast) => match to_json_with_tabs(&ast) {
-                Ok(json) => {
-                    let json_content = format!("{json}\n");
-                    let expected_path = dir.join("expected.json");
-                    match fixtures::write_file(&expected_path, &json_content) {
-                        Ok(()) => {
-                            println!("✓ expected.json");
-                            true
-                        }
-                        Err(e) => {
-                            eprintln!("✗ Failed to write expected.json: {e}");
-                            false
-                        }
+        let expected_written = match canonical {
+            Ok(json_content) => {
+                let expected_path = dir.join("expected.json");
+                match fixtures::write_file(&expected_path, &json_content) {
+                    Ok(()) => {
+                        println!("✓ expected.json");
+                        true
+                    }
+                    Err(e) => {
+                        eprintln!("✗ Failed to write expected.json: {e}");
+                        false
                     }
                 }
-                Err(e) => {
-                    eprintln!("⚠ Failed to serialize AST: {e}");
-                    false
-                }
-            },
-            Err(e) => {
-                eprintln!("⚠ Canonical parse failed (expected for TDD): {e}");
+            }
+            Err(CanonicalParseError::Unserializable(message)) => {
+                eprintln!("⚠ {message}");
                 false
+            }
+            Err(CanonicalParseError::Rejected(message)) => {
+                eprintln!("⚠ Canonical parse failed (expected for TDD): {message}");
+                false
+            }
+            // A fault is no verdict on the input, so it fails the command rather than
+            // reading as the TDD rejection above
+            Err(CanonicalParseError::Sidecar(e)) => {
+                eprintln!(
+                    "Error: {}",
+                    fixtures::canonical_sidecar_failure(input_type, &e)
+                );
+                return Err(CliError::Failed);
             }
         };
 
