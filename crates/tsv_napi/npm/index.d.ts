@@ -155,8 +155,8 @@ export class IgnoreStack {
 	is_path_pruned(rel: string): boolean;
 	/** The argument error for a named file tsv doesn't format, else `undefined`. */
 	unsupported_extension_error(path: string): string | undefined;
-	/** The warning text for a directory pruned by the build-output heuristic. */
-	heuristic_shadow_warning(dir: string): string;
+	/** The warning for a directory the build-output heuristic pruned under a tsv-layer re-include, else `undefined`. `loose_root` is the format root outside a git repo. */
+	heuristic_shadow_warning(dir: string, loose_root?: string): string | undefined;
 	/** The `.prettierignore`-outside-a-repo warning, else `undefined`. */
 	prettierignore_outside_repo_warning(
 		dir: string,

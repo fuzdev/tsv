@@ -1943,7 +1943,7 @@ function collect_root(root, cwd, files, errors, warnings) {
 		root_abs,
 		base_rel,
 		true,
-		in_repo,
+		loose_root(format_root, in_repo),
 		stack,
 		heuristic_active,
 		files,
@@ -2000,13 +2000,17 @@ function collect_recursive(
 	dir_abs,
 	dir_rel,
 	is_target_root,
-	in_repo,
+	// the format root's display path outside a git repo, `undefined` inside one — what a
+	// warning names a path by (loose_root), and so also whether the format root is a git
+	// repo (`.gitignore` is read only then). Mirrors the native collect_recursive
+	loose_root,
 	stack,
 	heuristic_active,
 	files,
 	errors,
 	warnings
 ) {
+	const in_repo = loose_root === undefined;
 	let entries;
 	try {
 		entries = readdirSync(dir, { withFileTypes: true });
@@ -2096,7 +2100,10 @@ function collect_recursive(
 			if (verdict !== 'descend') {
 				// on `prune_warn` fetch the message from Rust (single source of
 				// truth — the JS CLI never templates it). One warning per pruned dir.
-				if (verdict === 'prune_warn') warnings.push(stack.heuristic_shadow_warning(child_rel));
+				if (verdict === 'prune_warn') {
+					const warning = stack.heuristic_shadow_warning(child_rel, loose_root);
+					if (warning !== undefined) warnings.push(warning);
+				}
 				continue;
 			}
 			// the child reads its own ignore files when we recurse into it
@@ -2105,7 +2112,7 @@ function collect_recursive(
 				join(dir_abs, entry.name),
 				child_rel,
 				false,
-				in_repo,
+				loose_root,
 				stack,
 				child_heuristic,
 				files,

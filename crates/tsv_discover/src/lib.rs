@@ -78,12 +78,13 @@ pub enum DirVerdict {
     Descend,
     /// Skip the directory and its subtree.
     Prune,
-    /// Skip the directory and surface this non-fatal stderr warning: the
+    /// Skip the directory and surface a non-fatal stderr warning: the
     /// build-output heuristic pruned a directory that an *anchored* tsv-layer `!`
-    /// was trying to re-include *into* (a silent no-op). The string is the full
-    /// message (see [`heuristic_shadow_warning`]); the caller reports it without
-    /// re-deriving it.
-    PruneWithWarning(String),
+    /// was trying to re-include *into* (a silent no-op). The caller fetches the
+    /// message from [`heuristic_shadow_warning`], which also takes the format root's
+    /// display path outside a repo — context the per-directory verdict has no other
+    /// use for.
+    PruneWithWarning,
 }
 
 /// Whether a file name has a [formattable extension](FORMATTABLE_EXTENSIONS)
@@ -167,8 +168,8 @@ pub fn is_safety_net(name: &str) -> bool {
 /// [build-output](HEURISTIC_DIRS) directory prunes unless an explicit tsv-layer
 /// `!` re-includes it — and if instead an *anchored* `!dir/<file>` was trying to
 /// reach inside it (a no-op under the prune, by git's parent-directory rule), the
-/// verdict carries the [shadow warning](DirVerdict::PruneWithWarning); finally the
-/// matcher prunes anything it ignores. Otherwise, descend.
+/// verdict is [`DirVerdict::PruneWithWarning`]; finally the matcher prunes anything it
+/// ignores. Otherwise, descend.
 pub fn classify_dir(
     name: &str,
     child_rel: &str,
@@ -176,8 +177,7 @@ pub fn classify_dir(
     stack: &IgnoreStack,
 ) -> DirVerdict {
     // `heuristic_active` implies no `.gitignore` layer is pushed, so the
-    // `is_reincluded` / `has_negation_under` consulted below see only the tsv
-    // layer. That implication is load-bearing (a stray `.gitignore` negation would
+    // `is_reincluded` consulted below sees only the tsv layer. That implication is load-bearing (a stray `.gitignore` negation would
     // otherwise leak into the heuristic override), so the CLI/JS walkers' threading
     // of `heuristic_active` is enforced here, not trusted. The per-file
     // `is_path_pruned` replay assembles the full ancestor stack up front rather
@@ -200,9 +200,9 @@ pub fn classify_dir(
 /// a shallower level's heuristic is active. That is still faithful: the matcher's
 /// `last_match_at` only consults layers whose anchor is a prefix of the queried
 /// path (a deeper layer fails to `relativize`), so the leaf / re-include queries
-/// see exactly the ancestors they would mid-walk; and the one place a deeper layer
-/// *is* consulted — `has_negation_under`, picking `Prune` vs `PruneWithWarning` —
-/// only affects the warning, which a boolean prune query collapses away.
+/// see exactly the ancestors they would mid-walk; and `negation_under`, picking
+/// `Prune` vs `PruneWithWarning`, reads only layers anchored above the directory it
+/// asks about, the same ancestors again.
 fn classify_dir_inner(
     name: &str,
     child_rel: &str,
@@ -223,8 +223,8 @@ fn classify_dir_inner(
         // a tsv-layer `!child_rel/<file>` re-include is a silent no-op under this
         // prune (git's parent-dir rule); the warning points at the dir-level
         // escape that works.
-        return if stack.has_negation_under(child_rel) {
-            DirVerdict::PruneWithWarning(heuristic_shadow_warning(child_rel))
+        return if stack.negation_under(child_rel).is_some() {
+            DirVerdict::PruneWithWarning
         } else {
             DirVerdict::Prune
         };
@@ -326,17 +326,39 @@ pub fn should_format_file(name: &str, child_rel: &str, stack: &IgnoreStack) -> b
 }
 
 /// The stderr warning when the build-output heuristic prunes a directory that a
-/// tsv-layer `!` rule was trying to re-include *into*. The re-include is a silent
-/// no-op — git's parent-directory rule (matched in the `.gitignore` regime) bars
-/// re-including a descendant of an excluded directory — so the message points at
-/// the dir-level escape that does work. `d` is the pruned directory, format-root
-/// relative. Produced **once**, here: [`classify_dir`] carries it in
-/// [`DirVerdict::PruneWithWarning`], and the WASM binding fetches it directly, so
-/// no caller re-templates the text.
-pub fn heuristic_shadow_warning(d: &str) -> String {
-    format!(
-        "{d} is skipped by tsv's build-output heuristic, so a `!{d}/<file>` re-include under it does nothing; re-include the directory itself with `!{d}/` (then `{d}/*` + `!{d}/<file>` to select files within it)"
-    )
+/// tsv-layer `!` rule was trying to re-include *into*, or `None` when no such rule is
+/// written ([`IgnoreStack::negation_under`], which is how [`classify_dir`] reaches
+/// [`DirVerdict::PruneWithWarning`]). The re-include is a silent no-op — git's
+/// parent-directory rule (matched in the `.gitignore` regime) bars re-including a
+/// descendant of an excluded directory — so the message points at the dir-level escape
+/// that does work, for the file the rule was written in (the deepest holding one, whose
+/// rules are read last), spelled relative to that file's directory: `!/dist/` in
+/// `pkg/.formatignore` for a pruned `pkg/dist`. Every line is anchored with a leading
+/// `/`, without which a one-segment `!dist/` re-includes a `dist` at every depth; and
+/// spelled from the format root instead, the lines would do nothing in a nested file,
+/// and outside a repo — where the format root is the filesystem root — in any file.
+///
+/// `d` is the pruned directory relative to the format root, `/`-separated; `loose_root`
+/// is [`excluded_argument_warning`]'s, the format root's display path outside a git
+/// repo. Produced **once**, here, so the native CLI and the WASM binding emit the
+/// identical text.
+pub fn heuristic_shadow_warning(
+    d: &str,
+    loose_root: Option<&str>,
+    stack: &IgnoreStack,
+) -> Option<String> {
+    let negation = stack.negation_under(d)?;
+    let segments = tsv_ignore::split_segments(d);
+    let dir = path_display(&segments, loose_root);
+    let rule_file = ignore_file_display(
+        &segments[..negation.anchor_depth],
+        negation.source,
+        loose_root,
+    );
+    let rel = segments[negation.anchor_depth..].join("/");
+    Some(format!(
+        "{dir} is skipped by tsv's build-output heuristic, so a re-include under it in {rule_file} does nothing; re-include the directory itself there with `!/{rel}/` (then `/{rel}/*` + `!/{rel}/<file>` to select files within it)"
+    ))
 }
 
 /// The stderr warning when a `.prettierignore` sits in the **target root**
@@ -722,7 +744,7 @@ mod tests {
         let stack = tsv_stack("!build/keep.ts\n");
         assert_eq!(
             classify_dir("build", "build", true, &stack),
-            DirVerdict::PruneWithWarning(heuristic_shadow_warning("build")),
+            DirVerdict::PruneWithWarning,
         );
     }
 
@@ -762,12 +784,83 @@ mod tests {
 
     #[test]
     fn heuristic_shadow_warning_text_is_stable() {
-        // pinned verbatim — the native CLI carries it and the WASM binding fetches
-        // it, so both surfaces emit this exact string
+        // pinned verbatim — the native CLI and the WASM binding both fetch it, so both
+        // surfaces emit this exact string. The lines are for the file the re-include
+        // was written in, anchored and relative to its directory
+        let stack = tsv_stack("!dist/keep.ts\n");
         assert_eq!(
-            heuristic_shadow_warning("dist"),
-            "dist is skipped by tsv's build-output heuristic, so a `!dist/<file>` re-include under it does nothing; re-include the directory itself with `!dist/` (then `dist/*` + `!dist/<file>` to select files within it)"
+            heuristic_shadow_warning("dist", None, &stack).unwrap(),
+            "dist is skipped by tsv's build-output heuristic, so a re-include under it in the repo-root .formatignore does nothing; re-include the directory itself there with `!/dist/` (then `/dist/*` + `!/dist/<file>` to select files within it)"
         );
+        let mut stack = IgnoreStack::new();
+        stack.push_prettierignore("pkg", "!dist/keep.ts\n");
+        assert_eq!(
+            heuristic_shadow_warning("pkg/dist", None, &stack).unwrap(),
+            "pkg/dist is skipped by tsv's build-output heuristic, so a re-include under it in pkg/.prettierignore does nothing; re-include the directory itself there with `!/dist/` (then `/dist/*` + `!/dist/<file>` to select files within it)"
+        );
+        // outside a repo the format root is the filesystem root: both paths read
+        // absolutely, while the lines stay relative to the rule's file
+        let mut stack = IgnoreStack::new();
+        stack.push_formatignore("home/u/proj", "!src/build/keep.ts\n");
+        assert_eq!(
+            heuristic_shadow_warning("home/u/proj/src/build", Some("/"), &stack).unwrap(),
+            "/home/u/proj/src/build is skipped by tsv's build-output heuristic, so a re-include under it in /home/u/proj/.formatignore does nothing; re-include the directory itself there with `!/src/build/` (then `/src/build/*` + `!/src/build/<file>` to select files within it)"
+        );
+        // no re-include written under the directory: nothing to say
+        assert_eq!(
+            heuristic_shadow_warning("dist", None, &IgnoreStack::new()),
+            None
+        );
+    }
+
+    #[test]
+    fn heuristic_shadow_warning_lines_readmit_the_directory_alone() {
+        // pasted into the file the warning names (its `<file>` filled in), the lines put
+        // the pruned directory back in the walk and only the selected file in scope, and
+        // re-include no same-named directory elsewhere — which an unanchored `!dist/` did
+        for anchor in ["", "pkg"] {
+            let rule = "!dist/keep.ts\n";
+            let under = |path: &str| {
+                if anchor.is_empty() {
+                    path.to_string()
+                } else {
+                    format!("{anchor}/{path}")
+                }
+            };
+            let d = under("dist");
+            let mut stack = IgnoreStack::new();
+            stack.push_formatignore(anchor, rule);
+            let warning = heuristic_shadow_warning(&d, None, &stack).unwrap();
+            // the backticked spans are the lines, in order
+            let lines: Vec<String> = warning
+                .split('`')
+                .skip(1)
+                .step_by(2)
+                .map(|line| line.replace("<file>", "keep.ts"))
+                .collect();
+            let mut fixed = IgnoreStack::new();
+            fixed.push_formatignore(anchor, &format!("{rule}{}\n", lines.join("\n")));
+            assert_eq!(
+                classify_dir("dist", &d, true, &fixed),
+                DirVerdict::Descend,
+                "{d}: {lines:?}"
+            );
+            assert!(should_format_file(
+                "keep.ts",
+                &under("dist/keep.ts"),
+                &fixed
+            ));
+            assert!(!should_format_file(
+                "other.ts",
+                &under("dist/other.ts"),
+                &fixed
+            ));
+            assert_eq!(
+                classify_dir("dist", &under("lib/dist"), true, &fixed),
+                DirVerdict::Prune,
+                "{d}: {lines:?}"
+            );
+        }
     }
 
     #[test]

@@ -1478,7 +1478,12 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			assert.match(list.stdout, /a\.ts/);
 			assert.doesNotMatch(list.stdout, /keep\.ts/); // build/ still pruned
 			assert.match(list.stderr, /build is skipped by tsv's build-output heuristic/);
-			assert.match(list.stderr, /re-include the directory itself/);
+			// in the file the re-include was written in, anchored and relative to its
+			// directory (outside a repo the file itself is named absolutely)
+			assert.match(
+				list.stderr,
+				/\/\.formatignore does nothing; re-include the directory itself there with `!\/build\/`/
+			);
 
 			// a floating `!keep.ts` must NOT warn (targets any depth, not build/)
 			writeFileSync(join(dir, '.formatignore'), '!keep.ts\n');
