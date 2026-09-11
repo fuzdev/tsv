@@ -296,7 +296,7 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 			const ctor = (mod as Record<string, unknown>).IgnoreStack as
 				| (new () => {
 						push_gitignore(anchor: string, content: string): void;
-						push_tsv(anchor: string, content: string): void;
+						push_formatignore(anchor: string, content: string): void;
 						is_ignored(path: string, is_dir: boolean): boolean;
 						classify_dir(name: string, child_rel: string, heuristic_active: boolean): string;
 						should_format_file(name: string, child_rel: string): boolean;
@@ -305,7 +305,7 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 			if (!ctor) return false;
 			const stack = new ctor();
 			stack.push_gitignore('', 'build/\nignored.ts\n');
-			stack.push_tsv('', '!build/keep.ts\n'); // tsv layer can't re-include under an excluded dir
+			stack.push_formatignore('', '!build/keep.ts\n'); // tsv layer can't re-include under an excluded dir
 			return (
 				stack.is_ignored('build/x.ts', false) &&
 				stack.is_ignored('build/keep.ts', false) &&

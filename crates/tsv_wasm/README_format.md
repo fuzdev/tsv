@@ -78,7 +78,7 @@ import {IgnoreStack} from '@fuzdev/tsv_format_wasm';
 
 const stack = new IgnoreStack();
 stack.push_gitignore('', 'build/\n*.log\n'); // a .gitignore (anchor '' = root)
-stack.push_tsv('', '!keep.log\n'); // a .formatignore, evaluated after the gitignores
+stack.push_formatignore('', '!keep.log\n'); // a .formatignore, evaluated after the gitignores
 stack.is_ignored('build/out.js', false); // → true
 stack.is_ignored('keep.log', false); // → false (the tsv layer re-includes it)
 ```

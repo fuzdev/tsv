@@ -299,13 +299,19 @@ impl IgnoreStack {
         self.inner.pop_gitignore();
     }
 
-    /// Push one directory's tsv file, applied after every `.gitignore`. `anchor`
-    /// is the directory relative to the format root (`""` = root). The caller
-    /// resolves which file's content this is — `.formatignore` hierarchically, or
-    /// a `.prettierignore` (also hierarchical) shadowed by a sibling `.formatignore`.
-    #[napi(js_name = "push_tsv", catch_unwind)]
-    pub fn push_tsv(&mut self, anchor: String, content: String) {
-        self.inner.push_tsv(&anchor, &content);
+    /// Push one directory's `.formatignore` as a tsv layer, applied after every
+    /// `.gitignore`. `anchor` is the directory relative to the format root (`""` = root).
+    #[napi(js_name = "push_formatignore", catch_unwind)]
+    pub fn push_formatignore(&mut self, anchor: String, content: String) {
+        self.inner.push_formatignore(&anchor, &content);
+    }
+
+    /// Push one directory's `.prettierignore` as a tsv layer — the file read, inside a
+    /// repo, in a directory with no `.formatignore`. Matched exactly as a `.formatignore`
+    /// layer is; what differs is the file a warning about one of its rules names.
+    #[napi(js_name = "push_prettierignore", catch_unwind)]
+    pub fn push_prettierignore(&mut self, anchor: String, content: String) {
+        self.inner.push_prettierignore(&anchor, &content);
     }
 
     /// Pop the most recently pushed tsv layer (a traversal unwinding out of a
@@ -432,25 +438,25 @@ impl IgnoreStack {
     }
 
     /// The warning for a path an argument named — a file, or a directory root — that an
-    /// ignore file puts out of scope; `undefined` when no rule excludes it, which is also
-    /// the scope decision. `display` is the argument as given, `rel` its
-    /// format-root-relative path, `format_root` the format root's display path. Single
-    /// source of truth with the native CLI — the JS CLI never templates this string.
+    /// ignore file puts out of scope; `undefined` when no rule excludes it, and for a named
+    /// file a `.formatignore` or `.prettierignore` excludes, which is skipped quietly.
+    /// Whether the path is in scope is `is_ignored(rel, is_dir)`. `display` is the argument
+    /// as given, `rel` its format-root-relative path, `loose_root` the format root's display
+    /// path outside a git repo (`undefined` inside one). Single source of truth with the
+    /// native CLI — the JS CLI never templates this string.
     #[napi(js_name = "excluded_argument_warning", catch_unwind)]
     pub fn excluded_argument_warning(
         &self,
         display: String,
         rel: String,
         is_dir: bool,
-        in_repo: bool,
-        format_root: String,
+        loose_root: Option<String>,
     ) -> Either<String, Undefined> {
         or_undefined(tsv_discover::excluded_argument_warning(
             &display,
             &rel,
             is_dir,
-            in_repo,
-            &format_root,
+            loose_root.as_deref(),
             &self.inner,
         ))
     }

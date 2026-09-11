@@ -109,6 +109,11 @@
 //!   is accepted and carried by the member-freeze fixtures. The skipped span still feeds the
 //!   line-maximality map, so the union's own first member (sharing its line) doesn't run the
 //!   companion checks against a narrower span than the decided item-level freeze.
+//! - **A statement whose declaration's decorators precede it is skipped** — the decorator-first
+//!   export (`@dec⏎export class C {}`, `@dec⏎export declare class C {}`). The own-line gap before
+//!   `export` is inside the decorated declaration, where a directive freezes nothing in prettier or
+//!   tsv (the decorator→declaration position cataloged as inert by agreement), so an unfrozen
+//!   statement there is decided behavior, not a missed opt-in.
 
 use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet};
@@ -769,6 +774,22 @@ impl Walk<'_> {
         // span than the decided item-level freeze.
         if is_composite_type(node) {
             self.skipped_composites.push((line_start, e));
+            return;
+        }
+        // A statement whose declaration's decorators are written BEFORE the statement itself — a
+        // decorator-first `@dec⏎export class C {}` or `@dec⏎export declare class C {}`, where the
+        // export's span starts at `export` — is skipped: the gap in front of the statement is
+        // inside the decorated declaration, and a directive there is inert in prettier and tsv
+        // alike (the cataloged decorator→declaration agreement), so honoring is the wrong
+        // expectation.
+        if node
+            .get("declaration")
+            .and_then(|decl| decl.get("decorators"))
+            .and_then(Value::as_array)
+            .and_then(|decorators| decorators.first())
+            .and_then(|decorator| self.map.node_byte_span(decorator))
+            .is_some_and(|(decorator_start, _)| decorator_start < s)
+        {
             return;
         }
         self.out.push(Candidate {

@@ -139,8 +139,10 @@ export class IgnoreStack {
 	push_gitignore(anchor: string, content: string): void;
 	/** Pop the most recently pushed `.gitignore` layer. */
 	pop_gitignore(): void;
-	/** Push one directory's `.formatignore` / `.prettierignore`, applied after every `.gitignore`. */
-	push_tsv(anchor: string, content: string): void;
+	/** Push one directory's `.formatignore`, applied after every `.gitignore`. */
+	push_formatignore(anchor: string, content: string): void;
+	/** Push one directory's `.prettierignore` (read where a directory has no `.formatignore`), applied after every `.gitignore`. */
+	push_prettierignore(anchor: string, content: string): void;
 	/** Pop the most recently pushed tsv layer. */
 	pop_tsv(): void;
 	/** Whether `path` is ignored; `is_dir` makes trailing-`/` patterns apply. */
@@ -173,13 +175,12 @@ export class IgnoreStack {
 	gitignore_symlink_warning(path: string): string;
 	/** The traversal error for a relative root the working directory cannot resolve. */
 	unresolvable_root_error(root: string): string;
-	/** The warning for a named path an ignore file excludes, else `undefined` (the scope decision). */
+	/** The warning for a named path an ignore file excludes, else `undefined` (also for a named file a `.formatignore` / `.prettierignore` excludes, skipped quietly). `loose_root` is the format root outside a git repo. */
 	excluded_argument_warning(
 		display: string,
 		rel: string,
 		is_dir: boolean,
-		in_repo: boolean,
-		format_root: string
+		loose_root?: string
 	): string | undefined;
 	/** Whether no layer carries any rule. */
 	is_empty(): boolean;
