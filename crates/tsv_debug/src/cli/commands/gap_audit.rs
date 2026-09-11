@@ -131,12 +131,14 @@ use crate::audit::properties::{
     ledger_format, pristine_format, tsv_parse_to_value, unverified_cause_breakdown,
 };
 use crate::audit::ratchet::{
-    GateDiff, print_ratchet_skipped, refuse_narrowed_update, report_unpinned_panics,
+    GateDiff, print_ratchet_skipped, print_verdict, refuse_narrowed_update, report_unpinned_panics,
 };
 use crate::audit::report::{
     self, Confidence, Detail, Finding, GapDetail, ReportExample, RunSummary, Severity,
+    eprint_capped,
 };
 use crate::audit::sites::{code_regions, injection_sites, site_shape, snippet};
+use crate::audit::tally::merge_shape_map;
 use crate::cli::CliError;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::comment_ledger::CommentFindingKind;
@@ -410,7 +412,6 @@ const VERIFY_EXAMPLES: usize = 5;
 /// Everything a shape accumulates. Counts stay exact; only the [`VERIFY_EXAMPLES`] smallest
 /// examples are kept, so a corpus that fires a bug a million times still reports in bounded
 /// memory.
-#[derive(Clone)]
 struct ShapeAgg {
     count: usize,
     /// Which payloads reach this shape — a drop on `line` but not `block` is a different
@@ -440,6 +441,8 @@ struct Tally {
     accepted: usize,
     files_done: usize,
     parse_skipped: usize,
+    /// Files that could not be read — never injected into.
+    read_errors: usize,
     /// Bystander findings whose victim span could not be mapped back to seed coordinates
     /// across the splice (out of range / mid-`char`) — keyed on the injection offset as a
     /// fallback. Expected to be zero; a nonzero count means a reflow the linear span-shift
@@ -592,35 +595,28 @@ impl Tally {
         self.accepted += other.accepted;
         self.files_done += other.files_done;
         self.parse_skipped += other.parse_skipped;
+        self.read_errors += other.read_errors;
         self.victim_map_fallbacks += other.victim_map_fallbacks;
         self.node_edge_unresolved += other.node_edge_unresolved;
-        for (k, v) in other.node_edge_hits {
-            let c = self.node_edge_hits.entry(k).or_default();
+        merge_shape_map(&mut self.node_edge_hits, other.node_edge_hits, |c, v| {
             c.hits += v.hits;
             c.shapes.extend(v.shapes);
             c.gaps.extend(v.gaps);
             for (kind, n) in v.kind_hits {
                 *c.kind_hits.entry(kind).or_insert(0) += n;
             }
-        }
+        });
         self.dirty_files.extend(other.dirty_files);
-        for (k, v) in other.shapes {
-            match self.shapes.get_mut(&k) {
-                Some(e) => {
-                    e.count += v.count;
-                    e.bystander_hits += v.bystander_hits;
-                    e.payloads.extend(v.payloads);
-                    e.files.extend(v.files);
-                    // Keep the N smallest across both, NOT whoever merged first — see
-                    // `ExampleSet::merge`. Workers take disjoint files, so the two example
-                    // sets never share a path (no cross-tally ties).
-                    e.examples.merge(v.examples);
-                }
-                None => {
-                    self.shapes.insert(k, v);
-                }
-            }
-        }
+        merge_shape_map(&mut self.shapes, other.shapes, |e, v| {
+            e.count += v.count;
+            e.bystander_hits += v.bystander_hits;
+            e.payloads.extend(v.payloads);
+            e.files.extend(v.files);
+            // Keep the N smallest across both, NOT whoever merged first — see
+            // `ExampleSet::merge`. Workers take disjoint files, so the two example
+            // sets never share a path (no cross-tally ties).
+            e.examples.merge(v.examples);
+        });
     }
 }
 
@@ -655,6 +651,7 @@ fn audit_file(
         return;
     }
     let Ok(source) = std::fs::read_to_string(path) else {
+        tally.read_errors += 1;
         return;
     };
     let parser = ParserType::from_extension(&display);
@@ -954,7 +951,9 @@ impl GapAuditCommand {
             } else {
                 BTreeSet::new()
             };
-            let pinned = ratchet().write_pinned(&snapshot_keys(&total.shapes), "shape")?;
+            // `--update` prints no JSON document, so its write line stays on stdout beside the
+            // yield lines below rather than splitting off to stderr under `--json`.
+            let pinned = ratchet().write_pinned(&snapshot_keys(&total.shapes), "shape", false)?;
             // Yield line: RETIRED = pinned before, gone now (the slice's win); ADDED = pinned now,
             // absent before (a newly-reached or regressed shape). RE-PINNED (the intersection) is
             // silent — it's the unchanged bulk. `net` is the file's change in size.
@@ -1100,20 +1099,25 @@ impl GapAuditCommand {
                  it. Not pinnable and not a ratchet entry: fix the crash.",
                 panics.len()
             );
-            for ((_, shape), agg) in panics.iter().take(40) {
+            eprint_capped(panics.iter(), |((_, shape), agg)| {
                 let ex = agg.examples.canonical();
                 // A panic hit is always the injected comment (injection == attribution), so this
                 // "inject … at" line names the injection offset that reproduces the crash.
-                eprintln!(
+                format!(
                     "    {shape:<20} e.g. inject {} at {}:{}",
                     ex.payload, ex.path, ex.injection_offset
-                );
-            }
-            if panics.len() > 40 {
-                eprintln!("    … and {} more", panics.len() - 40);
-            }
+                )
+            });
         }
 
+        let shape_line = |k: &KnownKey| {
+            format!(
+                "    {:<14} {:<20} [{}]",
+                k.kind.label(),
+                k.shape,
+                k.payloads
+            )
+        };
         if !new.is_empty() {
             eprintln!(
                 "\n✗ {} NEW finding shape(s) — a comment in one of these gaps is dropped, \
@@ -1121,17 +1125,7 @@ impl GapAuditCommand {
                  seen it:",
                 new.len()
             );
-            for k in new.iter().take(40) {
-                eprintln!(
-                    "    {:<14} {:<20} [{}]",
-                    k.kind.label(),
-                    k.shape,
-                    k.payloads
-                );
-            }
-            if new.len() > 40 {
-                eprintln!("    … and {} more", new.len() - 40);
-            }
+            eprint_capped(new.iter(), shape_line);
             eprintln!(
                 "  Fix the drop, or — if it is genuinely pre-existing and merely newly \
                  REACHED by a fixture — re-run `deno task gaps:audit:update`."
@@ -1143,17 +1137,7 @@ impl GapAuditCommand {
                  them, drop the lines (`deno task gaps:audit:update`):",
                 stale.len()
             );
-            for k in stale.iter().take(40) {
-                eprintln!(
-                    "    {:<14} {:<20} [{}]",
-                    k.kind.label(),
-                    k.shape,
-                    k.payloads
-                );
-            }
-            if stale.len() > 40 {
-                eprintln!("    … and {} more", stale.len() - 40);
-            }
+            eprint_capped(stale.iter(), shape_line);
         }
 
         if diff.holds() {
@@ -1164,11 +1148,7 @@ impl GapAuditCommand {
                  gap drops a comment or swallows the content after one",
                 diff.known
             );
-            if self.json {
-                eprintln!("{msg}");
-            } else {
-                println!("{msg}");
-            }
+            print_verdict(self.json, &msg);
             Ok(())
         } else {
             Err(CliError::Failed)
@@ -1254,6 +1234,7 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
         injections: total.injections,
         accepted: total.accepted,
         parse_skipped: total.parse_skipped,
+        read_errors: total.read_errors,
         dirty_files: total.dirty_files.clone(),
         payload_labels: payloads.iter().map(|p| p.label()).collect(),
     };

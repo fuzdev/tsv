@@ -68,7 +68,7 @@ impl FixturesAuditCommand {
         );
         let mut results = Vec::new();
         while let Some(joined) = tasks.next().await {
-            results.push(super::task_result(joined, "audit")?);
+            results.push(super::task_result(joined, "fixture audit")?);
         }
 
         if self.json {
@@ -81,7 +81,7 @@ impl FixturesAuditCommand {
     }
 
     fn print_json(&self, results: &[FixtureAudit]) {
-        let output: Vec<_> = results
+        let output: serde_json::Value = results
             .iter()
             .filter(|r| self.verbose || r.has_novel)
             .map(|r| {
@@ -93,10 +93,7 @@ impl FixturesAuditCommand {
             })
             .collect();
 
-        // serde_json serialization of these plain Value/output types is infallible
-        #[allow(clippy::expect_used)]
-        let json = serde_json::to_string_pretty(&output).expect("Failed to serialize JSON");
-        println!("{json}");
+        super::print_json_pretty(&output);
     }
 
     fn print_human(&self, results: &[FixtureAudit]) {
@@ -439,7 +436,11 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
         };
 
         // Run our formatter
-        let ours_result = match fixtures::format_with_our_formatter(&content, &fixture.input_file) {
+        let ours_result = match fixtures::format_with_our_formatter(
+            &content,
+            &fixture.input_file,
+            fixture.goal(),
+        ) {
             Ok(formatted) => Some(classify_output(&formatted, &content, &known_files)),
             Err(_) => None,
         };
@@ -637,7 +638,12 @@ async fn classify_novel(
 
     if prettier_stable {
         // What our formatter does with V picks the marker — the shared three-way test.
-        match fixtures::classify_stable_form(&novel_output, input_content, &fixture.input_file) {
+        match fixtures::classify_stable_form(
+            &novel_output,
+            input_content,
+            &fixture.input_file,
+            fixture.goal(),
+        ) {
             StableFormMarker::PrettierVariant => {
                 Some(Suggestion::PrettierVariant(suffix.to_string()))
             }

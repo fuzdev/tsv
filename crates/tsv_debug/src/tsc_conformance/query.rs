@@ -7,6 +7,7 @@
 
 use super::baseline::parse_summary_block;
 use super::discovery::Baseline;
+use crate::cli::commands::profile::pct;
 use std::collections::HashMap;
 
 /// TS4xxx codes are the declaration-emit family.
@@ -21,16 +22,6 @@ fn read_baseline(baseline: &Baseline) -> Option<String> {
             eprintln!("warning: could not read {}: {e}", baseline.path.display());
             None
         }
-    }
-}
-
-/// `count / total * 100`, guarding division by zero.
-#[allow(clippy::cast_precision_loss)] // diagnostic counts stay well within f64 precision
-fn pct(count: usize, total: usize) -> f64 {
-    if total == 0 {
-        0.0
-    } else {
-        (count as f64 / total as f64) * 100.0
     }
 }
 

@@ -11,10 +11,12 @@ use tsv_lang::{
 use tsv_svelte::ast::internal::{Element, Fragment, FragmentNode, TextDecoding};
 
 use crate::audit::excerpt::first_line_diff;
-use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
+use crate::audit::sweep::{PristineSweep, sweep_pristine};
+use crate::audit::tally::CappedPaths;
+use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 
-use super::profile::{is_input_invalid_fixture, is_svelte, resolve_seed_files_named};
+use super::profile::{is_svelte, resolve_seed_files_named};
 
 /// Walk each Svelte seed ACROSS the print-width razor and grade the output at every width.
 ///
@@ -119,16 +121,24 @@ struct Shape {
     outline: String,
 }
 
-/// What one corpus walk produced.
-struct Sweep {
+/// The graded widths one corpus walk produced.
+#[derive(Default)]
+struct Grades {
     findings: Vec<Finding>,
     shapes: BTreeSet<Shape>,
-    /// Seeds whose pristine format succeeded — the count the verdict rests on.
-    formatted: usize,
-    /// Seeds skipped (unreadable, `input_invalid_*`, parse failure, panic).
-    skipped: usize,
     /// Distinct (seed, site, width) geometries actually formatted and graded.
     graded: usize,
+    /// Padded mutants whose first format PANICKED. Counted and named, not gated (the panic
+    /// gates own that class), but never silent: the sweep suppresses the default hook for the
+    /// whole walk, visitor included, so this bucket is the only record of one.
+    mutant_panics: CappedPaths,
+}
+
+/// What one corpus walk produced: the grades, beside the shared sweep's seed accounting —
+/// `pristine.formatted` is the count the verdict rests on.
+struct Sweep {
+    grades: Grades,
+    pristine: PristineSweep,
 }
 
 impl RazorAuditCommand {
@@ -143,13 +153,11 @@ impl RazorAuditCommand {
         } else {
             print_report(&sweep, self.width);
         }
+        sweep.grades.print_mutant_panic_sample();
+        sweep.pristine.finish(default_paths)?;
+        check_graded_nonzero(sweep.grades.graded, "widths graded")?;
 
-        check_graded_nonzero(sweep.graded, "widths graded")?;
-        if default_paths {
-            check_formatted_min(sweep.formatted, FIXTURES_FORMATTED_MIN)?;
-        }
-
-        if sweep.findings.is_empty() {
+        if sweep.grades.findings.is_empty() {
             Ok(())
         } else {
             Err(CliError::Failed)
@@ -157,54 +165,47 @@ impl RazorAuditCommand {
     }
 }
 
-/// Format under `catch_unwind`, so a printer panic on a mutant is a skip rather than a dead run.
-fn try_format(source: &str) -> Option<String> {
-    std::panic::catch_unwind(AssertUnwindSafe(|| {
-        format_source(source, ParserType::Svelte)
-    }))
-    .ok()?
-    .ok()
+/// One format of a padded mutant.
+enum Attempt {
+    Formatted(String),
+    /// tsv rejected the source (a parse error).
+    Rejected,
+    /// The format panicked; the payload names the crash.
+    Panicked(Box<dyn std::any::Any + Send>),
 }
 
-fn sweep_files(files: &[PathBuf], width: usize) -> Sweep {
-    let mut sweep = Sweep {
-        findings: Vec::new(),
-        shapes: BTreeSet::new(),
-        formatted: 0,
-        skipped: 0,
-        graded: 0,
-    };
-    for path in files {
-        if is_input_invalid_fixture(path) {
-            sweep.skipped += 1;
-            continue;
-        }
-        let Ok(source) = std::fs::read_to_string(path) else {
-            sweep.skipped += 1;
-            continue;
-        };
-        // The seed is graded from its own FIXED POINT, not from the bytes on disk: padding a
-        // formatted document perturbs one known geometry, where padding an arbitrary authoring
-        // would confound the width sweep with whatever reflow the first format performs.
-        let Some(base) = try_format(&source) else {
-            sweep.skipped += 1;
-            continue;
-        };
-        sweep.formatted += 1;
+/// Format under `catch_unwind`, so a printer panic on a mutant is recorded rather than a dead
+/// run.
+fn try_format(source: &str) -> Attempt {
+    match std::panic::catch_unwind(AssertUnwindSafe(|| {
+        format_source(source, ParserType::Svelte)
+    })) {
+        Ok(Ok(out)) => Attempt::Formatted(out),
+        Ok(Err(_)) => Attempt::Rejected,
+        Err(payload) => Attempt::Panicked(payload),
+    }
+}
 
+/// Format every seed through the shared pristine sweep, then walk each fixed point across the
+/// razor.
+fn sweep_files(files: &[PathBuf], width: usize) -> Sweep {
+    let mut grades = Grades::default();
+    // The seed is graded from its own FIXED POINT (the sweep's output), not from the bytes on
+    // disk: padding a formatted document perturbs one known geometry, where padding an arbitrary
+    // authoring would confound the width sweep with whatever reflow the first format performs.
+    let pristine = sweep_pristine(files, |path, _parser, _source, base| {
         // Width 0 — the seed's natural geometry. Free, and the only width a corpus normally
         // exercises.
-        grade(
-            &mut sweep,
+        grades.grade(
             Mutant {
                 path,
                 pad: 0,
                 site: 0,
             },
-            &base,
+            base,
         );
 
-        for site in pad_sites(&base) {
+        for site in pad_sites(base) {
             for pad in 1..=width {
                 let mut mutant = String::with_capacity(base.len() + pad);
                 mutant.push_str(&base[..site]);
@@ -212,14 +213,18 @@ fn sweep_files(files: &[PathBuf], width: usize) -> Sweep {
                     mutant.push('x');
                 }
                 mutant.push_str(&base[site..]);
-                let Some(out) = try_format(&mutant) else {
-                    continue;
-                };
-                grade(&mut sweep, Mutant { path, pad, site }, &out);
+                match try_format(&mutant) {
+                    Attempt::Formatted(out) => grades.grade(Mutant { path, pad, site }, &out),
+                    // Padding inside a construct can break the parse; nothing to grade.
+                    Attempt::Rejected => {}
+                    Attempt::Panicked(payload) => {
+                        grades.mutant_panics.push_panic(path, payload.as_ref());
+                    }
+                }
             }
         }
-    }
-    sweep
+    });
+    Sweep { grades, pristine }
 }
 
 /// The one geometry being graded: which seed, padded by how much, where. Carried as a unit
@@ -234,30 +239,47 @@ struct Mutant<'a> {
     site: usize,
 }
 
-/// Grade one formatted output against both properties.
-fn grade(sweep: &mut Sweep, mutant: Mutant<'_>, out: &str) {
-    sweep.graded += 1;
-
-    for (line, text) in line_head_boundary_spaces(out) {
-        sweep.record(Kind::StraySpace, mutant, line, text);
+impl Grades {
+    /// The padded mutants that panicked, `path: message`, to STDERR like the sweep's own
+    /// panic sample — so a `--json` run keeps a parseable stdout.
+    fn print_mutant_panic_sample(&self) {
+        if self.mutant_panics.is_empty() {
+            return;
+        }
+        eprintln!(
+            "⚠ {} padded mutant(s) PANICKED while formatting (not gated here — the panic gates own that class):",
+            self.mutant_panics.count()
+        );
+        for line in self.mutant_panics.sample_lines("    ") {
+            eprintln!("{line}");
+        }
     }
 
-    // F1 at this width. A second format that fails to parse its own predecessor's output is a
-    // distinct, absolute failure — no width may produce output tsv rejects.
-    match try_format(out) {
-        None => {
-            let (line, text) = first_line(out);
-            sweep.record(Kind::Unreparseable, mutant, line, text);
-        }
-        Some(second) if second != out => {
-            let (line, text) = first_diff_line(out, &second);
-            sweep.record(Kind::NonIdempotent, mutant, line, text);
-        }
-        Some(_) => {}
-    }
-}
+    /// Grade one formatted output against both properties.
+    fn grade(&mut self, mutant: Mutant<'_>, out: &str) {
+        self.graded += 1;
 
-impl Sweep {
+        for (line, text) in line_head_boundary_spaces(out) {
+            self.record(Kind::StraySpace, mutant, line, text);
+        }
+
+        // F1 at this width. A second format that fails to parse its own predecessor's output
+        // is a distinct, absolute failure — no width may produce output tsv rejects.
+        match try_format(out) {
+            // A panic on the reformat grades as a failed reparse too: either way this width
+            // produced output tsv cannot take back.
+            Attempt::Rejected | Attempt::Panicked(_) => {
+                let (line, text) = first_line(out);
+                self.record(Kind::Unreparseable, mutant, line, text);
+            }
+            Attempt::Formatted(second) if second != out => {
+                let (line, text) = first_diff_line(out, &second);
+                self.record(Kind::NonIdempotent, mutant, line, text);
+            }
+            Attempt::Formatted(_) => {}
+        }
+    }
+
     /// Record one finding and the shape it contributes to the report's grouping.
     fn record(&mut self, kind: Kind, mutant: Mutant<'_>, line: usize, text: String) {
         self.shapes.insert(Shape {
@@ -319,7 +341,7 @@ fn pad_sites(base: &str) -> Vec<usize> {
 }
 
 /// Every space sitting at the head of an output line **inside a fragment `Text` node** —
-/// returned as `(byte offset, 1-based line, the line's text)`.
+/// returned as `(1-based line, the line's text)`.
 ///
 /// The signature of the bug class: a text run's leading boundary space was baked into word 0
 /// instead of being claimed as the run's own break point, so it travelled to the head of a
@@ -507,28 +529,37 @@ fn first_diff_line(a: &str, b: &str) -> (usize, String) {
 }
 
 fn print_report(sweep: &Sweep, width: usize) {
+    let grades = &sweep.grades;
     println!("Razor audit — width sweep over the print-width boundary");
     println!(
-        "  {} seeds formatted, {} skipped, {} widths graded (±{width} columns per site)",
-        sweep.formatted, sweep.skipped, sweep.graded
+        "  {} seeds formatted ({}), {} widths graded (±{width} columns per site)",
+        sweep.pristine.formatted,
+        sweep.pristine.skipped_note(),
+        grades.graded
     );
+    if !grades.mutant_panics.is_empty() {
+        println!(
+            "  ⚠ {} padded mutant(s) PANICKED (named on stderr)",
+            grades.mutant_panics.count()
+        );
+    }
 
-    if sweep.findings.is_empty() {
+    if grades.findings.is_empty() {
         println!("\n✓ no findings — F1 and the line-head boundary hold at every swept width");
         return;
     }
 
     println!(
         "\n{} findings, {} shapes:",
-        sweep.findings.len(),
-        sweep.shapes.len()
+        grades.findings.len(),
+        grades.shapes.len()
     );
-    for shape in &sweep.shapes {
+    for shape in &grades.shapes {
         println!("  {:<16} {}", shape.kind.label(), shape.outline);
     }
 
     println!("\nReproducers (first 20):");
-    for f in sweep.findings.iter().take(20) {
+    for f in grades.findings.iter().take(20) {
         println!(
             "  {:<16} {}:{} (pad {} at byte {})\n      {:?}",
             f.kind.label(),
@@ -542,7 +573,8 @@ fn print_report(sweep: &Sweep, width: usize) {
 }
 
 fn print_json(sweep: &Sweep) {
-    let findings: Vec<_> = sweep
+    let grades = &sweep.grades;
+    let findings: Vec<_> = grades
         .findings
         .iter()
         .map(|f| {
@@ -556,17 +588,17 @@ fn print_json(sweep: &Sweep) {
             })
         })
         .collect();
-    let value = serde_json::json!({
-        "formatted": sweep.formatted,
-        "skipped": sweep.skipped,
-        "graded": sweep.graded,
-        "shapes": sweep.shapes.iter().map(|s| format!("{}\t{}", s.kind.label(), s.outline)).collect::<Vec<_>>(),
-        "findings": findings,
-    });
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&value).unwrap_or_default()
+    let value = sweep.pristine.json_report(
+        serde_json::json!({}),
+        serde_json::json!({
+            "graded": grades.graded,
+            "mutant_panicked": grades.mutant_panics.count(),
+            "mutant_panicked_sample": grades.mutant_panics.sample(),
+            "shapes": grades.shapes.iter().map(|s| format!("{}\t{}", s.kind.label(), s.outline)).collect::<Vec<_>>(),
+            "findings": findings,
+        }),
     );
+    super::print_json_pretty(&value);
 }
 
 #[cfg(test)]

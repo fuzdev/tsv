@@ -16,8 +16,9 @@
 //! `gap_audit` (`gap_audit_known.txt`), `blank_audit` (`blank_audit_known.txt` +
 //! the absorb behavior pin `blank_absorb_known.txt` — one consumer, two ratchets),
 //! `ignore_audit` (`ignore_audit_known.txt`), `fabrication_audit`
-//! (`fabrication_audit_known.txt`), `census_audit` and `width_audit`
-//! (`width_audit_known.txt`) are the consumers. It is written
+//! (`fabrication_audit_known.txt`), `census_audit` (`census_audit_known.txt`),
+//! `width_audit` (`width_audit_known.txt`), and `compile_corpus_compare --ratchet`
+//! (`compile_validation_known.txt`) are the consumers. It is written
 //! generic — parameterized on the snapshot **path**, the **key type**
 //! ([`SnapshotKey`], which owns its own line render/parse and its pinnability
 //! rule), and (via that trait) the **pinnable predicate** — so each later
@@ -212,13 +213,17 @@ impl Ratchet {
         &self,
         found: &BTreeSet<K>,
         noun: &str,
+        json: bool,
     ) -> Result<BTreeSet<K>, CliError> {
         self.write(found)?;
         let pinned: BTreeSet<K> = found.iter().filter(|k| k.is_pinnable()).cloned().collect();
-        println!(
-            "✓ wrote {} {noun}(s) to {}",
-            pinned.len(),
-            self.path.display()
+        print_verdict(
+            json,
+            &format!(
+                "✓ wrote {} {noun}(s) to {}",
+                pinned.len(),
+                self.path.display()
+            ),
         );
         Ok(pinned)
     }
@@ -271,13 +276,17 @@ impl Ratchet {
         found: &BTreeSet<K>,
         noun: &str,
         scope: &str,
+        json: bool,
         render: impl Fn(&K) -> String,
     ) -> Result<(), CliError> {
         let diff = self.grade(found)?;
         if diff.holds() {
-            println!(
-                "\n✓ ratchet holds — {} known {noun}(s), no new ones ({scope})",
-                diff.known
+            print_verdict(
+                json,
+                &format!(
+                    "\n✓ ratchet holds — {} known {noun}(s), no new ones ({scope})",
+                    diff.known
+                ),
             );
             return Ok(());
         }
@@ -339,6 +348,16 @@ impl<K> GateDiff<K> {
 // `compile_corpus_compare --ratchet` has its own path-keyed flow with different
 // semantics and keeps its own messages.
 // ---------------------------------------------------------------------------
+
+/// Print a verdict or status line: to stderr under `--json` (stdout then carries the JSON
+/// document and nothing else), to stdout otherwise.
+pub(crate) fn print_verdict(json: bool, line: &str) {
+    if json {
+        eprintln!("{line}");
+    } else {
+        println!("{line}");
+    }
+}
 
 /// Refuse `--update` on a narrowed run. The snapshot describes the FULL default run —
 /// `scope` names it in the audit's own words (e.g. "the blank payload over tests/fixtures") —
@@ -412,12 +431,16 @@ pub(crate) fn grade_narrowed_strictly(
     narrowed: &[&'static str],
     noun: &str,
     findings: usize,
+    json: bool,
 ) -> Result<(), CliError> {
     let flags = narrowed.join(" / ");
     if findings == 0 {
-        println!(
-            "\n✓ no {noun}s — {flags} narrows this run, so the snapshot was NOT consulted. \
-             Graded STRICTLY instead: here every {noun} fails, pinned or not."
+        print_verdict(
+            json,
+            &format!(
+                "\n✓ no {noun}s — {flags} narrows this run, so the snapshot was NOT consulted. \
+                 Graded STRICTLY instead: here every {noun} fails, pinned or not."
+            ),
         );
         return Ok(());
     }
@@ -592,11 +615,11 @@ mod tests {
     #[test]
     fn a_narrowed_strict_grade_fails_on_any_finding() {
         assert_eq!(
-            grade_narrowed_strictly(&["explicit paths"], "toy", 0),
+            grade_narrowed_strictly(&["explicit paths"], "toy", 0, false),
             Ok(())
         );
         assert_eq!(
-            grade_narrowed_strictly(&["explicit paths"], "toy", 1).err(),
+            grade_narrowed_strictly(&["explicit paths"], "toy", 1, false).err(),
             Some(CliError::Failed),
             "a finding off the default corpus is news, snapshot or no snapshot"
         );

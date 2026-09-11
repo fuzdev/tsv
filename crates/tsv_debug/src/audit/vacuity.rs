@@ -14,9 +14,10 @@
 //!   over the committed fixtures tree can be held to.
 //!
 //! Its own module rather than [`super::sweep`]'s (where it was born) because the
-//! floor is a question about an audit's DENOMINATOR, not about that loop: eight
+//! floor is a question about an audit's DENOMINATOR, not about that loop: nine
 //! of its callers — `canonicalize`, `binding`, `neutrality`, `roundtrip`,
-//! `authoring`, `paren`, `render`, `fuzz` — drive no sweep at all. The pin above it is
+//! `authoring`, `paren`, `render`, `fuzz`, `variant` — drive no sweep
+//! at all. The pin above it is
 //! sweep-shaped by coincidence of subject (its consumers all count formatted
 //! files); the two belong together because they are two answers to one question.
 
@@ -59,13 +60,38 @@ pub(crate) const FIXTURES_FORMATTED_MIN: usize = 7_429;
 /// Returns [`CliError::Failed`] (after a user-facing message) when fewer than
 /// `min` files were formatted.
 pub(crate) fn check_formatted_min(formatted: usize, min: usize) -> Result<(), CliError> {
-    if formatted >= min {
+    check_pinned_min(
+        formatted,
+        min,
+        "formatted",
+        "files",
+        "The fixtures walk shrank (or parsing collapsed), or this audit started skipping a \
+         class the others do not",
+        "FIXTURES_FORMATTED_MIN",
+    )
+}
+
+/// A REGRESSION PIN's floor: `count` — the run's `verb`-ed `noun`s — must reach `min`, or the
+/// population it measures shrank. `cause` says what a shrink means for the caller, and `pin`
+/// names the const to re-pin when the shrink is deliberate.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] (after the message) when `count < min`.
+pub(crate) fn check_pinned_min(
+    count: usize,
+    min: usize,
+    verb: &str,
+    noun: &str,
+    cause: &str,
+    pin: &str,
+) -> Result<(), CliError> {
+    if count >= min {
         return Ok(());
     }
     eprintln!(
-        "Error: pinned minimum — formatted {formatted} files < pinned {min}. \
-         The fixtures walk shrank (or parsing collapsed), or this audit started skipping a \
-         class the others do not; if deliberate, re-pin FIXTURES_FORMATTED_MIN."
+        "Error: pinned minimum — {verb} {count} {noun} < pinned {min}. {cause}; if deliberate, \
+         re-pin {pin}."
     );
     Err(CliError::Failed)
 }

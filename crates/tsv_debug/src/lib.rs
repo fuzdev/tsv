@@ -6,7 +6,6 @@ pub mod cli;
 pub mod compile_fixtures;
 pub mod deno;
 pub mod diff;
-pub mod error;
 pub mod fixtures;
 pub mod json;
 pub mod render_browser;

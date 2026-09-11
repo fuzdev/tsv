@@ -1,7 +1,6 @@
 use crate::cli::CliError;
 use crate::deno;
 use crate::diff::{DiffOptions, diff_to_string};
-use crate::error;
 use crate::render_normalize::normalize_pair;
 use argh::FromArgs;
 use tsv_cli::cli::format_source::format_source_with_source_type;
@@ -121,7 +120,7 @@ async fn compare_two_inputs(
     input2: &Input,
     parser_type: ParserType,
     render: bool,
-) -> error::Result<bool> {
+) -> Result<bool, String> {
     let content1 = input1.content();
     let content2 = input2.content();
 
@@ -137,15 +136,14 @@ async fn compare_round_trip(
     parser_type: ParserType,
     goal: Option<tsv_ts::Goal>,
     render: bool,
-) -> error::Result<bool> {
+) -> Result<bool, String> {
     let content = input.content();
 
     // Parse original
     let ast1 = parse_to_value(content, parser_type).await?;
 
     // Format
-    let formatted = format_source_with_source_type(content, parser_type, goal)
-        .map_err(error::DebugError::Command)?;
+    let formatted = format_source_with_source_type(content, parser_type, goal)?;
 
     // Parse formatted
     let ast2 = parse_to_value(&formatted, parser_type).await?;
@@ -157,8 +155,10 @@ async fn compare_round_trip(
 async fn parse_to_value(
     content: &str,
     parser_type: ParserType,
-) -> error::Result<serde_json::Value> {
-    Ok(deno::parse_by_type(content, parser_type).await?)
+) -> Result<serde_json::Value, String> {
+    deno::parse_by_type(content, parser_type)
+        .await
+        .map_err(|e| super::describe_deno_error(&e))
 }
 
 /// Compare two ASTs (ignoring spans/locations).
@@ -171,7 +171,7 @@ fn compare_asts(
     ast1: serde_json::Value,
     ast2: serde_json::Value,
     render: bool,
-) -> error::Result<bool> {
+) -> Result<bool, String> {
     let (ast1_clean, ast2_clean) = normalize_pair(ast1, ast2, render);
 
     if ast1_clean == ast2_clean {
@@ -179,8 +179,8 @@ fn compare_asts(
     }
 
     // Show diff when they don't match
-    let pretty1 = serde_json::to_string_pretty(&ast1_clean)?;
-    let pretty2 = serde_json::to_string_pretty(&ast2_clean)?;
+    let pretty1 = serde_json::to_string_pretty(&ast1_clean).map_err(|e| e.to_string())?;
+    let pretty2 = serde_json::to_string_pretty(&ast2_clean).map_err(|e| e.to_string())?;
 
     println!("\n=== AST Diff ===");
     let options = DiffOptions::ast_diff();

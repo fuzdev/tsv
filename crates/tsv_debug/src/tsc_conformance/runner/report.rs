@@ -26,7 +26,7 @@ pub struct SkeletonReport {
     /// Family diagnostics that matched (file, line, col, code).
     pub family_match: usize,
     /// Family baseline diagnostics with no matching diagnostic of ours (classified
-    /// below). Expected to be all merge/lib until S4/S5 land.
+    /// below).
     pub family_missing: usize,
     /// Family diagnostics we emit that the baseline lacks. **Gate: must be 0.**
     pub family_extra: usize,
@@ -369,7 +369,7 @@ pub struct CheckTestReport {
     pub parse_rejected: bool,
     /// The parse error message, when rejected.
     pub parse_error: Option<String>,
-    /// Our diagnostics (empty while the checker is a no-op).
+    /// Our diagnostics.
     pub ours: Vec<DiagLine>,
     /// The baseline's summary-block diagnostics (the expected set).
     pub baseline_summary: Vec<DiagLine>,

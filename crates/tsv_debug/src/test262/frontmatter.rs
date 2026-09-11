@@ -3,8 +3,6 @@
 //! Uses string operations instead of a YAML parser to avoid adding dependencies.
 //! The frontmatter format is simple enough to parse manually.
 
-#![allow(dead_code)] // Some methods are useful for future expansion
-
 /// Syntactic proposals tsv deliberately does not parse, by their test262
 /// `features:` name. A test requiring one of these is not a tsv conformance gap
 /// — it exercises an unimplemented proposal — so the runner skips it instead of
@@ -27,8 +25,6 @@ pub struct Frontmatter {
     pub flags: Vec<String>,
     /// For negative tests: the phase where the error should occur
     pub negative_phase: Option<String>,
-    /// For negative tests: the expected error type
-    pub negative_type: Option<String>,
 }
 
 impl Frontmatter {
@@ -156,17 +152,10 @@ pub fn parse(content: &str) -> Option<Frontmatter> {
             if trimmed.contains("phase:") {
                 frontmatter.negative_phase = extract_inline_field(trimmed, "phase");
             }
-            if trimmed.contains("type:") {
-                frontmatter.negative_type = extract_inline_field(trimmed, "type");
-            }
         }
         // phase: parse (inside negative block)
         else if in_negative && trimmed.starts_with("phase:") {
             frontmatter.negative_phase = parse_value(trimmed);
-        }
-        // type: SyntaxError (inside negative block)
-        else if in_negative && trimmed.starts_with("type:") {
-            frontmatter.negative_type = parse_value(trimmed);
         }
         // Exit negative block on non-indented, non-empty line that's a new field
         else if in_negative
@@ -344,7 +333,6 @@ $DONOTEVALUATE();
 
         let fm = parse(content).unwrap();
         assert!(fm.is_negative_parse());
-        assert_eq!(fm.negative_type.as_deref(), Some("SyntaxError"));
     }
 
     #[test]

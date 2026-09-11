@@ -40,6 +40,7 @@ use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 
 use super::profile::{is_input_invalid_fixture, is_ts_family, resolve_seed_files_named};
+use super::skip_ascii_whitespace;
 
 /// Audit whether a comment's *ownership* ever changes tsv's layout (a gate reading
 /// ownership where it should be blind to it).
@@ -110,7 +111,8 @@ impl NeutralityAuditCommand {
                         findings.extend(fs);
                     }
                 }
-                Err(()) => *counts.entry("skipped").or_default() += 1,
+                Err(Skip::Unreadable) => *counts.entry("read_error").or_default() += 1,
+                Err(Skip::Unformattable) => *counts.entry("skipped").or_default() += 1,
             }
         }
         findings.sort_by(|a, b| a.display.cmp(&b.display).then(a.line.cmp(&b.line)));
@@ -147,7 +149,7 @@ impl NeutralityAuditCommand {
                 "counts": counts,
                 "findings": findings_json,
             });
-            println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            super::print_json_pretty(&out);
             return self.finish(findings);
         }
 
@@ -183,12 +185,20 @@ impl NeutralityAuditCommand {
     }
 }
 
+/// Why a file was not probed.
+enum Skip {
+    /// The file could not be read.
+    Unreadable,
+    /// tsv cannot format the file as authored, so it is out of scope.
+    Unformattable,
+}
+
 /// Probe every glued block-comment position in one file.
-fn audit_file(path: &Path) -> Result<Vec<Finding>, ()> {
-    let source = std::fs::read_to_string(path).map_err(|_| ())?;
+fn audit_file(path: &Path) -> Result<Vec<Finding>, Skip> {
+    let source = std::fs::read_to_string(path).map_err(|_| Skip::Unreadable)?;
     // Format the file as-authored first: if tsv can't, it's out of scope.
     if format_source(&source, ParserType::TypeScript).is_err() {
-        return Err(());
+        return Err(Skip::Unformattable);
     }
     let sites = glued_block_sites(&source);
     let mut findings = Vec::new();
@@ -221,7 +231,7 @@ fn glued_block_sites(source: &str) -> Vec<Site> {
             continue;
         }
         let end = c.span.end as usize;
-        let anchor = skip_ws(bytes, end);
+        let anchor = skip_ascii_whitespace(bytes, end);
         // Glued to a token on the same line (not another comment / EOF).
         if anchor >= bytes.len() || bytes[anchor] == b'/' || source[end..anchor].contains('\n') {
             continue;
@@ -297,13 +307,6 @@ fn annotation_of_width(width: usize) -> String {
     format!("@__{}__", "P".repeat(width - 5))
 }
 
-fn skip_ws(bytes: &[u8], mut i: usize) -> usize {
-    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    i
-}
-
 fn indent(s: &str) -> String {
     use std::fmt::Write as _;
     s.lines().fold(String::new(), |mut acc, l| {
@@ -318,11 +321,18 @@ mod tests {
 
     #[test]
     fn annotation_of_width_is_owned_shape() {
-        // Exactly `width` bytes and recognized as an annotation.
+        // Exactly `width` bytes, and glued to a token the parser owns it.
         for w in [ANNOTATION_MIN, 9, 11, 20] {
             let a = annotation_of_width(w);
             assert_eq!(a.len(), w, "width {w}");
-            assert!(tsv_ts::is_jsdoc_type_cast_comment(&a) || a.starts_with("@__"));
+            let src = format!("const a = /*{a}*/ x;\n");
+            let arena = bumpalo::Bump::new();
+            let program = tsv_ts::parse(&src, &arena).expect("the probe source parses");
+            assert_eq!(program.comments.len(), 1, "width {w}");
+            assert!(
+                program.comments[0].owned_by_node,
+                "width {w}: a glued annotation must be owned"
+            );
         }
     }
 
@@ -333,8 +343,6 @@ mod tests {
         let src = "const a = /* @__PURE__ */ x;\n";
         let sites = glued_block_sites(src);
         assert_eq!(sites.len(), 1);
-        let arena = bumpalo::Bump::new();
-        let _ = tsv_ts::parse(src, &arena); // sanity: parses
         assert!(
             probe_site(Path::new("t.ts"), src, &sites[0]).is_none(),
             "a plain leading-comment position must be layout-neutral"

@@ -1,16 +1,17 @@
 //! Embedded Deno sidecar for JS tool access
 //!
-//! Provides access to prettier, Svelte parser, acorn-typescript parser, and
-//! Svelte's CSS parser (parseCss) via a lazily-spawned Deno process. The
-//! process is only started when one of these functions is first called.
+//! Provides access to prettier, Svelte's parser and compiler (including the
+//! render-key oracle), the acorn-typescript parser, and Svelte's CSS parser
+//! (`parseCss`) via a lazily-spawned pool of Deno processes. No process starts
+//! until one of these functions is first called.
 //!
 //! # Example
 //!
 //! ```ignore
-//! use tsv_debug::deno;
+//! use tsv_debug::deno::{self, PrettierParser};
 //!
-//! // Deno is spawned lazily on first call
-//! let formatted = deno::run_prettier("<div>hi</div>", "svelte").await?;
+//! // The pool is spawned lazily on first call
+//! let formatted = deno::run_prettier("<div>hi</div>", PrettierParser::Parser("svelte")).await?;
 //! let ast = deno::parse_svelte("<div>hi</div>").await?;
 //! ```
 
@@ -166,7 +167,7 @@ pub enum SvelteGenerate {
 
 impl SvelteGenerate {
     /// The `generate` value the Svelte compiler expects.
-    fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             SvelteGenerate::Server => "server",
             SvelteGenerate::Client => "client",
@@ -320,23 +321,9 @@ pub async fn svelte_render_key(source: &str) -> Result<String, DenoError> {
         .ok_or(DenoError::MissingOutput)
 }
 
-/// Parse TypeScript source code using acorn with TypeScript plugin
-///
-/// # Arguments
-/// * `source` - The TypeScript source code
-///
-/// # Returns
-/// AST as a JSON Value (caller serializes with desired formatting)
-///
-/// # Errors
-/// Returns an error if Deno is not available or parsing fails.
-pub async fn parse_typescript(source: &str) -> Result<Value, DenoError> {
-    parse_typescript_with_goal(source, tsv_ts::Goal::Module).await
-}
-
 /// Parse TypeScript with acorn against an explicit goal symbol.
 ///
-/// `Goal::Module` (the default, via [`parse_typescript`]) mirrors Svelte's
+/// `Goal::Module` (the default) mirrors Svelte's
 /// always-module parse; `Goal::Script` parses a standalone script (acorn
 /// `sourceType: 'script'`) — sloppy unless its own `"use strict"` prologue says
 /// otherwise, so it accepts `await` as an identifier, `with`, and the legacy
@@ -452,6 +439,18 @@ pub async fn check() -> Result<VersionInfo, DenoError> {
 mod tests {
     use super::*;
 
+    /// A sidecar's launch tempfiles are gone once it has answered — the pool
+    /// never drops its actors, so nothing else would delete them.
+    fn assert_launch_files_removed(actor: &DenoActor) {
+        for path in actor.launch_paths() {
+            assert!(
+                !path.exists(),
+                "sidecar launch file must be deleted once the sidecar answers: {}",
+                path.display()
+            );
+        }
+    }
+
     /// Test all deno tools in a single test to avoid race conditions
     /// with the shared static actor across multiple tokio runtimes.
     #[tokio::test]
@@ -462,6 +461,8 @@ mod tests {
         let info = result.unwrap();
         assert!(!info.deno.is_empty());
         assert!(!info.prettier.is_empty());
+        let slot = get_slot().await.expect("pool must be initialized");
+        assert_launch_files_removed(&*slot.actor.read().await);
 
         // Test prettier
         let result = run_prettier("<div>hello</div>", PrettierParser::Parser("svelte")).await;
@@ -475,8 +476,11 @@ mod tests {
         assert_eq!(ast.get("type").and_then(|v| v.as_str()), Some("Root"));
 
         // Test typescript parser
-        let result = parse_typescript("const x: number = 1;").await;
-        assert!(result.is_ok(), "parse_typescript failed: {result:?}");
+        let result = parse_typescript_with_goal("const x: number = 1;", tsv_ts::Goal::Module).await;
+        assert!(
+            result.is_ok(),
+            "parse_typescript_with_goal failed: {result:?}"
+        );
         let ast = result.unwrap();
         assert_eq!(ast.get("type").and_then(|v| v.as_str()), Some("Program"));
 
@@ -586,6 +590,7 @@ mod tests {
             !slot.actor.read().await.is_closed(),
             "slot must hold a live actor after the heal"
         );
+        assert_launch_files_removed(&*slot.actor.read().await);
     }
 
     #[test]

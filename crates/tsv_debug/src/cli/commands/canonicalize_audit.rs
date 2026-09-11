@@ -1,5 +1,4 @@
 use crate::cli::CliError;
-use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use std::path::Path;
 use tsv_svelte_compile::{CanonicalizeError, canonicalize_js};
@@ -51,6 +50,7 @@ struct AuditReport {
     files: usize,
     clean: usize,
     input_rejected: usize,
+    read_error: usize,
     non_idempotent: Vec<String>,
     corrupt_output: Vec<CorruptEntry>,
     comment_loss: Vec<CommentLossEntry>,
@@ -83,8 +83,8 @@ impl CanonicalizeAuditCommand {
 
         for file in &files {
             let Ok(source) = std::fs::read_to_string(file) else {
-                // Unreadable (permissions, non-UTF-8): treat like a rejected input.
-                report.input_rejected += 1;
+                // Unreadable (permissions, non-UTF-8): counted apart from a rejected input.
+                report.read_error += 1;
                 continue;
             };
             match canonicalize_js(&source) {
@@ -131,13 +131,7 @@ impl CanonicalizeAuditCommand {
             report.non_idempotent.len() + report.corrupt_output.len() + report.comment_loss.len();
 
         if self.json {
-            match to_json_with_tabs(&report) {
-                Ok(json) => println!("{json}"),
-                Err(e) => {
-                    eprintln!("Error serializing report: {e}");
-                    return Err(CliError::Failed);
-                }
-            }
+            super::print_json_tabs(&report, CliError::Failed)?;
         } else {
             for path in &report.non_idempotent {
                 println!("NON-IDEMPOTENT {path}");
@@ -149,10 +143,11 @@ impl CanonicalizeAuditCommand {
                 println!("COMMENT-LOSS {}  ({})", entry.path, entry.detail);
             }
             println!(
-                "canonicalize_audit: {} files — {} clean, {} input-rejected, {} non-idempotent, {} corrupt-output, {} comment-loss",
+                "canonicalize_audit: {} files — {} clean, {} input-rejected, {} read-error, {} non-idempotent, {} corrupt-output, {} comment-loss",
                 report.files,
                 report.clean,
                 report.input_rejected,
+                report.read_error,
                 report.non_idempotent.len(),
                 report.corrupt_output.len(),
                 report.comment_loss.len()
@@ -165,7 +160,7 @@ impl CanonicalizeAuditCommand {
         // This audit is the `deno task check` leg invoked with explicit paths, so
         // there is no `default_paths` pin above it to catch that.
         check_graded_nonzero(
-            report.files - report.input_rejected,
+            report.files - report.input_rejected - report.read_error,
             "TS/JS sources canonicalized",
         )?;
 

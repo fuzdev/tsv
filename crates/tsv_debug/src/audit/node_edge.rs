@@ -179,17 +179,18 @@ fn edge_between(children: &[WireChild<'_>], offset: usize) -> String {
 /// every hit via [`node_edge_key_with_map`] — the reason this one must never move into a loop
 /// over all injection sites. The source-based convenience form: currently only this module's
 /// tests drive it (so they exercise `with_map` and the map-build transitively — the multibyte
-/// coverage rides here), hence `allow(dead_code)` for the non-test build.
-#[allow(dead_code)] // source-based wrapper; exercised by this module's tests, kept as the single-offset API
+/// coverage rides here), hence `cfg(test)`.
+#[cfg(test)]
 pub(crate) fn node_edge_key(wire: &Value, source: &str, offset: usize) -> Option<NodeEdgeKey> {
     let map = Utf16ToByte::new(source);
     node_edge_key_with_map(wire, &map, offset)
 }
 
-/// [`node_edge_key`]'s walk, over a **prebuilt** [`Utf16ToByte`] map.
+/// The node-edge walk, over a **prebuilt** [`Utf16ToByte`] map.
 ///
 /// `map` must be the wire→byte map of the same `source` `wire` was parsed from (the wire's own
-/// positions are UTF-16, translated through it). Split from [`node_edge_key`] so a caller keying
+/// positions are UTF-16, translated through it). Split from the test-only `node_edge_key` (which
+/// builds the map per call) so a caller keying
 /// many offsets against one file — the record-time by-node keyer — pays the map build once rather
 /// than per offset.
 pub(crate) fn node_edge_key_with_map(

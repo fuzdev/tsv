@@ -2,7 +2,7 @@ use argh::FromArgs;
 use std::path::Path;
 
 use crate::cli::CliError;
-use crate::cli::commands::profile::resolve_profile_files;
+use crate::cli::commands::profile::{percentile, resolve_profile_files};
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::DocText;
 use tsv_lang::doc::arena::{DocArena, DocNode};
@@ -70,8 +70,10 @@ const NODE_KINDS: &[&str] = &[
     "FlushBreak",
     "FlowProbeEnd",
     "Align",
+    "AlignRoot",
+    "GatedState",
 ];
-const TEXT_KINDS: &[&str] = &["Static", "Pooled", "SourceSpan"];
+const TEXT_KINDS: &[&str] = &["Static", "Pooled", "SourceSpan", "VerbatimSpan"];
 
 #[derive(Default)]
 struct Stats {
@@ -173,10 +175,11 @@ fn run_reuse(files: &[std::path::PathBuf]) -> Result<(), CliError> {
     let mut arena: Option<DocArena> = None;
     let (mut max_node_cap, mut max_child_cap) = (0usize, 0usize);
     let (mut max_node_len, mut max_child_len) = (0usize, 0usize);
-    let (mut n, mut parse_errors) = (0u64, 0usize);
+    let (mut n, mut parse_errors, mut read_errors) = (0u64, 0usize, 0usize);
 
     for path in files {
         let Ok(source) = std::fs::read_to_string(path) else {
+            read_errors += 1;
             continue;
         };
         match &mut arena {
@@ -219,7 +222,9 @@ fn run_reuse(files: &[std::path::PathBuf]) -> Result<(), CliError> {
 
     let node_bytes = size_of::<DocNode>();
     let retained = max_node_cap * node_bytes + max_child_cap * size_of::<u32>();
-    eprintln!("reset()-reuse high-water — {n} files ({parse_errors} parse errors)\n");
+    eprintln!(
+        "reset()-reuse high-water — {n} files ({parse_errors} parse errors, {read_errors} unreadable)\n"
+    );
     eprintln!(
         "  nodes:    peak used {max_node_len}  / retained cap {max_node_cap}  (slack {:.1}%)",
         pct(
@@ -309,9 +314,21 @@ fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<()
     stats.bump_demand.push(demand as f64 / len);
     let children_slice = children.as_slice();
     for n in nodes.iter() {
-        *stats.node_hist.entry(classify_node(n)).or_default() += 1;
+        let kind = classify_node(n);
+        debug_assert!(
+            NODE_KINDS.contains(&kind),
+            "`{kind}` is missing from NODE_KINDS"
+        );
+        *stats.node_hist.entry(kind).or_default() += 1;
         match n {
-            DocNode::Text(t) => *stats.text_hist.entry(classify_text(t)).or_default() += 1,
+            DocNode::Text(t) => {
+                let text_kind = classify_text(t);
+                debug_assert!(
+                    TEXT_KINDS.contains(&text_kind),
+                    "`{text_kind}` is missing from TEXT_KINDS"
+                );
+                *stats.text_hist.entry(text_kind).or_default() += 1;
+            }
             DocNode::Concat(range) => {
                 stats.concat_total += 1;
                 let kids = range.resolve(children_slice);
@@ -385,13 +402,21 @@ fn pct(part: u64, whole: u64) -> f64 {
     part as f64 * 100.0 / whole.max(1) as f64
 }
 
-/// Value at percentile `p` (0..=100) of a pre-sorted slice (nearest-rank).
-fn percentile(sorted: &[f64], p: usize) -> f64 {
-    if sorted.is_empty() {
-        return 0.0;
-    }
-    let idx = (p * (sorted.len() - 1) + 50) / 100;
-    sorted[idx]
+/// The kinds a histogram table lists: the curated order first, then any kind the histogram
+/// holds that the list lacks, sorted — so a new `DocNode` / `DocText` variant shows up in a
+/// release report rather than dropping out of the table (the `debug_assert` at collection
+/// catches it only in a debug build).
+fn table_kinds(
+    listed: &[&'static str],
+    hist: &std::collections::HashMap<&'static str, u64>,
+) -> Vec<&'static str> {
+    let mut unlisted: Vec<&'static str> = hist
+        .keys()
+        .copied()
+        .filter(|kind| !listed.contains(kind))
+        .collect();
+    unlisted.sort_unstable();
+    listed.iter().copied().chain(unlisted).collect()
 }
 
 /// One-line percentile summary of a per-file density distribution.
@@ -460,14 +485,14 @@ fn print_report(s: &Stats, parse_errors: usize) {
     eprintln!();
 
     eprintln!("  DocNode variants (share of all nodes):");
-    for kind in NODE_KINDS {
+    for kind in table_kinds(NODE_KINDS, &s.node_hist) {
         if let Some(&c) = s.node_hist.get(kind) {
             eprintln!("    {kind:>18} {c:>10}  {:5.1}%", pct(c, s.nodes));
         }
     }
     let text_total: u64 = s.text_hist.values().sum();
     eprintln!("\n  DocText sub-variants (share of Text = {text_total} nodes):");
-    for kind in TEXT_KINDS {
+    for kind in table_kinds(TEXT_KINDS, &s.text_hist) {
         if let Some(&c) = s.text_hist.get(kind) {
             eprintln!(
                 "    {kind:>18} {c:>10}  {:5.1}% of Text  ({:5.1}% of all)",
@@ -555,8 +580,8 @@ fn print_json(s: &Stats, parse_errors: usize) {
         density_json(&s.children_density),
         density_json(&s.output_per_node),
         density_json(&s.bump_demand),
-        hist_json(NODE_KINDS, &s.node_hist),
-        hist_json(TEXT_KINDS, &s.text_hist),
+        hist_json(&table_kinds(NODE_KINDS, &s.node_hist), &s.node_hist),
+        hist_json(&table_kinds(TEXT_KINDS, &s.text_hist), &s.text_hist),
         degeneracy,
     );
 }

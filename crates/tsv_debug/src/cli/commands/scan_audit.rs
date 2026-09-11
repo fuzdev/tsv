@@ -193,9 +193,9 @@ impl ScanAuditCommand {
 
         let mut sites: Vec<Site> = Vec::new();
         for file in &files {
-            let Ok(text) = std::fs::read_to_string(file) else {
-                continue;
-            };
+            // An unreadable file is a scan that never ran, so it fails the audit rather than
+            // letting a banned site inside it pass unseen.
+            let text = super::read_doc(file)?;
             let rel = crate_relative(file);
             scan_file(&rel, &text, &mut sites);
         }
@@ -394,10 +394,7 @@ fn print_json(sites: &[Site], violations: &[&Site], stale: &[&Allow], deferred: 
         "deferred_count": deferred.len(),
         "deferred": deferred.iter().map(entry_json).collect::<Vec<_>>(),
     });
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&report).unwrap_or_default()
-    );
+    super::print_json_pretty(&report);
 }
 
 #[cfg(test)]

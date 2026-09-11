@@ -106,21 +106,7 @@ enum Verdict {
 // Deliberately serial (no spawn-per-fixture / sidecar pool like the other bulk
 // fixtures commands): only ~19 input.ts fixtures exist, a full run is ~0.4s.
 async fn run(verbose: bool, filters: &[String]) -> Result<(), CliError> {
-    let fixtures_dir = Path::new("tests/fixtures");
-    if !fixtures_dir.exists() {
-        eprintln!("Error: fixtures directory not found: tests/fixtures");
-        return Err(CliError::Failed);
-    }
-
-    let all = match fixtures::walk_fixtures(fixtures_dir) {
-        Ok(f) => f,
-        Err(e) => {
-            eprintln!("Error walking fixtures: {e}");
-            return Err(CliError::Failed);
-        }
-    };
-
-    let ts_fixtures: Vec<_> = all
+    let ts_fixtures: Vec<_> = super::walk_fixtures_or_fail()?
         .into_iter()
         .filter(|f| matches!(f.input_type(), InputType::TypeScript))
         .filter(|f| f.matches_filters(filters))
@@ -144,7 +130,7 @@ async fn run(verbose: bool, filters: &[String]) -> Result<(), CliError> {
             }
         };
 
-        match classify(&content, &fixture.path).await {
+        match classify(&content, &fixture.path, fixture.goal()).await {
             Verdict::Convertible => {
                 println!("  ✓ CONVERTIBLE  {}", fixture.relative_path);
                 convertible.push(fixture.relative_path.clone());
@@ -216,7 +202,7 @@ async fn run(verbose: bool, filters: &[String]) -> Result<(), CliError> {
 /// Checking variants — not just `input.ts` — matters because a divergence fixture's
 /// distinguishing case often lives in a variant (the BOM fixture's `input.ts` is
 /// de-BOMed; a normalization variant could collapse differently when embedded).
-async fn classify(content: &str, dir: &Path) -> Verdict {
+async fn classify(content: &str, dir: &Path, goal: tsv_ts::Goal) -> Verdict {
     if let Some(reason) = intentional_ts(dir) {
         return Verdict::Intentional(reason);
     }
@@ -233,8 +219,11 @@ async fn classify(content: &str, dir: &Path) -> Verdict {
             .and_then(|n| n.to_str())
             .unwrap_or("?")
             .to_string();
-        let Ok(file_content) = std::fs::read_to_string(&path) else {
-            continue;
+        let file_content = match std::fs::read_to_string(&path) {
+            Ok(content) => content,
+            // Unverifiable is not convertible: without the file there is no evidence the
+            // fixture survives the move.
+            Err(e) => return Verdict::Necessary(format!("{name}: unreadable: {e}")),
         };
         // Byte-0 carriers are handled by dir_byte0_feature; don't try to embed them.
         if file_content.starts_with('\u{FEFF}')
@@ -244,7 +233,7 @@ async fn classify(content: &str, dir: &Path) -> Verdict {
             continue;
         }
 
-        match context_diff(&file_content).await {
+        match context_diff(&file_content, goal).await {
             Ok(None) => {}
             Ok(Some((tool, standalone, embedded))) => {
                 return Verdict::FormatsDifferently {
@@ -258,6 +247,14 @@ async fn classify(content: &str, dir: &Path) -> Verdict {
         }
     }
 
+    // Checked last so a more specific reason above still names itself: the `goal` marker
+    // exists only beside a `.ts` input, and a Svelte `<script>` is always a module, so a
+    // script-goal fixture whose content happens to embed cleanly would lose its goal.
+    if goal == tsv_ts::Goal::Script {
+        return Verdict::Necessary(
+            "parse goal: script (a Svelte <script> is always a module)".into(),
+        );
+    }
     Verdict::Convertible
 }
 
@@ -271,17 +268,22 @@ async fn classify(content: &str, dir: &Path) -> Verdict {
 /// Compares standalone-vs-embedded of the SAME content (not against `input.ts`), so
 /// it's valid for non-idempotent variants (`prettier_intermediate_*`, `unformatted_*`)
 /// too — it asks "does the surrounding context matter?", independent of convergence.
-async fn context_diff(content: &str) -> Result<Option<(&'static str, String, String)>, String> {
+async fn context_diff(
+    content: &str,
+    goal: tsv_ts::Goal,
+) -> Result<Option<(&'static str, String, String)>, String> {
     let embedded = wrap_in_ts_script(content);
 
     if let Err(e) = parse_svelte(&embedded).await {
         return Err(format!("Svelte parse fails: {}", short(&e.to_string())));
     }
 
-    let ts_out = fixtures::format_with_our_formatter(content, "input.ts")
+    let ts_out = fixtures::format_with_our_formatter(content, "input.ts", goal)
         .map_err(|e| format!("tsv format error: {}", short(&e)))?;
-    let sv_out = fixtures::format_with_our_formatter(&embedded, "embed.svelte")
-        .map_err(|e| format!("tsv format error: {}", short(&e)))?;
+    // A Svelte `<script>` is a module whatever the standalone fixture's goal.
+    let sv_out =
+        fixtures::format_with_our_formatter(&embedded, "embed.svelte", tsv_ts::Goal::Module)
+            .map_err(|e| format!("tsv format error: {}", short(&e)))?;
     let sv_body = dedent_script_body(&sv_out);
     if normalize(&sv_body) != normalize(&ts_out) {
         return Ok(Some(("tsv", ts_out, sv_body)));
@@ -388,10 +390,5 @@ fn normalize(s: &str) -> String {
 
 /// Truncate a long error message for one-line reporting.
 fn short(s: &str) -> String {
-    let first = s.lines().next().unwrap_or(s);
-    if first.len() > 80 {
-        format!("{}…", &first[..80])
-    } else {
-        first.to_string()
-    }
+    super::truncate_chars(s.lines().next().unwrap_or(s), 80)
 }

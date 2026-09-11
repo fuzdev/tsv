@@ -91,26 +91,71 @@ pub fn write_file(path: &Path, content: &str) -> Result<(), String> {
     fs::write(path, content).map_err(|e| format!("Failed to write file {path:?}: {e}"))
 }
 
-/// Delete file if it exists
-pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
-    if path.exists() {
-        fs::remove_file(path).map_err(|e| format!("Failed to delete file {path:?}: {e}"))?;
-    }
-    Ok(())
-}
-
-/// Format content using our formatter
+/// Remove `path` if it exists, reporting whether there was a file to remove — the pair to
+/// [`write_if_changed`]. One `remove_file`, with a missing file read as `false`, so there is
+/// no `exists()` check to race.
 ///
-/// Determines file type from filepath extension and calls the appropriate formatter.
-/// Supports .svelte, .svelte.ts, .ts, and .css files.
-pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String, String> {
-    format_with_our_formatter_with_goal(content, filepath, tsv_ts::Goal::Module)
+/// # Errors
+///
+/// Returns the removal failure's message; a missing file is not one.
+pub fn remove_if_present(path: &Path) -> Result<bool, String> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(format!("Failed to delete file {path:?}: {e}")),
+    }
 }
 
-/// [`format_with_our_formatter`] against an explicit TypeScript parse goal —
-/// used by the validation phases for standalone-script (`Goal::Script`)
-/// fixtures. The goal is consulted only for `.ts` / `.svelte.ts` inputs.
-pub fn format_with_our_formatter_with_goal(
+/// How [`write_if_changed`] left a file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WriteOutcome {
+    /// The file did not exist and was written.
+    Created,
+    /// The file existed with other content and was rewritten.
+    Updated,
+    /// The file already held exactly this content; nothing was written.
+    Unchanged,
+}
+
+/// Write `content` to `path` unless the file already holds exactly that.
+///
+/// # Errors
+///
+/// Returns the write failure's message.
+pub fn write_if_changed(path: &Path, content: &str) -> Result<WriteOutcome, String> {
+    let existed = path.exists();
+    if existed && read_file(path).is_ok_and(|existing| existing == content) {
+        return Ok(WriteOutcome::Unchanged);
+    }
+    write_file(path, content)?;
+    // Keyed on existence, not readability: a file that existed but failed to read was
+    // overwritten, not created.
+    Ok(if existed {
+        WriteOutcome::Updated
+    } else {
+        WriteOutcome::Created
+    })
+}
+
+/// Whether `relative_path` matches any of `filters` — case-insensitive substrings, where no
+/// filters match everything. The one rule every fixture tree's pattern arguments share.
+pub fn path_matches_filters(relative_path: &str, filters: &[String]) -> bool {
+    if filters.is_empty() {
+        return true;
+    }
+    let lower = relative_path.to_lowercase();
+    filters
+        .iter()
+        .any(|filter| lower.contains(&filter.to_lowercase()))
+}
+
+/// Format content using our formatter at an explicit TypeScript parse goal.
+///
+/// Determines file type from filepath extension and calls the appropriate formatter
+/// (.svelte, .svelte.ts, .ts, and .css). The goal is consulted only for `.ts` /
+/// `.svelte.ts` inputs; a fixture passes its own [`Fixture::goal`], so a
+/// standalone-script (`Goal::Script`) fixture is formatted the way it is validated.
+pub fn format_with_our_formatter(
     content: &str,
     filepath: &str,
     goal: tsv_ts::Goal,

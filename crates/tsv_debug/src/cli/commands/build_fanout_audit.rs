@@ -26,8 +26,8 @@ pub struct BuildFanoutAuditCommand {
 }
 
 /// Stop deepening a construct once one format exceeds this many doc nodes, so
-/// the audit itself never OOMs on the (currently exponential) code. Exceeding
-/// it is treated as a failure (clearly super-linear).
+/// the audit itself never OOMs on a blowup. Exceeding it is treated as a failure
+/// (clearly super-linear).
 const NODE_CAP: usize = 3_000_000;
 
 /// Tolerated growth: `doc_nodes ~ depth^E`. A linear build is `E ≈ 1`; this
@@ -504,222 +504,223 @@ fn measure(c: &Construct) -> ConstructResult {
     }
 }
 
+/// Every construct the audit measures, with the depths it grows each one to.
+const CONSTRUCTS: &[Construct] = &[
+    Construct {
+        name: "svelte_elements",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_elements,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "svelte_inline_elements",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_inline_elements,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "svelte_if_nested",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_if,
+        depths: &[3, 6, 9],
+    },
+    Construct {
+        name: "svelte_each_nested",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_each,
+        depths: &[3, 6, 9],
+    },
+    Construct {
+        name: "svelte_await_nested",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_await,
+        depths: &[3, 6, 9],
+    },
+    Construct {
+        name: "svelte_block_sibling",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_block_sibling,
+        depths: &[3, 6, 9],
+    },
+    Construct {
+        name: "ts_call_chain",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_chain,
+        depths: &[2, 4, 6],
+    },
+    Construct {
+        name: "ts_ternary_nested",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_ternary,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_conditional_type_nested",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_conditional_type,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_call_obj",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_call_obj,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_multiarg",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_multiarg,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_multiarg_chain",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_multiarg_chain,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_multiarg_new",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_multiarg_new,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_curried_arrow",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_curried_arrow,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_curried_arrow_typed",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_curried_arrow_typed,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_curried_arrow_new",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_curried_arrow_new,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_curried_arrow_chain",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_curried_arrow_chain,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_curried_arrow_obj",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_curried_arrow_obj,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_curried_arrow_obj_multiarg",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_curried_arrow_obj_multiarg,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_curried_arrow_obj_chain",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_curried_arrow_obj_chain,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_obj_multiarg",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_obj_multiarg,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_own_line_comment_obj",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_own_line_comment_obj,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_own_line_comment_block",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_own_line_comment_block,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_own_line_comment_call",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_own_line_comment_call,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_broke_after_comment_obj",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_broke_after_comment_obj,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_obj_single",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_obj_single,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_assignment_nested",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_assignment_nested,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_ternary_call_arg",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_ternary_call_arg,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_array_callback",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_array_callback,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "svelte_snippet_nested",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_snippet_nested,
+        depths: &[3, 6, 9],
+    },
+    Construct {
+        name: "svelte_key_nested",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_key_nested,
+        depths: &[3, 6, 9],
+    },
+    Construct {
+        name: "ts_nested_arrow_cond_multiarg",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_cond_multiarg,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_arrow_cond_single",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_arrow_cond_single,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "ts_nested_fn_expr_multiarg",
+        parser: ParserType::TypeScript,
+        generate: gen_ts_nested_fn_expr_multiarg,
+        depths: &[4, 8, 12],
+    },
+];
+
 impl BuildFanoutAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let constructs = [
-            Construct {
-                name: "svelte_elements",
-                parser: ParserType::Svelte,
-                generate: gen_svelte_elements,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "svelte_inline_elements",
-                parser: ParserType::Svelte,
-                generate: gen_svelte_inline_elements,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "svelte_if_nested",
-                parser: ParserType::Svelte,
-                generate: gen_svelte_if,
-                depths: &[3, 6, 9],
-            },
-            Construct {
-                name: "svelte_each_nested",
-                parser: ParserType::Svelte,
-                generate: gen_svelte_each,
-                depths: &[3, 6, 9],
-            },
-            Construct {
-                name: "svelte_await_nested",
-                parser: ParserType::Svelte,
-                generate: gen_svelte_await,
-                depths: &[3, 6, 9],
-            },
-            Construct {
-                name: "svelte_block_sibling",
-                parser: ParserType::Svelte,
-                generate: gen_svelte_block_sibling,
-                depths: &[3, 6, 9],
-            },
-            Construct {
-                name: "ts_call_chain",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_chain,
-                depths: &[2, 4, 6],
-            },
-            Construct {
-                name: "ts_ternary_nested",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_ternary,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_conditional_type_nested",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_conditional_type,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_call_obj",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_call_obj,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_multiarg",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_multiarg,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_multiarg_chain",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_multiarg_chain,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_multiarg_new",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_multiarg_new,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_curried_arrow",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_curried_arrow,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_curried_arrow_typed",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_curried_arrow_typed,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_curried_arrow_new",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_curried_arrow_new,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_curried_arrow_chain",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_curried_arrow_chain,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_curried_arrow_obj",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_curried_arrow_obj,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_curried_arrow_obj_multiarg",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_curried_arrow_obj_multiarg,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_curried_arrow_obj_chain",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_curried_arrow_obj_chain,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_obj_multiarg",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_obj_multiarg,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_own_line_comment_obj",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_own_line_comment_obj,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_own_line_comment_block",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_own_line_comment_block,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_own_line_comment_call",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_own_line_comment_call,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_broke_after_comment_obj",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_broke_after_comment_obj,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_obj_single",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_obj_single,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_assignment_nested",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_assignment_nested,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_ternary_call_arg",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_ternary_call_arg,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_array_callback",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_array_callback,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "svelte_snippet_nested",
-                parser: ParserType::Svelte,
-                generate: gen_svelte_snippet_nested,
-                depths: &[3, 6, 9],
-            },
-            Construct {
-                name: "svelte_key_nested",
-                parser: ParserType::Svelte,
-                generate: gen_svelte_key_nested,
-                depths: &[3, 6, 9],
-            },
-            Construct {
-                name: "ts_nested_arrow_cond_multiarg",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_cond_multiarg,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_arrow_cond_single",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_arrow_cond_single,
-                depths: &[4, 8, 12],
-            },
-            Construct {
-                name: "ts_nested_fn_expr_multiarg",
-                parser: ParserType::TypeScript,
-                generate: gen_ts_nested_fn_expr_multiarg,
-                depths: &[4, 8, 12],
-            },
-        ];
-
-        let results: Vec<ConstructResult> = constructs.iter().map(measure).collect();
+        let results: Vec<ConstructResult> = CONSTRUCTS.iter().map(measure).collect();
         let failed = results.iter().filter(|r| !r.pass).count();
 
         if self.json {
@@ -809,8 +810,5 @@ fn print_json(results: &[ConstructResult]) {
         "constructs": arr,
         "pass": results.iter().all(|r| r.pass),
     });
-    match serde_json::to_string_pretty(&out) {
-        Ok(s) => println!("{s}"),
-        Err(e) => eprintln!("fanout audit: JSON serialize error: {e}"),
-    }
+    super::print_json_pretty(&out);
 }

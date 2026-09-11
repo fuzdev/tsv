@@ -710,9 +710,10 @@ entry point, so that *is* its production shape), while `parse + format` uses war
 `reset()`-reuse arenas (the `tsv_cli` shape). **Compare ratios only against ratios
 from this same command** — never against a raw timing from `profile`.
 
-Refusals and parse failures are counted, not timed. A `CorruptOutput` or a
-`TypeErasureLeak` is a compiler bug and fails the run. Pure Rust, no Deno; run with
-`--release` for anchors.
+Refusals and parse failures are counted, not timed. Any compile self-check failure
+(`CorruptOutput`, `TypeErasureLeak`, `GeneratedNameMissing`) is a compiler bug: it prints
+`COMPILER BUG <path>: <error>` and fails the run. Pure Rust, no Deno; run with `--release`
+for anchors.
 
 ```bash
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile

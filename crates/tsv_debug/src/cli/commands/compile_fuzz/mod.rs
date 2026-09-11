@@ -64,24 +64,24 @@
 //! changes which donor a given draw selects for every seed. That is inherent to a
 //! cross-product engine rather than a fixable defect — but it does mean this fuzzer's
 //! stability property is weaker than the formatter fuzzer's, and a fixture add can
-//! shift the donor-grafted mutants. Nine of the ten operators are unaffected.
+//! shift the donor-grafted mutants. Ten of the eleven operators are unaffected.
 
 mod anchors;
 mod operators;
 
-use crate::json::to_json_with_tabs;
 use anchors::Anchors;
 use argh::FromArgs;
 use futures_util::StreamExt;
 use operators::{Donor, Operator};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use tsv_svelte_compile::{
-    CompileError, CompileOptions, Parity, canonicalize_js, compare_canonical, compile,
-};
+use tsv_svelte_compile::{CompileOptions, Parity, canonicalize_js, compare_canonical, compile};
 
+use super::compile_corpus_compare::{CompileFailure, oracle_reject_code};
 use super::fuzz::{Rng, stream_seed};
-use super::profile::{is_pruned_dir, is_svelte};
+use super::print_json_tabs;
+use super::profile::{is_svelte, resolve_seed_files_named};
+use crate::audit::panic_hook::{CapturingPanicHook, take_last_panic};
 use crate::cli::CliError;
 use crate::deno::{self, DenoError, SvelteGenerate};
 use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
@@ -169,8 +169,9 @@ enum Verdict {
     OverAcceptance(String),
     /// tsv's compile panicked. HARD.
     Panic(String),
-    /// tsv's own output self-validation fired (`CorruptOutput` / `TypeErasureLeak`)
-    /// — always a compiler bug, and one the oracle never had to be consulted for.
+    /// tsv's own output self-validation fired (`CorruptOutput` / `TypeErasureLeak` /
+    /// `GeneratedNameMissing`) — always a compiler bug, and one the oracle never had to
+    /// be consulted for.
     /// HARD.
     SelfCheck(&'static str, String),
     /// A harness failure (sidecar, canonicalizer).
@@ -261,7 +262,7 @@ impl CompileFuzzCommand {
         } else {
             self.paths.clone()
         };
-        let files = discover_svelte(&paths)?;
+        let files = resolve_seed_files_named(&paths, 0, ".svelte files", is_svelte)?;
         if self.list {
             for f in &files {
                 println!("{}", f.display());
@@ -280,14 +281,9 @@ impl CompileFuzzCommand {
 
         // Record each panic instead of letting the default hook print it — the
         // fuzzer expects to trigger some, and a wall of backtraces buries the report.
-        let previous = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|info| {
-            LAST_PANIC.with(|c| *c.borrow_mut() = Some(info.to_string()));
-        }));
+        let _hook = CapturingPanicHook::install();
         let rt = super::create_runtime();
-        let result = rt.block_on(self.grade_and_report(mutants, unparseable));
-        std::panic::set_hook(previous);
-        result
+        rt.block_on(self.grade_and_report(mutants, unparseable))
     }
 
     /// Read each file, keeping the ones tsv's parser accepts (an unparseable seed is
@@ -453,30 +449,23 @@ async fn grade_source(source: &str) -> Verdict {
     let Ok(ours) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         compile(source, &CompileOptions::default())
     })) else {
-        return Verdict::Panic(
-            LAST_PANIC
-                .with(|c| c.borrow_mut().take())
-                .unwrap_or_default(),
-        );
+        return Verdict::Panic(take_last_panic().unwrap_or_default());
     };
     let ours = match ours {
         Ok(output) => output,
-        // The honest refusal contract — and the pre-filter's whole point.
-        Err(CompileError::Unsupported(reason)) => {
-            return Verdict::Refused(reason.bucket_key().into_owned());
-        }
-        Err(CompileError::Parse(e)) => return Verdict::TsvParseRejected(e.to_string()),
-        // Both self-checks are unconditional compiler bugs, provable without the
-        // oracle: emitted JS that does not reparse, or a TypeScript-only node that
-        // survived erasure.
-        Err(CompileError::CorruptOutput(e)) => {
-            return Verdict::SelfCheck("corrupt_output", e.to_string());
-        }
-        Err(CompileError::TypeErasureLeak(span)) => {
-            return Verdict::SelfCheck("type_erasure_leak", format!("at {span:?}"));
-        }
-        Err(CompileError::GeneratedNameMissing(span)) => {
-            return Verdict::SelfCheck("generated_name_missing", format!("at {span:?}"));
+        Err(error) => {
+            return match CompileFailure::of(error) {
+                // The honest refusal contract — and the pre-filter's whole point.
+                CompileFailure::Refused(reason) => {
+                    Verdict::Refused(reason.bucket_key().into_owned())
+                }
+                CompileFailure::Parse(detail) => Verdict::TsvParseRejected(detail),
+                // Every self-check is an unconditional compiler bug, provable without the
+                // oracle.
+                CompileFailure::SelfCheck(check, detail) => {
+                    Verdict::SelfCheck(check.label(), detail)
+                }
+            };
         }
     };
 
@@ -539,74 +528,18 @@ fn bounded_diff(ours: &str, oracle: &str) -> String {
 /// Lines of a mismatch diff carried into the report.
 const DIFF_LINE_CAP: usize = 20;
 
-/// The Svelte error code in an oracle rejection message (`svelte.dev/e/{code}`), or
-/// `None` when the message carries none — which means a sidecar failure, not a
-/// rejection.
-fn oracle_reject_code(message: &str) -> Option<String> {
-    let at = message.find("svelte.dev/e/")? + "svelte.dev/e/".len();
-    let rest = &message[at..];
-    let end = rest
-        .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
-        .unwrap_or(rest.len());
-    (end > 0).then(|| rest[..end].to_string())
+/// How many of `len` findings a report lists: all of them when `max_findings` is 0, else at
+/// most `max_findings`.
+fn shown(max_findings: usize, len: usize) -> usize {
+    if max_findings == 0 {
+        len
+    } else {
+        max_findings.min(len)
+    }
 }
 
 fn first_line(s: &str) -> String {
     s.lines().next().unwrap_or_default().to_string()
-}
-
-/// Discover `.svelte` files under the given paths, sorted (the round-robin schedule
-/// must not depend on filesystem order).
-fn discover_svelte(paths: &[String]) -> Result<Vec<PathBuf>, CliError> {
-    let mut out = Vec::new();
-    for path in paths {
-        let path = PathBuf::from(path);
-        if path.is_file() {
-            // Filter an explicitly named file by the same subject test the walk
-            // applies. Without it a `.ts` argument entered the seed list and was
-            // then parsed as a Svelte component — a silent unparseable seed rather
-            // than an argument error.
-            if is_svelte(&path) {
-                out.push(path);
-            }
-            continue;
-        }
-        if !path.is_dir() {
-            eprintln!("Error: no such path: {}", path.display());
-            return Err(CliError::Failed);
-        }
-        collect_svelte(&path, &mut out);
-    }
-    out.sort();
-    if out.is_empty() {
-        eprintln!("Error: no .svelte files found in {paths:?}");
-        return Err(CliError::Failed);
-    }
-    Ok(out)
-}
-
-fn collect_svelte(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            // Shared prune policy — without it this walk recursed into `node_modules`
-            // and `.git` on any real repo. Neutral over the default
-            // `tests/fixtures_compile` corpus, which holds no pruned directory.
-            if path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .is_none_or(is_pruned_dir)
-            {
-                continue;
-            }
-            collect_svelte(&path, out);
-        } else if is_svelte(&path) {
-            out.push(path);
-        }
-    }
 }
 
 /// The run's tallies.
@@ -741,7 +674,7 @@ impl Report {
         );
         println!("  {:>7}  panic in tsv's compile (a bug)", self.panic);
         println!(
-            "  {:>7}  self-check fired (corrupt output / erasure leak — a bug)",
+            "  {:>7}  self-check fired (corrupt output / erasure leak / missing generated name — a bug)",
             self.self_check
         );
         println!("  {:>7}  harness error\n", self.error);
@@ -788,11 +721,7 @@ impl Report {
             .filter(|g| g.verdict.is_harness_invalid_js())
             .collect();
         if !invalid_js.is_empty() {
-            let shown = if max_findings == 0 {
-                invalid_js.len()
-            } else {
-                max_findings.min(invalid_js.len())
-            };
+            let shown = shown(max_findings, invalid_js.len());
             println!(
                 "○ GENERATOR defects — mutants whose JS does not parse (NOT gated; fix the operator):\n"
             );
@@ -819,11 +748,7 @@ impl Report {
         let findings: Vec<&Graded> = graded.iter().filter(|g| g.verdict.is_hard()).collect();
         if !findings.is_empty() {
             println!("✗ HARD findings (each is a bug by the refusal contract):\n");
-            let shown = if max_findings == 0 {
-                findings.len()
-            } else {
-                max_findings.min(findings.len())
-            };
+            let shown = shown(max_findings, findings.len());
             for g in &findings[..shown] {
                 println!(
                     "  [{}] mutant {} · seed {} · ops {}",
@@ -859,12 +784,8 @@ impl Report {
 
     fn print_json(&self, graded: &[Graded], max_findings: usize) -> Result<(), CliError> {
         let findings: Vec<&Graded> = graded.iter().filter(|g| g.verdict.is_hard()).collect();
-        let shown = if max_findings == 0 {
-            findings.len()
-        } else {
-            max_findings.min(findings.len())
-        };
-        let findings_json: Vec<serde_json::Value> = findings[..shown]
+        let findings_shown = shown(max_findings, findings.len());
+        let findings_json: Vec<serde_json::Value> = findings[..findings_shown]
             .iter()
             .map(|g| {
                 serde_json::json!({
@@ -884,11 +805,7 @@ impl Report {
             .iter()
             .filter(|g| g.verdict.is_harness_invalid_js())
             .collect();
-        let invalid_js_shown = if max_findings == 0 {
-            invalid_js.len()
-        } else {
-            max_findings.min(invalid_js.len())
-        };
+        let invalid_js_shown = shown(max_findings, invalid_js.len());
         let invalid_js_json: Vec<serde_json::Value> = invalid_js[..invalid_js_shown]
             .iter()
             .map(|g| {
@@ -922,41 +839,13 @@ impl Report {
             "findings": findings_json,
             "harness_invalid_js_findings": invalid_js_json,
         });
-        match to_json_with_tabs(&out) {
-            Ok(json) => {
-                println!("{json}");
-                Ok(())
-            }
-            Err(e) => {
-                eprintln!("Error serializing report: {e}");
-                Err(CliError::Errored)
-            }
-        }
+        print_json_tabs(&out, CliError::Errored)
     }
-}
-
-thread_local! {
-    /// The most recent panic's `Display` string, captured by the panic hook installed
-    /// in [`CompileFuzzCommand::run`]. Per-thread, and `catch_unwind` returns on the
-    /// thread that panicked, so a concurrent grader reads its own panic.
-    static LAST_PANIC: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn oracle_reject_code_extracts_the_svelte_code() {
-        assert_eq!(
-            oracle_reject_code("Error: bad (https://svelte.dev/e/legacy_reactive_statement)")
-                .as_deref(),
-            Some("legacy_reactive_statement")
-        );
-        // A sidecar failure carries no code — it must NOT read as a rejection, or a
-        // harness hiccup would fail the run as an over-acceptance.
-        assert_eq!(oracle_reject_code("actor shutdown"), None);
-    }
 
     fn graded(verdict: Verdict) -> Graded {
         Graded {

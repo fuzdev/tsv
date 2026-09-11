@@ -47,9 +47,9 @@
 //!
 //! `gap_audit`, `blank_audit`, and `ignore_audit` are the consumers of the whole
 //! substrate; [`ratchet`] additionally serves `fabrication_audit`, `census_audit`,
-//! and `compile_corpus_compare --ratchet`, which drive no ledger. The modules are
-//! written generic where a second consumer would actually reuse them, and no
-//! further.
+//! `width_audit`, and `compile_corpus_compare --ratchet`, which drive no ledger. The
+//! modules are written generic where a second consumer would actually reuse them,
+//! and no further.
 
 // Always compiled: `properties` hosts the reparse primitives the `roundtrip_audit`
 // / `fuzz` commands share, which are not behind `comment_check`. (Its ledger /
@@ -66,18 +66,22 @@ pub(crate) mod census;
 // generic snapshot plumbing with no ledger dependency of its own.
 pub(crate) mod ratchet;
 
-// The pristine-format sweep is NOT gated: its consumers (`fabrication_audit`,
-// `census_audit`, `width_audit`) drive no instrumentation seam.
+// The pristine-format sweep is NOT gated: four of its six consumers
+// (`fabrication_audit`, `census_audit`, `width_audit`, `razor_audit`) drive no
+// instrumentation seam and exist in a default build; `swallow_audit` and
+// `comment_audit` drain theirs through `sweep_pristine_armed`.
 pub(crate) mod sweep;
 
-// The vacuity guard is NOT gated, and reaches further than the sweep: eight of
-// its callers (`canonicalize`, `binding`, `neutrality`, `roundtrip`, `authoring`,
-// `paren`, `render`, `fuzz`) drive no sweep, and several exist in a default build.
+// The vacuity guard is NOT gated, and reaches further than the sweep: nine of its
+// callers (`canonicalize`, `binding`, `neutrality`, `roundtrip`, `authoring`,
+// `paren`, `render`, `fuzz`, `variant`) drive no sweep, and several exist in a
+// default build.
 pub(crate) mod vacuity;
 
-// The panic-hook bracket is NOT gated: `sweep` installs one in a default build.
-// `ArmedRun` (gated, in `parallel`) holds one too — one definition, so the two
-// corpus-walk shapes cannot drift into silencing panics differently.
+// The panic-hook brackets are NOT gated: `sweep` installs the suppressing one in a
+// default build, and `ArmedRun` (gated, in `parallel`) holds the same one — one
+// definition, so the two corpus-walk shapes cannot drift into silencing panics
+// differently. The capturing one serves the fuzzers, which report each panic's text.
 pub(crate) mod panic_hook;
 
 // The capped path sample is NOT gated: `sweep`'s panic bucket is one, and that

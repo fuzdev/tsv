@@ -84,9 +84,14 @@ impl StableFormMarker {
 ///
 /// Pure Rust — the caller has already established that prettier holds `V` stable; every
 /// remaining question is about `ours`. `input_file` names the fixture's input so the right
-/// language formatter is selected.
-pub fn classify_stable_form(v: &str, input: &str, input_file: &str) -> StableFormMarker {
-    let Ok(ours) = crate::fixtures::format_with_our_formatter(v, input_file) else {
+/// language formatter is selected, and `goal` is the fixture's parse goal.
+pub fn classify_stable_form(
+    v: &str,
+    input: &str,
+    input_file: &str,
+    goal: tsv_ts::Goal,
+) -> StableFormMarker {
+    let Ok(ours) = crate::fixtures::format_with_our_formatter(v, input_file, goal) else {
         return StableFormMarker::OursRejects;
     };
     if ours == input {
@@ -95,7 +100,7 @@ pub fn classify_stable_form(v: &str, input: &str, input_file: &str) -> StableFor
     if ours == v {
         return StableFormMarker::Variant;
     }
-    match crate::fixtures::format_with_our_formatter(&ours, input_file) {
+    match crate::fixtures::format_with_our_formatter(&ours, input_file, goal) {
         Ok(second) if second == ours => StableFormMarker::DivergentVariant,
         _ => StableFormMarker::OursNotIdempotent,
     }

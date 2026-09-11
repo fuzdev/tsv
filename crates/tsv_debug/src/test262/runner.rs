@@ -1,7 +1,5 @@
 //! Execute test262 tests against tsv's parser.
 
-#![allow(dead_code)] // Some types/variants are useful for future expansion
-
 use super::discovery::TestFile;
 use super::frontmatter;
 use std::borrow::Cow;
@@ -85,17 +83,6 @@ pub enum StrictPrefixConflict {
     ByteZero,
 }
 
-impl StrictPrefixConflict {
-    /// The conflict's name for the run summary.
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::RawFlag => "raw + onlyStrict",
-            Self::NoStrictFlag => "onlyStrict + noStrict",
-            Self::ByteZero => "hashbang/BOM under a strict prefix",
-        }
-    }
-}
-
 /// Summary of test results.
 #[derive(Debug, Default)]
 pub struct TestSummary {
@@ -109,12 +96,11 @@ pub struct TestSummary {
     pub skipped_annex_b: usize,
     pub skipped_unimplemented_feature: usize,
     pub skipped_strict_prefix_conflict: usize,
-    pub skipped_filtered: usize,
     pub failures: Vec<(String, FailureReason)>,
 }
 
 impl TestSummary {
-    /// Get total skipped count (excluding user-filtered).
+    /// Get total skipped count.
     pub fn skipped(&self) -> usize {
         self.skipped_runtime
             + self.skipped_resolution
@@ -123,9 +109,7 @@ impl TestSummary {
             + self.skipped_unimplemented_feature
             + self.skipped_strict_prefix_conflict
     }
-}
 
-impl TestSummary {
     /// Add a test result to the summary.
     pub fn add(&mut self, test_path: &str, is_negative: bool, result: TestResult) {
         match result {
@@ -296,8 +280,8 @@ fn is_annex_b_path(relative_path: &str) -> bool {
 ///
 /// tsv grades both modes, so a test is skipped only for something tsv does not
 /// implement or cannot parse-grade: the Annex B grammar, runtime/resolution
-/// negatives (we only test parsing), an unimplemented syntactic proposal,
-/// contradictory `raw` + `onlyStrict` metadata, and files with no frontmatter.
+/// negatives (we only test parsing), an unimplemented syntactic proposal, a
+/// strict-prefix conflict (any [`StrictPrefixConflict`]), and files with no frontmatter.
 /// `relative_path` is the test262-root-relative path, needed only for the Annex B
 /// skip.
 fn classify(relative_path: &str, content: &str) -> Classification {
@@ -549,7 +533,7 @@ impl Manifest {
 ///
 /// Shares `classify` with `run_test`, so the manifest covers precisely tsv's
 /// graded subset (unreadable files are also skipped).
-pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
+fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
     let content = fs::read_to_string(&test.path).ok()?;
     let Classification::Grade {
         is_negative_parse,

@@ -1395,8 +1395,10 @@ the default width).
 # reformattable leaf scalars, acorn `extra`, and per-node comment ATTACHMENT — the root
 # `comments` array still pins every comment's presence + kind, the leaf check its text),
 # compare — so legit reformatting doesn't read as corruption. Buckets:
-# {tsv,canonical}_unreparseable (the prize — output the parser rejects) and
-# {tsv,canonical}_divergent (structural change). The gate buckets read zero on real
+# {tsv,canonical}_unreparseable (the prize — output the parser rejects),
+# {tsv,canonical}_leaf_corruption (the skeleton holds but conserved leaf text changed) and
+# {tsv,canonical}_divergent (structural change); read_error, format_error and
+# canonical_rejects_input are skips that carry no verdict. The gate buckets read zero on real
 # formatted code; the divergent bucket there holds a handful of template files where a
 # whitespace Text node appears or vanishes beside a BLOCK element — real document drift
 # for this audit's deliberately narrower question (see `render_browser`'s module doc),
@@ -1404,7 +1406,7 @@ the default width).
 # point it at the delimiter-dense prettier suites for the work-list.
 cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
 cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../corpora/collections/zzz/src
-# --gate fails ONLY on the *_unreparseable buckets (the reliable half — divergent is
+# --gate fails on the *_unreparseable and *_leaf_corruption buckets (divergent is
 # render-model noise over tests/fixtures). Bare --gate runs phase 1 only via a
 # reparse-only fast path (pure Rust, no sidecar) — the `deno task roundtrip:audit`
 # check gate; a cheap tripwire over tests/fixtures, real yield on external corpora.
@@ -1414,8 +1416,9 @@ cargo run -p tsv_debug roundtrip_audit --gate                       # the check 
 deno task roundtrip:audit:prettier                                 # the check gate's second scope (the prettier suites)
 cargo run -p tsv_debug roundtrip_audit --gate --canonical-all ../prettier/tests/format  # thorough
 # Also: --no-render, --verbose (AST diff per finding), --limit N, --json. The full
-# (non-gate) run is a diagnostic — the divergent bucket over tests/fixtures is
-# Svelte-reflow-noisy vs render_normalize's simpler whitespace model.
+# (non-gate) run is a diagnostic: it reports every finding bucket and exits 0 (the divergent
+# bucket over tests/fixtures is Svelte-reflow-noisy vs render_normalize's simpler whitespace
+# model).
 cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
 ```
 
@@ -1478,7 +1481,8 @@ is shared with [the corpus bundle](#the-corpus-bundle-auditcorpus) from
 cargo run -p tsv_debug binding_audit                                  # audit tests/fixtures
 cargo run -p tsv_debug binding_audit ../svelte/packages/svelte/src ../prettier/tests/format/js
 cargo run -p tsv_debug binding_audit --gate                          # the check gate (HARD only)
-# Also: --verbose (in→out bound-subtree per finding), --limit N, --json. A bare
+# Also: --verbose (in→out bound-subtree per finding), --limit N, --json. A run without
+# --gate reports HARD and SOFT findings and exits 0; only --gate fails (on HARD). A bare
 # --gate over tests/fixtures is a cheap tripwire (fixtures are format-stable); the
 # real yield is external corpora, where JSDoc casts + annotations are dense.
 cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
@@ -1839,7 +1843,8 @@ cargo run -p tsv_debug compile_conformance_audit
 ```bash
 # canonicalize_audit - canonicalize_js (the compile-parity reprint) at corpus scale: run the
 # canonicalizer twice per TS/JS file (.ts/.js/.mts/.cts/.mjs/.cjs, .svelte.ts included) and bucket —
-# input-rejected (informational: invalid fixtures, script-goal files), NON-IDEMPOTENT (failure),
+# input-rejected (informational: invalid fixtures, script-goal files), read-error (informational),
+# NON-IDEMPOTENT (failure),
 # CORRUPT-OUTPUT / unreparseable reprint (failure; the canonicalizer self-validates by reparse),
 # COMMENT-LOSS (failure; whitespace-normalized comment text/order before-vs-after — the bucket the
 # other two are structurally blind to: a swallowed comment leaves valid, idempotent JS).

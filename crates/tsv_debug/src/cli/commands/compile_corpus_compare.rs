@@ -1,5 +1,6 @@
 use crate::cli::CliError;
 use crate::cli::commands::profile::{is_pruned_dir, is_svelte};
+use crate::cli::commands::{print_json_tabs, truncate_chars};
 use crate::compile_fixtures::with_trailing_newline;
 use crate::deno::{self, DenoError, SvelteGenerate};
 use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
@@ -436,35 +437,22 @@ async fn classify(source: &str) -> Bucket {
     // guard and emitted unparseable JS — always a compiler bug.
     let ours = match compile(source, &CompileOptions::default()) {
         Ok(o) => o,
-        Err(CompileError::Unsupported(reason)) => {
-            let fenced = reason.is_deliberate_fence();
-            return Bucket::Refused {
-                fenced,
-                // Only asked when the first refusal was NOT itself a fence — a
-                // fence-first file is already counted, and the census is the more
-                // expensive question (a second parse + analysis pass). Measured at
-                // ~43 µs/file, ~5% of one warm oracle round trip, so it is invisible
-                // beside the sidecar this pipeline is bound by.
-                fence_contained: !fenced && census_finds_fence(source),
-                reason: reason.bucket_key().into_owned(),
-            };
-        }
-        Err(CompileError::Parse(e)) => return Bucket::Error("tsv-parse", e.to_string()),
-        Err(CompileError::CorruptOutput(e)) => {
-            return Bucket::Error("tsv-corrupt-output", e.to_string());
-        }
-        // The type-erasure self-check firing: a TypeScript-only node survived
-        // into the emitted program — a missed erase case, always a compiler bug
-        // (and one the output reparse cannot see, since the annotation parses).
-        Err(CompileError::TypeErasureLeak(span)) => {
-            return Bucket::Error("tsv-type-erasure-leak", format!("at {span:?}"));
-        }
-        // A generated name the transform assigns upfront was missing at emission
-        // — the upfront walk lost a fragment the emission path reached. Also
-        // always a compiler bug.
-        Err(CompileError::GeneratedNameMissing(span)) => {
-            return Bucket::Error("tsv-generated-name-missing", format!("at {span:?}"));
-        }
+        Err(error) => match CompileFailure::of(error).split() {
+            Ok(reason) => {
+                let fenced = reason.is_deliberate_fence();
+                return Bucket::Refused {
+                    fenced,
+                    // Only asked when the first refusal was NOT itself a fence — a
+                    // fence-first file is already counted, and the census is the more
+                    // expensive question (a second parse + analysis pass). Measured at
+                    // ~43 µs/file, ~5% of one warm oracle round trip, so it is invisible
+                    // beside the sidecar this pipeline is bound by.
+                    fence_contained: !fenced && census_finds_fence(source),
+                    reason: reason.bucket_key().into_owned(),
+                };
+            }
+            Err((kind, detail)) => return Bucket::Error(kind, detail),
+        },
     };
 
     // Both compiled — compare the canonical reprints (the parity bar).
@@ -546,14 +534,75 @@ fn bound_lines(s: &str, max: usize) -> String {
 /// reports its error kind under a `tsv-` prefix, which cannot collide with a
 /// bucket key.
 fn tsv_decline_reason(source: &str) -> Option<String> {
-    match compile(source, &CompileOptions::default()) {
-        Ok(_) => None,
-        Err(CompileError::Unsupported(reason)) => Some(reason.bucket_key().into_owned()),
-        Err(CompileError::Parse(_)) => Some("tsv-parse".to_string()),
-        Err(CompileError::CorruptOutput(_)) => Some("tsv-corrupt-output".to_string()),
-        Err(CompileError::TypeErasureLeak(_)) => Some("tsv-type-erasure-leak".to_string()),
-        Err(CompileError::GeneratedNameMissing(_)) => {
-            Some("tsv-generated-name-missing".to_string())
+    let error = compile(source, &CompileOptions::default()).err()?;
+    Some(match CompileFailure::of(error).split() {
+        Ok(reason) => reason.bucket_key().into_owned(),
+        Err((kind, _)) => kind.to_string(),
+    })
+}
+
+/// A compile error as the compile harnesses bucket it: tsv's honest refusal, its Svelte parser
+/// rejecting the component, or a compile self-check firing — output that does not reparse, a
+/// TypeScript node that survived erasure, a generated name missing at emission — which is
+/// always a compiler bug. Shared with `compile_fuzz`, so both harnesses classify one error the
+/// same way.
+pub(crate) enum CompileFailure {
+    Refused(Refusal),
+    Parse(String),
+    SelfCheck(SelfCheck, String),
+}
+
+/// Which compile self-check fired.
+#[derive(Clone, Copy)]
+pub(crate) enum SelfCheck {
+    CorruptOutput,
+    TypeErasureLeak,
+    GeneratedNameMissing,
+}
+
+impl SelfCheck {
+    /// The stable `tsv-*` kind. A ratchet key (`compile_validation_known.txt`), so byte-exact.
+    fn key(self) -> &'static str {
+        match self {
+            Self::CorruptOutput => "tsv-corrupt-output",
+            Self::TypeErasureLeak => "tsv-type-erasure-leak",
+            Self::GeneratedNameMissing => "tsv-generated-name-missing",
+        }
+    }
+
+    /// The label a `compile_fuzz` finding carries.
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::CorruptOutput => "corrupt_output",
+            Self::TypeErasureLeak => "type_erasure_leak",
+            Self::GeneratedNameMissing => "generated_name_missing",
+        }
+    }
+}
+
+impl CompileFailure {
+    pub(crate) fn of(error: CompileError) -> Self {
+        match error {
+            CompileError::Unsupported(reason) => Self::Refused(reason),
+            CompileError::Parse(e) => Self::Parse(e.to_string()),
+            CompileError::CorruptOutput(e) => {
+                Self::SelfCheck(SelfCheck::CorruptOutput, e.to_string())
+            }
+            CompileError::TypeErasureLeak(span) => {
+                Self::SelfCheck(SelfCheck::TypeErasureLeak, format!("at {span:?}"))
+            }
+            CompileError::GeneratedNameMissing(span) => {
+                Self::SelfCheck(SelfCheck::GeneratedNameMissing, format!("at {span:?}"))
+            }
+        }
+    }
+
+    /// The refusal (`Ok`), or a failure's stable `tsv-*` kind and detail line (`Err`).
+    fn split(self) -> Result<Refusal, (&'static str, String)> {
+        match self {
+            Self::Refused(reason) => Ok(reason),
+            Self::Parse(detail) => Err(("tsv-parse", detail)),
+            Self::SelfCheck(check, detail) => Err((check.key(), detail)),
         }
     }
 }
@@ -562,8 +611,9 @@ fn tsv_decline_reason(source: &str) -> Option<String> {
 /// (`https://svelte.dev/e/{code}` in the message). The code cleanly separates
 /// the buckets — `legacy_*` (legacy mode), `js_parse_error` (which includes
 /// TS-in-a-plain-script), etc. A ToolError without a code is NOT a rejection
-/// (a sidecar-internal failure) — the caller routes it to the error bucket.
-fn oracle_reject_code(message: &str) -> Option<String> {
+/// (a sidecar-internal failure) — the caller routes it to the error bucket. Shared with
+/// `compile_fuzz`, so the two harnesses bucket the same message the same way.
+pub(crate) fn oracle_reject_code(message: &str) -> Option<String> {
     const MARKER: &str = "svelte.dev/e/";
     let idx = message.find(MARKER)?;
     let code: String = message[idx + MARKER.len()..]
@@ -573,6 +623,16 @@ fn oracle_reject_code(message: &str) -> Option<String> {
     if code.is_empty() { None } else { Some(code) }
 }
 
+/// An error entry's detail as a ` — detail` suffix: one line, bounded, empty when there is no
+/// detail.
+fn detail_suffix(detail: &str) -> String {
+    if detail.is_empty() {
+        String::new()
+    } else {
+        format!(" — {}", truncate_chars(&detail.replace('\n', " "), 160))
+    }
+}
+
 /// The first non-empty line of `s`, bounded — error-detail projection.
 fn first_line(s: &str) -> String {
     let first = s
@@ -580,17 +640,7 @@ fn first_line(s: &str) -> String {
         .find(|l| !l.trim().is_empty())
         .unwrap_or("")
         .trim();
-    truncate(first, 160)
-}
-
-/// Truncate `s` to `max` chars (char-boundary safe), appending `…` when cut.
-fn truncate(s: &str, max: usize) -> String {
-    if s.chars().count() <= max {
-        s.to_string()
-    } else {
-        let cut: String = s.chars().take(max).collect();
-        format!("{cut}…")
-    }
+    truncate_chars(first, 160)
 }
 
 /// Canonicalized-path identity sets for the corpus walk: `dirs` breaks symlink
@@ -785,19 +835,6 @@ struct ErrorEntry {
     detail: String,
 }
 
-/// Accumulator for one reason's paths. The count is `paths.len()` — kept
-/// derived so the two can never disagree.
-#[derive(Default)]
-struct ReasonAgg {
-    paths: Vec<String>,
-}
-
-impl ReasonAgg {
-    fn add(&mut self, path: &str) {
-        self.paths.push(path.to_string());
-    }
-}
-
 /// Cap on the number of error entries carried in the report.
 const ERROR_CAP: usize = 100;
 
@@ -867,10 +904,10 @@ impl Report {
             .collect();
         totals.files = outcomes.len();
 
-        let mut refusal: BTreeMap<String, ReasonAgg> = BTreeMap::new();
-        let mut oracle_rej: BTreeMap<String, ReasonAgg> = BTreeMap::new();
-        let mut over_accept: BTreeMap<String, ReasonAgg> = BTreeMap::new();
-        let mut oracle_rej_refusal: BTreeMap<String, ReasonAgg> = BTreeMap::new();
+        let mut refusal: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut oracle_rej: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut over_accept: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut oracle_rej_refusal: BTreeMap<String, Vec<String>> = BTreeMap::new();
         let mut mismatches = Vec::new();
         let mut comment_position_paths: Vec<(String, String)> = Vec::new();
         let mut errors = Vec::new();
@@ -906,19 +943,28 @@ impl Report {
                         totals.fence_contained += 1;
                         gs.fence_contained += 1;
                     }
-                    refusal.entry(reason.clone()).or_default().add(&path);
+                    refusal
+                        .entry(reason.clone())
+                        .or_default()
+                        .push(path.clone());
                 }
                 Bucket::OracleRejected { code, tsv_refusal } => {
                     totals.oracle_rejected += 1;
                     gs.oracle_rejected += 1;
-                    oracle_rej.entry(code.clone()).or_default().add(&path);
+                    oracle_rej
+                        .entry(code.clone())
+                        .or_default()
+                        .push(path.clone());
                     match tsv_refusal {
-                        None => over_accept.entry(code.clone()).or_default().add(&path),
+                        None => over_accept
+                            .entry(code.clone())
+                            .or_default()
+                            .push(path.clone()),
                         Some(reason) => {
                             oracle_rej_refusal
                                 .entry(reason.clone())
                                 .or_default()
-                                .add(&path);
+                                .push(path.clone());
                         }
                     }
                 }
@@ -1061,12 +1107,13 @@ impl Report {
         if !self.errors.is_empty() || self.errors_truncated > 0 {
             println!("\nErrors ({}):", self.totals.error);
             for e in &self.errors {
-                let detail = if e.detail.is_empty() {
-                    String::new()
-                } else {
-                    format!(" — {}", truncate(&e.detail.replace('\n', " "), 160))
-                };
-                println!("  [{}] {} [{}]{}", e.group, e.path, e.kind, detail);
+                println!(
+                    "  [{}] {} [{}]{}",
+                    e.group,
+                    e.path,
+                    e.kind,
+                    detail_suffix(&e.detail)
+                );
             }
             if self.errors_truncated > 0 {
                 println!("  … (+{} more errors)", self.errors_truncated);
@@ -1143,15 +1190,15 @@ impl Report {
 
 /// Sort a reason map into a count-descending (then reason-ascending) list, each
 /// row's paths sorted so a report diffs cleanly across runs.
-fn sort_reasons(map: BTreeMap<String, ReasonAgg>) -> Vec<ReasonCount> {
+fn sort_reasons(map: BTreeMap<String, Vec<String>>) -> Vec<ReasonCount> {
     let mut v: Vec<ReasonCount> = map
         .into_iter()
-        .map(|(reason, mut agg)| {
-            agg.paths.sort();
+        .map(|(reason, mut paths)| {
+            paths.sort();
             ReasonCount {
                 reason,
-                count: agg.paths.len(),
-                paths: agg.paths,
+                count: paths.len(),
+                paths,
             }
         })
         .collect();
@@ -1245,17 +1292,10 @@ async fn classify_census(source: &str) -> CensusOutcome {
     // bug/parse outcomes are harness errors (as in `classify`).
     let first = match compile(source, &CompileOptions::default()) {
         Ok(_) => return CensusOutcome::Skipped,
-        Err(CompileError::Unsupported(reason)) => reason,
-        Err(CompileError::Parse(e)) => return CensusOutcome::Error("tsv-parse", e.to_string()),
-        Err(CompileError::CorruptOutput(e)) => {
-            return CensusOutcome::Error("tsv-corrupt-output", e.to_string());
-        }
-        Err(CompileError::TypeErasureLeak(span)) => {
-            return CensusOutcome::Error("tsv-type-erasure-leak", format!("at {span:?}"));
-        }
-        Err(CompileError::GeneratedNameMissing(span)) => {
-            return CensusOutcome::Error("tsv-generated-name-missing", format!("at {span:?}"));
-        }
+        Err(error) => match CompileFailure::of(error).split() {
+            Ok(reason) => reason,
+            Err((kind, detail)) => return CensusOutcome::Error(kind, detail),
+        },
     };
 
     // Census pass. It parsed once already inside `compile()`, so a parse error is
@@ -1459,12 +1499,7 @@ impl CensusReport {
         if self.errors > 0 {
             println!("\nErrors ({}):", self.errors);
             for (kind, detail) in &self.error_entries {
-                let detail = if detail.is_empty() {
-                    String::new()
-                } else {
-                    format!(" — {}", truncate(&detail.replace('\n', " "), 160))
-                };
-                println!("  [{kind}]{detail}");
+                println!("  [{kind}]{}", detail_suffix(detail));
             }
             if self.errors > self.error_entries.len() {
                 println!(
@@ -1491,16 +1526,7 @@ impl CensusReport {
             blockers: &self.blockers,
             disclaimed: &self.disclaimed,
         };
-        match to_json_with_tabs(&report) {
-            Ok(json) => {
-                println!("{json}");
-                Ok(())
-            }
-            Err(e) => {
-                eprintln!("Error serializing census report: {e}");
-                Err(CliError::Errored)
-            }
-        }
+        print_json_tabs(&report, CliError::Errored)
     }
 }
 
@@ -1926,6 +1952,12 @@ mod tests {
         );
         // No code URL → not a rejection (the caller buckets it as an ERROR so
         // sidecar-internal failures can't inflate oracle_rejected).
+        // The code ends at the first character a code cannot hold — here a closing paren.
+        assert_eq!(
+            oracle_reject_code("Error: bad (https://svelte.dev/e/legacy_reactive_statement)")
+                .as_deref(),
+            Some("legacy_reactive_statement")
+        );
         assert_eq!(oracle_reject_code("weird sidecar failure\n"), None);
         assert_eq!(oracle_reject_code("see svelte.dev/e/"), None);
         assert_eq!(first_line("\n  weird failure  \nmore"), "weird failure");

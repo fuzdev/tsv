@@ -28,17 +28,41 @@ struct CrateGroup {
 const GROUPS: &[CrateGroup] = &[
     CrateGroup {
         name: "foundation",
-        crates: &["tsv_lang", "tsv_html", "tsv_ignore"],
+        crates: &[
+            "tsv_lang",
+            "tsv_arena",
+            "tsv_html",
+            "tsv_ignore",
+            "tsv_discover",
+        ],
     },
     CrateGroup {
         name: "languages",
         crates: &["tsv_ts", "tsv_css", "tsv_svelte"],
     },
     CrateGroup {
+        name: "compiler",
+        crates: &["tsv_svelte_compile"],
+    },
+    CrateGroup {
+        name: "checker",
+        crates: &["tsv_check"],
+    },
+    CrateGroup {
         name: "tooling",
-        crates: &["tsv_cli", "tsv_debug", "tsv_ffi", "tsv_wasm"],
+        crates: &["tsv_cli", "tsv_debug", "tsv_ffi", "tsv_napi", "tsv_wasm"],
     },
 ];
+
+/// Crates in no [`GROUPS`] entry — reported rather than silently left out of every
+/// group total, so a new workspace crate shows up as a gap instead of a skewed sum.
+fn ungrouped(results: &[CrateMetrics]) -> Vec<&str> {
+    results
+        .iter()
+        .map(|r| r.name.as_str())
+        .filter(|name| !GROUPS.iter().any(|g| g.crates.contains(name)))
+        .collect()
+}
 
 impl MetricsCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
@@ -166,8 +190,11 @@ fn classify_phase(crate_name: &str, file_path: &Path, src_dir: &Path) -> String 
         return "deno".to_string();
     }
 
-    // Fixture/test infrastructure directories
-    if first_dir == "fixtures" || first_dir == "test262" {
+    // tsv_debug's own subsystem directories
+    if matches!(
+        first_dir,
+        "fixtures" | "test262" | "tsc_conformance" | "audit"
+    ) {
         return first_dir.to_string();
     }
 
@@ -203,7 +230,18 @@ fn find_crates_dir() -> Option<PathBuf> {
 
 /// All phase column names in display order
 const PHASE_ORDER: &[&str] = &[
-    "doc", "lexer", "parser", "ast", "printer", "escapes", "cli", "deno", "fixtures", "test262",
+    "doc",
+    "lexer",
+    "parser",
+    "ast",
+    "printer",
+    "escapes",
+    "cli",
+    "deno",
+    "fixtures",
+    "test262",
+    "tsc_conformance",
+    "audit",
     "other",
 ];
 
@@ -283,17 +321,29 @@ fn print_table(results: &[CrateMetrics]) {
         }
     }
 
+    let missing = ungrouped(results);
+    if !missing.is_empty() {
+        eprintln!(
+            "{:>name_width$}: {} (no entry in `GROUPS`)",
+            "ungrouped",
+            missing.join(", ")
+        );
+    }
     eprintln!("{:>name_width$}: {}", "total", format_num(grand_total));
 
-    // Derived metrics
+    // Derived metrics, over the `languages` group so a crate joining it is counted here too.
+    let languages = GROUPS
+        .iter()
+        .find(|g| g.name == "languages")
+        .map_or(&[][..], |g| g.crates);
     let language_total: usize = results
         .iter()
-        .filter(|r| ["tsv_ts", "tsv_css", "tsv_svelte"].contains(&r.name.as_str()))
+        .filter(|r| languages.contains(&r.name.as_str()))
         .map(|r| r.total)
         .sum();
     let printer_total: usize = results
         .iter()
-        .filter(|r| ["tsv_ts", "tsv_css", "tsv_svelte"].contains(&r.name.as_str()))
+        .filter(|r| languages.contains(&r.name.as_str()))
         .filter_map(|r| r.phases.get("printer"))
         .sum();
 
@@ -364,11 +414,9 @@ fn print_json(results: &[CrateMetrics]) {
     let output = serde_json::json!({
         "crates": crates,
         "groups": groups,
+        "ungrouped": ungrouped(results),
         "total": grand_total,
     });
 
-    // SAFETY: serde_json Value types always serialize successfully
-    #[allow(clippy::unwrap_used)]
-    let json_str = serde_json::to_string_pretty(&output).unwrap();
-    println!("{json_str}");
+    super::print_json_pretty(&output);
 }

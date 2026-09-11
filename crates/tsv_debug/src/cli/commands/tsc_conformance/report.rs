@@ -5,7 +5,7 @@
 use crate::cli::CliError;
 use crate::json::to_json_with_tabs;
 use crate::tsc_conformance::runner::SkeletonReport;
-use crate::tsc_conformance::{MissingCause, RunFilter};
+use crate::tsc_conformance::{FamilyFilter, MissingCause, RunFilter};
 use std::path::{Path, PathBuf};
 
 use super::pins::RunPins;
@@ -20,6 +20,8 @@ struct ManifestFilters {
     code: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     variant: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    family: Option<&'static str>,
 }
 
 /// The `--emit-manifest` wrapper: the per-variant report, the pins snapshot, and a
@@ -47,6 +49,7 @@ fn run_manifest<'a>(
         test: filter.test.clone(),
         code: filter.code,
         variant: filter.variant.as_ref().map(|(k, v)| format!("{k}={v}")),
+        family: filter.family.map(FamilyFilter::token),
     });
     RunManifest {
         filtered,
@@ -66,14 +69,7 @@ pub(super) fn write_manifest(
     path: &Path,
 ) -> Result<(), CliError> {
     let manifest = run_manifest(report, filter, pins);
-    let file = std::fs::File::create(path).map_err(|e| {
-        eprintln!("Error creating manifest {}: {e}", path.display());
-        CliError::Failed
-    })?;
-    serde_json::to_writer(std::io::BufWriter::new(file), &manifest).map_err(|e| {
-        eprintln!("Error writing manifest: {e}");
-        CliError::Failed
-    })?;
+    super::super::write_manifest_json(path, &manifest)?;
     println!(
         "Wrote manifest ({} variant rows) to {}",
         report.manifest_entries.len(),
@@ -346,21 +342,6 @@ fn sanitize_artifact_name(name: &str) -> String {
             }
         })
         .collect()
-}
-
-/// Serialize a report to pretty JSON on stdout, tab-indented like every other
-/// `tsv_debug` `--json` surface.
-pub(super) fn print_json<T: serde::Serialize>(report: &T) -> Result<(), CliError> {
-    match to_json_with_tabs(report) {
-        Ok(json) => {
-            println!("{json}");
-            Ok(())
-        }
-        Err(e) => {
-            eprintln!("Error serializing JSON: {e}");
-            Err(CliError::Failed)
-        }
-    }
 }
 
 #[cfg(test)]

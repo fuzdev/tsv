@@ -7,7 +7,6 @@ use crate::audit::ratchet::{
 };
 use crate::audit::shape::markup_head;
 use crate::audit::sweep::{PristineSweep, sweep_pristine};
-use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
 
 use super::profile::resolve_seed_files;
@@ -145,29 +144,30 @@ impl FabricationAuditCommand {
         } else {
             print_report(&sweep);
         }
-        sweep.pristine.print_panic_sample();
-
-        check_graded_nonzero(sweep.pristine.formatted, "files formatted")?;
-        if default_paths {
-            check_formatted_min(sweep.pristine.formatted, FIXTURES_FORMATTED_MIN)?;
-        }
+        sweep.pristine.finish(default_paths)?;
 
         let ratchet = ratchet();
         if self.update {
-            ratchet.write_pinned(&sweep.shapes, "shape")?;
+            ratchet.write_pinned(&sweep.shapes, "shape", self.json)?;
             return Ok(());
         }
         // Off the default corpus the snapshot doesn't apply — it pins the full default run, so
         // grading a narrowed one would call every unreached shape stale. Every fabrication is
         // news instead.
         if !default_paths {
-            return grade_narrowed_strictly(narrowed, "fabrication", sweep.fabrications.len());
+            return grade_narrowed_strictly(
+                narrowed,
+                "fabrication",
+                sweep.fabrications.len(),
+                self.json,
+            );
         }
 
         ratchet.grade_and_report(
             &sweep.shapes,
             "fabrication shape",
             &format!("{} files", sweep.pristine.formatted),
+            self.json,
             |shape| format!("{:?} ⇢ blank ⇢ {:?}", shape.before, shape.after),
         )
     }
@@ -179,7 +179,7 @@ struct Sweep {
     fabrications: Vec<Fabrication>,
     /// Every fabrication shape seen, deduped — what the ratchet grades.
     shapes: BTreeSet<FabricationShape>,
-    /// The shared skip/format bookkeeping (the [`check_formatted_min`] vacuity
+    /// The shared skip/format bookkeeping (the [`check_formatted_min`](crate::audit::vacuity::check_formatted_min) vacuity
     /// guard reads `formatted`; panics are counted there, not gated here — the
     /// panic gates own that class).
     pristine: PristineSweep,
@@ -558,9 +558,7 @@ fn print_json(sweep: &Sweep) {
             "files": items,
         }),
     );
-    #[allow(clippy::unwrap_used)]
-    let s = serde_json::to_string_pretty(&output).unwrap();
-    println!("{s}");
+    super::print_json_pretty(&output);
 }
 
 #[cfg(test)]

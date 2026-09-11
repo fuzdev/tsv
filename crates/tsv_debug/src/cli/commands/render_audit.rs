@@ -41,7 +41,7 @@
 use std::path::{Path, PathBuf};
 
 use argh::FromArgs;
-use futures_util::stream::{self, StreamExt};
+use futures_util::StreamExt;
 
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
@@ -50,6 +50,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use super::profile::{is_input_invalid_fixture, is_svelte, resolve_seed_files_named};
+use super::{ResultOrder, spawn_work_stream, task_result};
 
 /// Audit whether `tsv format` changes what a Svelte component renders.
 #[derive(FromArgs, Debug)]
@@ -82,6 +83,8 @@ enum Outcome {
     Changed { before: String, after: String },
     /// tsv could not format the file (a parse gap other gates own).
     FormatError,
+    /// The file could not be read.
+    ReadError,
     /// Svelte's analyzer rejects one side, so the oracle cannot run here.
     CompileSkipped,
 }
@@ -90,6 +93,7 @@ struct Tally {
     unchanged: usize,
     preserved: usize,
     format_error: usize,
+    read_error: usize,
     compile_skipped: usize,
     findings: Vec<(PathBuf, String, String)>,
 }
@@ -102,11 +106,11 @@ impl RenderAuditCommand {
             is_svelte(p) && !is_input_invalid_fixture(p)
         })?;
 
-        let concurrency = deno::init_bulk_pool();
+        let scanned = files.len();
         let rt = super::create_runtime();
-        let tally = rt.block_on(audit_files(&files, concurrency));
+        let tally = rt.block_on(audit_files(files))?;
 
-        self.report(&tally, files.len());
+        self.report(&tally, scanned);
 
         if self.gate && !tally.findings.is_empty() {
             return Err(CliError::Failed);
@@ -142,13 +146,11 @@ impl RenderAuditCommand {
                 "unchanged": tally.unchanged,
                 "preserved": tally.preserved,
                 "format_error": tally.format_error,
+                "read_error": tally.read_error,
                 "compile_skipped": tally.compile_skipped,
                 "findings": findings,
             });
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&report).unwrap_or_default()
-            );
+            super::print_json_pretty(&report);
             return;
         }
 
@@ -167,6 +169,7 @@ impl RenderAuditCommand {
             tally.compile_skipped
         );
         println!("  tsv format errors (skipped)    : {}", tally.format_error);
+        println!("  unreadable files (skipped)     : {}", tally.read_error);
         if tally.findings.is_empty() {
             println!("✓ no findings — formatting preserved the render on every checked file");
         } else {
@@ -180,46 +183,43 @@ impl RenderAuditCommand {
 
 /// Truncate a render key for display — they can be long.
 fn truncate(s: &str) -> String {
-    const MAX: usize = 240;
-    if s.chars().count() <= MAX {
-        return s.to_string();
-    }
-    let head: String = s.chars().take(MAX).collect();
-    format!("{head}… ({} chars)", s.chars().count())
+    super::truncate_chars_counted(s, 240)
 }
 
-async fn audit_files(files: &[PathBuf], concurrency: usize) -> Tally {
-    let results = stream::iter(files.iter().map(|path| async move {
-        let outcome = audit_file(path).await;
-        (path.clone(), outcome)
-    }))
-    .buffer_unordered(concurrency)
-    .collect::<Vec<_>>()
-    .await;
+/// Audit every file, each on its own spawned task so the CPU-bound format runs across the
+/// runtime's workers while the render-key calls spread over the sidecar pool.
+async fn audit_files(files: Vec<PathBuf>) -> Result<Tally, CliError> {
+    let mut results = spawn_work_stream(files, ResultOrder::Completion, |path| async move {
+        let outcome = audit_file(&path).await;
+        (path, outcome)
+    });
 
     let mut tally = Tally {
         unchanged: 0,
         preserved: 0,
         format_error: 0,
+        read_error: 0,
         compile_skipped: 0,
         findings: Vec::new(),
     };
-    for (path, outcome) in results {
+    while let Some(joined) = results.next().await {
+        let (path, outcome) = task_result(joined, "render audit")?;
         match outcome {
             Outcome::Unchanged => tally.unchanged += 1,
             Outcome::Preserved => tally.preserved += 1,
             Outcome::CompileSkipped => tally.compile_skipped += 1,
             Outcome::FormatError => tally.format_error += 1,
+            Outcome::ReadError => tally.read_error += 1,
             Outcome::Changed { before, after } => tally.findings.push((path, before, after)),
         }
     }
     tally.findings.sort_by(|a, b| a.0.cmp(&b.0));
-    tally
+    Ok(tally)
 }
 
 async fn audit_file(path: &Path) -> Outcome {
     let Ok(source) = std::fs::read_to_string(path) else {
-        return Outcome::FormatError;
+        return Outcome::ReadError;
     };
 
     let Ok(formatted) = format_source(&source, ParserType::Svelte) else {

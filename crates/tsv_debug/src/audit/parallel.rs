@@ -75,8 +75,8 @@ impl Drop for ArmedRun {
 /// lost, and a lost tally can silently flip the ratchet verdict — a dropped `new` shape reads as a
 /// false pass, a dropped sole instance of a pinned shape as a false stale. A gate that can
 /// silently mis-verdict is worse than a loud abort, so this returns [`CliError::Failed`]. (On that
-/// path the caller's suppressed panic hook / armed ledger leak until the process exits on the
-/// error — immaterial, since nothing formats after.)
+/// path the caller's [`ArmedRun`] still restores the panic hook and disarms the ledger when it
+/// drops.)
 pub(crate) fn run_pool<T: Default + Send>(
     files: &[PathBuf],
     jobs_hint: Option<usize>,

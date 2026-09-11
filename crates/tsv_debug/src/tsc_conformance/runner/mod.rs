@@ -31,9 +31,8 @@
 //! (the corpus has pathological-nesting tests and tsv's parser has no depth
 //! guard), and each test's check is wrapped in `catch_unwind` so a panic lands
 //! in its own bucket instead of killing the run. A stack-overflow *abort* can't
-//! be caught; the `grade::CRASH_EXCLUSIONS` list carves out crashers by kind — the
-//! genuine-abort class is empty on the pinned corpus (every current entry is a
-//! catchable panic tracking a tsv parser bug, liveness-probed each run).
+//! be caught; the `grade::CRASH_EXCLUSIONS` ledger carves out tracked tsv parser
+//! crashers, each a catchable panic re-probed every run (empty on the pinned corpus).
 //
 // tsgo: internal/compiler/program.go GetDiagnosticsOfAnyProgram (the pipeline)
 // tsgo: internal/testrunner/compiler_runner.go (the in-scope selection)
@@ -169,8 +168,8 @@ pub enum MissingCause {
 /// unaffected by what this one asks for.
 const SKELETON_STACK: usize = 512 * 1024 * 1024;
 
-/// One expect-clean variant that graded non-clean (should never happen while the
-/// checker is a no-op — a non-empty list is a gate failure).
+/// One expect-clean variant that graded non-clean — the checker emitted a diagnostic
+/// no baseline expects (a non-empty list is a gate failure).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct CleanFail {
     /// The `suite/config_name` baseline-space identity.
@@ -290,12 +289,7 @@ pub fn check_one(
     let baseline_name = config_name(&test.basename, &variant.description);
 
     // Join the baseline.
-    let mut ondisk: HashMap<(&str, String), &Baseline> = HashMap::new();
-    for baseline in &baselines {
-        if let Some((suite, n)) = baseline.relative_path.split_once('/') {
-            ondisk.insert((suite, n.to_string()), baseline);
-        }
-    }
+    let ondisk = grade::baseline_index(&baselines);
     let baseline = ondisk.get(&(test.suite, baseline_name.clone())).copied();
 
     // Parse + bind every unit, then merge against the selected variant's lib base.

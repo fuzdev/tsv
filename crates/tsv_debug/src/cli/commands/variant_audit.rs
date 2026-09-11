@@ -100,7 +100,7 @@
 //! Pure Rust — no Deno, no formatter run. Part of `deno task check` (via
 //! `deno task variants:audit`).
 
-use crate::audit::vacuity::check_graded_nonzero;
+use crate::audit::vacuity::{check_graded_nonzero, check_pinned_min};
 use crate::cli::CliError;
 use crate::fixtures::{self, FixtureFiles};
 use argh::FromArgs;
@@ -382,15 +382,15 @@ impl VariantAuditCommand {
         }
 
         check_graded_nonzero(graded.len(), "`_compact`/`_spaces` variants graded")?;
-        if graded.len() < VARIANTS_GRADED_MIN {
-            eprintln!(
-                "Error: pinned minimum — graded {} variants < pinned {VARIANTS_GRADED_MIN}. \
-                 The fixtures walk shrank, or variant recognition broke (a bucket rename, a \
-                 prefix typo, an extension mismatch); if deliberate, re-pin VARIANTS_GRADED_MIN.",
-                graded.len()
-            );
-            return Err(CliError::Failed);
-        }
+        check_pinned_min(
+            graded.len(),
+            VARIANTS_GRADED_MIN,
+            "graded",
+            "variants",
+            "The fixtures walk shrank, or variant recognition broke (a bucket rename, a prefix \
+             typo, an extension mismatch)",
+            "VARIANTS_GRADED_MIN",
+        )?;
 
         let failures: Vec<&Graded> = graded
             .iter()
@@ -517,10 +517,7 @@ fn print_json(graded: &[Graded], failures: &[&Graded], unalignable: &[Unalignabl
             "direction": u.direction.suffix(),
         })).collect::<Vec<_>>(),
     });
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&report).unwrap_or_default()
-    );
+    super::print_json_pretty(&report);
 }
 
 #[cfg(test)]

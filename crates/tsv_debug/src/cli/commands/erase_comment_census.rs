@@ -1,7 +1,7 @@
 use argh::FromArgs;
 use std::path::{Path, PathBuf};
 
-use super::profile::{is_svelte, resolve_profile_files_named};
+use super::profile::{is_svelte, pct, resolve_profile_files_named};
 use crate::cli::CliError;
 
 /// Census: comments exposed to the type-eraser's refusal window.
@@ -370,14 +370,6 @@ fn next_token_pos(source: &str, from: usize) -> usize {
     tsv_svelte_compile::next_token_pos(source, from) as usize
 }
 
-#[allow(clippy::cast_precision_loss)]
-fn pct(part: usize, whole: usize) -> f64 {
-    if whole == 0 {
-        return 0.0;
-    }
-    part as f64 / whole as f64 * 100.0
-}
-
 fn print_table(
     results: &[FileResult],
     scanned: usize,
@@ -466,8 +458,5 @@ fn print_json(results: &[FileResult], scanned: usize, parse_failed: usize, total
         "exposed_files": files,
     });
 
-    // SAFETY: serde_json Value types always serialize successfully
-    #[allow(clippy::unwrap_used)]
-    let json_str = serde_json::to_string_pretty(&output).unwrap();
-    println!("{json_str}");
+    super::print_json_pretty(&output);
 }

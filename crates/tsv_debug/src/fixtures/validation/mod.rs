@@ -6,14 +6,15 @@
 //! - errors.rs: `ValidationError` / `ValidationSuccess` and fix hints
 //! - structure.rs: structure validation (S* rules — file layout, divergence suffixes)
 //! - parsed_input.rs: shared input parse + wire-path/typed-walk parity probes
-//! - phases.rs: per-phase validation functions (P* parser, F* formatter, N* normalization)
+//! - phases/: per-phase validation functions (P* parser, F* formatter, N* normalization,
+//!   R* render equivalence)
 //! - summary.rs: cross-fixture aggregation and result printing
 //!
 //! This mod.rs keeps the per-fixture result type (`FixtureValidation`) and the
 //! `validate_fixture` orchestrator.
 
 mod errors;
-mod parsed_input;
+pub(crate) mod parsed_input;
 mod phases;
 mod structure;
 mod summary;
@@ -86,7 +87,7 @@ pub struct FixtureValidation {
     /// `svelte compile` render-key arm.
     pub render_equiv_verified_compile: usize,
     /// Whitespace variants confirmed render-equivalent via the template-only
-    /// `render_normalize` fallback arm — the compile-blind spot, counted so it
+    /// `render_browser` fallback arm — the compile-blind spot, counted so it
     /// stays visible.
     pub render_equiv_verified_fallback: usize,
 }
@@ -160,10 +161,6 @@ impl FixtureValidation {
 
     pub fn is_valid(&self) -> bool {
         self.errors.is_empty()
-    }
-
-    pub fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
     }
 }
 

@@ -56,7 +56,7 @@ use crate::audit::properties::tsv_parse_to_value;
 use crate::cli::CliError;
 use tsv_cli::cli::input::ParserType;
 
-use super::profile::resolve_profile_files;
+use super::profile::{pct, resolve_profile_files};
 use super::type_sizes;
 
 /// Census of AST node kinds over a corpus.
@@ -249,15 +249,6 @@ fn megabytes(bytes: usize) -> f64 {
     bytes as f64 / (1024.0 * 1024.0)
 }
 
-#[allow(clippy::cast_precision_loss)]
-fn share(count: usize, total: usize) -> f64 {
-    if total == 0 {
-        0.0
-    } else {
-        count as f64 * 100.0 / total as f64
-    }
-}
-
 fn print_table(
     census: &Census,
     rows: &[Row],
@@ -281,7 +272,7 @@ fn print_table(
             "{:<name_w$}  {:>9}  {:>6.2}%",
             row.name,
             row.count,
-            share(row.count, total)
+            pct(row.count, total)
         );
         if bytes {
             match row.size {
@@ -335,7 +326,7 @@ fn print_table(
                 "{:<slot_w$}  {:>9}  {:>6.2}%",
                 row.name,
                 row.count,
-                share(row.count, slot_total)
+                pct(row.count, slot_total)
             );
         }
     }
@@ -349,7 +340,7 @@ fn print_json(census: &Census, rows: &[Row], slot_rows: Option<Vec<Row>>, bytes:
             let mut node = serde_json::json!({
                 "name": r.name,
                 "count": r.count,
-                "share": share(r.count, total),
+                "share": pct(r.count, total),
             });
             // The byte columns appear only under `--bytes`. Emitting them
             // always would spell two different facts the same way: a `null`
@@ -377,13 +368,13 @@ fn print_json(census: &Census, rows: &[Row], slot_rows: Option<Vec<Row>>, bytes:
                 serde_json::json!({
                     "slot": r.name,
                     "count": r.count,
-                    "share": share(r.count, slot_total),
+                    "share": pct(r.count, slot_total),
                 })
             })
             .collect();
         out["slots"] = Value::Array(slots);
     }
-    println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    super::print_json_pretty(&out);
 }
 
 #[cfg(test)]

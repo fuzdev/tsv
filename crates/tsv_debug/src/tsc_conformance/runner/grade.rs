@@ -1,4 +1,5 @@
 use super::*;
+use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
 
 /// The merge-path family codes — a *missing* of one of these is classified as a
 /// merge-phase gap, not a same-table cascade bug.
@@ -89,31 +90,14 @@ fn classify_missing(basename: &str, code: u32) -> MissingCause {
     }
 }
 
-/// How a crash-excluded test fails, and whether its liveness is probeable.
-// `GenuineAbort` is the designed flag for a future stack-overflow entry (none on
-// the pinned corpus); it is un-probeable, so it is never re-run.
-#[derive(Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
-enum CrashKind {
-    /// A debug-build `debug_assert!` panic `catch_unwind` contains — probeable:
-    /// the sweep re-runs it under `catch_unwind` and FAILS if it no longer
-    /// panics (a fix landed, so the entry is stale and must be dropped).
-    CatchablePanic,
-    /// An uncatchable stack-overflow *abort* even on [`SKELETON_STACK`] — not
-    /// probeable (probing would abort the whole run), so it is trusted, not tested.
-    GenuineAbort,
-}
-
 /// Tests that crash the tsv parser — carved out by basename, counted, and
-/// reported (never silently). Each entry names its cause + kind; the list is a
-/// tracked-defect ledger, not a way to hide bugs. A [`CrashKind::CatchablePanic`]
-/// entry is liveness-probed every run (see [`probe_crash_exclusion`]).
-///
-/// Currently empty — no tracked parser crasher in the in-scope corpus. (The
-/// former `exportDeclarationInInternalModule.ts` entry — `export * from
-/// <identifier>;` tripping a `debug_assert!` in `parse_string_literal` — no
-/// longer panics.)
-const CRASH_EXCLUSIONS: &[(&str, CrashKind)] = &[];
+/// reported (never silently). The list is a tracked-defect ledger, not a way to
+/// hide bugs. Every entry is a catchable panic, liveness-probed every run (see
+/// [`probe_crash_exclusion`]): the sweep re-runs it under `catch_unwind` and FAILS
+/// once it no longer panics. An uncatchable stack-overflow abort cannot be probed
+/// without aborting the run, so an entry of that kind would need its own trusted,
+/// unprobed ledger. Currently empty — no tracked parser crasher in the in-scope corpus.
+const CRASH_EXCLUSIONS: &[&str] = &[];
 
 /// REGRESSION PIN (exact, two-sided): tests the sweep actually carved out via
 /// [`CRASH_EXCLUSIONS`]. It lives here, beside the ledger it describes, and is
@@ -122,12 +106,20 @@ const CRASH_EXCLUSIONS: &[(&str, CrashKind)] = &[];
 /// one), so `run --update` must never re-pin a carve-out on its own.
 pub const CRASH_EXCLUDED_PIN: usize = 0;
 
-/// The [`CrashKind`] of a crash-excluded test, or `None` if not excluded.
-fn crash_exclusion_kind(basename: &str) -> Option<CrashKind> {
-    CRASH_EXCLUSIONS
-        .iter()
-        .find(|(n, _)| *n == basename)
-        .map(|(_, k)| *k)
+/// Whether a test is on the [`CRASH_EXCLUSIONS`] ledger.
+fn is_crash_excluded(basename: &str) -> bool {
+    CRASH_EXCLUSIONS.contains(&basename)
+}
+
+/// Baseline lookup keyed by `(suite, config-name)` — exactly the runner's join.
+pub(super) fn baseline_index(baselines: &[Baseline]) -> HashMap<(&str, String), &Baseline> {
+    let mut ondisk = HashMap::new();
+    for baseline in baselines {
+        if let Some((suite, name)) = baseline.relative_path.split_once('/') {
+            ondisk.insert((suite, name.to_string()), baseline);
+        }
+    }
+    ondisk
 }
 
 /// The baseline shape used to bucket a parse-rejected variant.
@@ -145,13 +137,7 @@ pub(super) fn run_skeleton_inner(
     let corpus = discover_corpus(checkout)?;
     let baselines = discover_baselines(&baselines_dir(checkout))?;
 
-    // Baseline lookup keyed by (suite, config-name) — exactly the runner's join.
-    let mut ondisk: HashMap<(&str, String), &Baseline> = HashMap::new();
-    for baseline in &baselines {
-        if let Some((suite, name)) = baseline.relative_path.split_once('/') {
-            ondisk.insert((suite, name.to_string()), baseline);
-        }
-    }
+    let ondisk = baseline_index(&baselines);
 
     let mut report = SkeletonReport::default();
     let mut resolver = LibResolver::new(checkout);
@@ -166,11 +152,11 @@ pub(super) fn run_skeleton_inner(
         if SKIPPED_TESTS.contains(&test.basename.as_str()) {
             continue;
         }
-        if let Some(kind) = crash_exclusion_kind(&test.basename) {
+        if is_crash_excluded(&test.basename) {
             report.excluded_crashes += 1;
-            // Liveness probe: a catchable-panic entry must still panic; if it no
-            // longer does, the ledger entry is stale and the run fails.
-            if kind == CrashKind::CatchablePanic && !probe_crash_exclusion(test) {
+            // Liveness probe: an entry must still panic; if it no longer does, the
+            // ledger entry is stale and the run fails.
+            if !probe_crash_exclusion(test) {
                 report.stale_exclusions.push(test.basename.clone());
             }
             continue;
@@ -260,33 +246,13 @@ fn probe_crash_exclusion(test: &CorpusTest) -> bool {
         .collect();
     // Silence the default panic hook for the deliberate probe (we expect it to
     // panic; the message would otherwise leak to stderr and read as a failure).
-    let prev = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
-    let panicked = catch_unwind(AssertUnwindSafe(|| {
+    let _hook = SuppressedPanicHook::install();
+    catch_unwind(AssertUnwindSafe(|| {
         let _ = check_program(&source_units, &arena, &CheckOptions::default());
     }))
-    .is_err();
-    std::panic::set_hook(prev);
-    panicked
+    .is_err()
 }
 
-/// Extract a caught panic payload's message (the `&str` / `String` cases the
-/// standard panic machinery produces).
-fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
-    if let Some(s) = payload.downcast_ref::<&str>() {
-        (*s).to_string()
-    } else if let Some(s) = payload.downcast_ref::<String>() {
-        s.clone()
-    } else {
-        "(non-string panic payload)".to_string()
-    }
-}
-
-/// Parse+bind one single-file test once, then — per in-scope variant — merge it
-/// against that variant's resolved lib base and grade the result. Parse+bind is
-/// variant-independent; only the merge (and thus the lib-conflict family) varies by
-/// the resolved lib set, so a variant with a Promise/Symbol/… global conflicts at
-/// one target and is clean at another.
 /// Build `tsv_check`'s options from a variant's resolved directive config, mapping
 /// the harness tri-state to the checker's. `preserveConstEnums` feeds
 /// `ShouldPreserveConstEnums` (the `isolatedModules` contribution is not modeled —
@@ -305,6 +271,11 @@ pub(super) fn check_options_for(config: &BTreeMap<String, String>) -> CheckOptio
     }
 }
 
+/// Parse+bind one single-file test once, then — per in-scope variant — merge it
+/// against that variant's resolved lib base and grade the result. Parse+bind is
+/// variant-independent; only the merge (and thus the lib-conflict family) varies by
+/// the resolved lib set, so a variant with a Promise/Symbol/… global conflicts at
+/// one target and is clean at another.
 fn grade_test(
     test: &CorpusTest,
     unit: &Unit,
@@ -324,7 +295,7 @@ fn grade_test(
         Err(payload) => {
             report.panics.push(PanicRecord {
                 test: test.relative_path.clone(),
-                payload: panic_payload_message(&*payload),
+                payload: panic_message(&*payload).to_string(),
             });
             return;
         }
@@ -405,7 +376,7 @@ fn grade_test(
                     Err(payload) => {
                         report.panics.push(PanicRecord {
                             test: test.relative_path.clone(),
-                            payload: panic_payload_message(&*payload),
+                            payload: panic_message(&*payload).to_string(),
                         });
                         report.failing_variants.push(FailingVariant {
                             suite: test.suite.to_string(),
@@ -528,21 +499,15 @@ fn render_family_diff(
 ) -> String {
     use std::fmt::Write as _;
     let mut s = format!("# {}/{name}  ({reason})\n", test.suite);
-    let _ = writeln!(s, "## ours family ({})", ours.len());
-    for e in ours {
-        let _ = writeln!(
-            s,
-            "  {}({},{}): TS{}",
-            e.key.file, e.key.line, e.key.col, e.key.code
-        );
-    }
-    let _ = writeln!(s, "## baseline family ({})", base.len());
-    for e in base {
-        let _ = writeln!(
-            s,
-            "  {}({},{}): TS{}",
-            e.key.file, e.key.line, e.key.col, e.key.code
-        );
+    for (label, entries) in [("ours", ours), ("baseline", base)] {
+        let _ = writeln!(s, "## {label} family ({})", entries.len());
+        for e in entries {
+            let _ = writeln!(
+                s,
+                "  {}({},{}): TS{}",
+                e.key.file, e.key.line, e.key.col, e.key.code
+            );
+        }
     }
     s
 }

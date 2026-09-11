@@ -2,11 +2,30 @@
 //! and merges beside its shape map (the per-shape side lives in `audit::examples`,
 //! feature-gated where this module is not, hence no intra-doc link).
 //!
-//! Two consumer shapes, which is why `CappedPaths::merge` is feature-gated
-//! while the rest is not: the injection audits fold one bucket per worker (a
+//! Two consumer shapes, which is why `CappedPaths::merge` and `merge_shape_map` are
+//! feature-gated while the rest is not: the injection audits fold one bucket per worker (a
 //! `comment_check` build), while the single-threaded walks keep theirs in one
 //! (every build) — the pristine [`sweep`](crate::audit::sweep)'s panicking
 //! inputs, and the two mutation audits' base-non-idempotent seeds.
+
+/// Merge one worker's per-key aggregates into the total's: `merge` folds a key both hold,
+/// and a key only `src` holds moves over whole. The shared body behind every injection
+/// audit's shape-map merge.
+#[cfg(feature = "comment_check")]
+pub(crate) fn merge_shape_map<K: Ord, V>(
+    dst: &mut std::collections::BTreeMap<K, V>,
+    src: std::collections::BTreeMap<K, V>,
+    merge: impl Fn(&mut V, V),
+) {
+    for (k, v) in src {
+        match dst.get_mut(&k) {
+            Some(e) => merge(e, v),
+            None => {
+                dst.insert(k, v);
+            }
+        }
+    }
+}
 
 /// An exact count plus a bounded path sample — the "recorded, wants triage" bucket
 /// (`blank_audit`'s and `ignore_audit`'s not-a-clean-fixed-point files, the pristine
@@ -36,6 +55,19 @@ impl CappedPaths {
         if self.sample.len() < Self::CAP {
             self.sample.push(path);
         }
+    }
+
+    /// Record a caught panic at `path` as a `path: message` entry.
+    pub(crate) fn push_panic(
+        &mut self,
+        path: &std::path::Path,
+        payload: &(dyn std::any::Any + Send),
+    ) {
+        self.push(format!(
+            "{}: {}",
+            path.display(),
+            crate::audit::panic_hook::panic_message(payload)
+        ));
     }
 
     /// Fold another tally's bucket in — counts add exactly, the sample stays capped.

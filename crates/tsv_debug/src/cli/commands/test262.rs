@@ -1,9 +1,7 @@
 //! test262 command - run ECMAScript conformance tests against our parser.
 
 use crate::cli::CliError;
-use crate::test262::{
-    DiscoveryOptions, Manifest, TestSummary, discover_tests, format_failure, run_test,
-};
+use crate::test262::{Manifest, TestSummary, discover_tests, format_failure, run_test};
 use argh::FromArgs;
 use std::path::PathBuf;
 
@@ -98,8 +96,7 @@ impl Test262Command {
         }
 
         // Discover tests
-        let options = DiscoveryOptions::default();
-        let all_tests = match discover_tests(&self.path, &options) {
+        let all_tests = match discover_tests(&self.path) {
             Ok(tests) => tests,
             Err(e) => {
                 eprintln!("Error discovering tests: {e}");
@@ -161,14 +158,7 @@ impl Test262Command {
                 return Err(CliError::Failed);
             }
 
-            let file = std::fs::File::create(manifest_path).map_err(|e| {
-                eprintln!("Error creating manifest {}: {e}", manifest_path.display());
-                CliError::Failed
-            })?;
-            serde_json::to_writer(std::io::BufWriter::new(file), &manifest).map_err(|e| {
-                eprintln!("Error writing manifest: {e}");
-                CliError::Failed
-            })?;
+            super::write_manifest_json(manifest_path, &manifest)?;
 
             println!(
                 "Wrote {} graded tests to {}",
@@ -204,15 +194,10 @@ impl Test262Command {
             let (result, is_negative) = run_test(test);
 
             // Apply negative/positive filters
-            if let Some(is_neg) = is_negative {
-                if self.negative_only && !is_neg {
-                    summary.skipped_filtered += 1;
-                    continue;
-                }
-                if self.positive_only && is_neg {
-                    summary.skipped_filtered += 1;
-                    continue;
-                }
+            if let Some(is_neg) = is_negative
+                && ((self.negative_only && !is_neg) || (self.positive_only && is_neg))
+            {
+                continue;
             }
 
             // Record result
@@ -225,23 +210,21 @@ impl Test262Command {
         println!();
 
         // Print failures if verbose or if there are failures
-        if !summary.failures.is_empty() && (self.verbose || summary.total_failed() <= 20) {
-            println!("Failures:");
-            println!("---------");
-            for (path, reason) in &summary.failures {
-                println!("{path}");
-                for line in format_failure(reason).lines() {
-                    println!("  {line}");
-                }
-                println!();
-            }
-        } else if !summary.failures.is_empty() {
-            println!(
-                "Showing first 10 of {} failures (use --verbose to see all):",
+        if !summary.failures.is_empty() {
+            let show_all = self.verbose || summary.total_failed() <= 20;
+            let shown = if show_all {
+                println!("Failures:");
+                println!("---------");
                 summary.failures.len()
-            );
-            println!();
-            for (path, reason) in summary.failures.iter().take(10) {
+            } else {
+                println!(
+                    "Showing first 10 of {} failures (use --verbose to see all):",
+                    summary.failures.len()
+                );
+                println!();
+                10
+            };
+            for (path, reason) in summary.failures.iter().take(shown) {
                 println!("{path}");
                 for line in format_failure(reason).lines() {
                     println!("  {line}");

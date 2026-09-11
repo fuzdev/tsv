@@ -1,7 +1,7 @@
 use crate::cli::CliError;
+use crate::cli::commands::{print_block, print_json_tabs};
 use crate::deno::{self, SvelteGenerate};
 use crate::diff::{DiffOptions, diff_to_string};
-use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use tsv_cli::cli::input::{InputArgs, ParserType};
 use tsv_svelte_compile::{
@@ -143,20 +143,20 @@ fn report_both(
     if json {
         let hunks = differs.then(|| diff_to_string(ours, oracle, &DiffOptions::compile_compare()));
         let report = CompareReport {
-            target: target_name(target),
+            target: target.name(),
             parity,
             comment_position_tolerated: tolerated,
             ours_status: "ok",
             hunks,
         };
-        print_json(&report)?;
+        print_json_tabs(&report, CliError::Errored)?;
     } else if parity {
         let note = if tolerated {
             " (comment-position tolerated)"
         } else {
             ""
         };
-        println!("compile_compare [{}] parity{note}", target_name(target));
+        println!("compile_compare [{}] parity{note}", target.name());
         if tolerated {
             print!(
                 "{}",
@@ -166,7 +166,7 @@ fn report_both(
     } else {
         println!(
             "compile_compare [{}] canonical outputs differ",
-            target_name(target)
+            target.name()
         );
         print!(
             "{}",
@@ -190,43 +190,21 @@ fn report_unsupported(
 ) -> Result<(), CliError> {
     if json {
         let report = CompareReport {
-            target: target_name(target),
+            target: target.name(),
             parity: false,
             comment_position_tolerated: false,
             ours_status: "unsupported",
             hunks: None,
         };
-        print_json(&report)?;
+        print_json_tabs(&report, CliError::Errored)?;
     } else {
         println!(
             "compile_compare [{}] {err} — oracle canonical form:",
-            target_name(target)
+            target.name()
         );
         print_block(oracle);
     }
     Err(CliError::Errored)
-}
-
-/// Serialize `report` as tab-indented JSON to stdout.
-fn print_json(report: &CompareReport) -> Result<(), CliError> {
-    match to_json_with_tabs(report) {
-        Ok(json) => {
-            println!("{json}");
-            Ok(())
-        }
-        Err(err) => {
-            eprintln!("Error serializing report: {err}");
-            Err(CliError::Errored)
-        }
-    }
-}
-
-/// Print `text`, ensuring exactly one trailing newline.
-fn print_block(text: &str) {
-    print!("{text}");
-    if !text.ends_with('\n') {
-        println!();
-    }
 }
 
 /// Map the oracle target to the tsv compiler's own target enum.
@@ -234,13 +212,5 @@ fn to_generate(target: SvelteGenerate) -> Generate {
     match target {
         SvelteGenerate::Server => Generate::Server,
         SvelteGenerate::Client => Generate::Client,
-    }
-}
-
-/// The target's canonical name for reporting.
-fn target_name(target: SvelteGenerate) -> &'static str {
-    match target {
-        SvelteGenerate::Server => "server",
-        SvelteGenerate::Client => "client",
     }
 }

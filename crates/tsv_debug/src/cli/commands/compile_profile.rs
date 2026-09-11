@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use super::profile::{
-    format_duration, format_size, is_svelte, median_us, resolve_profile_files_named,
+    display_path, format_duration, format_size, is_svelte, median_us, resolve_profile_files_named,
+    us_per_kb,
 };
 use crate::cli::CliError;
 use tsv_svelte_compile::{CompileError, CompileOptions, compile};
@@ -68,23 +69,9 @@ impl CompileProfileCommand {
                 Ok(Outcome::Timed(result)) => results.push(result),
                 Ok(Outcome::Refused) => refused += 1,
                 Ok(Outcome::ParseFailed) => parse_failed += 1,
-                Ok(Outcome::CorruptOutput(err)) => {
+                Ok(Outcome::CompilerBug(err)) => {
                     corrupt += 1;
-                    eprintln!("COMPILER BUG (CorruptOutput) {}: {err}", path.display());
-                }
-                Ok(Outcome::TypeErasureLeak(span)) => {
-                    corrupt += 1;
-                    eprintln!(
-                        "COMPILER BUG (TypeErasureLeak) {}: TypeScript survived erasure at {span:?}",
-                        path.display()
-                    );
-                }
-                Ok(Outcome::GeneratedNameMissing(span)) => {
-                    corrupt += 1;
-                    eprintln!(
-                        "COMPILER BUG (GeneratedNameMissing) {}: a generated name was not assigned upfront at {span:?}",
-                        path.display()
-                    );
+                    eprintln!("COMPILER BUG {}: {err}", path.display());
                 }
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
@@ -142,12 +129,9 @@ enum Outcome {
     Timed(FileResult),
     Refused,
     ParseFailed,
-    CorruptOutput(tsv_lang::ParseError),
-    /// The type-erasure self-check fired — a compiler bug, like `CorruptOutput`.
-    TypeErasureLeak(tsv_lang::Span),
-    /// An upfront-assigned generated name was missing at emission — a compiler
-    /// bug, like `CorruptOutput`.
-    GeneratedNameMissing(tsv_lang::Span),
+    /// A compile self-check fired — output that does not reparse, a TypeScript node that
+    /// survived erasure, or a generated name missing at emission: always a compiler bug.
+    CompilerBug(CompileError),
 }
 
 /// Timing results for one compiled file.
@@ -187,11 +171,11 @@ fn profile_compile_file(
         Ok(_) => {}
         Err(CompileError::Unsupported(_)) => return Ok(Outcome::Refused),
         Err(CompileError::Parse(_)) => return Ok(Outcome::ParseFailed),
-        Err(CompileError::CorruptOutput(err)) => return Ok(Outcome::CorruptOutput(err)),
-        Err(CompileError::TypeErasureLeak(span)) => return Ok(Outcome::TypeErasureLeak(span)),
-        Err(CompileError::GeneratedNameMissing(span)) => {
-            return Ok(Outcome::GeneratedNameMissing(span));
-        }
+        Err(
+            err @ (CompileError::CorruptOutput(_)
+            | CompileError::TypeErasureLeak(_)
+            | CompileError::GeneratedNameMissing(_)),
+        ) => return Ok(Outcome::CompilerBug(err)),
     }
 
     let mut compile_times = Vec::with_capacity(iterations);
@@ -270,14 +254,6 @@ impl Aggregate {
     fn us_per_kb(&self, us: f64) -> f64 {
         us_per_kb(self.size_bytes, us)
     }
-}
-
-#[allow(clippy::cast_precision_loss)]
-fn us_per_kb(size_bytes: usize, us: f64) -> f64 {
-    if size_bytes == 0 {
-        return 0.0;
-    }
-    us / (size_bytes as f64 / 1024.0)
 }
 
 fn print_table(results: &[FileResult], iterations: usize, skips: &Skips) {
@@ -382,18 +358,5 @@ fn print_json(results: &[FileResult], iterations: usize, skips: &Skips) {
         },
     });
 
-    // SAFETY: serde_json Value types always serialize successfully
-    #[allow(clippy::unwrap_used)]
-    let json_str = serde_json::to_string_pretty(&output).unwrap();
-    println!("{json_str}");
-}
-
-/// Shorten path for display (show last 3 components)
-fn display_path(path: &Path) -> String {
-    let components: Vec<_> = path.components().collect();
-    if components.len() <= 3 {
-        return path.to_string_lossy().to_string();
-    }
-    let last_3: PathBuf = components[components.len() - 3..].iter().collect();
-    format!(".../{}", last_3.display())
+    super::print_json_pretty(&output);
 }

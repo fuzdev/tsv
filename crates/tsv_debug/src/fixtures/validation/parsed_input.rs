@@ -1,5 +1,5 @@
 //! Shared parse of a fixture input and the JSON-AST it feeds the parser-side
-//! validation phases (2/2b).
+//! validation phases (2/2b) and `fixtures_update_parsed`.
 
 use crate::fixtures::InputType;
 use crate::json::wire_value;
@@ -10,7 +10,7 @@ use tsv_cli::json_utils::indent_json_with_tabs;
 /// The parser-side validation phases (expected.json comparison, the tabbed
 /// serialization) all need the same AST — sharing one parse keeps
 /// `fixtures_validate` from re-parsing every fixture per phase.
-pub(super) enum ParsedInput<'arena> {
+pub(crate) enum ParsedInput<'arena> {
     Svelte(tsv_svelte::Root<'arena>),
     Ts(tsv_ts::Program<'arena>),
     Css(tsv_css::CssStyleSheet<'arena>),
@@ -20,7 +20,7 @@ pub(super) enum ParsedInput<'arena> {
 ///
 /// `arena` owns the internal AST and must outlive the returned `ParsedInput`
 /// (caller-owns-`Bump`).
-pub(super) fn parse_input<'arena>(
+pub(crate) fn parse_input<'arena>(
     content: &str,
     input_type: InputType,
     goal: tsv_ts::Goal,
@@ -42,14 +42,14 @@ pub(super) fn parse_input<'arena>(
 }
 
 /// The parser phases' view of one input: the writer's wire and its tabbed form.
-pub(super) struct InputAstPaths {
+pub(crate) struct InputAstPaths {
     /// The compact wire `convert_ast_json_bytes` emitted (the sole emission
     /// path). Read back into a `Value` only on a byte mismatch, to classify it
     /// as field-order-only vs semantic ([`Self::wire_value`]) — so the happy
     /// path deserializes nothing, like the CLI.
     pub wire: Vec<u8>,
     /// The same wire tab-indented + trailing newline — the exact bytes
-    /// `expected*.json` files store (matches `fixtures_update_parsed`); the
+    /// `expected*.json` files store (what `fixtures_update_parsed` writes); the
     /// byte-strict comparison the parser phases gate on.
     pub ast_json_tabs: String,
 }
@@ -66,14 +66,14 @@ impl InputAstPaths {
 /// recursion-free re-indenter — the `--pretty` route, so the gate exercises it
 /// on every fixture. `expected.json` — pinned to the canonical parser by the
 /// P1/P3 freshness checks — is the oracle these phases compare against.
-pub(super) fn input_ast_paths(parsed: &ParsedInput<'_>, content: &str) -> InputAstPaths {
+pub(crate) fn input_ast_paths(parsed: &ParsedInput<'_>, content: &str) -> InputAstPaths {
     let wire = match parsed {
         ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json_bytes(ast, content),
         ParsedInput::Ts(ast) => tsv_ts::convert_ast_json_bytes(ast, content),
         ParsedInput::Css(ast) => tsv_css::convert_ast_json_bytes(ast, content),
     };
     let mut tabs = indent_json_with_tabs(&wire);
-    // Trailing newline matches the fixtures_update_parsed format
+    // Trailing newline matches the expected*.json format
     tabs.push(b'\n');
     #[expect(
         clippy::expect_used,

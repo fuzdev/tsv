@@ -85,7 +85,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use futures_util::{StreamExt, stream};
+use futures_util::StreamExt;
 
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
@@ -98,6 +98,7 @@ use crate::cli::CliError;
 use crate::deno;
 
 use super::profile::{is_input_invalid_fixture, resolve_seed_files_named};
+use super::{ResultOrder, spawn_work_stream, task_result};
 
 /// Audit whether every file's formatted output reparses to the same document.
 ///
@@ -107,21 +108,24 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files_named};
 /// are given — point it at the corpus (`../prettier/tests/format/{css,js,typescript,html}`,
 /// `../corpora/collections/zzz/src`, `../corpora/collections/svelte/packages/svelte/src`, …) to generate the work-list.
 ///
-/// `--gate` restricts the failing set to the reliable `*_unreparseable` buckets
-/// (the divergent buckets are render-model noise over `tests/fixtures`); a bare
-/// `--gate` runs phase 1 only, the fast pure-Rust `deno task check` guard, while
-/// `--gate --canonical-all` is the thorough release-cadence form that also guards
-/// `canonical_unreparseable` (tsv's own parser accepting output the real parser
-/// rejects).
+/// A bare run reports every finding bucket and exits 0. `--gate` reports only the
+/// reliable `*_unreparseable` and `*_leaf_corruption` buckets and exits 1 on any (the
+/// divergent buckets are render-model noise over `tests/fixtures`); a bare `--gate`
+/// runs phase 1 only, the fast pure-Rust `deno task check` guard, which classifies
+/// `tsv_unreparseable` alone, while `--gate --canonical-all` is the thorough
+/// release-cadence form that also guards `canonical_unreparseable` (tsv's own parser
+/// accepting output the real parser rejects) and both leaf-corruption buckets.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "roundtrip_audit")]
 #[allow(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct RoundtripAuditCommand {
-    /// gate mode: fail (exit 1) ONLY on the {tsv,canonical}_unreparseable
-    /// buckets — the reliable half. The divergent buckets (render-model noise)
-    /// are still counted but non-fatal. Bare `--gate` runs phase 1 only
-    /// (pure Rust, no sidecar); add `--canonical-all` for the canonical
-    /// unreparseable guard too. This is the `deno task check` regression-guard
+    /// gate mode: report only the gate-fatal buckets — the
+    /// {tsv,canonical}_unreparseable and {tsv,canonical}_leaf_corruption buckets —
+    /// and exit 1 on any. The divergent buckets (render-model noise) are still
+    /// counted but non-fatal. Without it the run reports every finding and exits 0.
+    /// Bare `--gate` runs phase 1 only (pure Rust, no sidecar), which classifies
+    /// tsv_unreparseable alone; add `--canonical-all` for the canonical and
+    /// leaf-corruption guards too. This is the `deno task check` regression-guard
     /// mode.
     #[argh(switch)]
     gate: bool,
@@ -162,6 +166,8 @@ enum TsvVerdict {
     Clean,
     /// tsv could not format the input (a parse-gap; out of scope here).
     FormatError,
+    /// The file could not be read.
+    ReadError,
     /// tsv's own parser rejects tsv's own formatted output.
     Unreparseable,
     /// Output reparses with an **equal skeleton** but a decode-invariant leaf value changed
@@ -195,6 +201,7 @@ enum CanVerdict {
 enum Bucket {
     Clean,
     FormatError,
+    ReadError,
     CanonicalRejectsInput,
     CanonicalUnreparseable,
     TsvUnreparseable,
@@ -236,6 +243,7 @@ impl Bucket {
         match self {
             Self::Clean => "clean",
             Self::FormatError => "format_error",
+            Self::ReadError => "read_error",
             Self::CanonicalRejectsInput => "canonical_rejects_input",
             Self::CanonicalUnreparseable => "canonical_unreparseable",
             Self::TsvUnreparseable => "tsv_unreparseable",
@@ -246,13 +254,16 @@ impl Bucket {
         }
     }
 
-    /// A bucket the round-trip property was actually EVALUATED on. The two
-    /// negations are skips — tsv couldn't format the input, or the canonical
-    /// oracle rejected it — so neither carries a verdict. The vacuity floor
-    /// counts these: a run where every file skipped reports "no round-trip
+    /// A bucket the round-trip property was actually EVALUATED on. The three
+    /// negations are skips — the file couldn't be read, tsv couldn't format it, or
+    /// the canonical oracle rejected it — so none carries a verdict. The vacuity
+    /// floor counts these: a run where every file skipped reports "no round-trip
     /// findings" and exits 0, which is what a clean run reports too.
     fn is_graded(self) -> bool {
-        !matches!(self, Self::FormatError | Self::CanonicalRejectsInput)
+        !matches!(
+            self,
+            Self::ReadError | Self::FormatError | Self::CanonicalRejectsInput
+        )
     }
 
     /// A stable severity rank for sorting findings worst-first.
@@ -314,6 +325,9 @@ impl FileResult {
         if self.canonical == Some(CanVerdict::RejectsInput) {
             return Bucket::CanonicalRejectsInput;
         }
+        if self.tsv == TsvVerdict::ReadError {
+            return Bucket::ReadError;
+        }
         if self.tsv == TsvVerdict::FormatError {
             return Bucket::FormatError;
         }
@@ -371,7 +385,7 @@ impl RoundtripAuditCommand {
                 self.canonical_all,
                 render,
                 self.verbose,
-            ));
+            ))?;
         }
 
         let graded = results.iter().filter(|r| r.bucket().is_graded()).count();
@@ -383,10 +397,10 @@ impl RoundtripAuditCommand {
     }
 
     fn report(&self, results: &[FileResult]) -> Result<(), CliError> {
-        // In `--gate` mode only the gate-fatal buckets fail the run (the unreparseable +
-        // leaf-corruption half); the divergent buckets are counted but non-fatal (render-model
-        // noise).
-        let is_fail = |b: Bucket| {
+        // A bare run reports every finding bucket and exits 0. `--gate` reports only the
+        // gate-fatal buckets (the unreparseable + leaf-corruption half) and fails on any; the
+        // divergent buckets are counted but non-fatal there (render-model noise).
+        let reported = |b: Bucket| {
             if self.gate {
                 b.is_gate_fatal()
             } else {
@@ -399,12 +413,17 @@ impl RoundtripAuditCommand {
         for r in results {
             let b = r.bucket();
             *counts.entry(b.label()).or_default() += 1;
-            if is_fail(b) {
+            if reported(b) {
                 findings.push(r);
             }
         }
         // Most-severe findings first.
         findings.sort_by_key(|r| r.bucket().severity());
+        let verdict = if self.gate && !findings.is_empty() {
+            Err(CliError::Failed)
+        } else {
+            Ok(())
+        };
 
         if self.json {
             let findings_json: Vec<Value> = findings
@@ -423,12 +442,8 @@ impl RoundtripAuditCommand {
                 "counts": counts,
                 "findings": findings_json,
             });
-            println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
-            return if findings.is_empty() {
-                Ok(())
-            } else {
-                Err(CliError::Failed)
-            };
+            super::print_json_pretty(&out);
+            return verdict;
         }
 
         println!(
@@ -470,7 +485,12 @@ impl RoundtripAuditCommand {
                 println!("{diff}");
             }
         }
-        Err(CliError::Failed)
+        if !self.gate {
+            println!(
+                "\n(report-only: exits 0 — `--gate` fails on *_unreparseable + *_leaf_corruption)"
+            );
+        }
+        verdict
     }
 }
 
@@ -489,7 +509,7 @@ fn tsv_self_roundtrip(path: &Path, render: bool, verbose: bool, reparse_only: bo
     };
 
     let Ok(source) = std::fs::read_to_string(path) else {
-        return mk(TsvVerdict::FormatError, None);
+        return mk(TsvVerdict::ReadError, None);
     };
     let Ok(formatted) = format_source(&source, parser) else {
         return mk(TsvVerdict::FormatError, None);
@@ -555,14 +575,14 @@ async fn canonical_phase(
     canonical_all: bool,
     render: bool,
     verbose: bool,
-) {
+) -> Result<(), CliError> {
     // A file is checked when it's a tsv-self suspect, or unconditionally with
-    // --canonical-all. A FormatError has no output to reparse.
+    // --canonical-all. A read or format error has no output to reparse.
     let jobs: Vec<(usize, PathBuf, ParserType)> = results
         .iter()
         .enumerate()
         .filter(|(_, r)| {
-            r.tsv != TsvVerdict::FormatError
+            !matches!(r.tsv, TsvVerdict::ReadError | TsvVerdict::FormatError)
                 && (canonical_all
                     || matches!(
                         r.tsv,
@@ -575,25 +595,27 @@ async fn canonical_phase(
         .collect();
 
     if jobs.is_empty() {
-        return;
+        return Ok(());
     }
 
-    let concurrency = deno::init_bulk_pool();
-    let checked: Vec<(usize, CanVerdict, Option<String>)> = stream::iter(jobs)
-        .map(|(i, path, parser)| async move {
+    // Each check runs on its own spawned task, so the CPU-bound format and wire compare spread
+    // across the runtime's workers while the canonical parses share the sidecar pool.
+    let mut checked = spawn_work_stream(
+        jobs,
+        ResultOrder::Completion,
+        move |(i, path, parser)| async move {
             let (verdict, diff) = canonical_roundtrip(&path, parser, render, verbose).await;
             (i, verdict, diff)
-        })
-        .buffer_unordered(concurrency)
-        .collect()
-        .await;
-
-    for (i, verdict, diff) in checked {
+        },
+    );
+    while let Some(joined) = checked.next().await {
+        let (i, verdict, diff) = task_result(joined, "round-trip canonical check")?;
         results[i].canonical = Some(verdict);
         if results[i].diff.is_none() {
             results[i].diff = diff;
         }
     }
+    Ok(())
 }
 
 /// Reparse `path`'s input and tsv-formatted output with the canonical parser.

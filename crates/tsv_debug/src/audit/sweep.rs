@@ -4,15 +4,15 @@
 //! `catch_unwind`, bucket the skips identically, and hand each successfully
 //! formatted `(path, parser, source, output)` to the audit's own visitor.
 //!
-//! `fabrication_audit`, `census_audit`, `width_audit`, `swallow_audit` and
+//! `fabrication_audit`, `census_audit`, `width_audit`, `razor_audit`, `swallow_audit` and
 //! `comment_audit` are the consumers — the injection audits mutate per site, so
 //! none of those fit. Extracted when the census arrived as the loop's second
 //! verbatim copy; the conserved-content census v2 (decoded literal values) is
 //! the expected next.
 //!
-//! Every consumer walks the same seed list and skips the same classes, so all
-//! five pin the same [`FIXTURES_FORMATTED_MIN`](super::vacuity::FIXTURES_FORMATTED_MIN)
-//! on a default run. `comment_audit` pins a second number on top of it — a
+//! Every consumer skips the same classes (`razor_audit` walks only the `.svelte` seeds), so
+//! all six pin the same [`FIXTURES_FORMATTED_MIN`] on a default run. `comment_audit` pins a
+//! second number on top of it — a
 //! *comment* count (`REGISTERED_MIN`), for the collapse a file count cannot see:
 //! registration stopping while every file still formats. The guard itself lives
 //! in [`super::vacuity`]: the floor under those pins is a question about an
@@ -24,14 +24,15 @@ use serde_json::Value;
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
-use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
+use crate::audit::panic_hook::SuppressedPanicHook;
 use crate::audit::tally::CappedPaths;
+use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
+use crate::cli::CliError;
 use crate::cli::commands::profile::is_input_invalid_fixture;
 
 /// The sweep's bookkeeping: how many files were formatted, and why the rest
 /// were not. The vacuity guards read `formatted`
-/// ([`check_graded_nonzero`](super::vacuity::check_graded_nonzero) at any scope,
-/// [`check_formatted_min`](super::vacuity::check_formatted_min) on a default
+/// ([`check_graded_nonzero`] at any scope, [`check_formatted_min`] on a default
 /// run); the human report tail reads [`Self::skipped_note`] and the `--json` one
 /// [`Self::json_report`].
 pub(crate) struct PristineSweep {
@@ -77,12 +78,12 @@ impl PristineSweep {
     ///
     /// Takes both halves rather than returning a block to prepend because the
     /// workspace enables `serde_json`'s `preserve_order`, so **key order is
-    /// observable output**: four consumers lead with the sweep keys and
+    /// observable output**: every other consumer leads with the sweep keys and
     /// `width_audit` leads with `print_width`. A prefix helper would silently
     /// reorder that one. Spelling both halves at the call site keeps each
     /// report's order its own while the five fields have one definition — so a
     /// sixth bucket on this struct reaches every `--json` by adding a line here,
-    /// not by five hand-edits of which any one could be missed.
+    /// not by a hand-edit per consumer of which any one could be missed.
     pub(crate) fn json_report(&self, before: Value, after: Value) -> Value {
         let mut out = serde_json::Map::new();
         let mut take = |v: Value| {
@@ -102,13 +103,29 @@ impl PristineSweep {
         Value::Object(out)
     }
 
+    /// The standing tail every sweep consumer runs after its report: the panic sample
+    /// ([`Self::print_panic_sample`]), then the vacuity floors — nothing formatted fails at any
+    /// scope, and a full default run is held to [`FIXTURES_FORMATTED_MIN`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CliError::Failed`] when either floor fails.
+    pub(crate) fn finish(&self, full_default_run: bool) -> Result<(), CliError> {
+        self.print_panic_sample();
+        check_graded_nonzero(self.formatted, "files formatted")?;
+        if full_default_run {
+            check_formatted_min(self.formatted, FIXTURES_FORMATTED_MIN)?;
+        }
+        Ok(())
+    }
+
     /// The panicking inputs, `path: message`, bounded at [`CappedPaths::CAP`] —
     /// printed after the report so a crash names its reproducer even with the
     /// default hook suppressed.
     ///
     /// Prints rather than returning a string, and always to STDERR, so a
-    /// `--json` run keeps a parseable stdout without each of the five consumers
-    /// having to remember that.
+    /// `--json` run keeps a parseable stdout without each consumer having to
+    /// remember that.
     pub(crate) fn print_panic_sample(&self) {
         if self.panics.is_empty() {
             return;
@@ -157,9 +174,8 @@ pub(crate) fn sweep_pristine(
 /// the report — and here, unlike the injection audits, it stays latent until
 /// the sweep is pointed at real code. The panicking input is recorded in
 /// [`PristineSweep::panics`] instead, so the fix costs no information: it lives
-/// in this shared loop rather than in any one consumer, because all five
-/// (`fabrication_audit`, `census_audit`, `width_audit`, `swallow_audit`,
-/// `comment_audit`) format under the same `catch_unwind`.
+/// in this shared loop rather than in any one consumer, because every consumer
+/// formats under the same `catch_unwind`.
 pub(crate) fn sweep_pristine_armed(
     files: &[PathBuf],
     mut arm: impl FnMut(),
@@ -193,11 +209,7 @@ pub(crate) fn sweep_pristine_armed(
                 continue;
             }
             Err(payload) => {
-                sweep.panics.push(format!(
-                    "{}: {}",
-                    path.display(),
-                    panic_message(payload.as_ref())
-                ));
+                sweep.panics.push_panic(path, payload.as_ref());
                 continue;
             }
         };

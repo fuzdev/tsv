@@ -15,21 +15,8 @@ pub struct TestFile {
 impl TestFile {
     /// Check if this test file matches any of the given filter terms.
     pub fn matches_filters(&self, filters: &[String]) -> bool {
-        if filters.is_empty() {
-            return true;
-        }
-        let lower_path = self.relative_path.to_lowercase();
-        filters
-            .iter()
-            .any(|filter| lower_path.contains(&filter.to_lowercase()))
+        crate::fixtures::path_matches_filters(&self.relative_path, filters)
     }
-}
-
-/// Options for test discovery.
-#[derive(Debug, Default)]
-pub struct DiscoveryOptions {
-    /// Only discover tests in these subdirectories (relative to test262/test/)
-    pub subdirs: Vec<String>,
 }
 
 /// Walk the test262 directory and discover all test files.
@@ -38,10 +25,7 @@ pub struct DiscoveryOptions {
 /// - `*_FIXTURE.js` files (module dependencies, not standalone tests)
 /// - `test/staging/` (in-progress proposals)
 /// - `test/harness/` (harness infrastructure tests)
-pub fn discover_tests(
-    test262_root: &Path,
-    options: &DiscoveryOptions,
-) -> Result<Vec<TestFile>, String> {
+pub fn discover_tests(test262_root: &Path) -> Result<Vec<TestFile>, String> {
     let test_dir = test262_root.join("test");
 
     if !test_dir.exists() {
@@ -54,32 +38,20 @@ pub fn discover_tests(
 
     let mut tests = Vec::new();
 
-    // Determine which directories to scan
-    let scan_dirs: Vec<PathBuf> = if options.subdirs.is_empty() {
-        // Scan all standard test directories (exclude staging and harness)
-        let mut dirs = Vec::new();
-        if let Ok(entries) = fs::read_dir(&test_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                    // Skip staging (in-progress proposals) and harness (infrastructure tests)
-                    if name != "staging" && name != "harness" {
-                        dirs.push(path);
-                    }
+    // Scan all standard test directories (exclude staging and harness)
+    let mut scan_dirs = Vec::new();
+    if let Ok(entries) = fs::read_dir(&test_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                // Skip staging (in-progress proposals) and harness (infrastructure tests)
+                if name != "staging" && name != "harness" {
+                    scan_dirs.push(path);
                 }
             }
         }
-        dirs
-    } else {
-        // Scan only specified subdirectories
-        options
-            .subdirs
-            .iter()
-            .map(|subdir| test_dir.join(subdir))
-            .filter(|path| path.exists())
-            .collect()
-    };
+    }
 
     for dir in scan_dirs {
         discover_tests_recursive(&dir, test262_root, &mut tests)?;

@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::audit::sweep::{PristineSweep, sweep_pristine_armed};
-use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
 use tsv_lang::doc::swallow::{self, SwallowReport};
 
@@ -75,12 +74,7 @@ impl SwallowAuditCommand {
         } else {
             print_report(&violations, &sweep);
         }
-        sweep.print_panic_sample();
-
-        check_graded_nonzero(sweep.formatted, "files formatted")?;
-        if default_paths {
-            check_formatted_min(sweep.formatted, FIXTURES_FORMATTED_MIN)?;
-        }
+        sweep.finish(default_paths)?;
 
         if violations.is_empty() {
             Ok(())
@@ -148,7 +142,5 @@ fn print_json(violations: &[Violation], sweep: &PristineSweep) {
             "violations": items,
         }),
     );
-    #[allow(clippy::unwrap_used)]
-    let s = serde_json::to_string_pretty(&output).unwrap();
-    println!("{s}");
+    super::print_json_pretty(&output);
 }

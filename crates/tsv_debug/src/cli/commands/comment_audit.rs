@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::audit::sweep::{PristineSweep, sweep_pristine_armed};
-use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
+use crate::audit::vacuity::check_pinned_min;
 use crate::cli::CliError;
 use tsv_lang::comment_ledger::{self, CommentFinding, CommentFindingKind};
 
@@ -43,21 +43,23 @@ struct Violation {
 /// collapsed, still reports "no findings" and would otherwise pass. A minimum, not a
 /// two-sided pin, because the fixtures tree is COMMITTED and grows with ordinary fixture
 /// PRs (`deno task check` must not fail per added fixture); shrinkage/collapse fails.
-/// Re-pin to current when it trips. Same ritual as [`FIXTURES_FORMATTED_MIN`] and
+/// Re-pin to current when it trips. Same ritual as
+/// [`FIXTURES_FORMATTED_MIN`](crate::audit::vacuity::FIXTURES_FORMATTED_MIN) and
 /// `benches/js/lib/gate_counts.ts`.
 ///
 /// It answers a question the shared file pin cannot: **registration** collapsing without
 /// the file count moving (a format entry point that stops registering a carrier still
 /// formats every file). The converse holds too, which is why this audit passes BOTH —
 /// sharing the sweep means its `formatted` is the other four's by construction, so a skip
-/// policy that diverged here would drop below [`FIXTURES_FORMATTED_MIN`] and say so
+/// policy that diverged here would drop below that file pin and say so
 /// instead of hiding in this pin's slack. That slack is the reason to keep re-pinning
 /// tight: left at its first measured value it drifted 27% below the live count, a gap
 /// wide enough to swallow a quarter of the corpus in silence.
 ///
 /// Only a default run can be held to a number, so both pins stay `default_paths`-gated;
 /// the floor *under* them — zero graded files, vacuous at any scope — is
-/// [`check_graded_nonzero`], called unconditionally above.
+/// [`check_graded_nonzero`](crate::audit::vacuity::check_graded_nonzero), called
+/// unconditionally by [`PristineSweep::finish`].
 const REGISTERED_MIN: usize = 33_138;
 
 impl CommentAuditCommand {
@@ -105,19 +107,16 @@ impl CommentAuditCommand {
         } else {
             print_report(&violations, &stats);
         }
-        stats.sweep.print_panic_sample();
-
-        check_graded_nonzero(stats.sweep.formatted, "files formatted")?;
+        stats.sweep.finish(default_paths)?;
         if default_paths {
-            check_formatted_min(stats.sweep.formatted, FIXTURES_FORMATTED_MIN)?;
-        }
-        if default_paths && registered < REGISTERED_MIN {
-            eprintln!(
-                "Error: pinned minimum — registered {registered} comments < pinned \
-                 {REGISTERED_MIN}. The fixtures walk shrank (or registration collapsed); \
-                 if deliberate, re-pin REGISTERED_MIN."
-            );
-            return Err(CliError::Failed);
+            check_pinned_min(
+                registered,
+                REGISTERED_MIN,
+                "registered",
+                "comments",
+                "The fixtures walk shrank (or registration collapsed)",
+                "REGISTERED_MIN",
+            )?;
         }
 
         if violations.is_empty() {
@@ -129,7 +128,8 @@ impl CommentAuditCommand {
 }
 
 struct Stats {
-    /// The shared skip/format bookkeeping (the [`check_graded_nonzero`] vacuity
+    /// The shared skip/format bookkeeping (the
+    /// [`check_graded_nonzero`](crate::audit::vacuity::check_graded_nonzero) vacuity
     /// floor reads `formatted`; the report tail reads `skipped_note`).
     sweep: PristineSweep,
     registered: usize,
@@ -248,7 +248,5 @@ fn print_json(violations: &[Violation], stats: &Stats) {
             "violations": items,
         }),
     );
-    #[allow(clippy::unwrap_used)]
-    let s = serde_json::to_string_pretty(&output).unwrap();
-    println!("{s}");
+    super::print_json_pretty(&output);
 }

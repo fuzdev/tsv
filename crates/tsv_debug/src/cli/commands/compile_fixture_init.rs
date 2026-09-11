@@ -117,15 +117,14 @@ impl CompileFixtureInitCommand {
                 }
                 println!("✓ {EXPECTED_CSS} (raw oracle css)");
             }
-            None => {
-                if css_path.exists() {
-                    if let Err(e) = std::fs::remove_file(&css_path) {
-                        eprintln!("Error removing stale {EXPECTED_CSS}: {e}");
-                        return Err(CliError::Failed);
-                    }
-                    println!("✓ removed stale {EXPECTED_CSS} (component is unstyled)");
+            None => match fixtures::remove_if_present(&css_path) {
+                Ok(true) => println!("✓ removed stale {EXPECTED_CSS} (component is unstyled)"),
+                Ok(false) => {}
+                Err(e) => {
+                    eprintln!("Error removing stale {EXPECTED_CSS}: {e}");
+                    return Err(CliError::Failed);
                 }
-            }
+            },
         }
 
         println!("\nCompile fixture initialized: {}", self.dir);
