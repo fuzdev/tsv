@@ -935,7 +935,7 @@ impl<'a> Printer<'a> {
             // exactly when the ternary drops to its own (paren-less) line — width
             // or a hard break in the body — and collapses to the glued bytes flat.
             // An author blank yields with that break; the value-gap gate, not the
-            // argument list's (`Printer::run_rides_value_gap_hang`).
+            // argument list's (`Printer::value_gap_soft_broke_after_run`).
             let with_leading =
                 if let Some(run) = self.value_gap_soft_broke_after_run(arrow_end, body_start) {
                     let mut run_parts = DocBuf::new();
@@ -974,7 +974,7 @@ impl<'a> Printer<'a> {
             // broken seam — the body's hard break or width — puts the run on its
             // own line with the body re-fitting below, prettier's
             // `printLeadingComment` `line`. An author blank yields with that break, as
-            // at the ternary arm and the `=` seams (`Printer::run_rides_value_gap_hang`).
+            // at the ternary arm and the `=` seams (`Printer::value_gap_soft_broke_after_run`).
             let body_doc = build_body(&|| self.build_arrow_body_doc(expr));
             parts.push(
                 if let Some(run) = self.value_gap_soft_broke_after_run(arrow_end, body_start) {

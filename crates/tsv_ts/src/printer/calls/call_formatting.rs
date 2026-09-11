@@ -33,6 +33,7 @@ use super::test_patterns::{
 };
 use crate::ast::internal;
 use crate::printer::CommentVec;
+use crate::printer::comments::BrokeAfterBreak;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, function_signature_has_breaking_comments,
 };
@@ -719,16 +720,17 @@ fn try_single_arg_comment_paths(
     // owned one is `None` here and rides on `arg_doc`.
     if printer.has_comments_on_page_between(paren_open, arg_start) && !has_own_line_trailing_comment
     {
-        // The broke-after half of this gap first: a block-only run glued to `(`
-        // whose last comment the author broke after rides its newline-after soft
-        // `line` inside the same wrap group — own line when the argument breaks
-        // the call open, glued bytes when everything collapses (prettier's
-        // `printLeadingComment` `line`). An own-line-authored run declines the
-        // gate and keeps the glued emitter below, whose glue answers preserve
-        // its breaks; so does an owned comment, which rides the argument's doc.
-        if let Some(run) = printer.opener_trailing_broke_after_run(paren_open, arg_start) {
+        // The broke-after half of this gap first: a block-only run the author broke
+        // after rides its newline-after soft `line` inside the same wrap group — own
+        // line when the argument breaks the call open, glued bytes when everything
+        // collapses (prettier's `printLeadingComment` `line`) — or, carrying an author
+        // blank, the forced form that keeps it and opens the call. A run holding an
+        // own-line comment declines the gate and keeps the glued emitter below, whose
+        // glue answers preserve its breaks; so does an owned comment, which rides the
+        // argument's doc.
+        if let Some((run, brk)) = printer.first_arg_broke_after_run(paren_open, arg_start) {
             let mut parts: DocBuf = DocBuf::new();
-            printer.push_leading_run_with_soft_line(&mut parts, &run);
+            printer.push_first_arg_broke_after_run(&mut parts, &run, arg_start, brk);
             parts.push(build_joined_argument_doc(
                 printer,
                 paren_open,
@@ -1085,16 +1087,27 @@ fn build_call_with_arg_comments(
                 // arg. Same shared emitter; it ends with the right separator before
                 // the arg (space after a hug, hardline after an own-line comment).
                 gap_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
-            } else if let Some(run) =
-                printer.opener_trailing_broke_after_run(paren_open, first_arg_start)
+            } else if let Some((run, BrokeAfterBreak::Soft)) =
+                printer.first_arg_broke_after_run(paren_open, first_arg_start)
             {
                 // A block-only run glued to `(` that the author broke after: its
                 // newline-after soft `line` rides the argument group — own line
                 // when the list breaks (a breaking first argument, a sibling, or
                 // width), glued bytes when the call collapses. The glue loop
-                // below would weld the run to the argument in both renderings.
+                // below would weld the run to the argument in both renderings. A
+                // run carrying an author blank is the glue loop's: it keeps the blank
+                // and records the forced expansion this builder needs.
                 printer.push_leading_run_with_soft_line(&mut arg_parts, &run);
             } else {
+                // TODO: this loop is a hand-rolled copy of the broke-after run emitter, and it
+                // diverges from it: every non-blank separator is a space, so
+                // `fn(/* c1 */⏎⏎/* c2 */ /* c3 */⏎a, b)` welds `/* c3 */ a` (the lone argument,
+                // `new` and the chain keep the break), and its raw newline count reads a blank
+                // INSIDE the argument's parens as the author's (`fn(/* c */ (⏎⏎a), b)` →
+                // `/* c */⏎⏎a`). The forced run belongs in the shared emitter
+                // (`Printer::push_first_arg_broke_after_run`) with `force_expansion` set; what
+                // then reaches this loop needs its own audit (a multi-line owned tail still
+                // relies on its blank arm). Needs a fixture.
                 // A block trails the `(` but nothing forces expansion. Every comment
                 // in this gap is a block (no line comment reaches here) that is
                 // paren-trailing or hugs an arg — all collapsible.

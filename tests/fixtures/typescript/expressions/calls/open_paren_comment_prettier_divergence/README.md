@@ -1,8 +1,14 @@
 # open_paren_comment_prettier_divergence
 
-A comment trailing a call's opening `(` on the same line (e.g. `fn( // c` or
-`fn(/* c */`) is preserved on the `(` line. Prettier relocates it to its own
-line as the first argument's leading comment.
+A line comment trailing a call's opening `(` on the same line (`fn( // c`) is
+preserved on the `(` line, and so is a block comment that shares that line with
+something forcing it (`fn( /* paren */` above an own-line `// lead`). Prettier
+relocates the run to its own line as the first argument's leading comment.
+
+A block comment alone on the `(` line is not this divergence: it forces nothing,
+so it leads the first argument — on the argument's line when the call fits, on a
+line of its own above it when the call breaks — the same bytes prettier prints
+([first_arg_leading_comment_breaking_value](../first_arg_leading_comment_breaking_value/)).
 
 tsv: keeps the comment trailing `(` where the user placed it
 Prettier: moves the comment down to its own line
