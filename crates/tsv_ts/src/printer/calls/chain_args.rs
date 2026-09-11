@@ -63,8 +63,9 @@ fn get_call_type_arguments<'a>(
 }
 
 /// The `(`→first-argument gap for the chain's **body-line** paths, as a doc: the blocks the
-/// author left on the `(`'s line, then the rest of the gap through the shared leading
-/// emitter ([`PartitionedComments::emit_leading_comments_inline_aware`]).
+/// author left on the `(`'s line and the rest of the gap, as ONE leading run
+/// ([`PartitionedComments::emit_unpulled_gap`] — the same answer
+/// [`super::arg_comments::emit_first_arg_leading_comments`] gives a block-only gap).
 ///
 /// The force-expanded builder takes it too, for the gap its own delimiter-line pull declined
 /// ([`PartitionedComments::pulls_to_delimiter_line`]) — the whole gap leads the argument
@@ -95,31 +96,10 @@ fn build_inline_leading_comments(
     paren_open: u32,
     arg_start: u32,
 ) -> Option<DocId> {
-    let d = printer.d();
-    // A block-only run the author broke after takes its newline-after soft `line` —
-    // the same gate and emitter the non-chain seams use
-    // (`emit_first_arg_leading_comments`): own line when the argument layout breaks,
-    // glued bytes when it collapses, the forced form when it carries an author blank.
-    // A run holding an own-line comment declines and keeps the emitters below.
-    if let Some((run, brk)) = printer.first_arg_broke_after_run(paren_open, arg_start) {
-        let mut parts = DocBuf::new();
-        printer.push_first_arg_broke_after_run(&mut parts, &run, arg_start, brk);
-        return Some(d.concat(&parts));
-    }
-    let pc = PartitionedComments::new(printer, paren_open, arg_start);
-
     let mut parts = DocBuf::new();
-    for comment in &pc.trailing_block {
-        parts.push(printer.build_comment_doc(comment));
-        parts.push(d.text(" "));
-    }
-    pc.emit_leading_comments_inline_aware(&mut parts, printer);
-
-    if parts.is_empty() {
-        None
-    } else {
-        Some(d.concat(&parts))
-    }
+    // A `//` trailing the `(` stays out of the run — its callers place it (see above).
+    PartitionedComments::new(printer, paren_open, arg_start).emit_unpulled_gap(&mut parts, printer);
+    (!parts.is_empty()).then(|| printer.d().concat(&parts))
 }
 
 /// Build inline trailing block comments for an argument (non-expansion path).
@@ -667,8 +647,7 @@ fn build_chain_args_force_expand(
                 // conformance_prettier_ts_comments.md §Comment relocation, Call open paren `(`).
                 // A block hugging the arg stays inline (`/* b */ a`), an own-line block /
                 // line comment takes its own line with author blanks preserved.
-                first_pc.emit_delimiter_line_pull(&mut paren_line_prefix_parts, printer);
-                first_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
+                first_pc.emit_pulled_gap(&mut paren_line_prefix_parts, &mut arg_parts, printer);
             } else if let Some(doc) = build_inline_leading_comments(printer, paren_open, arg_start)
             {
                 // Nothing pulled, so the WHOLE gap leads the first argument — which is the

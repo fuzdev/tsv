@@ -647,17 +647,13 @@ pub(super) fn has_trailing_line_comments_slice(
 /// first argument.
 ///
 /// Own-line comments always lead the first argument. A run with a comment trailing `(`
-/// — or a glued run the author gave a line of its own — goes one of three ways, and the
-/// split is the run's *kind*, not each comment's:
+/// goes one of two ways, and the split is the run's *kind*, not each comment's:
 ///
-/// - **Block-only, broke after** (`fn(/* c */⏎a)`, and a glued run the author gave its
-///   own line) — the run takes its newline-after soft `line`: its own line when the
-///   argument list breaks, the glued bytes when it collapses (prettier's
-///   `printLeadingComment` `line`); an author blank in or after it takes the forced form,
-///   which keeps the blank. Gated by [`Printer::first_arg_broke_after_run`], emitted by
-///   [`Printer::push_first_arg_broke_after_run`].
-/// - **Block-only, glued** (`fn(/* c */ a)`) — emitted inline ahead of the first
-///   argument, so a call that fits stays on one line (matching prettier).
+/// - **Block-only** — the whole gap is one leading run
+///   ([`PartitionedComments::emit_unpulled_gap`]): a space where the author glued a pair
+///   (`fn(/* c */ a)`, so a call that fits stays on one line), the soft `line` where a comment
+///   broke after (`fn(/* c */⏎a)` — its own line when the argument list breaks, the glued
+///   bytes when it collapses), and a blank-preserving hardline for an author blank.
 /// - **Any line comment in the run** — the whole run stays on the `(` line, in source
 ///   order. A `//` runs to EOL, so it cannot ride the argument's line; keeping it where
 ///   the author put it is tsv's sanctioned divergence (prettier relocates it to its own
@@ -696,27 +692,13 @@ pub(super) fn emit_first_arg_leading_comments(
     if !printer.has_comments_to_emit_between(paren_open, first_arg_start) {
         return;
     }
-    // A block-only run the author broke after takes its newline-after soft `line`
-    // instead of the glue below — own line when the argument list breaks (this
-    // builder's layouts are the breaking ones), glued bytes when it collapses — or,
-    // carrying an author blank, the forced form that keeps it. A run holding an
-    // own-line comment declines the gate and keeps the emitters below
-    // (`Printer::first_arg_broke_after_run`).
-    if let Some((run, brk)) = printer.first_arg_broke_after_run(paren_open, first_arg_start) {
-        printer.push_first_arg_broke_after_run(parts, &run, first_arg_start, brk);
-        return;
-    }
-    let d = printer.d();
     let pc = PartitionedComments::new(printer, paren_open, first_arg_start);
     if pc.has_trailing_line() {
         pc.emit_trailing_comments(paren_line, printer);
+        pc.emit_leading_comments_inline_aware(parts, printer);
     } else {
-        for comment in &pc.trailing_block {
-            parts.push(printer.build_comment_doc(comment));
-            parts.push(d.text(" "));
-        }
+        pc.emit_unpulled_gap(parts, printer);
     }
-    pc.emit_leading_comments_inline_aware(parts, printer);
 }
 
 /// Emit the comments between the LAST argument and `)` — the closing counterpart to
@@ -1151,6 +1133,53 @@ impl<'a> PartitionedComments<'a> {
         if let Some(pulled_end) = self.trailing_end() {
             printer.push_delimiter_glued_blank(parts, pulled_end, self.end);
         }
+    }
+
+    /// Emit a gap whose delimiter-line pull fired: the pull onto `paren_line`
+    /// ([`Self::emit_delimiter_line_pull`]), then everything below it leading the first item
+    /// through the shared leading emitter ([`Self::emit_leading_comments_inline_aware`]) —
+    /// the call family's force-expanded builders all take this pair.
+    ///
+    /// ⚠️ **The two halves are one step.** A builder that pulled through the shared emitter
+    /// and printed the rest by hand — each comment followed by a bare `hardline` — split a
+    /// glued pair below the pulled comment and ate an author blank before the argument
+    /// (`new Foo( // c⏎/* a */ /* b */⏎x` → `/* a */⏎/* b */`), where every sibling builder
+    /// kept both.
+    pub(super) fn emit_pulled_gap(
+        &self,
+        paren_line: &mut DocBuf,
+        parts: &mut DocBuf,
+        printer: &Printer<'_>,
+    ) {
+        self.emit_delimiter_line_pull(paren_line, printer);
+        self.emit_leading_comments_inline_aware(parts, printer);
+    }
+
+    /// Emit a gap nothing pulled as ONE leading run: every comment in it except a `//`
+    /// trailing the delimiter (whose caller places it on the delimiter's line) leads the first
+    /// item through the shared leading emitter ([`Printer::push_leading_comment_run`]). Its
+    /// separators are prettier's `printLeadingComment`: a space where the author glued a pair
+    /// (`fn(/* c */ a)`), the soft `line` where a comment broke after (its own line when the
+    /// list breaks, the glued bytes when it collapses), and a blank-preserving hardline for an
+    /// author blank or an own-line comment. Returns whether it pushed that hardline, which a
+    /// collapsible list cannot stay flat around. Every builder of the call family's
+    /// `(`→first-argument gap takes this for a gap it does not pull.
+    ///
+    /// ⚠️ **A hand-rolled separator here is the bug class, and each builder once had one.** A
+    /// space after a comment the author broke after welded it to the argument
+    /// (`/* c2 */ /* c3 */⏎a, b` → `/* c2 */ /* c3 */ a,`) — including a run ending in a
+    /// MULTI-line owned comment (`fn(/* c1 */⏎/* c2⏎*/ a)` → `/* c1 */ /* c2⏎*/ a`, a blank
+    /// above `c2` dropped) and one glued to a stripped paren that holds a break
+    /// (`/* c2 */ (⏎{…})` → `/* c1 */ /* c2 */ {`) — and a raw newline count read a blank INSIDE
+    /// the argument's parens (`fn(/* c */ (⏎⏎a), b)`), or a multi-line comment's own newline, as
+    /// the author's.
+    pub(super) fn emit_unpulled_gap(&self, parts: &mut DocBuf, printer: &Printer<'_>) -> bool {
+        printer.push_leading_comment_run(
+            parts,
+            self.trailing_block.iter().chain(&self.leading).copied(),
+            self.end,
+            LeadingGlue::AdjacentStrippedParen,
+        )
     }
 
     /// Whether the author left a blank line in this inter-argument gap.

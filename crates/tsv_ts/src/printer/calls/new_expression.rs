@@ -660,13 +660,8 @@ impl<'a> Printer<'a> {
             let gap_pc = PartitionedComments::new(self, paren_open, first_arg_start);
             if gap_pc.pulls_to_delimiter_line(self) {
                 let mut paren_line_prefix = DocBuf::new();
-                gap_pc.emit_delimiter_line_pull(&mut paren_line_prefix, self);
-
                 let mut inner = DocBuf::new();
-                for comment in &gap_pc.leading {
-                    inner.push(self.build_comment_doc(comment));
-                    inner.push(d.hardline());
-                }
+                gap_pc.emit_pulled_gap(&mut paren_line_prefix, &mut inner, self);
                 // The `(`→first-argument gap is emitted above (the paren-line prefix and
                 // the leading run), so the builder must not print it a second time — hence
                 // its `paren_line` out-param stays unused here and must come back empty.

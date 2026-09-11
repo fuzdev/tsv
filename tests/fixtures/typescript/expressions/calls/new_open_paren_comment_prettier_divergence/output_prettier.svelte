@@ -58,6 +58,35 @@
 		{ b: 2 }
 	);
 
+	// block comment trailing `(`, an own-line block comment, then a glued pair
+	new Foo(
+		/* paren */
+		/* lead */
+		/* c1 */ /* c2 */
+		a
+	);
+
+	// line comment trailing `(`, then a glued pair — single arg and several
+	new Foo(
+		// c9
+		/* c1 */ /* c2 */
+		a
+	);
+	new Foo(
+		// c10
+		/* c1 */ /* c2 */
+		a,
+		b
+	);
+
+	// an author blank below an own-line block comment survives
+	new Foo(
+		/* paren */
+		/* lead */
+
+		a
+	);
+
 	// an author blank BELOW the pulled comment survives — the blank is authorship, not
 	// the container's leading gap (the blank ABOVE one stays erased, against the delimiter)
 	new Foo(

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 733,
+	"end": 938,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -297,24 +297,136 @@
 					"column": 10
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A glued pair on its own line below a comment that owns its line: both breaks hold.",
+			"start": 725,
+			"end": 810,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 1
+				},
+				"end": {
+					"line": 49,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 819,
+			"end": 827,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 2
+				},
+				"end": {
+					"line": 51,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 830,
+			"end": 838,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 2
+				},
+				"end": {
+					"line": 52,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 839,
+			"end": 847,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 11
+				},
+				"end": {
+					"line": 52,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 879,
+			"end": 887,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 2
+				},
+				"end": {
+					"line": 58,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 890,
+			"end": 898,
+			"loc": {
+				"start": {
+					"line": 59,
+					"column": 2
+				},
+				"end": {
+					"line": 59,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 899,
+			"end": 907,
+			"loc": {
+				"start": {
+					"line": 59,
+					"column": 11
+				},
+				"end": {
+					"line": 59,
+					"column": 19
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 732,
+		"end": 937,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 723,
+			"end": 928,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 48,
+					"line": 64,
 					"column": 9
 				}
 			},
@@ -1170,6 +1282,289 @@
 							"end": 673
 						}
 					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 812,
+					"end": 867,
+					"loc": {
+						"start": {
+							"line": 50,
+							"column": 1
+						},
+						"end": {
+							"line": 56,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 812,
+						"end": 866,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 1
+							},
+							"end": {
+								"line": 56,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 812,
+							"end": 815,
+							"loc": {
+								"start": {
+									"line": 50,
+									"column": 1
+								},
+								"end": {
+									"line": 50,
+									"column": 4
+								}
+							},
+							"name": "fn7"
+						},
+						"arguments": [
+							{
+								"type": "ObjectExpression",
+								"start": 850,
+								"end": 863,
+								"loc": {
+									"start": {
+										"line": 53,
+										"column": 2
+									},
+									"end": {
+										"line": 55,
+										"column": 3
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 855,
+										"end": 859,
+										"loc": {
+											"start": {
+												"line": 54,
+												"column": 3
+											},
+											"end": {
+												"line": 54,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 855,
+											"end": 856,
+											"loc": {
+												"start": {
+													"line": 54,
+													"column": 3
+												},
+												"end": {
+													"line": 54,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 858,
+											"end": 859,
+											"loc": {
+												"start": {
+													"line": 54,
+													"column": 6
+												},
+												"end": {
+													"line": 54,
+													"column": 7
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 819,
+										"end": 827
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 830,
+										"end": 838
+									},
+									{
+										"type": "Block",
+										"value": " c3 ",
+										"start": 839,
+										"end": 847
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A glued pair on its own line below a comment that owns its line: both breaks hold.",
+							"start": 725,
+							"end": 810
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 869,
+					"end": 927,
+					"loc": {
+						"start": {
+							"line": 57,
+							"column": 1
+						},
+						"end": {
+							"line": 63,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 869,
+						"end": 926,
+						"loc": {
+							"start": {
+								"line": 57,
+								"column": 1
+							},
+							"end": {
+								"line": 63,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 873,
+							"end": 875,
+							"loc": {
+								"start": {
+									"line": 57,
+									"column": 5
+								},
+								"end": {
+									"line": 57,
+									"column": 7
+								}
+							},
+							"name": "C8"
+						},
+						"arguments": [
+							{
+								"type": "ObjectExpression",
+								"start": 910,
+								"end": 923,
+								"loc": {
+									"start": {
+										"line": 60,
+										"column": 2
+									},
+									"end": {
+										"line": 62,
+										"column": 3
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 915,
+										"end": 919,
+										"loc": {
+											"start": {
+												"line": 61,
+												"column": 3
+											},
+											"end": {
+												"line": 61,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 915,
+											"end": 916,
+											"loc": {
+												"start": {
+													"line": 61,
+													"column": 3
+												},
+												"end": {
+													"line": 61,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 918,
+											"end": 919,
+											"loc": {
+												"start": {
+													"line": 61,
+													"column": 6
+												},
+												"end": {
+													"line": 61,
+													"column": 7
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 879,
+										"end": 887
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 890,
+										"end": 898
+									},
+									{
+										"type": "Block",
+										"value": " c3 ",
+										"start": 899,
+										"end": 907
+									}
+								]
+							}
+						]
+					}
 				}
 			],
 			"sourceType": "module"

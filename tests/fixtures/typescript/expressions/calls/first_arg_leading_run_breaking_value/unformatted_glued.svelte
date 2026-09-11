@@ -31,4 +31,16 @@ b`);
 	/* c2 */ {
 		a: 1
 	});
+
+	// A glued pair on its own line below a comment that owns its line: both breaks hold.
+	fn7(/* c1 */
+	/* c2 */ /* c3 */
+	{
+		a: 1
+	});
+	new C8(/* c1 */
+	/* c2 */ /* c3 */
+	{
+		a: 1
+	});
 </script>

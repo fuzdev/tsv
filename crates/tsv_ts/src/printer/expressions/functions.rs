@@ -934,8 +934,8 @@ impl<'a> Printer<'a> {
             // instead of the glued space: inside the parens group it materializes
             // exactly when the ternary drops to its own (paren-less) line — width
             // or a hard break in the body — and collapses to the glued bytes flat.
-            // An author blank yields with that break; the value-gap gate, not the
-            // argument list's (`Printer::value_gap_soft_broke_after_run`).
+            // An author blank yields with that break, as at every value gap
+            // (`Printer::value_gap_soft_broke_after_run`).
             let with_leading =
                 if let Some(run) = self.value_gap_soft_broke_after_run(arrow_end, body_start) {
                     let mut run_parts = DocBuf::new();
