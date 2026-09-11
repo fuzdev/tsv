@@ -134,7 +134,10 @@ crates (the open-convention stance):
   path spelled literally (`pattern_path` escapes `*`, `?`, `[`, `]`, `\` and trailing
   spaces, so a `[slug]` directory is no character class), for the file the repo root
   reads (`IgnoreStack::tsv_layer_source` — its `.prettierignore` where it has no
-  `.formatignore`, since creating one would shadow it). The callers' stack stops at a
+  `.formatignore`, since creating one would shadow it). A path no line can hold — a
+  line feed in any segment, or a file name ending in `\r`, which a line's end strips —
+  gets no lines (`reinclude_lines` declines it) and is told to narrow the rule instead;
+  a `\r` anywhere else is an ordinary character. The callers' stack stops at a
   directory a rule excludes, as the walk reads no ignore file inside one, so a rule in
   such a file can still exclude the path once the directory is re-included.
   `loose_root` is the format root's display path outside a repo, where paths are named

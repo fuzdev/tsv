@@ -1068,6 +1068,33 @@ fn test_format_named_path_reads_no_ignore_file_inside_an_excluded_directory() {
     );
 }
 
+/// A named file whose name holds a line feed is warned about like any other a `.gitignore`
+/// excludes, but offered no re-include lines: the name would split each one across two
+/// lines, which no ignore file can hold. Unix only, as Windows forbids the character in a
+/// file name.
+#[cfg(unix)]
+#[test]
+fn test_format_named_file_with_a_line_break_gets_no_reinclude_lines() {
+    let dir = temp_dir("line_break_name");
+    fs::create_dir_all(dir.join(".git")).unwrap();
+    fs::create_dir_all(dir.join("build")).unwrap();
+    fs::write(dir.join(".gitignore"), "build/\n").unwrap();
+    let file = dir.join("build/a\nb.ts");
+    fs::write(&file, UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", file.to_str().unwrap()]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
+    assert!(output.stdout.is_empty(), "stderr: {stderr}");
+    assert!(
+        stderr.contains(
+            "a\nb.ts is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; no ignore-file line can hold the line break in its path, so narrow that rule to format it"
+        ),
+        "stderr: {stderr}"
+    );
+    assert!(!stderr.contains('`'), "stderr: {stderr}");
+}
+
 /// An explicitly named file is held to the extension check before anything else: the
 /// parser dispatch behind a path has no unknown arm, so without this
 /// gate a `.json` file is parsed as TypeScript — usually a baffling syntax error,
