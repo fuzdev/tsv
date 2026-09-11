@@ -130,12 +130,14 @@ pub(super) fn build_arrow_sig_doc(
     printer.prepend_owned_leading_comment_at(arrow.span.start, sig)
 }
 
-/// Prepend any comments between arrow `=>` and body expression to `body_doc`.
+/// Prepend any comments between arrow `=>` and body expression to `body_doc`, for a state
+/// that puts the body BELOW `=>` (`(sig =>\n  body,\n)`) or collapses to such a state on the
+/// doc's forced break.
 ///
-/// When call argument paths build `sig_doc` and `body_doc` separately
-/// (for break states like `(sig =>\n  body,\n)`), comments between `=>`
-/// and the body are not part of either doc. This finds them and prepends
-/// to `body_doc`, returning it unchanged if none exist.
+/// When call argument paths build `sig_doc` and `body_doc` separately, comments between
+/// `=>` and the body are not part of either doc. This finds them and prepends to
+/// `body_doc`, returning it unchanged if none exist. A state that keeps the body on the
+/// `=>` line takes [`prepend_hugged_arrow_body_comments`] instead.
 pub(super) fn prepend_arrow_body_comments(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
@@ -143,10 +145,40 @@ pub(super) fn prepend_arrow_body_comments(
     body_doc: DocId,
 ) -> DocId {
     let arrow_end = arrow_token_end(arrow);
+    let d = printer.d();
 
-    // Prepend inline comments between `=>` and body. Glued: a single-line block
-    // hugged to `=>` stays with the body across a source newline, matching the main
-    // arrow-body path (`has_own_line_post_arrow_comment`) and prettier.
+    // A run the author broke AFTER keeps its breaks before a body that breaks — by a hard
+    // break of its own, or by the multi-line comment the run ends in — exactly as the arrow's
+    // own arms answer it (`Printer::break_or_hang_after_operator_run_doc`). The body sits below
+    // `=>` in every state this doc reaches, so the forced emitter is the rendering the run
+    // needs; glued, it welded the run onto the body (`/* x */ /* y */ fn(`).
+    if let Some(run) = printer.broke_after_value_leading_run(arrow_end, body_start)
+        && (d.will_break(body_doc) || printer.run_ends_in_glued_multiline_block(&run))
+    {
+        let mut parts = DocBuf::new();
+        printer.push_leading_run_before_breaking_value(&mut parts, &run, body_start);
+        parts.push(body_doc);
+        return d.concat(&parts);
+    }
+    prepend_hugged_arrow_body_comments(printer, arrow, body_start, body_doc)
+}
+
+/// Prepend the `=>`→body gap's comments to a body that stays on the `=>` line — the member
+/// chain's hugged `(sig => <body>)` state. Glued: a single-line block hugged to `=>` stays
+/// with the body across a source newline, matching the main arrow-body path
+/// (`has_own_line_post_arrow_comment`) and prettier.
+///
+/// ⚠️ **Never the forced run of [`prepend_arrow_body_comments`].** Its hardlines break AFTER
+/// the comment while this state keeps `=> /* c */` on the head line, so the body landed at the
+/// statement's indent (`map((item) => /* c */⏎⏎({`), a form the next pass reads as the
+/// gap-break state and prints differently — `blanks:audit` found it.
+pub(super) fn prepend_hugged_arrow_body_comments(
+    printer: &Printer<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    body_start: u32,
+    body_doc: DocId,
+) -> DocId {
+    let arrow_end = arrow_token_end(arrow);
     if let Some(lc) = printer.build_rhs_comments_glued_opt(arrow_end, body_start) {
         printer.d().concat(&[lc, body_doc])
     } else {
@@ -362,9 +394,29 @@ fn build_arrow_body_like_arrow(
     body_expr: &internal::Expression<'_>,
 ) -> DocId {
     let prev = printer.arrow_chain_context.replace(ArrowChainContext::None);
-    let doc = printer.build_expression_doc(body_expr);
+    let doc = printer.build_arrow_arg_body_doc(body_expr);
     printer.arrow_chain_context.set(prev);
     doc
+}
+
+impl Printer<'_> {
+    /// The BODY of an arrow that a call-argument state reassembles from signature + body,
+    /// built as the whole arrow's own body build builds it
+    /// (`Printer::build_arrow_body_doc_with_leading`): a multi-line comment the body owns
+    /// prints outside the body's own group ([`Printer::build_value_with_outermost_owned_comment`]).
+    ///
+    /// Built here by the pre-built injection, the lone ternary ladders of the plain call, `new`
+    /// and the member chain, and the break-body ladder of a call's or `new`'s last argument.
+    /// Claimed by the innermost node instead, the comment's hard break explodes a ternary the
+    /// break-body state keeps flat, while the own-line authoring that state prints takes a
+    /// claimed route on the next pass — so the state wobbled. (The chain's force-expanded and
+    /// multi-argument states build their body plainly: no authoring reaches either as the
+    /// printed state of a ternary body, so a claim there could not be pinned.)
+    pub(super) fn build_arrow_arg_body_doc(&self, body_expr: &internal::Expression<'_>) -> DocId {
+        self.build_value_with_outermost_owned_comment(body_expr, || {
+            self.build_expression_doc(body_expr)
+        })
+    }
 }
 
 /// Pre-build an expand-last-arg arrow's **break-body-state** body **once** so the whole-arrow

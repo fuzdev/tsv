@@ -2371,11 +2371,7 @@ impl<'a> Printer<'a> {
     /// overflows. An author blank after the run yields with the unforced break
     /// ([`LeadingGlue::AdjacentValueGap`]'s rule), unlike the hard sibling,
     /// whose forced break carries it.
-    pub(crate) fn hang_after_operator_run_doc(
-        &self,
-        run: &[&'a Comment],
-        value_doc: DocId,
-    ) -> DocId {
+    fn hang_after_operator_run_doc(&self, run: &[&'a Comment], value_doc: DocId) -> DocId {
         let d = self.d();
         let mut content = DocBuf::new();
         if let Some(last) =
@@ -2442,7 +2438,7 @@ impl<'a> Printer<'a> {
         value_start: u32,
         value_doc: DocId,
     ) -> DocId {
-        if self.d().will_break(value_doc) {
+        if self.d().will_break(value_doc) || self.run_ends_in_glued_multiline_block(run) {
             self.break_after_operator_run_doc(run, value_start, value_doc)
         } else {
             self.hang_after_operator_run_doc(run, value_doc)
@@ -2503,16 +2499,20 @@ impl<'a> Printer<'a> {
     /// (`= /* c */ /* m⏎ */ v`) is printed by the value's doc and absent from the
     /// emit run, but it still occupies the gap — measured against `value_start`,
     /// the emitted run's tail reads as broken-after when the author glued the whole
-    /// run, and the owned multiline block's own newlines answer `will_break` for a
-    /// value prettier keeps flat (its `fits` stops at the first newline in comment
-    /// text). An owned comment between the run and the value therefore declines —
-    /// via the blank scan's in-source ceiling, which stops at the owned comment, not
-    /// via the glue test below — with ONE exception: a single-line block with nothing but
-    /// spaces (or an opening paren) between it and the value. That is the second half of a
-    /// broke-after run (`= /* c1 */⏎/* c2 */ v`), its doc answers `will_break` for the
-    /// value's own reasons alone, and declining it welded the run: the glued path puts a
-    /// space after every comment, so `c1`'s break vanished whatever the value did. A
-    /// MULTI-line owned tail still declines, for the reason above.
+    /// run. So the blank scan's in-source ceiling stops at the owned comment, and the
+    /// owned tail must be glued through to the value
+    /// ([`Self::owned_tail_glued_to_value`]): it is then the second half of the run, which
+    /// broke after only if an earlier comment did — `c` glued to `m` above did not, so that
+    /// gap declines. Declining a real one welded it (`= /* c1 */⏎/* c2 */ v`): the glued path
+    /// puts a space after every comment, so `c1`'s break vanished whatever the value did.
+    ///
+    /// ⚠️ **A MULTI-line owned tail is taken too, and every consumer owes the claim.** Its
+    /// doc answers `will_break`, and that answer is right: prettier breaks `c1`'s separator
+    /// around a multi-line comment of either kind, indentable or preserved, and keeps an
+    /// author blank there. What is wrong is the comment breaking the VALUE's own group,
+    /// which it does from the innermost node that owns it (`= /* c1 */⏎/* c2⏎*/ a ? b : c`
+    /// exploded the ternary) — so each consumer builds its value with the comment claimed
+    /// outside that group ([`Self::build_value_with_outermost_owned_comment`]).
     ///
     /// ⚠️ **The glue test asks the comment's own NEIGHBOURS, never the distance to the
     /// value** ([`Self::comment_hugs_next`], prettier's `hasNewline(text,
@@ -2548,7 +2548,7 @@ impl<'a> Printer<'a> {
         // the emit run stops short of it) and un-owned otherwise (a type position, or a
         // comment glued to a grouping paren whose strip discards the node that would own it).
         let glued_tail = if tail_start == value_start {
-            self.glued_through_open_parens(last.span.end, value_start)
+            self.comment_glued_through_open_parens(last, value_start)
         } else {
             self.owned_tail_glued_to_value(tail_start, value_start)
         };
@@ -2556,32 +2556,37 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether the in-source remainder `[tail_start, value_start)` of a value gap is exactly
-    /// one OWNED single-line block comment glued through to the value
-    /// ([`Self::glued_through_open_parens`]) — the glued second half of a broke-after run
-    /// ([`Self::broke_after_value_leading_run`]).
+    /// one OWNED block comment glued through to the value
+    /// ([`Self::comment_glued_through_open_parens`]) — the glued second half of a broke-after
+    /// run ([`Self::broke_after_value_leading_run`]), single- or multi-line.
     fn owned_tail_glued_to_value(&self, tail_start: u32, value_start: u32) -> bool {
         let mut tail = self.comments_in_source_between(tail_start, value_start);
         let Some(owned) = tail.next() else {
             return false;
         };
         owned.owned_by_node
-            && !owned.multiline
             && tail.next().is_none()
-            && self.glued_through_open_parens(owned.span.end, value_start)
+            && self.comment_glued_through_open_parens(owned, value_start)
     }
 
-    /// Whether `[start, end)` holds nothing but spaces, tabs and opening parens — a comment
-    /// glued to the value, possibly through grouping parens the author wrote around it
-    /// (`/* c */ (v)`, stripped, or an arrow's object body `/* c */ ({…})`, kept).
+    /// Whether `comment` is glued to the value at `value_start`, possibly through grouping
+    /// parens the author wrote around it (`/* c */ (v)`, stripped, or an arrow's object body
+    /// `/* c */ ({…})`, kept): nothing but spaces and tabs after its `*/`
+    /// ([`Self::comment_hugs_next`]), then nothing but those parens and the whitespace
+    /// inside them.
     ///
-    /// ⚠️ **No newline, which is the whole reason the parens are allowed.** A break the author
-    /// put INSIDE the parens (`= /* c */ (⏎v)`) is not a break after the comment, and reading
-    /// it as one broke a value prettier hugs — that stays excluded. Without the parens the
-    /// shell authoring welded where its bare twin broke, two fixed points for one layout.
-    fn glued_through_open_parens(&self, start: u32, end: u32) -> bool {
-        self.source.as_bytes()[start as usize..end as usize]
-            .iter()
-            .all(|b| matches!(b, b' ' | b'\t' | b'('))
+    /// ⚠️ **A break INSIDE the parens is the parens' own layout, not a break after the
+    /// comment** — the glue is asked of the comment's neighbour, as at every other gap.
+    /// Reading `/* c2 */ (⏎{…})` as unglued welded a run whose earlier comment broke
+    /// (`= /* c1 */⏎/* c2 */ (⏎{…})` → `= /* c1 */ /* c2 */ {`) where its bare twin and
+    /// prettier break. It does not make `= /* c */ (⏎v)` a broke-after run: no comment there
+    /// broke, which is the caller's other conjunct. Without the parens allowed at all, the
+    /// shell authoring welded where its bare twin broke — two fixed points for one layout.
+    fn comment_glued_through_open_parens(&self, comment: &Comment, value_start: u32) -> bool {
+        self.comment_hugs_next(comment)
+            && self.source.as_bytes()[comment.span.end as usize..value_start as usize]
+                .iter()
+                .all(|b| matches!(b, b' ' | b'\t' | b'\n' | b'('))
     }
 
     /// [`Self::broke_after_value_leading_run`] plus the hard-break question:
@@ -2607,11 +2612,25 @@ impl<'a> Printer<'a> {
     ) -> Option<(CommentVec<'a>, DocId)> {
         let comments = self.broke_after_value_leading_run(gap_start, value_start)?;
         let value_doc = build_value();
-        if self.d().will_break(value_doc) {
+        if self.d().will_break(value_doc) || self.run_ends_in_glued_multiline_block(&comments) {
             Some((comments, value_doc))
         } else {
             None
         }
+    }
+
+    /// Whether a broke-after run ([`Self::broke_after_value_leading_run`]) ENDS in a
+    /// multi-line block glued to the value (`: /* x */⏎/* y⏎*/ B`) — a hard break the run
+    /// carries on its own, whatever the value does. Prettier breaks the separator before
+    /// such a comment and keeps an author blank there, so each dispatcher between the forced
+    /// and the soft half asks this beside `will_break(value)`.
+    ///
+    /// Only an UN-owned tail reaches it — a type position, or a comment glued to a stripped
+    /// paren — since it rides in the run. An OWNED tail is printed by the value's doc, whose
+    /// `will_break` already answers for it.
+    pub(crate) fn run_ends_in_glued_multiline_block(&self, run: &[&Comment]) -> bool {
+        run.last()
+            .is_some_and(|c| c.multiline && self.comment_hugs_next(c))
     }
 
     /// Build a leading-comment run over `[start, end)` into a fresh `DocBuf`,

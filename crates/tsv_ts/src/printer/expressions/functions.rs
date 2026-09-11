@@ -923,7 +923,14 @@ impl<'a> Printer<'a> {
             {
                 doc
             } else {
-                build_body(&|| self.build_expression_doc(expr))
+                // A multi-line comment the body owns prints outside the ternary's own
+                // group, or its hard break explodes a ternary prettier keeps flat
+                // ([`Printer::build_value_with_outermost_owned_comment`]).
+                build_body(&|| {
+                    self.build_value_with_outermost_owned_comment(expr, || {
+                        self.build_expression_doc(expr)
+                    })
+                })
             };
             // This arm emits the paren tokens itself rather than going through
             // `build_arrow_body_doc`, so it prepends the run on its own seam — the same
@@ -934,10 +941,18 @@ impl<'a> Printer<'a> {
             // instead of the glued space: inside the parens group it materializes
             // exactly when the ternary drops to its own (paren-less) line — width
             // or a hard break in the body — and collapses to the glued bytes flat.
-            // An author blank yields with that break, as at every value gap
-            // (`Printer::value_gap_soft_broke_after_run`).
-            let with_leading =
-                if let Some(run) = self.value_gap_soft_broke_after_run(arrow_end, body_start) {
+            // An author blank yields with a WIDTH break, as at every value gap
+            // (`Printer::value_gap_soft_broke_after_run`); a body with a hard break of its
+            // own forces the break instead, so the run takes the forced emitter and the
+            // blank survives with it — the `=` seams' two halves
+            // ([`Printer::break_or_hang_after_operator_run_doc`]).
+            let soft_run = self.value_gap_soft_broke_after_run(arrow_end, body_start);
+            if let Some(run) = &soft_run
+                && (d.will_break(body_doc) || self.run_ends_in_glued_multiline_block(run))
+            {
+                parts.push(self.break_after_operator_run_doc(run, body_start, body_doc));
+            } else {
+                let with_leading = if let Some(run) = soft_run {
                     let mut run_parts = DocBuf::new();
                     self.push_leading_run_with_soft_line(&mut run_parts, &run);
                     run_parts.push(body_doc);
@@ -945,13 +960,14 @@ impl<'a> Printer<'a> {
                 } else {
                     prepend_leading(d, gap_run(), body_doc)
                 };
-            if d.will_break(body_doc) {
-                // Body has hardlines (multiline template in ternary, etc.)
-                // Use normal break layout — no parens needed
-                parts.push(hang_after_operator(d, with_leading));
-            } else {
-                parts.push(d.text(" "));
-                parts.push(ternary_body_parens_group(d, with_leading));
+                if d.will_break(body_doc) {
+                    // Body has hardlines (multiline template in ternary, etc.)
+                    // Use normal break layout — no parens needed
+                    parts.push(hang_after_operator(d, with_leading));
+                } else {
+                    parts.push(d.text(" "));
+                    parts.push(ternary_body_parens_group(d, with_leading));
+                }
             }
         } else {
             // Normal expression: can break after => with indentation
@@ -969,16 +985,17 @@ impl<'a> Printer<'a> {
             // Inline block comments before a non-huggable body:
             // `() => /* comment */ a + b`
             //
-            // A run the author broke after rides the hang group's own machinery
-            // (`hang_after_operator_run_doc`): flat renders the glued bytes; a
-            // broken seam — the body's hard break or width — puts the run on its
-            // own line with the body re-fitting below, prettier's
-            // `printLeadingComment` `line`. An author blank yields with that break, as
-            // at the ternary arm and the `=` seams (`Printer::value_gap_soft_broke_after_run`).
+            // A run the author broke after takes the `=` seams' two halves
+            // ([`Printer::break_or_hang_after_operator_run_doc`]): a body with a hard break of
+            // its own forces the break, and an author blank survives with it; anything else
+            // rides the hang group's own machinery — flat renders the glued bytes, a width
+            // break puts the run on its own line with the body re-fitting below, prettier's
+            // `printLeadingComment` `line`, and an author blank yields with that break, as at
+            // the ternary arm (`Printer::value_gap_soft_broke_after_run`).
             let body_doc = build_body(&|| self.build_arrow_body_doc(expr));
             parts.push(
                 if let Some(run) = self.value_gap_soft_broke_after_run(arrow_end, body_start) {
-                    self.hang_after_operator_run_doc(&run, body_doc)
+                    self.break_or_hang_after_operator_run_doc(&run, body_start, body_doc)
                 } else {
                     hang_after_operator(d, prepend_leading(d, gap_run(), body_doc))
                 },
@@ -2003,7 +2020,10 @@ impl<'a> Printer<'a> {
         // where the body always breaks via hardline — if_break selects
         // the break variant (no parens).
         if matches!(expr, internal::Expression::ConditionalExpression(_)) {
-            let body_doc = self.build_expression_doc(expr);
+            // A multi-line comment the body owns prints outside the ternary's own group,
+            // after the run ([`Printer::build_value_with_outermost_owned_comment`]).
+            let body_doc = self
+                .build_value_with_outermost_owned_comment(expr, || self.build_expression_doc(expr));
             // The leading run rides INSIDE these parens, so the paren decision wraps
             // both — `will_break` asks about the body AND the run.
             let with_leading = prepend(body_doc);

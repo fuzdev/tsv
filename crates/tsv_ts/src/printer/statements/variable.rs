@@ -189,7 +189,7 @@ impl<'a> Printer<'a> {
         // inverted, which the comment lookups read as empty — the same invariant every
         // other gated call site here rides.
         let hoisted_run = self.hoisted_owned_value_gap_run_opt(rhs_comments_start, init);
-        let build_value = &|| self.build_value_under_hoist(hoisted_run, init, value);
+        let build_value = &|| self.build_gap_value_doc(hoisted_run, init, value);
         let value: &dyn Fn() -> DocId = build_value;
 
         // Helper: build init doc with optional inline block comments prepended.

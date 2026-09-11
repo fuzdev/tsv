@@ -30,8 +30,8 @@ use super::arg_wrapping::{
     build_joined_argument_doc, build_printed_argument_doc, build_single_arrow_hug_doc,
     build_ternary_arrow_hug_ladder, classify_chain_arg, first_arg_signature_refuses_expand_first,
     last_arg_arrow_gap_break, last_two_args_same_type, prebuild_expand_last_break_body,
-    prebuild_expand_last_obj_array_body, prepend_arrow_body_comments, should_expand_first_arg,
-    try_hook_deps_args_doc,
+    prebuild_expand_last_obj_array_body, prepend_arrow_body_comments,
+    prepend_hugged_arrow_body_comments, should_expand_first_arg, try_hook_deps_args_doc,
 };
 use crate::ast::internal::{self, Expression};
 use crate::printer::expressions::functions::{
@@ -181,7 +181,8 @@ fn build_hugged_arrow_arg_doc(
     body_doc: DocId,
 ) -> DocId {
     let d = printer.d();
-    let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+    let body_doc =
+        prepend_hugged_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
     let sig_doc = prepend_leading(
         d,
         ctx.leading_comment_doc,
@@ -915,7 +916,7 @@ fn build_chain_args_single(
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
-        let body_doc = printer.build_expression_doc(body_expr);
+        let body_doc = printer.build_arrow_arg_body_doc(body_expr);
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
         let sig_doc = build_arrow_sig_doc(printer, arrow);
