@@ -144,7 +144,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 "Found either expected_ours.json or expected_svelte.json but not both.\n\
                 When using the expected_ours.json + expected_svelte.json pattern, both files must exist.\n\
                 - expected_ours.json: Our parser's AST (source of truth for our tests)\n\
-                - expected_svelte.json: Svelte's AST (documents the difference)\n\
+                - expected_svelte.json: the canonical parser's AST (documents the difference)\n\
                 Run: deno task fixtures:update:parsed".to_string()
             );
         }
@@ -176,7 +176,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             return Err(
                 "expected.json cannot coexist with expected_ours.json + expected_svelte.json.\n\
                 Use either:\n\
-                - expected.json (default: our parser matches Svelte)\n\
+                - expected.json (default: our parser matches the canonical parser)\n\
                 - expected_ours.json + expected_svelte.json (our parser intentionally differs)\n\
                 Remove expected.json"
                     .to_string(),
@@ -190,7 +190,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         if expected_ours_content == expected_svelte_content {
             return Err(
                 "expected_ours.json and expected_svelte.json are identical.\n\
-                The divergence pattern is only for when our parser differs from Svelte's.\n\
+                The divergence pattern is only for when our parser differs from the canonical parser's.\n\
                 If the ASTs match, use the standard expected.json pattern instead:\n\
                 1. Remove _svelte_divergence suffix from directory name\n\
                 2. Delete expected_ours.json and expected_svelte.json\n\
@@ -204,7 +204,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             "Directory '{dir_name}' has '_svelte_divergence' suffix but lacks required files.\n\
             Svelte divergence directories MUST have both:\n\
             - expected_ours.json (our parser's AST)\n\
-            - expected_svelte.json (Svelte parser's AST)\n\
+            - expected_svelte.json (the canonical parser's AST)\n\
             Either add these files or remove the '_svelte_divergence' suffix from the directory name."
         ));
     } else {

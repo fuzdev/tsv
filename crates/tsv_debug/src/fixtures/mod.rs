@@ -21,6 +21,8 @@ pub use variants::{
     unformatted_ours_suffix,
 };
 
+use crate::deno::{DenoError, parse_by_type_with_goal};
+use crate::json::to_json_with_tabs;
 use std::fs;
 use std::path::Path;
 use tsv_cli::cli::format_source::format_source_with_source_type;
@@ -149,6 +151,85 @@ pub fn path_matches_filters(relative_path: &str, filters: &[String]) -> bool {
         .any(|filter| lower.contains(&filter.to_lowercase()))
 }
 
+/// Why [`canonical_expected_json`] produced no AST to store or compare.
+#[derive(Debug)]
+pub enum CanonicalParseError {
+    /// The canonical parser rejected the input — the sidecar answered the request with an error
+    /// ([`DenoError::ToolError`], see [`is_canonical_rejection`]), whose rendered text this
+    /// carries. The only variant that is a verdict on the input. The wire does not separate a
+    /// parser's syntax error from any other exception thrown inside the sidecar's handler, so a
+    /// sidecar-internal JS throw reads as a rejection too.
+    Rejected(String),
+    /// The sidecar never answered for the parser: deno missing, a spawn or transport failure, a
+    /// crash, a shutdown, a timeout. No verdict on the input, so a check reports it and never
+    /// grades it, and a generator never writes the rejection marker for it.
+    Sidecar(DenoError),
+    /// The AST parsed but did not serialize; the message is worded for a fixture result.
+    Unserializable(String),
+}
+
+/// Whether a failed canonical parse is the parser's own rejection of the input — a tool error,
+/// the sidecar's answer — rather than a sidecar fault that says nothing about the input.
+///
+/// The one statement of the rule, shared by [`canonical_expected_json`] and the
+/// `input_invalid_*` check.
+pub(crate) fn is_canonical_rejection(error: &DenoError) -> bool {
+    matches!(error, DenoError::ToolError { .. })
+}
+
+impl CanonicalParseError {
+    /// Classify a failed canonical parse by [`is_canonical_rejection`]: a rejection carries the
+    /// tool error's rendered text, and every other [`DenoError`] is a sidecar fault.
+    fn from_deno(error: DenoError) -> Self {
+        if is_canonical_rejection(&error) {
+            Self::Rejected(error.to_string())
+        } else {
+            Self::Sidecar(error)
+        }
+    }
+}
+
+/// The message for a sidecar fault that kept the canonical parser from answering
+/// ([`CanonicalParseError::Sidecar`]). It embeds the fault's own text, which the validation
+/// summary's sidecar-health counters match on.
+pub fn canonical_sidecar_failure(input_type: InputType, error: &DenoError) -> String {
+    format!(
+        "canonical parser ({}) gave no verdict — sidecar failure: {error}",
+        input_type.canonical_parser_name()
+    )
+}
+
+/// Parse a fixture input with its canonical parser (Svelte, acorn-typescript, or `parseCss`)
+/// at `goal`, returning the AST in the exact bytes an `expected*.json` holds — tab-indented
+/// with a trailing newline.
+///
+/// The single definition the generators (`fixture_init`, `fixtures_update_parsed`) and the
+/// validator's canonical-parser checks (P1, P3, F7) share, so what a fixture stores and what
+/// it is graded against cannot drift apart. The goal reaches acorn only; see
+/// [`parse_by_type_with_goal`].
+///
+/// # Errors
+///
+/// Returns [`CanonicalParseError::Rejected`] when the canonical parser rejects the input,
+/// [`CanonicalParseError::Sidecar`] when the sidecar fails to answer, and
+/// [`CanonicalParseError::Unserializable`] when the AST does not serialize.
+pub async fn canonical_expected_json(
+    source: &str,
+    input_type: InputType,
+    goal: tsv_ts::Goal,
+) -> Result<String, CanonicalParseError> {
+    let ast = parse_by_type_with_goal(source, input_type.parser_type(), goal)
+        .await
+        .map_err(CanonicalParseError::from_deno)?;
+    let json = to_json_with_tabs(&ast).map_err(|e| {
+        CanonicalParseError::Unserializable(format!(
+            "Failed to serialize {} AST: {e}",
+            input_type.language_name()
+        ))
+    })?;
+    Ok(format!("{json}\n"))
+}
+
 /// Format content using our formatter at an explicit TypeScript parse goal.
 ///
 /// Determines file type from filepath extension and calls the appropriate formatter
@@ -165,4 +246,65 @@ pub fn format_with_our_formatter(
     };
     format_source_with_source_type(content, input_type.parser_type(), Some(goal))
         .map_err(|e| format!("Format error (parse): {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Only the sidecar's own answer grades an input: a tool error is a rejection, and every
+    /// other `DenoError` is a fault. Pins [`is_canonical_rejection`] — the rule both
+    /// `canonical_expected_json` and the `input_invalid_*` check read — and `from_deno`'s
+    /// agreement with it. The exhaustive match makes a new variant a compile error here until
+    /// it is classified (and added to the list).
+    #[test]
+    fn only_a_tool_error_is_a_canonical_rejection() {
+        let io = || std::io::Error::other("io");
+        let response_parse = crate::json::from_str::<serde_json::Value>("{").unwrap_err();
+        let errors = [
+            DenoError::TempfileCreate(io()),
+            DenoError::ScriptWrite(io()),
+            DenoError::ProcessSpawn(io()),
+            DenoError::DenoNotFound,
+            DenoError::PipeMissing { pipe: "stdout" },
+            DenoError::Communication(io()),
+            DenoError::ResponseParse(response_parse),
+            DenoError::ToolError {
+                message: "Unexpected token (1:1)".to_string(),
+            },
+            DenoError::MissingOutput,
+            DenoError::EmptyOutput,
+            DenoError::SidecarCrashed,
+            DenoError::ActorShutdown,
+            DenoError::Timeout { seconds: 30 },
+        ];
+        for error in errors {
+            let rendered = error.to_string();
+            let is_rejection = match &error {
+                DenoError::ToolError { .. } => true,
+                DenoError::TempfileCreate(_)
+                | DenoError::ScriptWrite(_)
+                | DenoError::ProcessSpawn(_)
+                | DenoError::DenoNotFound
+                | DenoError::PipeMissing { .. }
+                | DenoError::Communication(_)
+                | DenoError::ResponseParse(_)
+                | DenoError::MissingOutput
+                | DenoError::EmptyOutput
+                | DenoError::SidecarCrashed
+                | DenoError::ActorShutdown
+                | DenoError::Timeout { .. } => false,
+            };
+            assert_eq!(is_canonical_rejection(&error), is_rejection, "{rendered}");
+            match (CanonicalParseError::from_deno(error), is_rejection) {
+                (CanonicalParseError::Rejected(message), true) => {
+                    assert_eq!(message, rendered);
+                }
+                (CanonicalParseError::Sidecar(fault), false) => {
+                    assert_eq!(fault.to_string(), rendered);
+                }
+                (other, _) => panic!("{rendered} classified as {other:?}"),
+            }
+        }
+    }
 }

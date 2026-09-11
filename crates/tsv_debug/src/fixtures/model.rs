@@ -10,7 +10,7 @@ use tsv_ts::Goal;
 /// Canonical error JSON format for expected_svelte.json files
 ///
 /// This is the complete JSON content (with trailing newline) written to expected_svelte.json
-/// when Svelte's parser fails to parse the input.
+/// when the canonical parser (Svelte, acorn-typescript, or `parseCss`) rejects the input.
 pub const EXPECTED_SVELTE_ERROR_JSON: &str = "{\"error\": \"failed to parse\"}\n";
 
 /// Marker file asserting prettier has NO fixed point on the fixture's input —
@@ -132,6 +132,26 @@ impl InputType {
             InputType::Svelte => ParserType::Svelte,
             InputType::SvelteTs | InputType::TypeScript => ParserType::TypeScript,
             InputType::Css => ParserType::Css,
+        }
+    }
+
+    /// The language this input type's canonical parser reads, as a name for messages
+    /// (`.svelte.ts` rune modules are TypeScript).
+    pub const fn language_name(self) -> &'static str {
+        match self {
+            InputType::Svelte => "Svelte",
+            InputType::SvelteTs | InputType::TypeScript => "TypeScript",
+            InputType::Css => "CSS",
+        }
+    }
+
+    /// The canonical parser this input type is graded against, as a name for messages —
+    /// Svelte's own parser, acorn-typescript, or Svelte's `parseCss`.
+    pub const fn canonical_parser_name(self) -> &'static str {
+        match self {
+            InputType::Svelte => "Svelte",
+            InputType::SvelteTs | InputType::TypeScript => "acorn-typescript",
+            InputType::Css => "parseCss",
         }
     }
 }

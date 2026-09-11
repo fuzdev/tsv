@@ -1,12 +1,11 @@
 //! P-phase parser validation plus invalid-syntax checks (P* rules + input_invalid_*).
 
-use crate::deno::{parse_css, parse_svelte, parse_typescript_with_goal};
-use crate::fixtures::{self, Fixture, FixtureFiles, InputType, read_file};
-use crate::json::to_json_with_tabs;
+use crate::deno::parse_by_type_with_goal;
+use crate::fixtures::{self, CanonicalParseError, Fixture, FixtureFiles, InputType, read_file};
 
 use super::super::FixtureValidation;
 use super::super::errors::{ValidationError, ValidationSuccess};
-use super::super::parsed_input::InputAstPaths;
+use super::super::parsed_input::{InputAstPaths, parse_input};
 
 /// P2: Validate expected_ours.json matches our parser output
 pub(in crate::fixtures::validation) fn validate_parser_ours(
@@ -91,54 +90,21 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
     }
 }
 
-/// P1, P3: Validate expected.json and expected_svelte.json match external parser
+/// P1, P3: Validate expected.json and expected_svelte.json against the canonical parser
 ///
-/// For Svelte fixtures: uses Svelte's parser
-/// For TypeScript and SvelteTs fixtures: uses acorn+typescript parser
+/// One path for every input type: the canonical parser is Svelte's for `.svelte`,
+/// acorn-typescript at the fixture's goal for `.ts` / `.svelte.ts`, and `parseCss` for
+/// `.css`, serialized by [`fixtures::canonical_expected_json`] — the same bytes
+/// `fixtures:update:parsed` writes. P1: the canonical parser must accept the input and
+/// match `expected.json`. P3: `expected_svelte.json` must hold the canonical AST, or
+/// [`fixtures::EXPECTED_SVELTE_ERROR_JSON`] exactly when the canonical parser rejects.
+/// A sidecar fault is no verdict on the input, so it is reported once and grades neither.
 pub(in crate::fixtures::validation) async fn validate_parser_external(
     result: &mut FixtureValidation,
     fixture: &Fixture,
     input: &str,
     input_type: InputType,
 ) {
-    // CSS fixtures use Svelte's parseCss as the external canonical source
-    if input_type == InputType::Css {
-        let expected_path = fixture.expected_path();
-        if !expected_path.exists() {
-            return;
-        }
-        let expected_content = match read_file(&expected_path) {
-            Ok(c) => c,
-            Err(e) => {
-                result.add_error(ValidationError::FileReadError(e));
-                return;
-            }
-        };
-        match parse_css(input).await {
-            Ok(css_ast) => {
-                let css_ast_json = match to_json_with_tabs(&css_ast) {
-                    Ok(json) => format!("{json}\n"),
-                    Err(e) => {
-                        result.add_error(ValidationError::ParserError(format!(
-                            "Failed to serialize CSS AST: {e}"
-                        )));
-                        return;
-                    }
-                };
-                if expected_content != css_ast_json {
-                    result.add_error(ValidationError::ParserExpectedJsonOutdated);
-                } else {
-                    result.add_success(ValidationSuccess::ParserExpectedJsonMatches);
-                }
-            }
-            Err(e) => {
-                result.add_error(ValidationError::ParserError(format!(
-                    "CSS parser (parseCss) failed: {e}"
-                )));
-            }
-        }
-        return;
-    }
     let expected_path = fixture.expected_path();
     let expected_svelte_path = fixture.expected_svelte_path();
 
@@ -169,92 +135,56 @@ pub(in crate::fixtures::validation) async fn validate_parser_external(
         None
     };
 
-    // Check if expected_svelte.json signals expected parse failure
-    let expected_svelte_failure = matches!(
-        &expected_svelte_content,
-        Some(content) if content == fixtures::EXPECTED_SVELTE_ERROR_JSON
-    );
-
     if expected_content.is_none() && expected_svelte_content.is_none() {
         return;
     }
 
-    // TypeScript and SvelteTs fixtures use acorn+typescript, not Svelte parser
-    if input_type == InputType::TypeScript || input_type == InputType::SvelteTs {
-        let Some(expected_str) = &expected_content else {
-            return; // No expected.json to validate
+    // Narrowed to the two answers that grade the files — the AST, or the rejection's message;
+    // a sidecar fault or an unserializable AST is reported once and grades nothing
+    let canonical: Result<String, String> =
+        match fixtures::canonical_expected_json(input, input_type, fixture.goal()).await {
+            Ok(json) => Ok(json),
+            Err(CanonicalParseError::Rejected(message)) => Err(message),
+            Err(CanonicalParseError::Sidecar(e)) => {
+                result.add_error(ValidationError::CanonicalParserSidecarFailure(
+                    fixtures::canonical_sidecar_failure(input_type, &e),
+                ));
+                return;
+            }
+            Err(CanonicalParseError::Unserializable(message)) => {
+                result.add_error(ValidationError::ParserError(message));
+                return;
+            }
         };
 
-        match parse_typescript_with_goal(input, fixture.goal()).await {
-            Ok(ts_ast) => {
-                let ts_ast_json = match to_json_with_tabs(&ts_ast) {
-                    Ok(json) => format!("{json}\n"),
-                    Err(e) => {
-                        result.add_error(ValidationError::ParserError(format!(
-                            "Failed to serialize TypeScript AST: {e}"
-                        )));
-                        return;
-                    }
-                };
-
-                if *expected_str != ts_ast_json {
-                    result.add_error(ValidationError::ParserExpectedJsonOutdated);
-                } else {
-                    result.add_success(ValidationSuccess::ParserExpectedJsonMatches);
-                }
+    // P1: expected.json holds the canonical AST, so a rejection fails it outright
+    if let Some(expected_str) = &expected_content {
+        match &canonical {
+            Ok(json) if expected_str == json => {
+                result.add_success(ValidationSuccess::ParserExpectedJsonMatches);
             }
-            Err(e) => {
+            Ok(_) => result.add_error(ValidationError::ParserExpectedJsonOutdated),
+            Err(message) => {
                 result.add_error(ValidationError::ParserError(format!(
-                    "TypeScript parser (acorn) failed: {e}"
+                    "canonical parser ({}) rejected the input: {message}",
+                    input_type.canonical_parser_name()
                 )));
             }
         }
-        return;
     }
 
-    // Svelte fixtures use Svelte's parser
-    match parse_svelte(input).await {
-        Ok(svelte_ast) => {
-            if expected_svelte_failure {
-                result.add_error(ValidationError::ParserExpectedSvelteOutdated);
-                return;
-            }
-
-            let svelte_ast_json = match to_json_with_tabs(&svelte_ast) {
-                Ok(json) => format!("{json}\n"),
-                Err(e) => {
-                    result.add_error(ValidationError::ParserError(format!(
-                        "Failed to serialize Svelte AST: {e}"
-                    )));
-                    return;
-                }
-            };
-
-            // P1: Check expected.json (only if not in svelte divergence dir)
-            if let Some(expected_str) = &expected_content {
-                if *expected_str != svelte_ast_json {
-                    result.add_error(ValidationError::ParserExpectedJsonOutdated);
-                } else {
-                    result.add_success(ValidationSuccess::ParserExpectedJsonMatches);
-                }
-            }
-
-            // P3: Check expected_svelte.json
-            if let Some(expected_svelte_str) = &expected_svelte_content {
-                if !expected_svelte_failure && *expected_svelte_str != svelte_ast_json {
-                    result.add_error(ValidationError::ParserExpectedSvelteOutdated);
-                } else if !expected_svelte_failure {
-                    result.add_success(ValidationSuccess::ParserExpectedSvelteMatches);
-                }
-            }
-        }
-        Err(_) => {
-            // Svelte parse failed - check if this was expected
-            if !expected_svelte_failure && expected_svelte_content.is_some() {
-                result.add_error(ValidationError::ParserExpectedSvelteOutdated);
-            } else if expected_svelte_failure {
-                result.add_success(ValidationSuccess::ParserExpectedSvelteMatches);
-            }
+    // P3: expected_svelte.json holds the canonical AST, or the error marker exactly
+    // when the canonical parser rejects
+    if let Some(expected_svelte_str) = &expected_svelte_content {
+        let expects_rejection = expected_svelte_str == fixtures::EXPECTED_SVELTE_ERROR_JSON;
+        let matches = match &canonical {
+            Ok(json) => !expects_rejection && expected_svelte_str == json,
+            Err(_) => expects_rejection,
+        };
+        if matches {
+            result.add_success(ValidationSuccess::ParserExpectedSvelteMatches);
+        } else {
+            result.add_error(ValidationError::ParserExpectedSvelteOutdated);
         }
     }
 }
@@ -335,9 +265,10 @@ pub(in crate::fixtures::validation) fn validate_tsv_rejects(
 /// and this fails with `TsvRejectsCanonicalRejects` — convert the fixture to
 /// `input_invalid_*`. Otherwise the canonical AST is pinned byte-strict against
 /// `expected_svelte.json` (refreshed by `fixtures:update:parsed`), so a canonical
-/// parser bump that changes the shape surfaces too. Dispatches on input type
-/// (`.svelte` → Svelte, `.ts`/`.svelte.ts` → acorn-typescript, `.css` →
-/// parseCss), always comparing to `expected_svelte.json` (the canonical AST).
+/// parser bump that changes the shape surfaces too. Separate from P3 because a
+/// rejection here is never the error marker: the canonical AST comes from
+/// [`fixtures::canonical_expected_json`], the derivation P3 shares. A sidecar fault
+/// is no rejection, so it is reported as a canonical-parser sidecar failure instead.
 pub(in crate::fixtures::validation) async fn validate_tsv_rejects_canonical(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -352,38 +283,23 @@ pub(in crate::fixtures::validation) async fn validate_tsv_rejects_canonical(
         }
     };
 
-    // Parse with the canonical parser for this input type, then serialize with the
-    // same tabbed format expected_svelte.json stores (matches fixtures_update_parsed).
-    let canonical: Result<String, String> = match input_type {
-        InputType::Svelte => parse_svelte(input).await.map_err(|e| e.to_string()),
-        InputType::SvelteTs | InputType::TypeScript => {
-            parse_typescript_with_goal(input, fixture.goal())
-                .await
-                .map_err(|e| e.to_string())
+    match fixtures::canonical_expected_json(input, input_type, fixture.goal()).await {
+        Ok(actual) if actual == expected => {
+            result.add_success(ValidationSuccess::ParserExpectedSvelteMatches);
         }
-        InputType::Css => parse_css(input).await.map_err(|e| e.to_string()),
-    }
-    .and_then(|ast| {
-        to_json_with_tabs(&ast)
-            .map(|json| format!("{json}\n"))
-            .map_err(|e| format!("Failed to serialize canonical AST: {e}"))
-    });
-
-    match canonical {
-        Ok(actual) => {
-            if actual == expected {
-                result.add_success(ValidationSuccess::ParserExpectedSvelteMatches);
-            } else {
-                result.add_error(ValidationError::ParserExpectedSvelteOutdated);
-            }
-        }
-        // A serialization failure is impossible in practice (the canonical AST is
-        // already JSON), so a hard error here means the canonical parser rejected —
-        // the divergence is dead.
-        Err(_) => {
+        Ok(_) => result.add_error(ValidationError::ParserExpectedSvelteOutdated),
+        Err(CanonicalParseError::Rejected(_)) => {
             result.add_error(ValidationError::TsvRejectsCanonicalRejects(
                 fixture.input_file.clone(),
             ));
+        }
+        Err(CanonicalParseError::Sidecar(e)) => {
+            result.add_error(ValidationError::CanonicalParserSidecarFailure(
+                fixtures::canonical_sidecar_failure(input_type, &e),
+            ));
+        }
+        Err(CanonicalParseError::Unserializable(message)) => {
+            result.add_error(ValidationError::ParserError(message));
         }
     }
 }
@@ -393,6 +309,9 @@ pub(in crate::fixtures::validation) async fn validate_tsv_rejects_canonical(
 /// For Svelte files: both our parser and Svelte's parser must fail
 /// For TypeScript and SvelteTs files: both our parser and acorn-typescript must fail
 /// For CSS files: both our parser and Svelte's parseCss must fail
+///
+/// Only the canonical parser's own rejection counts as failing; a sidecar fault is reported
+/// against the file and grades nothing.
 pub(in crate::fixtures::validation) async fn validate_invalid_syntax(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -419,23 +338,26 @@ pub(in crate::fixtures::validation) async fn validate_invalid_syntax(
 
         // Check our parser
         let arena = bumpalo::Bump::new();
-        let ours_failed = match input_type {
-            InputType::Svelte => tsv_svelte::parse(&variant_content, &arena).is_err(),
-            InputType::SvelteTs | InputType::TypeScript => {
-                tsv_ts::parse_with_goal(&variant_content, fixture.goal(), &arena).is_err()
-            }
-            InputType::Css => tsv_css::parse(&variant_content, &arena).is_err(),
-        };
+        let ours_failed =
+            parse_input(&variant_content, input_type, fixture.goal(), &arena).is_err();
 
         // Check canonical parser
-        let canonical_failed = match input_type {
-            InputType::Svelte => parse_svelte(&variant_content).await.is_err(),
-            InputType::SvelteTs | InputType::TypeScript => {
-                parse_typescript_with_goal(&variant_content, fixture.goal())
-                    .await
-                    .is_err()
+        let canonical_failed = match parse_by_type_with_goal(
+            &variant_content,
+            input_type.parser_type(),
+            fixture.goal(),
+        )
+        .await
+        {
+            Ok(_) => false,
+            Err(e) if fixtures::is_canonical_rejection(&e) => true,
+            Err(e) => {
+                result.add_error(ValidationError::CanonicalParserSidecarFailure(format!(
+                    "{variant_name}: {}",
+                    fixtures::canonical_sidecar_failure(input_type, &e)
+                )));
+                continue;
             }
-            InputType::Css => parse_css(&variant_content).await.is_err(),
         };
 
         // Evaluate results - both must fail for a valid invalid-syntax test
