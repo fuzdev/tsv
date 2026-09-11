@@ -653,8 +653,9 @@ tail doesn't realloc) and **bump demand/byte** (an *un-pre-sized* `Bump::new()`'
 `allocated_bytes()` per source byte — the AST's byte demand, since the production
 `bump_allocated` figure is dominated by the pre-size, not demand; note bumpalo never
 copies on chunk growth, so the bump pre-size is a malloc-count/peak knob, not a
-memcpy-churn one). `--list-errors` prints the path + parse error for every file the walk
-skips — the fast native first pass for finding tsv parse over-rejections (a file the
+memcpy-churn one). `--list-errors` prints the path + error for every file the walk
+skips — `parse-fail`, or `read-fail` for an unreadable file, counted apart in the
+report — the fast native first pass for finding tsv parse over-rejections (a file the
 canonical parser accepts but tsv rejects is a real gap; most corpus rejects are
 intentional-error test fixtures the canonical parser also rejects).
 
@@ -668,7 +669,7 @@ binaries prices their layout term without touching the PMU.
 cargo run -p tsv_debug arena_stats ../corpora/collections/zzz/src/lib ../corpora/collections/fuz_css/src/lib
 cargo run -p tsv_debug arena_stats <paths> --json
 cargo run -p tsv_debug arena_stats <paths> --reuse         # reset()-reuse high-water
-cargo run -p tsv_debug arena_stats <paths> --list-errors   # list parse-skipped files
+cargo run -p tsv_debug arena_stats <paths> --list-errors   # list skipped files (parse-fail / read-fail)
 ```
 
 ### 8. `tsv_debug buffer_sizes` — printer buffer sizing
