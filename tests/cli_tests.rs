@@ -1011,6 +1011,63 @@ fn test_format_list_scopes_each_file_argument_by_its_own_directory() {
     );
 }
 
+/// A named path reads no ignore file inside a directory a rule excludes, as the walk that
+/// prunes the directory reads none: a named file there is skipped quietly despite the
+/// shadowed `.prettierignore` beside that directory's `.formatignore` (and, on unix, a
+/// symlinked `.gitignore` below it), and a named directory under it warns only that it is
+/// excluded. Mirrored by `scripts/test_npm.ts`.
+#[test]
+fn test_format_named_path_reads_no_ignore_file_inside_an_excluded_directory() {
+    let dir = temp_dir("excluded_directory_ignore_files");
+    fs::create_dir_all(dir.join(".git")).unwrap();
+    fs::create_dir_all(dir.join("vendor/sub")).unwrap();
+    fs::write(dir.join(".formatignore"), "vendor/\n").unwrap();
+    fs::write(dir.join("vendor/.formatignore"), "").unwrap();
+    fs::write(dir.join("vendor/.prettierignore"), "").unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("../../.formatignore", dir.join("vendor/sub/.gitignore")).unwrap();
+    for file in ["keep.ts", "vendor/x.ts", "vendor/sub/y.ts"] {
+        fs::write(dir.join(file), "x").unwrap();
+    }
+    let arg = |file: &str| dir.join(file).to_string_lossy().into_owned();
+
+    // the walk prunes vendor/ without a word…
+    let output = tsv(&["format", "--list", dir.path().to_str().unwrap()]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        arg("keep.ts"),
+        "stderr: {stderr}"
+    );
+    assert!(!stderr.contains("warning"), "stderr: {stderr}");
+
+    // …a named file under it is skipped as quietly…
+    let output = tsv(&[
+        "format",
+        "--list",
+        arg("vendor/x.ts").as_str(),
+        arg("vendor/sub/y.ts").as_str(),
+    ]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
+    assert!(output.stdout.is_empty(), "stderr: {stderr}");
+    assert!(!stderr.contains("warning"), "stderr: {stderr}");
+
+    // …and a named directory under it warns that it is excluded, and of nothing inside
+    let output = tsv(&["format", "--list", arg("vendor/sub").as_str()]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
+    assert!(
+        stderr.contains("which a rule in the repo-root .formatignore excludes"),
+        "stderr: {stderr}"
+    );
+    assert!(
+        !stderr.contains("shadowed") && !stderr.contains("symbolic link"),
+        "stderr: {stderr}"
+    );
+}
+
 /// An explicitly named file is held to the extension check before anything else: the
 /// parser dispatch behind a path has no unknown arm, so without this
 /// gate a `.json` file is parsed as TypeScript — usually a baffling syntax error,

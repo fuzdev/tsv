@@ -375,8 +375,9 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
 }
 
 /// A stack loaded with the ignore layers of `dirs` — a directory root's ancestors, from
-/// `format_root` down to its parent ([`collect_root`]) — and whether the build-output
-/// heuristic is still on below them (no `.gitignore` among them was read).
+/// `format_root` down to its parent ([`collect_root`]), reading nothing inside one a rule
+/// excludes ([`push_dir_layers`]), which puts the root out of scope — and whether the
+/// build-output heuristic is still on below them (no `.gitignore` among them was read).
 fn preload_ancestors(
     dirs: &[PathBuf],
     format_root: &Path,
@@ -386,7 +387,9 @@ fn preload_ancestors(
     let mut stack = IgnoreStack::new();
     let mut heuristic_active = true;
     for dir in dirs {
-        if push_dir_layers(dir, format_root, in_repo, &mut stack, warnings).gitignore {
+        if push_dir_layers(dir, format_root, in_repo, &mut stack, warnings)
+            .is_some_and(|pushed| pushed.gitignore)
+        {
             heuristic_active = false;
         }
     }
@@ -394,17 +397,28 @@ fn preload_ancestors(
 }
 
 /// Push the ignore layers of `dir` — a directory no listing is held for — onto `stack`,
-/// anchored relative to `format_root`. The one preload a named path gets: for a directory
-/// root's ancestors ([`preload_ancestors`]), and for each directory a file argument's
-/// scope moves into ([`FileScope::enter`]).
+/// anchored relative to `format_root`, or `None`, reading nothing, when a rule in the
+/// layers already pushed excludes `dir`, itself or through an ancestor: the walk prunes
+/// such a directory without listing
+/// it, so it never reads — nor warns about — the ignore files inside, which could bring
+/// nothing under the directory back in scope anyway (git's parent-directory rule). A
+/// named file's quiet skip depends on it: an unreadable or symlinked file, or a shadow,
+/// inside the directory that excludes the file would otherwise be the run's only output.
+/// The one preload a named path gets, for a directory root's ancestors
+/// ([`preload_ancestors`]) and for each directory a file argument's scope moves into
+/// ([`FileScope::enter`]); `stack` must already hold what this pushed for every ancestor of
+/// `dir`.
 fn push_dir_layers(
     dir: &Path,
     format_root: &Path,
     in_repo: bool,
     stack: &mut IgnoreStack,
     warnings: &mut Vec<String>,
-) -> PushedLayers {
+) -> Option<PushedLayers> {
     let anchor = rel_to(format_root, dir);
+    if stack.is_ignored(&anchor, true) {
+        return None;
+    }
     // No listing, so presence is probed — by the descent's own rule (`is_ignore_file`), so
     // a directory reads the same files whether it is walked or preloaded. A
     // present-but-unreadable `.formatignore` still shadows (`read_ignore_file` warns and
@@ -436,7 +450,7 @@ fn push_dir_layers(
             }
         }
     }
-    pushed
+    Some(pushed)
 }
 
 /// Which layers one directory pushed onto a stack — what taking it back off pops.
@@ -462,15 +476,18 @@ impl PushedLayers {
 /// own directory — popping back to the two directories' common ancestor and pushing
 /// down — so an ignore file above many named files is read and parsed once, where a
 /// scope built per directory re-read every ancestor's for each (a hook naming files
-/// spread over many directories parsed the repo-root `.gitignore` once per directory).
+/// spread over many directories parsed the repo-root `.gitignore` once per directory) —
+/// and none inside a directory a rule excludes is read at all ([`push_dir_layers`]).
 #[derive(Default)]
 struct FileScope {
     /// Empty until the first file argument moves the scope.
     format_root: PathBuf,
     in_repo: bool,
     stack: IgnoreStack,
-    /// The directories whose layers `stack` holds, format root first, with what each pushed.
-    dirs: Vec<(PathBuf, PushedLayers)>,
+    /// The directories on the way to the latest file argument, format root first, with what
+    /// each pushed onto `stack` — `None` for one a rule excludes and every one below it,
+    /// whose ignore files are never read.
+    dirs: Vec<(PathBuf, Option<PushedLayers>)>,
 }
 
 impl FileScope {
@@ -495,7 +512,9 @@ impl FileScope {
             .take_while(|((held, _), wanted)| held == *wanted)
             .count();
         for (_, pushed) in self.dirs.drain(shared..).rev() {
-            pushed.pop_from(&mut self.stack);
+            if let Some(pushed) = pushed {
+                pushed.pop_from(&mut self.stack);
+            }
         }
         for level in chain.into_iter().skip(shared) {
             let pushed = push_dir_layers(
