@@ -154,8 +154,9 @@ pub struct ParseError(Box<Payload>);
 struct Payload {
     kind: ParseErrorKind,
     /// The error is a **goal gate**: it fired on a construct one parse goal reads and the
-    /// other refuses (`import` / `export` / `import.meta`, or the operand of a top-level
-    /// `await`, at `Script`), so the rejection says which grammar the source was written
+    /// other refuses (`import` / `export` / `import.meta`, a top-level `for await`, or the
+    /// operand of a top-level `await`, at `Script`), so the rejection says which grammar the
+    /// source was written
     /// against rather than that it is broken. Beside the kind rather than on one variant,
     /// because the refusal it marks can take any kind's shape — the `await` operand's is
     /// whatever error the name reading hit there. Read by the format fallback's

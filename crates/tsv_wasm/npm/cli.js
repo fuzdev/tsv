@@ -250,8 +250,9 @@ Paths are formatted in place (written only when the output differs) and
 changed paths print to stdout; directories recurse over
 .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css, honoring .gitignore
 (hierarchically, in a git tree) plus hierarchical .formatignore /
-.prettierignore. An explicitly named file skips the ignore
-files, but its extension must still be one tsv formats.
+.prettierignore. A named file or directory is bounded by the ignore
+files alone (skipped with a warning when they exclude it), and a named
+file's extension must still be one tsv formats.
 --content/--stdin print formatted source to stdout.
 
 Options:
@@ -658,7 +659,7 @@ async function format_paths(values, positionals) {
 	const explicit_jobs =
 		values.list || values.jobs === undefined ? undefined : clamp_worker_count(values.jobs);
 
-	const { files, errors: traversal_errors, warnings } = discover_files(positionals);
+	const { files, errors: traversal_errors, warnings, excluded_files } = discover_files(positionals);
 	for (const msg of traversal_errors) {
 		eprint(`error: ${msg}\n`);
 	}
@@ -682,7 +683,11 @@ async function format_paths(values, positionals) {
 		if (traversal_errors.length > 0) process.exit(2);
 		return;
 	}
-	if (files.length === 0 && traversal_errors.length === 0) {
+	// An empty run every argument accounts for — each a named file an ignore rule
+	// excluded, warned above — is not the error: what a lint-staged run hands over when
+	// only ignored files are staged. An excluded directory argument keeps the error.
+	// Mirrors the native `exit_if_nothing_in_scope`.
+	if (files.length === 0 && traversal_errors.length === 0 && excluded_files < positionals.length) {
 		// neutral wording: an empty result can mean "no
 		// .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css here" *or* "all of them are
 		// ignored" (e.g. a target under a gitignored dir), so don't imply a
@@ -802,9 +807,10 @@ function format_files(files, check) {
  * The main thread has ~1 MiB of V8 stack and a pool worker `WORKER_STACK_SIZE_MB`, so a
  * deep file's verdict used to turn on which route the file count picked. A worker reaches
  * the WASM module's own ceiling, whose trap is the same answer on every route. It costs
- * one worker start, paid only when a file overflowed; where the runtime ignores the stack
- * option (Bun, Deno) the retry reports the error again. The failed attempt wrote nothing,
- * so no file is written twice.
+ * one worker start, paid only when a file overflowed. Deno ignores the stack option, and
+ * there the retry reports the error again; Bun ignores it too, but its retry runs wasm
+ * code the failed attempt has already warmed, which recursion reaches deeper on (docs/cli.md
+ * §Recursion Depth). The failed attempt wrote nothing, so no file is written twice.
  */
 async function retry_overflowed_files(files, outcomes, check) {
 	const retry = [];
@@ -1512,11 +1518,12 @@ function ancestor_chain(format_root, leaf) {
  * format, mirroring the native `discover_files`: root args are validated
  * upfront (any bad one fails the run with exit 2 — one that resolves to neither
  * a file nor a directory, or a *file* whose extension tsv doesn't format),
- * explicit files are always included regardless of the ignore files (the caller
- * named them) but not regardless of extension, and directories recurse with the
- * extension filter. Symlinks inside directories are not followed. Traversal
- * errors below a valid root are non-fatal and returned for reporting. See
- * `collect_root` for the gitignore-aware ignore semantics.
+ * a named file or directory is bounded by the ignore files alone (one a rule excludes
+ * is skipped with a warning, and `excluded_files` counts the files), a named file is
+ * held to its extension first, and directories recurse with the extension filter.
+ * Symlinks inside directories are not followed. Traversal errors below a valid root
+ * are non-fatal and returned for reporting. See `collect_root` for the
+ * gitignore-aware ignore semantics.
  */
 function discover_files(paths) {
 	const stats = paths.map((path) => {
@@ -1554,15 +1561,21 @@ function discover_files(paths) {
 	let files = [];
 	const errors = [];
 	const warnings = [];
+	// each directory a file argument sits in is scoped once: a hook or a lint-staged run
+	// names many files in few directories. Mirrors the native `walk_args`.
+	const file_scopes = new Map();
+	let excluded_files = 0;
 	for (let i = 0; i < paths.length; i++) {
 		if (stats[i].isFile()) {
-			// explicit file bypasses the ignore files (not the extension check,
-			// which the validation above already applied)
-			files.push(paths[i]);
+			// the extension check is the validation's above, already applied
+			if (collect_file(paths[i], cwd, file_scopes, files, errors, warnings)) {
+				excluded_files++;
+			}
 		} else {
 			collect_root(paths[i], cwd, files, errors, warnings);
 		}
 	}
+	for (const scope of file_scopes.values()) free_ignore_stack(scope.stack);
 	files.sort(compare_paths);
 	files = files.filter((path, i) => path !== files[i - 1]);
 	if (roots_can_overlap(paths, stats)) {
@@ -1582,7 +1595,12 @@ function discover_files(paths) {
 	// both channels sorted and deduped, as the native `discover_into` does: overlapping
 	// roots re-walk the shared subtree, so the same unreadable path or pruned directory
 	// would otherwise report twice — and count twice in the summary's error total
-	return { files, errors: sort_dedup(errors), warnings: sort_dedup(warnings) };
+	return {
+		files,
+		errors: sort_dedup(errors),
+		warnings: sort_dedup(warnings),
+		excluded_files
+	};
 }
 
 /** Whether two of `paths` can yield the same file, which is when the canonical dedup
@@ -1665,57 +1683,25 @@ function tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, s
 }
 
 /**
- * Set up the ignore evaluation for one directory `root`, then recurse. Inside a
- * git repo the format root is the repo root (a hard stop — nothing above it is
- * read, so `--check` is reproducible); outside one it's the filesystem root (so
- * an ancestor `.formatignore` is honored). Preloads the `IgnoreStack` for the
- * ancestor chain from there down: `.formatignore` at each level (and, inside a
- * repo, a `.prettierignore` it shadows per-directory), and `.gitignore` at each
- * level when in a repo. Mirrors the native `collect_root`.
+ * Load `stack` with the ignore layers of `dirs` — directories from `format_root` down,
+ * shallowest first — returning whether the build-output heuristic is still on below
+ * them (no `.gitignore` among them was read). The one preload a named path gets: a
+ * directory root's ancestors (`collect_root`), or a file argument's directory and
+ * everything above it (`collect_file`). Mirrors the native `preload_ancestors`.
  */
-function collect_root(root, cwd, files, errors, warnings) {
-	let root_abs;
-	try {
-		root_abs = realpathSync(root);
-	} catch {
-		if (!isAbsolute(root) && cwd === null) {
-			// a relative root that will not canonicalize, with no working directory to
-			// join it onto: walked anyway, it would anchor on no format root and read no
-			// ancestor's ignore files. Mirrors the native collect_root.
-			errors.push(unresolvable_root_error(root));
-			return;
-		}
-		// `resolve` settles `.` and `..` lexically, as the native `absolutize` does, and
-		// asks the process for no cwd here: an absolute `root` needs none, and a relative
-		// one is joined onto the `cwd` already held
-		root_abs = isAbsolute(root) ? resolve(root) : resolve(cwd, root);
-	}
-	const repo_root = find_repo_root(root_abs);
-	const in_repo = repo_root !== null;
-	const format_root = repo_root ?? filesystem_root(root_abs);
-
-	const stack = new IgnoreStack();
+function preload_ancestors(stack, dirs, format_root, in_repo, warnings) {
 	let heuristic_active = true;
-	// `root` relative to the format root (always an ancestor-or-self of it, so
-	// never null); '' means `root` *is* the format root
-	const base_rel = rel_under(format_root, root_abs) ?? '';
-
-	// preload the ancestors *above* `root` (format root → `root`'s parent). `root`
-	// and everything below reads its own ignore files in collect_recursive from
-	// the listing it already fetches, so an ignore-file-free subtree costs no
-	// speculative opens; `root` is excluded here to avoid reading its ignores
-	// twice. Ancestors above `root` aren't listed, so they keep the direct open.
-	for (const ancestor of ancestor_chain(format_root, root_abs).slice(0, -1)) {
-		const anchor = rel_under(format_root, ancestor) ?? '';
-		// No listing for ancestors, so presence is probed — by the descent's own rule
-		// (is_ignore_file), so a directory reads the same files whether it is walked
-		// or preloaded. A present-but-unreadable `.formatignore` still shadows
-		// (read_ignore_file warns and yields no rules rather than falling through),
-		// and only an absent one hands the level to `.prettierignore`.
-		const has_formatignore = is_ignore_file(join(ancestor, FORMATIGNORE_FILE));
-		const has_prettierignore = in_repo && is_ignore_file(join(ancestor, PRETTIERIGNORE_FILE));
+	for (const dir of dirs) {
+		const anchor = rel_under(format_root, dir) ?? '';
+		// No listing for a preloaded directory, so presence is probed — by the descent's
+		// own rule (is_ignore_file), so a directory reads the same files whether it is
+		// walked or preloaded. A present-but-unreadable `.formatignore` still shadows
+		// (read_ignore_file warns and yields no rules rather than falling through), and
+		// only an absent one hands the level to `.prettierignore`.
+		const has_formatignore = is_ignore_file(join(dir, FORMATIGNORE_FILE));
+		const has_prettierignore = in_repo && is_ignore_file(join(dir, PRETTIERIGNORE_FILE));
 		const tsv = tsv_layer_content(
-			ancestor,
+			dir,
 			has_formatignore,
 			has_prettierignore,
 			in_repo,
@@ -1726,7 +1712,7 @@ function collect_root(root, cwd, files, errors, warnings) {
 		// `.gitignore` layer: only inside a git repo, and never through a symlink, which git
 		// does not follow (gitignore_presence)
 		if (in_repo) {
-			const gitignore = join(ancestor, GITIGNORE_FILE);
+			const gitignore = join(dir, GITIGNORE_FILE);
 			const presence = gitignore_presence(gitignore);
 			if (presence === 'symlink') {
 				warnings.push(stack.gitignore_symlink_warning(gitignore));
@@ -1739,25 +1725,127 @@ function collect_root(root, cwd, files, errors, warnings) {
 			}
 		}
 	}
+	return heuristic_active;
+}
 
-	// The recursion uses the leaf-only matcher query (is_ignored_leaf, inside
-	// classify_dir/should_format_file), exact only when an entry's ancestors are
-	// already cleared — true for everything the walk descends into, but not for
-	// `root` itself when it's under an ignored ancestor (e.g. `tsv format
-	// build/sub` with a gitignored `build/`). Gate it once with the full
-	// ancestor-walking is_ignored, and — inside a repo — with is_path_pruned, which
-	// replays the other two prunes (the safety nets and the build-output heuristic)
-	// over the root's ANCESTOR segments, so `tsv format dist/sub` and
-	// `node_modules/pkg` list what `tsv format .` lists for those subtrees: nothing.
-	// The root itself is the one the caller named and is not graded. Outside a repo
-	// those two prunes grade no ancestor: the format root is then the filesystem
-	// root, where `.formatignore` reading starts rather than a project, so a loose
-	// `~/.cache/proj` or `/build` sandbox stays in scope. Mirrors the native
-	// collect_root.
-	if (
-		base_rel !== '' &&
-		((in_repo && stack.is_path_pruned(base_rel)) || stack.is_ignored(base_rel, true))
-	) {
+/**
+ * A named path made absolute: canonicalized, or — when it will not canonicalize —
+ * resolved lexically as the native `absolutize` does (`resolve` settles `.` and `..`, and
+ * asks the process for no cwd: an absolute path needs none, and a relative one is joined
+ * onto the `cwd` already held). `null` is a relative path with no working directory to
+ * join it onto, which the caller refuses (`unresolvable_root_error`): taken as named, it
+ * would anchor on no format root and read none of its ancestors' ignore files. Mirrors
+ * the native `absolute_named_path`.
+ */
+function absolute_named_path(path, cwd) {
+	try {
+		return realpathSync(path);
+	} catch {
+		if (isAbsolute(path)) return resolve(path);
+		return cwd === null ? null : resolve(cwd, path);
+	}
+}
+
+/**
+ * The format root above `dir` and whether it is a repo root: inside a git repo the repo
+ * root (a hard stop — nothing above it is read), outside one the filesystem root (so an
+ * ancestor `.formatignore` is honored). Mirrors the native `format_root_of`.
+ */
+function format_root_of(dir) {
+	const repo_root = find_repo_root(dir);
+	return repo_root === null
+		? { format_root: filesystem_root(dir), in_repo: false }
+		: { format_root: repo_root, in_repo: true };
+}
+
+/**
+ * One file argument: into `files` unless an ignore file excludes it — through an
+ * ancestor directory or at the file itself, as it would exclude the file from the walk
+ * that reached it — in which case the run warns and the file is skipped. Returns whether
+ * an ignore rule excluded it. The safety nets and the build-output heuristic never
+ * apply: they prune what a walk discovers, and the caller named this file. The scope is
+ * the file's canonical directory's, resolved as a directory root's is, and built once
+ * per directory into `scopes` (whose stacks the caller frees). Mirrors the native
+ * `collect_file`.
+ */
+function collect_file(path, cwd, scopes, files, errors, warnings) {
+	const file_abs = absolute_named_path(path, cwd);
+	if (file_abs === null) {
+		errors.push(unresolvable_root_error(path));
+		return false;
+	}
+	const dir_abs = dirname(file_abs);
+	let scope = scopes.get(dir_abs);
+	if (scope === undefined) {
+		const { format_root, in_repo } = format_root_of(dir_abs);
+		const stack = new IgnoreStack();
+		preload_ancestors(stack, ancestor_chain(format_root, dir_abs), format_root, in_repo, warnings);
+		scope = { format_root, in_repo, stack };
+		scopes.set(dir_abs, scope);
+	}
+	const rel = rel_under(scope.format_root, file_abs) ?? '';
+	const excluded = scope.stack.excluded_argument_warning(
+		path,
+		rel,
+		false,
+		scope.in_repo,
+		scope.format_root
+	);
+	if (excluded !== undefined) {
+		warnings.push(excluded);
+		return true;
+	}
+	files.push(path);
+	return false;
+}
+
+/**
+ * Set up the ignore evaluation for one directory `root`, then recurse. Inside a
+ * git repo the format root is the repo root (a hard stop — nothing above it is
+ * read, so `--check` is reproducible); outside one it's the filesystem root (so
+ * an ancestor `.formatignore` is honored). Preloads the `IgnoreStack` for the
+ * ancestor chain from there down: `.formatignore` at each level (and, inside a
+ * repo, a `.prettierignore` it shadows per-directory), and `.gitignore` at each
+ * level when in a repo. Mirrors the native `collect_root`.
+ */
+function collect_root(root, cwd, files, errors, warnings) {
+	const root_abs = absolute_named_path(root, cwd);
+	if (root_abs === null) {
+		errors.push(unresolvable_root_error(root));
+		return;
+	}
+	const { format_root, in_repo } = format_root_of(root_abs);
+
+	const stack = new IgnoreStack();
+	// `root` relative to the format root (always an ancestor-or-self of it, so
+	// never null); '' means `root` *is* the format root
+	const base_rel = rel_under(format_root, root_abs) ?? '';
+
+	// preload the ancestors *above* `root` (format root → `root`'s parent). `root`
+	// and everything below reads its own ignore files in collect_recursive from
+	// the listing it already fetches, so an ignore-file-free subtree costs no
+	// speculative opens; `root` is excluded here to avoid reading its ignores
+	// twice. Ancestors above `root` aren't listed, so they keep the direct open.
+	const heuristic_active = preload_ancestors(
+		stack,
+		ancestor_chain(format_root, root_abs).slice(0, -1),
+		format_root,
+		in_repo,
+		warnings
+	);
+
+	// A named root is bounded by the ignore files alone, gated once with the full
+	// ancestor-walking matcher: a root a rule excludes — through an ancestor (`tsv format
+	// build/sub` with a gitignored `build/`) or at itself — puts nothing under it in
+	// scope, and the run says so. The recursion's leaf-only query (is_ignored_leaf, inside
+	// classify_dir/should_format_file) is exact only once an entry's ancestors are
+	// cleared, which this gate also secures for `root`. The safety nets and the
+	// build-output heuristic grade neither the root nor its ancestors, in either regime:
+	// they prune what a walk discovers, and the caller named this directory. Mirrors the
+	// native collect_root.
+	const excluded = stack.excluded_argument_warning(root, base_rel, true, in_repo, format_root);
+	if (excluded !== undefined) {
+		warnings.push(excluded);
 		free_ignore_stack(stack);
 		return;
 	}

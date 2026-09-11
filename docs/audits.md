@@ -769,8 +769,9 @@ or `crates/**/npm` sources, so nothing else covers this tree.
 **Scope.** The root `.formatignore` prunes `tests/fixtures/` and
 `tests/fixtures_compile/` — those files are DATA whose whole claim is the state
 they are committed in, and many are deliberately not format fixed points. A
-directory argument can never step past that; only an explicitly named FILE bypasses
-the ignore files, which is why nothing under `tests/` may ever be named directly.
+directory argument can never step past that, and neither can a named file: one under an
+excluded path is skipped with a warning, so the rule guards the fixtures from an explicit
+`tsv format <file>` as well as from a directory run.
 Markdown and JSON are out of scope entirely — they stay hand-maintained.
 
 **Blind spots.** It only sees shapes this repo's own source happens to contain, so

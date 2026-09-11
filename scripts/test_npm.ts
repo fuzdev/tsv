@@ -1607,8 +1607,8 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(result.stderr, /not a file or directory/);
 	});
 
-	// An explicitly named file bypasses the ignore files but not the extension
-	// check — otherwise the parser dispatch (no unknown arm) hands a `.json` file
+	// An explicitly named file is held to the extension check before the ignore files:
+	// without it the parser dispatch (no unknown arm) hands a `.json` file
 	// to the TypeScript parser, which for a top-level-array JSON *succeeds* and
 	// rewrites it into a TS expression statement. Mirrors the native CLI, message
 	// and all, via `tsv_discover::unsupported_extension_error`.
@@ -2217,11 +2217,12 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
-	// An explicit file arg is trusted past the *ignore files*, not past the
-	// extension check — the two reach the same "not formatted" answer by different
-	// routes: traversal filters the file out of scope, the explicit arg is an
-	// argument error.
-	it('format trusts an explicit file arg past the ignore files, not past the extension', () => {
+	// An explicit file arg is held to the extension check first — traversal filters an
+	// unsupported file out of scope, the explicit arg is an argument error — and then
+	// to the ignore files, which bound it as they bound the walk: an excluded one is
+	// skipped with a warning, untouched, and a run whose every argument was such a file
+	// exits 0. Mirrors the native CLI.
+	it('format holds an explicit file arg to the extension check, then to the ignore files', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
 			writeFileSync(join(dir, 'a.txt'), 'const   x=1');
@@ -2235,12 +2236,35 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			assert.match(explicit.stderr, /unsupported file extension/);
 			assert.equal(readFileSync(join(dir, 'a.txt'), 'utf-8'), 'const   x=1');
 
-			// the ignore files, though, really are bypassed by an explicit arg
-			writeFileSync(join(dir, '.formatignore'), 'b.ts\n');
+			// the ignore files bound it as they bound the walk: an excluded named file is
+			// skipped with a warning and left untouched, and a run whose every argument was
+			// such a file is not the empty-run error…
+			writeFileSync(join(dir, '.formatignore'), 'b.ts\ngen*/\n');
 			writeFileSync(join(dir, 'b.ts'), 'const   x=1');
 			const ignored = run_cli(['format', join(dir, 'b.ts')]);
 			assert.equal(ignored.status, 0);
-			assert.equal(readFileSync(join(dir, 'b.ts'), 'utf-8'), 'const x = 1;\n');
+			assert.match(
+				ignored.stderr,
+				/b\.ts is excluded by a \.formatignore or \.prettierignore rule, so it is not formatted/
+			);
+			assert.equal(readFileSync(join(dir, 'b.ts'), 'utf-8'), 'const   x=1');
+			// …beside a file that formats, the run is the ordinary one…
+			writeFileSync(join(dir, 'c.ts'), 'const   x=1');
+			const mixed = run_cli(['format', join(dir, 'b.ts'), join(dir, 'c.ts')]);
+			assert.equal(mixed.status, 0);
+			assert.equal(readFileSync(join(dir, 'c.ts'), 'utf-8'), 'const x = 1;\n');
+			assert.equal(readFileSync(join(dir, 'b.ts'), 'utf-8'), 'const   x=1');
+			// …and a directory the rules exclude is still the empty-run error, warned
+			const gen = mkdtempSync(join(dir, 'gen'));
+			writeFileSync(join(gen, 'd.ts'), 'const   x=1');
+			const excluded_dir = run_cli(['format', gen]);
+			assert.equal(excluded_dir.status, 2);
+			assert.match(
+				excluded_dir.stderr,
+				/is excluded by a \.formatignore or \.prettierignore rule, so nothing under it is formatted/
+			);
+			assert.match(excluded_dir.stderr, /No files to format/);
+			assert.equal(readFileSync(join(gen, 'd.ts'), 'utf-8'), 'const   x=1');
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}

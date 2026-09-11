@@ -262,7 +262,8 @@ lang_bindings!(
 /// Holds `.gitignore` and tsv (`.formatignore` / `.prettierignore`) layers
 /// pushed shallowest-first, answers the per-path ignore status
 /// (`is_ignored`), and delegates the discovery verdicts (`classify_dir`,
-/// `should_format_file`, `is_path_pruned`) plus the shared warning strings to
+/// `should_format_file`, `is_path_pruned`, `excluded_argument_warning`) plus the shared
+/// warning strings to
 /// `tsv_discover`.
 #[cfg(feature = "format")]
 #[napi]
@@ -428,6 +429,30 @@ impl IgnoreStack {
     #[napi(js_name = "gitignore_symlink_warning", catch_unwind)]
     pub fn gitignore_symlink_warning(&self, path: String) -> String {
         tsv_discover::gitignore_symlink_warning(&path)
+    }
+
+    /// The warning for a path an argument named — a file, or a directory root — that an
+    /// ignore file puts out of scope; `undefined` when no rule excludes it, which is also
+    /// the scope decision. `display` is the argument as given, `rel` its
+    /// format-root-relative path, `format_root` the format root's display path. Single
+    /// source of truth with the native CLI — the JS CLI never templates this string.
+    #[napi(js_name = "excluded_argument_warning", catch_unwind)]
+    pub fn excluded_argument_warning(
+        &self,
+        display: String,
+        rel: String,
+        is_dir: bool,
+        in_repo: bool,
+        format_root: String,
+    ) -> Either<String, Undefined> {
+        or_undefined(tsv_discover::excluded_argument_warning(
+            &display,
+            &rel,
+            is_dir,
+            in_repo,
+            &format_root,
+            &self.inner,
+        ))
     }
 
     /// The traversal error for a relative directory root the working directory cannot

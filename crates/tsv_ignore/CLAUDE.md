@@ -44,8 +44,8 @@ this path." tsv's discovery *policy* — the build-output heuristic, the
 always-pruned safety nets, the formattable-extension check, the heuristic-shadow
 warning — lives one layer up in [`tsv_discover`](../tsv_discover/CLAUDE.md), which
 builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
-`has_negation_under` / `has_gitignore_layers` / `gitignore_anchors`; the ancestor-walking `is_ignored`
-is the caller's, for gating the root). Keeping that policy out of here is deliberate: `IgnoreStack`
+`has_negation_under` / `has_gitignore_layers` / `gitignore_anchors`, and `exclusion` — the
+ancestor-walking answer with its witness — to bound and warn about a path an argument named). Keeping that policy out of here is deliberate: `IgnoreStack`
 stays a pure gitignore(5) matcher, reusable beyond tsv's own discovery rules, and
 the three surfaces share the prune *decision* through `tsv_discover` rather than
 re-deriving it from these primitives.
@@ -76,7 +76,7 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   only `path`'s **own** last-match, **no ancestor walk**. Equivalent to
   `is_ignored` *only when every ancestor is already known not-ignored* — which
   tsv's discovery guarantees (it prunes ignored dirs before descending and gates
-  the root with full `is_ignored`), letting it skip the O(depth) re-walk per entry
+  the root with the full ancestor-walking answer, `exclusion`), letting it skip the O(depth) re-walk per entry
   (the matcher dominates discovery; this roughly halves its self-time on a deep
   tree). A sharp contract — see Known edges.
 - `IgnoreStack::is_reincluded(path, is_dir)` — the per-path `!`-negation polarity
@@ -97,6 +97,12 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   `tsv_discover::is_path_pruned`) reconstruct each ancestor's `heuristic_active` —
   the heuristic is off at a level once a `.gitignore` anchored above it is present.
 - `IgnoreStack::is_empty()` — callers skip per-path matching when true.
+- `IgnoreStack::exclusion(path, is_dir) -> Option<Exclusion>` — the witness behind
+  `is_ignored`: the shallowest excluded prefix of `path` (`Exclusion::depth`, in
+  segments) and the kind of layer whose rule excluded it
+  (`IgnoreSource::{Gitignore, Tsv}`), `Some` exactly when `is_ignored` is `true`. A
+  diagnostic query off the hot path: `tsv_discover` reads it once per path an argument
+  named, to warn which directory put the path out of scope and whose rule did.
 
 **Which** files feed the stack is the caller's choice. tsv reads `.formatignore`
 hierarchically (one tsv layer per directory) and, inside a git repo,
@@ -200,9 +206,10 @@ from.
   *not* ignored unless a rule matches the file path itself. It equals `is_ignored`
   **only when the path's ancestors are already cleared**, which the discovery walk
   guarantees: it prunes ignored directories before descending, and the CLI/JS
-  walkers gate the initial `root` with a full `is_ignored` (so `tsv format
-  build/sub` under a gitignored `build/` still finds nothing — the gate catches
-  it; the per-entry walk below uses the cheaper leaf query). It exists purely for
+  walkers gate the initial `root` with the full ancestor-walking answer
+  (`exclusion`, so `tsv format build/sub` under a gitignored `build/` still finds
+  nothing — the gate catches it, and warns; the per-entry walk below uses the
+  cheaper leaf query). It exists purely for
   that hot path — never call it on an arbitrary path whose ancestors haven't been
   cleared. Pinned by `stack_is_ignored_leaf_skips_the_ancestor_prune` and the
   `fully_ignored_target_is_empty` discovery scenario.

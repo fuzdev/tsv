@@ -68,7 +68,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             None
         };
-        if is_await {
+        if let Some(at) = await_at {
+            // `for await` is an `[+Await]` production. At `Script` goal a position a module
+            // would take it in — the top level, and the blocks under it — refuses it, and the
+            // refusal is a goal gate: only a module holds the loop there, so the format
+            // fallback reads the file as one (`parse_with_goal_or_fallback`). A non-async
+            // function body takes it at neither goal and stays the deferred early error.
+            if !self.in_await && self.in_await_if_module {
+                return Err(self.error_goal_gate_at(
+                    "'for await' at the top level is only allowed in a module",
+                    at,
+                ));
+            }
             self.advance()?;
         }
 

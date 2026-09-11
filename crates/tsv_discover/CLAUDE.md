@@ -5,8 +5,9 @@
 
 The single home of the decisions `tsv format`'s directory walk makes: the
 always-pruned safety nets, the build-output heuristic, the formattable-extension
-check, the heuristic-shadow warning, the `.prettierignore`-shadowed warning, and
-the `.prettierignore`-outside-a-repo warning. The three discovery surfaces — the
+check, the heuristic-shadow warning, the `.prettierignore`-shadowed warning, the
+`.prettierignore`-outside-a-repo warning, and the gate on a path an argument names
+(`excluded_argument_warning`). The three discovery surfaces — the
 native CLI (`tsv_cli`), the WASM CLI (`crates/tsv_wasm/npm/cli.js`), and the VS
 Code extension — call into it instead of reimplementing the decision, so they
 agree **by construction** rather than by hand-mirrored constants and templates
@@ -54,7 +55,7 @@ crates (the open-convention stance):
   name or a whole path.
 - `unsupported_extension_error(path) -> Option<String>` — the argument error for
   an explicitly named **file** whose extension tsv doesn't format, `None`
-  otherwise. A file argument bypasses the *ignore files*, but never this: the
+  otherwise — asked of a file argument before anything else: the
   parser dispatch behind a path has no unknown arm (everything that isn't
   `.svelte` or `.css` goes to the TypeScript parser), so an unsupported extension
   would be parsed as TypeScript — usually a baffling syntax error, and for a
@@ -79,9 +80,10 @@ crates (the open-convention stance):
   only reaches an entry whose ancestor directories are already cleared, so the
   re-walk is redundant — dropping it roughly halves the matcher's self-time, which
   dominates discovery on deep trees. **This relies on the caller gating the
-  initial `root` with a full `is_ignored`** (a directory under an ignored ancestor,
-  e.g. `tsv format build/sub` with a gitignored `build/`, isn't walk-cleared) —
-  `tsv_cli`'s `collect_root` and `cli.js`'s do exactly that. See
+  initial `root` with the full ancestor-walking answer** (a directory under an
+  ignored ancestor, e.g. `tsv format build/sub` with a gitignored `build/`, isn't
+  walk-cleared) — `tsv_cli`'s `collect_root` and `cli.js`'s do exactly that, through
+  `excluded_argument_warning`. See
   `is_ignored_leaf`'s contract in [`tsv_ignore`](../tsv_ignore/CLAUDE.md).
 - `is_path_pruned(rel, &IgnoreStack) -> bool` — the per-file companion to
   `classify_dir` for a consumer with **no top-down traversal** (the VS Code
@@ -99,7 +101,22 @@ crates (the open-convention stance):
   consulted picks only `Prune` vs `PruneWithWarning`, which a boolean collapses.
   Pair with `IgnoreStack::is_ignored(rel, false)` for the file-level match.
   `classify_dir` stays the primitive for real traversers, which thread
-  `heuristic_active` naturally as they descend.
+  `heuristic_active` naturally as they descend. The CLIs never ask it of a path an
+  argument named: see the next entry.
+- `excluded_argument_warning(display, rel, is_dir, in_repo, format_root, &IgnoreStack)
+  -> Option<String>` — the warning for a path an argument **named** (a file, or a
+  directory root) that an ignore file puts out of scope, `None` when no rule excludes
+  it — which is also the scope decision: a named path is bounded by the ignore files
+  alone. The safety nets and the build-output heuristic prune what a walk *discovers*,
+  so they grade neither a named path nor its ancestors, while an ignore rule bounds a
+  named path through any ancestor or at itself, exactly as it bounds the walk. The
+  text names the kind of file whose rule excluded the path
+  (`IgnoreStack::exclusion`'s `IgnoreSource`), since the remedies differ: a
+  `.gitignore`'d path is re-included from the repo-root `.formatignore`, a tsv-layer
+  rule is the user's to narrow. An excluding ancestor reads relative to the format
+  root inside a repo and absolute outside one. Both CLIs gate every named path on it
+  (`collect_root`, `collect_file`), which is also what keeps the walk's leaf-only
+  matcher query sound for the root.
 - `DirVerdict { Descend, Prune, PruneWithWarning(String) }` — `PruneWithWarning`
   carries the full warning string, so the native caller reports it without
   re-deriving.
@@ -145,7 +162,8 @@ crates (the open-convention stance):
   method-for-method twin) — the `format`-gated `IgnoreStack` wrapper exposes
   `classify_dir(name, child_rel, heuristic_active) -> string`
   (`"descend"|"prune"|"prune_warn"`), `should_format_file(name, child_rel) ->
-  bool`, `is_path_pruned(rel) -> bool`, `heuristic_shadow_warning(dir) -> string`,
+  bool`, `is_path_pruned(rel) -> bool`, `excluded_argument_warning(display, rel, is_dir,
+  in_repo, format_root) -> string | undefined`, `heuristic_shadow_warning(dir) -> string`,
   `unsupported_extension_error(path) -> string | undefined`,
   `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
   has_formatignore) -> string | undefined`, and the sibling

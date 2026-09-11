@@ -25,7 +25,8 @@ use std::thread;
 /// change (`--check`), 2 errors. Directory discovery is gitignore-aware:
 /// inside a git repo it honors `.gitignore` (hierarchically, like git) plus
 /// hierarchical `.formatignore` / `.prettierignore`; outside one, only
-/// `.formatignore`. An explicitly named file skips the ignore files, but its
+/// `.formatignore`. A named file or directory is bounded by the ignore files
+/// alone (skipped with a warning when they exclude it), and a named file's
 /// extension must still be one tsv formats. `--list` prints the discovered
 /// in-scope files without formatting (path mode only).
 #[derive(FromArgs, Debug)]
@@ -297,8 +298,14 @@ fn exit_bad_args(bad_args: &[String]) -> ! {
 /// rather than leaving it naming the old set. `crates/tsv_wasm/npm/cli.js` restates the
 /// finished message by hand (as it does `clamp_worker_count`), and the two are compared
 /// byte for byte by `scripts/test_napi_npm.ts`'s message-parity suite.
-fn exit_if_nothing_in_scope(file_count: usize, error_count: usize) {
-    if file_count == 0 && error_count == 0 {
+///
+/// An empty run every argument accounts for is not the error: when each argument was a
+/// named file an ignore rule excluded (`Diagnostics::excluded_files`, one warning apiece),
+/// the caller's own files were refused by the caller's own rules — what a lint-staged run
+/// hands over when only ignored files are staged — and the run exits 0. A directory
+/// argument the rules exclude keeps the error, so a mis-scoped command still fails loudly.
+fn exit_if_nothing_in_scope(file_count: usize, diagnostics: &Diagnostics, arg_count: usize) {
+    if file_count == 0 && diagnostics.errors.is_empty() && diagnostics.excluded_files < arg_count {
         let extensions = tsv_discover::formattable_extension_list("/");
         exit_with_error(
             2,
@@ -313,7 +320,7 @@ fn format_collected(paths: &[String], check: bool, jobs: usize) -> Formatted {
     let Discovered { files, diagnostics } =
         discover_files(paths).unwrap_or_else(|bad_args| exit_bad_args(&bad_args));
     report_discovery(&diagnostics);
-    exit_if_nothing_in_scope(files.len(), diagnostics.errors.len());
+    exit_if_nothing_in_scope(files.len(), &diagnostics, paths.len());
     let outcomes = format_files(&files, check, jobs);
     Formatted {
         files,
@@ -637,7 +644,7 @@ fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
     // bad-argument arm is unreachable here — handled anyway rather than asserted
     let diagnostics = discovery.unwrap_or_else(|bad_args| exit_bad_args(&bad_args));
     report_discovery(&diagnostics);
-    exit_if_nothing_in_scope(sink.keys.len(), diagnostics.errors.len());
+    exit_if_nothing_in_scope(sink.keys.len(), &diagnostics, paths.len());
 
     // slot by walk index, then read out in key order
     let mut slots: Vec<Option<(PathBuf, FileOutcome)>> = Vec::new();

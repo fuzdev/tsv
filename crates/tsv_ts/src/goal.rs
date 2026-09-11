@@ -24,7 +24,7 @@
 /// | construct | `Module` | `Script` |
 /// | --- | --- | --- |
 /// | `await` as an identifier / binding / label / class name | reserved | allowed (`[~Await]`) |
-/// | top-level `await` *expression* | allowed | syntax error |
+/// | top-level `await` — an *expression*, or a `for await` loop | allowed | syntax error |
 /// | `import.meta` | allowed | syntax error |
 /// | top-level `import` / `export` *declarations* | allowed | syntax error |
 ///
@@ -38,7 +38,7 @@ pub enum Goal {
     Module,
     /// `ParseScript` — `await` is an ordinary identifier (the top level is
     /// `[~Await]`); `import`/`export` declarations, `import.meta`, and top-level
-    /// `await` expressions are syntax errors. Script code is **sloppy** unless its
+    /// `await` expressions and `for await` loops are syntax errors. Script code is **sloppy** unless its
     /// directive prologue holds a `"use strict"`, so the strict-mode production
     /// disallowances parse where a module rejects them — enumerated once on the flag
     /// that gates them (`Parser::strict`), never re-listed here. The Annex B

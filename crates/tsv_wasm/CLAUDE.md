@@ -141,7 +141,7 @@ argument errors, arrays included.
 families.** `read_options` decodes it to `None` rather than `Module`, and the format
 exports hand that to `parse_ast_for_format!` → `tsv_ts::parse_with_goal_or_fallback`:
 the module grammar, retried as a script only if that parse *fails*, reporting the
-module's error when both do if the script retry died on a top-level `import`/`export`, an `import.meta` or a top-level `await`'s operand, else the further-reaching one (the module's on a tie). That is what lets `format_typescript(source)` with no bag
+module's error when both do if the script retry died on a top-level `import`/`export`, an `import.meta`, a top-level `for await` or a top-level `await`'s operand, else the further-reaching one (the module's on a tie). That is what lets `format_typescript(source)` with no bag
 — an editor's whole call, and `npm/cli.js`'s path mode — format a legacy sloppy
 script (`with`, a leading-zero literal or escape, `await` as a name). A **set** value
 is exact, so `{sourceType: 'module'}` still refuses one; nothing the module grammar
@@ -380,6 +380,12 @@ hierarchical), then queries:
   `.gitignore` anchors, so it takes no extra arguments; pair it with
   `is_ignored(rel, false)` for the file-level match. (`classify_dir` stays the
   primitive for `npm/cli.js`, which threads `heuristic_active` down a real walk.)
+- `excluded_argument_warning(display, rel, is_dir, in_repo, format_root) -> string |
+  undefined` — the warning for a path an argument named (a file, or a directory root)
+  that an ignore file puts out of scope, naming the kind of file whose rule did it;
+  `undefined` when no rule excludes the path, which is also the scope decision, so
+  `npm/cli.js` gates every named path on it alone (the safety nets and the heuristic
+  grade no named path).
 - `heuristic_shadow_warning(dir) -> string`, `prettierignore_outside_repo_warning`,
   `prettierignore_shadowed_warning`, and `gitignore_symlink_warning(path)` — the four
   warning templates, beside `unresolvable_root_error(root)`'s traversal error (methods,

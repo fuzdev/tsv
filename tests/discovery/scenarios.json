@@ -1,5 +1,5 @@
 {
-	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, explicit-arg bypass, argument rejection, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list <root>/<target>`. A case carries EITHER `expected` — the in-scope files, relative to the tempdir root, in exact sorted order — OR `error`, a substring of the argument error that must fail the run upfront (exit 2, nothing listed). An `expected` case may add `warns`: substrings each of which some warning the walk emits must carry, and `no_warns`: substrings no warning may carry (exit code and stdout untouched either way) — the one pin on the warnings channel as a walk PRODUCT, where the texts themselves are tsv_discover's unit tests'. A tree value may also be `{\"symlink\": \"<target>\"}`, a symbolic link to `<target>` resolved from the link's own directory; a scenario holding one needs unix, and both harnesses skip it elsewhere. Names are ASCII so Rust's PathBuf order and cli.js's compare_paths agree (see cli.js compare_paths for the astral-plane/Windows caveat).",
+	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, the scope of a named path, argument rejection, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list <root>/<target>`. A case carries EITHER `expected` — the in-scope files, relative to the tempdir root, in exact sorted order — OR `error`, a substring of the argument error that must fail the run upfront (exit 2, nothing listed). An `expected` case may add `warns`: substrings each of which some warning the walk emits must carry, and `no_warns`: substrings no warning may carry (exit code and stdout untouched either way) — the one pin on the warnings channel as a walk PRODUCT, where the texts themselves are tsv_discover's unit tests'. A tree value may also be `{\"symlink\": \"<target>\"}`, a symbolic link to `<target>` resolved from the link's own directory; a scenario holding one needs unix, and both harnesses skip it elsewhere. Names are ASCII so Rust's PathBuf order and cli.js's compare_paths agree (see cli.js compare_paths for the astral-plane/Windows caveat).",
 	"scenarios": [
 		{
 			"name": "respects_prettierignore",
@@ -115,22 +115,26 @@
 			"cases": [{"target": "", "expected": ["a.ts"]}]
 		},
 		{
-			"name": "explicit_file_bypasses_ignore",
-			"note": "discovery skips an ignored file, but naming it explicitly puts it in scope (the ignore files govern discovery, not explicit args)",
+			"name": "explicit_file_is_bounded_by_the_ignore_files",
+			"note": "a named FILE is bounded by the ignore files as the walk that reaches it is: one a rule excludes — itself, or through an ancestor directory, in either kind of layer — is skipped with a warning naming that kind, and one no rule excludes is in scope",
 			"tree": {
 				".git/": null,
+				".gitignore": "gen/\n",
 				".prettierignore": "skip.ts\n",
 				"skip.ts": "x",
-				"keep.ts": "x"
+				"keep.ts": "x",
+				"gen/g.ts": "x"
 			},
 			"cases": [
 				{"target": "", "expected": ["keep.ts"]},
-				{"target": "skip.ts", "expected": ["skip.ts"]}
+				{"target": "keep.ts", "expected": ["keep.ts"], "no_warns": ["excluded"]},
+				{"target": "skip.ts", "expected": [], "warns": ["skip.ts is excluded by a .formatignore or .prettierignore rule, so it is not formatted"]},
+				{"target": "gen/g.ts", "expected": [], "warns": ["gen/g.ts is inside gen, which .gitignore excludes, so it is not formatted"]}
 			]
 		},
 		{
 			"name": "explicit_file_does_not_bypass_the_extension",
-			"note": "the other half of explicit_file_bypasses_ignore: a named FILE skips the ignore files but not the extension check, because the parser dispatch behind a path has no unknown arm (everything that isn't .svelte/.css goes to the TypeScript parser) — a named .json would be parsed as TS, and a top-level-array one silently rewritten into invalid JSON. A DIRECTORY arg is a scope rather than a target, so the same files inside it are simply filtered out by the walk",
+			"note": "a named FILE is checked for its extension before anything else: an unsupported one is an argument error, because the parser dispatch behind a path has no unknown arm (everything that isn't .svelte/.css goes to the TypeScript parser) — a named .json would be parsed as TS, and a top-level-array one silently rewritten into invalid JSON. A DIRECTORY arg is a scope rather than a target, so the same files inside it are simply filtered out by the walk",
 			"tree": {
 				".git/": null,
 				"src/app.ts": "x",
@@ -158,7 +162,7 @@
 		},
 		{
 			"name": "fully_ignored_target_is_empty",
-			"note": "a target under an ignored dir discovers nothing (empty scope is valid) — both the dir itself and a deeper subdir. The walk's per-entry matcher query is leaf-only (no ancestor prune), so this pins the root-gate that re-applies the full ancestor walk to the named root, one and two levels deep",
+			"note": "a target under an ignored dir discovers nothing (empty scope is valid) — both the dir itself and a deeper subdir — and warns, naming the kind of file whose rule excluded it and the remedy that kind takes. The walk's per-entry matcher query is leaf-only (no ancestor prune), so this pins the root-gate that re-applies the full ancestor walk to the named root, one and two levels deep",
 			"tree": {
 				".git/": null,
 				".gitignore": "build/\n",
@@ -166,8 +170,8 @@
 				"build/sub/app.ts": "x"
 			},
 			"cases": [
-				{"target": "build", "expected": []},
-				{"target": "build/sub", "expected": []}
+				{"target": "build", "expected": [], "warns": ["build is excluded by .gitignore, so nothing under it is formatted; re-include it with `!build/` in the repo-root .formatignore"]},
+				{"target": "build/sub", "expected": [], "warns": ["build/sub is inside build, which .gitignore excludes, so nothing under it is formatted; re-include that directory with `!build/` in the repo-root .formatignore"]}
 			]
 		},
 		{
@@ -305,24 +309,28 @@
 				"proj/a.gen.ts": "x",
 				"proj/main.ts": "x"
 			},
-			"cases": [{"target": "proj", "expected": ["proj/main.ts"]}]
+			"cases": [
+				{"target": "proj", "expected": ["proj/main.ts"]},
+				{"target": "proj/a.gen.ts", "expected": [], "warns": ["a.gen.ts is excluded by a .formatignore or .prettierignore rule, so it is not formatted; narrow or negate that rule to format it"]}
+			]
 		},
 		{
-			"name": "explicit_subdir_under_pruned_ancestor_is_out_of_scope",
-			"note": "subtree consistency across the walk's three prunes: an explicitly targeted subdirectory lists exactly what targeting an ancestor lists for it. A heuristic dir (no .gitignore, so dist/ is guessed build output), a safety net (node_modules/) and a hidden dir each prune their DESCENDANTS when named, while the root the caller named is itself never pruned by any of the three (a hidden, heuristic or safety-net dir passed explicitly recurses — the one escape hatch from a prune, and what a shell glob hands over)",
+			"name": "explicit_subdir_under_a_built_in_prune_is_in_scope",
+			"note": "the safety nets and the build-output heuristic prune only what a walk DISCOVERS: a named directory is never pruned by them, neither at itself nor through an ancestor, so a subdirectory of a heuristic dir (no .gitignore, so dist/ is guessed build output), of a safety net (node_modules/) or of a hidden dir lists what naming its parent lists for it — and warns about nothing, since no rule the user wrote is involved. Walking down from the repo root still prunes all three, and a walk below a named root still prunes its own children (dist/sub/build/)",
 			"tree": {
 				".git/": null,
 				"src/c.ts": "x",
 				"dist/sub/a.ts": "x",
+				"dist/sub/build/x.ts": "x",
 				"node_modules/pkg/i.ts": "x",
 				".hidden/b.ts": "x",
 				".hidden/sub/c.ts": "x"
 			},
 			"cases": [
 				{"target": "", "expected": ["src/c.ts"]},
-				{"target": "dist/sub", "expected": []},
-				{"target": "node_modules/pkg", "expected": []},
-				{"target": ".hidden/sub", "expected": []},
+				{"target": "dist/sub", "expected": ["dist/sub/a.ts"], "no_warns": ["excluded"]},
+				{"target": "node_modules/pkg", "expected": ["node_modules/pkg/i.ts"], "no_warns": ["excluded"]},
+				{"target": ".hidden/sub", "expected": [".hidden/sub/c.ts"], "no_warns": ["excluded"]},
 				{"target": "dist", "expected": ["dist/sub/a.ts"]},
 				{"target": "node_modules", "expected": ["node_modules/pkg/i.ts"]},
 				{"target": ".hidden", "expected": [".hidden/b.ts", ".hidden/sub/c.ts"]}
@@ -330,7 +338,7 @@
 		},
 		{
 			"name": "pruned_ancestor_outside_repo_is_not_graded",
-			"note": "outside a git repo the format root is the filesystem root — where .formatignore reading starts, not a project — so the safety nets and the heuristic do not grade a named subdirectory's ANCESTORS: a loose project under a heuristic or hidden directory (a /build sandbox, ~/.cache) stays in scope. Walking down from the tempdir root still prunes those directories (no .gitignore is read outside a repo, so the heuristic is on)",
+			"note": "outside a git repo as inside one, the safety nets and the heuristic do not grade a named subdirectory's ANCESTORS (they grade no named path): a loose project under a heuristic or hidden directory (a /build sandbox, ~/.cache) stays in scope. Walking down from the tempdir root still prunes those directories (no .gitignore is read outside a repo, so the heuristic is on)",
 			"tree": {
 				"build/proj/a.ts": "x",
 				".cache/proj/b.ts": "x",
