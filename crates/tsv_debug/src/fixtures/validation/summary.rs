@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 
 use super::FixtureValidation;
 use super::errors::ValidationError;
+use crate::deno::DenoError;
 
 /// Context for cross-fixture duplicate detection (internal use only)
 #[derive(Debug, Default)]
@@ -135,31 +136,26 @@ impl ValidationSummary {
     }
 
     pub fn failed_results(&self) -> impl Iterator<Item = &FixtureValidation> {
-        self.results.iter().filter(|r| r.has_errors())
+        self.results.iter().filter(|r| !r.is_valid())
     }
 
     /// Count fixtures that failed due to a transient Deno sidecar fault —
     /// shutdown, crash, or the empty-output miss (`DenoError::EmptyOutput`)
     ///
     /// A high count indicates the sidecar malfunctioned during the test run,
-    /// causing cascading failures that aren't real fixture issues.
+    /// causing cascading failures that aren't real fixture issues. Each fault is
+    /// matched on its own `Display` text — what the validation phases embed in their
+    /// error messages — so rewording a variant cannot drop it from the count.
     ///
     /// Called from `tests/fixtures_tests.rs` (root-crate integration test).
-    /// The `tsv_debug` binary doesn't use this, so the `#[allow]` silences a
-    /// dead_code warning that only fires in the binary build.
-    #[allow(dead_code)]
     pub fn count_sidecar_failures(&self) -> usize {
-        self.results
-            .iter()
-            .filter(|r| {
-                r.errors.iter().any(|e| {
-                    matches!(e, ValidationError::FormatterError(msg) | ValidationError::ParserError(msg)
-                        if msg.contains("deno actor shut down")
-                            || msg.contains("sidecar crashed")
-                            || msg.contains("returned empty output for non-empty input"))
-                })
-            })
-            .count()
+        let faults = [
+            DenoError::ActorShutdown,
+            DenoError::SidecarCrashed,
+            DenoError::EmptyOutput,
+        ]
+        .map(|fault| fault.to_string());
+        self.count_failures_matching(|msg| faults.iter().any(|fault| msg.contains(fault.as_str())))
     }
 
     /// Count fixtures that failed due to Deno sidecar timeout
@@ -167,15 +163,25 @@ impl ValidationSummary {
     /// A high count indicates the sidecar is hanging on certain inputs,
     /// possibly due to a bug in prettier/acorn or resource exhaustion.
     ///
-    /// Called from `tests/fixtures_tests.rs` — see note on `count_sidecar_failures`.
-    #[allow(dead_code)]
+    /// Called from `tests/fixtures_tests.rs` (root-crate integration test).
     pub fn count_timeout_failures(&self) -> usize {
+        // `DenoError::Timeout`'s text carries the elapsed seconds, so match the head it renders
+        // before them — derived from the variant, like the faults above, never a copied literal.
+        let rendered = DenoError::Timeout { seconds: 0 }.to_string();
+        let head = rendered
+            .split_once(" after ")
+            .map_or(rendered.as_str(), |(head, _)| head);
+        self.count_failures_matching(|msg| msg.contains(head))
+    }
+
+    /// Fixtures carrying a formatter or parser error whose message satisfies `matches`.
+    fn count_failures_matching(&self, matches: impl Fn(&str) -> bool) -> usize {
         self.results
             .iter()
             .filter(|r| {
                 r.errors.iter().any(|e| {
                     matches!(e, ValidationError::FormatterError(msg) | ValidationError::ParserError(msg)
-                        if msg.contains("timed out"))
+                        if matches(msg))
                 })
             })
             .count()
@@ -248,7 +254,7 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
     if !summary.cross_fixture_duplicates.is_empty() {
         eprintln!("✗ Cross-fixture duplicates detected:");
         for group in &summary.cross_fixture_duplicates {
-            eprintln!("    Duplicate input.svelte content:");
+            eprintln!("    Duplicate input content:");
             for path in group {
                 eprintln!("      - {path}");
             }
@@ -413,5 +419,41 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
             "Results Summary: {} passed, {} failed out of {} total",
             summary.passed_fixtures, summary.failed_fixtures, summary.total_fixtures
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A validation result carrying one formatter error with `message` embedded, the way the
+    /// validation phases wrap a sidecar failure.
+    fn failed_with(message: &str) -> FixtureValidation {
+        let mut result = FixtureValidation::new("fixture".to_string());
+        result.add_error(ValidationError::FormatterError(format!(
+            "input.svelte: {message}"
+        )));
+        result
+    }
+
+    /// Each counter keys on its fault's own rendered text, so rewording a `DenoError` variant
+    /// cannot silently zero the integration test's sidecar-health guard.
+    #[test]
+    fn sidecar_fault_counters_match_the_rendered_errors() {
+        let mut faults = ValidationSummary::new();
+        for fault in [
+            DenoError::ActorShutdown,
+            DenoError::SidecarCrashed,
+            DenoError::EmptyOutput,
+        ] {
+            faults.add(failed_with(&fault.to_string()));
+        }
+        assert_eq!(faults.count_sidecar_failures(), 3);
+        assert_eq!(faults.count_timeout_failures(), 0);
+
+        let mut timeouts = ValidationSummary::new();
+        timeouts.add(failed_with(&DenoError::Timeout { seconds: 30 }.to_string()));
+        assert_eq!(timeouts.count_timeout_failures(), 1);
+        assert_eq!(timeouts.count_sidecar_failures(), 0);
     }
 }

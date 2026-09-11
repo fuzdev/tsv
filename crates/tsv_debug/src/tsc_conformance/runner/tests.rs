@@ -98,6 +98,16 @@ fn keeps_family_selects_sub_family() {
 }
 
 #[test]
+fn family_filter_token_round_trips_through_parse() {
+    // `token` keys the manifest's filters, so it must name exactly the filter `parse` reads back.
+    for index in 0..FAMILIES.len() {
+        let filter = FamilyFilter::One(index);
+        assert!(FamilyFilter::parse(filter.token()) == Some(filter));
+    }
+    assert!(FamilyFilter::parse(FamilyFilter::All.token()) == Some(FamilyFilter::All));
+}
+
+#[test]
 fn filters_compose_as_and() {
     // The call site ANDs the three predicates; all must keep for a variant to be
     // graded, and any one failing excludes it.

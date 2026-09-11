@@ -253,13 +253,7 @@ impl Fixture {
 
     /// Check if this fixture matches any of the given filter terms
     pub fn matches_filters(&self, filters: &[String]) -> bool {
-        if filters.is_empty() {
-            return true;
-        }
-        let lower_path = self.relative_path.to_lowercase();
-        filters
-            .iter()
-            .any(|filter| lower_path.contains(&filter.to_lowercase()))
+        super::path_matches_filters(&self.relative_path, filters)
     }
 }
 

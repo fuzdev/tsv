@@ -29,6 +29,15 @@ impl FamilyFilter {
         tokens.push("all");
         tokens.join(" / ")
     }
+
+    /// The `--family` token this filter parses from — the inverse of [`Self::parse`].
+    #[must_use]
+    pub fn token(self) -> &'static str {
+        match self {
+            FamilyFilter::One(index) => FAMILIES[index].key,
+            FamilyFilter::All => "all",
+        }
+    }
 }
 
 /// The code set a [`FamilyFilter`] keeps a variant for (its baseline must carry at

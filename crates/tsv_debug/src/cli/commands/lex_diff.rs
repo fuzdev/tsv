@@ -41,7 +41,7 @@ pub struct LexDiffCommand {
 const SECTION: &str = "@@@ ";
 
 impl LexDiffCommand {
-    pub fn run(&self) -> Result<(), CliError> {
+    pub(crate) fn run(&self) -> Result<(), CliError> {
         if self.paths.is_empty() {
             eprintln!("lex_diff: no paths given");
             return Err(CliError::Failed);

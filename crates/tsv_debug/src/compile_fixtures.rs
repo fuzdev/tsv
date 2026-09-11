@@ -42,14 +42,11 @@ pub struct CompileFixture {
 
 impl CompileFixture {
     /// Whether this fixture matches any of the given case-insensitive substring
-    /// filters (empty filters match everything). Mirrors the main tree's
-    /// `Fixture::matches_filters`.
+    /// filters (empty filters match everything) — the one rule
+    /// [`path_matches_filters`](crate::fixtures::path_matches_filters) states for every
+    /// fixture tree.
     pub fn matches_filters(&self, filters: &[String]) -> bool {
-        if filters.is_empty() {
-            return true;
-        }
-        let lower = self.relative_path.to_lowercase();
-        filters.iter().any(|f| lower.contains(&f.to_lowercase()))
+        crate::fixtures::path_matches_filters(&self.relative_path, filters)
     }
 
     /// The fixture's `input.svelte` path.

@@ -9,6 +9,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -113,12 +115,9 @@ fn sidecar_runtime() -> &'static Runtime {
     })
 }
 
-/// Internal request to the actor
+/// Internal request to the actor: the wire request plus where its response goes
 struct ActorRequest {
-    id: u64,
-    tool: String,
-    content: String,
-    options: Option<Value>,
+    wire: WireRequest,
     response_tx: oneshot::Sender<Result<Value, DenoError>>,
 }
 
@@ -132,6 +131,8 @@ enum ActorCommand {
 #[derive(Debug)]
 pub struct DenoActor {
     tx: mpsc::Sender<ActorCommand>,
+    #[cfg(test)]
+    launch_paths: [PathBuf; 3],
 }
 
 impl DenoActor {
@@ -245,19 +246,36 @@ impl DenoActor {
         // Create channel for requests
         let (tx, rx) = mpsc::channel(256);
 
+        #[cfg(test)]
+        let launch_paths =
+            [&script_file, &config_file, &lock_file].map(|file| file.path().to_path_buf());
+
         // Spawn actor task
         let actor_state = ActorState {
             child,
             stdin: BufWriter::new(stdin),
             line_rx,
             pending: HashMap::new(),
-            _script_file: script_file, // Keep alive for process lifetime
-            _config_file: config_file, // Keep alive for process lifetime
-            _lock_file: lock_file,     // Keep alive for process lifetime
+            files: Some(SidecarFiles {
+                _script: script_file,
+                _config: config_file,
+                _lock: lock_file,
+            }),
         };
         tokio::spawn(run_actor(actor_state, rx));
 
-        Ok(Self { tx })
+        Ok(Self {
+            tx,
+            #[cfg(test)]
+            launch_paths,
+        })
+    }
+
+    /// Where this actor's launch tempfiles were written (test-only — lets a
+    /// test assert they are deleted once the sidecar has answered).
+    #[cfg(test)]
+    pub(super) fn launch_paths(&self) -> &[PathBuf; 3] {
+        &self.launch_paths
     }
 
     /// Enqueue a request on this actor's event loop.
@@ -279,10 +297,12 @@ impl DenoActor {
         let (response_tx, response_rx) = oneshot::channel();
 
         let request = ActorRequest {
-            id,
-            tool: tool.to_string(),
-            content: content.to_string(),
-            options: options.cloned(),
+            wire: WireRequest {
+                id,
+                tool: tool.to_string(),
+                content: content.to_string(),
+                options: options.cloned(),
+            },
             response_tx,
         };
 
@@ -324,26 +344,36 @@ struct ActorState {
     stdin: BufWriter<ChildStdin>,
     line_rx: mpsc::Receiver<String>,
     pending: HashMap<u64, oneshot::Sender<Result<Value, DenoError>>>,
-    _script_file: NamedTempFile,
-    _config_file: NamedTempFile,
-    _lock_file: NamedTempFile,
+    /// The files deno was launched from, until the sidecar's first stdout line
+    /// — see [`SidecarFiles`].
+    files: Option<SidecarFiles>,
+}
+
+/// The three tempfiles a sidecar is launched from: the script, its deno
+/// config, and the frozen lockfile the config names. Dropping deletes them.
+///
+/// They are dropped at the sidecar's first stdout line rather than with the
+/// actor, because the pool is a process-global static: an actor is never
+/// dropped when the process exits, so files held for its lifetime would
+/// outlive every run, three per spawn. Deno has read all three by the time the
+/// script prints anything — the config and lockfile at startup, the script and
+/// its imports (all static, resolved against the in-memory lock) before the
+/// module body runs — so nothing reads them afterwards. A process killed
+/// before its sidecar's first line still leaves its three behind.
+struct SidecarFiles {
+    _script: NamedTempFile,
+    _config: NamedTempFile,
+    _lock: NamedTempFile,
 }
 
 impl ActorState {
     /// Send a request to the sidecar
     async fn send_request(&mut self, req: ActorRequest) -> Result<(), DenoError> {
-        let wire_req = WireRequest {
-            id: req.id,
-            tool: req.tool,
-            content: req.content,
-            options: req.options,
-        };
-
         // Store the response channel
-        self.pending.insert(req.id, req.response_tx);
+        self.pending.insert(req.wire.id, req.response_tx);
 
         // Serialize and send
-        let json = serde_json::to_string(&wire_req).map_err(|e| {
+        let json = serde_json::to_string(&req.wire).map_err(|e| {
             DenoError::Communication(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
         })?;
         self.stdin
@@ -373,6 +403,11 @@ impl ActorState {
                 });
             }
         };
+        // Any stdout line means the module graph is loaded and running, so the
+        // launch files have been read for the last time — see `SidecarFiles`.
+        // Dropped before the response is sent, so a caller holding one knows
+        // they are gone.
+        self.files = None;
 
         // Skip empty lines and non-JSON output (defensive against stdout noise from npm packages)
         let trimmed = line.trim();

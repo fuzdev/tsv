@@ -69,6 +69,7 @@ use crate::cli::CliError;
 use crate::render_normalize::structural_skeleton;
 
 use super::profile::{is_input_invalid_fixture, is_ts_family, resolve_seed_files_named};
+use super::skip_ascii_whitespace;
 
 /// Audit whether tsv formatting re-binds any forward-binding comment (JSDoc cast
 /// or bundler annotation) to a different subtree.
@@ -81,9 +82,10 @@ use super::profile::{is_input_invalid_fixture, is_ts_family, resolve_seed_files_
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "binding_audit")]
 pub struct BindingAuditCommand {
-    /// gate mode: fail (exit 1) on HARD findings only — an owned cast/annotation
-    /// comment that re-binds. Soft findings (plain glued comments) are counted
-    /// but non-fatal. This is the `deno task check` regression-guard mode.
+    /// gate mode: report only HARD findings — an owned cast/annotation comment
+    /// that re-binds — and exit 1 on any. Soft findings (plain glued comments)
+    /// are counted but non-fatal. Without it the run reports every finding and
+    /// exits 0. This is the `deno task check` regression-guard mode.
     #[argh(switch)]
     gate: bool,
 
@@ -163,6 +165,8 @@ struct CommentBinding {
 
 /// Per-file outcome.
 enum FileOutcome {
+    /// The file could not be read.
+    ReadError,
     /// Input didn't parse (a parse gap; out of scope).
     ParseError,
     /// tsv couldn't format the input.
@@ -209,6 +213,7 @@ impl BindingAuditCommand {
         let mut compared = 0usize;
         for path in &files {
             match audit_file(path) {
+                FileOutcome::ReadError => *counts.entry("read_error").or_default() += 1,
                 FileOutcome::ParseError => *counts.entry("parse_error").or_default() += 1,
                 FileOutcome::FormatError => *counts.entry("format_error").or_default() += 1,
                 FileOutcome::ReparseError => *counts.entry("reparse_error").or_default() += 1,
@@ -246,16 +251,22 @@ impl BindingAuditCommand {
         counts: &BTreeMap<&'static str, usize>,
         findings: &[Finding],
     ) -> Result<(), CliError> {
-        // `--gate` fails on hard findings only; a bare run fails on any finding.
-        let has_hard = findings.iter().any(|f| f.hard);
-        let is_fail = if self.gate {
-            has_hard
+        // `--gate` fails on hard findings; a bare run reports every finding and exits 0.
+        let verdict = if self.gate && findings.iter().any(|f| f.hard) {
+            Err(CliError::Failed)
         } else {
-            !findings.is_empty()
+            Ok(())
+        };
+        // In gate mode only hard findings are reported, in both outputs (soft are
+        // informational and already shown in the counts).
+        let reported: Vec<&Finding> = if self.gate {
+            findings.iter().filter(|f| f.hard).collect()
+        } else {
+            findings.iter().collect()
         };
 
         if self.json {
-            let findings_json: Vec<Value> = findings
+            let findings_json: Vec<Value> = reported
                 .iter()
                 .map(|f| {
                     serde_json::json!({
@@ -274,12 +285,8 @@ impl BindingAuditCommand {
                 "counts": counts,
                 "findings": findings_json,
             });
-            println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
-            return if is_fail {
-                Err(CliError::Failed)
-            } else {
-                Ok(())
-            };
+            super::print_json_pretty(&out);
+            return verdict;
         }
 
         println!("comment↔token binding audit — {scanned} files\n");
@@ -291,20 +298,9 @@ impl BindingAuditCommand {
             println!("(gate mode: only hard_rebind fails; soft counts are informational)\n");
         }
 
-        // In gate mode only hard findings are reported (soft are informational and
-        // already shown in the counts).
-        let reported: Vec<&Finding> = if self.gate {
-            findings.iter().filter(|f| f.hard).collect()
-        } else {
-            findings.iter().collect()
-        };
         if reported.is_empty() {
             println!("✓ no re-binding findings (every glued comment binds the same subtree)");
-            return if is_fail {
-                Err(CliError::Failed)
-            } else {
-                Ok(())
-            };
+            return verdict;
         }
         println!("✗ {} finding(s):\n", reported.len());
         for f in reported {
@@ -329,18 +325,17 @@ impl BindingAuditCommand {
                 println!("      out: {}", f.out_sig);
             }
         }
-        if is_fail {
-            Err(CliError::Failed)
-        } else {
-            Ok(())
+        if !self.gate {
+            println!("\n(report-only: exits 0 — `--gate` fails on hard_rebind findings)");
         }
+        verdict
     }
 }
 
 /// Audit one file: format it, reparse both, align block comments, compare bindings.
 fn audit_file(path: &Path) -> FileOutcome {
     let Ok(source) = std::fs::read_to_string(path) else {
-        return FileOutcome::ParseError;
+        return FileOutcome::ReadError;
     };
     let Some(input) = extract_bindings(&source) else {
         return FileOutcome::ParseError;
@@ -417,7 +412,7 @@ fn comment_binding(
     content: &str,
 ) -> Option<Binding> {
     let end = comment.span.end as usize;
-    let anchor = skip_ws(bytes, end);
+    let anchor = skip_ascii_whitespace(bytes, end);
     // Glued to another comment or EOF — bound to no token.
     if anchor >= bytes.len() || bytes[anchor] == b'/' {
         return None;
@@ -546,13 +541,6 @@ fn strip_parens(v: &Value) -> Value {
         Value::Array(a) => Value::Array(a.iter().map(strip_parens).collect()),
         other => other.clone(),
     }
-}
-
-fn skip_ws(bytes: &[u8], mut i: usize) -> usize {
-    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    i
 }
 
 /// Skip a run of whitespace + comments (not strings — a string starts an

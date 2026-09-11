@@ -87,7 +87,7 @@ use tsv_cli::cli::input::ParserType;
 use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char, text_edge_ws};
 
 use crate::audit::excerpt::line_context;
-use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
+use crate::audit::panic_hook::SuppressedPanicHook;
 use crate::audit::properties::{BaseFixedPoint, base_fixed_point};
 use crate::audit::repro::{ReproCase, write_repro_case};
 use crate::audit::tally::CappedPaths;
@@ -520,6 +520,8 @@ impl Outcome {
 struct Report {
     files_scanned: usize,
     files_parse_error: usize,
+    /// Files that could not be read — never scanned.
+    files_read_error: usize,
     /// Seeds whose own format is not a fixed point: excluded from the authoring analysis
     /// (there is nothing for the variants to converge ON) and a failure of the run. A
     /// [`CappedPaths`] rather than a count beside a `Vec`, so the number the report prints
@@ -707,7 +709,10 @@ impl AuthoringAuditCommand {
         if is_input_invalid_fixture(path) {
             return None;
         }
-        let source = std::fs::read_to_string(path).ok()?;
+        let Ok(source) = std::fs::read_to_string(path) else {
+            report.files_read_error += 1;
+            return None;
+        };
         report.files_scanned += 1;
         let f = match base_fixed_point(&source, ParserType::Svelte) {
             BaseFixedPoint::Ok(f) => f,
@@ -803,11 +808,7 @@ fn guarded<T>(path: &Path, report: &mut Report, work: impl FnOnce(&mut Report) -
     match std::panic::catch_unwind(AssertUnwindSafe(|| work(report))) {
         Ok(value) => Some(value),
         Err(payload) => {
-            report.panics.push(format!(
-                "{}: {}",
-                path.display(),
-                panic_message(payload.as_ref())
-            ));
+            report.panics.push_panic(path, payload.as_ref());
             None
         }
     }
@@ -825,9 +826,10 @@ fn splice(f: &str, site: &Site) -> String {
 fn print_human(report: &Report, verbose: bool, triaged: bool) {
     println!("Authoring-independence audit (Svelte boundary whitespace)");
     println!(
-        "  files: {} scanned, {} parse-error, {} base-non-idempotent",
+        "  files: {} scanned, {} parse-error, {} read-error, {} base-non-idempotent",
         report.files_scanned,
         report.files_parse_error,
+        report.files_read_error,
         report.base_non_idempotent.count(),
     );
     println!(
@@ -1003,6 +1005,7 @@ fn print_json(report: &Report) {
     let out = serde_json::json!({
         "files_scanned": report.files_scanned,
         "files_parse_error": report.files_parse_error,
+        "files_read_error": report.files_read_error,
         "files_base_non_idempotent": report.base_non_idempotent.count(),
         "panicked": report.panics.count(),
         "sites": report.sites,
@@ -1013,7 +1016,7 @@ fn print_json(report: &Report) {
         "base_non_idempotent_sample": report.base_non_idempotent.sample(),
         "panicked_sample": report.panics.sample(),
     });
-    println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    super::print_json_pretty(&out);
 }
 
 #[cfg(test)]

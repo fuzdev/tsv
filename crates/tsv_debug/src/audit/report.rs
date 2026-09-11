@@ -27,12 +27,13 @@
 //! Sketched here (not migrated) to prove `{skeleton + detail}` doesn't flatten a
 //! load-bearing distinction:
 //!
-//! - **`roundtrip_audit`** — 7 buckets (`clean`, `format_error`,
+//! - **`roundtrip_audit`** — 10 buckets (`clean`, `read_error`, `format_error`,
 //!   `canonical_rejects_input`, `{canonical,tsv}_unreparseable`,
-//!   `{canonical,tsv}_divergent`). The two `*_unreparseable` (the reliable half,
-//!   `--gate`-fatal) → `severity: GateFailing`; the two `*_divergent`
-//!   (render-model noise, informational under `--gate`) → `Informational`;
-//!   `clean` / `format_error` / `*_rejects_input` are non-findings, not emitted.
+//!   `{canonical,tsv}_leaf_corruption`, `{canonical,tsv}_divergent`). The four
+//!   `*_unreparseable` / `*_leaf_corruption` (`--gate`-fatal) → `severity: GateFailing`;
+//!   the two `*_divergent` (render-model noise, informational under `--gate`) →
+//!   `Informational`; `clean` / `read_error` / `format_error` / `*_rejects_input` are
+//!   non-findings, not emitted.
 //!   The two-phase oracle → `confidence`: a canonical-confirmed finding is
 //!   `Confirmed`, a tsv-self-only suspect (canonical didn't run) `Unconfirmed`.
 //!   The exact bucket label rides `detail` verbatim, so the
@@ -245,6 +246,8 @@ pub(crate) struct RunSummary {
     pub(crate) injections: usize,
     pub(crate) accepted: usize,
     pub(crate) parse_skipped: usize,
+    /// Files that could not be read — never probed.
+    pub(crate) read_errors: usize,
     /// Files already non-clean before injection — reported, never injected into.
     pub(crate) dirty_files: Vec<String>,
     pub(crate) payload_labels: Vec<&'static str>,
@@ -267,6 +270,13 @@ fn print_header(s: &RunSummary) {
         s.accepted,
         s.payload_labels.join(", ")
     );
+
+    if s.read_errors > 0 {
+        println!(
+            "○ {} file(s) could not be read — never probed\n",
+            s.read_errors
+        );
+    }
 
     if !s.dirty_files.is_empty() {
         println!(
@@ -451,9 +461,28 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
     }
 }
 
+/// How many entries a gate report lists per section before its `… and N more` tail.
+const REPORT_LIST_CAP: usize = 40;
+
+/// Print one gate-report section's entries to stderr, each rendered by `line`, capped at
+/// [`REPORT_LIST_CAP`] with an `… and N more` tail.
+pub(crate) fn eprint_capped<T>(
+    items: impl ExactSizeIterator<Item = T>,
+    line: impl Fn(T) -> String,
+) {
+    let total = items.len();
+    for item in items.take(REPORT_LIST_CAP) {
+        eprintln!("{}", line(item));
+    }
+    if total > REPORT_LIST_CAP {
+        eprintln!("    … and {} more", total - REPORT_LIST_CAP);
+    }
+}
+
 /// Print the findings as JSON, folding in any audit-specific **top-level** sections `extra`
-/// carries (the run-level per-audit detail slot the module docs flag as future work — gap uses
-/// it for its report-only `by_node` (+ `by_node_unresolved`) rollup). An empty `extra` reproduces the bare
+/// carries (the run-level per-audit detail slot — gap uses it for its report-only `by_node`
+/// (+ `by_node_unresolved`) rollup, blank and ignore for their companion sections). An empty
+/// `extra` reproduces the bare
 /// envelope byte-for-byte, so an audit with nothing to add passes `&Map::new()`.
 pub(crate) fn print_json(
     s: &RunSummary,
@@ -553,6 +582,7 @@ pub(crate) fn print_json(
         "injections": s.injections,
         "accepted": s.accepted,
         "parse_skipped": s.parse_skipped,
+        "read_skipped": s.read_errors,
         "dirty_files": s.dirty_files,
         "payloads": s.payload_labels,
         "findings": findings.iter().map(Finding::count).sum::<usize>(),
@@ -565,7 +595,7 @@ pub(crate) fn print_json(
             map.insert(k.clone(), v.clone());
         }
     }
-    println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    crate::cli::commands::print_json_pretty(&out);
 }
 
 /// How many pinnable findings ([`Severity::Informational`]) carry the given

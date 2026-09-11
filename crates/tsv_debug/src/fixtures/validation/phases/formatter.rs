@@ -13,8 +13,7 @@ pub(in crate::fixtures::validation) fn validate_formatter_idempotent(
     fixture: &Fixture,
     input: &str,
 ) -> bool {
-    match fixtures::format_with_our_formatter_with_goal(input, &fixture.input_file, fixture.goal())
-    {
+    match fixtures::format_with_our_formatter(input, &fixture.input_file, fixture.goal()) {
         Ok(formatted) => {
             if formatted != *input {
                 result.add_error(ValidationError::FormatterInputNotIdempotent(

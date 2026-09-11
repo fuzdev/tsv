@@ -77,12 +77,12 @@ async fn test_all_fixtures() {
     // pinned entry must still fire — a stale one means the oracle improved)
     summary.detect_stale_benign_render_equiv();
 
-    // Detect Deno sidecar crash pattern (many "deno actor shut down" errors)
+    // Detect Deno sidecar crash pattern (many actor-shutdown / crash / empty-output errors)
     let sidecar_failures = summary.count_sidecar_failures();
     assert!(
         sidecar_failures <= 5,
         "\n\nDeno sidecar crashed during test run!\n\n\
-        {sidecar_failures} fixtures failed with 'deno actor shut down' errors.\n\
+        {sidecar_failures} fixtures failed with sidecar faults (actor shutdown, crash, or empty output).\n\
         This indicates the Deno process died unexpectedly during validation.\n\n\
         This is an infrastructure issue, not a fixture issue.\n\
         Try running the tests again. If this persists, check:\n\

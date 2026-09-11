@@ -21,6 +21,8 @@ use super::baseline::parse_baseline;
 use super::discovery::Baseline;
 use super::pretty::{parse_pretty, render_pretty};
 use super::render::{render_baseline, self_assertion_violations};
+use crate::cli::commands::profile::pct;
+use crate::cli::commands::truncate_chars;
 use std::collections::BTreeMap;
 
 /// Cap on the message excerpt shown for a failing baseline (in chars).
@@ -234,16 +236,6 @@ fn record(
     bucket_map.entry(bucket).or_default().push(example);
 }
 
-/// `count / total * 100`, guarding division by zero.
-#[allow(clippy::cast_precision_loss)] // counts stay well within f64 precision
-fn pct(count: usize, total: usize) -> f64 {
-    if total == 0 {
-        0.0
-    } else {
-        (count as f64 / total as f64) * 100.0
-    }
-}
-
 /// The first differing `CRLF`-line between the original and the render, with a
 /// truncated excerpt of each (`<EOF>` when one side ran out first).
 fn first_diff(original: &str, rendered: &str) -> (usize, String, String) {
@@ -253,18 +245,10 @@ fn first_diff(original: &str, rendered: &str) -> (usize, String, String) {
     while k < a.len() && k < b.len() && a[k] == b[k] {
         k += 1;
     }
-    let excerpt = |s: Option<&&str>| s.map_or_else(|| "<EOF>".to_string(), |v| truncate(v));
+    let excerpt = |s: Option<&&str>| {
+        s.map_or_else(|| "<EOF>".to_string(), |v| truncate_chars(v, EXCERPT_CHARS))
+    };
     (k, excerpt(a.get(k)), excerpt(b.get(k)))
-}
-
-/// Truncate to [`EXCERPT_CHARS`] chars (char-safe), appending an ellipsis.
-fn truncate(s: &str) -> String {
-    if s.chars().count() <= EXCERPT_CHARS {
-        s.to_string()
-    } else {
-        let head: String = s.chars().take(EXCERPT_CHARS).collect();
-        format!("{head}…")
-    }
 }
 
 /// Bucket a failing baseline by its most salient format feature (priority

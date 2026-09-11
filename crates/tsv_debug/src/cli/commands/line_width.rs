@@ -144,10 +144,7 @@ impl LineWidthCommand {
         // Print JSON output
         if self.json {
             let output = serde_json::json!({"lines": json_results});
-            // SAFETY: serde_json Value types always serialize successfully
-            #[allow(clippy::unwrap_used)]
-            let json_str = serde_json::to_string_pretty(&output).unwrap();
-            println!("{json_str}");
+            super::print_json_pretty(&output);
         }
 
         Ok(())

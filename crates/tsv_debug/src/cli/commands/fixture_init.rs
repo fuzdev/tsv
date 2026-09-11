@@ -211,14 +211,12 @@ fn write_goal_marker(dir: &Path, goal: Goal) -> Result<(), String> {
             println!("✓ {GOAL_FILENAME} ({})", goal.source_type());
             Ok(())
         }
-        Goal::Module => match std::fs::remove_file(&path) {
-            Ok(()) => {
+        Goal::Module => {
+            if fixtures::remove_if_present(&path)? {
                 println!("✓ {GOAL_FILENAME} removed (module is the default goal)");
-                Ok(())
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(format!("Failed to remove {}: {e}", path.display())),
-        },
+            Ok(())
+        }
     }
 }
 
@@ -259,19 +257,18 @@ fn resolve_content(
     dir: &Path,
     input_type: InputType,
 ) -> Result<String, String> {
+    // --content / --stdin write a new input, so neither may replace one without --force
+    if (content_flag.is_some() || use_stdin) && !force && find_input_file(dir).is_some() {
+        return Err("Input file already exists. Use --force to overwrite.".to_string());
+    }
+
     // --content flag
     if let Some(content) = content_flag {
-        if !force && find_input_file(dir).is_some() {
-            return Err("Input file already exists. Use --force to overwrite.".to_string());
-        }
         return Ok(content.to_string());
     }
 
     // --stdin flag (explicit, consistent with other tsv_debug commands)
     if use_stdin {
-        if !force && find_input_file(dir).is_some() {
-            return Err("Input file already exists. Use --force to overwrite.".to_string());
-        }
         let mut buffer = String::new();
         std::io::Read::read_to_string(&mut std::io::stdin(), &mut buffer)
             .map_err(|e| format!("Failed to read stdin: {e}"))?;

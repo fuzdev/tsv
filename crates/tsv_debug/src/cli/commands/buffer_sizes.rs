@@ -2,7 +2,7 @@ use argh::FromArgs;
 use std::path::Path;
 
 use crate::cli::CliError;
-use crate::cli::commands::profile::resolve_profile_files;
+use crate::cli::commands::profile::{percentile, resolve_profile_files};
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::Comment;
 use tsv_lang::estimated_ast_arena_capacity;
@@ -152,7 +152,7 @@ fn collect_file(
     Ok(())
 }
 
-/// Report the four printer-buffer populations sampled during the format runs.
+/// Report the three printer-buffer populations sampled during the format runs.
 /// Each label's inline `N` is read from the buffer type itself, so a re-tuned
 /// capacity can't leave a stale label here.
 #[cfg(feature = "buffer_stats")]
@@ -224,15 +224,6 @@ fn collect_comments(comments: &[Comment], source: &str, comment_lines: &mut Vec<
             comment_lines.push(comment.content(source).split('\n').count());
         }
     }
-}
-
-/// Value at percentile `p` (0..=100) of a pre-sorted slice (nearest-rank).
-fn percentile(sorted: &[usize], p: usize) -> usize {
-    if sorted.is_empty() {
-        return 0;
-    }
-    let idx = (p * (sorted.len() - 1) + 50) / 100;
-    sorted[idx]
 }
 
 #[allow(clippy::cast_precision_loss)]

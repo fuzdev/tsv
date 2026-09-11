@@ -329,12 +329,13 @@ What's shared through tsv_lang vs reimplemented per language, and why:
 **Code distribution** (from `cargo run -p tsv_debug metrics`):
 
 ```
-foundation (tsv_lang + tsv_html): ~7% of codebase
-languages (tsv_ts + tsv_css + tsv_svelte): ~49%
-experimental compiler + checker (tsv_svelte_compile + tsv_check): ~20%
-tooling (tsv_cli + tsv_debug + bindings): ~23%
+foundation (tsv_lang + tsv_arena + tsv_html + tsv_ignore + tsv_discover): ~9% of codebase
+languages (tsv_ts + tsv_css + tsv_svelte): ~52%
+compiler (tsv_svelte_compile): ~12%
+experimental checker (tsv_check): ~5%
+tooling (tsv_cli + tsv_debug + bindings): ~22%
 
-printer % of language code: ~61%
+printer % of language code: ~63%
 ```
 
 The 7% foundation / 49% language split (the experimental compiler/checker and dev tooling counted separately) reflects genuine domain complexity, not missing extraction opportunities. The doc builder already factors out the rendering algorithm (the expensive shared part); what remains language-specific is the _formatting decisions_ themselves — when to break, how to indent, where to attach comments — which differ fundamentally between TypeScript, CSS, and Svelte.

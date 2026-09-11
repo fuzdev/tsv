@@ -109,7 +109,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::audit::excerpt::{first_line_diff, line_context};
-use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
+use crate::audit::panic_hook::SuppressedPanicHook;
 use crate::audit::properties::{
     BaseFixedPoint, Utf16ToByte, base_fixed_point, source_has_ignore_directive, tsv_parse_to_value,
 };
@@ -348,6 +348,8 @@ struct Finding {
 struct Report {
     files_scanned: usize,
     files_parse_error: usize,
+    /// Files that could not be read — never scanned.
+    files_read_error: usize,
     files_output_reparse_error: usize,
     files_ignore_directive: usize,
     /// Seeds whose own format is not a fixed point: excluded from the re-association
@@ -419,11 +421,7 @@ impl ParenAuditCommand {
                     self.scan_file(path, &mut report);
                 }));
                 if let Err(payload) = scanned {
-                    report.panics.push(format!(
-                        "{}: {}",
-                        path.display(),
-                        panic_message(payload.as_ref())
-                    ));
+                    report.panics.push_panic(path, payload.as_ref());
                 }
             }
         }
@@ -451,6 +449,7 @@ impl ParenAuditCommand {
             return;
         }
         let Ok(source) = std::fs::read_to_string(path) else {
+            report.files_read_error += 1;
             return;
         };
         // A frozen region reproduces the inserted parens verbatim — correct behavior that
@@ -548,9 +547,10 @@ fn describe_first_diff(base: &str, variant: &str) -> Option<(usize, String, Stri
 fn print_human(report: &Report, examples: usize) {
     println!("Paren-authoring independence audit (same-operator logical re-association)");
     println!(
-        "  files: {} scanned, {} parse-error, {} output-reparse-error, {} ignore-directive (skipped), {} base-non-idempotent",
+        "  files: {} scanned, {} parse-error, {} read-error, {} output-reparse-error, {} ignore-directive (skipped), {} base-non-idempotent",
         report.files_scanned,
         report.files_parse_error,
+        report.files_read_error,
         report.files_output_reparse_error,
         report.files_ignore_directive,
         report.base_non_idempotent.count(),
@@ -694,6 +694,7 @@ fn print_json(report: &Report) {
     let out = serde_json::json!({
         "files_scanned": report.files_scanned,
         "files_parse_error": report.files_parse_error,
+        "files_read_error": report.files_read_error,
         "files_output_reparse_error": report.files_output_reparse_error,
         "files_ignore_directive": report.files_ignore_directive,
         "files_base_non_idempotent": report.base_non_idempotent.count(),
@@ -706,7 +707,7 @@ fn print_json(report: &Report) {
         "base_non_idempotent_sample": report.base_non_idempotent.sample(),
         "panicked_sample": report.panics.sample(),
     });
-    println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    super::print_json_pretty(&out);
 }
 
 #[cfg(test)]

@@ -456,6 +456,35 @@ pub(crate) enum F1Outcome {
     NonIdempotent,
 }
 
+impl F1Outcome {
+    /// A **reliable** finding — always a real bug: `format_error` / `unreparseable` mean tsv
+    /// can't round-trip its own output, `non_idempotent` breaks the F1 fixed point, and
+    /// `leaf_value_corruption` is a still-parses value change invisible to the structural
+    /// skeleton. `structural_divergence` is the soft bucket; `rejected` and `ok` aren't findings.
+    pub(crate) fn is_hard(self) -> bool {
+        matches!(
+            self,
+            Self::FormatError
+                | Self::Unreparseable
+                | Self::LeafValueCorruption
+                | Self::NonIdempotent
+        )
+    }
+
+    /// The outcome's report and `--json` label.
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Rejected => "rejected",
+            Self::Ok => "ok",
+            Self::FormatError => "format_error",
+            Self::Unreparseable => "unreparseable",
+            Self::LeafValueCorruption => "leaf_value_corruption",
+            Self::StructuralDivergence => "structural_divergence",
+            Self::NonIdempotent => "non_idempotent",
+        }
+    }
+}
+
 /// Run the shared format-fixed-point invariants on one already-valid-UTF-8 input. See
 /// [`F1Outcome`] for the variants.
 ///

@@ -128,16 +128,16 @@ use crate::audit::properties::{
     pristine_format, source_has_ignore_directive, structurally_equivalent, tsv_parse_to_value,
 };
 use crate::audit::ratchet::{
-    GateDiff, Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update,
+    GateDiff, Ratchet, SnapshotKey, print_ratchet_skipped, print_verdict, refuse_narrowed_update,
     report_unpinned_panics,
 };
 use crate::audit::report::{
-    self, BlankDetail, Detail, Finding, ReportExample, RunSummary, Severity,
+    self, BlankDetail, Detail, Finding, ReportExample, RunSummary, Severity, eprint_capped,
 };
 use crate::audit::sites::{
     code_regions, injection_sites, site_shape, snippet, string_and_template_spans,
 };
-use crate::audit::tally::CappedPaths;
+use crate::audit::tally::{CappedPaths, merge_shape_map};
 use crate::cli::CliError;
 
 use super::profile::{is_input_invalid_fixture, resolve_seed_files};
@@ -192,11 +192,15 @@ pub struct BlankAuditCommand {
 /// ≤1-blank-run invariant must collapse.
 const PAYLOAD: &str = "\n\n";
 
+/// Every structural compare here is render-aware: Svelte 5 render-time template whitespace is
+/// normalized before the skeletons are compared (see `structurally_equivalent`).
+const RENDER: bool = true;
+
 /// Why an injected blank is a finding. `Panic` is the one absolute break (never pinnable); the
 /// rest are policy invariants the ratchet grades.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum BlankKind {
-    /// The formatter crashed on the injected blank — a comment in a gap must never do this.
+    /// The formatter crashed on the injected blank — a blank in a gap must never do this.
     /// NEVER pinnable.
     Panic,
     /// `format(format(x)) != format(x)` — the specifier-list / array-pattern class.
@@ -555,23 +559,6 @@ impl AbsorbAgg {
     }
 }
 
-/// Merge one worker's per-key aggregates into the total's — the shared body behind both of
-/// [`Tally::merge`]'s shape maps (the finding shapes and the absorb classes).
-fn merge_shape_map<K: Ord, V>(
-    dst: &mut BTreeMap<K, V>,
-    src: BTreeMap<K, V>,
-    merge: impl Fn(&mut V, V),
-) {
-    for (k, v) in src {
-        match dst.get_mut(&k) {
-            Some(e) => merge(e, v),
-            None => {
-                dst.insert(k, v);
-            }
-        }
-    }
-}
-
 /// One thread's slice of the work.
 #[derive(Default)]
 struct Tally {
@@ -593,6 +580,8 @@ struct Tally {
     absorbed: usize,
     files_done: usize,
     parse_skipped: usize,
+    /// Files that could not be read — never injected into.
+    read_errors: usize,
     /// Files that dropped/double-printed a comment AS AUTHORED (ledger-dirty) — reported by
     /// `comments:audit`, not injected into. ~0 over `tests/fixtures`.
     dirty_files: Vec<String>,
@@ -649,6 +638,7 @@ impl Tally {
         self.absorbed += other.absorbed;
         self.files_done += other.files_done;
         self.parse_skipped += other.parse_skipped;
+        self.read_errors += other.read_errors;
         self.dirty_files.extend(other.dirty_files);
         self.not_clean.merge(other.not_clean);
         merge_shape_map(&mut self.shapes, other.shapes, ShapeAgg::merge);
@@ -812,13 +802,14 @@ fn blank_run_violation(output: &str, wire: &Value, skip: bool) -> Option<usize> 
 /// The pristine gate is load-bearing: a file that already isn't a fixed point (or is ledger-dirty,
 /// or already blank-run-violating) would re-report that base problem at every one of its sites, so
 /// such a file is reported once and skipped.
-fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
+fn audit_file(path: &std::path::Path, tally: &mut Tally) {
     let display = path.to_string_lossy().into_owned();
     // Intentionally-invalid fixtures don't parse — nothing to inject into.
     if is_input_invalid_fixture(path) {
         return;
     }
     let Ok(source) = std::fs::read_to_string(path) else {
+        tally.read_errors += 1;
         return;
     };
     let parser = ParserType::from_extension(&display);
@@ -844,7 +835,7 @@ fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
         } => (comment_spans, output),
     };
     // Pristine 2/3 — a format fixed point (idempotency / reparse / leaf) as authored.
-    match std::panic::catch_unwind(AssertUnwindSafe(|| f1_check(&source, parser, render))) {
+    match std::panic::catch_unwind(AssertUnwindSafe(|| f1_check(&source, parser, RENDER))) {
         Ok(F1Outcome::Ok) => {}
         _ => {
             tally.record_not_clean(display);
@@ -945,7 +936,7 @@ fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
         // `catch_unwind` (the first format didn't panic, so any panic here is the reparse or the
         // idempotency-format's).
         let graded = std::panic::catch_unwind(AssertUnwindSafe(|| {
-            grade_changed(&injected, &output, parser, render, has_format_ignore)
+            grade_changed(&injected, &output, parser, has_format_ignore)
         }));
         match graded {
             Err(_) => tally.record(BlankKind::Panic, offset, &source, &display),
@@ -981,7 +972,6 @@ fn grade_changed(
     injected: &str,
     output: &str,
     parser: ParserType,
-    render: bool,
     has_format_ignore: bool,
 ) -> Vec<BlankKind> {
     let mut kinds = Vec::new();
@@ -1004,7 +994,7 @@ fn grade_changed(
     let leaf_changed = leaf_conservation_diff(&wire_in, &wire_out).is_some();
     // Invariant 3 (structure) — the reparse-skeleton compare. Structure / leaf / idempotency are
     // exclusive, in `f1_check`'s priority order.
-    let (equal, _) = structurally_equivalent(wire_in, wire_out, render, false);
+    let (equal, _) = structurally_equivalent(wire_in, wire_out, RENDER, false);
     if !equal {
         kinds.push(BlankKind::StructuralDivergence);
     } else if leaf_changed {
@@ -1046,20 +1036,20 @@ impl BlankAuditCommand {
         let files = resolve_seed_files(&self.paths, self.limit)?;
 
         let armed = ArmedRun::arm(false);
-        let render = true;
         // Stride-chunked worker pool (see `audit::parallel::run_pool`); a worker panic outside the
         // per-injection catch fails the run rather than silently dropping a tally.
-        let total = run_pool(
-            &files,
-            self.jobs,
-            |path, tally| audit_file(path, render, tally),
-            Tally::merge,
-        )?;
+        let total = run_pool(&files, self.jobs, audit_file, Tally::merge)?;
         drop(armed);
 
         if self.update {
-            ratchet().write_pinned(&snapshot_keys(&total.shapes), "shape")?;
-            absorb_ratchet().write_pinned(&absorb_keys(&total.absorb_shapes), "absorb class")?;
+            // `--update` prints no JSON document, so the write lines stay on stdout beside the
+            // report lines below rather than splitting off to stderr under `--json`.
+            ratchet().write_pinned(&snapshot_keys(&total.shapes), "shape", false)?;
+            absorb_ratchet().write_pinned(
+                &absorb_keys(&total.absorb_shapes),
+                "absorb class",
+                false,
+            )?;
             // The report-only STRUCTURAL-DIVERGENCE shapes are deliberately NOT in the file — name
             // the count at re-pin so it's clear they were seen and held soft, not lost.
             let soft = count_soft(&total.shapes);
@@ -1205,30 +1195,23 @@ impl BlankAuditCommand {
                  pinnable and not a ratchet entry: fix the crash.",
                 panics.len()
             );
-            for ((_, shape), agg) in panics.iter().take(40) {
+            eprint_capped(panics.iter(), |((_, shape), agg)| {
                 let ex = agg.examples.canonical();
-                eprintln!(
+                format!(
                     "    {shape:<20} e.g. inject blank at {}:{}",
                     ex.path, ex.offset
-                );
-            }
-            if panics.len() > 40 {
-                eprintln!("    … and {} more", panics.len() - 40);
-            }
+                )
+            });
         }
 
+        let shape_line = |k: &BlankKey| format!("    {:<22} {}", k.kind.label(), k.shape);
         if !new.is_empty() {
             eprintln!(
                 "\n✗ {} NEW finding shape(s) — a blank in one of these gaps breaks an invariant \
                  the snapshot has never seen:",
                 new.len()
             );
-            for k in new.iter().take(40) {
-                eprintln!("    {:<22} {}", k.kind.label(), k.shape);
-            }
-            if new.len() > 40 {
-                eprintln!("    … and {} more", new.len() - 40);
-            }
+            eprint_capped(new.iter(), shape_line);
             eprintln!(
                 "  Fix it, or — if it is genuinely pre-existing and merely newly REACHED by a \
                  fixture — re-run `deno task blanks:audit:update`."
@@ -1240,12 +1223,7 @@ impl BlankAuditCommand {
                  drop the lines (`deno task blanks:audit:update`):",
                 stale.len()
             );
-            for k in stale.iter().take(40) {
-                eprintln!("    {:<22} {}", k.kind.label(), k.shape);
-            }
-            if stale.len() > 40 {
-                eprintln!("    … and {} more", stale.len() - 40);
-            }
+            eprint_capped(stale.iter(), shape_line);
         }
 
         if diff.holds() {
@@ -1254,11 +1232,7 @@ impl BlankAuditCommand {
                  breaks an invariant",
                 diff.known
             );
-            if self.json {
-                eprintln!("{msg}");
-            } else {
-                println!("{msg}");
-            }
+            print_verdict(self.json, &msg);
             Ok(())
         } else {
             Err(CliError::Failed)
@@ -1283,21 +1257,16 @@ fn report_absorb_gate(diff: &GateDiff<AbsorbKey>, total: &Tally) -> Result<(), C
              it, this is a blank-DROP bug — fix it instead.",
             new.len()
         );
-        for k in new.iter().take(40) {
-            match total.absorb_shapes.get(&k.0) {
-                Some(agg) => {
-                    let ex = agg.shape.examples.canonical();
-                    eprintln!(
-                        "    {:<40} e.g. inject blank at {}:{}  {}",
-                        k.0, ex.path, ex.offset, ex.snippet
-                    );
-                }
-                None => eprintln!("    {}", k.0),
+        eprint_capped(new.iter(), |k| match total.absorb_shapes.get(&k.0) {
+            Some(agg) => {
+                let ex = agg.shape.examples.canonical();
+                format!(
+                    "    {:<40} e.g. inject blank at {}:{}  {}",
+                    k.0, ex.path, ex.offset, ex.snippet
+                )
             }
-        }
-        if new.len() > 40 {
-            eprintln!("    … and {} more", new.len() - 40);
-        }
+            None => format!("    {}", k.0),
+        });
     }
     if !stale.is_empty() {
         eprintln!(
@@ -1305,12 +1274,7 @@ fn report_absorb_gate(diff: &GateDiff<AbsorbKey>, total: &Tally) -> Result<(), C
              — a fix — or a vanished site). Re-pin (`{REPIN_HINT}`):",
             stale.len()
         );
-        for k in stale.iter().take(40) {
-            eprintln!("    {}", k.0);
-        }
-        if stale.len() > 40 {
-            eprintln!("    … and {} more", stale.len() - 40);
-        }
+        eprint_capped(stale.iter(), |k| format!("    {}", k.0));
     }
 
     if diff.holds() {
@@ -1335,6 +1299,7 @@ fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
         injections: total.injections,
         accepted: total.accepted,
         parse_skipped: total.parse_skipped,
+        read_errors: total.read_errors,
         dirty_files: total.dirty_files.clone(),
         payload_labels: vec!["blank"],
     };
@@ -1388,30 +1353,25 @@ fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
     if total.not_clean.is_empty() {
         return;
     }
-    let line = |s: String| {
-        if json {
-            eprintln!("{s}");
-        } else {
-            println!("{s}");
+    print_verdict(
+        json,
+        &format!(
+            "\n○ {} file(s) skipped — not a clean format fixed point AS AUTHORED (non-idempotent, \
+             unreparseable, or already blank-run-violating). Over tests/fixtures this is expected \
+             (the variant / unformatted / prettier-output fixture files are not tsv fixed points); \
+             over a real-code corpus each wants triage{}",
+            total.not_clean.count(),
+            if show_paths {
+                ":"
+            } else {
+                " (--report to list)"
+            }
+        ),
+    );
+    if show_paths {
+        for line in total.not_clean.sample_lines("    ") {
+            print_verdict(json, &line);
         }
-    };
-    line(format!(
-        "\n○ {} file(s) skipped — not a clean format fixed point AS AUTHORED (non-idempotent, \
-         unreparseable, or already blank-run-violating). Over tests/fixtures this is expected \
-         (the variant / unformatted / prettier-output fixture files are not tsv fixed points); \
-         over a real-code corpus each wants triage{}",
-        total.not_clean.count(),
-        if show_paths {
-            ":"
-        } else {
-            " (--report to list)"
-        }
-    ));
-    if !show_paths {
-        return;
-    }
-    for l in total.not_clean.sample_lines("    ") {
-        line(l);
     }
 }
 

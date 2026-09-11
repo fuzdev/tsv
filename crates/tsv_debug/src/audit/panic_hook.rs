@@ -1,5 +1,7 @@
-//! The **suppressed-panic-hook** bracket every audit that formats under
-//! `catch_unwind` installs for the duration of its corpus walk.
+//! The **panic-hook brackets**: [`SuppressedPanicHook`], which every audit that formats
+//! under `catch_unwind` installs for the duration of its corpus walk, and
+//! [`CapturingPanicHook`], which the fuzzers (`fuzz`, `compile_fuzz`) install to report each
+//! panic's text and location through [`take_last_panic`].
 //!
 //! An audit that catches a formatter panic and buckets it has already recorded
 //! the finding; the default hook then prints a full `thread '…' panicked at …`
@@ -13,38 +15,82 @@
 //! its site; a caller that dropped the hook without recording would turn a
 //! crash into silence, which is strictly worse than the noise.
 //!
-//! One definition, two consumers (`ArmedRun` in `audit::parallel` holds one —
-//! no intra-doc link, that module is feature-gated and this one is not — and
-//! `sweep_pristine_armed` installs one), because a hook left installed on an
-//! error path is invisible until the run that needed it.
+//! One definition for every caller — `ArmedRun` in `audit::parallel` holds one
+//! (no intra-doc link: that module is feature-gated and this one is not), the
+//! pristine sweep installs one, and `authoring_audit`, `paren_audit` and
+//! `tsc_conformance`'s crash probe take one directly — because a hook left
+//! installed on an error path is invisible until the run that needed it.
 
 /// The boxed hook `std::panic::take_hook` hands back — held for the restore on drop.
 type PanicHook = Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Sync + Send + 'static>;
 
-/// RAII: the default panic hook is replaced with a no-op on construction and
-/// restored on drop — including on an early-return error path, which a
-/// hand-rolled take/set pair leaks.
+/// RAII core of both brackets: installs `hook` on construction and restores the hook it
+/// displaced on drop — including on an early-return error path, which a hand-rolled take/set
+/// pair leaks.
 ///
-/// Nesting is safe: each guard restores exactly the hook it displaced, and
-/// `Drop` runs in reverse construction order.
-pub(crate) struct SuppressedPanicHook {
+/// Nesting is safe: each guard restores exactly the hook it displaced, and `Drop` runs in
+/// reverse construction order.
+struct HookGuard {
     prev: Option<PanicHook>,
 }
 
-impl SuppressedPanicHook {
-    pub(crate) fn install() -> Self {
+impl HookGuard {
+    fn install(hook: PanicHook) -> Self {
         let prev = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {}));
+        std::panic::set_hook(hook);
         Self { prev: Some(prev) }
     }
 }
 
-impl Drop for SuppressedPanicHook {
+impl Drop for HookGuard {
     fn drop(&mut self) {
         if let Some(hook) = self.prev.take() {
             std::panic::set_hook(hook);
         }
     }
+}
+
+/// RAII: the default panic hook is replaced with a no-op on construction and restored on
+/// drop.
+pub(crate) struct SuppressedPanicHook {
+    _guard: HookGuard,
+}
+
+impl SuppressedPanicHook {
+    pub(crate) fn install() -> Self {
+        Self {
+            _guard: HookGuard::install(Box::new(|_| {})),
+        }
+    }
+}
+
+thread_local! {
+    /// This thread's most recent panic, as its `Display` text (message and location), recorded
+    /// by [`CapturingPanicHook`]. Per-thread, and `catch_unwind` returns on the thread that
+    /// panicked, so a concurrent caller reads its own panic.
+    static LAST_PANIC: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// RAII: while alive, every panic's `Display` text is recorded for [`take_last_panic`] instead
+/// of printed — for a caller that reports the panics it triggers with their location. Restores
+/// the displaced hook on drop, like [`SuppressedPanicHook`].
+pub(crate) struct CapturingPanicHook {
+    _guard: HookGuard,
+}
+
+impl CapturingPanicHook {
+    pub(crate) fn install() -> Self {
+        Self {
+            _guard: HookGuard::install(Box::new(|info| {
+                LAST_PANIC.with(|c| *c.borrow_mut() = Some(info.to_string()));
+            })),
+        }
+    }
+}
+
+/// Take this thread's last panic text [`CapturingPanicHook`] recorded, clearing the slot.
+pub(crate) fn take_last_panic() -> Option<String> {
+    LAST_PANIC.with(|c| c.borrow_mut().take())
 }
 
 /// The panic payload's message, for a caller recording a caught panic.
@@ -54,13 +100,6 @@ impl Drop for SuppressedPanicHook {
 /// (a non-string payload) has no text to report. Suppressing the hook removes
 /// the only other place that text would have appeared, so a recorder that
 /// skipped this would drop it entirely.
-///
-/// Deliberately NOT shared with `tsc_conformance`'s `panic_payload_message`,
-/// which asks the same question: that module is declared under BOTH crate roots
-/// (`lib.rs` and `main.rs`) while `audit` is bin-only, so a call into here would
-/// not compile in the lib build. Unifying them means promoting this module to
-/// the crate root first. The sentinel string is kept identical to that one so
-/// the two at least read as one answer.
 pub(crate) fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
     if let Some(s) = payload.downcast_ref::<&'static str>() {
         return s;

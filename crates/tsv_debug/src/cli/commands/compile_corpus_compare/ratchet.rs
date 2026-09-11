@@ -35,7 +35,8 @@
 //!   `exit_verdict`.
 //! - `HARNESS-ERROR` — **never pinnable**. Every harness failure that is not the oracle
 //!   itself rejecting-by-throwing: a tsv-side compiler bug (`tsv-corrupt-output`,
-//!   `tsv-type-erasure-leak`, `tsv-parse`), a canonicalizer bug (`canonicalize-ours`,
+//!   `tsv-type-erasure-leak`, `tsv-generated-name-missing`, `tsv-parse`), a canonicalizer
+//!   bug (`canonicalize-ours`,
 //!   `canonicalize-oracle`, `oracle-recanonicalize`, `oracle-non-idempotent`), or an
 //!   environment failure (`read`, `oracle-sidecar`). None of those are upstream's, so
 //!   none may be laundered into a list whose header tells the next reader that an
@@ -161,7 +162,8 @@ impl Kind {
     ///
     /// The split is *whose bug is it*, and only one answer is "upstream's": the oracle
     /// throwing instead of rejecting. Everything else — a tsv compiler self-check
-    /// (`tsv-corrupt-output` / `tsv-type-erasure-leak`), a tsv parser over-rejection
+    /// (`tsv-corrupt-output` / `tsv-type-erasure-leak` / `tsv-generated-name-missing`), a
+    /// tsv parser over-rejection
     /// (`tsv-parse`), a canonicalizer failure (`canonicalize-*` / `oracle-recanonicalize`
     /// / `oracle-non-idempotent`), or an environment failure (`read` / `oracle-sidecar`)
     /// — is ours or the machine's, and must fail rather than be pinnable.

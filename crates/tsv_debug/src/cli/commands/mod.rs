@@ -127,6 +127,112 @@ pub fn path_goal(file: Option<&str>) -> Option<tsv_ts::Goal> {
     file.and_then(tsv_ts::Goal::from_extension)
 }
 
+/// Print `text`, ensuring it ends with exactly one trailing newline.
+pub(crate) fn print_block(text: &str) {
+    print!("{text}");
+    if !text.ends_with('\n') {
+        println!();
+    }
+}
+
+/// The index just past a run of ASCII whitespace starting at byte `i`.
+pub(crate) fn skip_ascii_whitespace(bytes: &[u8], mut i: usize) -> usize {
+    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    i
+}
+
+/// Read a repo document a command audits, printing the error on a miss.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when the file cannot be read.
+pub(crate) fn read_doc(path: &Path) -> Result<String, CliError> {
+    std::fs::read_to_string(path).map_err(|e| {
+        eprintln!("Error reading {}: {e}", path.display());
+        CliError::Failed
+    })
+}
+
+/// Print `value` as tab-indented JSON on stdout. `on_error` is the command's exit class for a
+/// serialization failure.
+///
+/// # Errors
+///
+/// Returns `on_error` when `value` fails to serialize.
+pub(crate) fn print_json_tabs<T: serde::Serialize>(
+    value: &T,
+    on_error: CliError,
+) -> Result<(), CliError> {
+    match crate::json::to_json_with_tabs(value) {
+        Ok(json) => {
+            println!("{json}");
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Error serializing JSON: {e}");
+            Err(on_error)
+        }
+    }
+}
+
+/// Print `value` as `serde_json`'s two-space pretty JSON on stdout. Takes a built `Value`
+/// rather than any `Serialize`, because a `Value`'s alternate `Display` is that same pretty
+/// form and cannot fail — so there is no serialization error to swallow.
+pub(crate) fn print_json_pretty(value: &serde_json::Value) {
+    println!("{value:#}");
+}
+
+/// Write `value` as compact JSON to the manifest file at `path`.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when the file cannot be created or written.
+pub(crate) fn write_manifest_json<T: serde::Serialize>(
+    path: &Path,
+    value: &T,
+) -> Result<(), CliError> {
+    let file = std::fs::File::create(path).map_err(|e| {
+        eprintln!("Error creating manifest {}: {e}", path.display());
+        CliError::Failed
+    })?;
+    serde_json::to_writer(std::io::BufWriter::new(file), value).map_err(|e| {
+        eprintln!("Error writing manifest: {e}");
+        CliError::Failed
+    })
+}
+
+/// Truncate `s` to `max` chars (char-boundary safe), appending `…` when cut.
+pub(crate) fn truncate_chars(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        let cut: String = s.chars().take(max).collect();
+        format!("{cut}…")
+    }
+}
+
+/// [`truncate_chars`] that also names the full length when it cuts: `… (N chars)`.
+pub(crate) fn truncate_chars_counted(s: &str, max: usize) -> String {
+    let count = s.chars().count();
+    if count <= max {
+        s.to_string()
+    } else {
+        let cut: String = s.chars().take(max).collect();
+        format!("{cut}… ({count} chars)")
+    }
+}
+
+/// A sidecar error's message with its remediation hint on a second line, when it has one —
+/// for a command that reports the error as text rather than printing the hint itself.
+pub(crate) fn describe_deno_error(error: &crate::deno::DenoError) -> String {
+    match error.hint() {
+        "" => error.to_string(),
+        hint => format!("{error}\nhint: {hint}"),
+    }
+}
+
 /// Walk `tests/fixtures`, returning [`CliError::Failed`] (after printing a
 /// message) on a missing directory or a walk error. The shared front door for
 /// every `fixtures_*` command.
@@ -266,15 +372,15 @@ where
 }
 
 /// Unwrap a joined `tokio::spawn` result, mapping a task panic to
-/// [`CliError::TaskPanic`] (the message reads `fixture {what} task panicked`).
-/// The shared join-error arm of the `fixtures_*` commands' concurrent drivers.
+/// [`CliError::TaskPanic`] (the message reads `{what} task panicked`). The shared
+/// join-error arm of every [`spawn_work_stream`] driver.
 ///
 /// # Errors
 ///
 /// Returns [`CliError::TaskPanic`] when the joined task panicked.
 pub fn task_result<T>(joined: Result<T, JoinError>, what: &str) -> Result<T, CliError> {
     joined.map_err(|e| {
-        eprintln!("fixture {what} task panicked: {e}");
+        eprintln!("{what} task panicked: {e}");
         CliError::TaskPanic
     })
 }

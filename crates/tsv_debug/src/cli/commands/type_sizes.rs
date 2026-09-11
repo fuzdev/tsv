@@ -218,7 +218,7 @@ fn print_json(rows: &[TypeRow]) {
         })
         .collect();
     let out = serde_json::json!({ "types": items, "count": rows.len() });
-    println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    super::print_json_pretty(&out);
 }
 
 /// Every boarded type, grouped by the module it is defined in — so a group is

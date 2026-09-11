@@ -76,8 +76,9 @@
 //! Pure Rust, no sidecar, no new deps — the `fuzz` / `gap_audit` / `blank_audit` direction. Sites
 //! come from a walk of the wire AST tree keyed to `code_regions` (the spans the AST says are JS),
 //! so the perturbation lands only in JS. Each candidate node must (a) lie fully inside a JS region,
-//! (b) **lead its own line** (modulo a single leading `|`/`&` union/intersection separator — so the
-//! directive binds to it), and (c) have at least one **perturbable** structural space (a space
+//! (b) **lead its own line** (modulo a single leading operator from `LINE_LEAD_OPERATORS` — a
+//! `|`/`&` union/intersection separator or a conditional's `?`/`:` — so the directive binds to it),
+//! and (c) have at least one **perturbable** structural space (a space
 //! outside a string/template/comment/regex-literal interior). A node with none is skipped: it
 //! reformats to itself, so honoring is untestable and uninteresting.
 //!
@@ -133,14 +134,14 @@ use crate::audit::properties::{
     Pristine, Utf16ToByte, pristine_format, source_has_ignore_directive, tsv_parse_to_value,
 };
 use crate::audit::ratchet::{
-    GateDiff, Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update,
+    GateDiff, Ratchet, SnapshotKey, print_ratchet_skipped, print_verdict, refuse_narrowed_update,
     report_unpinned_panics,
 };
 use crate::audit::report::{
-    self, Detail, Finding, IgnoreDetail, ReportExample, RunSummary, Severity,
+    self, Detail, Finding, IgnoreDetail, ReportExample, RunSummary, Severity, eprint_capped,
 };
 use crate::audit::sites::{code_regions, regex_literal_spans, snippet, string_and_template_spans};
-use crate::audit::tally::CappedPaths;
+use crate::audit::tally::{CappedPaths, merge_shape_map};
 use crate::cli::CliError;
 
 use super::profile::{is_input_invalid_fixture, resolve_seed_files};
@@ -397,6 +398,8 @@ struct Tally {
     trailing_frozen: usize,
     files_done: usize,
     parse_skipped: usize,
+    /// Files that could not be read — never injected into.
+    read_errors: usize,
     /// Files not a clean format fixed point AS AUTHORED (or already directive-bearing) — reported
     /// and skipped, exact count + bounded path sample. Over `tests/fixtures` these are the
     /// variant / unformatted / format-ignore files.
@@ -451,19 +454,13 @@ impl Tally {
         self.trailing_frozen += other.trailing_frozen;
         self.files_done += other.files_done;
         self.parse_skipped += other.parse_skipped;
+        self.read_errors += other.read_errors;
         self.not_clean.merge(other.not_clean);
-        for (k, v) in other.shapes {
-            match self.shapes.get_mut(&k) {
-                Some(e) => {
-                    e.count += v.count;
-                    e.files.extend(v.files);
-                    e.examples.merge(v.examples);
-                }
-                None => {
-                    self.shapes.insert(k, v);
-                }
-            }
-        }
+        merge_shape_map(&mut self.shapes, other.shapes, |e, v| {
+            e.count += v.count;
+            e.files.extend(v.files);
+            e.examples.merge(v.examples);
+        });
     }
 }
 
@@ -559,7 +556,6 @@ enum FormatOutcome {
 /// globally) so it can't grow unbounded.
 fn format_checked(mutant: &str, parser: ParserType) -> FormatOutcome {
     let formatted = std::panic::catch_unwind(AssertUnwindSafe(|| format_source(mutant, parser)));
-    #[cfg(feature = "comment_check")]
     let _ = comment_ledger::take_comment_ledger();
     match formatted {
         Err(_) => FormatOutcome::Panicked,
@@ -727,8 +723,8 @@ impl Walk<'_> {
     }
 
     /// Whether a typed `node` at position `{pt}.{field}` is an injectable candidate: inside a JS
-    /// region and leading its own line (modulo a single leading `|`/`&` union/intersection
-    /// separator, so the directive binds to it).
+    /// region and leading its own line (modulo a single leading [`LINE_LEAD_OPERATORS`] operator,
+    /// so the directive binds to it).
     fn consider(&mut self, node: &Value, nt: &str, pt: &str, field: &str) {
         let Some((s, e)) = self.map.node_byte_span(node) else {
             return;
@@ -810,6 +806,7 @@ fn audit_file(path: &Path, tally: &mut Tally) {
         return;
     }
     let Ok(source) = std::fs::read_to_string(path) else {
+        tally.read_errors += 1;
         return;
     };
     let parser = ParserType::from_extension(&display);
@@ -1054,7 +1051,9 @@ impl IgnoreAuditCommand {
         drop(armed);
 
         if self.update {
-            ratchet().write_pinned(&snapshot_keys(&total.shapes), "position")?;
+            // `--update` prints no JSON document, so the write line stays on stdout beside the
+            // report lines below rather than splitting off to stderr under `--json`.
+            ratchet().write_pinned(&snapshot_keys(&total.shapes), "position", false)?;
             print_companions(&total);
             report_not_clean(&total, false, true);
             return report_unpinned_panics(
@@ -1116,11 +1115,12 @@ impl IgnoreAuditCommand {
                  and not a ratchet entry: fix the crash.",
                 panics.len()
             );
-            for ((_, shape), agg) in panics.iter().take(40) {
+            eprint_capped(panics.iter(), |((_, shape), agg)| {
                 let ex = agg.examples.canonical();
-                eprintln!("    {shape:<28} e.g. {}:{}", ex.path, ex.offset);
-            }
+                format!("    {shape:<28} e.g. {}:{}", ex.path, ex.offset)
+            });
         }
+        let position_line = |k: &IgnoreKey| format!("    {:<12} {}", k.kind.label(), k.shape);
         if !diff.new.is_empty() {
             eprintln!(
                 "\n✗ {} NEW finding(s) — a `// prettier-ignore` here fails a graded check \
@@ -1128,12 +1128,7 @@ impl IgnoreAuditCommand {
                  seen it fail:",
                 diff.new.len()
             );
-            for k in diff.new.iter().take(40) {
-                eprintln!("    {:<12} {}", k.kind.label(), k.shape);
-            }
-            if diff.new.len() > 40 {
-                eprintln!("    … and {} more", diff.new.len() - 40);
-            }
+            eprint_capped(diff.new.iter(), position_line);
             eprintln!(
                 "  Fix the position (printer opt-in for UNHONORED, the misbinding for \
                  TRAILING_FROZEN, scope narrowing for OVERFROZEN, the relocation transient for \
@@ -1147,18 +1142,16 @@ impl IgnoreAuditCommand {
                  fire. Drop the lines (`{REPIN_HINT}`):",
                 diff.stale.len()
             );
-            for k in diff.stale.iter().take(40) {
-                eprintln!("    {:<12} {}", k.kind.label(), k.shape);
-            }
-            if diff.stale.len() > 40 {
-                eprintln!("    … and {} more", diff.stale.len() - 40);
-            }
+            eprint_capped(diff.stale.iter(), position_line);
         }
         if diff.holds() {
-            println!(
-                "\n✓ ratchet holds — every finding is a known gap ({} pinned); no directive \
-                 position newly fails a graded check",
-                diff.known
+            print_verdict(
+                self.json,
+                &format!(
+                    "\n✓ ratchet holds — every finding is a known gap ({} pinned); no directive \
+                     position newly fails a graded check",
+                    diff.known
+                ),
             );
             Ok(())
         } else {
@@ -1182,6 +1175,7 @@ fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
         injections: total.injections,
         accepted: total.honored + total.unhonored,
         parse_skipped: total.parse_skipped,
+        read_errors: total.read_errors,
         // ignore_audit reports its own not-clean bucket (with paths) via `report_not_clean`; the
         // envelope's dirty-file notice (a `comments:audit` overlap) is unused here.
         dirty_files: Vec::new(),
@@ -1265,22 +1259,18 @@ fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
     if total.not_clean.is_empty() {
         return;
     }
-    let line = |s: String| {
-        if json {
-            eprintln!("{s}");
-        } else {
-            println!("{s}");
-        }
-    };
     let paths = if show_paths {
         format!(":\n{}", total.not_clean.sample_lines("    ").join("\n"))
     } else {
         String::new()
     };
-    line(format!(
-        "\n○ {} file(s) skipped — not a clean format fixed point AS AUTHORED (or already \
-         directive-bearing). Over tests/fixtures this is expected (variant / unformatted / \
-         format-ignore fixtures); over a real-code corpus each wants triage{paths}",
-        total.not_clean.count()
-    ));
+    print_verdict(
+        json,
+        &format!(
+            "\n○ {} file(s) skipped — not a clean format fixed point AS AUTHORED (or already \
+             directive-bearing). Over tests/fixtures this is expected (variant / unformatted / \
+             format-ignore fixtures); over a real-code corpus each wants triage{paths}",
+            total.not_clean.count()
+        ),
+    );
 }

@@ -1,6 +1,6 @@
 use crate::cli::CliError;
+use crate::cli::commands::read_doc;
 use crate::compile_fixtures::{COMPILE_FIXTURES_DIR, walk_compile_fixtures};
-use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use std::path::Path;
 
@@ -53,13 +53,7 @@ struct AuditReport {
 
 impl CompileConformanceAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let doc = match std::fs::read_to_string(CATALOG_DOC) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Error reading {CATALOG_DOC}: {e}");
-                return Err(CliError::Failed);
-            }
-        };
+        let doc = read_doc(Path::new(CATALOG_DOC))?;
 
         // A missing tree is an empty tree (nothing to audit).
         let root = Path::new(COMPILE_FIXTURES_DIR);
@@ -72,13 +66,7 @@ impl CompileConformanceAuditCommand {
             Vec::new()
         };
 
-        let checklist = match std::fs::read_to_string(CHECKLIST_DOC) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Error reading {CHECKLIST_DOC}: {e}");
-                return Err(CliError::Failed);
-            }
-        };
+        let checklist = read_doc(Path::new(CHECKLIST_DOC))?;
         let (stale_refusal_keys, unmentioned_refusal_keys) = audit_refusal_keys(&checklist);
 
         let mut report = AuditReport {
@@ -109,13 +97,7 @@ impl CompileConformanceAuditCommand {
             report.orphans.len() + report.missing_backlinks.len() + report.stale_refusal_keys.len();
 
         if self.json {
-            match to_json_with_tabs(&report) {
-                Ok(json) => println!("{json}"),
-                Err(e) => {
-                    eprintln!("Error serializing report: {e}");
-                    return Err(CliError::Failed);
-                }
-            }
+            super::print_json_tabs(&report, CliError::Failed)?;
         } else {
             for orphan in &report.orphans {
                 println!("ORPHAN: {orphan} not cataloged in {CATALOG_DOC}");

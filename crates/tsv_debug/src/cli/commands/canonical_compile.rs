@@ -1,6 +1,6 @@
 use crate::cli::CliError;
+use crate::cli::commands::{print_block, print_json_tabs};
 use crate::deno::{self, SvelteCompileOutput, SvelteGenerate};
-use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use tsv_cli::cli::input::{InputArgs, ParserType};
 
@@ -71,16 +71,7 @@ fn print_output(
     as_json: bool,
 ) -> Result<(), CliError> {
     if as_json {
-        match to_json_with_tabs(output) {
-            Ok(json) => {
-                println!("{json}");
-                Ok(())
-            }
-            Err(err) => {
-                eprintln!("Error serializing output: {err}");
-                Err(CliError::Failed)
-            }
-        }
+        print_json_tabs(output, CliError::Failed)
     } else {
         print_block(&output.js);
         if show_css {
@@ -91,13 +82,5 @@ fn print_output(
             }
         }
         Ok(())
-    }
-}
-
-/// Print `text`, ensuring it ends with exactly one trailing newline.
-fn print_block(text: &str) {
-    print!("{text}");
-    if !text.ends_with('\n') {
-        println!();
     }
 }

@@ -766,7 +766,7 @@ cargo run -p tsv_debug compile_conformance_audit
 cargo run -p tsv_debug variant_audit
 
 # canonicalize_audit - canonicalize_js at corpus scale: run twice per TS/JS file and bucket —
-# input-rejected (informational), NON-IDEMPOTENT / CORRUPT-OUTPUT / COMMENT-LOSS (all failures).
+# input-rejected / read-error (informational), NON-IDEMPOTENT / CORRUPT-OUTPUT / COMMENT-LOSS (all failures).
 # Pure Rust; gated in `deno task check` over tests/fixtures + tests/fixtures_compile. --json.
 cargo run -p tsv_debug canonicalize_audit tests/fixtures tests/fixtures_compile  # or real-corpus dirs
 ```

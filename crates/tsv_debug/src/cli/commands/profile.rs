@@ -221,7 +221,7 @@ impl Aggregate {
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn us_per_kb(size_bytes: usize, us: f64) -> f64 {
+pub(crate) fn us_per_kb(size_bytes: usize, us: f64) -> f64 {
     if size_bytes == 0 {
         return 0.0;
     }
@@ -598,10 +598,7 @@ fn print_json(results: &[FileResult], iterations: usize, skipped: usize) {
         "totals": aggregate_json(&total),
     });
 
-    // SAFETY: serde_json Value types always serialize successfully
-    #[allow(clippy::unwrap_used)]
-    let json_str = serde_json::to_string_pretty(&output).unwrap();
-    println!("{json_str}");
+    super::print_json_pretty(&output);
 }
 
 fn aggregate_json(agg: &Aggregate) -> serde_json::Value {
@@ -622,13 +619,33 @@ fn aggregate_json(agg: &Aggregate) -> serde_json::Value {
 }
 
 /// Shorten path for display (show last 3 components)
-fn display_path(path: &Path) -> String {
+pub(crate) fn display_path(path: &Path) -> String {
     let components: Vec<_> = path.components().collect();
     if components.len() <= 3 {
         return path.to_string_lossy().to_string();
     }
     let last_3: PathBuf = components[components.len() - 3..].iter().collect();
     format!(".../{}", last_3.display())
+}
+
+/// Value at percentile `p` (0..=100) of a pre-sorted slice (nearest-rank); the default
+/// value for an empty slice.
+pub(crate) fn percentile<T: Copy + Default>(sorted: &[T], p: usize) -> T {
+    if sorted.is_empty() {
+        return T::default();
+    }
+    let idx = (p * (sorted.len() - 1) + 50) / 100;
+    sorted[idx]
+}
+
+/// `count / total * 100`, guarding division by zero.
+#[allow(clippy::cast_precision_loss)] // diagnostic counts stay well within f64 precision
+pub(crate) fn pct(count: usize, total: usize) -> f64 {
+    if total == 0 {
+        0.0
+    } else {
+        (count as f64 / total as f64) * 100.0
+    }
 }
 
 /// Resolve CLI path args to profileable files of unqualified `"supported files"`
@@ -745,7 +762,7 @@ pub(crate) fn resolve_seed_files(
 ///
 /// **An empty result is an error at every scope** — a gate over zero files proves nothing,
 /// and it is the one vacuity a run can be sure of without a pinned count (the scope-relative
-/// half of the guard; see `audit::sweep::check_graded_nonzero`, which floors the audits whose
+/// half of the guard; see `audit::vacuity::check_graded_nonzero`, which floors the audits whose
 /// headline denominator can still collapse to zero *below* a non-empty resolution).
 ///
 /// `subject` names the resolved thing in that message, and `keep` is the audit's own
@@ -869,12 +886,12 @@ fn collect_files_recursive(dir: &Path, files: &mut Vec<PathBuf>) {
 /// [safety nets](tsv_discover::SAFETY_NET_DIRS) plus the build-output heuristic
 /// ([hidden dirs and `dist`/`build`/`target`](tsv_discover::HEURISTIC_DIRS)).
 ///
-/// The single prune policy for **every** source-corpus walk in `tsv_debug` — this one,
-/// `compile_corpus_compare`'s, `compile_fuzz`'s, and `lex_diff`'s. They had drifted into
-/// four different answers, one of which (the fuzzer's) pruned nothing at all and
-/// recursed into `node_modules` and `.git` when pointed at a real repo. Walks over
-/// *structured* corpora with their own layout rules (the fixture trees, test262, the
-/// tsgo cases) are a different question and keep their own traversal.
+/// The single prune policy for **every** source-corpus walk in `tsv_debug` — this one (the
+/// seed resolution the profiling commands, the audits and `compile_fuzz` share),
+/// `compile_corpus_compare`'s, and `lex_diff`'s. A walk that prunes nothing recurses into
+/// `node_modules` and `.git` when pointed at a real repo. Walks over *structured* corpora
+/// with their own layout rules (the fixture trees, test262, the tsgo cases) are a different
+/// question and keep their own traversal.
 ///
 /// Ignore FILES are deliberately not consulted, which is why this is not
 /// `tsv_discover::classify_dir`: the root `.formatignore` prunes `tests/fixtures/`

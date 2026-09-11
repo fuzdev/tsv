@@ -20,7 +20,10 @@ swallow_check = ["tsv_lang/swallow_check"]
 # (the `comments:audit` / `gaps:audit` / `blanks:audit` / `ignore:audit` deno tasks pass
 # it). Off by default for the same reason as `swallow_check` — a default build carries no
 # registration in the format entry points and no record hook in the printers' comment seams.
+# Implies `swallow_check`: the ledger-armed format (`audit::properties::ledger_format`) also
+# drains the render-time swallow reports, which `gap_audit` grades.
 comment_check = [
+	"swallow_check",
 	"tsv_lang/comment_check",
 	"tsv_ts/comment_check",
 	"tsv_css/comment_check",

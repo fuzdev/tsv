@@ -1,11 +1,11 @@
 use crate::cli::CliError;
+use crate::cli::commands::print_json_tabs;
 use crate::compile_fixtures::{
     COMPILE_FIXTURES_DIR, CompileFixture, EXPECTED_SERVER_JS, walk_compile_fixtures,
     with_trailing_newline,
 };
 use crate::deno::{self, SvelteGenerate};
 use crate::diff::{DiffOptions, diff_to_string};
-use crate::json::to_json_with_tabs;
 use argh::FromArgs;
 use futures_util::StreamExt;
 use std::path::Path;
@@ -41,6 +41,34 @@ pub struct CompileFixturesValidateCommand {
     patterns: Vec<String>,
 }
 
+/// Check (b)'s verdict on tsv's own compile. Serializes as [`Self::label`], so the `--json`
+/// row and the human report spell it one way.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OursStatus {
+    /// The canonicalized JS and the CSS both match the committed expectations.
+    Parity,
+    /// tsv compiled, but its JS or CSS differs from the expectations.
+    Mismatch,
+    /// tsv failed to compile, or its output failed to canonicalize.
+    Error,
+}
+
+impl OursStatus {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Parity => "parity",
+            Self::Mismatch => "mismatch",
+            Self::Error => "error",
+        }
+    }
+}
+
+impl serde::Serialize for OursStatus {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.label())
+    }
+}
+
 /// One fixture's validation outcome (the `--json` row).
 #[derive(serde::Serialize)]
 struct FixtureReport {
@@ -49,10 +77,17 @@ struct FixtureReport {
     oracle_fresh: bool,
     /// Check (c): the committed expected_server.js is a canonicalize fixed point.
     expected_idempotent: bool,
-    /// Check (b): "parity" | "mismatch" | "error".
-    ours_status: &'static str,
+    /// Check (b): tsv's own compile against the expectations.
+    ours_status: OursStatus,
     /// Human-readable failure details (empty when everything passed).
     errors: Vec<String>,
+}
+
+impl FixtureReport {
+    /// All three checks gate: oracle freshness, expected idempotence, AND ours parity.
+    fn passed(&self) -> bool {
+        self.oracle_fresh && self.expected_idempotent && self.ours_status == OursStatus::Parity
+    }
 }
 
 impl CompileFixturesValidateCommand {
@@ -115,13 +150,11 @@ impl CompileFixturesValidateCommand {
             reports.push(super::task_result(joined, "compile-validation")?);
         }
 
-        // All three checks gate: oracle freshness, expected idempotence, AND
-        // ours parity (the compiler must reproduce every fixture).
-        let gating_failures = reports
+        let gating_failures = reports.iter().filter(|r| !r.passed()).count();
+        let parity = reports
             .iter()
-            .filter(|r| !r.oracle_fresh || !r.expected_idempotent || r.ours_status != "parity")
+            .filter(|r| r.ours_status == OursStatus::Parity)
             .count();
-        let parity = reports.iter().filter(|r| r.ours_status == "parity").count();
 
         if self.json {
             #[derive(serde::Serialize)]
@@ -137,20 +170,15 @@ impl CompileFixturesValidateCommand {
                 ours_parity: parity,
                 fixtures: reports,
             };
-            match to_json_with_tabs(&summary) {
-                Ok(json) => println!("{json}"),
-                Err(e) => {
-                    eprintln!("Error serializing report: {e}");
-                    return Err(CliError::Failed);
-                }
-            }
+            print_json_tabs(&summary, CliError::Failed)?;
         } else {
             for report in &reports {
-                let ok = report.oracle_fresh
-                    && report.expected_idempotent
-                    && report.ours_status == "parity";
-                let mark = if ok { "✓" } else { "✗" };
-                println!("{mark} {} [ours: {}]", report.fixture, report.ours_status);
+                let mark = if report.passed() { "✓" } else { "✗" };
+                println!(
+                    "{mark} {} [ours: {}]",
+                    report.fixture,
+                    report.ours_status.label()
+                );
                 for error in &report.errors {
                     eprintln!("  {error}");
                 }
@@ -183,7 +211,7 @@ async fn validate_fixture(fixture: &CompileFixture) -> FixtureReport {
                 fixture: name,
                 oracle_fresh: false,
                 expected_idempotent: false,
-                ours_status: "error",
+                ours_status: OursStatus::Error,
                 errors,
             };
         }
@@ -195,7 +223,19 @@ async fn validate_fixture(fixture: &CompileFixture) -> FixtureReport {
             String::new()
         }
     };
-    let expected_css = std::fs::read_to_string(fixture.expected_css_path()).ok();
+    // A missing expected.css means an unstyled component; one that exists but cannot be read is
+    // an error, not "unstyled" — that reading would pass a CSS check it never ran.
+    let expected_css = match std::fs::read_to_string(fixture.expected_css_path()) {
+        Ok(css) => Some(css),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => {
+            errors.push(format!(
+                "cannot read {}: {e}",
+                fixture.expected_css_path().display()
+            ));
+            None
+        }
+    };
 
     // (c) Expected idempotence — pure Rust, no sidecar.
     let expected_idempotent = if expected_js.is_empty() {
@@ -285,19 +325,19 @@ async fn validate_fixture(fixture: &CompileFixture) -> FixtureReport {
                     errors.push("ours css differs from expected.css".to_string());
                 }
                 if js_parity && css_parity {
-                    "parity"
+                    OursStatus::Parity
                 } else {
-                    "mismatch"
+                    OursStatus::Mismatch
                 }
             }
             Err(e) => {
                 errors.push(format!("could not canonicalize our output: {e}"));
-                "error"
+                OursStatus::Error
             }
         },
         Err(e) => {
             errors.push(format!("tsv compile failed: {e}"));
-            "error"
+            OursStatus::Error
         }
     };
 

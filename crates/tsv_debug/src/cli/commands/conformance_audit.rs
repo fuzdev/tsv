@@ -1,4 +1,5 @@
 use crate::cli::CliError;
+use crate::cli::commands::read_doc;
 use crate::fixtures;
 use argh::FromArgs;
 use std::collections::{BTreeSet, HashMap};
@@ -227,14 +228,6 @@ fn catalog_owners(
         }
     }
     Ok(owners)
-}
-
-/// Read a doc file, returning [`CliError::Failed`] (after a message) on failure.
-fn read_doc(path: &Path) -> Result<String, CliError> {
-    std::fs::read_to_string(path).map_err(|e| {
-        eprintln!("Error reading {}: {e}", path.display());
-        CliError::Failed
-    })
 }
 
 /// Enumerate every `.md` file the repo tracks (sorted, repo-relative).
@@ -1098,10 +1091,7 @@ impl Report {
             })).collect::<Vec<_>>(),
             "stray_readmes": self.stray_readmes,
         });
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&report).unwrap_or_default()
-        );
+        super::print_json_pretty(&report);
     }
 }
 

@@ -23,7 +23,7 @@ impl FixturesUpdateFormattedCommand {
     }
 }
 
-async fn run(filters: &[String]) -> Result<(), CliError> {
+pub(super) async fn run(filters: &[String]) -> Result<(), CliError> {
     let (fixture_list, total_count) = super::walk_and_filter(filters)?;
 
     let mut created = 0;
@@ -58,7 +58,7 @@ async fn run(filters: &[String]) -> Result<(), CliError> {
     );
 
     while let Some(joined) = results.next().await {
-        let (fixture, outcome) = super::task_result(joined, "update")?;
+        let (fixture, outcome) = super::task_result(joined, "fixture update")?;
 
         let FixtureOutcome::Processed {
             formatted,
@@ -251,6 +251,17 @@ enum FormattedResult {
     Failed(String),
 }
 
+impl From<Result<fixtures::WriteOutcome, String>> for FormattedResult {
+    fn from(written: Result<fixtures::WriteOutcome, String>) -> Self {
+        match written {
+            Ok(fixtures::WriteOutcome::Created) => Self::Created,
+            Ok(fixtures::WriteOutcome::Updated) => Self::Updated,
+            Ok(fixtures::WriteOutcome::Unchanged) => Self::Unchanged,
+            Err(e) => Self::Failed(e),
+        }
+    }
+}
+
 /// Per-fixture results computed in a spawned task and printed by the driver in
 /// fixture order — tasks never print, so concurrent fixtures can't interleave output.
 enum FixtureOutcome {
@@ -326,7 +337,7 @@ async fn update_audit_signature(fixture: &fixtures::Fixture) -> FormattedResult 
 
     // No output_prettier → no chain anchor → remove any stale signature
     if !output_prettier_path.exists() {
-        return remove_signature(&signature_path);
+        return remove_if_present(&signature_path);
     }
 
     let output_prettier_content = match fixtures::read_file(&output_prettier_path) {
@@ -342,7 +353,7 @@ async fn update_audit_signature(fixture: &fixtures::Fixture) -> FormattedResult 
 
     match chain {
         // Prettier idempotent — no signature needed. Remove stale file if any.
-        ChainWalk::Collapsed => remove_signature(&signature_path),
+        ChainWalk::Collapsed => remove_if_present(&signature_path),
         ChainWalk::Pinned(sig) => {
             write_signature(&signature_path, &sig, ChainAnchor::OutputPrettier)
         }
@@ -381,26 +392,14 @@ fn write_signature(
     signature: &AuditSignature,
     anchor: ChainAnchor,
 ) -> FormattedResult {
-    let serialized = signature.serialize(anchor);
-    let existing = fixtures::read_file(path).ok();
-    if existing.as_deref() == Some(serialized.as_str()) {
-        return FormattedResult::Unchanged;
-    }
-    let created = existing.is_none();
-    match fixtures::write_file(path, &serialized) {
-        Ok(()) if created => FormattedResult::Created,
-        Ok(()) => FormattedResult::Updated,
-        Err(e) => FormattedResult::Failed(e),
-    }
+    fixtures::write_if_changed(path, &signature.serialize(anchor)).into()
 }
 
-/// Remove a signature file if present, reporting Removed / NotNeeded.
-fn remove_signature(path: &std::path::Path) -> FormattedResult {
-    if !path.exists() {
-        return FormattedResult::NotNeeded;
-    }
-    match fixtures::delete_file_if_exists(path) {
-        Ok(()) => FormattedResult::Removed,
+/// Remove a generated file if present, reporting Removed / NotNeeded.
+fn remove_if_present(path: &std::path::Path) -> FormattedResult {
+    match fixtures::remove_if_present(path) {
+        Ok(true) => FormattedResult::Removed,
+        Ok(false) => FormattedResult::NotNeeded,
         Err(e) => FormattedResult::Failed(e),
     }
 }
@@ -421,33 +420,12 @@ async fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
 
     let output_prettier_path = fixture.output_prettier_path();
 
-    // If formatted output is identical to input, remove output_prettier file
+    // If formatted output is identical to input, remove output_prettier file;
+    // otherwise write/update it
     if formatted == input {
-        if output_prettier_path.exists() {
-            match fixtures::delete_file_if_exists(&output_prettier_path) {
-                Ok(()) => FormattedResult::Removed,
-                Err(e) => FormattedResult::Failed(e),
-            }
-        } else {
-            FormattedResult::NotNeeded
-        }
+        remove_if_present(&output_prettier_path)
     } else {
-        // Formatted output differs from input, write/update output_prettier file
-        let existing = fixtures::read_file(&output_prettier_path).ok();
-
-        if Some(&formatted) == existing.as_ref() {
-            FormattedResult::Unchanged
-        } else if existing.is_none() {
-            match fixtures::write_file(&output_prettier_path, &formatted) {
-                Ok(()) => FormattedResult::Created,
-                Err(e) => FormattedResult::Failed(e),
-            }
-        } else {
-            match fixtures::write_file(&output_prettier_path, &formatted) {
-                Ok(()) => FormattedResult::Updated,
-                Err(e) => FormattedResult::Failed(e),
-            }
-        }
+        fixtures::write_if_changed(&output_prettier_path, &formatted).into()
     }
 }
 
@@ -601,7 +579,14 @@ async fn update_intermediate_files(
         // leaves every marker unreachable (N10's blocking arm asks the same predicate from
         // the absence side).
         let stable_form = (first_pass_unpinned && matches!(shape, ChainShape::StableFirstPass))
-            .then(|| fixtures::classify_stable_form(&formatted, &input, &fixture.input_file));
+            .then(|| {
+                fixtures::classify_stable_form(
+                    &formatted,
+                    &input,
+                    &fixture.input_file,
+                    fixture.goal(),
+                )
+            });
         let no_single_form_marker = match shape {
             // Two or more distinct intermediates; `prettier_intermediate*_*` pins exactly one.
             ChainShape::UnstableNotConverging => true,
@@ -738,7 +723,7 @@ async fn update_intermediate_files(
                     write_signature(&chain_signature_path, &sig, ChainAnchor::UnformattedOurs)
                 }
                 // Prettier holds the source itself stable, so there is no chain to record.
-                Ok(ChainWalk::Collapsed) => remove_signature(&chain_signature_path),
+                Ok(ChainWalk::Collapsed) => remove_if_present(&chain_signature_path),
                 Ok(ChainWalk::Truncated { completed, error }) => refuse_truncated_signature(
                     &chain_signature_path,
                     ChainAnchor::UnformattedOurs,
@@ -748,7 +733,7 @@ async fn update_intermediate_files(
                 Err(e) => FormattedResult::Failed(e),
             }
         } else {
-            remove_signature(&chain_signature_path)
+            remove_if_present(&chain_signature_path)
         };
         if !matches!(signature_result, FormattedResult::NotNeeded) {
             results.push(IntermediateOutput::File(
@@ -785,10 +770,7 @@ fn remove_orphan_intermediates(
             if files.unformatted_ours.contains(&source) {
                 continue;
             }
-            let result = match fixtures::delete_file_if_exists(&fixture.path.join(name)) {
-                Ok(()) => FormattedResult::Removed,
-                Err(e) => FormattedResult::Failed(e),
-            };
+            let result = remove_if_present(&fixture.path.join(name));
             results.push(IntermediateOutput::File(name.clone(), result));
         }
     }
@@ -812,10 +794,7 @@ fn remove_orphan_chain_signatures(
         if files.unformatted_ours.contains(&source) {
             continue;
         }
-        let result = match fixtures::delete_file_if_exists(&fixture.path.join(signature_name)) {
-            Ok(()) => FormattedResult::Removed,
-            Err(e) => FormattedResult::Failed(e),
-        };
+        let result = remove_if_present(&fixture.path.join(signature_name));
         results.push(IntermediateOutput::File(signature_name.clone(), result));
     }
 }
@@ -872,11 +851,8 @@ fn remove_stale_intermediates(
     results: &mut Vec<IntermediateOutput>,
 ) {
     for (path, name) in paths {
-        if path.exists() {
-            let result = match fixtures::delete_file_if_exists(path) {
-                Ok(()) => FormattedResult::Removed,
-                Err(e) => FormattedResult::Failed(e),
-            };
+        let result = remove_if_present(path);
+        if !matches!(result, FormattedResult::NotNeeded) {
             results.push(IntermediateOutput::File((*name).clone(), result));
         }
     }
@@ -892,32 +868,10 @@ fn write_intermediate_target(
     formatted: &str,
     results: &mut Vec<IntermediateOutput>,
 ) {
-    for (opposite_path, opposite_filename) in opposite_paths {
-        if opposite_path.exists()
-            && let Err(e) = fixtures::delete_file_if_exists(opposite_path)
-        {
-            results.push(IntermediateOutput::File(
-                (*opposite_filename).clone(),
-                FormattedResult::Failed(e),
-            ));
-            // Continue to write the correct target even on cleanup failure.
-        }
-    }
+    // Continues to write the correct target even on a cleanup failure.
+    remove_stale_intermediates(opposite_paths, results);
 
-    let existing = fixtures::read_file(target_path).ok();
-    let result = if existing.as_deref() == Some(formatted) {
-        FormattedResult::Unchanged
-    } else if existing.is_none() {
-        match fixtures::write_file(target_path, formatted) {
-            Ok(()) => FormattedResult::Created,
-            Err(e) => FormattedResult::Failed(e),
-        }
-    } else {
-        match fixtures::write_file(target_path, formatted) {
-            Ok(()) => FormattedResult::Updated,
-            Err(e) => FormattedResult::Failed(e),
-        }
-    };
+    let result: FormattedResult = fixtures::write_if_changed(target_path, formatted).into();
     results.push(IntermediateOutput::File(
         target_filename.to_string(),
         result,

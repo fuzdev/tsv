@@ -8,7 +8,6 @@ use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 use crate::audit::ratchet::{Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update};
 use crate::audit::shape::{markup_head, name_run};
 use crate::audit::sweep::{PristineSweep, sweep_pristine};
-use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
 
 use super::profile::{lang_token, resolve_seed_files};
@@ -208,7 +207,7 @@ struct Sweep {
     overruns: Vec<Overrun>,
     /// Every shape seen, deduped — what the ratchet grades.
     shapes: BTreeSet<WidthShape>,
-    /// The shared skip/format bookkeeping (the [`check_formatted_min`] vacuity guard reads
+    /// The shared skip/format bookkeeping (the [`check_formatted_min`](crate::audit::vacuity::check_formatted_min) vacuity guard reads
     /// `formatted`; panics are counted there, not gated here — the panic gates own that class).
     pristine: PristineSweep,
     /// Output lines measured, over-width or not — the denominator that makes the overrun
@@ -241,20 +240,12 @@ impl WidthAuditCommand {
         } else {
             print_report(&sweep, self.verbose);
         }
-        // Always, and to stderr: the default panic hook is suppressed for the
-        // sweep, so this is the only place a crashing input is named. Ungated
-        // by `--json` (which writes stdout) so `2>/dev/null` still parses.
-        sweep.pristine.print_panic_sample();
-
-        check_graded_nonzero(sweep.pristine.formatted, "files formatted")?;
         let full_run = narrowed.is_empty();
-        if full_run {
-            check_formatted_min(sweep.pristine.formatted, FIXTURES_FORMATTED_MIN)?;
-        }
+        sweep.pristine.finish(full_run)?;
 
         let ratchet = ratchet();
         if self.update {
-            ratchet.write_pinned(&sweep.shapes, "shape")?;
+            ratchet.write_pinned(&sweep.shapes, "shape", self.json)?;
             return Ok(());
         }
         // Off the default corpus the snapshot doesn't apply — it pins the full default run, so
@@ -272,6 +263,7 @@ impl WidthAuditCommand {
             &sweep.shapes,
             "over-width shape",
             &format!("{} files", sweep.pristine.formatted),
+            self.json,
             |shape| format!("[{}] {}", shape.lang, shape.render()),
         )
     }
@@ -537,7 +529,7 @@ fn print_report(sweep: &Sweep, verbose: bool) {
     }
 
     // The per-shape rollup: one line per shape with a count, the widest hit, and one
-    // reproducer, so a single prose-heavy fixture cannot bury the others. `--report` prints
+    // reproducer, so a single prose-heavy fixture cannot bury the others. `--verbose` prints
     // every line.
     for (shape, roll) in rollups(&sweep.overruns) {
         println!(
@@ -581,9 +573,7 @@ fn print_json(sweep: &Sweep) {
             "items": items,
         }),
     );
-    #[allow(clippy::unwrap_used)]
-    let s = serde_json::to_string_pretty(&output).unwrap();
-    println!("{s}");
+    super::print_json_pretty(&output);
 }
 
 #[cfg(test)]

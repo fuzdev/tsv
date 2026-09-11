@@ -136,7 +136,8 @@ deno task compile:validation                                       # the on-dema
 cargo run --profile corpus -p tsv_debug compile_fuzz                 # tests/fixtures_compile
 cargo run --profile corpus -p tsv_debug compile_fuzz --iterations 20000 --dump-dir /tmp/cf
 deno task compile:fuzz                                              # the on-demand task
-# Also: --seed, --max-mutations N, --limit N, --jobs N, --max-findings N, --list, --json.
+# Also: --seed, --max-mutations N, --limit N, --jobs N, --max-findings N, --list, --json. Seed
+# paths resolve like the other corpus tools' (globs accepted, overlapping paths deduplicated).
 # Build with `--profile corpus` (release + panic=unwind) so a panic in tsv's compile is caught
 # and REPORTED as a finding rather than killing the run. Sidecar-dependent, so NOT in
 # `deno task check` (which is the pure-Rust fixture gate).

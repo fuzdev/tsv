@@ -1,3 +1,4 @@
+use crate::audit::vacuity::check_pinned_min;
 use crate::cli::CliError;
 use crate::fixtures::validation;
 use argh::FromArgs;
@@ -51,7 +52,7 @@ impl FixturesValidateCommand {
 
         let mut summary = validation::ValidationSummary::new();
         while let Some(joined) = results.next().await {
-            let result = super::task_result(joined, "validation")?;
+            let result = super::task_result(joined, "fixture validation")?;
             if !result.diff_output.is_empty() {
                 eprint!("{}", result.diff_output);
             }
@@ -69,14 +70,15 @@ impl FixturesValidateCommand {
 
         // REGRESSION PIN — see `validation::FIXTURES_MIN` (shared with the
         // fixtures_tests integration test, the form CI runs).
-        if self.filters.is_empty() && summary.total_fixtures < validation::FIXTURES_MIN {
-            eprintln!(
-                "Error: pinned minimum — validated {} fixtures < pinned {}. \
-                 Fixture discovery shrank; if deliberate (fixtures deleted), re-pin FIXTURES_MIN.",
+        if self.filters.is_empty() {
+            check_pinned_min(
                 summary.total_fixtures,
-                validation::FIXTURES_MIN
-            );
-            return Err(CliError::Failed);
+                validation::FIXTURES_MIN,
+                "validated",
+                "fixtures",
+                "Fixture discovery shrank",
+                "FIXTURES_MIN",
+            )?;
         }
 
         // Exit with appropriate code

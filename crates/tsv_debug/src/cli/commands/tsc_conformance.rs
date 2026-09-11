@@ -1,8 +1,8 @@
-//! tsc_conformance command — ad-hoc queries over the TypeScript-Go conformance
-//! baselines (`*.errors.txt`). Pure Rust, no typechecker: tool #1 of the
-//! typechecker conformance harness (the "ask important questions" tool). Reads
-//! only the committed tsgo baselines — the corpus *inputs* live in a git
-//! submodule that is often unmaterialized.
+//! tsc_conformance command — the TypeScript-Go conformance harness. `query` and
+//! `roundtrip` read only the committed tsgo `*.errors.txt` baselines; `index` joins
+//! the corpus inputs (a git submodule that is often unmaterialized) back to them;
+//! `run` and `check-test` drive the experimental `tsv_check` checker over that
+//! corpus. Pure Rust.
 
 mod gates;
 mod pins;
@@ -27,9 +27,11 @@ use pins::{
     PRETTY_PATH_PIN, ROUNDTRIP_PASS_PIN, load_pin_snapshot, measured_pins, require_pinned_oracle,
     update_pin_snapshot,
 };
-use report::{may_write_report, print_json, write_diff_artifacts, write_manifest, write_report};
+use report::{may_write_report, write_diff_artifacts, write_manifest, write_report};
 
-/// Query the tsgo TypeScript conformance baselines.
+use super::print_json_tabs;
+
+/// The tsgo TypeScript conformance harness: baseline queries and the `tsv_check` sweep.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "tsc_conformance")]
 pub struct TscConformanceCommand {
@@ -225,7 +227,7 @@ impl RunCommand {
         if !may_write_report(self.report.is_some(), filtered) {
             eprintln!(
                 "Error: --report writes the committed full report; it cannot be combined with \
-                 --test/--code/--variant filters."
+                 --test/--code/--variant/--family filters."
             );
             return Err(CliError::Failed);
         }
@@ -243,7 +245,7 @@ impl RunCommand {
             CliError::Failed
         })?;
         if self.json {
-            print_json(&report)?;
+            print_json_tabs(&report, CliError::Failed)?;
         } else {
             report.print();
         }
@@ -287,22 +289,19 @@ impl RunCommand {
     /// Build the triage filter from the CLI flags (lowercasing the `--variant` key,
     /// which the config maps store lowercased).
     fn build_filter(&self) -> Result<RunFilter, CliError> {
-        let variant = match self.variant.as_deref().map(parse_variant_filter) {
-            Some(Ok((k, v))) => Some((k.to_lowercase(), v)),
-            Some(Err(e)) => {
-                eprintln!("{e}");
-                return Err(CliError::Failed);
-            }
-            None => None,
-        };
-        let family = match self.family.as_deref().map(parse_family_filter) {
-            Some(Ok(f)) => Some(f),
-            Some(Err(e)) => {
-                eprintln!("{e}");
-                return Err(CliError::Failed);
-            }
-            None => None,
-        };
+        let variant = self
+            .variant
+            .as_deref()
+            .map(parse_variant_filter)
+            .transpose()
+            .map_err(report_filter_error)?
+            .map(|(k, v)| (k.to_lowercase(), v));
+        let family = self
+            .family
+            .as_deref()
+            .map(parse_family_filter)
+            .transpose()
+            .map_err(report_filter_error)?;
         Ok(RunFilter {
             test: self.test.clone(),
             code: self.code,
@@ -310,6 +309,12 @@ impl RunCommand {
             family,
         })
     }
+}
+
+/// Print a triage-filter parse error and fail the command.
+fn report_filter_error(message: String) -> CliError {
+    eprintln!("{message}");
+    CliError::Failed
 }
 
 impl CheckTestCommand {
@@ -323,20 +328,18 @@ impl CheckTestCommand {
             print!("{dot}");
             return Ok(());
         }
-        let variant = match self.variant.as_deref().map(parse_variant_filter) {
-            Some(Ok(v)) => Some(v),
-            Some(Err(e)) => {
-                eprintln!("{e}");
-                return Err(CliError::Failed);
-            }
-            None => None,
-        };
+        let variant = self
+            .variant
+            .as_deref()
+            .map(parse_variant_filter)
+            .transpose()
+            .map_err(report_filter_error)?;
         let report = check_one(&self.path, &self.name, variant).map_err(|e| {
             eprintln!("Error: {e}");
             CliError::Failed
         })?;
         if self.json {
-            print_json(&report)
+            print_json_tabs(&report, CliError::Failed)
         } else {
             report.print();
             Ok(())
@@ -376,7 +379,7 @@ impl IndexCommand {
         })?;
 
         if self.json {
-            print_json(&report)?;
+            print_json_tabs(&report, CliError::Failed)?;
         } else {
             report.print(self.verbose);
         }
@@ -398,7 +401,7 @@ impl RoundtripCommand {
 
         let report = run_roundtrip(&filtered);
         if self.json {
-            print_json(&report)?;
+            print_json_tabs(&report, CliError::Failed)?;
         } else {
             report.print(self.verbose);
         }
@@ -495,7 +498,7 @@ impl QueryCommand {
                 enforce_pin(baselines.len())?;
                 let report = histogram(&baselines);
                 if self.json {
-                    print_json(&report)
+                    print_json_tabs(&report, CliError::Failed)
                 } else {
                     report.print_table();
                     Ok(())
@@ -505,7 +508,7 @@ impl QueryCommand {
                 enforce_pin(baselines.len())?;
                 let report = denominators(&baselines);
                 if self.json {
-                    print_json(&report)
+                    print_json_tabs(&report, CliError::Failed)
                 } else {
                     report.print_summary(corpus_materialized(&self.path));
                     Ok(())
@@ -521,7 +524,7 @@ impl QueryCommand {
                 let code = parse_code(code_arg)?;
                 let report = tests_by_code(&baselines, code);
                 if self.json {
-                    print_json(&report)
+                    print_json_tabs(&report, CliError::Failed)
                 } else {
                     report.print();
                     Ok(())
@@ -542,7 +545,7 @@ impl QueryCommand {
 }
 
 /// Parse an error code, accepting a bare number (`2454`) or a `TS`-prefixed form
-/// (`TS2454`, case-insensitive).
+/// (`TS2454` or `ts2454`).
 fn parse_code(arg: &str) -> Result<u32, CliError> {
     let digits = arg
         .strip_prefix("TS")

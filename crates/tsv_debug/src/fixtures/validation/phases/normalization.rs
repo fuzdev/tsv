@@ -104,7 +104,7 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
             .or_default()
             .push(pv_name.clone());
 
-        match fixtures::format_with_our_formatter_with_goal(&pv_content, pv_name, fixture.goal()) {
+        match fixtures::format_with_our_formatter(&pv_content, pv_name, fixture.goal()) {
             Ok(formatted) => {
                 if formatted != *input {
                     result.add_error(ValidationError::NormalizationPrettierVariantNotNormalized(
@@ -170,7 +170,7 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
             .or_default()
             .push(variant_name.clone());
 
-        match fixtures::format_with_our_formatter_with_goal(
+        match fixtures::format_with_our_formatter(
             &variant_content,
             &fixture.input_file,
             fixture.goal(),
@@ -236,7 +236,7 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
             .or_default()
             .push(variant_name.clone());
 
-        match fixtures::format_with_our_formatter_with_goal(
+        match fixtures::format_with_our_formatter(
             &variant_content,
             &fixture.input_file,
             fixture.goal(),
@@ -307,7 +307,7 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
             .or_default()
             .push(stable_name.clone());
 
-        match fixtures::format_with_our_formatter_with_goal(
+        match fixtures::format_with_our_formatter(
             &stable_content,
             &fixture.input_file,
             fixture.goal(),
@@ -386,11 +386,8 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
             .or_default()
             .push(tw_name.clone());
 
-        match fixtures::format_with_our_formatter_with_goal(
-            &tw_content,
-            &fixture.input_file,
-            fixture.goal(),
-        ) {
+        match fixtures::format_with_our_formatter(&tw_content, &fixture.input_file, fixture.goal())
+        {
             Ok(formatted) => {
                 // N11b: ours must NOT normalize to input
                 if formatted == *input {
@@ -413,7 +410,7 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
                 }
 
                 // N11d: the rewritten third form must itself be a fixed point
-                match fixtures::format_with_our_formatter_with_goal(
+                match fixtures::format_with_our_formatter(
                     &formatted,
                     &fixture.input_file,
                     fixture.goal(),
@@ -469,7 +466,7 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
     }
 }
 
-/// N1, N3, N6, N7, N7b, N8, N9a, N10, N11a, N12: Validate prettier normalization behavior
+/// N1, N3, N6, N7, N7b, N7c, N8, N9a, N10, N11a, N12: Validate prettier normalization behavior
 ///
 /// Orchestrates the per-rule helpers below. Each rule lives in its own function
 /// so a skip or early return inside one rule can't silently disable the rules
@@ -491,37 +488,41 @@ pub(in crate::fixtures::validation) async fn validate_normalization_prettier(
     // prettier output IS one of them is pinned by that file — S22 forbids a byte-copy under
     // a second name, so the sharing is how two sources whose chains coincide are both
     // covered by the one file that records the form.
-    let mut intermediate_forms = validate_n7_prettier_intermediates(
-        result,
-        fixture,
-        input,
-        input_ext,
-        files,
-        &unformatted_ours_outputs,
-    )
-    .await;
-    intermediate_forms.extend(
-        validate_n7b_intermediates_to_variant(
-            result,
-            fixture,
-            input,
-            input_ext,
-            files,
-            &unformatted_ours_outputs,
-        )
-        .await,
-    );
-    intermediate_forms.extend(
-        validate_n7c_intermediates_to_divergent_variant(
-            result,
-            fixture,
-            input,
-            input_ext,
-            files,
-            &unformatted_ours_outputs,
-        )
-        .await,
-    );
+    let input_target = [input.to_string()];
+    let variant_targets =
+        read_contents(fixture, files.prettier_variant.iter().chain(&files.variant));
+    let divergent_variant_targets = read_contents(fixture, &files.divergent_variant);
+    let mut intermediate_forms = Vec::new();
+    for (family, names, targets) in [
+        (
+            &N7_INTERMEDIATE,
+            &files.prettier_intermediate,
+            &input_target[..],
+        ),
+        (
+            &N7B_INTERMEDIATE_TO_VARIANT,
+            &files.prettier_intermediate_to_variant,
+            &variant_targets[..],
+        ),
+        (
+            &N7C_INTERMEDIATE_TO_DIVERGENT_VARIANT,
+            &files.prettier_intermediate_to_divergent_variant,
+            &divergent_variant_targets[..],
+        ),
+    ] {
+        intermediate_forms.extend(
+            validate_intermediate_family(
+                result,
+                fixture,
+                input,
+                family,
+                names,
+                targets,
+                &unformatted_ours_outputs,
+            )
+            .await,
+        );
+    }
     validate_n8_unformatted_prettier(result, fixture, files).await;
     // N12 before N10: the chain signatures it verifies are exactly what N10 must not
     // report as undocumented.
@@ -781,29 +782,124 @@ async fn validate_n6_unformatted_ours(
     unformatted_ours_prettier_outputs
 }
 
-/// N7: prettier_intermediate_* validation
-///
-/// These files capture prettier's unstable first-pass output from unformatted_ours_* files.
+/// One `prettier_intermediate*_*` family — N7 / N7b / N7c differ only in what this names:
+/// the filename prefix, which checks apply, and the error or success each check reports.
+struct IntermediateFamily {
+    /// Filename prefix, e.g. `prettier_intermediate_`; without its trailing `_` it labels the
+    /// family's diffs ([`Self::label`]).
+    prefix: &'static str,
+    missing_source: fn(String) -> ValidationError,
+    mismatch: fn(String) -> ValidationError,
+    is_stable: fn(String) -> ValidationError,
+    /// The checks a family whose convergence targets are documented variant files adds
+    /// (N7b / N7c); `None` for N7, whose target is the input itself.
+    variant_target: Option<VariantTargetChecks>,
+    not_converging: fn(String) -> ValidationError,
+    converged: fn(usize) -> ValidationSuccess,
+}
+
+/// The two checks only a variant-targeted intermediate family runs — one field, so a family
+/// cannot carry one without the other.
+struct VariantTargetChecks {
+    /// The documented variant targets must exist.
+    no_target: fn(String) -> ValidationError,
+    /// A second pass that lands on the input belongs to plain N7 instead.
+    converges_to_input: fn(String) -> ValidationError,
+}
+
+impl IntermediateFamily {
+    /// The label this family's diffs carry: its prefix without the trailing `_`.
+    fn label(&self) -> &'static str {
+        self.prefix.trim_end_matches('_')
+    }
+}
+
+/// N7: `prettier_intermediate_*` — prettier's unstable first pass over an `unformatted_ours_*`
+/// file, whose second pass converges to the input.
+const N7_INTERMEDIATE: IntermediateFamily = IntermediateFamily {
+    prefix: "prettier_intermediate_",
+    missing_source: ValidationError::NormalizationPrettierIntermediateMissingSource,
+    mismatch: ValidationError::NormalizationPrettierIntermediateMismatch,
+    is_stable: ValidationError::NormalizationPrettierIntermediateIsStable,
+    variant_target: None,
+    not_converging: ValidationError::NormalizationPrettierIntermediateNotConverging,
+    converged: ValidationSuccess::PrettierIntermediatesConverge,
+};
+
+/// N7b: `prettier_intermediate_to_variant_*` — like N7, but the second pass converges to a
+/// documented `variant_*` / `prettier_variant_*` file.
+const N7B_INTERMEDIATE_TO_VARIANT: IntermediateFamily = IntermediateFamily {
+    prefix: "prettier_intermediate_to_variant_",
+    missing_source: ValidationError::NormalizationPrettierIntermediateToVariantMissingSource,
+    mismatch: ValidationError::NormalizationPrettierIntermediateToVariantMismatch,
+    is_stable: ValidationError::NormalizationPrettierIntermediateToVariantIsStable,
+    variant_target: Some(VariantTargetChecks {
+        no_target: ValidationError::NormalizationPrettierIntermediateToVariantNoVariantTarget,
+        converges_to_input:
+            ValidationError::NormalizationPrettierIntermediateToVariantConvergesToInput,
+    }),
+    not_converging: ValidationError::NormalizationPrettierIntermediateToVariantNotConverging,
+    converged: ValidationSuccess::PrettierIntermediatesToVariantConverge,
+};
+
+/// N7c: `prettier_intermediate_to_divergent_variant_*` — the second pass converges to a
+/// documented `divergent_variant_*` (a prettier-stable form our formatter rewrites to a third
+/// form), the target no other intermediate marker accepts. It arises when the intersection
+/// first-member redundant-paren shell's prettier path settles on a glued form ours un-glues.
+const N7C_INTERMEDIATE_TO_DIVERGENT_VARIANT: IntermediateFamily = IntermediateFamily {
+    prefix: "prettier_intermediate_to_divergent_variant_",
+    missing_source:
+        ValidationError::NormalizationPrettierIntermediateToDivergentVariantMissingSource,
+    mismatch: ValidationError::NormalizationPrettierIntermediateToDivergentVariantMismatch,
+    is_stable: ValidationError::NormalizationPrettierIntermediateToDivergentVariantIsStable,
+    variant_target: Some(VariantTargetChecks {
+        no_target:
+            ValidationError::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget,
+        converges_to_input:
+            ValidationError::NormalizationPrettierIntermediateToDivergentVariantConvergesToInput,
+    }),
+    not_converging:
+        ValidationError::NormalizationPrettierIntermediateToDivergentVariantNotConverging,
+    converged: ValidationSuccess::PrettierIntermediatesToDivergentVariantConverge,
+};
+
+/// The readable contents of `names` in the fixture directory — a variant-targeted family's
+/// convergence targets. Read failures are tolerated without an error: N1 / N9a / N11a own these
+/// files and report an unreadable one loudly, so a silent skip here can't hide a gap.
+fn read_contents<'a>(
+    fixture: &Fixture,
+    names: impl IntoIterator<Item = &'a String>,
+) -> Vec<String> {
+    names
+        .into_iter()
+        .filter_map(|name| read_file(&fixture.path.join(name)).ok())
+        .collect()
+}
+
+/// N7 / N7b / N7c: validate one intermediate family's files. Each `<prefix><suffix>` file must
+/// be prettier's first pass over `unformatted_ours_<suffix>`, must be unstable under a second
+/// pass, and that second pass must land on one of `targets` — the input for N7, the documented
+/// variant files for N7b / N7c.
 ///
 /// Returns the contents of the intermediates that verified — the forms a sibling suffix
 /// may share (see [`validate_n10_cross_path_discovery`]).
-async fn validate_n7_prettier_intermediates(
+async fn validate_intermediate_family(
     result: &mut FixtureValidation,
     fixture: &Fixture,
     input: &str,
-    input_ext: &str,
-    files: &FixtureFiles,
+    family: &IntermediateFamily,
+    names: &[String],
+    targets: &[String],
     unformatted_ours_prettier_outputs: &HashMap<String, String>,
 ) -> Vec<String> {
-    let fixture_dir = &fixture.path;
+    let input_ext = fixture.input_type().extension();
     let prettier_parser = fixture.input_type().prettier_parser();
 
     let mut verified_contents = Vec::new();
     let mut converged = 0;
 
-    for intermediate_name in &files.prettier_intermediate {
-        let intermediate_path = fixture_dir.join(intermediate_name);
-        let intermediate_content = match read_file(&intermediate_path) {
+    for name in names {
+        let content = match read_file(&fixture.path.join(name)) {
             Ok(c) => c,
             Err(e) => {
                 result.add_error(ValidationError::FileReadError(e));
@@ -811,387 +907,90 @@ async fn validate_n7_prettier_intermediates(
             }
         };
 
-        // Extract suffix: prettier_intermediate_X.svelte -> X
-        let suffix = intermediate_name
-            .strip_prefix("prettier_intermediate_")
+        // Extract suffix: <prefix>X.svelte -> X
+        let suffix = name
+            .strip_prefix(family.prefix)
             .and_then(|s| s.strip_suffix(input_ext))
             .unwrap_or("");
 
-        // Check 1: Must have corresponding unformatted_ours_* file
+        // Must have a corresponding unformatted_ours_* file
         let Some(expected_content) = unformatted_ours_prettier_outputs.get(suffix) else {
-            result.add_error(
-                ValidationError::NormalizationPrettierIntermediateMissingSource(
-                    intermediate_name.clone(),
-                ),
-            );
+            result.add_error((family.missing_source)(name.clone()));
             continue;
         };
 
-        // Check 2: prettier(unformatted_ours_X) == prettier_intermediate_X
-        if *expected_content != intermediate_content {
-            result.add_error(ValidationError::NormalizationPrettierIntermediateMismatch(
-                intermediate_name.clone(),
-            ));
+        // A variant-targeted family needs at least one documented target to converge to
+        if let Some(checks) = &family.variant_target
+            && targets.is_empty()
+        {
+            result.add_error((checks.no_target)(name.clone()));
+            continue;
+        }
+
+        // prettier(unformatted_ours_X) == <prefix>X
+        if *expected_content != content {
+            result.add_error((family.mismatch)(name.clone()));
             result.add_diff(
                 &format!(
-                    "prettier_intermediate mismatch: {}/{}",
-                    fixture.relative_path, intermediate_name
+                    "{} mismatch: {}/{}",
+                    family.label(),
+                    fixture.relative_path,
+                    name
                 ),
-                &intermediate_content,
+                &content,
                 expected_content,
                 &diff::DiffOptions::freshness(),
             );
             continue;
         }
 
-        // Check 3: prettier(prettier_intermediate_X) != prettier_intermediate_X (must be unstable)
-        match run_prettier(&intermediate_content, prettier_parser).await {
+        // prettier(<prefix>X) != <prefix>X — an intermediate is unstable by definition (a
+        // stable one belongs in prettier_variant_* instead)
+        match run_prettier(&content, prettier_parser).await {
             Ok(second_pass) => {
-                if second_pass == intermediate_content {
-                    // It's stable - should be prettier_variant_* instead
-                    result.add_error(ValidationError::NormalizationPrettierIntermediateIsStable(
-                        intermediate_name.clone(),
-                    ));
+                if second_pass == content {
+                    result.add_error((family.is_stable)(name.clone()));
                     continue;
                 }
 
-                // Check 4: prettier(prettier_intermediate_X) == input (converges to stable form)
-                if second_pass != *input {
-                    result.add_error(
-                        ValidationError::NormalizationPrettierIntermediateNotConverging(
-                            intermediate_name.clone(),
-                        ),
-                    );
-                    result.add_diff(
-                        &format!(
-                            "prettier_intermediate not converging: {}/{}",
-                            fixture.relative_path, intermediate_name
-                        ),
-                        &second_pass,
-                        input,
-                        &diff::DiffOptions::prettier_behavior(),
-                    );
-                } else {
+                // A second pass that lands on the input belongs to plain N7
+                if let Some(checks) = &family.variant_target
+                    && second_pass == *input
+                {
+                    result.add_error((checks.converges_to_input)(name.clone()));
+                    continue;
+                }
+
+                if targets.contains(&second_pass) {
                     converged += 1;
-                    verified_contents.push(intermediate_content);
-                }
-            }
-            Err(e) => {
-                result.add_error(ValidationError::FormatterError(format!(
-                    "Prettier on {intermediate_name}: {e}"
-                )));
-            }
-        }
-    }
-
-    if converged > 0 {
-        result.add_success(ValidationSuccess::PrettierIntermediatesConverge(converged));
-    }
-
-    verified_contents
-}
-
-/// N7b: prettier_intermediate_to_variant_* validation
-///
-/// Like N7, but the second pass must converge to a documented variant_*/prettier_variant_*
-/// file (not input).
-///
-/// Returns the contents of the intermediates that verified, as N7 does.
-async fn validate_n7b_intermediates_to_variant(
-    result: &mut FixtureValidation,
-    fixture: &Fixture,
-    input: &str,
-    input_ext: &str,
-    files: &FixtureFiles,
-    unformatted_ours_prettier_outputs: &HashMap<String, String>,
-) -> Vec<String> {
-    let fixture_dir = &fixture.path;
-    let prettier_parser = fixture.input_type().prettier_parser();
-
-    // Pre-read variant_*/prettier_variant_* contents — these are the allowed convergence
-    // targets. Read failures are tolerated without an error: N1/N9a own these files and
-    // report unreadable ones loudly, so a silent skip here can't hide a gap.
-    let mut variant_target_contents: Vec<String> = Vec::new();
-    for pv_name in &files.prettier_variant {
-        if let Ok(content) = read_file(&fixture_dir.join(pv_name)) {
-            variant_target_contents.push(content);
-        }
-    }
-    for v_name in &files.variant {
-        if let Ok(content) = read_file(&fixture_dir.join(v_name)) {
-            variant_target_contents.push(content);
-        }
-    }
-
-    let mut verified_contents = Vec::new();
-    let mut converged = 0;
-
-    for intermediate_name in &files.prettier_intermediate_to_variant {
-        let intermediate_path = fixture_dir.join(intermediate_name);
-        let intermediate_content = match read_file(&intermediate_path) {
-            Ok(c) => c,
-            Err(e) => {
-                result.add_error(ValidationError::FileReadError(e));
-                continue;
-            }
-        };
-
-        // Extract suffix: prettier_intermediate_to_variant_X.svelte -> X
-        let suffix = intermediate_name
-            .strip_prefix("prettier_intermediate_to_variant_")
-            .and_then(|s| s.strip_suffix(input_ext))
-            .unwrap_or("");
-
-        // Check 1: Must have corresponding unformatted_ours_* file
-        let Some(expected_content) = unformatted_ours_prettier_outputs.get(suffix) else {
-            result.add_error(
-                ValidationError::NormalizationPrettierIntermediateToVariantMissingSource(
-                    intermediate_name.clone(),
-                ),
-            );
-            continue;
-        };
-
-        // Check 2: must have at least one variant_*/prettier_variant_* file as convergence target
-        if variant_target_contents.is_empty() {
-            result.add_error(
-                ValidationError::NormalizationPrettierIntermediateToVariantNoVariantTarget(
-                    intermediate_name.clone(),
-                ),
-            );
-            continue;
-        }
-
-        // Check 3: prettier(unformatted_ours_X) == prettier_intermediate_to_variant_X
-        if *expected_content != intermediate_content {
-            result.add_error(
-                ValidationError::NormalizationPrettierIntermediateToVariantMismatch(
-                    intermediate_name.clone(),
-                ),
-            );
-            result.add_diff(
-                &format!(
-                    "prettier_intermediate_to_variant mismatch: {}/{}",
-                    fixture.relative_path, intermediate_name
-                ),
-                &intermediate_content,
-                expected_content,
-                &diff::DiffOptions::freshness(),
-            );
-            continue;
-        }
-
-        // Check 4: prettier(prettier_intermediate_to_variant_X) != prettier_intermediate_to_variant_X (unstable)
-        match run_prettier(&intermediate_content, prettier_parser).await {
-            Ok(second_pass) => {
-                if second_pass == intermediate_content {
-                    result.add_error(
-                        ValidationError::NormalizationPrettierIntermediateToVariantIsStable(
-                            intermediate_name.clone(),
-                        ),
-                    );
-                    continue;
-                }
-
-                // Check 5: second pass must NOT equal input (else use prettier_intermediate_* instead)
-                if second_pass == *input {
-                    result.add_error(
-                        ValidationError::NormalizationPrettierIntermediateToVariantConvergesToInput(
-                            intermediate_name.clone(),
-                        ),
-                    );
-                    continue;
-                }
-
-                // Check 6: second pass must match some variant_* / prettier_variant_* content
-                let hits_variant = variant_target_contents.contains(&second_pass);
-                if !hits_variant {
-                    result.add_error(
-                        ValidationError::NormalizationPrettierIntermediateToVariantNotConverging(
-                            intermediate_name.clone(),
-                        ),
-                    );
-                    if let Some(first_target) = variant_target_contents.first() {
+                    verified_contents.push(content);
+                } else {
+                    result.add_error((family.not_converging)(name.clone()));
+                    if let Some(first_target) = targets.first() {
                         result.add_diff(
                             &format!(
-                                "prettier_intermediate_to_variant not converging: {}/{}",
-                                fixture.relative_path, intermediate_name
+                                "{} not converging: {}/{}",
+                                family.label(),
+                                fixture.relative_path,
+                                name
                             ),
                             &second_pass,
                             first_target,
                             &diff::DiffOptions::prettier_behavior(),
                         );
                     }
-                } else {
-                    converged += 1;
-                    verified_contents.push(intermediate_content);
                 }
             }
             Err(e) => {
                 result.add_error(ValidationError::FormatterError(format!(
-                    "Prettier on {intermediate_name}: {e}"
+                    "Prettier on {name}: {e}"
                 )));
             }
         }
     }
 
     if converged > 0 {
-        result.add_success(ValidationSuccess::PrettierIntermediatesToVariantConverge(
-            converged,
-        ));
-    }
-
-    verified_contents
-}
-
-/// N7c: prettier_intermediate_to_divergent_variant_* validation
-///
-/// The `divergent_variant`-targeted sibling of N7b: prettier's unstable first-pass
-/// output from an `unformatted_ours_*` shell whose second pass converges to a
-/// documented `divergent_variant_*` (a prettier-stable form our formatter rewrites
-/// to a third form), rather than input (N7) or a `variant_*`/`prettier_variant_*`
-/// (N7b). This is the convergence target no other intermediate marker accepts —
-/// it arises when the intersection first-member redundant-paren shell's prettier
-/// path settles on a glued form ours un-glues. Checks mirror N7b exactly, only the
-/// convergence target set differs.
-async fn validate_n7c_intermediates_to_divergent_variant(
-    result: &mut FixtureValidation,
-    fixture: &Fixture,
-    input: &str,
-    input_ext: &str,
-    files: &FixtureFiles,
-    unformatted_ours_prettier_outputs: &HashMap<String, String>,
-) -> Vec<String> {
-    let fixture_dir = &fixture.path;
-    let prettier_parser = fixture.input_type().prettier_parser();
-
-    // Pre-read divergent_variant_* contents — the allowed convergence targets.
-    // Read failures are tolerated without an error: N11a owns these files and
-    // reports unreadable ones loudly, so a silent skip here can't hide a gap.
-    let mut divergent_variant_target_contents: Vec<String> = Vec::new();
-    for dv_name in &files.divergent_variant {
-        if let Ok(content) = read_file(&fixture_dir.join(dv_name)) {
-            divergent_variant_target_contents.push(content);
-        }
-    }
-
-    let mut verified_contents = Vec::new();
-    let mut converged = 0;
-
-    for intermediate_name in &files.prettier_intermediate_to_divergent_variant {
-        let intermediate_path = fixture_dir.join(intermediate_name);
-        let intermediate_content = match read_file(&intermediate_path) {
-            Ok(c) => c,
-            Err(e) => {
-                result.add_error(ValidationError::FileReadError(e));
-                continue;
-            }
-        };
-
-        // Extract suffix: prettier_intermediate_to_divergent_variant_X.svelte -> X
-        let suffix = intermediate_name
-            .strip_prefix("prettier_intermediate_to_divergent_variant_")
-            .and_then(|s| s.strip_suffix(input_ext))
-            .unwrap_or("");
-
-        // Check 1: Must have corresponding unformatted_ours_* file
-        let Some(expected_content) = unformatted_ours_prettier_outputs.get(suffix) else {
-            result.add_error(
-                ValidationError::NormalizationPrettierIntermediateToDivergentVariantMissingSource(
-                    intermediate_name.clone(),
-                ),
-            );
-            continue;
-        };
-
-        // Check 2: must have at least one divergent_variant_* file as convergence target
-        if divergent_variant_target_contents.is_empty() {
-            result.add_error(
-                ValidationError::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(
-                    intermediate_name.clone(),
-                ),
-            );
-            continue;
-        }
-
-        // Check 3: prettier(unformatted_ours_X) == prettier_intermediate_to_divergent_variant_X
-        if *expected_content != intermediate_content {
-            result.add_error(
-                ValidationError::NormalizationPrettierIntermediateToDivergentVariantMismatch(
-                    intermediate_name.clone(),
-                ),
-            );
-            result.add_diff(
-                &format!(
-                    "prettier_intermediate_to_divergent_variant mismatch: {}/{}",
-                    fixture.relative_path, intermediate_name
-                ),
-                &intermediate_content,
-                expected_content,
-                &diff::DiffOptions::freshness(),
-            );
-            continue;
-        }
-
-        // Check 4: prettier(intermediate) != intermediate (unstable)
-        match run_prettier(&intermediate_content, prettier_parser).await {
-            Ok(second_pass) => {
-                if second_pass == intermediate_content {
-                    result.add_error(
-                        ValidationError::NormalizationPrettierIntermediateToDivergentVariantIsStable(
-                            intermediate_name.clone(),
-                        ),
-                    );
-                    continue;
-                }
-
-                // Check 5: second pass must NOT equal input (else use prettier_intermediate_* instead)
-                if second_pass == *input {
-                    result.add_error(
-                        ValidationError::NormalizationPrettierIntermediateToDivergentVariantConvergesToInput(
-                            intermediate_name.clone(),
-                        ),
-                    );
-                    continue;
-                }
-
-                // Check 6: second pass must match some divergent_variant_* content
-                let hits_divergent_variant =
-                    divergent_variant_target_contents.contains(&second_pass);
-                if !hits_divergent_variant {
-                    result.add_error(
-                        ValidationError::NormalizationPrettierIntermediateToDivergentVariantNotConverging(
-                            intermediate_name.clone(),
-                        ),
-                    );
-                    if let Some(first_target) = divergent_variant_target_contents.first() {
-                        result.add_diff(
-                            &format!(
-                                "prettier_intermediate_to_divergent_variant not converging: {}/{}",
-                                fixture.relative_path, intermediate_name
-                            ),
-                            &second_pass,
-                            first_target,
-                            &diff::DiffOptions::prettier_behavior(),
-                        );
-                    }
-                } else {
-                    converged += 1;
-                    verified_contents.push(intermediate_content);
-                }
-            }
-            Err(e) => {
-                result.add_error(ValidationError::FormatterError(format!(
-                    "Prettier on {intermediate_name}: {e}"
-                )));
-            }
-        }
-    }
-
-    if converged > 0 {
-        result.add_success(
-            ValidationSuccess::PrettierIntermediatesToDivergentVariantConverge(converged),
-        );
+        result.add_success((family.converged)(converged));
     }
 
     verified_contents
@@ -1351,8 +1150,12 @@ async fn validate_n10_cross_path_discovery(
                     Ok(second) if second == *prettier_output => {
                         // A one-pass-stable output; which pin (if any) can hold it is the
                         // shared `ours(V)` test.
-                        let marker =
-                            classify_stable_form(prettier_output, input, &fixture.input_file);
+                        let marker = classify_stable_form(
+                            prettier_output,
+                            input,
+                            &fixture.input_file,
+                            fixture.goal(),
+                        );
                         match marker.file_prefix() {
                             Some(prefix) => {
                                 // A single-form marker can express it — deliberately left

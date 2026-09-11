@@ -86,11 +86,6 @@ pub fn normalize_pair(a: Value, b: Value, render: bool) -> (Value, Value) {
 /// Used by `roundtrip_audit`'s corruption hunt (a re-quoted `attr='a"b'` →
 /// `attr="a"b"` reparses to two attributes, an array-length change the skeleton
 /// catches while ignoring the legitimate leaf-content reformatting around it).
-///
-/// `pub` (not `pub(crate)`) because `render_normalize.rs` is compiled into both
-/// the lib and bin targets while `cli` — the only consumer — lives in the bin
-/// alone, so a crate-private item reads as dead code in the lib target; its
-/// siblings `render_normalize` / `normalize_pair` are `pub` for the same reason.
 #[must_use]
 pub fn structural_skeleton(v: &Value) -> Value {
     match v {
