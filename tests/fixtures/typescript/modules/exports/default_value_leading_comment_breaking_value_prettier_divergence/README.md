@@ -28,5 +28,5 @@ nothing forces that break.
 
 See
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
-(`export default`→value, a forced break after the first comment) and
+(keyword→value gaps, a forced break after a block comment) and
 [conformance_prettier.md §Authored breaks in value position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position).

@@ -43,8 +43,9 @@ What the cases pin:
   positions.
 - **c6/c7** — a **block ahead of the line comment** keeps its own line too, where
   prettier pulls the block up alone.
-- **c8** — an own-line **multiline** block reaches this arm through the gate's
-  broke-after half rather than through a `//`, and lands the same way. The
+- **c8/c8c** — an own-line **multiline** block reaches this arm through the gate's
+  broke-after half rather than through a `//`, and lands the same way at `new` and
+  at `await`, where prettier pulls it up onto the keyword's line. The
   *glued* multiline authoring (`new /* … */⏎Foo()`) is on the keyword's line, so
   it trails there — the trailing sibling's `c7` case.
 - **c9** — in value position the run sits one level under the statement.

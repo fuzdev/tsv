@@ -1,7 +1,6 @@
 <script>
 	import a from './a' with {
-		type:
-			// c
+		type: // c
 			'json'
 	};
 </script>

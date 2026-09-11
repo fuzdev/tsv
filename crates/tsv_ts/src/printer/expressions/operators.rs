@@ -5,7 +5,7 @@
 // - Clarity-based parens (mixing logical operators, etc.)
 
 use crate::ast::internal::{self, BinaryOperator, Expression};
-use crate::printer::comments::{CommentSpacing, KeywordOperandGap};
+use crate::printer::comments::CommentSpacing;
 use crate::printer::{CommentVec, ParenContext, Printer, RunLeadingBlank};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -1389,51 +1389,6 @@ impl<'a> Printer<'a> {
             )
         };
 
-        // A block run the author broke AFTER, before an argument that WILL BREAK or holding a
-        // multi-line comment, keeps its break — prettier's `printLeadingComment` newline-after
-        // `line`, materialized by that forced break (`await /* c */⏎fn({…})` stays
-        // broken, the argument opening un-indented on the next line; `await` is not a
-        // restricted production, so the break is layout, not ASI — contrast `yield`).
-        // The gate is the shared `breaking_value_leading_run`; an argument that FITS behind
-        // single-line comments declines into the glued pull-up below. Mirrors
-        // `build_spread_doc`; a
-        // parenthesized argument keeps the glued path (the compound is unprobed).
-        //
-        // ⚠️ A FROZEN operand declines this arm outright. The arm glues the run to the
-        // keyword (`await /* c */⏎…`), which for an honored directive is the placement the
-        // floor calls INERT — pass 1 would print the frozen bytes with the directive welded
-        // to `await`, and pass 2 would read no freeze and normalize them, a silent loss no
-        // gate but `blanks:audit` can see (it needs a blank INSIDE the slice to make the
-        // operand `will_break` and reach here at all). The gap's own answer already routes a
-        // directive to the continuation below, where it keeps its line.
-        if frozen.is_none()
-            && !self.needs_parens(await_expr.argument, ParenContext::AwaitArgument)
-            && let Some((run, arg_doc)) =
-                self.breaking_value_leading_run(keyword_end, argument_start, operand_doc)
-        {
-            let mut parts: DocBuf = smallvec![d.text("await ")];
-            self.push_leading_run_before_breaking_value(&mut parts, &run, argument_start);
-            parts.push(arg_doc);
-            self.append_trailing_paren_comments(&mut parts, argument_end, await_expr.span.end);
-            return d.concat(&parts);
-        }
-
-        // The keyword→operand gap, shared with `new`→callee. The run is emitted OUTSIDE
-        // any parens the operand needs — the gap belongs to the keyword, not to a pair
-        // the printer must emit — so it answers one way whether or not the operand's
-        // precedence happens to require one. A comment the author wrote INSIDE those
-        // parens is glued to the operand and therefore owned, so it never reaches this
-        // axis and keeps its place (the `grouped_operand_comment` divergence).
-        let gap = self.keyword_operand_gap(keyword_end, argument_start);
-        // A resolved freeze reaches the CONTINUATION arm and no other: an honored directive
-        // hangs what follows it ([`Printer::comment_hangs_next`]), which is exactly what the
-        // gap's gate reads. Every other arm glues the run to the keyword, where the directive
-        // would be inert and the freeze lost on the next pass.
-        debug_assert!(
-            frozen.is_none() || matches!(gap, KeywordOperandGap::Continuation),
-            "an await→operand freeze must reach the continuation arm"
-        );
-
         let argument_doc = if has_trailing_comments {
             // The grouping parens are required when the operand needs them (`await`
             // binds tighter than a binary/ternary operand, so `await x + y` is
@@ -1476,21 +1431,36 @@ impl<'a> Printer<'a> {
             operand_doc()
         };
 
-        match gap {
-            KeywordOperandGap::Continuation => {
-                let mut parts: DocBuf = smallvec![d.text("await")];
-                self.append_keyword_value_line_comments(
-                    &mut parts,
-                    keyword_end,
-                    argument_start,
-                    argument_doc,
-                );
-                d.concat(&parts)
-            }
-            KeywordOperandGap::Inline(Some(run)) => {
-                d.concat(&[d.text("await "), run, argument_doc])
-            }
-            KeywordOperandGap::Inline(None) => d.concat(&[d.text("await "), argument_doc]),
+        // The keyword→operand gap, shared with `new`→callee. The run is emitted OUTSIDE
+        // any parens the operand needs — the gap belongs to the keyword, not to a pair
+        // the printer must emit — so it answers one way whether or not the operand's
+        // precedence happens to require one. A comment the author wrote INSIDE those
+        // parens is glued to the operand and therefore owned, so it never reaches this
+        // axis and keeps its place (the `grouped_operand_comment` divergence).
+        //
+        // The argument hangs whole below the run when the gap hangs
+        // ([`Printer::keyword_value_hang_doc`]) — `await /* c */⏎fn({…})` stays broken, and
+        // `await` is not a restricted production, so the break is layout, not ASI (contrast
+        // `yield`). A resolved freeze always hangs, since an honored directive hangs what
+        // follows it; the inline arm glues the run to the keyword, where a directive would be
+        // inert and the freeze lost on the next pass.
+        if let Some(argument_doc) =
+            self.keyword_value_hang_doc(keyword_end, argument_start, || argument_doc)
+        {
+            let mut parts: DocBuf = smallvec![d.text("await")];
+            self.append_keyword_value_line_comments(
+                &mut parts,
+                keyword_end,
+                argument_start,
+                argument_doc,
+            );
+            return d.concat(&parts);
+        }
+        debug_assert!(frozen.is_none(), "an await→operand freeze must hang");
+        match self.build_inline_comments_between_doc_trailing_space_opt(keyword_end, argument_start)
+        {
+            Some(run) => d.concat(&[d.text("await "), run, argument_doc]),
+            None => d.concat(&[d.text("await "), argument_doc]),
         }
     }
 

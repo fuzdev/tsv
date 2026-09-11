@@ -177,13 +177,15 @@ its tail:
   continuation indent](./conformance_prettier_ts_comments.md#comment-relocation).
 - **Prefix type operators** — the `keyof`/`typeof` operand hang
   (`type A = keyof // c⏎\t\tB`), shared via `append_keyword_value_line_comments` with
-  type-parameter constraint/default values, class-property initializers and a switch
-  label's `case`→test gap. See
+  type-parameter constraint/default values, class-property initializers, a switch
+  label's `case`→test gap and the function/constructor-type `=>`→return gap. See
   [Prefix type-operator operand hang](./conformance_prettier_ts_comments.md#comment-relocation).
   ⚠️ That seam is this rule's **keyword→value** half, and it differs from every other
   site below in one respect: an **own-line** comment there keeps its own line rather
   than pulling up to trail the head, because it *leads a value* (the corollary in
-  [§Comment Position Philosophy](#comment-position-philosophy)).
+  [§Comment Position Philosophy](#comment-position-philosophy)). A comment the author
+  put on the head's line stays there, so both placements are stable — the seam
+  preserves either authoring and moves neither onto the other's line.
 - **`: Type` annotations** — the colon→type continuation (`prop: // c⏎\tType`), via
   the shared `build_type_annotation_doc`, **uniformly for union, intersection, and
   simple types** and in **every** context: property signatures
@@ -279,10 +281,12 @@ its tail:
   layout choice — the `//` swallows the call's own parens and the `;`. See
   [Callee→empty argument list](./conformance_prettier_ts_comments.md#comment-relocation).
 - **Function/constructor-type `=>`→return type** — the arrow's operand hang
-  (`() => // c⏎\tT`), the same seam this gap's *frozen* arm already reached through
-  the shared `append_keyword_value_line_comments`. A union return keeps its own
-  break-after-arrow layout. See [Fn/ctor-type `=>`→return-type line
-  comment](./conformance_prettier_ts_comments.md#comment-relocation).
+  (`() => // c⏎\tT`), through the shared `append_keyword_value_line_comments` the prefix
+  type operators take and this gap's *frozen* arm reaches too, so it is a keyword→value
+  site: a comment on the `=>` line trails it and an own-line one keeps its line (the ⚠️
+  above). A non-hugging union return keeps its own break-after-arrow layout. See the two
+  [Fn/ctor-type `=>`→return-type](./conformance_prettier_ts_comments.md#comment-relocation)
+  entries.
 - **Value-arrow `=>`→body, and a curried chain's head→head gap** — the expression-level
   spelling of the row above (`(e) => // c⏎\te.prop`), which the two `=>`s once answered
   differently. The rule is the **gap's**, not the body's: object, block and ternary bodies
@@ -359,6 +363,17 @@ its tail:
   inside the parens, which supply their own indent
   ([expr_leading_line_paren_shell](../tests/fixtures/svelte/syntax/comments/expr_leading_line_paren_shell_prettier_divergence/),
   the shell sweep across all three of the family's resolving seams).
+
+**At a keyword→value gap the rule reads any forced break, not only a `//` one.** A block
+run the author broke after forces its break too when a comment in it spans lines or the value
+breaks on its own ([§Authored breaks in value position](#authored-breaks-in-value-position)),
+and it takes the same indent there — `export default`, `export =`, `case`, `await`, `new`, the
+prefix type operators, the `typeof` query, `infer` and the function-type `=>` alike
+(`new /* x */⏎\t/* y⏎\t */ C()`) — so one gap has one continuation whatever forced its break.
+Prettier leaves it flush, the same answer it gives the `//`. The value gaps that are not keyword
+gaps (`=`, `:`, an arrow body, a spread's dots) keep prettier's layout for that break. See the
+keyword→value forced-break entry in
+[§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation).
 
 **Two gaps are outside this rule, and the grammar is what excludes them**: an
 `as`/`satisfies` cast's operand→keyword gap and a postfix `++`/`--`'s
@@ -441,7 +456,9 @@ for a run whose last comment is glued to the value and an earlier one broke
 collapses — exactly as a break before the value would. When that glued comment is
 **multi-line** (`= /* c1 */⏎/* c2⏎*/ v`) the break is forced whatever the value does, since a
 comment spanning lines cannot share the line of one that broke before it, so the blank survives
-there too, and the value keeps its own layout below the comment.
+there too, and the value keeps its own layout below the comment. At a keyword→value gap that
+forced break takes the continuation indent
+([§Uniform Forced-Continuation Indent](#uniform-forced-continuation-indent)).
 
 The rule holds at every value gap whose own-line authoring **hangs** the comment (the
 initializer family: declarator, class property, object value, enum member, and the `=`/`:`
@@ -461,11 +478,22 @@ run (`build_header_comment_run`), and the prefix-keyword operand seam
 gate and emitter cannot answer differently. Prettier **agrees** wherever it leaves the run in
 the gap (declaration header, `:`→type annotation, prefix type-operator operand, callee→empty
 argument list, type-parameter `extends`), differing only in the continuation indent already
-cataloged there; it drops the blank only where it **relocates** the run out of the gap
-entirely — past the `=` at a binding initializer or default, to end-of-line at a property
-signature — so the drop is incidental to the relocation rather than a considered answer.
+cataloged there; it drops the blank where it **relocates** the run out of the gap entirely —
+past the `=` at a binding initializer or default, to end-of-line at a property signature — so
+the drop there is incidental to the relocation rather than a considered answer.
 Cataloged at
 [continuation_blank_between_comments](../tests/fixtures/typescript/syntax/comments/continuation_blank_between_comments_prettier_divergence/).
+
+⚠️ **One exception, at the operator→value gaps.** After a `//` that trails a declarator,
+assignment or for-init `=` (`const a = // x⏎⏎b`), prettier drops the blank *without* moving
+the comment, and tsv drops it too
+([multi_block_comment_after_eq](../tests/fixtures/typescript/declarations/variable/multi_block_comment_after_eq/));
+the object property's and import attribute's `:` share that partition
+(`build_operator_line_comment_hang`) and its answer. After a same-line **block** whose break a
+`//` below it forces (`const a = /* x */⏎⏎// y⏎b`) the blank survives, as prettier keeps it —
+[operator_value_forced_break_blank](../tests/fixtures/typescript/syntax/comments/operator_value_forced_break_blank_prettier_divergence/).
+The keyword→value gaps keep the blank after a trailing `//` as well; the two families part on
+that one cell.
 
 The import/export header family takes the same rule, and the reason is **not** a
 comment-position question: `gap_comment_continuation_tail` must consult its gate rather than key

@@ -1,0 +1,1133 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 872,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `new` callee: a run the author broke after, ending in a multi-line comment glued to",
+			"start": 44,
+			"end": 130,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the callee — the break after the first comment is forced, and the rest of the run and",
+			"start": 133,
+			"end": 221,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the whole tail hang one level under the keyword",
+			"start": 224,
+			"end": 274,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x ",
+			"start": 281,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 6
+				},
+				"end": {
+					"line": 6,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n ",
+			"start": 292,
+			"end": 303,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 3
+				},
+				"end": {
+					"line": 8,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a preserved multi-line comment: same rule",
+			"start": 313,
+			"end": 357,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x ",
+			"start": 364,
+			"end": 371,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 6
+				},
+				"end": {
+					"line": 11,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\nz ",
+			"start": 375,
+			"end": 384,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the break between the comments carries an author blank",
+			"start": 394,
+			"end": 451,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x ",
+			"start": 458,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 6
+				},
+				"end": {
+					"line": 16,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n ",
+			"start": 470,
+			"end": 481,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 3
+				},
+				"end": {
+					"line": 19,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `await` argument: same rule",
+			"start": 491,
+			"end": 521,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x ",
+			"start": 530,
+			"end": 537,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 8
+				},
+				"end": {
+					"line": 22,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n ",
+			"start": 541,
+			"end": 552,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 3
+				},
+				"end": {
+					"line": 24,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an argument that takes parens keeps the run outside them",
+			"start": 570,
+			"end": 629,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x ",
+			"start": 638,
+			"end": 645,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 8
+				},
+				"end": {
+					"line": 27,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n ",
+			"start": 649,
+			"end": 660,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 3
+				},
+				"end": {
+					"line": 29,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x ",
+			"start": 689,
+			"end": 696,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 8
+				},
+				"end": {
+					"line": 31,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n ",
+			"start": 701,
+			"end": 712,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 3
+				},
+				"end": {
+					"line": 34,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " as a call argument, the run and the callee hang inside the argument list",
+			"start": 735,
+			"end": 810,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 2
+				},
+				"end": {
+					"line": 36,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x ",
+			"start": 824,
+			"end": 831,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 7
+				},
+				"end": {
+					"line": 38,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n ",
+			"start": 836,
+			"end": 848,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 4
+				},
+				"end": {
+					"line": 40,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 871,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 862,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 43,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 20,
+					"end": 861,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 35,
+						"end": 37,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 18
+							}
+						},
+						"name": "f1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 40,
+						"end": 861,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 21
+							},
+							"end": {
+								"line": 42,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 277,
+								"end": 309,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 12
+									}
+								},
+								"expression": {
+									"type": "NewExpression",
+									"start": 277,
+									"end": 308,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 11
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 304,
+										"end": 306,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 7
+											},
+											"end": {
+												"line": 8,
+												"column": 9
+											}
+										},
+										"name": "C1",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " x ",
+												"start": 281,
+												"end": 288
+											},
+											{
+												"type": "Block",
+												"value": " y\n ",
+												"start": 292,
+												"end": 303
+											}
+										]
+									},
+									"arguments": []
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " `new` callee: a run the author broke after, ending in a multi-line comment glued to",
+										"start": 44,
+										"end": 130
+									},
+									{
+										"type": "Line",
+										"value": " the callee — the break after the first comment is forced, and the rest of the run and",
+										"start": 133,
+										"end": 221
+									},
+									{
+										"type": "Line",
+										"value": " the whole tail hang one level under the keyword",
+										"start": 224,
+										"end": 274
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 360,
+								"end": 390,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "NewExpression",
+									"start": 360,
+									"end": 389,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 9
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 385,
+										"end": 387,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 5
+											},
+											"end": {
+												"line": 13,
+												"column": 7
+											}
+										},
+										"name": "C2",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " x ",
+												"start": 364,
+												"end": 371
+											},
+											{
+												"type": "Block",
+												"value": " y\nz ",
+												"start": 375,
+												"end": 384
+											}
+										]
+									},
+									"arguments": []
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a preserved multi-line comment: same rule",
+										"start": 313,
+										"end": 357
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 454,
+								"end": 487,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 12
+									}
+								},
+								"expression": {
+									"type": "NewExpression",
+									"start": 454,
+									"end": 486,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 11
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 482,
+										"end": 484,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 7
+											},
+											"end": {
+												"line": 19,
+												"column": 9
+											}
+										},
+										"name": "C3",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " x ",
+												"start": 458,
+												"end": 465
+											},
+											{
+												"type": "Block",
+												"value": " y\n ",
+												"start": 470,
+												"end": 481
+											}
+										]
+									},
+									"arguments": []
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " the break between the comments carries an author blank",
+										"start": 394,
+										"end": 451
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 524,
+								"end": 566,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 20
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 524,
+									"end": 565,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 19
+										}
+									},
+									"argument": {
+										"type": "CallExpression",
+										"start": 553,
+										"end": 565,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 7
+											},
+											"end": {
+												"line": 24,
+												"column": 19
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 553,
+											"end": 555,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 7
+												},
+												"end": {
+													"line": 24,
+													"column": 9
+												}
+											},
+											"name": "fn"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 556,
+												"end": 559,
+												"loc": {
+													"start": {
+														"line": 24,
+														"column": 10
+													},
+													"end": {
+														"line": 24,
+														"column": 13
+													}
+												},
+												"name": "aaa"
+											},
+											{
+												"type": "Identifier",
+												"start": 561,
+												"end": 564,
+												"loc": {
+													"start": {
+														"line": 24,
+														"column": 15
+													},
+													"end": {
+														"line": 24,
+														"column": 18
+													}
+												},
+												"name": "bbb"
+											}
+										],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " x ",
+												"start": 530,
+												"end": 537
+											},
+											{
+												"type": "Block",
+												"value": " y\n ",
+												"start": 541,
+												"end": 552
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " `await` argument: same rule",
+										"start": 491,
+										"end": 521
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 632,
+								"end": 679,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 25
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 632,
+									"end": 678,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 24
+										}
+									},
+									"argument": {
+										"type": "ConditionalExpression",
+										"start": 662,
+										"end": 677,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 8
+											},
+											"end": {
+												"line": 29,
+												"column": 23
+											}
+										},
+										"test": {
+											"type": "Identifier",
+											"start": 662,
+											"end": 665,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 8
+												},
+												"end": {
+													"line": 29,
+													"column": 11
+												}
+											},
+											"name": "aaa"
+										},
+										"consequent": {
+											"type": "Identifier",
+											"start": 668,
+											"end": 671,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 14
+												},
+												"end": {
+													"line": 29,
+													"column": 17
+												}
+											},
+											"name": "bbb"
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 674,
+											"end": 677,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 20
+												},
+												"end": {
+													"line": 29,
+													"column": 23
+												}
+											},
+											"name": "ccc"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " x ",
+												"start": 638,
+												"end": 645
+											},
+											{
+												"type": "Block",
+												"value": " y\n ",
+												"start": 649,
+												"end": 660
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " an argument that takes parens keeps the run outside them",
+										"start": 570,
+										"end": 629
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 683,
+								"end": 731,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 2
+									},
+									"end": {
+										"line": 34,
+										"column": 25
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 683,
+									"end": 730,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 2
+										},
+										"end": {
+											"line": 34,
+											"column": 24
+										}
+									},
+									"argument": {
+										"type": "ConditionalExpression",
+										"start": 714,
+										"end": 729,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 8
+											},
+											"end": {
+												"line": 34,
+												"column": 23
+											}
+										},
+										"test": {
+											"type": "Identifier",
+											"start": 714,
+											"end": 717,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 8
+												},
+												"end": {
+													"line": 34,
+													"column": 11
+												}
+											},
+											"name": "aaa"
+										},
+										"consequent": {
+											"type": "Identifier",
+											"start": 720,
+											"end": 723,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 14
+												},
+												"end": {
+													"line": 34,
+													"column": 17
+												}
+											},
+											"name": "bbb"
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 726,
+											"end": 729,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 20
+												},
+												"end": {
+													"line": 34,
+													"column": 23
+												}
+											},
+											"name": "ccc"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " x ",
+												"start": 689,
+												"end": 696
+											},
+											{
+												"type": "Block",
+												"value": " y\n ",
+												"start": 701,
+												"end": 712
+											}
+										]
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 813,
+								"end": 858,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 41,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 813,
+									"end": 857,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 2
+										},
+										"end": {
+											"line": 41,
+											"column": 3
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 813,
+										"end": 815,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 2
+											},
+											"end": {
+												"line": 37,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "NewExpression",
+											"start": 820,
+											"end": 853,
+											"loc": {
+												"start": {
+													"line": 38,
+													"column": 3
+												},
+												"end": {
+													"line": 40,
+													"column": 12
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 849,
+												"end": 851,
+												"loc": {
+													"start": {
+														"line": 40,
+														"column": 8
+													},
+													"end": {
+														"line": 40,
+														"column": 10
+													}
+												},
+												"name": "C4",
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": " x ",
+														"start": 824,
+														"end": 831
+													},
+													{
+														"type": "Block",
+														"value": " y\n ",
+														"start": 836,
+														"end": 848
+													}
+												]
+											},
+											"arguments": []
+										}
+									],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " as a call argument, the run and the callee hang inside the argument list",
+										"start": 735,
+										"end": 810
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

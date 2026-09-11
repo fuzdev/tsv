@@ -1,14 +1,4 @@
 <script lang="ts">
-	// await argument: the comment's soft separator breaks with the argument —
-	// the run keeps the keyword's line, the argument opens un-indented below.
-	async function f1() {
-		const a = await /* c1 */
-		fn1({
-			b: 1,
-			c: 2
-		});
-	}
-
 	// call argument: the run takes its own line inside the expanded arguments
 	fn2(/* c2 */
 	{

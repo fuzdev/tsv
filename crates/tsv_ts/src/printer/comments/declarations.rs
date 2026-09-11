@@ -469,11 +469,11 @@ impl<'a> Printer<'a> {
     /// position — the region between a callee and what opens its argument list — so a
     /// caller that answered them differently would make the `?.` change how the gap reads.
     ///
-    /// ⚠️ Not [`Self::keyword_operand_gap`], whose gate is
-    /// [`Printer::comments_force_own_line_between`] and therefore also hangs a multiline
-    /// block the author broke after. These two gaps reflow that block inline instead, so
-    /// the narrower gate is deliberate and the two routers are siblings rather than
-    /// duplicates.
+    /// ⚠️ Not [`Self::keyword_value_hang_doc`], whose gate is
+    /// [`Printer::comments_force_own_line_between`] plus a forced broke-after run, and which
+    /// therefore also hangs a multiline block the author broke after. These two gaps reflow
+    /// that block inline instead, so the narrower gate is deliberate and the two gates are
+    /// siblings rather than duplicates.
     pub(crate) fn build_line_split_gap_doc(&self, start: u32, end: u32, tail: DocId) -> DocId {
         if self.has_line_comments_between(start, end) {
             return self.build_continuation_indent(start, end, tail);
@@ -1910,6 +1910,50 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The value doc when a keyword→value gap HANGS its value, else `None` — the question a
+    /// keyword→value seam asks before choosing between its inline form and
+    /// [`Self::append_keyword_value_line_comments`]. Two things hang it: a comment that forces
+    /// its own line ([`Self::comments_force_own_line_between`] — a line comment, or a multi-line
+    /// block the author broke after), and a block run the author broke after whose break is
+    /// FORCED ([`Self::breaking_value_leading_run`] — a multi-line comment in the run, or a value
+    /// that breaks on its own). Both take the seam's one continuation indent, so a gap answers
+    /// the same whatever forced its break (conformance_prettier.md §Uniform Forced-Continuation
+    /// Indent). `build_value` runs only when one of the two can hang the gap.
+    ///
+    /// A gap that does not hang trails its run inline
+    /// (`build_inline_comments_between_doc_trailing_space_opt`): a single-line block in any
+    /// authored position forces nothing, so the author's break is reflowed
+    /// (conformance_prettier.md §Authored breaks in value position).
+    ///
+    /// ⚠️ That inline form must NOT go through the continuation `indent` "for uniformity".
+    /// Nothing in the gap ends a line there, so the indent is not inert — it applies to every
+    /// break the value makes on its own WIDTH, pushing a broken argument list or object a level
+    /// over (`await /* c */ fn({…})`).
+    ///
+    /// ⚠️ Emitting the hang through `build_rhs_comments_opt` reads as the obvious code and is
+    /// wrong: that builder picks each separator from the comment's AUTHORED position, so an
+    /// own-line comment keeps a hardline while the concat glues it to the keyword. The result —
+    /// comment pulled up, break kept — *is* the glued authoring, which reflows inline on the
+    /// next pass, so the format is not idempotent on its own output.
+    ///
+    /// ⚠️ **Do not merge this with `gap_comment_continuation_tail`** (the module-header gap
+    /// emitter) on the strength of their matching gate→{hang, inline} shape. The gates differ on
+    /// purpose for a **glued multiline block** (`kw /* …⏎… */ v`): this gate keeps it inline,
+    /// while the header gap's `has_multiline_block_comments_on_page_between` hangs *any*
+    /// multiline block, glued or not.
+    pub(crate) fn keyword_value_hang_doc(
+        &self,
+        keyword_end: u32,
+        value_start: u32,
+        build_value: impl FnOnce() -> DocId,
+    ) -> Option<DocId> {
+        if self.comments_force_own_line_between(keyword_end, value_start) {
+            return Some(build_value());
+        }
+        self.breaking_value_leading_run(keyword_end, value_start, build_value)
+            .map(|(_, value_doc)| value_doc)
+    }
+
     /// Emit leading comments in `[keyword_end, value_start)` followed by
     /// `value_doc` broken onto its own indented line. Use when at least one line
     /// comment sits in the gap (a line comment forces the value down). The caller
@@ -1935,6 +1979,9 @@ impl<'a> Printer<'a> {
     /// `await`→operand (`build_await_doc`), whose tail is the WHOLE operand so a broken
     /// argument list renders at the hang's indent.
     ///
+    /// A same-line block's break is forced here too — the seam is reached only when the gap
+    /// hangs — so an author blank after it survives, as after a `//`.
+    ///
     /// ⚠️ The caller pushes its keyword **bare** — this seam owns every separator after
     /// it, so a keyword text carrying its own trailing space renders two.
     pub(crate) fn append_keyword_value_line_comments(
@@ -1956,6 +2003,17 @@ impl<'a> Printer<'a> {
                 if comment.is_block {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
+                    // The gap hangs, so the break after this block is forced — by a comment
+                    // below it, by the block spanning lines, or by the value — and an author
+                    // blank after it survives, as after the `//` below.
+                    let next = self.blank_scan_end_after(
+                        comment,
+                        comments.get(i + 1).map_or(value_start, |c| c.span.start),
+                    );
+                    if self.has_blank_line_between_strict(comment.span.end, next) {
+                        debug_assert_eq!(value_block.len(), 1, "value_block is still its seed");
+                        value_block.insert(0, d.literalline());
+                    }
                 } else {
                     parts.push(self.build_trailing_line_comment_doc(comment));
                     on_own_line = true; // a line comment ends its line
@@ -1969,9 +2027,10 @@ impl<'a> Printer<'a> {
                         comments.get(i + 1).map_or(value_start, |c| c.span.start),
                     );
                     // Prepending is well-defined: this arm needs `!on_own_line`, which
-                    // only the arm itself clears, and the same-line *block* arm above
-                    // doesn't touch `value_block` — so it still holds nothing but its
-                    // seed hardline, and the blank belongs before that.
+                    // only the arm itself clears, and a same-line *block* before it inserts
+                    // a blank only when one follows it — which puts this comment on a later
+                    // line — so `value_block` still holds nothing but its seed hardline, and
+                    // the blank belongs before that.
                     debug_assert_eq!(value_block.len(), 1, "value_block is still its seed");
                     if self.has_blank_line_between_strict(comment.span.end, next) {
                         value_block.insert(0, d.literalline());

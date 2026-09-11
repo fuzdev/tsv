@@ -27,5 +27,4 @@ inside its parens, which tsv lands on the same fixed point.
 
 See
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
-(`export default`→value, `export =`→value and `case`→test, a forced break after the first
-comment).
+(keyword→value gaps, a forced break after a block comment).

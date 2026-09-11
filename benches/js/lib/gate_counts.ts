@@ -840,7 +840,24 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// lists across the change: `unknown` loses exactly these two, `known` 122 → 124, and
 	// `partial` (32) / `safety` (0) / `errors` (188) and every `svelte` and `css` bucket are
 	// file-for-file identical.
-	typescript: 71,
+	//
+	// 71 → 72: `js/ignore/issue-9877.js` arrives from `known`, an honest reading of a divergence
+	// the old layout had been hiding. Its source is `matrix: // prettier-ignore⏎new Float32Array([…])`
+	// — a directive TRAILING an object property's `:`. tsv's placement floor calls a directive
+	// sharing its line with anything inert (docs/conformance_prettier_ignore.md), so the array
+	// reflows under tsv before and after; prettier honors it there (though not after a
+	// declarator `=`, where it reflows too). The object property's `:` used to push a `:`-line
+	// `//` onto a line of its own, which read as the cataloged comment-relocation family and
+	// filed the file `known`; it now keeps the comment on the `:` line, as the declarator `=`
+	// does, so the unhonored freeze is the file's whole diff and no pattern claims it.
+	//
+	// Measured by a baseline-vs-tip byte A/B over the 11,749 `find`-enumerated
+	// `../corpora/collections` + `../prettier/tests/format` files (`.html` included, stdout,
+	// stderr and exit code compared per file): 2 movers, both in the prettier suites, ZERO in
+	// real code — this file, and `js/assignment-comments/function.js`, which gains prettier's
+	// blank after `f6 = /* comment */` and stays `known`. The `--all` run confirms the scope:
+	// `typescript` `unknown` is the only cell that moves in any language.
+	typescript: 72,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.

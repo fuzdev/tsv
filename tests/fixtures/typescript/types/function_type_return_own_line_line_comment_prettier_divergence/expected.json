@@ -1,0 +1,1797 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1040,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line `//` in a function type's `=>`→return gap keeps the line the author gave it;",
+			"start": 20,
+			"end": 111,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the return type hangs one level in below it.",
+			"start": 113,
+			"end": 160,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 179,
+			"end": 184,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The constructor type shares the gap.",
+			"start": 192,
+			"end": 231,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 254,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " ...and so does the abstract constructor type.",
+			"start": 267,
+			"end": 315,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 347,
+			"end": 352,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run keeps one comment per line, in order.",
+			"start": 360,
+			"end": 406,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 425,
+			"end": 430,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 433,
+			"end": 438,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block ahead of the line comment keeps its own line too.",
+			"start": 446,
+			"end": 506,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 525,
+			"end": 533,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 536,
+			"end": 541,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block on the `=>` line stays there, and the author blank after it survives.",
+			"start": 549,
+			"end": 629,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 646,
+			"end": 654,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 16
+				},
+				"end": {
+					"line": 31,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 658,
+			"end": 663,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 2
+				},
+				"end": {
+					"line": 33,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A hugging union return hangs as a simple type does.",
+			"start": 671,
+			"end": 725,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 744,
+			"end": 750,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 789,
+			"end": 795,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 2
+				},
+				"end": {
+					"line": 42,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A function type in a parameter annotation.",
+			"start": 828,
+			"end": 873,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 1
+				},
+				"end": {
+					"line": 45,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c12",
+			"start": 900,
+			"end": 906,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 3
+				},
+				"end": {
+					"line": 48,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Control: a comment the author put ON the `=>` line trails it, as before.",
+			"start": 926,
+			"end": 1001,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 1
+				},
+				"end": {
+					"line": 52,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 1018,
+			"end": 1024,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 16
+				},
+				"end": {
+					"line": 53,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1039,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1030,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 55,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 162,
+					"end": 189,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 167,
+						"end": 168,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 171,
+						"end": 188,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 3
+							}
+						},
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 174,
+							"end": 188,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 13
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 187,
+								"end": 188,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 187,
+									"end": 188,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 179,
+										"end": 184
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line `//` in a function type's `=>`→return gap keeps the line the author gave it;",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " the return type hangs one level in below it.",
+							"start": 113,
+							"end": 160
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 233,
+					"end": 264,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 238,
+						"end": 239,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSConstructorType",
+						"start": 242,
+						"end": 263,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 3
+							}
+						},
+						"abstract": false,
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 249,
+							"end": 263,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 17
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 262,
+								"end": 263,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 262,
+									"end": 263,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 254,
+										"end": 259
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The constructor type shares the gap.",
+							"start": 192,
+							"end": 231
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 317,
+					"end": 357,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 322,
+						"end": 323,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 6
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSConstructorType",
+						"start": 326,
+						"end": 356,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 10
+							},
+							"end": {
+								"line": 16,
+								"column": 3
+							}
+						},
+						"abstract": true,
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 342,
+							"end": 356,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 26
+								},
+								"end": {
+									"line": 16,
+									"column": 3
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 355,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 355,
+									"end": 356,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 347,
+										"end": 352
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " ...and so does the abstract constructor type.",
+							"start": 267,
+							"end": 315
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 408,
+					"end": 443,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 413,
+						"end": 414,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 417,
+						"end": 442,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 10
+							},
+							"end": {
+								"line": 22,
+								"column": 3
+							}
+						},
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 420,
+							"end": 442,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 13
+								},
+								"end": {
+									"line": 22,
+									"column": 3
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 441,
+								"end": 442,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 441,
+									"end": 442,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 22,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 425,
+										"end": 430
+									},
+									{
+										"type": "Line",
+										"value": " c5",
+										"start": 433,
+										"end": 438
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run keeps one comment per line, in order.",
+							"start": 360,
+							"end": 406
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 508,
+					"end": 546,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 513,
+						"end": 514,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 6
+							},
+							"end": {
+								"line": 25,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 517,
+						"end": 545,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 10
+							},
+							"end": {
+								"line": 28,
+								"column": 3
+							}
+						},
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 520,
+							"end": 545,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 13
+								},
+								"end": {
+									"line": 28,
+									"column": 3
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 544,
+								"end": 545,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 544,
+									"end": 545,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 2
+										},
+										"end": {
+											"line": 28,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c6 ",
+										"start": 525,
+										"end": 533
+									},
+									{
+										"type": "Line",
+										"value": " c7",
+										"start": 536,
+										"end": 541
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block ahead of the line comment keeps its own line too.",
+							"start": 446,
+							"end": 506
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 631,
+					"end": 668,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 636,
+						"end": 637,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 6
+							},
+							"end": {
+								"line": 31,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 640,
+						"end": 667,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 10
+							},
+							"end": {
+								"line": 34,
+								"column": 3
+							}
+						},
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 643,
+							"end": 667,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 13
+								},
+								"end": {
+									"line": 34,
+									"column": 3
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 666,
+								"end": 667,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 2
+									},
+									"end": {
+										"line": 34,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 666,
+									"end": 667,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 2
+										},
+										"end": {
+											"line": 34,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c8 ",
+										"start": 646,
+										"end": 654
+									},
+									{
+										"type": "Line",
+										"value": " c9",
+										"start": 658,
+										"end": 663
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block on the `=>` line stays there, and the author blank after it survives.",
+							"start": 549,
+							"end": 629
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 727,
+					"end": 769,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 18
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 732,
+						"end": 733,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 6
+							},
+							"end": {
+								"line": 37,
+								"column": 7
+							}
+						},
+						"name": "H"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 736,
+						"end": 768,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 10
+							},
+							"end": {
+								"line": 39,
+								"column": 17
+							}
+						},
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 739,
+							"end": 768,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 13
+								},
+								"end": {
+									"line": 39,
+									"column": 17
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 753,
+								"end": 768,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 2
+									},
+									"end": {
+										"line": 39,
+										"column": 17
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeLiteral",
+										"start": 753,
+										"end": 761,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 2
+											},
+											"end": {
+												"line": 39,
+												"column": 10
+											}
+										},
+										"members": [
+											{
+												"type": "TSPropertySignature",
+												"start": 755,
+												"end": 759,
+												"loc": {
+													"start": {
+														"line": 39,
+														"column": 4
+													},
+													"end": {
+														"line": 39,
+														"column": 8
+													}
+												},
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 755,
+													"end": 756,
+													"loc": {
+														"start": {
+															"line": 39,
+															"column": 4
+														},
+														"end": {
+															"line": 39,
+															"column": 5
+														}
+													},
+													"name": "a"
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 756,
+													"end": 759,
+													"loc": {
+														"start": {
+															"line": 39,
+															"column": 5
+														},
+														"end": {
+															"line": 39,
+															"column": 8
+														}
+													},
+													"typeAnnotation": {
+														"type": "TSLiteralType",
+														"start": 758,
+														"end": 759,
+														"loc": {
+															"start": {
+																"line": 39,
+																"column": 7
+															},
+															"end": {
+																"line": 39,
+																"column": 8
+															}
+														},
+														"literal": {
+															"type": "Literal",
+															"start": 758,
+															"end": 759,
+															"loc": {
+																"start": {
+																	"line": 39,
+																	"column": 7
+																},
+																"end": {
+																	"line": 39,
+																	"column": 8
+																}
+															},
+															"value": 1,
+															"raw": "1"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"type": "TSNullKeyword",
+										"start": 764,
+										"end": 768,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 13
+											},
+											"end": {
+												"line": 39,
+												"column": 17
+											}
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c10",
+										"start": 744,
+										"end": 750
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A hugging union return hangs as a simple type does.",
+							"start": 671,
+							"end": 725
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 772,
+					"end": 825,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 29
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 777,
+						"end": 778,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 6
+							},
+							"end": {
+								"line": 41,
+								"column": 7
+							}
+						},
+						"name": "I"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 781,
+						"end": 824,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 10
+							},
+							"end": {
+								"line": 43,
+								"column": 28
+							}
+						},
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 784,
+							"end": 824,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 13
+								},
+								"end": {
+									"line": 43,
+									"column": 28
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 798,
+								"end": 824,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 2
+									},
+									"end": {
+										"line": 43,
+										"column": 28
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 798,
+										"end": 817,
+										"loc": {
+											"start": {
+												"line": 43,
+												"column": 2
+											},
+											"end": {
+												"line": 43,
+												"column": 21
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 798,
+											"end": 801,
+											"loc": {
+												"start": {
+													"line": 43,
+													"column": 2
+												},
+												"end": {
+													"line": 43,
+													"column": 5
+												}
+											},
+											"name": "Map"
+										},
+										"typeArguments": {
+											"type": "TSTypeParameterInstantiation",
+											"start": 801,
+											"end": 817,
+											"loc": {
+												"start": {
+													"line": 43,
+													"column": 5
+												},
+												"end": {
+													"line": 43,
+													"column": 21
+												}
+											},
+											"params": [
+												{
+													"type": "TSStringKeyword",
+													"start": 802,
+													"end": 808,
+													"loc": {
+														"start": {
+															"line": 43,
+															"column": 6
+														},
+														"end": {
+															"line": 43,
+															"column": 12
+														}
+													}
+												},
+												{
+													"type": "TSNumberKeyword",
+													"start": 810,
+													"end": 816,
+													"loc": {
+														"start": {
+															"line": 43,
+															"column": 14
+														},
+														"end": {
+															"line": 43,
+															"column": 20
+														}
+													}
+												}
+											]
+										}
+									},
+									{
+										"type": "TSNullKeyword",
+										"start": 820,
+										"end": 824,
+										"loc": {
+											"start": {
+												"line": 43,
+												"column": 24
+											},
+											"end": {
+												"line": 43,
+												"column": 28
+											}
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c11",
+										"start": 789,
+										"end": 795
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 875,
+					"end": 923,
+					"loc": {
+						"start": {
+							"line": 46,
+							"column": 1
+						},
+						"end": {
+							"line": 50,
+							"column": 11
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 880,
+						"end": 881,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 6
+							},
+							"end": {
+								"line": 46,
+								"column": 7
+							}
+						},
+						"name": "J"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 884,
+						"end": 922,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 10
+							},
+							"end": {
+								"line": 50,
+								"column": 10
+							}
+						},
+						"parameters": [
+							{
+								"type": "Identifier",
+								"start": 888,
+								"end": 911,
+								"loc": {
+									"start": {
+										"line": 47,
+										"column": 2
+									},
+									"end": {
+										"line": 49,
+										"column": 4
+									}
+								},
+								"name": "a",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 889,
+									"end": 911,
+									"loc": {
+										"start": {
+											"line": 47,
+											"column": 3
+										},
+										"end": {
+											"line": 49,
+											"column": 4
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSFunctionType",
+										"start": 891,
+										"end": 911,
+										"loc": {
+											"start": {
+												"line": 47,
+												"column": 5
+											},
+											"end": {
+												"line": 49,
+												"column": 4
+											}
+										},
+										"parameters": [],
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 894,
+											"end": 911,
+											"loc": {
+												"start": {
+													"line": 47,
+													"column": 8
+												},
+												"end": {
+													"line": 49,
+													"column": 4
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 910,
+												"end": 911,
+												"loc": {
+													"start": {
+														"line": 49,
+														"column": 3
+													},
+													"end": {
+														"line": 49,
+														"column": 4
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 910,
+													"end": 911,
+													"loc": {
+														"start": {
+															"line": 49,
+															"column": 3
+														},
+														"end": {
+															"line": 49,
+															"column": 4
+														}
+													},
+													"name": "B"
+												},
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " c12",
+														"start": 900,
+														"end": 906
+													}
+												]
+											}
+										}
+									}
+								}
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 915,
+							"end": 922,
+							"loc": {
+								"start": {
+									"line": 50,
+									"column": 3
+								},
+								"end": {
+									"line": 50,
+									"column": 10
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 918,
+								"end": 922,
+								"loc": {
+									"start": {
+										"line": 50,
+										"column": 6
+									},
+									"end": {
+										"line": 50,
+										"column": 10
+									}
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A function type in a parameter annotation.",
+							"start": 828,
+							"end": 873
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1003,
+					"end": 1029,
+					"loc": {
+						"start": {
+							"line": 53,
+							"column": 1
+						},
+						"end": {
+							"line": 54,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1008,
+						"end": 1009,
+						"loc": {
+							"start": {
+								"line": 53,
+								"column": 6
+							},
+							"end": {
+								"line": 53,
+								"column": 7
+							}
+						},
+						"name": "K"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 1012,
+						"end": 1028,
+						"loc": {
+							"start": {
+								"line": 53,
+								"column": 10
+							},
+							"end": {
+								"line": 54,
+								"column": 3
+							}
+						},
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 1015,
+							"end": 1028,
+							"loc": {
+								"start": {
+									"line": 53,
+									"column": 13
+								},
+								"end": {
+									"line": 54,
+									"column": 3
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 1027,
+								"end": 1028,
+								"loc": {
+									"start": {
+										"line": 54,
+										"column": 2
+									},
+									"end": {
+										"line": 54,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1027,
+									"end": 1028,
+									"loc": {
+										"start": {
+											"line": 54,
+											"column": 2
+										},
+										"end": {
+											"line": 54,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c13",
+										"start": 1018,
+										"end": 1024
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Control: a comment the author put ON the `=>` line trails it, as before.",
+							"start": 926,
+							"end": 1001
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

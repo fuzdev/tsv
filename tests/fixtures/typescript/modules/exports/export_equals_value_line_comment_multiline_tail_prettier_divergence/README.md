@@ -28,6 +28,5 @@ inside its parens (`/* y⏎*/ (⏎aaa ? bbb : ccc)`), which tsv lands on the sam
 
 See
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
-(`export default`→value, `export =`→value and `case`→test, a forced break after the first
-comment) and
+(keyword→value gaps, a forced break after a block comment) and
 [conformance_prettier.md §Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent).

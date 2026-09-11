@@ -25,8 +25,8 @@ export default /* x */
 `unformatted_ours_paren_break.svelte` is the same run before a parenthesized value with a break
 inside its parens (`/* y⏎*/ (⏎aaa ? bbb : ccc)`), which tsv lands on the same fixed point.
 
-The `export default` carve-out of the continuation-indent rule — prettier keeps the operand
-break here, tsv hangs it indented. See
+Prettier keeps the operand break here, and tsv hangs it indented, as at every keyword→value gap.
+See
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
-(`export default`→value, a forced break after the first comment) and
+(keyword→value gaps, a forced break after a block comment) and
 [conformance_prettier.md §Authored breaks in value position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position).

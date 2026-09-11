@@ -36,6 +36,11 @@
 		c8b */
 			Foo();
 
+		await
+			/* c8c
+		c8d */
+			fn2();
+
 		// In value position the run sits one level under the statement.
 		const c =
 			await
