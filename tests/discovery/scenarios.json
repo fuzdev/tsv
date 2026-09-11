@@ -1,5 +1,5 @@
 {
-	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, explicit-arg bypass, argument rejection, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list <root>/<target>`. A case carries EITHER `expected` — the in-scope files, relative to the tempdir root, in exact sorted order — OR `error`, a substring of the argument error that must fail the run upfront (exit 2, nothing listed). An `expected` case may add `warns`: substrings each of which some warning the walk emits must carry (exit code and stdout untouched) — the one pin on the warnings channel as a walk PRODUCT, where the texts themselves are tsv_discover's unit tests'. Names are ASCII so Rust's PathBuf order and cli.js's compare_paths agree (see cli.js compare_paths for the astral-plane/Windows caveat).",
+	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, explicit-arg bypass, argument rejection, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list <root>/<target>`. A case carries EITHER `expected` — the in-scope files, relative to the tempdir root, in exact sorted order — OR `error`, a substring of the argument error that must fail the run upfront (exit 2, nothing listed). An `expected` case may add `warns`: substrings each of which some warning the walk emits must carry, and `no_warns`: substrings no warning may carry (exit code and stdout untouched either way) — the one pin on the warnings channel as a walk PRODUCT, where the texts themselves are tsv_discover's unit tests'. A tree value may also be `{\"symlink\": \"<target>\"}`, a symbolic link to `<target>` resolved from the link's own directory; a scenario holding one needs unix, and both harnesses skip it elsewhere. Names are ASCII so Rust's PathBuf order and cli.js's compare_paths agree (see cli.js compare_paths for the astral-plane/Windows caveat).",
 	"scenarios": [
 		{
 			"name": "respects_prettierignore",
@@ -326,6 +326,61 @@
 				{"target": "dist", "expected": ["dist/sub/a.ts"]},
 				{"target": "node_modules", "expected": ["node_modules/pkg/i.ts"]},
 				{"target": ".hidden", "expected": [".hidden/b.ts", ".hidden/sub/c.ts"]}
+			]
+		},
+		{
+			"name": "pruned_ancestor_outside_repo_is_not_graded",
+			"note": "outside a git repo the format root is the filesystem root — where .formatignore reading starts, not a project — so the safety nets and the heuristic do not grade a named subdirectory's ANCESTORS: a loose project under a heuristic or hidden directory (a /build sandbox, ~/.cache) stays in scope. Walking down from the tempdir root still prunes those directories (no .gitignore is read outside a repo, so the heuristic is on)",
+			"tree": {
+				"build/proj/a.ts": "x",
+				".cache/proj/b.ts": "x",
+				"dist/x/src/c.ts": "x",
+				"top.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["top.ts"]},
+				{"target": "build/proj", "expected": ["build/proj/a.ts"]},
+				{"target": ".cache/proj", "expected": [".cache/proj/b.ts"]},
+				{"target": "dist/x/src", "expected": ["dist/x/src/c.ts"]}
+			]
+		},
+		{
+			"name": "a_directory_named_like_an_ignore_file_is_not_one",
+			"note": "an ignore file is present when it is a REGULAR file, by the same rule whether its directory is walked or only preloaded as an ancestor: a directory named .formatignore does not shadow the sibling .prettierignore, and a directory named .gitignore neither turns the heuristic off nor warns about a file it could not read",
+			"tree": {
+				".git/": null,
+				".formatignore/": null,
+				".gitignore/": null,
+				".prettierignore": "p.ts\n",
+				"p.ts": "x",
+				"keep.ts": "x",
+				"sub/p.ts": "x",
+				"sub/keep.ts": "x",
+				"sub/dist/d.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["keep.ts", "sub/keep.ts"], "no_warns": ["could not read", "shadowed"]},
+				{"target": "sub", "expected": ["sub/keep.ts"], "no_warns": ["could not read", "shadowed"]}
+			]
+		},
+		{
+			"name": "a_symlinked_ignore_file_is_followed",
+			"note": "an ignore file reached through a symlink is read, by the same rule whether its directory is walked or only preloaded (a listing's own file type does not follow the link, so the walk has to)",
+			"tree": {
+				".git/": null,
+				"rules/prettier": "p.ts\n",
+				"rules/format": "f.ts\n",
+				".prettierignore": {"symlink": "rules/prettier"},
+				"sub/.formatignore": {"symlink": "../rules/format"},
+				"p.ts": "x",
+				"keep.ts": "x",
+				"sub/deep/p.ts": "x",
+				"sub/deep/f.ts": "x",
+				"sub/deep/keep.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["keep.ts", "sub/deep/keep.ts"]},
+				{"target": "sub/deep", "expected": ["sub/deep/keep.ts"]}
 			]
 		}
 	]

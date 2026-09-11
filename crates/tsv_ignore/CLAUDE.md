@@ -122,7 +122,7 @@ from.
   (shallow→deep), last match winning. So a deeper file overrides a shallower one,
   the tsv layer overrides any `.gitignore`, and the parent-prune holds across
   files. Gitignore-only behavior is byte-for-byte `git check-ignore` (the test
-  table is pinned against it). `IgnoreRules` stays the single-root primitive each
+  table is pinned against it), less the known edges below. `IgnoreRules` stays the single-root primitive each
   layer is built from.
 - **Case-sensitive** — always, matching prettier's `ignore` and git on a
   case-sensitive filesystem. See the case-insensitivity edge below.
@@ -163,8 +163,22 @@ from.
   ASCII, with `glob_is_code_point_granular` pinning the multibyte behavior). Rare
   in practice — `?`/classes over multibyte names are unusual, and `*` is unaffected.
 
-- POSIX bracket classes (`[[:alpha:]]`) are not supported (treated literally) —
-  prettier's matcher doesn't rely on them either.
+- **POSIX bracket classes** (`[[:alpha:]]`) are not supported — prettier's
+  matcher doesn't rely on them either. They are read as ordinary class members, so
+  `[[:alpha:]]` is the class `[:alph` followed by a literal `]` (git matches one ASCII
+  letter), and a malformed `[[:bogus:]]`, which git never matches, matches here.
+
+- **A `/` inside a bracket class** (`a[/]b.ts`, `x[!/]y.ts`) — a pattern is split on
+  `/` before its classes are read, so the class is cut open and the rule never
+  matches, where git reads the class whole. Near-zero exposure: a path component
+  cannot hold the `/` such a class names.
+
+- **A `**` glued to a literal prefix** (`foo**/bar.ts`) is two stars within one
+  segment by gitignore(5) — no directory crossing — and tsv follows that. git's
+  matcher compares the literal prefix first and matches the rest as a fresh pattern,
+  where the `**` then leads and crosses directories, so git also ignores
+  `foox/y/bar.ts`. A git quirk against its own documentation, deliberately not
+  followed.
 
 - **`is_reincluded` is leaf-only** — it reports the `!`-negation polarity of the
   query path *itself*, with no ancestor walk (unlike `is_ignored`). A caller that

@@ -9,7 +9,8 @@
 /// One segment of a pattern.
 #[derive(Debug)]
 pub(crate) enum Seg {
-    /// A literal `**` segment — matches zero or more path segments.
+    /// A `**` segment (or any longer run of stars) — matches zero or more path
+    /// segments.
     DoubleStar,
     /// A normal segment, matched against one path segment via its tokens.
     Glob(Vec<Tok>),
@@ -86,7 +87,9 @@ impl Seg {
 /// matcher aborts on — an unterminated `[`, which `wildmatch` answers with
 /// `WM_ABORT_ALL`, so the whole pattern matches nothing (not even a literal `[`).
 pub(crate) fn parse_segment(s: &str) -> Option<Seg> {
-    if s == "**" {
+    // `wildmatch` consumes a whole run of stars before it tests what bounds it, so a
+    // segment that is nothing but stars — `***` included — is a double star
+    if s.len() >= 2 && s.bytes().all(|b| b == b'*') {
         return Some(Seg::DoubleStar);
     }
     let chars: Vec<char> = s.chars().collect();
@@ -132,6 +135,16 @@ pub(crate) fn parse_segment(s: &str) -> Option<Seg> {
 /// Parses a `[...]` class starting at `open` (where `chars[open] == '['`).
 /// Returns the class token and the index just past the closing `]`, or `None`
 /// if the class is unterminated.
+///
+/// A transcription of git's `wildmatch` class loop, whose reading order decides
+/// every edge. Each element is a member the moment it is read: an escape resolves
+/// first (`[\a-c]` is the range `a`–`c`, not `a`, `-`, `c`), a `]` in the first
+/// position is a literal rather than the terminator, and a range's low end has
+/// already matched as a plain member by the time its `-` is read (so the empty
+/// range `[z-a]` still matches `z`). A `-` opens a range only when an element
+/// precedes it and the next character is not `]`; the element a range consumed
+/// cannot open another (`[a-c-e]` is `a`–`c`, `-`, `e`), and the high end may be
+/// escaped (`[a-\]]`).
 fn parse_class(chars: &[char], open: usize) -> Option<(Tok, usize)> {
     let mut i = open + 1;
     let mut negated = false;
@@ -139,33 +152,40 @@ fn parse_class(chars: &[char], open: usize) -> Option<(Tok, usize)> {
         negated = true;
         i += 1;
     }
+    let first = i;
     let mut items = Vec::new();
-    // a `]` right after `[` (or `[!`) is a literal `]`, not the terminator
-    if i < chars.len() && chars[i] == ']' {
-        items.push(ClassItem::Ch(']'));
-        i += 1;
-    }
-    while i < chars.len() && chars[i] != ']' {
-        if i + 2 < chars.len() && chars[i + 1] == '-' && chars[i + 2] != ']' {
-            // The range's low end also matches as a plain member: git's `wildmatch`
-            // tests the character for equality before it reads the `-`, so `[z-a]`
-            // — an empty range — still matches a `z`, and `[a-c]` matches `a` twice
-            // over. Emitting both reproduces that loop exactly.
-            items.push(ClassItem::Ch(chars[i]));
-            items.push(ClassItem::Range(chars[i], chars[i + 2]));
-            i += 3;
-        } else if chars[i] == '\\' && i + 1 < chars.len() {
-            items.push(ClassItem::Ch(chars[i + 1]));
+    // `wildmatch`'s `prev_ch`: the element a following `-` ranges from, `None` at the
+    // class start and once a range has consumed it
+    let mut prev: Option<char> = None;
+    loop {
+        let c = *chars.get(i)?;
+        // a `]` right after `[` (or `[!`) is a literal member, not the terminator
+        if c == ']' && i > first {
+            return Some((Tok::Class { negated, items }, i + 1));
+        }
+        if c == '\\' {
+            let escaped = *chars.get(i + 1)?;
+            items.push(ClassItem::Ch(escaped));
+            prev = Some(escaped);
             i += 2;
+        } else if c == '-'
+            && let Some(low) = prev
+            && let Some(&next) = chars.get(i + 1)
+            && next != ']'
+        {
+            let (high, width) = if next == '\\' {
+                (*chars.get(i + 2)?, 3)
+            } else {
+                (next, 2)
+            };
+            items.push(ClassItem::Range(low, high));
+            prev = None;
+            i += width;
         } else {
-            items.push(ClassItem::Ch(chars[i]));
+            items.push(ClassItem::Ch(c));
+            prev = Some(c);
             i += 1;
         }
-    }
-    if i < chars.len() && chars[i] == ']' {
-        Some((Tok::Class { negated, items }, i + 1))
-    } else {
-        None
     }
 }
 

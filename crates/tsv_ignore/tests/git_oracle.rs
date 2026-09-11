@@ -250,3 +250,85 @@ fn parse_level_rules_match_git() {
         ],
     );
 }
+
+/// Bracket classes read in `wildmatch`'s order: an escape resolves before a `-` is
+/// read (`[\a-c]` is a range), an escaped `-` is a member, a range's high end may be
+/// escaped, a leading `]` is a member that can open a range, and an escaped high end
+/// that swallows the `]` leaves the class unterminated (the rule matches nothing).
+#[test]
+fn bracket_class_escapes_and_ranges_match_git() {
+    assert_matches_git(
+        "class_escapes",
+        &[(
+            "",
+            "c1[\\a-c].ts\nc2[a-\\c].ts\nc4[a\\-c].ts\nc5[\\\\-\\]].ts\nc6[!\\a-c].ts\nd6[]-a].ts\nd7[\\z-a].ts\ne1[\\-c].ts\nr1[[-\\].ts\n",
+        )],
+        &[
+            ("c1a.ts", false),
+            ("c1b.ts", false),
+            ("c1-.ts", false),
+            ("c1d.ts", false),
+            ("c2b.ts", false),
+            ("c2-.ts", false),
+            ("c4-.ts", false),
+            ("c4b.ts", false),
+            ("c4\\.ts", false),
+            ("c5\\.ts", false),
+            ("c5].ts", false),
+            ("c5-.ts", false),
+            ("c6b.ts", false),
+            ("c6-.ts", false),
+            ("c6d.ts", false),
+            ("d6^.ts", false),
+            ("d6-.ts", false),
+            ("d6].ts", false),
+            ("d7z.ts", false),
+            ("d7a.ts", false),
+            ("d7-.ts", false),
+            ("e1-.ts", false),
+            ("e1a.ts", false),
+            ("e1c.ts", false),
+            ("r1[.ts", false),
+            ("r1\\.ts", false),
+        ],
+    );
+}
+
+/// `**` bounded by an escaped slash: the zero-directory shortcut is taken across a
+/// bare slash only, so `**\/` must match at least one directory, while an escaped
+/// slash ahead of `**` changes nothing. A segment of three stars is a double star.
+#[test]
+fn escaped_slash_after_double_star_and_star_runs_match_git() {
+    assert_matches_git(
+        "starstar_escaped",
+        &[(
+            "",
+            "**\\/f3.ts\na4\\/**\\/b4.ts\na11\\/**/b11.ts\na17/**\\/b17.ts\n**\\/d18/\na13/***/b13.ts\n",
+        )],
+        &[
+            ("f3.ts", false),
+            ("s/f3.ts", false),
+            ("s/t/f3.ts", false),
+            ("a4/b4.ts", false),
+            ("a4/x/b4.ts", false),
+            ("a11/b11.ts", false),
+            ("a17/b17.ts", false),
+            ("a17/x/b17.ts", false),
+            ("d18/x.ts", false),
+            ("s/d18/x.ts", false),
+            ("a13/b13.ts", false),
+            ("a13/x/y/b13.ts", false),
+        ],
+    );
+}
+
+/// A bare `\r` ends the file's last line the way it ends a CRLF one: git reads the
+/// file as if it closed with a newline, so the final rule applies.
+#[test]
+fn bare_carriage_return_at_eof_matches_git() {
+    assert_matches_git(
+        "cr_eof",
+        &[("", "a.ts\ncr_eof.ts\r")],
+        &[("cr_eof.ts", false), ("a.ts", false), ("other.ts", false)],
+    );
+}

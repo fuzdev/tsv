@@ -318,6 +318,36 @@ if (/wasm\.\w+\([^)]*\bthis\.__wbg_ptr/.test(patched_glue)) {
 	);
 	Deno.exit(1);
 }
+// The complement, which neither check above can see because it names no `wasm` call:
+// every raw receiver left in the glue must be a shape that never hands a pointer to
+// the live instance — `__destroy_into_raw`'s read-and-zero, the constructor's
+// assignment, its (rewritten) registration — and only `free()` may call
+// `__destroy_into_raw()`. The read is counted rather than exempted outright: the same
+// `const ptr = this.__wbg_ptr;` line in a method is exactly the aliasing to catch, as
+// is a `self`-consuming method (whose glue destroys the handle and passes the pointer
+// on) — stale-handle paths the rewrite would otherwise miss in silence.
+const raw_receivers = patched_glue
+	.split('\n')
+	.filter((line) => /\bthis\.__wbg_ptr\b/.test(line))
+	.filter(
+		(line) =>
+			!/^\s*const ptr = this\.__wbg_ptr;$/.test(line) &&
+			!/^\s*this\.__wbg_ptr = (?:0|ret(?: >>> 0)?);$/.test(line) &&
+			!/Finalization\.register\(this, \{ ptr: this\.__wbg_ptr, gen: /.test(line)
+	);
+const ptr_reads = patched_glue.match(/^\s*const ptr = this\.__wbg_ptr;$/gm)?.length ?? 0;
+const destroy_calls = patched_glue.match(/\bthis\.__destroy_into_raw\(\)/g)?.length ?? 0;
+if (raw_receivers.length > 0 || ptr_reads !== classes.length || destroy_calls !== classes.length) {
+	console.error(
+		`FAIL: ${main_js} reads a receiver the stale-handle guard does not cover — ` +
+			`${raw_receivers.length} unrecognized \`this.__wbg_ptr\` line(s)` +
+			raw_receivers.map((line) => `\n  ${line.trim()}`).join('') +
+			`\n${ptr_reads} \`const ptr = this.__wbg_ptr;\` read(s) and ${destroy_calls} ` +
+			`\`this.__destroy_into_raw()\` call(s) for ${classes.length} class(es), where each ` +
+			`class's \`__destroy_into_raw\` makes exactly one read and its \`free()\` one call`
+	);
+	Deno.exit(1);
+}
 if (registry_rewrites !== classes.length || free_rewrites !== classes.length) {
 	console.error(
 		`FAIL: rewrote ${registry_rewrites} FinalizationRegistry callback(s) and ${free_rewrites} ` +

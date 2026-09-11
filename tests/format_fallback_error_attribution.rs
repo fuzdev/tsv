@@ -213,3 +213,29 @@ fn a_named_goal_reports_its_own_error() {
         .to_string();
     assert!(script.starts_with(TYPO_MESSAGE), "{script}");
 }
+
+/// The mark the attribution reads, at each site that sets it and nowhere else: every
+/// `import` / `export` / `import.meta` refusal at `Script` is a goal gate, while the
+/// module-only construct with no gate (a top-level `await` statement, where `await` is
+/// a name) and a `Module` strictness error are plain errors. The tests above read the
+/// mark through the fallback; this reads it off each attempt directly.
+#[test]
+fn the_goal_gate_mark_is_set_by_the_module_item_refusals_alone() {
+    let arena = Bump::new();
+    for (label, source) in [
+        ("export declaration", "export {};\n"),
+        ("side-effect import", "import 'y';\n"),
+        ("default import", "import x from 'y';\n"),
+        ("import.meta", "let m = import.meta;\n"),
+    ] {
+        let error = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
+            .expect_err("a module item rejects at Script");
+        assert!(error.is_goal_gated(), "{label}: {error}");
+    }
+    let script_await = tsv_ts::parse_with_goal("await x;\n", tsv_ts::Goal::Script, &arena)
+        .expect_err("`await x` is a missing `;` at Script");
+    assert!(!script_await.is_goal_gated(), "{script_await}");
+    let module_octal = tsv_ts::parse_with_goal("var n = 010;\n", tsv_ts::Goal::Module, &arena)
+        .expect_err("a legacy octal rejects at Module");
+    assert!(!module_octal.is_goal_gated(), "{module_octal}");
+}

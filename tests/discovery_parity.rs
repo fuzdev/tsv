@@ -13,8 +13,9 @@
 //! agreement.
 //!
 //! Each scenario materializes its `tree` in a fresh tempdir (string = file,
-//! null = empty dir; a `.git` entry makes a dir look like a repo root without
-//! a real git binary), then for each case calls `discover_files` on
+//! null = empty dir, `{"symlink": target}` = a symlink, unix only; a `.git` entry
+//! makes a dir look like a repo root without a real git binary), then for each
+//! case calls `discover_files` on
 //! `<root>/<target>`. A case carries **either** `expected` — the discovered
 //! files, relative to the tempdir root and `/`-joined — **or** `error`, a
 //! substring of the argument error that must fail the run upfront with nothing
@@ -37,7 +38,9 @@ fn fresh_dir(tag: &str) -> PathBuf {
 }
 
 /// Materialize a scenario `tree`: string value = file (parents created), null =
-/// empty directory.
+/// empty directory, `{"symlink": target}` = a symbolic link to `target`, resolved
+/// from the link's own directory (a scenario holding one is skipped off unix — see
+/// [`holds_symlinks`]).
 fn materialize(root: &Path, tree: &serde_json::Map<String, Value>) {
     for (rel, value) in tree {
         let path = root.join(rel);
@@ -49,9 +52,37 @@ fn materialize(root: &Path, tree: &serde_json::Map<String, Value>) {
                 fs::create_dir_all(path.parent().unwrap()).unwrap();
                 fs::write(&path, contents).unwrap();
             }
-            other => panic!("tree value for {rel:?} must be a string or null, got {other}"),
+            Value::Object(link) => {
+                let target = link
+                    .get("symlink")
+                    .and_then(Value::as_str)
+                    .unwrap_or_else(|| {
+                        panic!("tree object for {rel:?} must be {{\"symlink\": target}}")
+                    });
+                fs::create_dir_all(path.parent().unwrap()).unwrap();
+                symlink(target, &path);
+            }
+            other => {
+                panic!("tree value for {rel:?} must be a string, null or a symlink, got {other}")
+            }
         }
     }
+}
+
+/// Whether a scenario's tree holds a symlink — which needs unix, so the scenario is
+/// skipped elsewhere.
+fn holds_symlinks(tree: &serde_json::Map<String, Value>) -> bool {
+    tree.values().any(Value::is_object)
+}
+
+#[cfg(unix)]
+fn symlink(target: &str, link: &Path) {
+    std::os::unix::fs::symlink(target, link).unwrap();
+}
+
+#[cfg(not(unix))]
+fn symlink(_target: &str, link: &Path) {
+    panic!("{link:?}: a scenario holding a symlink is skipped off unix");
 }
 
 /// Run one case: discover under `<root>/<target>`. `Ok` carries the in-scope
@@ -82,6 +113,15 @@ fn discover_case(root: &Path, target: &str) -> Result<(Vec<String>, Vec<String>)
     Ok((files, discovered.diagnostics.warnings))
 }
 
+/// The substrings a case lists under `key` (`warns` / `no_warns`) — none when absent.
+fn needles<'a>(case: &'a Value, key: &str) -> impl Iterator<Item = &'a str> {
+    case.get(key)
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|needle| needle.as_str().unwrap())
+}
+
 fn expected_list(case: &Value) -> Vec<String> {
     case["expected"]
         .as_array()
@@ -104,6 +144,10 @@ fn discovery_matches_shared_scenarios() {
     for scenario in scenarios {
         let name = scenario["name"].as_str().unwrap();
         let tree = scenario["tree"].as_object().unwrap();
+        if cfg!(not(unix)) && holds_symlinks(tree) {
+            eprintln!("discovery parity [{name}]: holds a symlink, which needs unix — skipped");
+            continue;
+        }
         let root = fresh_dir(name);
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
@@ -122,7 +166,7 @@ fn discovery_matches_shared_scenarios() {
                         ));
                     }
                 }
-                (Some(needle), Ok(files)) => failures.push(format!(
+                (Some(needle), Ok((files, _))) => failures.push(format!(
                     "[{name}] target={target:?}\n     expected error containing: {needle:?}\n     actual: discovered {files:?}"
                 )),
                 (None, Err(errors)) => failures.push(format!(
@@ -139,14 +183,19 @@ fn discovery_matches_shared_scenarios() {
                     // `warns`: substrings each of which some warning must carry — the
                     // only pin on the WARNINGS channel as a walk product (the texts
                     // themselves are `tsv_discover`'s unit tests')
-                    if let Some(needles) = case.get("warns").and_then(Value::as_array) {
-                        for needle in needles {
-                            let needle = needle.as_str().unwrap();
-                            if !warnings.iter().any(|w| w.contains(needle)) {
-                                failures.push(format!(
-                                    "[{name}] target={target:?}\n     expected a warning containing: {needle:?}\n     actual warnings:                {warnings:?}"
-                                ));
-                            }
+                    for needle in needles(case, "warns") {
+                        if !warnings.iter().any(|w| w.contains(needle)) {
+                            failures.push(format!(
+                                "[{name}] target={target:?}\n     expected a warning containing: {needle:?}\n     actual warnings:                {warnings:?}"
+                            ));
+                        }
+                    }
+                    // `no_warns`: substrings no warning may carry
+                    for needle in needles(case, "no_warns") {
+                        if let Some(warning) = warnings.iter().find(|w| w.contains(needle)) {
+                            failures.push(format!(
+                                "[{name}] target={target:?}\n     expected no warning containing: {needle:?}\n     actual warning:                    {warning:?}"
+                            ));
                         }
                     }
                 }

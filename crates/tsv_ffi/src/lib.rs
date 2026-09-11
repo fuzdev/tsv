@@ -895,16 +895,19 @@ mod tests {
         }
     }
 
-    // --- a panic inside a call is reported, and the thread's arenas survive it ---
+    // --- a panic inside a call is reported, and the thread still formats after it ---
 
     /// The contract `tsv_napi` proves end to end through its `panic_probe` export,
     /// held here at this crate's own boundary: a panic inside `f` (the dev profile
     /// unwinds) yields `TSV_STATUS_ERROR` with the `panic: …` envelope, both
-    /// out-params written exactly as on any other error, and — the arena half — the
-    /// next call on the same thread succeeds, because `with_ast_arena` had taken the
-    /// arena out of its slot for the duration and the unwind never sees a held guard.
+    /// out-params written exactly as on any other error, and the next call on the
+    /// same thread succeeds. The arena itself does not survive: `with_ast_arena` had
+    /// taken it out of its slot for the call, so the unwind drops it and leaves the
+    /// slot empty, and the next call builds a fresh one. (Take/park is what keeps the
+    /// slot usable after a WASM *trap*, which no native test can raise; under an unwind
+    /// a held borrow guard would have been released too.)
     #[test]
-    fn a_panicking_call_reports_and_leaves_the_arena_usable() {
+    fn a_panicking_call_reports_and_leaves_the_thread_usable() {
         let source = "const   x=1";
         let mut out_len: usize = 0;
         let mut out_status: u32 = u32::MAX;

@@ -11,7 +11,7 @@
 //!
 //! Two layers, one public:
 //!
-//! - [`IgnoreRules`] — one ignore file's rules, matched against paths relative
+//! - `IgnoreRules` — one ignore file's rules, matched against paths relative
 //!   to that file's root. The single-file primitive, crate-private: every
 //!   consumer reaches it through a stack layer.
 //! - [`IgnoreStack`] — a hierarchical, git-faithful evaluator: a stack of
@@ -44,7 +44,7 @@
 
 mod glob;
 
-use glob::{PathSeg, Seg, match_segments, parse_segment};
+use glob::{PathSeg, Seg, Tok, match_segments, parse_segment};
 
 /// A compiled set of ignore rules, applied in source order with last-match-wins
 /// semantics (a later `!` negation re-includes an earlier exclusion).
@@ -90,8 +90,14 @@ impl IgnoreRules {
         // silently disable the file's first rule — in the unsafe direction, since
         // the first rule of a `.gitignore` is `node_modules` more often than not.
         let content = content.strip_prefix('\u{feff}').unwrap_or(content);
-        // `lines()` splits on `\n` and strips a trailing `\r`, handling CRLF
-        let rules = content.lines().filter_map(parse_line).collect();
+        // One rule per `\n`-separated line, one trailing `\r` stripped from each — the
+        // last line's too, which git reads as if the file ended in a newline. (`lines()`
+        // strips a `\r` only ahead of a `\n`, so a final `rule\r` kept it and never matched.)
+        let rules = content
+            .split('\n')
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .filter_map(parse_line)
+            .collect();
         Self { rules }
     }
 
@@ -156,8 +162,8 @@ impl IgnoreRules {
 /// a shallower one of its own kind, and a positive match at an ancestor prunes
 /// the subtree before a deeper `!` can re-include it — matching git's "cannot
 /// re-include a file whose parent directory is excluded" rule. The gitignore-only
-/// behavior is byte-for-byte `git check-ignore` (on case-sensitive filesystems;
-/// see the crate docs).
+/// behavior is byte-for-byte `git check-ignore` on case-sensitive filesystems, less
+/// the known edges the crate's `CLAUDE.md` lists.
 #[derive(Debug, Default)]
 pub struct IgnoreStack {
     /// `.gitignore` layers in shallow→deep push order.
@@ -346,15 +352,14 @@ impl IgnoreStack {
     /// ([`is_ignored`](Self::is_ignored) iterates prefixes,
     /// [`is_reincluded`](Self::is_reincluded) queries the leaf directly).
     fn last_match_at(&self, prefix: &[PathSeg<'_>], is_dir: bool) -> Option<bool> {
-        let mut state: Option<bool> = None;
-        for layer in self.gitignore.iter().chain(&self.tsv) {
-            if let Some(rel) = layer.relativize(prefix)
-                && let Some(v) = layer.rules.last_match(rel, is_dir)
-            {
-                state = Some(v);
-            }
-        }
-        state
+        // the last layer to speak wins, read as the first from the end — the same answer,
+        // stopping at the deepest layer that matches (as `IgnoreRules::last_match` reads
+        // its rules)
+        self.gitignore
+            .iter()
+            .chain(&self.tsv)
+            .rev()
+            .find_map(|layer| layer.rules.last_match(layer.relativize(prefix)?, is_dir))
     }
 }
 
@@ -459,20 +464,23 @@ fn parse_line(raw: &str) -> Option<Rule> {
 
     // Split on `/`, escaped or not: `\/` is a slash git matches literally against
     // the path's own separator, and since no path component can hold a `/`, an
-    // escaped one separates segments exactly as a bare one does (`a\/b.ts` ignores
-    // `a/b.ts`). Any other escape stays with its segment for `parse_segment`. An
-    // EMPTY segment — a doubled `//`, or the `foo/` left by `foo//` once the
-    // structural trailing `/` is stripped — is a pattern git can never match (no path
-    // has an empty component), and a never-matching rule contributes nothing to
+    // escaped one separates segments as a bare one does (`a\/b.ts` ignores `a/b.ts`)
+    // — with one difference, so each segment remembers which kind ended it: git takes
+    // `**`'s zero-directory shortcut only across a BARE slash, so a `**` followed by
+    // `\/` must match at least one directory (`**\/f.ts` ignores `s/f.ts`, never
+    // `f.ts`). Any other escape stays with its segment for `parse_segment`. An EMPTY
+    // segment — a doubled `//`, or the `foo/` left by `foo//` once the structural
+    // trailing `/` is stripped — is a pattern git can never match (no path has an
+    // empty component), and a never-matching rule contributes nothing to
     // last-match-wins, so it is dropped like the trailing-backslash one above.
-    let mut segs = Vec::new();
+    let mut raw_segs: Vec<(String, bool)> = Vec::new(); // (text, ended by `\/`)
     let mut seg = String::new();
     let mut chars = s.chars();
     while let Some(c) = chars.next() {
         match c {
-            '/' => segs.push(std::mem::take(&mut seg)),
+            '/' => raw_segs.push((std::mem::take(&mut seg), false)),
             '\\' => match chars.next() {
-                Some('/') => segs.push(std::mem::take(&mut seg)),
+                Some('/') => raw_segs.push((std::mem::take(&mut seg), true)),
                 Some(next) => {
                     seg.push('\\');
                     seg.push(next);
@@ -483,16 +491,21 @@ fn parse_line(raw: &str) -> Option<Rule> {
             c => seg.push(c),
         }
     }
-    segs.push(seg);
-    if segs.iter().any(String::is_empty) {
+    raw_segs.push((seg, false));
+    if raw_segs.iter().any(|(text, _)| text.is_empty()) {
         return None;
     }
-    // `parse_segment` refuses a segment git's matcher aborts on (an unterminated
-    // `[`), which makes the whole pattern never match — dropped for the same reason
-    let mut segs: Vec<Seg> = segs
-        .iter()
-        .map(|seg| parse_segment(seg))
-        .collect::<Option<_>>()?;
+    let mut segs = Vec::with_capacity(raw_segs.len() + 1);
+    for (text, escaped_separator) in &raw_segs {
+        // `parse_segment` refuses a segment git's matcher aborts on (an unterminated
+        // `[`), which makes the whole pattern never match — dropped for the same reason
+        let parsed = parse_segment(text)?;
+        if *escaped_separator && matches!(parsed, Seg::DoubleStar) {
+            // one directory, then `**`'s zero or more: at least one
+            segs.push(Seg::Glob(vec![Tok::Star]));
+        }
+        segs.push(parsed);
+    }
     // a floating pattern is equivalent to one prefixed with `**/`
     if !anchored {
         segs.insert(0, Seg::DoubleStar);
@@ -935,11 +948,47 @@ mod tests {
         assert!(!rules.is_ignored("xa.ts", false));
     }
 
+    /// The class, star-run, escaped-`**` and trailing-`\r` rules `tests/git_oracle.rs`
+    /// holds against git, pinned here too so a git-less run still grades them.
+    #[test]
+    fn class_escapes_star_runs_escaped_double_star_and_final_cr_parse_like_git() {
+        // an escape resolves before its `-` is read: `[\a-c]` is the range a–c
+        let rules = ig("x[\\a-c].ts\n");
+        assert!(rules.is_ignored("xb.ts", false));
+        assert!(!rules.is_ignored("x-.ts", false));
+        // an escaped `-` is a member, not a range
+        let rules = ig("x[a\\-c].ts\n");
+        assert!(rules.is_ignored("x-.ts", false));
+        assert!(!rules.is_ignored("xb.ts", false));
+        // a range's high end may be escaped
+        assert!(ig("x[a-\\c].ts\n").is_ignored("xb.ts", false));
+        // a leading `]` is a member, and can open a range (`]`–`a` holds `^`, not `-`)
+        let rules = ig("x[]-a].ts\n");
+        assert!(rules.is_ignored("x^.ts", false));
+        assert!(!rules.is_ignored("x-.ts", false));
+        // an escaped high end that swallows the `]` leaves the class unterminated
+        assert!(ig("x[[-\\].ts\n").is_empty());
+
+        // a segment of three stars is a double star
+        let rules = ig("a/***/b.ts\n");
+        assert!(rules.is_ignored("a/b.ts", false));
+        assert!(rules.is_ignored("a/x/y/b.ts", false));
+
+        // `**`'s zero-directory shortcut is taken across a bare slash only
+        let rules = ig("**\\/f.ts\n");
+        assert!(!rules.is_ignored("f.ts", false));
+        assert!(rules.is_ignored("s/f.ts", false));
+        assert!(ig("**/f.ts\n").is_ignored("f.ts", false));
+
+        // a bare `\r` ends the last line too
+        assert!(ig("a.ts\nb.ts\r").is_ignored("b.ts", false));
+    }
+
     #[test]
     fn crlf_line_endings_parse_like_lf() {
-        // `parse` splits with `str::lines()`, which drops a trailing `\r`, so a
-        // CRLF ignore file behaves identically to an LF one — the trailing-`/`
-        // and negation markers are detected on the `\r`-stripped line.
+        // `parse` strips one trailing `\r` from each `\n`-split line, so a CRLF
+        // ignore file behaves identically to an LF one — the trailing-`/` and
+        // negation markers are detected on the `\r`-stripped line.
         let rules = ig("*.log\r\nbuild/\r\n!keep.log\r\n");
         assert!(rules.is_ignored("debug.log", false));
         assert!(rules.is_ignored("build/out.js", false));

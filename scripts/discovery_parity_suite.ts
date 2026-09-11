@@ -7,8 +7,9 @@
  * a divergence fails one side or the other.
  *
  * Each scenario materializes its `tree` in a tempdir (string = file, null =
- * empty dir; a `.git` entry fakes a repo root with no real git binary), then
- * asserts `format --list <root>/<target>` reports `expected` (root-relative,
+ * empty dir, `{symlink: target}` = a symlink, skipped on Windows; a `.git` entry
+ * fakes a repo root with no real git binary), then asserts
+ * `format --list <root>/<target>` reports `expected` (root-relative,
  * exact sorted order) — or, for a case carrying `error` instead, that the run
  * fails upfront (exit 2) with that substring on stderr and nothing on stdout.
  */
@@ -16,22 +17,32 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-/** Materialize a scenario `tree`: string = file (parents created), null = empty dir. */
-const materialize = (root: string, tree: Record<string, string | null>): void => {
+/** One scenario tree entry: a file's contents, an empty directory, or a symlink. */
+type TreeValue = string | null | { symlink: string };
+
+/** Materialize a scenario `tree`: string = file (parents created), null = empty dir,
+ * `{symlink: target}` = a symbolic link to `target`, resolved from the link's own
+ * directory (a scenario holding one is skipped on Windows — `holds_symlinks`). */
+const materialize = (root: string, tree: Record<string, TreeValue>): void => {
 	for (const [rel, value] of Object.entries(tree)) {
 		const path = join(root, rel);
 		if (value === null) {
 			mkdirSync(path, { recursive: true });
-		} else {
-			mkdirSync(dirname(path), { recursive: true });
-			writeFileSync(path, value);
+			continue;
 		}
+		mkdirSync(dirname(path), { recursive: true });
+		if (typeof value === 'string') writeFileSync(path, value);
+		else symlinkSync(value.symlink, path);
 	}
 };
+
+/** Whether a scenario's tree holds a symlink, which Windows can't make unprivileged. */
+const holds_symlinks = (tree: Record<string, TreeValue>): boolean =>
+	Object.values(tree).some((value) => value !== null && typeof value === 'object');
 
 /**
  * Separators normalized to `/`, the spelling `expected` is written in.
@@ -56,12 +67,13 @@ export const register_discovery_parity_suite = (
 		);
 
 		for (const scenario of table.scenarios) {
-			it(scenario.name, () => {
+			const skip = process.platform === 'win32' && holds_symlinks(scenario.tree);
+			it(scenario.name, { skip }, () => {
 				const root = mkdtempSync(join(tmpdir(), 'tsv-parity-'));
 				try {
 					materialize(root, scenario.tree);
 					const prefix = `${to_posix(root)}/`;
-					for (const { target, expected, error, warns } of scenario.cases) {
+					for (const { target, expected, error, warns, no_warns } of scenario.cases) {
 						const arg = target === '' ? root : join(root, target);
 						const result = spawnSync(process.execPath, [cli_path, 'format', '--list', arg], {
 							encoding: 'utf-8'
@@ -91,6 +103,13 @@ export const register_discovery_parity_suite = (
 							assert.ok(
 								result.stderr.includes(needle),
 								`${scenario.name} [target=${target}]: expected a warning containing ${JSON.stringify(needle)}, stderr: ${JSON.stringify(result.stderr)}`
+							);
+						}
+						// `no_warns`: substrings no warning may carry
+						for (const needle of no_warns ?? []) {
+							assert.ok(
+								!result.stderr.includes(needle),
+								`${scenario.name} [target=${target}]: expected no warning containing ${JSON.stringify(needle)}, stderr: ${JSON.stringify(result.stderr)}`
 							);
 						}
 					}

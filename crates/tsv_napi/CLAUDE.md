@@ -177,7 +177,8 @@ package.json check covers the `files` declaration and the file on disk, this
 covers what npm actually packs — executable where a mode exists (npm packs
 the on-disk mode). Then the degraded paths: binary removed → `cli.js`,
 present-but-unrunnable → warn + `cli.js`, child killed by a signal →
-re-raised. The last two are posix-only by nature, not by omission: the
+re-raised (SIGTERM), or reported as 128 + its number where a re-raise would not
+end the dispatcher (SIGUSR1, which would start Node's inspector instead). The last two are posix-only by nature, not by omission: the
 fallback branch keys on any spawn error, so a Windows staging would re-enter
 an already-proven branch, and signal death has no Windows analogue.
 
@@ -199,12 +200,13 @@ directions and fails the section if either runner is ever repointed.
   doubly-bad invocation has one right answer. A table of usage errors (each
   landing before any file is touched, several of them faulty two or three ways
   at once) must produce the same exit code AND byte-identical stderr from both
-  bins. Where the messages stop being tsv's own — argh and `parseArgs` word
-  their own parse failures, and the OS words its own `ENOENT` — the table
-  stops; those agree on the exit code alone.
-- **The `--jobs` accepted set** — a Rust `usize` on one side, a regex on the
-  other, so the verdict is pinned over both edges (`+5`, `usize::MAX`, one
-  past it) rather than the message, which is each argument parser's own.
+  bins — argh's own parse failures included, since `cli.js` transcribes argh's
+  grammar and its words (`parse_argv`). Where the messages stop being either's
+  — the OS words its own `ENOENT` — the table stops; those agree on the exit
+  code alone.
+- **The `--jobs` accepted set** — a Rust `usize` on one side, its transcription
+  (`usize_from_str`) on the other, so the verdict is pinned over both edges
+  (`+5`, `usize::MAX`, one past it).
 - **Invalid UTF-8** — the native CLI reads with Rust's `read_to_string`, which
   refuses invalid bytes; Node's `readFileSync(path, 'utf-8')` substitutes
   U+FFFD and returns a string that looks fine, so `cli.js` decodes strictly
@@ -213,8 +215,8 @@ directions and fails the section if either runner is ever repointed.
   text back over the author's file and reported success. The row asserts the
   refusal AND that neither bin touched a byte.
 - **Repeated options** — argh refuses a second `--content`/`--parser`/
-  `--source-type`/`--jobs`; `parseArgs` would keep the last, so `cli.js`
-  restates the refusal. The sharp one is `--parser ts --parser css`, which
+  `--source-type`/`--jobs`, and so does `cli.js`, which parses by argh's
+  grammar. The sharp one is `--parser ts --parser css`, which
   unrefused does not merely pick a value but formats the input under a grammar
   the same invocation named against. Repeated switches are the control: argh
   counts them, so neither bin may refuse those.

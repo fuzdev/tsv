@@ -241,10 +241,12 @@ fn classify_dir_inner(
     DirVerdict::Descend
 }
 
-/// Whether `rel` — a format-root-relative, `/`-separated **file** path — is
-/// skipped because some ancestor directory would be pruned by the traversal (a
+/// Whether `rel` — a format-root-relative, `/`-separated path — is skipped because
+/// some STRICT ancestor directory would be pruned by the traversal (a
 /// [safety net](SAFETY_NET_DIRS), the build-output heuristic, or the matcher)
-/// before the walk reaches the file. The per-file companion to [`classify_dir`]
+/// before the walk reaches it. `rel` itself is never graded, so it may name a file
+/// or a directory root a caller named (`tsv_cli`'s `collect_root` gates a root this
+/// way). The per-file companion to [`classify_dir`]
 /// for a consumer that has **no top-down traversal**: the VS Code extension
 /// formats one open document at a time, so it can't thread `heuristic_active`
 /// down a walk.

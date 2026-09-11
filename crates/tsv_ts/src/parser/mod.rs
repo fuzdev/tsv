@@ -1410,7 +1410,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// module rather than as one more position to compare
     /// (`ParseError::is_goal_gated`; `parse_with_goal_or_fallback`).
     pub(super) fn error_goal_gate_at(&self, message: &str, position: usize) -> ParseError {
-        ParseError::goal_gated(message.to_string(), position)
+        ParseError::goal_gate(message.to_string(), position)
     }
 
     /// [`Parser::error_goal_gate_at`] at the current position.

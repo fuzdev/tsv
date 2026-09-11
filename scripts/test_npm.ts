@@ -1746,6 +1746,40 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	// The engine's OTHER overflow: a long flat chain exhausts V8's own native stack
+	// before the WASM shadow stack on the main thread, which V8 reports as a
+	// `RangeError` (`Maximum call stack size exceeded`) rather than a trap — and the
+	// instance is stranded all the same, so a later innocent file traps with `memory
+	// access out of bounds`, though not in every round. Hence the rounds, each a chain
+	// and four ordinary files, sequentially (`--jobs 1`): the gate is that every error
+	// is a chain's, reinstantiated, and every ordinary file still formats.
+	it('format recovers the engine after a RangeError, not only after a trap', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			const rounds = 12;
+			const chain = `${Array.from({ length: 10_000 }, () => 'a').join('+')};\n`;
+			for (let r = 0; r < rounds; r++) {
+				const round = String(r).padStart(2, '0');
+				writeFileSync(join(dir, `r${round}_a_chain.ts`), chain);
+				for (let f = 0; f < 4; f++) {
+					writeFileSync(join(dir, `r${round}_b${f}.ts`), `const  x${f}=${f}\n`);
+				}
+			}
+			const result = run_cli(['format', '--check', '--jobs', '1', dir]);
+			const error_lines = result.stderr.split('\n').filter((l) => l.startsWith('error: '));
+			assert.equal(error_lines.length, rounds, result.stderr);
+			for (const line of error_lines) {
+				assert.match(line, /_a_chain\.ts: .*\(WASM engine reinstantiated\)$/, result.stderr);
+			}
+			assert.match(
+				result.stderr,
+				new RegExp(`^${rounds * 4} would change, 0 unchanged, ${rounds} errors$`, 'm')
+			);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	// The dying-worker accounting rests on one mechanism: a worker that throws
 	// mid-run posts what it finished BEFORE its 'error' event reaches the parent
 	// (`run_format_worker`'s finally), so the main thread's unfilled-slot sweep
@@ -1926,7 +1960,12 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	it('format --jobs with a non-integer value exits 1 (argument-parsing error)', () => {
 		const result = run_cli(['format', '--jobs', 'many', 'a.ts']);
 		assert.equal(result.status, 1);
-		assert.match(result.stderr, /--jobs expects an integer/);
+		assert.ok(
+			result.stderr.includes(
+				"Error parsing option '--jobs' with value 'many': invalid digit found in string"
+			),
+			result.stderr
+		);
 	});
 
 	it('format on a trailing-slash root reports single-slash paths (PathBuf::push parity)', () => {
@@ -2033,10 +2072,10 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(result.stderr, /Unrecognized argument/);
 	});
 
-	it('no command prints usage and exits 1', () => {
+	it('no command refuses as argh does and exits 1', () => {
 		const result = run_cli([]);
 		assert.equal(result.status, 1);
-		assert.match(result.stderr, /Usage: tsv/);
+		assert.match(result.stderr, /^One of the following subcommands must be present:/);
 	});
 
 	it('--help exits 0', () => {

@@ -34,12 +34,16 @@
 //!
 //! **A non-blocking fd is the other non-failure.** `cli.js` flips its own fd 1 to
 //! non-blocking by piping the worker pool's stdio through the parent; this binary
-//! never does, but it inherits whatever description its parent hands it, and a Node
-//! parent that touched `process.stdout` on a pipe — the `@fuzdev/tsv` loader, a task
-//! runner — hands it a non-blocking one. A full pipe then reads `EAGAIN`, which
-//! [`write_or_stop`] waits out rather than panics on. Any *other* write error still
-//! panics, exactly as the macros did — a report truncated by a full disk with nothing
-//! said about it is the worse failure.
+//! never does, but whether its fd blocks belongs to the open file description, which
+//! it shares with its parent. A Node parent opens its own piped `process.stdout`
+//! lazily, and opening it flips that description to non-blocking — so a parent that
+//! spawns `tsv` asynchronously and then logs (a task runner) flips it under the
+//! running child. The flip has to come from the parent's side and after the spawn:
+//! libuv resets fds 0–2 to blocking as it spawns a child, which is why the
+//! `@fuzdev/tsv` loader, waiting in `spawnSync`, cannot cause it. A full pipe then
+//! reads `EAGAIN`, which [`write_or_stop`] waits out rather than panics on. Any
+//! *other* write error still panics, exactly as the macros did — a report truncated by
+//! a full disk with nothing said about it is the worse failure.
 //!
 //! **Scope: the shipped bin.** `tsv_debug` keeps `println!`/`eprintln!` at its ~1,160
 //! write sites and still aborts on a closed reader. That is deliberate, not an
@@ -49,6 +53,14 @@
 //! because that function is this crate's.
 
 use std::io::{self, Write};
+use std::time::Duration;
+
+/// The first wait after a `WouldBlock` — about what a fast consumer takes to drain a
+/// pipe buffer — doubled on each one in a row, up to [`WOULD_BLOCK_MAX_WAIT`].
+const WOULD_BLOCK_MIN_WAIT: Duration = Duration::from_micros(50);
+
+/// The longest wait between retries against a consumer that is slow to drain.
+const WOULD_BLOCK_MAX_WAIT: Duration = Duration::from_millis(1);
 
 /// Write `bytes` to stdout verbatim, stopping quietly if the consumer closed the pipe.
 ///
@@ -105,16 +117,17 @@ macro_rules! err_line {
 ///
 /// A hand loop over `write` rather than `write_all`, for the one other write error
 /// that is not a failure: **`EAGAIN`**. Whether the fd blocks is a property of the open
-/// file description, which the *parent* owns — a Node parent that has initialized its
-/// own `process.stdout` on a pipe has flipped that description to non-blocking, and
-/// every child inherits it. The `@fuzdev/tsv` loader execs this binary with inherited
-/// stdio from exactly such a parent, and a task runner piping `tsv` through a slow
-/// consumer is the same shape. A full pipe then answers `WouldBlock` instead of
-/// parking the write, and `write_all` would have panicked on it after every file was
-/// already rewritten. So a `WouldBlock` sleeps a millisecond and retries (a spin would
-/// burn a core against a consumer as slow as a human scrolling `less`) — the loop
+/// file description, which this process shares with its parent, and a Node parent
+/// that opens its own piped `process.stdout` while `tsv` runs flips it to non-blocking
+/// under the child (the module docs say when). A full pipe then answers `WouldBlock`
+/// instead of parking the write, and `write_all` would have panicked on it after every
+/// file was already rewritten. So a `WouldBlock` waits and retries — the loop
 /// `cli.js`'s `write_fd` runs for the same reason — honoring partial writes, since
-/// `write_all` cannot report how far it got.
+/// `write_all` cannot report how far it got. The wait backs off from
+/// [`WOULD_BLOCK_MIN_WAIT`] to [`WOULD_BLOCK_MAX_WAIT`] and resets once a write lands:
+/// a flat millisecond held the output to one 64 KiB pipe buffer per millisecond though
+/// a fast consumer drains that in microseconds, and a spin would burn a core against
+/// one as slow as a human scrolling `less`.
 ///
 /// The flush is not redundant: stdout is line-buffered and a newline-free write (the
 /// wire) can leave a tail in the buffer. `process::exit` does run the runtime's stdout
@@ -127,25 +140,32 @@ macro_rules! err_line {
 )]
 fn write_or_stop<W: Write>(out: &mut W, bytes: &[u8], name: &str) {
     let mut rest = bytes;
+    let mut wait = WOULD_BLOCK_MIN_WAIT;
     loop {
         let step = if rest.is_empty() {
             // everything is handed over; the flush is the last step, and it can fail
             // the same three ways a write can
             out.flush().map(|()| None)
         } else {
-            out.write(rest).map(Some)
+            // a sink that takes none of a non-empty buffer will take nothing more: the
+            // `WriteZero` `write_all` reported, a failure rather than a reader that left
+            out.write(rest).and_then(|n| match n {
+                0 => Err(io::ErrorKind::WriteZero.into()),
+                n => Ok(Some(n)),
+            })
         };
         match step {
             Ok(None) => return,
-            // A zero-length write is a closed sink by any other name (`write_all`
-            // reports it as `WriteZero`); nothing further can be delivered.
-            Ok(Some(0)) => return,
-            Ok(Some(n)) => rest = &rest[n..],
+            Ok(Some(n)) => {
+                rest = &rest[n..];
+                wait = WOULD_BLOCK_MIN_WAIT;
+            }
             Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
             // The pipe is full and the fd is non-blocking: the consumer is slow, not
             // gone. Wait for it.
             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                std::thread::sleep(wait);
+                wait = (wait * 2).min(WOULD_BLOCK_MAX_WAIT);
             }
             // The consumer went away (`| head`, `| less` quit, a killed log collector).
             // Stop writing; the caller's own exit code still stands.
