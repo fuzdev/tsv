@@ -1251,7 +1251,7 @@ impl<'a> Printer<'a> {
         // header's clauses, which are `shouldNotIndent`'s own `ForStatement` term
         // (`node !== parent.body && parent.type === "ForStatement"`, which a
         // ForOf/ForIn statement is not).
-        let doc = self.build_expression_doc(right);
+        let doc = self.build_expression_doc_claiming_outermost(right);
         if needs_parens(right, ParenContext::ForInOfRight, self.in_for_init.get()) {
             self.d().parens(doc)
         } else {

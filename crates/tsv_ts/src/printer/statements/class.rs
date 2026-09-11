@@ -584,9 +584,7 @@ impl<'a> Printer<'a> {
         // (`b = // c⏎/* y⏎*/ a ? b : c` exploded the conditional prettier keeps flat).
         let doc = match facts.frozen {
             Some(frozen) => self.build_frozen_expression_doc(value, frozen),
-            None => self.build_value_with_outermost_owned_comment(value, || {
-                self.build_expression_doc(value)
-            }),
+            None => self.build_expression_doc_claiming_outermost(value),
         };
         if facts.position_parens {
             self.d().parens(doc)

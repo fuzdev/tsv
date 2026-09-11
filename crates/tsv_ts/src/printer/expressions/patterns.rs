@@ -1567,9 +1567,7 @@ impl<'a> Printer<'a> {
             // the value claims its owned multi-line comment itself, beneath the parens this
             // position adds — `build_gap_value_doc` would prepend it outside the pair.
             let rhs_doc = self.build_value_under_hoist(hoisted_run, pattern.right, || {
-                let rhs_doc = self.build_value_with_outermost_owned_comment(pattern.right, || {
-                    self.build_expression_doc(pattern.right)
-                });
+                let rhs_doc = self.build_expression_doc_claiming_outermost(pattern.right);
                 if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
                     d.parens(rhs_doc)
                 } else {

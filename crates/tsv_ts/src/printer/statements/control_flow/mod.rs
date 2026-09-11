@@ -1560,14 +1560,14 @@ impl<'a> Printer<'a> {
     /// (e.g., `for (i = 0; i < len; i++)` — the `i < len` stays flat).
     /// Assignment expressions get double-parens for clarity: `while ((x = y))`
     fn build_condition_doc(&self, expr: &Expression<'_>, grouping: HeadChainGrouping) -> DocId {
-        let inner = match expr {
+        let inner = self.build_value_with_outermost_owned_comment(expr, || match expr {
             Expression::BinaryExpression(binary)
                 if grouping == HeadChainGrouping::ParenGroupDrives =>
             {
                 self.build_binary_chain_doc_ungrouped_condition(binary)
             }
             _ => self.build_expression_doc(expr),
-        };
+        });
         self.wrap_statement_test_parens(expr, inner)
     }
 

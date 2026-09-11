@@ -246,7 +246,7 @@ pub(crate) fn print_node_inner<'a>(
             // …)`) — the brackets make the bare `in` reachable here, unlike a chain
             // base/callee whose parens are structurally mandatory. A sequence
             // self-parenthesizes via `build_sequence_doc`.
-            let raw_inner = printer.build_expression_doc(expr);
+            let raw_inner = printer.build_expression_doc_claiming_outermost(expr);
             let inner = if needs_parens(
                 expr,
                 ParenContext::ComputedPropertyKey,

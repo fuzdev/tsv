@@ -91,7 +91,9 @@ impl<'a> Printer<'a> {
                 // interpolation's own column.
                 let expr_inner = match frozen {
                     Some(frozen) => self.build_frozen_expression_doc(expr, frozen),
-                    None => self.build_flat_chain_expression_doc(expr),
+                    None => self.build_value_with_outermost_owned_comment(expr, || {
+                        self.build_flat_chain_expression_doc(expr)
+                    }),
                 };
                 let expr_doc = if self.needs_parens(expr, ParenContext::TemplateLiteralExpression) {
                     d.parens(expr_inner)

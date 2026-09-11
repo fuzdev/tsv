@@ -1094,9 +1094,7 @@ impl<'a> Printer<'a> {
             // left inside, its body's forced break explodes an operand prettier keeps flat.
             // Asked only where the pair is KEPT — see that seam's ⚠️.
             let operand = if needs_parens {
-                self.build_value_with_outermost_owned_comment(expression, || {
-                    self.build_expression_doc(expression)
-                })
+                self.build_expression_doc_claiming_outermost(expression)
             } else {
                 self.build_expression_doc(expression)
             };

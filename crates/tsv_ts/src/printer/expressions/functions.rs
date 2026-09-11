@@ -926,11 +926,7 @@ impl<'a> Printer<'a> {
                 // A multi-line comment the body owns prints outside the ternary's own
                 // group, or its hard break explodes a ternary prettier keeps flat
                 // ([`Printer::build_value_with_outermost_owned_comment`]).
-                build_body(&|| {
-                    self.build_value_with_outermost_owned_comment(expr, || {
-                        self.build_expression_doc(expr)
-                    })
-                })
+                build_body(&|| self.build_expression_doc_claiming_outermost(expr))
             };
             // This arm emits the paren tokens itself rather than going through
             // `build_arrow_body_doc`, so it prepends the run on its own seam — the same
@@ -2022,8 +2018,7 @@ impl<'a> Printer<'a> {
         if matches!(expr, internal::Expression::ConditionalExpression(_)) {
             // A multi-line comment the body owns prints outside the ternary's own group,
             // after the run ([`Printer::build_value_with_outermost_owned_comment`]).
-            let body_doc = self
-                .build_value_with_outermost_owned_comment(expr, || self.build_expression_doc(expr));
+            let body_doc = self.build_expression_doc_claiming_outermost(expr);
             // The leading run rides INSIDE these parens, so the paren decision wraps
             // both — `will_break` asks about the body AND the run.
             let with_leading = prepend(body_doc);

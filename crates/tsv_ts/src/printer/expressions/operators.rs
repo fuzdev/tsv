@@ -1692,8 +1692,20 @@ impl<'a> Printer<'a> {
         let frozen = (i > 0)
             .then(|| self.gap_frozen_span(seq.expressions[i - 1].span().end, expr.span()))
             .flatten();
+        // A later operand's MULTI-LINE owned comment is claimed here, outside the operand's own
+        // group: the comma gap's run is emitted on the to-emit axis and never sees it, so claimed
+        // by the innermost node its hard break explodes an operand prettier keeps flat
+        // (`(a, // x⏎/* y⏎*/ b ? c : d)`). The first operand's is the run builders' claim
+        // ([`Printer::build_doc_with_outermost_owned_comment_at`]), which the `Hanging` line-comment
+        // twin declines on purpose.
         let core = frozen.map_or_else(
-            || self.build_expression_doc(expr),
+            || {
+                if i == 0 {
+                    self.build_expression_doc(expr)
+                } else {
+                    self.build_expression_doc_claiming_outermost(expr)
+                }
+            },
             |frozen| self.build_frozen_expression_doc(expr, frozen),
         );
         if matches!(expr, Expression::AssignmentExpression(_)) {

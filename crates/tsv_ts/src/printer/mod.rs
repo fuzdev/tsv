@@ -1367,9 +1367,16 @@ impl<'a> Printer<'a> {
     /// to be read. The leading-separator half is
     /// [`Self::leading_comment_is_honored_directive`], and the same rule at the declaration
     /// headers is `Printer::build_header_comment_run`.
+    ///
+    /// ⚠️ **"A newline after it" is asked of the comment's own neighbour**
+    /// ([`Printer::comment_hugs_next`]), never of the distance to `next`. The distance reading
+    /// counted a break INSIDE a paren the author wrote around the value as a break after the
+    /// comment (`export default /* c⏎d */ (⏎v)`), hanging the value where the bare spelling and
+    /// prettier keep it on the comment's line — so the paren spelling's first pass and its
+    /// reparse took two different layouts.
     pub(crate) fn comment_hangs_next(&self, c: &internal::Comment, next: u32) -> bool {
         !c.is_block
-            || (c.multiline && self.has_newline_between(c.span.end, next))
+            || (c.multiline && next > c.span.end && !self.comment_hugs_next(c))
             || self.is_honored_directive(c)
     }
 

@@ -1090,8 +1090,7 @@ impl<'a> Printer<'a> {
             // `(/* c⏎d */ x) as T` path never reaches, since the shell is built only when
             // the gap holds a comment the EMIT axis can see (an un-owned run member) or
             // the operand→keyword gap needs the parens for ASI.
-            _ => self
-                .build_value_with_outermost_owned_comment(expr, || self.build_expression_doc(expr)),
+            _ => self.build_expression_doc_claiming_outermost(expr),
         });
         if let Some((trailing, _needs_break)) =
             self.trailing_paren_comment_parts(expr_end, inner_end)

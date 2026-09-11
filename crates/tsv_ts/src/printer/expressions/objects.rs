@@ -1006,10 +1006,11 @@ impl<'a> Printer<'a> {
         // The `[`→key gap cannot hang a leading cast's break — no operator line to end —
         // so the cast reflows onto the `[`'s line (`Printer::with_jsdoc_cast_cannot_hang_gap`).
         self.with_jsdoc_cast_cannot_hang_gap(key, || {
+            let doc = self.build_expression_doc_claiming_outermost(key);
             if self.needs_parens(key, super::ParenContext::ComputedPropertyKey) {
-                self.d().parens(self.build_expression_doc(key))
+                self.d().parens(doc)
             } else {
-                self.build_expression_doc(key)
+                doc
             }
         })
     }
