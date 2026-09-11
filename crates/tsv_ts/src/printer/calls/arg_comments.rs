@@ -646,14 +646,16 @@ pub(super) fn has_trailing_line_comments_slice(
 /// two lines they can land on: `paren_line` rides the `(` line, `parts` leads the
 /// first argument.
 ///
-/// Own-line comments always lead the first argument. A same-line run trailing `(`
-/// goes one of three ways, and the split is the run's *kind*, not each comment's:
+/// Own-line comments always lead the first argument. A run with a comment trailing `(`
+/// — or a glued run the author gave a line of its own — goes one of three ways, and the
+/// split is the run's *kind*, not each comment's:
 ///
-/// - **Block-only, broke after** (`fn(/* c */⏎a)`) — the run takes its newline-after
-///   soft `line` ([`Printer::push_leading_run_with_soft_line`]): its own line when the
+/// - **Block-only, broke after** (`fn(/* c */⏎a)`, and a glued run the author gave its
+///   own line) — the run takes its newline-after soft `line`: its own line when the
 ///   argument list breaks, the glued bytes when it collapses (prettier's
-///   `printLeadingComment` `line`). Gated by
-///   [`Printer::opener_trailing_broke_after_run`].
+///   `printLeadingComment` `line`); an author blank in or after it takes the forced form,
+///   which keeps the blank. Gated by [`Printer::first_arg_broke_after_run`], emitted by
+///   [`Printer::push_first_arg_broke_after_run`].
 /// - **Block-only, glued** (`fn(/* c */ a)`) — emitted inline ahead of the first
 ///   argument, so a call that fits stays on one line (matching prettier).
 /// - **Any line comment in the run** — the whole run stays on the `(` line, in source
@@ -694,13 +696,14 @@ pub(super) fn emit_first_arg_leading_comments(
     if !printer.has_comments_to_emit_between(paren_open, first_arg_start) {
         return;
     }
-    // A block-only run glued to `(` that the author broke after takes its
-    // newline-after soft `line` instead of the glue below — own line when the
-    // argument list breaks (this builder's layouts are the breaking ones), glued
-    // bytes when it collapses. An own-line-authored run declines the gate and
-    // keeps the emitters below (`Printer::opener_trailing_broke_after_run`).
-    if let Some(run) = printer.opener_trailing_broke_after_run(paren_open, first_arg_start) {
-        printer.push_leading_run_with_soft_line(parts, &run);
+    // A block-only run the author broke after takes its newline-after soft `line`
+    // instead of the glue below — own line when the argument list breaks (this
+    // builder's layouts are the breaking ones), glued bytes when it collapses — or,
+    // carrying an author blank, the forced form that keeps it. A run holding an
+    // own-line comment declines the gate and keeps the emitters below
+    // (`Printer::first_arg_broke_after_run`).
+    if let Some((run, brk)) = printer.first_arg_broke_after_run(paren_open, first_arg_start) {
+        printer.push_first_arg_broke_after_run(parts, &run, first_arg_start, brk);
         return;
     }
     let d = printer.d();
