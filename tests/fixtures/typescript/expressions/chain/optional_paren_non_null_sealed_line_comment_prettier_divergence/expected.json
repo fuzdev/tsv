@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 428,
+	"end": 687,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -121,24 +121,104 @@
 					"column": 11
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A multi-line block the base OWNS, in the same pair, with the `//` still in the",
+			"start": 419,
+			"end": 500,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing gap: the pair prints its BROKEN body here, a second rendering of the same",
+			"start": 502,
+			"end": 587,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " operand, and the comment survives in it.",
+			"start": 589,
+			"end": 632,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a\nb ",
+			"start": 648,
+			"end": 657,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 663,
+			"end": 667,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 10
+				},
+				"end": {
+					"line": 20,
+					"column": 14
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 427,
+		"end": 686,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 418,
+			"end": 677,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 15,
+					"line": 22,
 					"column": 9
 				}
 			},
@@ -644,6 +724,203 @@
 							"value": " the assignment hugs the shell (`= (`), which breaks at the comment.",
 							"start": 313,
 							"end": 383
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 634,
+					"end": 676,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 640,
+							"end": 675,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 640,
+								"end": 641,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "n"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 644,
+								"end": 675,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 21,
+										"column": 7
+									}
+								},
+								"object": {
+									"type": "TSNonNullExpression",
+									"start": 644,
+									"end": 671,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 11
+										},
+										"end": {
+											"line": 21,
+											"column": 3
+										}
+									},
+									"expression": {
+										"type": "ChainExpression",
+										"start": 658,
+										"end": 662,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 5
+											},
+											"end": {
+												"line": 20,
+												"column": 9
+											}
+										},
+										"expression": {
+											"type": "MemberExpression",
+											"start": 658,
+											"end": 662,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 5
+												},
+												"end": {
+													"line": 20,
+													"column": 9
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 658,
+												"end": 659,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 5
+													},
+													"end": {
+														"line": 20,
+														"column": 6
+													}
+												},
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 661,
+												"end": 662,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 8
+													},
+													"end": {
+														"line": 20,
+														"column": 9
+													}
+												},
+												"name": "b"
+											},
+											"computed": false,
+											"optional": true
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " a\nb ",
+												"start": 648,
+												"end": 657
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 663,
+												"end": 667
+											}
+										]
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 672,
+									"end": 675,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 4
+										},
+										"end": {
+											"line": 21,
+											"column": 7
+										}
+									},
+									"name": "ccc"
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block the base OWNS, in the same pair, with the `//` still in the",
+							"start": 419,
+							"end": 500
+						},
+						{
+							"type": "Line",
+							"value": " trailing gap: the pair prints its BROKEN body here, a second rendering of the same",
+							"start": 502,
+							"end": 587
+						},
+						{
+							"type": "Line",
+							"value": " operand, and the comment survives in it.",
+							"start": 589,
+							"end": 632
 						}
 					]
 				}
