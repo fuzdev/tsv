@@ -49,6 +49,22 @@
 			b();
 		};
 
+	// the break between the comments carries an author blank at the arrow body too
+	const q = () =>
+		/* c1 */
+
+		/* c2 */ function () {
+			b();
+		};
+
+	// an arrow call argument whose body breaks: same rule
+	fn1((x) =>
+		/* c1 */
+		/* c2 */ fn2(function () {
+			b();
+		})
+	);
+
 	// a value that breaks by width alone: the soft separator breaks with the hang
 	const u =
 		/* c1 */

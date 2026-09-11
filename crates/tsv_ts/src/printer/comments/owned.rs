@@ -273,7 +273,33 @@ impl<'a> Printer<'a> {
         build_value: impl FnOnce() -> DocId,
     ) -> (Option<DocId>, DocId) {
         let run = self.hoisted_owned_value_gap_run_opt(gap_start, value);
-        (run, self.build_value_under_hoist(run, value, build_value))
+        (run, self.build_gap_value_doc(run, value, build_value))
+    }
+
+    /// The value build of a gap seam whose closure builds the value ALONE: the hoist's
+    /// suppression ([`Self::build_value_under_hoist`]) where the hoist fired, and where it
+    /// declined, the value's multi-line owned comment claimed outside the value's own group
+    /// ([`Self::build_value_with_outermost_owned_comment`]).
+    ///
+    /// The hoist declines for a run that is not glued through — a run the author broke after
+    /// (`= /* c1 */⏎/* c2⏎*/ a ? b : c`), or one under an own-line comment — whose arm prints
+    /// the rest of the run on the emit axis. Claimed by the innermost node there, the comment's
+    /// hard break explodes a value prettier keeps flat. Under the hoist the claim declines on
+    /// its own, since the hoist already claims the comment.
+    ///
+    /// ⚠️ **Only for a closure that builds the value alone.** The claim prepends after
+    /// `build_value` returns, so a closure that also prepends the gap's leading run prints the
+    /// owned comment AHEAD of that run — the arrow's `build_body` closures carry it, which is
+    /// why the arrow claims beneath the run instead (`Printer::build_arrow_body_doc_with_leading`).
+    pub(in crate::printer) fn build_gap_value_doc(
+        &self,
+        run: Option<DocId>,
+        value: &Expression<'_>,
+        build_value: impl FnOnce() -> DocId,
+    ) -> DocId {
+        self.build_value_under_hoist(run, value, || {
+            self.build_value_with_outermost_owned_comment(value, build_value)
+        })
     }
 
     /// The **other half of the hoist**: build `value`'s doc with its own claim suppressed

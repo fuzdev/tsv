@@ -396,7 +396,7 @@ impl<'a> Printer<'a> {
                                 && arrow_hug_refused_by_comments(self, arrow, body_expr))
                         {
                             let sig_doc = build_arrow_sig_doc(self, arrow);
-                            let body_doc = self.build_expression_doc(body_expr);
+                            let body_doc = self.build_arrow_arg_body_doc(body_expr);
                             let body_doc = prepend_arrow_body_comments(
                                 self,
                                 arrow,

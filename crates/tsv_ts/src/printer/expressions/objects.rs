@@ -732,7 +732,7 @@ impl<'a> Printer<'a> {
                     if needs_parens {
                         value_parts.push(d.text("("));
                     }
-                    value_parts.push(self.build_value_under_hoist(hoisted_run, prop.value, || {
+                    value_parts.push(self.build_gap_value_doc(hoisted_run, prop.value, || {
                         self.build_object_property_value_doc(prop.value, value_frozen)
                     }));
                     if needs_parens {

@@ -972,7 +972,7 @@ fn build_ternary_arrow_hug_states(
     let sig_doc = build_arrow_sig_doc(printer, arrow);
 
     // Build body expression with comments between `=>` and body
-    let body_doc = printer.build_expression_doc(body_expr);
+    let body_doc = printer.build_arrow_arg_body_doc(body_expr);
     let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
     // A forced break collapses the ladder to its break state alone — asked here of the BODY,

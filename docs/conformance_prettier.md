@@ -425,7 +425,10 @@ A value with a **hard** break of its own (a preserved-expanded object, a functio
 force it, and there the blank survives with the break, prettier's form too. The same holds
 for a run whose last comment is glued to the value and an earlier one broke
 (`= /* c1 */⏎/* c2 */ v`): the break lives between the two comments, and it renders — or
-collapses — exactly as a break before the value would.
+collapses — exactly as a break before the value would. When that glued comment is
+**multi-line** (`= /* c1 */⏎/* c2⏎*/ v`) the break is forced whatever the value does, since a
+comment spanning lines cannot share the line of one that broke before it, so the blank survives
+there too, and the value keeps its own layout below the comment.
 
 The rule holds at every value gap whose own-line authoring **hangs** the comment (the
 initializer family: declarator, class property, object value, enum member, and the `=`/`:`

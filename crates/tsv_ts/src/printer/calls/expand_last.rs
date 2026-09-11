@@ -245,8 +245,10 @@ pub(super) fn try_expand_last_arg(
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
             // Reuse the pre-built call body (see above); conditional bodies build fresh.
-            let body_doc =
-                body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);
+            let body_doc = body_reuse.map_or_else(
+                || printer.build_arrow_arg_body_doc(body_expr),
+                |(_, doc)| doc,
+            );
             let body_doc =
                 prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 

@@ -353,12 +353,17 @@ impl<'a> Printer<'a> {
                     op_pos + assign.operator.as_str().len() as u32 - 1,
                     rhs_comment_end,
                     assign.operator.as_str_with_leading_space(),
+                    // Both `=`-comment arms print their run outside the value, so a
+                    // multi-line comment the value owns prints outside the value's own group
+                    // too — the declarator's rule ([`Printer::build_value_with_outermost_owned_comment`]).
                     || {
-                        self.build_expression_doc_with_paren_comments(
-                            assign.right,
-                            assign.span.end,
-                            false,
-                        )
+                        self.build_value_with_outermost_owned_comment(assign.right, || {
+                            self.build_expression_doc_with_paren_comments(
+                                assign.right,
+                                assign.span.end,
+                                false,
+                            )
+                        })
                     },
                 )
             {
@@ -368,11 +373,13 @@ impl<'a> Printer<'a> {
                 && rhs_comments.is_some()
                 && let Some(rhs_doc) =
                     self.broke_after_operator_rhs_doc(effective_rhs_start, rhs_comment_end, || {
-                        self.build_expression_doc_with_paren_comments(
-                            assign.right,
-                            assign.span.end,
-                            false,
-                        )
+                        self.build_value_with_outermost_owned_comment(assign.right, || {
+                            self.build_expression_doc_with_paren_comments(
+                                assign.right,
+                                assign.span.end,
+                                false,
+                            )
+                        })
                     })
             {
                 return d.concat(&[left_doc, assign.operator.doc_with_leading_space(d), rhs_doc]);
