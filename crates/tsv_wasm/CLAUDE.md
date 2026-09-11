@@ -381,6 +381,11 @@ the file a warning names), then queries:
   `.gitignore` anchors, so it takes no extra arguments; pair it with
   `is_ignored(rel, false)` for the file-level match. (`classify_dir` stays the
   primitive for `npm/cli.js`, which threads `heuristic_active` down a real walk.)
+- `path_heuristic_shadow_warning(rel, loose_root?) -> string | undefined` — the same
+  per-file replay's warning: `heuristic_shadow_warning`'s text for the first ancestor
+  `is_path_pruned` stops at, when the heuristic pruned it under a tsv-layer re-include
+  (the `'prune_warn'` a walk would have reached); `undefined` for any other prune, or
+  none.
 - `excluded_argument_warning(display, rel, is_dir, loose_root?) -> string | undefined`
   — the warning for a path an argument named (a file, or a directory root) that an
   ignore file puts out of scope, naming the file whose rule did it; `undefined` when no

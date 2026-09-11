@@ -153,6 +153,8 @@ export class IgnoreStack {
 	should_format_file(name: string, child_rel: string): boolean;
 	/** Whether an ancestor directory of `rel` would be pruned by discovery. */
 	is_path_pruned(rel: string): boolean;
+	/** The heuristic-shadow warning for the first ancestor directory of `rel` discovery prunes, else `undefined`. `loose_root` is the format root outside a git repo. */
+	path_heuristic_shadow_warning(rel: string, loose_root?: string): string | undefined;
 	/** The argument error for a named file tsv doesn't format, else `undefined`. */
 	unsupported_extension_error(path: string): string | undefined;
 	/** The warning for a directory the build-output heuristic pruned under a tsv-layer re-include, else `undefined`. `loose_root` is the format root outside a git repo. */
