@@ -32,8 +32,6 @@ use super::test_patterns::{
     build_test_callee_flat_doc, is_test_call, test_call_flat_layout_applies,
 };
 use crate::ast::internal;
-use crate::printer::CommentVec;
-use crate::printer::comments::BrokeAfterBreak;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, function_signature_has_breaking_comments,
 };
@@ -628,10 +626,11 @@ fn push_lone_arg_trailing_comments(
     }
 }
 
-/// Single-argument comment paths: leading line comments (multi-line expansion)
-/// and inline block comments before the lone argument. Returns `None` when the
-/// argument has no such comments — or has own-line trailing comments, which
-/// defer to the general comment path — so the caller falls through.
+/// Single-argument comment paths for the `(`→argument gap: a gap a comment forces open (a
+/// line comment, or a block that owns its line) takes the expanded layout with the
+/// delimiter-line pull, and a block-only gap leads the argument as one run inside the soft
+/// wrap. Returns `None` when the gap holds no comment — or the argument has own-line
+/// trailing comments, which defer to the general comment path — so the caller falls through.
 fn try_single_arg_comment_paths(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
@@ -653,36 +652,34 @@ fn try_single_arg_comment_paths(
         .comments_on_page_between(arg_end, paren_close)
         .any(|c| !c.is_block || !printer.is_same_line(arg_end, c.span.start));
 
-    let has_line_comments = printer.has_line_comments_between(paren_open, arg_start);
-
-    // TODO: a lone argument answers the delimiter-line question differently from every
-    // sibling (`docs/comments.md` §The delimiter-line question). With a block-only run in
-    // the `(`→argument gap, the hug branch below joins the whole run with spaces, MERGING
-    // comments the author put on separate lines (`fn(/* c1 */⏎/* c2 */⏎a)` →
-    // `fn(⏎/* c1 */ /* c2 */⏎a⏎)`). This is an F1 IDEMPOTENCY break, not just a prettier
-    // divergence: the merged form is not a fixed point, and pass 2 collapses the whole
-    // call to `fn(/* c1 */ /* c2 */ a);`. Every other argument count, and `new`/member-chain at this
-    // one, pull the `(`-line comment onto the `(` and give each own-line comment its own
-    // line. Deferring the gap to the general comment path is NOT the fix on its own: it
-    // regresses the blank-line-after-a-leading-comment shape
-    // (`calls/first_arg_leading_comment_blank`, `calls/leading_arg_block_comment_newline`,
-    // `syntax/comments/blank_line_after_value_leading_comment`), so the general path needs
-    // the blank-preserving arm first. Needs a fixture.
-    if has_line_comments && !has_own_line_trailing_comment {
+    // A line comment, or a block comment that owns its line, forces the list open — the gap
+    // question `new` and the member chain ask too. Such a gap takes the expanded layout
+    // below, which answers the delimiter-line question as every sibling does
+    // (`docs/comments.md` §The delimiter-line question): a comment on the `(` line stays
+    // there, and the rest leads the argument, each own-line comment on its own line.
+    //
+    // ⚠️ **Not `has_line_comments` alone.** A block that owns its line forces the break
+    // exactly as a `//` does, and the hug branch below — whose glued emitter joins a block to
+    // what follows even across a newline — MERGED comments the author put on separate lines
+    // (`fn(/* c1 */⏎/* c2 */⏎a)` → `fn(⏎/* c1 */ /* c2 */⏎a⏎)`, then `fn(/* c1 */ /* c2 */ a)`
+    // on the next pass) and welded a glued pair below one (`/* c2 */ /* c3 */⏎{` →
+    // `/* c2 */ /* c3 */ {`), a form prettier's own output reached on its first tsv pass.
+    let forces_expansion = should_force_expansion_for_comments(printer, paren_open, arg_start);
+    if forces_expansion && !has_own_line_trailing_comment {
         // Multi-line format: fn( // comment\n\targ,\n)
         // Comments trailing the `(` on its own line stay there (a divergence from
         // prettier, which relocates them to their own line); own-line comments
         // stay on their own lines before the arg. See conformance_prettier_ts_comments.md
         // §Comment relocation (Call open paren `(`).
-        let gap_pc = PartitionedComments::new(printer, paren_open, arg_start);
-
         let mut paren_line_prefix = DocBuf::new();
-        gap_pc.emit_delimiter_line_pull(&mut paren_line_prefix, printer);
-
         let mut inner = DocBuf::new();
         // Own-line comments each take their own line (author blanks preserved); a
         // block that hugs the arg stays inline with it (`/* b */ a`).
-        gap_pc.emit_leading_comments_inline_aware(&mut inner, printer);
+        PartitionedComments::new(printer, paren_open, arg_start).emit_pulled_gap(
+            &mut paren_line_prefix,
+            &mut inner,
+            printer,
+        );
         // Use the argument-context builder so a binary/logical chain (or conditional)
         // takes the ARGUMENT group structure — matching the no-leading-comment path.
         // (Both builders indent the continuation; they differ in whether a forced break
@@ -715,55 +712,36 @@ fn try_single_arg_comment_paths(
     // isn't emitted here, but it still forces the expansion — a to-emit gate would
     // go blind to it and wrongly hug.
     //
-    // `build_rhs_comments_glued_opt` emits only the non-owned comments (with spaces
-    // between consecutive blocks: `fn(/** @type {A} */ /** @type {B} */ expr)`); an
-    // owned one is `None` here and rides on `arg_doc`.
+    // The run itself is the gap's one leading run (`PartitionedComments::emit_unpulled_gap`,
+    // which states why a glue emitter here is the bug class): it prints only the non-owned
+    // comments — an owned one rides on the argument's doc, so
+    // `fn(/** @type {A} */ /** @type {B} */ expr)` keeps its glued space — and an author blank's
+    // hardline opens the call. No comment here owns its line: such a gap took the expanded
+    // branch above.
     if printer.has_comments_on_page_between(paren_open, arg_start) && !has_own_line_trailing_comment
     {
-        // The broke-after half of this gap first: a block-only run the author broke
-        // after rides its newline-after soft `line` inside the same wrap group — own
-        // line when the argument breaks the call open, glued bytes when everything
-        // collapses (prettier's `printLeadingComment` `line`) — or, carrying an author
-        // blank, the forced form that keeps it and opens the call. A run holding an
-        // own-line comment declines the gate and keeps the glued emitter below, whose
-        // glue answers preserve its breaks; so does an owned comment, which rides the
-        // argument's doc.
-        if let Some((run, brk)) = printer.first_arg_broke_after_run(paren_open, arg_start) {
-            let mut parts: DocBuf = DocBuf::new();
-            printer.push_first_arg_broke_after_run(&mut parts, &run, arg_start, brk);
-            parts.push(build_joined_argument_doc(
-                printer,
-                paren_open,
-                call.arguments,
-                0,
-            ));
-            push_lone_arg_trailing_comments(printer, &mut parts, arg_end, paren_close);
-            return Some(wrap_call_with_soft_breaks(d, callee, d.concat(&parts)));
-        }
-        let inline_comments = printer.build_rhs_comments_glued_opt(paren_open, arg_start);
+        let mut parts: DocBuf = DocBuf::new();
+        PartitionedComments::new(printer, paren_open, arg_start)
+            .emit_unpulled_gap(&mut parts, printer);
         // Argument-context builder so a binary/logical chain gets its
         // continuation indent (matches the no-comment path); see the leading
         // line-comment branch above for the same reasoning. A directive alone on its
         // line freezes the argument (Rule A) — only the BLOCK spelling reaches here
         // (a line comment routes to the branch above).
-        let arg_doc = build_joined_argument_doc(printer, paren_open, call.arguments, 0);
-
-        // Leading run, argument, trailing run — `build_rhs_comments_glued_opt` already
-        // adds the trailing space after each comment it emits.
-        let mut parts: DocBuf = DocBuf::new();
-        if let Some(inline) = inline_comments {
-            parts.push(inline);
-        }
-        parts.push(arg_doc);
+        parts.push(build_joined_argument_doc(
+            printer,
+            paren_open,
+            call.arguments,
+            0,
+        ));
         push_lone_arg_trailing_comments(printer, &mut parts, arg_end, paren_close);
-        let arg_with_comment = d.concat(&parts);
 
         // Soft-break wrapping so the outer call can expand when content exceeds print
         // width — e.g., fn(/** @type {T} */ call(long_args)) →
         // fn(\n\t/** @type {T} */ call(\n\t\tlong_args,\n\t),\n). An arg that breaks
         // internally (multiline content) breaks this group with it, which is already
         // the expanded form — no separate hard-break arm.
-        return Some(wrap_call_with_soft_breaks(d, callee, arg_with_comment));
+        return Some(wrap_call_with_soft_breaks(d, callee, d.concat(&parts)));
     }
 
     None
@@ -1080,76 +1058,20 @@ fn build_call_with_arg_comments(
                 // the own-line set then leads the first arg via the shared emitter (a block
                 // hugging the arg stays inline, own-line/line comments break, author blanks
                 // preserved).
-                gap_pc.emit_delimiter_line_pull(&mut paren_line_prefix_parts, printer);
-                gap_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
+                gap_pc.emit_pulled_gap(&mut paren_line_prefix_parts, &mut arg_parts, printer);
             } else if !has_paren_line {
                 // No comment on the `(` line → every gap comment leads the first
                 // arg. Same shared emitter; it ends with the right separator before
                 // the arg (space after a hug, hardline after an own-line comment).
                 gap_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
-            } else if let Some((run, BrokeAfterBreak::Soft)) =
-                printer.first_arg_broke_after_run(paren_open, first_arg_start)
-            {
-                // A block-only run glued to `(` that the author broke after: its
-                // newline-after soft `line` rides the argument group — own line
-                // when the list breaks (a breaking first argument, a sibling, or
-                // width), glued bytes when the call collapses. The glue loop
-                // below would weld the run to the argument in both renderings. A
-                // run carrying an author blank is the glue loop's: it keeps the blank
-                // and records the forced expansion this builder needs.
-                printer.push_leading_run_with_soft_line(&mut arg_parts, &run);
             } else {
-                // TODO: this loop is a hand-rolled copy of the broke-after run emitter, and it
-                // diverges from it: every non-blank separator is a space, so
-                // `fn(/* c1 */⏎⏎/* c2 */ /* c3 */⏎a, b)` welds `/* c3 */ a` (the lone argument,
-                // `new` and the chain keep the break), and its raw newline count reads a blank
-                // INSIDE the argument's parens as the author's (`fn(/* c */ (⏎⏎a), b)` →
-                // `/* c */⏎⏎a`). The forced run belongs in the shared emitter
-                // (`Printer::push_first_arg_broke_after_run`) with `force_expansion` set; what
-                // then reaches this loop needs its own audit (a multi-line owned tail still
-                // relies on its blank arm). Needs a fixture.
-                // A block trails the `(` but nothing forces expansion. Every comment
-                // in this gap is a block (no line comment reaches here) that is
-                // paren-trailing or hugs an arg — all collapsible.
-                // Prettier joins consecutive blocks (and the hugged arg) onto one
-                // line; an author blank line in the gap breaks the run and is
-                // preserved (and forces the call open). A space keeps a block glued
-                // to its arg, so a hug (`/* c */ a`) stays inline.
-                let comments: CommentVec<'_> = printer
-                    .comments_to_emit_between(paren_open, first_arg_start)
-                    .collect();
-                // A blank between two comments, or between the last and the arg, expands
-                // the call (the comment interiors are skipped — only the gaps matter).
-                let blank_in_gap = comments
-                    .windows(2)
-                    .any(|w| printer.has_blank_line_between(w[0].span.end, w[1].span.start))
-                    || comments.last().is_some_and(|last| {
-                        printer.has_blank_line_between(last.span.end, first_arg_start)
-                    });
-                if blank_in_gap {
-                    force_expansion = true;
-                }
-                let mut prev_end: Option<u32> = None;
-                let push_sep = |arg_parts: &mut DocBuf, from: u32, to: u32| {
-                    if printer.has_blank_line_between(from, to) {
-                        arg_parts.push(d.literalline());
-                        arg_parts.push(d.hardline());
-                    } else {
-                        arg_parts.push(d.text(" "));
-                    }
-                };
-                for comment in &comments {
-                    if let Some(pe) = prev_end {
-                        push_sep(&mut arg_parts, pe, comment.span.start);
-                    }
-                    arg_parts.push(printer.build_comment_doc(comment));
-                    prev_end = Some(comment.span.end);
-                }
-                // Separator to the first arg: a space keeps a hugging block glued to
-                // it; an author blank line breaks (and is preserved).
-                if let Some(pe) = prev_end {
-                    push_sep(&mut arg_parts, pe, first_arg_start);
-                }
+                // A comment trails the `(` and nothing in the gap forces the list open, so the
+                // run is block-only and no comment in it owns its line: the gap's one leading
+                // run, whose author-blank hardline is the one separator that must also open the
+                // list. Every builder of this gap shares that emitter
+                // (`PartitionedComments::emit_unpulled_gap`, which states why a hand-rolled
+                // separator here is the bug class).
+                force_expansion |= gap_pc.emit_unpulled_gap(&mut arg_parts, printer);
             }
         }
 

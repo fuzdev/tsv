@@ -5,6 +5,10 @@ A comment trailing a `new` expression's opening `(` on the same line
 the author placed it. Prettier drops it onto its **own line** inside the parens,
 as the first argument's leading comment.
 
+The comments below the pulled one keep their own separators, exactly as they
+would without the pull: a glued pair stays on one line, and an author blank
+before the argument survives.
+
 ## Reason
 
 Same rule as the simple-callee and member-chain forms

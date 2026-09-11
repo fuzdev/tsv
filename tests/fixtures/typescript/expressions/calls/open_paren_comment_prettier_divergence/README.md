@@ -2,8 +2,10 @@
 
 A line comment trailing a call's opening `(` on the same line (`fn( // c`) is
 preserved on the `(` line, and so is a block comment that shares that line with
-something forcing it (`fn( /* paren */` above an own-line `// lead`). Prettier
-relocates the run to its own line as the first argument's leading comment.
+something forcing it (`fn( /* paren */` above an own-line `// lead`, or above an
+own-line `/* lead */`, which forces the list open just the same — a lone argument
+and several alike). Prettier relocates the run to its own line as the first
+argument's leading comment.
 
 A block comment alone on the `(` line is not this divergence: it forces nothing,
 so it leads the first argument — on the argument's line when the call fits, on a

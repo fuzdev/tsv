@@ -258,15 +258,12 @@ impl LeadingGlue {
 /// keeps its space in both.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum BrokeAfterBreak {
-    /// The run is forced open — by the value's own hard break, or at an argument list's
-    /// first-argument gap by an author blank the list keeps
-    /// ([`Printer::first_arg_broke_after_run`]) — so every separator the author broke renders
-    /// as the break prettier's `propagateBreaks` makes of its `line`: a blank-preserving
-    /// `hardline` ([`Printer::push_leading_run_separator`]).
+    /// The run is forced open by the value's own hard break, so every separator the author
+    /// broke renders as the break prettier's `propagateBreaks` makes of its `line`: a
+    /// blank-preserving `hardline` ([`Printer::push_leading_run_separator`]).
     Forced,
     /// The run rides a group that may still render flat: a broken separator is a soft
-    /// `line`. At a value gap an author blank yields with it
-    /// ([`LeadingGlue::AdjacentValueGap`]); an argument list never hands this arm one.
+    /// `line`, and an author blank yields with it ([`LeadingGlue::AdjacentValueGap`]).
     Soft,
 }
 
@@ -2395,103 +2392,28 @@ impl<'a> Printer<'a> {
     /// ([`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value)
     /// is the hard-break form, [`hang_after_operator_run_doc`](Self::hang_after_operator_run_doc)
     /// the seam-grouped one). The caller places the run inside an existing group
-    /// (an argument list's wrap), so the `line` materializes exactly when that
-    /// group breaks — the value's own hard break, a sibling's, or width — and
-    /// collapses to the glued bytes when it stays flat. That is prettier's
-    /// `printLeadingComment` `line` riding the argument group, which its
-    /// `propagateBreaks` marks broken for any of those reasons.
+    /// (the arrow's ternary-body parens), so the `line` materializes exactly when that
+    /// group breaks — the value's own hard break, or width — and collapses to the glued
+    /// bytes when it stays flat. That is prettier's `printLeadingComment` `line` riding
+    /// the enclosing group, which its `propagateBreaks` marks broken for either reason.
     pub(crate) fn push_leading_run_with_soft_line(&self, parts: &mut DocBuf, run: &[&'a Comment]) {
         if let Some(last) = self.push_breaking_value_run_body(parts, run, BrokeAfterBreak::Soft) {
             self.push_soft_run_tail(parts, last);
         }
     }
 
-    /// [`Self::broke_after_value_leading_run`] at an argument list's `(`→first-argument gap,
-    /// with the break its separators render at: [`BrokeAfterBreak::Soft`] when they ride the
-    /// argument group's soft `line`, [`BrokeAfterBreak::Forced`] when an author blank inside
-    /// the run or after it must survive, which only a forced break can carry. Emitted by
-    /// [`Self::push_first_arg_broke_after_run`]. A run in which some comment owns its line
-    /// declines ([`Self::no_comment_owns_its_line`]): that comment keeps its break
-    /// unconditionally (`calls/leading_arg_block_comment_newline`'s second case), and the
-    /// caller's own emitters print it. The keyword seams (spread dots, `await`) take the
-    /// value gap's gate instead — their target pulls an own-line run up onto the keyword's
-    /// line.
-    ///
-    /// ⚠️ **An argument list is a LIST gap, so an author blank is kept, not yielded.** At a
-    /// value gap the blank goes with the unforced break
-    /// ([conformance_prettier.md](../../../../docs/conformance_prettier.md) §Authored breaks
-    /// in value position); here prettier's `printLeadingComment` keeps it and opens the list,
-    /// as the plain call's multi-argument glue loop always did. Declining on a blank handed
-    /// the run to glue emitters that dropped it — and on a breaking argument the authored
-    /// break with it, a third form.
-    ///
-    /// ⚠️ **The blank is read strictly** ([`Self::run_holds_author_blank`]). A break the
-    /// author put INSIDE the argument's parens (`fn(/* c */⏎(⏎{…}))`) is two newlines with a
-    /// `(` between them, which a raw newline count calls a blank: the lone argument then
-    /// welded (`/* c */ {`) and the plain call's glue loop fabricated one (`/* c */⏎⏎{`).
-    pub(crate) fn first_arg_broke_after_run(
-        &self,
-        paren_open: u32,
-        first_arg_start: u32,
-    ) -> Option<(CommentVec<'a>, BrokeAfterBreak)> {
-        let run = self.broke_after_value_leading_run(paren_open, first_arg_start)?;
-        if !self.no_comment_owns_its_line(&run) {
-            return None;
-        }
-        let brk = if self.run_holds_author_blank(&run, first_arg_start) {
-            BrokeAfterBreak::Forced
-        } else {
-            BrokeAfterBreak::Soft
-        };
-        Some((run, brk))
-    }
-
-    /// Push a [`Self::first_arg_broke_after_run`] hit: the soft form
-    /// ([`Self::push_leading_run_with_soft_line`]), or for a run carrying an author blank the
-    /// forced one ([`Self::push_leading_run_before_breaking_value`]), whose blank-preserving
-    /// hardlines open the argument list around it.
-    pub(crate) fn push_first_arg_broke_after_run(
-        &self,
-        parts: &mut DocBuf,
-        run: &[&'a Comment],
-        first_arg_start: u32,
-        brk: BrokeAfterBreak,
-    ) {
-        match brk {
-            BrokeAfterBreak::Forced => {
-                self.push_leading_run_before_breaking_value(parts, run, first_arg_start);
-            }
-            BrokeAfterBreak::Soft => self.push_leading_run_with_soft_line(parts, run),
-        }
-    }
-
-    /// Whether some separator of a broke-after run — between two of its comments, or after
-    /// its last — holds an author blank, measured the way the forced emitter
-    /// ([`Self::push_leading_run_separator`]) prints it: up to the next physical comment
-    /// ([`Self::blank_scan_end_after`]), and strictly, so a line holding a stripped paren is
-    /// not blank.
-    fn run_holds_author_blank(&self, run: &[&'a Comment], value_start: u32) -> bool {
-        run.iter().any(|c| {
-            self.has_blank_line_between_strict(
-                c.span.end,
-                self.blank_scan_end_after(c, value_start),
-            )
-        })
-    }
-
     /// Does no comment in a broke-after run OWN its line — a newline on both sides of it,
     /// the one case prettier's `printLeadingComment` answers with a `hardline` rather than a
     /// `line` or a space? The soft-separator gate of the value gaps
-    /// ([`Self::value_gap_soft_broke_after_run`], [`Self::broke_after_operator_rhs_doc`]) and of
-    /// the first-argument gap ([`Self::first_arg_broke_after_run`]) alike.
+    /// ([`Self::value_gap_soft_broke_after_run`], [`Self::broke_after_operator_rhs_doc`]).
     ///
     /// ⚠️ **Not "every comment on the opener's line".** That reading declines a glued run the
-    /// author gave its own line (`=⏎/* c1 */ /* c2 */⏎v`, `fn(⏎/* c1 */ /* c2 */⏎{…})` — `c1`
-    /// hugs, `c2` has content before it), and the caller's glue path then welds the run to a
-    /// breaking value (`/* c1 */ /* c2 */ {`), a form the next pass reads differently from
-    /// this one. It declines the `(shell)` spelling too (`fn(/* c1 */⏎/* c2 */ ({…}))`): `c2`
-    /// is glued to a paren the printer strips, so nothing owns it, and it sits in the run on
-    /// a line of its own.
+    /// author gave its own line (`=⏎/* c1 */ /* c2 */⏎v` — `c1` hugs, `c2` has content before
+    /// it), and the caller's glue path then welds the run to a breaking value
+    /// (`/* c1 */ /* c2 */ {`), a form the next pass reads differently from this one. It
+    /// declines the `(shell)` spelling too (`= /* c1 */⏎/* c2 */ ({…})`): `c2` is glued to a
+    /// paren the printer strips, so nothing owns it, and it sits in the run on a line of its
+    /// own.
     fn no_comment_owns_its_line(&self, run: &[&'a Comment]) -> bool {
         run.iter()
             .all(|c| self.comment_follows_content_on_its_line(c) || self.comment_hugs_next(c))

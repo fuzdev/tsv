@@ -17,24 +17,20 @@
 	);
 
 	// block comment trailing `(`, then an own-line block comment — single arg
-	fn( /* paren */
-		/* lead */
-		a
-	);
+	fn(/* paren */
+	/* lead */
+	a);
 
 	// the same with multiple args
-	fn( /* paren */
-		/* lead */
-		a,
-		b
-	);
+	fn(/* paren */
+	/* lead */
+	a, b);
 
 	// an author blank below the pulled block comment survives
-	fn( /* paren */
+	fn(/* paren */
 
-		/* lead */
-		a
-	);
+	/* lead */
+	a);
 
 	// line comment trailing `(` — arguments the call force-expands (function
 	// composition): the comment still stays on the `(` line
