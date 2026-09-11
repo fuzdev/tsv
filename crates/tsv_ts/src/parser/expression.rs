@@ -2738,7 +2738,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `import.meta` is a Module-goal-only construct (early error:
                 // "Syntax Error if the syntactic goal symbol is not Module").
                 if self.goal != crate::Goal::Module {
-                    return Err(self.error_msg("'import.meta' is only allowed in a module"));
+                    return Err(self.error_goal_gate("'import.meta' is only allowed in a module"));
                 }
                 let (prop_start, prop_end) = self.current_pos();
                 self.advance()?; // consume 'meta'

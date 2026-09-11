@@ -939,6 +939,38 @@ fn test_format_explicit_file_rejects_unsupported_extension() {
     assert_eq!(fs::read_to_string(&json).unwrap(), "[1,   2,    3]\n");
 }
 
+/// `parse <file>` takes the same extension check as `format <file>`, and the same
+/// message: the dispatch behind a path has no unknown arm, so without it a `.md` is
+/// parsed as TypeScript and the user reads a syntax error about their prose. An
+/// explicit `--parser` is the override — the caller named the grammar, so the name of
+/// the file no longer decides.
+#[test]
+fn test_parse_file_rejects_unsupported_extension_unless_parser_is_named() {
+    let dir = temp_dir("parse_unsupported_extension");
+    let md = dir.join("notes.md");
+    fs::write(&md, "x = 1\n").unwrap();
+
+    let output = tsv(&["parse", md.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(1), "parse keeps its 0/1 codes");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("unsupported file extension") && stderr.contains(".svelte"),
+        "stderr: {stderr}"
+    );
+    assert!(output.stdout.is_empty(), "nothing parsed");
+
+    let output = tsv(&["parse", md.to_str().unwrap(), "--parser", "typescript"]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "--parser overrides the extension"
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).starts_with(r#"{"type":"Program""#),
+        "the named grammar parsed the file"
+    );
+}
+
 /// The extension check is an *argument* error, so it fails the run upfront with
 /// nothing written — the same contract as an unresolvable path — and every bad
 /// argument is reported in one pass.
@@ -2029,9 +2061,10 @@ fn test_format_path_falls_back_to_script() {
 #[test]
 fn test_format_path_both_goals_fail_reports_the_module_error() {
     // Broken under both grammars: `with` fails the module parse, the `import`
-    // declaration fails the script retry. The error that reached FURTHER is the reported
-    // one — here the module's, at line 2 (`tests/format_fallback_error_attribution.rs`
-    // pins the rule; this pins the CLI's rendering of it).
+    // declaration fails the script retry — a goal gate, which settles the file as a
+    // module, so the module's error is the reported one, at line 2
+    // (`tests/format_fallback_error_attribution.rs` pins the rule; this pins the CLI's
+    // rendering of it).
     let dir = temp_dir("format_path_both_fail");
     let file = dir.join("broken.js");
     fs::write(&file, "import x from 'y';\nwith (a) {\n\tb;\n}\n").expect("write temp file");
@@ -2046,11 +2079,11 @@ fn test_format_path_both_goals_fail_reports_the_module_error() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("The 'with' statement is not allowed in strict mode"),
-        "should report the further-reaching (module) parse error: {stderr}"
+        "should report the module parse error: {stderr}"
     );
     assert!(
         !stderr.contains("'import' is only allowed in a module"),
-        "should not report the script retry's earlier error: {stderr}"
+        "should not report the script retry's goal-gate error: {stderr}"
     );
 }
 
@@ -2465,4 +2498,73 @@ fn test_parse_closed_pipe_is_not_a_parse_error() {
     fs::write(&path, "const bad = ;\n").unwrap();
     let broken = tsv_in_dir(tree.path(), &["parse", "big.ts"]);
     assert_eq!(broken.status.code(), Some(1));
+}
+
+/// A **non-blocking** stdout is a slow consumer, not a failure: the run waits it out and
+/// every line arrives.
+///
+/// Whether the fd blocks is a property of the open file description, which the parent
+/// owns — a Node parent that has initialized its own `process.stdout` on a pipe has
+/// flipped that description to non-blocking, and the `@fuzdev/tsv` loader execs this
+/// binary with exactly such an inherited fd. A full pipe then answers `EAGAIN` where a
+/// blocking one would park the write, and `write_all` panicked on it (exit 134 under
+/// `panic = "abort"`) after every file had already been rewritten — the same crash
+/// `cli.js`'s `write_fd` was fixed for. A `UnixStream` pair stands in for the flipped
+/// pipe: the child's end is set non-blocking before it is handed over as stdout, the
+/// reader holds the other end and drains late, and a socket's send buffer fills and
+/// answers `EAGAIN` exactly as a pipe's does — once it is full. A socket buffers
+/// ~200 KiB where a pipe buffers 64 KiB, so this tree is `SOCKET_TREE_FILES` deep
+/// rather than `PIPE_TREE_FILES`: the 1,200-file report fits in a socket whole, and the
+/// row then passes with the `EAGAIN` arm removed (it was checked; it did).
+#[cfg(unix)]
+#[test]
+fn test_format_non_blocking_stdout_is_waited_out_not_a_crash() {
+    use std::io::Read as _;
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::UnixStream;
+    use std::process::Stdio;
+
+    const SOCKET_TREE_FILES: usize = 6000;
+    let tree = temp_dir("non_blocking_stdout");
+    let pad = "p".repeat(150);
+    for i in 0..SOCKET_TREE_FILES {
+        fs::write(tree.path().join(format!("{pad}_{i}.ts")), UNFORMATTED_TS)
+            .expect("write seed file");
+    }
+    let (mut reader, writer) = UnixStream::pair().expect("socket pair");
+    writer.set_nonblocking(true).expect("set O_NONBLOCK");
+    let mut child = Command::new(built_tsv())
+        .args(["format", "--check", "."])
+        .current_dir(tree.path())
+        .stdout(Stdio::from(OwnedFd::from(writer)))
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn tsv");
+    // the slow consumer: nothing drains the socket until the writer has surely filled it
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    let mut stdout = String::new();
+    reader.read_to_string(&mut stdout).expect("drain stdout");
+    let status = child.wait().expect("wait");
+    let mut stderr = String::new();
+    child
+        .stderr
+        .take()
+        .expect("piped stderr")
+        .read_to_string(&mut stderr)
+        .expect("read stderr");
+
+    assert!(
+        !stderr.contains("panicked") && !stderr.contains("temporarily unavailable"),
+        "the CLI crashed on a non-blocking stdout: {stderr}"
+    );
+    assert_eq!(
+        status.code(),
+        Some(1),
+        "--check still reports would-change: {stderr}"
+    );
+    assert_eq!(
+        stdout.lines().count(),
+        SOCKET_TREE_FILES,
+        "the changed-path list was truncated, stderr: {stderr}"
+    );
 }

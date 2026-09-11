@@ -61,17 +61,6 @@ struct Walk<'a> {
 pub struct Diagnostics {
     /// `path: detail` messages — reported by the caller, counted as errors.
     pub errors: Vec<String>,
-    /// Non-fatal diagnostics — see [`Discovered::warnings`].
-    pub warnings: Vec<String>,
-}
-
-/// Result of expanding path arguments: the files to format plus any non-fatal
-/// traversal errors (unreadable directories/entries) and discovery warnings.
-/// All three are sorted.
-pub struct Discovered {
-    pub files: Vec<PathBuf>,
-    /// `path: detail` messages — reported by the caller, counted as errors.
-    pub errors: Vec<String>,
     /// Non-fatal diagnostics — reported to stderr by the caller but **not**
     /// counted as errors (no effect on the exit code or stdout): the
     /// heuristic-shadow warning ([`tsv_discover::heuristic_shadow_warning`]), the
@@ -82,6 +71,13 @@ pub struct Discovered {
     /// `.gitignore`/`.formatignore`/`.prettierignore` whose read failed; see
     /// [`read_ignore_file`]).
     pub warnings: Vec<String>,
+}
+
+/// Result of expanding path arguments: the files to format, sorted and deduplicated,
+/// plus the walk's [`Diagnostics`].
+pub struct Discovered {
+    pub files: Vec<PathBuf>,
+    pub diagnostics: Diagnostics,
 }
 
 /// Expand files and directories into a sorted, deduplicated list of files to format.
@@ -146,20 +142,46 @@ pub struct Discovered {
 /// With multiple roots, overlapping spellings of the same file (`src` vs
 /// `./src`, absolute vs relative, symlink aliases) are deduplicated by canonical
 /// path, keeping the first spelling in sorted order. A single root can't produce
-/// duplicates (symlinks aren't followed), so the canonicalization cost is skipped.
+/// duplicates (symlinks aren't followed), and neither can roots that don't overlap —
+/// so the per-file `realpath` runs only when one canonical root is an ancestor-or-self
+/// of another, or a file argument is present (a file can be named twice, or sit under
+/// a directory root); `tsv format src lib` pays one `realpath` per ROOT, not per file.
 pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
     let mut files: Vec<PathBuf> = Vec::new();
     let diagnostics = discover_into(paths, &mut files)?;
     files.sort_by_cached_key(|p| path_sort_key(p));
     files.dedup();
-    if paths.len() > 1 {
+    if roots_can_overlap(paths) {
         let mut seen: HashSet<PathBuf> = HashSet::with_capacity(files.len());
         files.retain(|p| seen.insert(fs::canonicalize(p).unwrap_or_else(|_| p.clone())));
     }
-    Ok(Discovered {
-        files,
-        errors: diagnostics.errors,
-        warnings: diagnostics.warnings,
+    Ok(Discovered { files, diagnostics })
+}
+
+/// Whether two of `paths` can yield the same file: a file argument among them (it
+/// can repeat, or sit under a directory root), or one canonical directory root an
+/// ancestor-or-self of another. Every argument was validated ahead of this, so a
+/// `canonicalize` failure is a race and reads as "may overlap".
+fn roots_can_overlap(paths: &[String]) -> bool {
+    if paths.len() < 2 {
+        return false;
+    }
+    let mut roots = Vec::with_capacity(paths.len());
+    for path in paths {
+        let path = Path::new(path);
+        if !path.is_dir() {
+            return true;
+        }
+        let Ok(canonical) = fs::canonicalize(path) else {
+            return true;
+        };
+        roots.push(canonical);
+    }
+    roots.iter().enumerate().any(|(i, a)| {
+        roots
+            .iter()
+            .enumerate()
+            .any(|(j, b)| i != j && b.starts_with(a))
     })
 }
 
@@ -189,19 +211,26 @@ pub fn discover_into(
     // the one thing a file argument does *not* get to bypass (see
     // `unsupported_extension_error`: the parser dispatch behind it has no unknown
     // arm, so an unsupported extension would be parsed as TypeScript).
-    let bad: Vec<String> = paths
-        .iter()
-        .filter_map(|p| {
-            let path = Path::new(p.as_str());
-            if path.is_dir() {
-                None
-            } else if path.is_file() {
-                unsupported_extension_error(p)
-            } else {
-                Some(format!("{p}: not a file or directory"))
+    // One `stat` per argument, kept for the dispatch below — the same answer the
+    // validation gave, rather than a second query that could disagree with it.
+    let mut kinds = Vec::with_capacity(paths.len());
+    let mut bad = Vec::new();
+    for p in paths {
+        let kind = match fs::metadata(p) {
+            Ok(metadata) if metadata.is_dir() => ArgKind::Dir,
+            Ok(metadata) if metadata.is_file() => {
+                if let Some(error) = unsupported_extension_error(p) {
+                    bad.push(error);
+                }
+                ArgKind::File
             }
-        })
-        .collect();
+            _ => {
+                bad.push(format!("{p}: not a file or directory"));
+                ArgKind::File
+            }
+        };
+        kinds.push(kind);
+    }
     if !bad.is_empty() {
         return Err(bad);
     }
@@ -218,14 +247,13 @@ pub fn discover_into(
         errors: Vec::new(),
         warnings: Vec::new(),
     };
-    for path_str in paths {
+    for (path_str, kind) in paths.iter().zip(kinds) {
         let path = PathBuf::from(path_str);
-        if path.is_file() {
+        match kind {
             // explicit file argument — bypasses the ignore files (not the
             // extension check, which the validation above already applied)
-            out.files.push(path);
-        } else {
-            collect_root(&path, &cwd, &mut out);
+            ArgKind::File => out.files.push(path),
+            ArgKind::Dir => collect_root(&path, &cwd, &mut out),
         }
     }
     out.files.flush();
@@ -241,6 +269,13 @@ pub fn discover_into(
         errors: out.errors,
         warnings: out.warnings,
     })
+}
+
+/// What one path argument resolved to, decided once by `discover_into`'s validation.
+#[derive(Clone, Copy)]
+enum ArgKind {
+    File,
+    Dir,
 }
 
 /// Set up the ignore evaluation for one directory `root`, then recurse into it.
@@ -279,25 +314,19 @@ fn collect_root(root: &Path, cwd: &Path, out: &mut Walk<'_>) {
     let chain = ancestor_chain(&format_root, &root_abs);
     for ancestor in &chain[..chain.len() - 1] {
         let anchor = rel_to(&format_root, ancestor);
-        // tsv layer: `.formatignore` everywhere; inside a repo, a `.prettierignore`
-        // it shadows per-directory (hierarchical, like `.formatignore` — deeper
-        // wins). No listing for ancestors, so the read outcome stands in for
-        // presence: a present-but-unreadable `.formatignore` (`Unreadable`, warned)
-        // shadows `.prettierignore` just as in the listed case — only a genuinely
-        // `Absent` one falls through.
-        let tsv_content = if in_repo {
-            match read_ignore_file(&ancestor.join(FORMATIGNORE_FILE), &mut out.warnings) {
-                IgnoreRead::Content(content) => Some(content),
-                IgnoreRead::Unreadable => None,
-                IgnoreRead::Absent => {
-                    read_ignore_file(&ancestor.join(PRETTIERIGNORE_FILE), &mut out.warnings)
-                        .content()
-                }
-            }
-        } else {
-            read_ignore_file(&ancestor.join(FORMATIGNORE_FILE), &mut out.warnings).content()
-        };
-        if let Some(content) = tsv_content {
+        // No listing for ancestors, so presence is learned by opening: a
+        // present-but-unreadable `.formatignore` still shadows (`read_ignore_file`
+        // warns and yields no rules rather than falling through), and only a
+        // genuinely absent one hands the level to `.prettierignore`.
+        let has_formatignore = ancestor.join(FORMATIGNORE_FILE).exists();
+        let has_prettierignore = in_repo && ancestor.join(PRETTIERIGNORE_FILE).exists();
+        if let Some(content) = tsv_layer_content(
+            ancestor,
+            has_formatignore,
+            has_prettierignore,
+            in_repo,
+            &mut out.warnings,
+        ) {
             stack.push_tsv(&anchor, &content);
         }
         // `.gitignore` layer: only inside a git repo
@@ -318,7 +347,19 @@ fn collect_root(root: &Path, cwd: &Path, out: &mut Walk<'_>) {
     // the full, ancestor-walking `is_ignored`: an ignored root means nothing
     // under it is in scope. (The format root itself — `base_rel` empty — has no
     // ancestors to clear and is never ignored.)
-    if !base_rel.is_empty() && stack.is_ignored(&base_rel, true) {
+    //
+    // The matcher is one of three things an ancestor can be pruned by; the safety
+    // nets and the build-output heuristic are the other two, and `is_path_pruned`
+    // replays all three over `root`'s ANCESTOR segments exactly as the walk would
+    // have decided them on the way down — so `tsv format dist/sub` under an
+    // un-gitignored `dist/`, or `node_modules/pkg`, lists what `tsv format .` lists
+    // for that subtree: nothing. That is the subtree-consistency promise, and it is
+    // also what the VS Code extension asks per file, so the two surfaces agree. Only
+    // the ancestors are graded: the root ITSELF is the one a caller named, and a
+    // hidden or heuristic directory passed explicitly recurses by design.
+    if !base_rel.is_empty()
+        && (tsv_discover::is_path_pruned(&base_rel, &stack) || stack.is_ignored(&base_rel, true))
+    {
         return;
     }
 
@@ -331,6 +372,44 @@ fn collect_root(root: &Path, cwd: &Path, out: &mut Walk<'_>) {
         heuristic_active,
         out,
     );
+}
+
+/// The tsv layer one directory contributes, read by the precedence the two walks
+/// share: `.formatignore` whenever present (every level, in or out of a repo);
+/// inside a repo, a `.prettierignore` is the drop-in fallback at every level
+/// (hierarchical, like `.formatignore`), used solely when no *sibling*
+/// `.formatignore` is present. Precedence is by PRESENCE, not readability — a
+/// present-but-unreadable `.formatignore` still shadows: `read_ignore_file` warns
+/// and yields no rules rather than silently falling through to `.prettierignore`.
+///
+/// A shadowed `.prettierignore` is warned about here too, at whichever directory the
+/// shadow sits — the ancestor preload and the descent both reach this, so the
+/// warning fires whether the shadowing directory is walked or only preloaded
+/// (targeting `pkg` under a repo root holding both files warns like targeting `.`).
+/// One statement of the ladder, so the two callers cannot drift on it; they differ
+/// only in how presence was learned (a listing, or an `exists` probe).
+fn tsv_layer_content(
+    dir: &Path,
+    has_formatignore: bool,
+    has_prettierignore: bool,
+    in_repo: bool,
+    warnings: &mut Vec<String>,
+) -> Option<String> {
+    if let Some(warning) = prettierignore_shadowed_warning(
+        &dir.to_string_lossy(),
+        in_repo,
+        has_prettierignore,
+        has_formatignore,
+    ) {
+        warnings.push(warning);
+    }
+    if has_formatignore {
+        read_ignore_file(&dir.join(FORMATIGNORE_FILE), warnings).content()
+    } else if in_repo && has_prettierignore {
+        read_ignore_file(&dir.join(PRETTIERIGNORE_FILE), warnings).content()
+    } else {
+        None
+    }
 }
 
 fn collect_recursive(
@@ -354,20 +433,28 @@ fn collect_recursive(
     // Materialize the listing once: it's used twice — to read THIS dir's own
     // ignore files (opening one only when the listing actually contains it, so an
     // ignore-file-free dir costs zero speculative `open`s) before classifying its
-    // children, then to walk the entries. Each entry's name is taken once here and
-    // reused below.
-    let mut entries: Vec<(fs::DirEntry, OsString)> = Vec::new();
+    // children, then to walk the entries. Only the name and the file type are
+    // kept, not the `DirEntry`: an entry holds the directory handle open, so a
+    // retained listing would pin one `DIR*` per level for the whole recursion
+    // below it, and its name is an owned `OsString` already. Paths are rebuilt
+    // with `dir.join(&name)`, which is exactly what `DirEntry::path` does.
+    let mut entries: Vec<(OsString, fs::FileType)> = Vec::new();
     match fs::read_dir(dir) {
         Ok(read_dir) => {
             for entry in read_dir {
-                match entry {
-                    Ok(entry) => {
-                        let name = entry.file_name();
-                        entries.push((entry, name));
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(e) => {
+                        out.errors
+                            .push(format!("{}: read_dir entry failed: {e}", dir.display()));
+                        continue;
                     }
+                };
+                match entry.file_type() {
+                    Ok(file_type) => entries.push((entry.file_name(), file_type)),
                     Err(e) => out
                         .errors
-                        .push(format!("{}: read_dir entry failed: {e}", dir.display())),
+                        .push(format!("{}: file_type failed: {e}", entry.path().display())),
                 }
             }
         }
@@ -385,7 +472,12 @@ fn collect_recursive(
     // file's *content* is still opened only when present (below), so an
     // ignore-file-free dir costs zero speculative opens.
     let (mut has_formatignore, mut has_prettierignore, mut has_gitignore) = (false, false, false);
-    for (_, name) in &entries {
+    for (name, file_type) in &entries {
+        // a DIRECTORY named `.gitignore` is not an ignore file: reading it would
+        // fail with `EISDIR` and warn about rules that were never there
+        if !file_type.is_file() {
+            continue;
+        }
         let n = name.as_os_str();
         if n == OsStr::new(FORMATIGNORE_FILE) {
             has_formatignore = true;
@@ -395,39 +487,18 @@ fn collect_recursive(
             has_gitignore = true;
         }
     }
-    // tsv layer: `.formatignore` whenever present (every level, in or out of a
-    // repo); inside a repo, a `.prettierignore` is the drop-in fallback at every
-    // level (hierarchical, like `.formatignore`), used solely when no *sibling*
-    // `.formatignore` is present. Precedence is by presence (the listing), not
-    // readability — a present-but-unreadable `.formatignore` still shadows:
-    // `read_ignore_file` warns and yields no rules rather than silently falling
-    // through to `.prettierignore`.
-    let tsv_content = if has_formatignore {
-        read_ignore_file(&dir.join(FORMATIGNORE_FILE), &mut out.warnings).content()
-    } else if in_repo && has_prettierignore {
-        read_ignore_file(&dir.join(PRETTIERIGNORE_FILE), &mut out.warnings).content()
-    } else {
-        None
-    };
-    let tsv_pushed = if let Some(content) = tsv_content {
+    let tsv_pushed = if let Some(content) = tsv_layer_content(
+        dir,
+        has_formatignore,
+        has_prettierignore,
+        in_repo,
+        &mut out.warnings,
+    ) {
         stack.push_tsv(dir_rel, &content);
         true
     } else {
         false
     };
-    // inside a repo, a sibling `.formatignore` shadows this dir's `.prettierignore`
-    // (one tsv layer per directory) — its rules go unread here. Warn from the
-    // listing already in hand (presence-only, no extra read), pointing at merging
-    // the patterns into `.formatignore`. Unlike the outside-repo warning below,
-    // this fires at every directory (a shadow is per-directory, not target-root).
-    if let Some(warning) = prettierignore_shadowed_warning(
-        &dir.to_string_lossy(),
-        in_repo,
-        has_prettierignore,
-        has_formatignore,
-    ) {
-        out.warnings.push(warning);
-    }
     // outside a git repo a target-root `.prettierignore` is silently skipped (tsv
     // reads `.formatignore` there) — warn, from the listing already in hand (no
     // extra stat), pointing at the rename / `git init` fixes. Bounded to the
@@ -460,15 +531,14 @@ fn collect_recursive(
     };
     let child_heuristic = heuristic_active && !git_pushed;
 
-    for (entry, name) in &entries {
-        let file_type = match entry.file_type() {
-            Ok(file_type) => file_type,
-            Err(e) => {
-                out.errors
-                    .push(format!("{}: file_type failed: {e}", entry.path().display()));
-                continue;
-            }
-        };
+    for (name, file_type) in &entries {
+        // A file that is not formattable by name needs neither the relative path
+        // nor a verdict — and on an app repo that is the majority of entries (the
+        // lockfiles, the `.md`, the images), so the extension is read ahead of the
+        // `String` the verdict would take.
+        if file_type.is_file() && !tsv_discover::is_formattable(&name.to_string_lossy()) {
+            continue;
+        }
         let name = name.to_string_lossy();
         let child_rel = if dir_rel.is_empty() {
             name.to_string()
@@ -491,10 +561,10 @@ fn collect_recursive(
                 DirVerdict::Descend => {}
             }
             // the child reads its own ignore files (and pushes/pops its own layers)
-            // when we recurse into it. `entry.path()` is built only here, so a
-            // pruned dir or a non-formatted file never pays for the allocation.
+            // when we recurse into it. The path is built only here, so a pruned dir
+            // or a non-formatted file never pays for the allocation.
             collect_recursive(
-                &entry.path(),
+                &dir.join(name.as_ref()),
                 &child_rel,
                 false,
                 in_repo,
@@ -503,7 +573,7 @@ fn collect_recursive(
                 out,
             );
         } else if file_type.is_file() && should_format_file(&name, &child_rel, stack) {
-            out.files.push(entry.path());
+            out.files.push(dir.join(name.as_ref()));
         }
     }
 
@@ -566,15 +636,30 @@ fn ancestor_chain(format_root: &Path, leaf: &Path) -> Vec<PathBuf> {
 }
 
 /// Best-effort absolute form of `path` when `fs::canonicalize` fails (e.g. a
-/// permission error mid-walk) — joined onto `cwd` if relative, otherwise as-is.
-/// Unlike `canonicalize` it does not resolve symlinks or `..`; it only feeds the
-/// format-root walk, which still lands on an ancestor-or-self of `path`.
+/// permission error mid-walk) — joined onto `cwd` if relative, otherwise as-is,
+/// with `.` and `..` resolved lexically. Unlike `canonicalize` it does not resolve
+/// symlinks; it only feeds the format-root walk, which still lands on an
+/// ancestor-or-self of `path`. The `..` resolution is not cosmetic: `rel_to` keeps
+/// `Normal` components alone, so an unresolved `..` would be *deleted* from the
+/// format-root-relative path rather than applied, anchoring the walk one directory
+/// off.
 fn absolutize(path: &Path, cwd: &Path) -> PathBuf {
-    if path.is_absolute() {
+    let joined = if path.is_absolute() {
         path.to_path_buf()
     } else {
         cwd.join(path)
+    };
+    let mut normalized = PathBuf::new();
+    for component in joined.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            other => normalized.push(other),
+        }
     }
+    normalized
 }
 
 /// `path` relative to `format_root` as a `/`-joined string (the anchor form the

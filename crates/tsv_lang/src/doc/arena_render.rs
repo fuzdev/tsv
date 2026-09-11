@@ -374,6 +374,12 @@ fn render_line_node(
 #[expect(clippy::too_many_arguments)]
 #[cold]
 #[inline(never)]
+// `policy` is written only by the `swallow_check` audit seam; without the feature the
+// `&mut` is a signature the caller's borrow already committed to, not a use.
+#[cfg_attr(
+    not(feature = "swallow_check"),
+    allow(clippy::needless_pass_by_ref_mut)
+)]
 fn render_multiline_text<P: RenderPolicy>(
     ctx: &RenderCtx<'_>,
     body: &str,

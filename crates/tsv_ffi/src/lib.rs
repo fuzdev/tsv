@@ -54,13 +54,15 @@ use std::slice;
 // `catch_unwind`-caught panic). The goal-axis macros come from the same crate,
 // so the three bindings share ONE definition of which languages have a goal
 // rather than three hand-synced copies.
+#[cfg(any(feature = "parse", feature = "format"))]
+use tsv_arena::goal_allowed;
+#[cfg(feature = "parse")]
+use tsv_arena::parse_ast;
 #[cfg(feature = "format")]
 use tsv_arena::parse_ast_for_format;
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
-#[cfg(any(feature = "parse", feature = "format"))]
-use tsv_arena::{goal_allowed, parse_ast};
 
 /// `*out_status` for a call that produced its payload: the returned bytes are the
 /// wire JSON, the formatted source, or (for `tsv_parse_internal_*`) empty.
@@ -224,7 +226,13 @@ pub const SOURCE_TYPE_UNSPECIFIED: u32 = 2;
 /// hard-wires `Module` and CSS has no goal, so a caller passing `1` there asked
 /// for something that cannot be honored and must be told — the same stance
 /// `tsv_wasm`'s `read_options` takes when it rejects the `sourceType` key outright.
-/// Code `2` — the caller named none — is accepted on **every** language but only on
+/// Code `0` (module) is accepted on every language, the goalless ones included —
+/// the one place this binding parts from its two siblings, which refuse even
+/// `'module'` there. It is forced by the shape: a `u32` is a required argument, so a
+/// caller of `tsv_parse_css` must name *some* code, parse refuses `2`, and `0` is the
+/// only neutral spelling left; a Svelte or CSS caller is not agreeing to a goal by
+/// passing it, only filling the slot. Code `2` — the caller named none — is accepted
+/// on **every** language but only on
 /// the format exports (`unspecified`): a formatter answers it with the
 /// module-then-script fallback, and one with no goal axis has nothing to answer at
 /// all, while a parse export's wire carries a `Program.sourceType` that one settled
@@ -885,6 +893,46 @@ mod tests {
                 call_goal(f, src, MODULE);
             }
         }
+    }
+
+    // --- a panic inside a call is reported, and the thread's arenas survive it ---
+
+    /// The contract `tsv_napi` proves end to end through its `panic_probe` export,
+    /// held here at this crate's own boundary: a panic inside `f` (the dev profile
+    /// unwinds) yields `TSV_STATUS_ERROR` with the `panic: …` envelope, both
+    /// out-params written exactly as on any other error, and — the arena half — the
+    /// next call on the same thread succeeds, because `with_ast_arena` had taken the
+    /// arena out of its slot for the duration and the unwind never sees a held guard.
+    #[test]
+    fn a_panicking_call_reports_and_leaves_the_arena_usable() {
+        let source = "const   x=1";
+        let mut out_len: usize = 0;
+        let mut out_status: u32 = u32::MAX;
+        // Safety: `source` is a live `&str`; both out-params are live locals.
+        let ptr = unsafe {
+            with_source_string::<_, Vec<u8>>(
+                source.as_ptr(),
+                source.len(),
+                &raw mut out_len,
+                &raw mut out_status,
+                |_| -> Result<Vec<u8>, String> {
+                    with_ast_arena(|_arena| panic!("boom inside the arena"))
+                },
+            )
+        };
+        assert!(!ptr.is_null());
+        // Safety: the call wrote `out_len` bytes at `ptr`; freed exactly once below.
+        let out = unsafe { slice::from_raw_parts(ptr, out_len) };
+        let rendered = std::str::from_utf8(out).expect("utf-8").to_owned();
+        unsafe { tsv_free(ptr, out_len) };
+        assert_eq!(out_status, TSV_STATUS_ERROR);
+        assert_eq!(
+            error_message(&rendered).as_deref(),
+            Some("panic: boom inside the arena")
+        );
+
+        // the same thread formats normally afterwards, through the real export
+        assert_eq!(call(tsv_format_typescript, source), "const x = 1;\n");
     }
 
     // --- format_panic renders each payload variant (pure, no panic needed) ---

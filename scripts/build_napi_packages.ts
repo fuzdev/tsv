@@ -30,6 +30,7 @@
 
 import { parseArgs } from 'node:util';
 
+import { host_triple } from './napi_host.ts';
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 import { format_size } from './size.ts';
 
@@ -53,16 +54,6 @@ const SUPPORTED_TRIPLES = [
 	'darwin-arm64',
 	'win32-x64'
 ];
-
-/** Host triple in node-platform terms, from Deno's own build target. */
-const host_triple = (): string => {
-	const { os, arch, target } = Deno.build;
-	const cpu = arch === 'x86_64' ? 'x64' : arch === 'aarch64' ? 'arm64' : arch;
-	if (os === 'linux') return `linux-${cpu}-${target.includes('musl') ? 'musl' : 'gnu'}`;
-	if (os === 'darwin') return `darwin-${cpu}`;
-	if (os === 'windows') return `win32-${cpu}`;
-	return `${os}-${cpu}`;
-};
 
 /** package.json `os`/`cpu`/`libc` selection fields for a triple. */
 const platform_fields = (triple: string): { os: string[]; cpu: string[]; libc?: string[] } => {

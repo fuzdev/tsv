@@ -406,8 +406,9 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.throws(() => api.format_typescript('var   await=1', { sourceType: 'module' }));
 		assert.equal(api.format_typescript('var   await=1'), 'var await = 1;\n');
 		assert.equal(api.format_typescript('export const   x=1'), 'export const x = 1;\n');
-		// Broken under BOTH grammars: the further-reaching error is the reported one — here
-		// the module's (`with` at line 2; the script retry died at line 1's `import`).
+		// Broken under BOTH grammars: the script retry died at line 1's `import` — a goal
+		// gate, which settles the file as a module — so the module's error is the reported
+		// one (`with` at line 2).
 		throws_with(
 			() => api.format_typescript("import x from 'y';\nwith (a) {\n\tb;\n}\n"),
 			"The 'with' statement is not allowed in strict mode"
@@ -747,8 +748,8 @@ const run_cli = (args: Array<string>, stdin?: string) =>
  * else pins the dispatch — this leaves the parity verdicts with nothing to
  * degrade into.
  */
-const run_native = (args: Array<string>, input: string | Buffer = '') =>
-	spawnSync(native_path, args, { encoding: 'utf-8', input });
+const run_native = (args: Array<string>, input: string | Buffer = '', cwd?: string) =>
+	spawnSync(native_path, args, { encoding: 'utf-8', input, cwd });
 
 describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () => {
 	it('is wired as the package bin', () => {
@@ -1004,8 +1005,8 @@ const advertised_flags = (help: string, source: string): Array<string> => {
 	return flags;
 };
 
-const run_mirror = (args: Array<string>, input: string | Buffer = '') =>
-	spawnSync(process.execPath, [cli_path, ...args], { encoding: 'utf-8', input });
+const run_mirror = (args: Array<string>, input: string | Buffer = '', cwd?: string) =>
+	spawnSync(process.execPath, [cli_path, ...args], { encoding: 'utf-8', input, cwd });
 
 // The three parity suites below all compare `run_native` against `run_mirror`,
 // and a faithful mirror compared against ITSELF passes every row — so a runner
@@ -1174,7 +1175,36 @@ const USAGE_ROWS: Array<{ args: Array<string>; exit: number; says: string }> = [
 		args: ['parse', '--content', 'x', '--parser', 'css', '--source-type', 'bogus'],
 		exit: 1,
 		says: "invalid --source-type 'bogus'"
+	},
+	// argh's own grammar, restated by the mirror ahead of `parseArgs` (`parse_argv`):
+	// no inline values, no short flags, a value-taking flag with nothing after it,
+	// and the extra positional refused before any value is looked at
+	{
+		args: ['format', '--content=x', '--parser', 'ts'],
+		exit: 1,
+		says: 'Unrecognized argument: --content=x'
+	},
+	{ args: ['format', '--check=1', 'x.ts'], exit: 1, says: 'Unrecognized argument: --check=1' },
+	{ args: ['format', '-x', 'x.ts'], exit: 1, says: 'Unrecognized argument: -x' },
+	{ args: ['format', '-', 'x.ts'], exit: 1, says: 'Unrecognized argument: -' },
+	{ args: ['format', '--content'], exit: 1, says: "No value provided for option '--content'." },
+	{ args: ['help', 'bogus'], exit: 1, says: 'Unrecognized argument: bogus' },
+	{
+		args: ['parse', 'a.ts', 'b.ts', '--source-type', 'bogus'],
+		exit: 1,
+		says: 'Unrecognized argument: b.ts'
 	}
+];
+
+/** Rows that SUCCEED on both bins with byte-identical stdout: the word `help` in a
+ * subcommand's argv prints that subcommand's help (argh's help word, which the
+ * mirror once took for a path and formatted a directory named `help`), and a
+ * value-taking flag takes the next word verbatim even when it is flag-shaped. */
+const STDOUT_ROWS: Array<{ args: Array<string>; starts: string }> = [
+	{ args: ['format', 'help'], starts: 'Usage: tsv format' },
+	{ args: ['format', '--check', 'help', 'extra'], starts: 'Usage: tsv format' },
+	{ args: ['parse', 'help'], starts: 'Usage: tsv parse' },
+	{ args: ['format', '--content', '--check', '--parser', 'ts'], starts: '--check;\n' }
 ];
 
 describe('message parity: the native CLI and cli.js refuse in the same order', () => {
@@ -1194,6 +1224,68 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 			);
 		});
 	}
+
+	for (const { args, starts } of STDOUT_ROWS) {
+		it(`${args.join(' ')} → exit 0, stdout ${JSON.stringify(starts)}`, () => {
+			// a directory named `help` holding an unformatted file: the row is also
+			// the proof that neither bin formats it
+			const dir = mkdtempSync(join(tmpdir(), 'tsv-help-word-'));
+			try {
+				mkdirSync(join(dir, 'help'));
+				writeFileSync(join(dir, 'help', 'c.ts'), 'const  z=1\n');
+				const native = run_native(args, '', dir);
+				const mirror = run_mirror(args, '', dir);
+				assert.equal(native.status, 0, `native stderr: ${native.stderr}`);
+				assert.equal(mirror.status, 0, `cli.js stderr: ${mirror.stderr}`);
+				assert.ok(native.stdout.startsWith(starts), `native stdout: ${native.stdout}`);
+				assert.ok(mirror.stdout.startsWith(starts), `cli.js stdout: ${mirror.stdout}`);
+				assert.equal(readFileSync(join(dir, 'help', 'c.ts'), 'utf-8'), 'const  z=1\n');
+			} finally {
+				rmSync(dir, { recursive: true, force: true });
+			}
+		});
+	}
+
+	// `--pretty` is a re-serialization on the mirror (`JSON.stringify(JSON.parse(…))`)
+	// and a byte re-indent natively, and the two are held byte-identical — which
+	// rests on three writer facts (ECMAScript number spelling, no integer-like keys,
+	// serde's escape set), so it is pinned rather than argued. The sample carries the
+	// tokens that would part them: a large integer, a float at the exponent switch,
+	// a tiny float, a lone surrogate, U+2028, an astral char, and nesting.
+	it('parse --pretty is byte-identical on both bins', () => {
+		const sample =
+			'const a = [9007199254740993, 1e21, 1e-7, 0.000001, "\\ud800", "\u2028", "😀", [[[{}]]]];\n';
+		const args = ['parse', '--pretty', '--content', sample, '--parser', 'typescript'];
+		const native = run_native(args);
+		const mirror = run_mirror(args);
+		assert.equal(native.status, 0, native.stderr);
+		assert.equal(mirror.status, 0, mirror.stderr);
+		assert.ok(native.stdout.includes('\t"type": "Program"'), 'the pretty form is tab-indented');
+		assert.equal(mirror.stdout, native.stdout);
+	});
+
+	// The mirror's `format` help hand-restates the extension list (its help text is a
+	// literal, as argh's is), so it is held against the list the binding renders from
+	// `tsv_discover::FORMATTABLE_EXTENSIONS` — the same const the native help is pinned
+	// to by `tests/cli_tests.rs`. A ninth language then cannot ship a JS help naming
+	// eight.
+	it('the mirror help names exactly the extensions the binding formats', () => {
+		const mirror = run_mirror(['help', 'format']);
+		assert.equal(mirror.status, 0, mirror.stderr);
+		const empty = mkdtempSync(join(tmpdir(), 'tsv-help-ext-'));
+		try {
+			// the binding's list, rendered `/`-joined by the nothing-in-scope refusal
+			const refused = run_mirror(['format', empty]);
+			const match = /no unignored (\S+) files in scope/.exec(refused.stderr);
+			assert.ok(match, refused.stderr);
+			assert.ok(
+				mirror.stdout.includes(match[1]),
+				`help says ${JSON.stringify(mirror.stdout)}, the binding formats ${match[1]}`
+			);
+		} finally {
+			rmSync(empty, { recursive: true, force: true });
+		}
+	});
 
 	// The nothing-in-scope refusal, which needs a real empty directory and so cannot
 	// be a `USAGE_ROWS` entry. It is the one refusal whose text is *derived* on the

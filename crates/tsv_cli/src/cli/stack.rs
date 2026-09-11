@@ -113,6 +113,10 @@ pub fn clamp_worker_count(requested: usize) -> usize {
 /// failure leaves behind, and an unnamed thread prints `<unknown>` there. Keep names
 /// under 15 bytes — Linux truncates past that.
 pub fn sized_thread(name: &str) -> thread::Builder {
+    debug_assert!(
+        name.len() < 16,
+        "thread name `{name}` is over the 15-byte Linux limit and would be truncated in the one diagnostic an overflow leaves"
+    );
     thread::Builder::new()
         .stack_size(STACK_SIZE)
         .name(name.to_owned())
@@ -129,13 +133,16 @@ pub fn sized_thread(name: &str) -> thread::Builder {
 /// error after the default hook has already printed it — and only under a `panic =
 /// "unwind"` profile, since `abort` kills the process before the join.
 ///
-/// A refused spawn runs `f` on this thread instead. That gives up the reservation, but
-/// a machine that cannot spawn a thread is not one where refusing to work is the
-/// better answer — and the format pool answers the same refusal the same way (narrow
-/// to however many threads the OS gave, and format on the calling thread if that was
-/// none), so no route turns a busy machine into a failed run. The closure is consumed
-/// by the failed attempt, so it is handed over in a cell the fallback can take it back
-/// out of.
+/// A refused spawn runs `f` on this thread instead, and says so: that gives up the
+/// reservation (on Windows, for the 1 MiB main-thread stack the module doc exists to
+/// escape), and an overflow that follows would otherwise read as
+/// `thread 'main' has overflowed its stack` with nothing explaining why the ceiling
+/// was the inherited one. A machine that cannot spawn a thread is still not one where
+/// refusing to work is the better answer — the format pool answers the same refusal
+/// the same way (narrow to however many threads the OS gave, and format on the
+/// calling thread if that was none, warning each time), so no route turns a busy
+/// machine into a failed run. The closure is consumed by the failed attempt, so it is
+/// handed over in a cell the fallback can take it back out of.
 pub fn run_on_sized_stack<F, T>(f: F) -> T
 where
     F: FnOnce() -> T + Send + 'static,
@@ -147,7 +154,12 @@ where
         Ok(handle) => handle
             .join()
             .unwrap_or_else(|_| std::process::exit(PANIC_EXIT_CODE)),
-        Err(_) => take_and_run(&held),
+        Err(e) => {
+            err_line!(
+                "warning: could not start the sized thread ({e}); running on the inherited stack"
+            );
+            take_and_run(&held)
+        }
     }
 }
 

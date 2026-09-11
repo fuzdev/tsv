@@ -211,16 +211,23 @@ pub fn parse_with_goal<'arena>(
 /// module grammar is tried first and the script grammar only if it *fails* — so a
 /// legacy sloppy script (a `with` statement, a leading-zero literal, `await` as a
 /// name) formats from a bare path while a module-valid source is never reinterpreted.
-/// When both attempts fail, the reported error is the one that reached **furthest into
-/// the source**, the module attempt's on a tie. The attempt that got further is the one
-/// whose grammar the file was written against, so its error is the file's own: a broken
-/// module's script attempt dies early at its first `import` / `export` / `import.meta` /
-/// top-level `await`, and a broken sloppy script's module attempt dies early at its first
-/// `with` / legacy literal / `await` name — the very construct the retry exists to admit,
-/// so reporting *that* would point a legacy script's author away from their typo. prettier
-/// reads the same way in practice: its babel parser tolerates the strict-mode production
-/// disallowances at the module goal (`allowedReasonCodes`), so the error it shows on such a
-/// file is the typo. Pinned by `tests/format_fallback_error_attribution.rs`.
+/// When both attempts fail, the reported error is the attempt's whose grammar the file
+/// was written against, decided in two steps. **A script attempt that died on a goal
+/// gate** — an `import` / `export` / `import.meta`, the constructs only a module holds
+/// ([`ParseError::is_goal_gated`]) — has proved the file a module whatever else is in it,
+/// so the module attempt's error is the file's own: a broken module's script attempt dies
+/// there at its first module-only construct, even one that sits *after* the real error
+/// (definitions first, `export` at the bottom). **Otherwise the error that reached
+/// furthest into the source** is the file's own, the module attempt's on a tie: a broken
+/// sloppy script's module attempt dies early at its first `with` / legacy literal /
+/// `await` name — the very construct the retry exists to admit, so reporting *that* would
+/// point a legacy script's author away from their typo — and a broken module's script
+/// attempt dies at its top-level `await`, the one module-only construct that carries no
+/// gate (at `Script` the word is an identifier, so the attempt fails on whatever follows
+/// it). prettier reads the same way in practice: its babel parser tolerates the
+/// strict-mode production disallowances at the module goal (`allowedReasonCodes`), so the
+/// error it shows on such a file is the typo. Pinned by
+/// `tests/format_fallback_error_attribution.rs`.
 ///
 /// [`parse`] and [`parse_with_goal`] have no fallback: a parse hands back an AST
 /// whose `sourceType` is a claim about which grammar produced it, and a retry would
@@ -239,9 +246,11 @@ pub fn parse_with_goal_or_fallback<'arena>(
     }
     parse_with_goal(source, Goal::Module, arena).or_else(|module_error| {
         parse_with_goal(source, Goal::Script, arena).map_err(|script_error| {
-            // The further error is the file's own; a tie (or a positionless error, which
-            // both attempts share) keeps the module's.
-            if script_error.position() > module_error.position() {
+            // A goal gate proves the source a module; past that, the further error is
+            // the file's own and a tie keeps the module's. The one positionless error
+            // (`FileTooLarge`) is raised by both attempts alike, so the comparison never
+            // sees a `None` against a `Some`.
+            if !script_error.is_goal_gated() && script_error.position() > module_error.position() {
                 script_error
             } else {
                 module_error

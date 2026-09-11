@@ -15,6 +15,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { constants } from 'node:os';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -55,8 +56,16 @@ if (bin === undefined) {
 		await import('./cli.js');
 	} else if (result.signal) {
 		// the child died by signal — re-raise it so the parent's exit status
-		// reports the same signal death (128+n) instead of a plain exit code
-		process.kill(process.pid, result.signal);
+		// reports the same signal death (128+n) instead of a plain exit code. A
+		// signal this host cannot raise (a name it has no number for) must not turn
+		// into an unhandled exception with a stack trace: the shell's own spelling
+		// of a signal death, 128 + its number, is the fallback, and 1 past that.
+		try {
+			process.kill(process.pid, result.signal);
+		} catch {
+			const number = constants.signals[result.signal];
+			process.exit(number === undefined ? 1 : 128 + number);
+		}
 	} else {
 		process.exit(result.status ?? 1);
 	}

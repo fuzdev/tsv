@@ -9,10 +9,11 @@
 //! the same grammar prettier matches via its `ignore` dependency and git matches
 //! for `.gitignore`.
 //!
-//! Two layers of API:
+//! Two layers, one public:
 //!
 //! - [`IgnoreRules`] — one ignore file's rules, matched against paths relative
-//!   to that file's root. The single-file primitive.
+//!   to that file's root. The single-file primitive, crate-private: every
+//!   consumer reaches it through a stack layer.
 //! - [`IgnoreStack`] — a hierarchical, git-faithful evaluator: a stack of
 //!   per-directory `.gitignore` layers plus a parallel stack of per-directory tsv
 //!   layers (`.formatignore`), evaluated against format-root-relative paths with
@@ -48,7 +49,7 @@ use glob::{PathSeg, Seg, match_segments, parse_segment};
 /// A compiled set of ignore rules, applied in source order with last-match-wins
 /// semantics (a later `!` negation re-includes an earlier exclusion).
 #[derive(Debug, Default)]
-pub struct IgnoreRules {
+pub(crate) struct IgnoreRules {
     rules: Vec<Rule>,
 }
 
@@ -84,6 +85,11 @@ impl Rule {
 impl IgnoreRules {
     /// Parses the text of one ignore file into a rule set.
     pub fn parse(content: &str) -> Self {
+        // A leading UTF-8 BOM is not part of the first pattern: git skips it
+        // (`add_patterns_from_buffer`), and an editor that writes one would otherwise
+        // silently disable the file's first rule — in the unsafe direction, since
+        // the first rule of a `.gitignore` is `node_modules` more often than not.
+        let content = content.strip_prefix('\u{feff}').unwrap_or(content);
         // `lines()` splits on `\n` and strips a trailing `\r`, handling CRLF
         let rules = content.lines().filter_map(parse_line).collect();
         Self { rules }
@@ -105,6 +111,10 @@ impl IgnoreRules {
     /// directory is excluded" rule. This also means a file under a directory
     /// that matches any rule (e.g. `build/`) is reported ignored without the
     /// caller having to test the directory separately.
+    ///
+    /// The stack never asks this — it layers `last_match` per prefix itself — so the
+    /// single-file form survives only for the unit tests that grade one file's rules.
+    #[cfg(test)]
     pub fn is_ignored(&self, path: &str, is_dir: bool) -> bool {
         walk_ancestors_ignored(path, is_dir, |prefix, dir| self.last_match(prefix, dir))
     }
@@ -115,13 +125,16 @@ impl IgnoreRules {
     /// is the per-level primitive [`IgnoreStack`] layers across files; on its
     /// own it does *not* apply the ancestor prune (the caller iterates prefixes).
     fn last_match(&self, path: &[PathSeg<'_>], is_dir: bool) -> Option<bool> {
-        let mut state = None;
-        for rule in &self.rules {
-            if rule.matches(path, is_dir) {
-                state = Some(!rule.negated);
-            }
-        }
-        state
+        // last-match-wins, read as first-match-wins backwards: identical answer, and
+        // the scan stops at the first rule that speaks — on the hot path (per layer,
+        // per prefix, per entry) that is the whole difference between walking every
+        // rule of a long `.gitignore` for each of a pruned tree's files and stopping
+        // at the one that prunes it
+        self.rules
+            .iter()
+            .rev()
+            .find(|rule| rule.matches(path, is_dir))
+            .map(|rule| !rule.negated)
     }
 }
 
@@ -444,15 +457,42 @@ fn parse_line(raw: &str) -> Option<Rule> {
     }
     let anchored = leading_slash || s.contains('/');
 
-    let mut segs: Vec<Seg> = s
-        .split('/')
-        .filter(|seg| !seg.is_empty())
-        .map(parse_segment)
-        .collect();
-    if segs.is_empty() {
-        // the pattern was only slashes (e.g. `/`) — nothing to match
+    // Split on `/`, escaped or not: `\/` is a slash git matches literally against
+    // the path's own separator, and since no path component can hold a `/`, an
+    // escaped one separates segments exactly as a bare one does (`a\/b.ts` ignores
+    // `a/b.ts`). Any other escape stays with its segment for `parse_segment`. An
+    // EMPTY segment — a doubled `//`, or the `foo/` left by `foo//` once the
+    // structural trailing `/` is stripped — is a pattern git can never match (no path
+    // has an empty component), and a never-matching rule contributes nothing to
+    // last-match-wins, so it is dropped like the trailing-backslash one above.
+    let mut segs = Vec::new();
+    let mut seg = String::new();
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '/' => segs.push(std::mem::take(&mut seg)),
+            '\\' => match chars.next() {
+                Some('/') => segs.push(std::mem::take(&mut seg)),
+                Some(next) => {
+                    seg.push('\\');
+                    seg.push(next);
+                }
+                // unreachable — a trailing unescaped backslash returned above
+                None => seg.push('\\'),
+            },
+            c => seg.push(c),
+        }
+    }
+    segs.push(seg);
+    if segs.iter().any(String::is_empty) {
         return None;
     }
+    // `parse_segment` refuses a segment git's matcher aborts on (an unterminated
+    // `[`), which makes the whole pattern never match — dropped for the same reason
+    let mut segs: Vec<Seg> = segs
+        .iter()
+        .map(|seg| parse_segment(seg))
+        .collect::<Option<_>>()?;
     // a floating pattern is equivalent to one prefixed with `**/`
     if !anchored {
         segs.insert(0, Seg::DoubleStar);
@@ -865,6 +905,34 @@ mod tests {
         assert!(!rules.is_empty());
         assert!(rules.is_ignored("foo\\", false));
         assert!(!rules.is_ignored("foo", false));
+    }
+
+    /// The parse-level rules `tests/git_oracle.rs` holds against git; pinned here
+    /// too so a git-less run still grades them.
+    #[test]
+    fn bom_escaped_slash_empty_segment_and_open_class_parse_like_git() {
+        // a leading BOM is skipped, so the FIRST rule still applies
+        let rules = ig("\u{feff}first.ts\nsecond.ts\n");
+        assert!(rules.is_ignored("first.ts", false));
+        assert!(rules.is_ignored("second.ts", false));
+
+        // `\/` is a separator: no path component can hold a slash
+        let rules = ig("a\\/b.ts\n");
+        assert!(rules.is_ignored("a/b.ts", false));
+        assert!(!rules.is_ignored("a\\", true));
+
+        // an empty segment never matches (`foo//` is `foo/` after the structural strip)
+        assert!(ig("foo//\n").is_empty());
+        assert!(ig("a//b\n").is_empty());
+
+        // an unterminated class aborts the whole pattern, not a literal `[`
+        assert!(ig("q[bc.ts\n").is_empty());
+        assert!(!ig("q[bc.ts\n").is_ignored("q[bc.ts", false));
+
+        // a range's low end is a member even when the range is empty
+        let rules = ig("x[z-a].ts\n");
+        assert!(rules.is_ignored("xz.ts", false));
+        assert!(!rules.is_ignored("xa.ts", false));
     }
 
     #[test]

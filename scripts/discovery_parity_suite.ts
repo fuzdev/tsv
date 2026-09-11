@@ -61,7 +61,7 @@ export const register_discovery_parity_suite = (
 				try {
 					materialize(root, scenario.tree);
 					const prefix = `${to_posix(root)}/`;
-					for (const { target, expected, error } of scenario.cases) {
+					for (const { target, expected, error, warns } of scenario.cases) {
 						const arg = target === '' ? root : join(root, target);
 						const result = spawnSync(process.execPath, [cli_path, 'format', '--list', arg], {
 							encoding: 'utf-8'
@@ -86,6 +86,13 @@ export const register_discovery_parity_suite = (
 							.map(to_posix)
 							.map((line) => (line.startsWith(prefix) ? line.slice(prefix.length) : line));
 						assert.deepEqual(actual, expected, `${scenario.name} [target=${target}]`);
+						// `warns`: substrings each of which some `warning:` line must carry
+						for (const needle of warns ?? []) {
+							assert.ok(
+								result.stderr.includes(needle),
+								`${scenario.name} [target=${target}]: expected a warning containing ${JSON.stringify(needle)}, stderr: ${JSON.stringify(result.stderr)}`
+							);
+						}
 					}
 				} finally {
 					rmSync(root, { recursive: true, force: true });

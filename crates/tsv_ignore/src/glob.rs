@@ -82,10 +82,12 @@ impl Seg {
     }
 }
 
-/// Parses one pattern segment into its matcher form.
-pub(crate) fn parse_segment(s: &str) -> Seg {
+/// Parses one pattern segment into its matcher form, or `None` for a segment git's
+/// matcher aborts on — an unterminated `[`, which `wildmatch` answers with
+/// `WM_ABORT_ALL`, so the whole pattern matches nothing (not even a literal `[`).
+pub(crate) fn parse_segment(s: &str) -> Option<Seg> {
     if s == "**" {
-        return Seg::DoubleStar;
+        return Some(Seg::DoubleStar);
     }
     let chars: Vec<char> = s.chars().collect();
     let mut toks = Vec::new();
@@ -114,14 +116,9 @@ pub(crate) fn parse_segment(s: &str) -> Seg {
                 i += 1;
             }
             '[' => {
-                if let Some((class, next)) = parse_class(&chars, i) {
-                    toks.push(class);
-                    i = next;
-                } else {
-                    // unterminated class — treat `[` as a literal
-                    toks.push(Tok::Lit('['));
-                    i += 1;
-                }
+                let (class, next) = parse_class(&chars, i)?;
+                toks.push(class);
+                i = next;
             }
             c => {
                 toks.push(Tok::Lit(c));
@@ -129,7 +126,7 @@ pub(crate) fn parse_segment(s: &str) -> Seg {
             }
         }
     }
-    Seg::Glob(toks)
+    Some(Seg::Glob(toks))
 }
 
 /// Parses a `[...]` class starting at `open` (where `chars[open] == '['`).
@@ -150,6 +147,11 @@ fn parse_class(chars: &[char], open: usize) -> Option<(Tok, usize)> {
     }
     while i < chars.len() && chars[i] != ']' {
         if i + 2 < chars.len() && chars[i + 1] == '-' && chars[i + 2] != ']' {
+            // The range's low end also matches as a plain member: git's `wildmatch`
+            // tests the character for equality before it reads the `-`, so `[z-a]`
+            // — an empty range — still matches a `z`, and `[a-c]` matches `a` twice
+            // over. Emitting both reproduces that loop exactly.
+            items.push(ClassItem::Ch(chars[i]));
             items.push(ClassItem::Range(chars[i], chars[i + 2]));
             i += 3;
         } else if chars[i] == '\\' && i + 1 < chars.len() {

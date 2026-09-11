@@ -1,8 +1,10 @@
 use crate::cli::commands::parse::{check_source_type_language, parse_source_type_arg};
-use crate::cli::discover::{Diagnostics, FileSink, discover_files, discover_into, path_sort_key};
+use crate::cli::discover::{
+    Diagnostics, Discovered, FileSink, discover_files, discover_into, path_sort_key,
+};
 use crate::cli::format_source::{format_source_in, format_source_with_source_type};
 use crate::cli::input::{InputArgs, ParserType};
-use crate::cli::out::write_stdout;
+use crate::cli::out::{exit_with_error, write_stdout};
 use crate::cli::stack::{clamp_worker_count, sized_thread};
 use crate::err_line;
 use argh::FromArgs;
@@ -58,6 +60,10 @@ pub struct FormatCommand {
     jobs: Option<usize>,
 
     /// files and/or directories (directories recurse over .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css)
+    // TODO: the list above is a hand copy of `tsv_discover::FORMATTABLE_EXTENSIONS` — argh
+    // takes help text from the doc comment alone, so it cannot be rendered from the
+    // const the way `exit_if_nothing_in_scope`'s message is; a ninth language must
+    // update it by hand (as it must `cli.js`'s help)
     #[argh(positional)]
     paths: Vec<String>,
 }
@@ -69,6 +75,16 @@ pub struct FormatCommand {
 /// cannot happen in release (`panic = "abort"` kills the process first). One spelling so
 /// the two cannot drift; `tests/cli_tests.rs` asserts a `--jobs 0` run never produces it.
 const WORKER_PANICKED: &str = "worker thread panicked";
+
+/// What either path-mode route hands back: the in-scope files with their outcomes,
+/// index-aligned and in sorted-path order, plus how many traversal errors the walk
+/// reported (counted into the summary's error total; the messages were already
+/// printed). The caller cannot tell which route produced it.
+struct Formatted {
+    files: Vec<PathBuf>,
+    outcomes: Vec<FileOutcome>,
+    discovery_errors: usize,
+}
 
 /// Per-file result, reported in sorted-path order.
 enum FileOutcome {
@@ -90,74 +106,61 @@ impl FormatCommand {
     /// `--content`/`--stdin` mode — format one input to stdout (or `--check` it).
     fn run_single(self) {
         if !self.paths.is_empty() {
-            err_line!("Error: --content/--stdin cannot be combined with file paths");
-            process::exit(2);
+            exit_with_error(
+                2,
+                "Error: --content/--stdin cannot be combined with file paths",
+            );
         }
         if self.jobs.is_some() {
-            err_line!(
-                "Error: --jobs applies to file paths; --content/--stdin format a single input"
+            exit_with_error(
+                2,
+                "Error: --jobs applies to file paths; --content/--stdin format a single input",
             );
-            process::exit(2);
         }
         if self.list {
-            err_line!(
-                "Error: --list applies to file paths; --content/--stdin format a single input"
+            exit_with_error(
+                2,
+                "Error: --list applies to file paths; --content/--stdin format a single input",
             );
-            process::exit(2);
         }
-        let goal = match parse_source_type_arg(self.source_type.as_deref()) {
-            Ok(g) => g,
-            Err(e) => {
-                err_line!("Error: {e}");
-                process::exit(2);
-            }
-        };
+        let goal = parse_source_type_arg(self.source_type.as_deref())
+            .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
         let input_args = InputArgs {
             content: self.content,
             stdin: self.stdin,
             parser: self.parser,
             file: None,
         };
-        let (input, parser_type) = match input_args.resolve() {
-            Ok(pair) => pair,
-            Err(e) => {
-                err_line!("Error: {e}");
-                process::exit(2);
-            }
-        };
+        let (input, parser_type) = input_args
+            .resolve()
+            .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
         if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
-            err_line!("Error: {e}");
-            process::exit(2);
+            exit_with_error(2, format_args!("Error: {e}"));
         }
-        match format_source_with_source_type(input.content(), parser_type, goal) {
-            Ok(formatted) => {
-                if self.check {
-                    if formatted != input.content() {
-                        err_line!("would change");
-                        process::exit(1);
-                    }
-                } else {
-                    write_stdout(formatted.as_bytes());
-                }
+        let formatted = format_source_with_source_type(input.content(), parser_type, goal)
+            .unwrap_or_else(|e| exit_with_error(2, format_args!("Parse error: {e}")));
+        if self.check {
+            if formatted != input.content() {
+                exit_with_error(1, "would change");
             }
-            Err(e) => {
-                err_line!("Parse error: {e}");
-                process::exit(2);
-            }
+        } else {
+            write_stdout(formatted.as_bytes());
         }
     }
 
     /// Path mode — discover files, format in parallel, report sorted.
     fn run_paths(self) {
         if self.paths.is_empty() {
-            err_line!("Error: No input provided. Use a file path, --content, or --stdin");
-            process::exit(2);
+            exit_with_error(
+                2,
+                "Error: No input provided. Use a file path, --content, or --stdin",
+            );
         }
         if self.parser.is_some() {
-            err_line!(
-                "Error: --parser applies to --content/--stdin; file paths use extension detection"
+            exit_with_error(
+                2,
+                "Error: --parser applies to --content/--stdin; file paths use extension detection",
             );
-            process::exit(2);
         }
         // Path mode resolves the source type per file instead of taking one for the
         // whole run: a Svelte or CSS file on the same command line has no source
@@ -167,14 +170,13 @@ impl FormatCommand {
         // `--source-type` here asks for something no answer fits, and is refused
         // rather than ignored.
         if self.source_type.is_some() {
-            err_line!(
-                "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script"
+            exit_with_error(
+                2,
+                "Error: --source-type applies to --content/--stdin; file paths take the module grammar, retried as a script",
             );
-            process::exit(2);
         }
         if self.list && self.check {
-            err_line!("Error: --list and --check cannot be combined");
-            process::exit(2);
+            exit_with_error(2, "Error: --list and --check cannot be combined");
         }
         // --list reports the in-scope set and stops — no formatting, and an
         // empty result is a valid answer (exit 0), unlike the format action
@@ -185,7 +187,10 @@ impl FormatCommand {
                 Ok(discovered) => discovered,
                 Err(bad_args) => exit_bad_args(&bad_args),
             };
-            report_discovery(&discovered.errors, &discovered.warnings);
+            report_discovery(
+                &discovered.diagnostics.errors,
+                &discovered.diagnostics.warnings,
+            );
             // build the whole listing and emit it in one write: a per-path write
             // re-locks stdout and flushes for each of (potentially thousands of)
             // lines, which dominates `--list` on a large tree; one buffered write is
@@ -196,7 +201,7 @@ impl FormatCommand {
                 let _ = writeln!(listing, "{}", path.display());
             }
             write_stdout(listing.as_bytes());
-            if !discovered.errors.is_empty() {
+            if !discovered.diagnostics.errors.is_empty() {
                 process::exit(2);
             }
             return;
@@ -211,12 +216,15 @@ impl FormatCommand {
         // formatting — explicit file arguments are trivial to discover, and
         // multiple roots need the canonical-path dedup, which is set-wide (see
         // `discover_into`). Both paths report in sorted-path order.
-        let (files, outcomes, discovery_errors) =
-            if self.paths.len() == 1 && Path::new(&self.paths[0]).is_dir() {
-                format_streamed(&self.paths, self.check, jobs)
-            } else {
-                format_collected(&self.paths, self.check, jobs)
-            };
+        let Formatted {
+            files,
+            outcomes,
+            discovery_errors,
+        } = if self.paths.len() == 1 && Path::new(&self.paths[0]).is_dir() {
+            format_streamed(&self.paths, self.check, jobs)
+        } else {
+            format_collected(&self.paths, self.check, jobs)
+        };
 
         // Buffer the changed-path lines and emit them in one write, for the same
         // reason `--list` does (above): a per-path write re-locks stdout and
@@ -298,26 +306,26 @@ fn exit_bad_args(bad_args: &[String]) -> ! {
 fn exit_if_nothing_in_scope(file_count: usize, error_count: usize) {
     if file_count == 0 && error_count == 0 {
         let extensions = tsv_discover::formattable_extension_list("/");
-        err_line!("Error: No files to format — no unignored {extensions} files in scope");
-        process::exit(2);
+        exit_with_error(
+            2,
+            format_args!("Error: No files to format — no unignored {extensions} files in scope"),
+        );
     }
 }
 
 /// Discover the whole set, then format it: the path for explicit file arguments
 /// and for multiple roots, whose canonical-path dedup needs every path in hand.
-fn format_collected(
-    paths: &[String],
-    check: bool,
-    jobs: usize,
-) -> (Vec<PathBuf>, Vec<FileOutcome>, usize) {
-    let discovered = match discover_files(paths) {
-        Ok(discovered) => discovered,
-        Err(bad_args) => exit_bad_args(&bad_args),
-    };
-    report_discovery(&discovered.errors, &discovered.warnings);
-    exit_if_nothing_in_scope(discovered.files.len(), discovered.errors.len());
-    let outcomes = format_files(&discovered.files, check, jobs);
-    (discovered.files, outcomes, discovered.errors.len())
+fn format_collected(paths: &[String], check: bool, jobs: usize) -> Formatted {
+    let Discovered { files, diagnostics } =
+        discover_files(paths).unwrap_or_else(|bad_args| exit_bad_args(&bad_args));
+    report_discovery(&diagnostics.errors, &diagnostics.warnings);
+    exit_if_nothing_in_scope(files.len(), diagnostics.errors.len());
+    let outcomes = format_files(&files, check, jobs);
+    Formatted {
+        files,
+        outcomes,
+        discovery_errors: diagnostics.errors.len(),
+    }
 }
 
 /// Worker count when `--jobs` is not given.
@@ -581,26 +589,15 @@ impl FileSink for QueueSink<'_> {
 
 /// Stream one directory root into the pool: this thread walks while the workers
 /// format, so the walk's wall time hides behind the first files instead of adding
-/// to the run. Returns the same `(files, outcomes)` pairing as `format_collected`
-/// — in sorted-path order — so the caller can't tell which path produced it.
-fn format_streamed(
-    paths: &[String],
-    check: bool,
-    jobs: usize,
-) -> (Vec<PathBuf>, Vec<FileOutcome>, usize) {
+/// to the run. Returns the same `Formatted` as `format_collected` — in sorted-path
+/// order — so the caller can't tell which path produced it.
+fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
     let queue = FileQueue::new();
     let mut sink = QueueSink {
         queue: &queue,
         keys: Vec::new(),
         batch: Vec::new(),
     };
-    // the caller only streams a directory root, which always resolves, so the
-    // bad-argument arm is unreachable here — handled anyway rather than asserted
-    let mut discovery: Result<Diagnostics, Vec<String>> = Ok(Diagnostics {
-        errors: Vec::new(),
-        warnings: Vec::new(),
-    });
-    let mut claimed: Vec<(usize, PathBuf, FileOutcome)> = Vec::new();
 
     // `--jobs 0` is a width, not an opt-out: a pool of zero leaves every
     // discovered file unclaimed, and each one then reads out through the
@@ -612,12 +609,13 @@ fn format_streamed(
     // which is the whole point of streaming.
     let jobs = jobs.max(1);
 
-    thread::scope(|scope| {
+    // The scope's two products: the walk's diagnostics and every claimed outcome.
+    let (discovery, claimed): (Result<Diagnostics, Vec<String>>, Vec<_>) = thread::scope(|scope| {
         let _release = ReleasePoolOnUnwind(&queue);
         let handles = spawn_pool(scope, jobs, || drain_queue(&queue, check));
 
         // this thread is the producer
-        discovery = discover_into(paths, &mut sink);
+        let discovery = discover_into(paths, &mut sink);
         queue.finish();
         // ordering the results is this thread's work too, and the pool is still
         // draining, so it costs nothing on the wall
@@ -628,21 +626,22 @@ fn format_streamed(
         // formats nothing and reports every file as a panic from a worker that never
         // existed (the slot sweep below), which is the lie an unclamped `--jobs 0`
         // would tell. The queue is finished, so this drains what the walk left and stops.
-        if handles.is_empty() {
-            claimed = drain_queue(&queue, check);
-        }
-
+        let mut claimed = if handles.is_empty() {
+            drain_queue(&queue, check)
+        } else {
+            Vec::new()
+        };
         for handle in handles {
             if let Ok(mut outcomes) = handle.join() {
                 claimed.append(&mut outcomes);
             }
         }
+        (discovery, claimed)
     });
 
-    let diagnostics = match discovery {
-        Ok(diagnostics) => diagnostics,
-        Err(bad_args) => exit_bad_args(&bad_args),
-    };
+    // the caller only streams a directory root, which always resolves, so the
+    // bad-argument arm is unreachable here — handled anyway rather than asserted
+    let diagnostics = discovery.unwrap_or_else(|bad_args| exit_bad_args(&bad_args));
     report_discovery(&diagnostics.errors, &diagnostics.warnings);
     exit_if_nothing_in_scope(sink.keys.len(), diagnostics.errors.len());
 
@@ -667,7 +666,11 @@ fn format_streamed(
         files.push(path);
         outcomes.push(outcome);
     }
-    (files, outcomes, diagnostics.errors.len())
+    Formatted {
+        files,
+        outcomes,
+        discovery_errors: diagnostics.errors.len(),
+    }
 }
 
 /// One streamed worker's whole life: claim a path, format it, keep the outcome

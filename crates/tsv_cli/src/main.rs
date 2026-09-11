@@ -1,3 +1,6 @@
+// See `lib.rs`: the bin writes through `out_line!` / `err_line!` alone.
+#![deny(clippy::print_stdout, clippy::print_stderr)]
+
 use argh::FromArgs;
 use tsv_cli::{err_line, out_line};
 

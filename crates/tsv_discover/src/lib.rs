@@ -114,11 +114,13 @@ pub fn is_formattable(name: &str) -> bool {
 /// written, alongside the not-a-file-or-directory check. The extension list is
 /// rendered from [`FORMATTABLE_EXTENSIONS`], so a new language flows into the
 /// message. Produced **once**, here — like [`heuristic_shadow_warning`] — so the
-/// native CLI and the WASM CLI emit the identical text.
+/// native CLI and the WASM CLI emit the identical text. `parse <file>` refuses with
+/// the same message (the parser dispatch behind a path is the same one), which is
+/// why it says what tsv *handles* rather than what it formats.
 pub fn unsupported_extension_error(path: &str) -> Option<String> {
     (!is_formattable(path)).then(|| {
         let list = formattable_extension_list(", ");
-        format!("{path}: unsupported file extension (tsv formats {list})")
+        format!("{path}: unsupported file extension (tsv handles {list})")
     })
 }
 
@@ -463,7 +465,7 @@ mod tests {
         // string, and the extension list is rendered from the constant
         assert_eq!(
             unsupported_extension_error("data.json").unwrap(),
-            "data.json: unsupported file extension (tsv formats .ts, .mts, .cts, .js, .mjs, .cjs, .svelte, .css)"
+            "data.json: unsupported file extension (tsv handles .ts, .mts, .cts, .js, .mjs, .cjs, .svelte, .css)"
         );
     }
 

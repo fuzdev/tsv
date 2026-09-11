@@ -64,7 +64,9 @@ const log = (...args: unknown[]) => console.error(...args);
 
 const has_tsv_extension = (path: string): boolean => {
 	const dot = path.lastIndexOf('.');
-	return dot > path.lastIndexOf('/') && TSV_EXTENSIONS.includes(path.slice(dot + 1));
+	// `dot > slash + 1`, not `> slash`: a bare dotfile (`.ts`) is a stem with no
+	// extension to `Path::extension`, which is what `is_formattable` reads
+	return dot > path.lastIndexOf('/') + 1 && TSV_EXTENSIONS.includes(path.slice(dot + 1));
 };
 
 /** Runs `git -C ../corpora <args>`; the trimmed stdout, or `null` on a non-zero exit. */

@@ -42,7 +42,7 @@ use crate::merge::{FileMerge, LibBase, LibFile, merge_program};
 use crate::options::CheckOptions;
 use bumpalo::Bump;
 use tsv_ts::ast::Program;
-use tsv_ts::{Goal, parse_with_goal};
+use tsv_ts::{Goal, parse_with_goal_or_fallback};
 
 /// One source unit to check — a file name (its diagnostic path) and its source.
 pub struct SourceUnit<'a> {
@@ -360,18 +360,15 @@ pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
     })
 }
 
-/// Parse a unit via the goal rule: `Module` first, `Script` on failure. Returns
-/// the program, the goal it parsed under, and whether the `Script` retry won; on
-/// double failure returns the `Module`-goal error message.
+/// Parse a unit via the goal rule — `tsv_ts::parse_with_goal_or_fallback`, the same
+/// module-then-script fallback every format surface runs, so which error a double
+/// failure reports is stated once, there. Returns the program, the goal it parsed
+/// under (read back off the program, which records the grammar that produced it),
+/// and whether the `Script` retry won.
 fn parse_unit<'a>(source: &'a str, arena: &'a Bump) -> Result<(Program<'a>, Goal, bool), String> {
-    match parse_with_goal(source, Goal::Module, arena) {
-        Ok(program) => Ok((program, Goal::Module, false)),
-        Err(module_err) => match parse_with_goal(source, Goal::Script, arena) {
-            Ok(program) => Ok((program, Goal::Script, true)),
-            // Both goals failed: report the primary (Module) goal's error.
-            Err(_script_err) => Err(module_err.to_string()),
-        },
-    }
+    let program = parse_with_goal_or_fallback(source, None, arena).map_err(|e| e.to_string())?;
+    let goal = program.goal;
+    Ok((program, goal, goal == Goal::Script))
 }
 
 #[cfg(test)]

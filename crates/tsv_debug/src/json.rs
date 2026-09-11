@@ -107,12 +107,19 @@ mod tests {
         let value: Value = from_str(&deep).expect("unbounded read");
         assert!(value.is_array());
 
-        let deep = tsv_cli::cli::stack::run_on_sized_stack(|| {
-            let n = 1_000;
-            let deep = format!("{}{}", "[".repeat(n), "]".repeat(n));
-            let value: Value = from_str(&deep).expect("unbounded read");
-            value.is_array()
-        });
+        // On a sized thread joined by hand rather than through `run_on_sized_stack`:
+        // that wrapper answers a panic with `process::exit(101)`, which here would
+        // take the whole test binary down mid-run instead of failing this one test.
+        let deep = tsv_cli::cli::stack::sized_thread("tsv-test")
+            .spawn(|| {
+                let n = 1_000;
+                let deep = format!("{}{}", "[".repeat(n), "]".repeat(n));
+                let value: Value = from_str(&deep).expect("unbounded read");
+                value.is_array()
+            })
+            .expect("spawn")
+            .join()
+            .expect("the deep read must not panic");
         assert!(deep);
     }
 

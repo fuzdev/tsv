@@ -56,6 +56,7 @@ import { fileURLToPath } from 'node:url';
 
 import { CORE_CRATES, WASM_CRATES, wasm_bundle_dir } from '../benches/js/lib/tsv_artifacts.ts';
 import { assert_staged_fresh, type StagedCheck } from './check_staged_freshness.ts';
+import { host_triple } from './napi_host.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const repo_rel = (absolute: string): string => relative(ROOT, absolute);
@@ -71,17 +72,28 @@ const json = Deno.args.includes('--json');
  * one that ships beside the addon, so grading it grades what a user of
  * `@fuzdev/tsv` runs — falling back to a plain `cargo build -p tsv_cli
  * --release`, which is the same binary by a shorter path.
+ *
+ * The host's own package is looked for ahead of the directory scan: a local
+ * staging holds only the host triple, but a runner that has gathered several
+ * matrix artifacts holds several, and the first `readdir` entry is then whichever
+ * the filesystem lists first — a foreign one would fail to exec.
  */
 function find_native_cli(): { path: string; label: string } | undefined {
 	const exe = Deno.build.os === 'windows' ? 'tsv.exe' : 'tsv';
 	const pkg_root = join(ROOT, 'crates/tsv_napi/pkg');
 	if (existsSync(pkg_root)) {
+		const staged = (triple: string) => {
+			const candidate = join(pkg_root, triple, exe);
+			return existsSync(candidate)
+				? { path: candidate, label: `staged platform package (${triple})` }
+				: undefined;
+		};
+		const host = staged(host_triple());
+		if (host !== undefined) return host;
 		for (const entry of readdirSync(pkg_root)) {
 			if (entry === 'napi') continue;
-			const candidate = join(pkg_root, entry, exe);
-			if (existsSync(candidate)) {
-				return { path: candidate, label: `staged platform package (${entry})` };
-			}
+			const found = staged(entry);
+			if (found !== undefined) return found;
 		}
 	}
 	const release = join(ROOT, 'target/release', exe);

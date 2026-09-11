@@ -45,8 +45,9 @@
 //!
 //! The tempting form is a `RefCell` whose borrow guard is held across `f`. That
 //! is correct only where a panic *unwinds*, because only an unwind drops the
-//! guard. The shipped profiles are `panic = "abort"` (`[profile.release]`), and
-//! a WASM trap is not a process death: the JS host catches it as a
+//! guard. The shipped WASM, FFI and CLI artifacts are `panic = "abort"`
+//! (`[profile.release]`; the N-API addon alone ships `[profile.napi]`'s unwind,
+//! and take/park is correct under both), and a WASM trap is not a process death: the JS host catches it as a
 //! `RuntimeError` and the module instance stays alive and callable. So a held
 //! guard would be left locked with nothing to release it, and **every later call
 //! on that warm instance** would fail on `borrow_mut` — one bad file bricking a
@@ -141,6 +142,28 @@ pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -
 // here. The macros carry no arena; they live beside the helpers because this
 // crate is where the bindings' shared substrate goes rather than in any one of
 // them (see the crate's CLAUDE.md §Why this crate exists).
+
+/// The refusal for a `sourceType` named on a language that has no goal axis
+/// (Svelte hard-wires `Module`; CSS has no goal), `noun` naming the export family
+/// (`parse` / `format`) the way the binding's other option errors do.
+///
+/// One spelling for `tsv_wasm` and `tsv_napi` — the loader `crates/tsv_napi/npm/index.js`
+/// restates it by hand in JS, the one copy this crate cannot reach — so a consumer
+/// swapping `@fuzdev/tsv_wasm` for `@fuzdev/tsv` reads the same text. The C FFI has no
+/// noun (a code, not a bag) and spells its own.
+#[must_use]
+pub fn source_type_unsupported_message(noun: &str) -> String {
+    format!("{noun} option 'sourceType' is only supported for TypeScript")
+}
+
+/// The refusal for a `sourceType` value that names neither goal — the value echoed,
+/// the two accepted spellings listed. Shared by the same two bindings as
+/// [`source_type_unsupported_message`]; the CLI's `--source-type` spells the flag
+/// instead of the key and keeps its own copy.
+#[must_use]
+pub fn invalid_source_type_message(source_type: &str) -> String {
+    format!("invalid sourceType '{source_type}' (expected 'script' or 'module')")
+}
 
 /// The per-language parse call behind each binding's uniform exports.
 ///

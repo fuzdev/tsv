@@ -213,3 +213,40 @@ fn gitignore_doc_cascade() {
         ],
     );
 }
+
+/// The parse-level rules the unit tests pin by hand, held against git itself: a
+/// leading BOM (skipped, so the first rule still applies), CRLF endings, trailing
+/// spaces trimmed unless escaped, a trailing backslash as an invalid pattern, escaped
+/// specials as literals, an escaped slash as a separator, an empty segment (`foo//`)
+/// and an unterminated class as never-matching patterns, and a range whose low end is
+/// a plain member even when the range itself is empty (`[z-a]`).
+#[test]
+fn parse_level_rules_match_git() {
+    assert_matches_git(
+        "parse_rules",
+        &[(
+            "",
+            "\u{feff}bomfirst.ts\ncrlf.ts\r\nspaced.ts   \nesc\\ \nbar\\\n\\#hash.ts\n\\!bang.ts\na\\*b.ts\nsub\\/slash.ts\nfoo//\nq[bc.ts\nx[z-a].ts\n",
+        )],
+        &[
+            ("bomfirst.ts", false), // the BOM is not part of the pattern
+            ("crlf.ts", false),
+            ("spaced.ts", false),
+            ("esc ", false), // an escaped trailing space is kept
+            ("esc", false),
+            ("bar", false), // `bar\` is invalid and matches nothing
+            ("bar\\", false),
+            ("#hash.ts", false),
+            ("!bang.ts", false),
+            ("a*b.ts", false),
+            ("axb.ts", false),
+            ("sub/slash.ts", false), // `\/` is a separator
+            ("foo/a.ts", false),     // `foo//` never matches `foo/`
+            ("foo", true),
+            ("q[bc.ts", false), // an unterminated class matches nothing, not a literal `[`
+            ("xz.ts", false),   // the low end of `[z-a]` is a member
+            ("xa.ts", false),
+            ("xb.ts", false),
+        ],
+    );
+}

@@ -97,7 +97,12 @@ impl InputArgs {
     /// Precedence: `--content` > `--stdin` > file positional. `--content` and
     /// `--stdin` require `--parser`. On a file path, `--parser` overrides the
     /// extension-based detection when present; otherwise it's inferred from the
-    /// extension.
+    /// extension — which must then be one tsv handles. The dispatch behind a path has
+    /// no unknown arm (everything that isn't `.svelte` or `.css` is TypeScript), so
+    /// without the check `tsv parse README.md` reports a baffling TypeScript syntax
+    /// error rather than saying the file is out of scope. Same check, same message, as
+    /// `tsv format <file>` (`tsv_discover::unsupported_extension_error`), where it is an
+    /// argument error for the same reason.
     pub fn resolve(self) -> Result<(Input, ParserType), String> {
         if let Some(content) = self.content {
             let parser_type = self
@@ -110,9 +115,15 @@ impl InputArgs {
                 .ok_or("--stdin requires --parser <svelte|typescript|css>")?;
             Ok((Input::from_stdin()?, parser_type))
         } else if let Some(path) = self.file {
-            let parser_type = self
-                .parser
-                .unwrap_or_else(|| ParserType::from_extension(&path));
+            let parser_type = match self.parser {
+                Some(parser_type) => parser_type,
+                None => {
+                    if let Some(error) = tsv_discover::unsupported_extension_error(&path) {
+                        return Err(error);
+                    }
+                    ParserType::from_extension(&path)
+                }
+            };
             Ok((Input::from_file(&path)?, parser_type))
         } else {
             Err("No input provided. Use a file path, --content, or --stdin".to_string())
