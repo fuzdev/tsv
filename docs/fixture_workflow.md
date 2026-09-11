@@ -117,7 +117,8 @@ Options: `--parser typescript|css|svelte-ts` (default: svelte; `ts` and `svelte.
 
 `--goal script` builds a **standalone-script** fixture: it writes the `goal` marker and
 generates `expected.json` from acorn at `sourceType: 'script'`, so `await` is an ordinary
-identifier and `import`/`export`/`import.meta` are syntax errors — the two sides of the
+identifier and `import`/`export`/`import.meta` are syntax errors (tsv keeps a TypeScript
+namespace body's `import`/`export`, a cataloged divergence) — the two sides of the
 fixture then agree on the goal it is graded at. It applies to `.ts` / `.svelte.ts` inputs
 only (Svelte `<script>` is always a module, CSS has no goal); `--goal module` removes any
 marker. Either move lands only on a successful regeneration of `expected.json` — on

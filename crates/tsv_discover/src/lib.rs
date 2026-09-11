@@ -406,6 +406,33 @@ pub fn prettierignore_shadowed_warning(
     })
 }
 
+/// The stderr warning for an in-tree `.gitignore` that is a **symbolic link**.
+///
+/// git does not follow one — gitignore(5): "Git does not follow symbolic links when
+/// accessing a .gitignore file in the working tree", which keeps the file reading the same
+/// from the index or a tree as from disk — and warns that it cannot access it, applying
+/// none of its rules. tsv's `.gitignore` regime is git's, so the discovery walks treat such
+/// a file exactly as they treat an unreadable one: its rules are not applied, the
+/// build-output heuristic stays on for its subtree, and this says so. `path` is the link's
+/// own path. The tsv layer (`.formatignore` / `.prettierignore`) keeps reading through
+/// links, as prettier does, so only this name takes the warning. Produced **once**, here,
+/// so the native CLI and the WASM binding emit the identical text.
+pub fn gitignore_symlink_warning(path: &str) -> String {
+    format!(
+        "{path} is a symbolic link, which git does not follow in a working tree; its ignore rules are not applied"
+    )
+}
+
+/// The traversal error for a **relative** directory root that cannot be made absolute
+/// because the working directory itself cannot be resolved — it was deleted out from under
+/// the run. Walked anyway, the root would anchor on no format root and read none of its
+/// ancestors' ignore files, silently widening the scope, so the walk refuses it instead.
+/// `root` is the argument as given. Produced **once**, here, so the native CLI and the
+/// WASM binding emit the identical text.
+pub fn unresolvable_root_error(root: &str) -> String {
+    format!("{root}: cannot resolve a relative path: the working directory is unavailable")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -644,6 +671,24 @@ mod tests {
         assert_eq!(
             prettierignore_shadowed_warning("src", true, true, true).unwrap(),
             ".prettierignore in src is shadowed by a sibling .formatignore and is not applied; move its patterns into .formatignore to keep them"
+        );
+    }
+
+    #[test]
+    fn gitignore_symlink_warning_text_is_stable() {
+        // pinned verbatim: both CLIs emit it, and the VS Code extension restates it by
+        // hand against a published binding that predates it
+        assert_eq!(
+            gitignore_symlink_warning("/repo/.gitignore"),
+            "/repo/.gitignore is a symbolic link, which git does not follow in a working tree; its ignore rules are not applied"
+        );
+    }
+
+    #[test]
+    fn unresolvable_root_error_text_is_stable() {
+        assert_eq!(
+            unresolvable_root_error(".."),
+            "..: cannot resolve a relative path: the working directory is unavailable"
         );
     }
 

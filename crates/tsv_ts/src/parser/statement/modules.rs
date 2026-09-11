@@ -6,6 +6,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
 use super::DecoratorListKind;
+use super::ModuleItemContext;
 use super::class::DecoratedClassExport;
 
 /// The parsed pieces of a module specifier that begins with the contextual
@@ -77,14 +78,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
-    pub(super) fn parse_export_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_export_declaration(
+        &mut self,
+        context: ModuleItemContext,
+    ) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
-        // `export` declarations are reachable only via `ModuleItem` — a Script
-        // goal has no export declarations.
-        if self.goal != crate::Goal::Module {
-            return Err(self.error_goal_gate("'export' is only allowed in a module"));
-        }
+        // `export` declarations are reachable only via `ModuleItem`, and a Script goal has
+        // none outside a namespace body.
+        self.check_module_item_goal(context, "export", start)?;
 
         // Consume 'export' keyword
         debug_assert!(matches!(
@@ -929,7 +931,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// An ES `import` declaration is a `ModuleItem`, so it is a syntax error at
-    /// `Goal::Script` — but a TypeScript **import-equals** (`import x = A.B`,
+    /// `Goal::Script` outside a namespace body ([`ModuleItemContext`]) — but a TypeScript
+    /// **import-equals** (`import x = A.B`,
     /// `import x = require('y')`) is not an `ImportDeclaration` at all. It predates ES
     /// modules, is how a script or a namespace aliases, and tsc accepts it in a
     /// non-module file: its own `conformance/externalModules/topLevelAwait.2.ts`
@@ -948,11 +951,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// not a TypeScript judgement — so tsv follows tsc here and diverges from the
     /// shape oracle. `position` is the `import` keyword, so the error still points at
     /// the statement head rather than at whatever token ends it.
-    fn check_import_declaration_goal(&self, position: usize) -> Result<(), ParseError> {
-        if self.goal == crate::Goal::Module {
-            return Ok(());
-        }
-        Err(self.error_goal_gate_at("'import' is only allowed in a module", position))
+    fn check_import_declaration_goal(
+        &self,
+        context: ModuleItemContext,
+        position: usize,
+    ) -> Result<(), ParseError> {
+        self.check_module_item_goal(context, "import", position)
     }
 
     /// Parse import declaration:
@@ -964,7 +968,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - `import type { a } from "y"` (type-only import)
     /// - `import { type a, b } from "y"` (inline type modifier)
     /// - `import x from "y" with { type: "json" }` (import attributes)
-    pub(super) fn parse_import_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_import_declaration(
+        &mut self,
+        context: ModuleItemContext,
+    ) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // NOTE: the `Goal::Script` gate is NOT here, on the keyword — see
@@ -1007,7 +1014,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for side-effect import: `import "y"`
         if matches!(self.current_kind(), TokenKind::String) {
-            self.check_import_declaration_goal(start)?;
+            self.check_import_declaration_goal(context, start)?;
             let source = self.parse_string_literal()?;
             // Check for import attributes after source
             let attributes = self.parse_import_attributes()?;
@@ -1111,7 +1118,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // passes through here: a default binding falls out of the block above (having
         // already returned if it was an import-equals), while `* as ns` and `{ … }`
         // never enter it, since `try_binding_name` declines their leading token.
-        self.check_import_declaration_goal(start)?;
+        self.check_import_declaration_goal(context, start)?;
 
         // Parse namespace import: `import * as ns from "y"`
         if matches!(self.current_kind(), TokenKind::Star) {

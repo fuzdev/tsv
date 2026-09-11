@@ -382,6 +382,25 @@
 				{"target": "", "expected": ["keep.ts", "sub/deep/keep.ts"]},
 				{"target": "sub/deep", "expected": ["sub/deep/keep.ts"]}
 			]
+		},
+		{
+			"name": "a_symlinked_gitignore_is_not_applied",
+			"note": "git does not follow a symbolic link to a .gitignore in a working tree (gitignore(5)) — it warns and applies none of the linked rules — so neither does tsv, by the same rule whether the directory is walked or only preloaded: g.ts stays in scope at both depths, and with no .gitignore applied the build-output heuristic stays on and prunes dist/, which a regular .gitignore would have turned off. The tsv layer keeps following links (the scenario above)",
+			"tree": {
+				".git/": null,
+				"rules/git": "g.ts\n",
+				".gitignore": {"symlink": "rules/git"},
+				"sub/.gitignore": {"symlink": "../rules/git"},
+				"g.ts": "x",
+				"keep.ts": "x",
+				"dist/out.ts": "x",
+				"sub/deep/g.ts": "x",
+				"sub/deep/keep.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["g.ts", "keep.ts", "sub/deep/g.ts", "sub/deep/keep.ts"], "warns": ["sub/.gitignore is a symbolic link, which git does not follow"]},
+				{"target": "sub/deep", "expected": ["sub/deep/g.ts", "sub/deep/keep.ts"], "warns": ["sub/.gitignore is a symbolic link, which git does not follow"]}
+			]
 		}
 	]
 }

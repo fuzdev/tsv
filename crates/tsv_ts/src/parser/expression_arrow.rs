@@ -67,7 +67,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// parameter parse errors. A body error rewinds the same way, to a verdict tsc
     /// shares: the parenthesized reading hands the same body to the alternate's
     /// arrow, which fails on it again. A head without an annotation parses straight,
-    /// so a body error there keeps its message.
+    /// so a body error there keeps its message. The one error handed back instead of
+    /// rewound is a **goal gate** ([`ParseError::is_goal_gated`]): it fires on an
+    /// `import.meta` token the parenthesized reading has to consume as well, so the
+    /// file is no script either way, and rewinding would trade the one mark the format
+    /// fallback reads for a position-only error further on.
     ///
     /// An **unambiguous** head — one tsc reads as a signature without asking
     /// ([`ArrowHead::commits_to_signature`], its `Tristate.True`) — is not
@@ -112,6 +116,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let checkpoint = self.checkpoint();
         match parse(self) {
             Ok(arrow) if self.check(&TokenKind::Colon) => Ok(Some(arrow)),
+            // a goal gate fires on a module-only token the parenthesized reading has to
+            // consume too, so rewinding would only trade it for whatever error that
+            // reading hits first — and the format fallback reads the gate, not the position
+            Err(error) if error.is_goal_gated() => Err(error),
             Ok(_) | Err(_) => {
                 self.rewind(checkpoint);
                 Ok(None)

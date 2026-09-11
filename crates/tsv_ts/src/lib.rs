@@ -186,9 +186,11 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Progr
 ///
 /// [`parse`] is the `Goal::Module` form (the default, correct for Svelte
 /// `<script>` and ~all real TS). Pass `Goal::Script` to parse a standalone
-/// script, where `await` is an ordinary identifier and `import`/`export`
+/// script, where `await` is an ordinary identifier and top-level `import`/`export`
 /// declarations, `import.meta`, and top-level `await` expressions are syntax
-/// errors. The goal carries no strictness of its own past `Module`: a script is
+/// errors — a TypeScript namespace body holds `import`/`export` at either goal, since
+/// tsc decides module-ness from top-level statements alone. The goal carries no
+/// strictness of its own past `Module`: a script is
 /// sloppy unless its directive prologue holds a `"use strict"`, so the strict-mode
 /// production disallowances parse only under a directive-free `Script`. Which
 /// constructs those are is enumerated once, on the flag that gates them
@@ -213,18 +215,17 @@ pub fn parse_with_goal<'arena>(
 /// name) formats from a bare path while a module-valid source is never reinterpreted.
 /// When both attempts fail, the reported error is the attempt's whose grammar the file
 /// was written against, decided in two steps. **A script attempt that died on a goal
-/// gate** — an `import` / `export` / `import.meta`, the constructs only a module holds
-/// ([`ParseError::is_goal_gated`]) — has proved the file a module whatever else is in it,
-/// so the module attempt's error is the file's own: a broken module's script attempt dies
-/// there at its first module-only construct, even one that sits *after* the real error
-/// (definitions first, `export` at the bottom). **Otherwise the error that reached
-/// furthest into the source** is the file's own, the module attempt's on a tie: a broken
-/// sloppy script's module attempt dies early at its first `with` / legacy literal /
-/// `await` name — the very construct the retry exists to admit, so reporting *that* would
-/// point a legacy script's author away from their typo — and a broken module's script
-/// attempt dies at its top-level `await`, the one module-only construct that carries no
-/// gate (at `Script` the word is an identifier, so the attempt fails on whatever follows
-/// it). prettier reads the same way in practice: its babel parser tolerates the
+/// gate** — a top-level `import` / `export`, an `import.meta`, or the operand a module
+/// reads after a top-level `await` (where a Script's name reading of the word fails), the
+/// constructs only a module holds ([`ParseError::is_goal_gated`]) — has proved the file a
+/// module whatever else is in it, so the module attempt's error is the file's own: a
+/// broken module's script attempt dies there at its first module-only construct, even one
+/// that sits *after* the real error (definitions first, `export` at the bottom).
+/// **Otherwise the error that reached furthest into the source** is the file's own, the
+/// module attempt's on a tie: a broken sloppy script's module attempt dies early at its
+/// first `with` / legacy literal / `await` name — the very construct the retry exists to
+/// admit, so reporting *that* would point a legacy script's author away from their typo.
+/// prettier reads the same way in practice: its babel parser tolerates the
 /// strict-mode production disallowances at the module goal (`allowedReasonCodes`), so the
 /// error it shows on such a file is the typo. Pinned by
 /// `tests/format_fallback_error_attribution.rs`.

@@ -256,6 +256,23 @@ impl IgnoreStack {
         )
     }
 
+    /// The warning for an in-tree `.gitignore` that is a symbolic link — which git does
+    /// not follow, so its rules are not applied — delegating to
+    /// `tsv_discover::gitignore_symlink_warning`. `path` is the link's path. A method (not
+    /// a free function) so it rides the `IgnoreStack` class re-export through the package
+    /// facade; the receiver is unused. Single source of truth with the native CLI.
+    pub fn gitignore_symlink_warning(&self, path: &str) -> String {
+        tsv_discover::gitignore_symlink_warning(path)
+    }
+
+    /// The traversal error for a relative directory root that the working directory cannot
+    /// resolve (it was deleted), delegating to `tsv_discover::unresolvable_root_error`. A
+    /// method so it rides the class re-export; the receiver is unused — the refusal comes
+    /// before any matcher is assembled. Single source of truth with the native CLI.
+    pub fn unresolvable_root_error(&self, root: &str) -> String {
+        tsv_discover::unresolvable_root_error(root)
+    }
+
     /// Whether no layer carries any rule — callers skip per-path matching.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()

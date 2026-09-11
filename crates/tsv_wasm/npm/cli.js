@@ -36,6 +36,7 @@
 import { Buffer } from 'node:buffer';
 import {
 	existsSync,
+	lstatSync,
 	readdirSync,
 	readFileSync,
 	realpathSync,
@@ -44,7 +45,7 @@ import {
 	writeSync
 } from 'node:fs';
 import { availableParallelism } from 'node:os';
-import { dirname, isAbsolute, join, relative as path_relative, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative as path_relative, resolve, sep } from 'node:path';
 import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads';
 
 /** The compiled module a worker inherited from the main thread, or `undefined`
@@ -151,6 +152,17 @@ const WORKER_FILE_THRESHOLD = IS_WASM_ENGINE
  * same numbers. Declared with the other pool constants, above the `main()`
  * call — a `const` below it is dead-zoned for the whole run. */
 const MAX_WORKERS_PER_LOGICAL_CPU = 4;
+
+/** The stack, in MiB, every pool worker reserves — the native CLI's `STACK_SIZE`
+ * (`tsv_cli`'s `cli/stack.rs`), restated by hand like the ceiling above and gated against
+ * it by the package test. A V8 worker takes Node's `resourceLimits.stackSizeMb` (4 MiB
+ * unless set) where the main thread has ~1 MiB, so a deep file formatted on one route
+ * and overflowed on the other, and which route ran depended on how many OTHER files the
+ * tree held. Reserving the native size in every worker, and retrying a main-thread
+ * overflow in one (`retry_overflowed_files`), gives every route the worker's ceiling —
+ * on the WASM engine, the module's own stack. The reservation is committed lazily, so it
+ * costs address space and ~no memory. Bun and Deno ignore the option. */
+const WORKER_STACK_SIZE_MB = 32;
 
 /** Valid `--parser` values (shared by `format` and `parse` — `FORMATTERS` and
  * `PARSERS` are keyed by the same names). */
@@ -525,6 +537,19 @@ function unsupported_extension_error(path) {
 	}
 }
 
+/** The traversal error for a relative root the working directory cannot resolve — the
+ * binding's `tsv_discover::unresolvable_root_error`, taken through a throwaway stack
+ * as `unsupported_extension_error` takes its own, since the refusal comes before
+ * `collect_root` assembles one. */
+function unresolvable_root_error(root) {
+	const arg_policy = new IgnoreStack();
+	try {
+		return arg_policy.unresolvable_root_error(root);
+	} finally {
+		free_ignore_stack(arg_policy);
+	}
+}
+
 /** Extension-based parser detection, mirroring the native `ParserType::from_extension`. */
 function parser_from_extension(path) {
 	if (path.endsWith('.svelte')) return 'svelte';
@@ -672,7 +697,7 @@ async function format_paths(values, positionals) {
 	const outcomes =
 		jobs > 1
 			? await format_files_parallel(files, values.check, jobs)
-			: format_files(files, values.check);
+			: await retry_overflowed_files(files, format_files(files, values.check), values.check);
 
 	// Buffer the changed-path lines and emit them in one write, matching the
 	// native CLI: a per-path write re-locks stdout for each of (potentially
@@ -742,7 +767,13 @@ function format_one(path, check) {
 		// instance too (see `recover_engine_suffix`), and any other one costs at most a
 		// reinstantiate it did not need.
 		if (error instanceof WebAssembly.RuntimeError || error instanceof RangeError) {
-			return { kind: 'error', message: `${error.message}${recover_engine_suffix(error)}` };
+			return {
+				kind: 'error',
+				message: `${error.message}${recover_engine_suffix(error)}`,
+				// V8's own stack ran out before the module's: what a pool worker's larger
+				// stack may still clear (`retry_overflowed_files`)
+				native_stack_overflow: error instanceof RangeError
+			};
 		}
 		return { kind: 'error', message: error.message };
 	}
@@ -763,14 +794,161 @@ function format_files(files, check) {
 	return files.map((path) => format_one(path, check));
 }
 
-/** Logical and physical CPU counts. The SMT width is one read of
+/**
+ * Re-run, in a one-worker pool, each file whose format on this thread ran out of V8's own
+ * native stack, and put the retried outcomes in place of the failed ones — `outcomes` is
+ * indexed by `files`, and is returned.
+ *
+ * The main thread has ~1 MiB of V8 stack and a pool worker `WORKER_STACK_SIZE_MB`, so a
+ * deep file's verdict used to turn on which route the file count picked. A worker reaches
+ * the WASM module's own ceiling, whose trap is the same answer on every route. It costs
+ * one worker start, paid only when a file overflowed; where the runtime ignores the stack
+ * option (Bun, Deno) the retry reports the error again. The failed attempt wrote nothing,
+ * so no file is written twice.
+ */
+async function retry_overflowed_files(files, outcomes, check) {
+	const retry = [];
+	for (let i = 0; i < outcomes.length; i++) {
+		if (outcomes[i].native_stack_overflow) retry.push(i);
+	}
+	if (retry.length === 0) return outcomes;
+	const retried = await format_files_parallel(
+		retry.map((i) => files[i]),
+		check,
+		1
+	);
+	for (let j = 0; j < retry.length; j++) outcomes[retry[j]] = retried[j];
+	return outcomes;
+}
+
+/**
+ * The process's cgroup CPU quota in whole cores, rounded down — `Infinity` when none
+ * is set or none can be read. A transcription of the quota Rust's
+ * `available_parallelism` applies on Linux (std's `cgroups::quota`), which the native
+ * CLI's `--jobs` ceiling and default width both read, while Node's and Bun's
+ * `availableParallelism()` count the affinity mask alone: under a `--cpus` or
+ * `CPUQuota=` limit the two bins would otherwise name different ceilings, and this one
+ * would size its pool past the quota. (Deno's count already applies it, and a second
+ * `min` changes nothing.)
+ *
+ * The process's place in the hierarchy comes from `/proc/self/cgroup`, where a v1
+ * entry naming the `cpu` controller wins over the v2 one. The quota is the smallest
+ * `limit / period` on the path from that cgroup up to its mount: `cpu.max` under v2
+ * (read only when the path holds `cgroup.controllers`, so it really is cgroup2), and
+ * `cpu.cfs_quota_us` over `cpu.cfs_period_us` under v1. An unlimited quota (`max`,
+ * `-1`) is not a count and sets nothing, and a failed read reads as no quota, so this
+ * can only ever lower a count.
+ */
+function cgroup_cpu_quota() {
+	let entries;
+	try {
+		entries = readFileSync('/proc/self/cgroup', 'utf-8');
+	} catch {
+		return Infinity; // not Linux, or no procfs
+	}
+	let group = null;
+	for (const line of entries.split('\n')) {
+		const fields = line.split(':');
+		if (fields.length < 3) continue;
+		// the second field lists a v1 hierarchy's controllers, and is empty for v2
+		const version = fields[1] === '' ? 2 : fields[1].split(',').includes('cpu') ? 1 : 0;
+		// a v1 `cpu` entry already found wins, since it names its controllers
+		if (version === 0 || (group !== null && version === 2)) continue;
+		// the path, without its leading `/`
+		group = { version, path: fields.slice(2).join(':').slice(1) };
+	}
+	if (group === null) return Infinity;
+	return group.version === 2 ? cgroup_v2_quota(group.path) : cgroup_v1_quota(group.path);
+}
+
+/** The smallest cgroup v2 `cpu.max` quota from `group` up to the cgroup2 mount at its
+ * standard location (file-hierarchy(7); std reads no other). */
+function cgroup_v2_quota(group) {
+	const mount = '/sys/fs/cgroup';
+	const dir = join(mount, group);
+	if (!existsSync(join(dir, 'cgroup.controllers'))) return Infinity; // not cgroup2
+	return smallest_quota_upward(dir, mount, (level) => {
+		const [limit, period] = readFileSync(join(level, 'cpu.max'), 'utf-8').split('\n')[0].split(' ');
+		return cgroup_quota_cores(limit, period);
+	});
+}
+
+/** The smallest cgroup v1 CFS quota from `group` up to its `cpu` controller's mount —
+ * the first of `cgroup_v1_mounts` that holds the group. */
+function cgroup_v1_quota(group) {
+	for (const [mount, path] of cgroup_v1_mounts(group)) {
+		const dir = join(mount, path);
+		if (!existsSync(dir)) continue; // guessed the mount wrong
+		return smallest_quota_upward(dir, mount, (level) =>
+			cgroup_quota_cores(
+				readFileSync(join(level, 'cpu.cfs_quota_us'), 'utf-8').trim(),
+				readFileSync(join(level, 'cpu.cfs_period_us'), 'utf-8').trim()
+			)
+		);
+	}
+	return Infinity;
+}
+
+/** The smallest quota `read_level` reads from `dir` up to `mount` inclusive, one level at
+ * a time — the shape both of std's cgroup walks take. A level whose files cannot be read
+ * sets nothing (a cgroup2 root has no `cpu.max`). */
+function smallest_quota_upward(dir, mount, read_level) {
+	let quota = Infinity;
+	for (let level = dir; level === mount || level.startsWith(`${mount}/`); level = dirname(level)) {
+		try {
+			quota = Math.min(quota, read_level(level));
+		} catch {
+			// nothing readable at this level
+		}
+	}
+	return quota;
+}
+
+/** Where a cgroup v1 `cpu` controller may be mounted, each paired with `group`
+ * re-rooted under it: the two paths cgroups(7) names, then the first matching
+ * `/proc/self/mountinfo` entry — read only once both guesses miss, and trimmed for a
+ * bind mount of a subtree. */
+function* cgroup_v1_mounts(group) {
+	yield ['/sys/fs/cgroup/cpu', group];
+	yield ['/sys/fs/cgroup/cpu,cpuacct', group];
+	let mountinfo;
+	try {
+		mountinfo = readFileSync('/proc/self/mountinfo', 'utf-8');
+	} catch {
+		return;
+	}
+	for (const line of mountinfo.split('\n')) {
+		// `id parent major:minor root mount-point options… - fstype source super-options`
+		const items = line.trim().split(' ');
+		if (items.length < 7) continue;
+		const [root, mount_point] = [items[3], items[4]];
+		if (items.at(-3) !== 'cgroup' || !items.at(-1).split(',').includes('cpu')) continue;
+		if (!root.startsWith('/')) return;
+		const sub = root.slice(1);
+		// a bind mount whose bound subtree does not hold this process's cgroup
+		if (sub !== '' && group !== sub && !group.startsWith(`${sub}/`)) continue;
+		yield [mount_point, group.slice(sub.length).replace(/^\//, '')];
+		return;
+	}
+}
+
+/** `limit / period` in whole cores, or `Infinity` when either is not a count (an
+ * unlimited `max` or `-1`) or the period is zero. */
+function cgroup_quota_cores(limit, period) {
+	if (!/^\d+$/.test(limit ?? '') || !/^\d+$/.test(period ?? '')) return Infinity;
+	return Number(period) > 0 ? Math.floor(Number(limit) / Number(period)) : Infinity;
+}
+
+/** Logical and physical CPU counts. The logical count is the one the native CLI
+ * reads — the affinity mask capped by the cgroup CPU quota (`cgroup_cpu_quota`,
+ * floored at one core as std floors it). The SMT width is one read of
  * `thread_siblings_list`, not one per CPU; anywhere that read fails — every
  * non-Linux platform included — it reads 1 and physical degrades to logical,
  * so the topology can only ever lower a worker count, never raise it. */
 function cpu_topology() {
 	let logical;
 	try {
-		logical = availableParallelism();
+		logical = Math.min(availableParallelism(), Math.max(1, cgroup_cpu_quota()));
 	} catch {
 		return { logical: 1, physical: 1 };
 	}
@@ -937,7 +1115,12 @@ async function format_files_parallel(files, check, jobs) {
 	const workers = [];
 	for (let i = 0; i < jobs; i++) {
 		try {
-			workers.push(new Worker(new URL(import.meta.url), { workerData: worker_data }));
+			workers.push(
+				new Worker(new URL(import.meta.url), {
+					workerData: worker_data,
+					resourceLimits: { stackSizeMb: WORKER_STACK_SIZE_MB }
+				})
+			);
 		} catch (error) {
 			// A worker starts claiming the moment it is constructed, so once ANY
 			// came up, falling back to this thread would re-format files that are
@@ -1252,6 +1435,22 @@ function is_ignore_file(path) {
 	}
 }
 
+/** How an in-tree `.gitignore` is present, by git's rule rather than `is_ignore_file`'s:
+ * `'symlink'` for a symbolic link — git does not follow one in a working tree and applies
+ * none of its rules, so the walk warns and treats it as a file whose rules could not be
+ * read — `'file'` for a regular file, and `'absent'` otherwise. Asked without following
+ * the link; a listing's own entry type answers the same question for the descent. Mirrors
+ * the native `GitignorePresence`. */
+function gitignore_presence(path) {
+	try {
+		const stat = lstatSync(path);
+		if (stat.isSymbolicLink()) return 'symlink';
+		return stat.isFile() ? 'file' : 'absent';
+	} catch {
+		return 'absent';
+	}
+}
+
 /** The nearest ancestor of `start` (inclusive) holding a `.git` entry (dir or
  * file) — the repo root — or null if there is no git tree above `start`.
  * Mirrors the native `find_repo_root`. */
@@ -1341,12 +1540,15 @@ function discover_files(paths) {
 		process.exit(2);
 	}
 
-	// canonical cwd so it compares cleanly with canonicalized roots below
-	let cwd;
+	// canonical cwd so it compares cleanly with canonicalized roots below; null when it
+	// cannot be resolved (a deleted working directory, where `process.cwd()` itself
+	// throws), which only a relative root that fails to canonicalize ever asks for.
+	// Mirrors the native `walk_args`.
+	let cwd = null;
 	try {
 		cwd = realpathSync(process.cwd());
 	} catch {
-		cwd = process.cwd();
+		// left null — see collect_root
 	}
 
 	let files = [];
@@ -1435,6 +1637,12 @@ function join_lines(paths) {
  * warning fires whether the shadowing directory is walked or only preloaded. One
  * statement of the ladder, mirroring the native `tsv_layer_content`; the two
  * callers differ only in how presence was learned (a listing, or an `is_ignore_file` probe).
+ *
+ * `dir` is the directory's ABSOLUTE path — an ancestor as preloaded, a walked
+ * directory as `collect_recursive`'s `dir_abs` — never an argument spelling: the one
+ * spelling its ignore files are read by and its diagnostics name it by, whichever root
+ * or spelling reached it, so overlapping roots (`tsv format . sub`, `tsv format . ./`)
+ * report one warning rather than one per spelling. Mirrors the native `tsv_layer_content`.
  * @returns {string | null} the layer's content, or null for no layer
  */
 function tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, stack, warnings) {
@@ -1470,7 +1678,17 @@ function collect_root(root, cwd, files, errors, warnings) {
 	try {
 		root_abs = realpathSync(root);
 	} catch {
-		root_abs = isAbsolute(root) ? root : join(cwd, root);
+		if (!isAbsolute(root) && cwd === null) {
+			// a relative root that will not canonicalize, with no working directory to
+			// join it onto: walked anyway, it would anchor on no format root and read no
+			// ancestor's ignore files. Mirrors the native collect_root.
+			errors.push(unresolvable_root_error(root));
+			return;
+		}
+		// `resolve` settles `.` and `..` lexically, as the native `absolutize` does, and
+		// asks the process for no cwd here: an absolute `root` needs none, and a relative
+		// one is joined onto the `cwd` already held
+		root_abs = isAbsolute(root) ? resolve(root) : resolve(cwd, root);
 	}
 	const repo_root = find_repo_root(root_abs);
 	const in_repo = repo_root !== null;
@@ -1505,12 +1723,19 @@ function collect_root(root, cwd, files, errors, warnings) {
 			warnings
 		);
 		if (tsv !== null) stack.push_tsv(anchor, tsv);
-		// `.gitignore` layer: only inside a git repo
-		if (in_repo && is_ignore_file(join(ancestor, GITIGNORE_FILE))) {
-			const gr = read_ignore_file(join(ancestor, GITIGNORE_FILE), warnings);
-			if (gr.kind === 'content') {
-				stack.push_gitignore(anchor, gr.content);
-				heuristic_active = false;
+		// `.gitignore` layer: only inside a git repo, and never through a symlink, which git
+		// does not follow (gitignore_presence)
+		if (in_repo) {
+			const gitignore = join(ancestor, GITIGNORE_FILE);
+			const presence = gitignore_presence(gitignore);
+			if (presence === 'symlink') {
+				warnings.push(stack.gitignore_symlink_warning(gitignore));
+			} else if (presence === 'file') {
+				const gr = read_ignore_file(gitignore, warnings);
+				if (gr.kind === 'content') {
+					stack.push_gitignore(anchor, gr.content);
+					heuristic_active = false;
+				}
 			}
 		}
 	}
@@ -1539,6 +1764,7 @@ function collect_root(root, cwd, files, errors, warnings) {
 
 	collect_recursive(
 		root,
+		root_abs,
 		base_rel,
 		true,
 		in_repo,
@@ -1592,6 +1818,10 @@ function compare_paths(a, b) {
 
 function collect_recursive(
 	dir,
+	// `dir`'s absolute path — the spelling its ignore files are read by and every
+	// ignore-file diagnostic names it by (see tsv_layer_content); `dir` keeps the
+	// argument's spelling for the paths the walk emits
+	dir_abs,
 	dir_rel,
 	is_target_root,
 	in_repo,
@@ -1614,24 +1844,23 @@ function collect_recursive(
 	// when present (below). Mirrors the native collect_recursive.
 	let has_formatignore = false;
 	let has_prettierignore = false;
-	let has_gitignore = false;
+	// `.gitignore` takes git's presence rule (gitignore_presence), which the listing's own
+	// entry type answers: a link is not followed
+	let gitignore = 'absent';
 	for (const e of entries) {
-		if (
-			e.name !== FORMATIGNORE_FILE &&
-			e.name !== PRETTIERIGNORE_FILE &&
-			!(in_repo && e.name === GITIGNORE_FILE)
-		) {
+		if (e.name === GITIGNORE_FILE) {
+			if (in_repo) gitignore = e.isSymbolicLink() ? 'symlink' : e.isFile() ? 'file' : 'absent';
 			continue;
 		}
+		if (e.name !== FORMATIGNORE_FILE && e.name !== PRETTIERIGNORE_FILE) continue;
 		// the preload's presence rule (is_ignore_file): a listing's file type does not
 		// follow a symlink, so only a link costs the stat that asks what it points at
-		if (!e.isFile() && !(e.isSymbolicLink() && is_ignore_file(join(dir, e.name)))) continue;
+		if (!e.isFile() && !(e.isSymbolicLink() && is_ignore_file(join(dir_abs, e.name)))) continue;
 		if (e.name === FORMATIGNORE_FILE) has_formatignore = true;
-		else if (e.name === PRETTIERIGNORE_FILE) has_prettierignore = true;
-		else has_gitignore = true;
+		else has_prettierignore = true;
 	}
 	const tsv = tsv_layer_content(
-		dir,
+		dir_abs,
 		has_formatignore,
 		has_prettierignore,
 		in_repo,
@@ -1648,19 +1877,22 @@ function collect_recursive(
 	// of truth with the native CLI), pointing at the rename / `git init` fixes.
 	if (is_target_root) {
 		const warning = stack.prettierignore_outside_repo_warning(
-			dir,
+			dir_abs,
 			in_repo,
 			has_prettierignore,
 			has_formatignore
 		);
 		if (warning != null) warnings.push(warning);
 	}
-	// `.gitignore` layer: only inside a repo (has_gitignore implies in_repo); turns
-	// the heuristic off for children. A present-but-unreadable `.gitignore` warns
-	// and is not pushed — so the heuristic stays on, which the warning makes visible.
+	// `.gitignore` layer: only inside a repo (`gitignore` stays 'absent' outside one);
+	// turns the heuristic off for children. A present-but-unreadable `.gitignore` warns
+	// and is not pushed — so the heuristic stays on, which the warning makes visible —
+	// and a symlinked one, which git does not follow, takes the same path with its own.
 	let git_pushed = false;
-	if (has_gitignore) {
-		const r = read_ignore_file(join(dir, GITIGNORE_FILE), warnings);
+	if (gitignore === 'symlink') {
+		warnings.push(stack.gitignore_symlink_warning(join(dir_abs, GITIGNORE_FILE)));
+	} else if (gitignore === 'file') {
+		const r = read_ignore_file(join(dir_abs, GITIGNORE_FILE), warnings);
 		if (r.kind === 'content') {
 			stack.push_gitignore(dir_rel, r.content);
 			git_pushed = true;
@@ -1694,6 +1926,7 @@ function collect_recursive(
 			// the child reads its own ignore files when we recurse into it
 			collect_recursive(
 				path,
+				join(dir_abs, entry.name),
 				child_rel,
 				false,
 				in_repo,

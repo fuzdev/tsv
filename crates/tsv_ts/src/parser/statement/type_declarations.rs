@@ -8,6 +8,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
+use super::ModuleItemContext;
 
 /// End offset of a module declaration body (block or nested declaration).
 fn module_body_end(body: &TSModuleDeclarationBody<'_>) -> u32 {
@@ -984,7 +985,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // behind for whatever reads next — `Parser::rewind` is a caller that
         // abandons a failed parse and keeps going. A namespace/module body is a
         // module-item context, so `import`/`export` declarations are valid here
-        // (unlike an ordinary block).
+        // (unlike an ordinary block) — at either goal ([`ModuleItemContext`]).
         let ambient = is_ambient || self.in_ambient_context;
         let body = self.with_context_flag(
             |p| &mut p.in_ambient_context,
@@ -992,7 +993,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             |p| {
                 let mut body = p.bvec();
                 while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-                    let stmt = p.parse_module_item()?;
+                    let stmt = p.parse_module_item(ModuleItemContext::NamespaceBody)?;
                     body.push(stmt);
                 }
                 Ok(body)

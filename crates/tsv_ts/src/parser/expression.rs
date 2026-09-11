@@ -799,7 +799,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.parse_single_param_arrow_function()?
                     } else {
                         // Script `[~Await]`: `await` is an ordinary `IdentifierReference`.
-                        self.parse_keyword_identifier_reference()?
+                        self.parse_await_name_reference()?
                     }
                 } else {
                     // Module `[~Await]`: `await` is reserved and there is no
@@ -1645,7 +1645,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // `[~Await]` / `[~Yield]`) — e.g. a `new` callee (`new await()`,
             // `new yield()`) or any primary reference.
             TokenKind::Keyword(KeywordKind::Await) if self.await_is_identifier() => {
-                self.parse_keyword_identifier_reference()
+                self.parse_await_name_reference()
             }
             TokenKind::Keyword(KeywordKind::Yield) if self.yield_is_identifier() => {
                 self.parse_keyword_identifier_reference()
@@ -2289,6 +2289,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             start as u32,
             end,
         ))
+    }
+
+    /// [`Parser::parse_keyword_identifier_reference`] for `await` read as a name, noting
+    /// where a module would have read its operand: the same-line token after it, where
+    /// the position is `[+Await]` under `Goal::Module` (`in_await_if_module`). A Script
+    /// parse that then dies exactly there died because `await` is a name at this goal —
+    /// tsc's parser reads that same shape as an await expression in any file
+    /// (`isAwaitExpression`) — so `Parser::parse` marks that error a goal gate. A line
+    /// break after the name closes the statement by ASI, so a token past one is no
+    /// operand.
+    fn parse_await_name_reference(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
+        let reference = self.parse_keyword_identifier_reference()?;
+        if self.in_await_if_module && !self.had_line_terminator {
+            self.await_name_operand = Some(self.current_pos().0);
+        }
+        Ok(reference)
     }
 
     /// Parse yield expression: `yield`, `yield value`, or `yield* iterable`

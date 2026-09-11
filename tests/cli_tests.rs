@@ -1701,6 +1701,75 @@ fn test_format_prettierignore_alone_in_repo_not_shadowed_no_warn() {
 }
 
 #[test]
+fn test_format_overlapping_roots_name_a_shadowed_prettierignore_once() {
+    // a directory reached by two walks — as an argument (`.`) and as the preloaded
+    // ancestor of another root (`sub`), or under two spellings of one argument (`.` and
+    // `./`) — is named by its absolute path in both, so the walk's exact-string dedup
+    // collapses the warning to one line rather than one per spelling
+    let dir = git_repo("overlapping_roots_shadow_once");
+    fs::write(dir.join(".formatignore"), "af.ts\n").unwrap();
+    fs::write(dir.join(".prettierignore"), "pf.ts\n").unwrap();
+    fs::create_dir(dir.join("sub")).unwrap();
+    fs::write(dir.join("sub/keep.ts"), FORMATTED_TS).unwrap();
+    let canonical = fs::canonicalize(&*dir).unwrap();
+    let expected = format!(".prettierignore in {} is shadowed", canonical.display());
+
+    for roots in [[".", "sub"], [".", "./"]] {
+        let output = tsv_in_dir(&dir, &["format", "--list", roots[0], roots[1]]);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.code(), Some(0), "{roots:?}: {stderr}");
+        let shadowed: Vec<&str> = stderr
+            .lines()
+            .filter(|line| line.contains("is shadowed"))
+            .collect();
+        assert_eq!(
+            shadowed.len(),
+            1,
+            "{roots:?}: one warning per directory: {stderr}"
+        );
+        assert!(
+            shadowed[0].contains(&expected),
+            "{roots:?}: named by its absolute path: {stderr}"
+        );
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn test_format_relative_root_under_a_deleted_cwd_is_refused() {
+    // a relative root has nothing absolute to resolve against once the working directory
+    // is gone (Linux still resolves `..` inside a removed directory, so the argument
+    // itself stats fine). Walked anyway, it anchored no format root and read no
+    // ancestor's ignore files — the repo root's `.formatignore` went unread and
+    // `a/skip.ts` was listed — so the root is refused instead
+    let dir = git_repo("deleted_cwd_relative_root");
+    fs::write(dir.join(".formatignore"), "a/skip.ts\n").unwrap();
+    fs::create_dir_all(dir.join("a/gone")).unwrap();
+    fs::write(dir.join("a/skip.ts"), FORMATTED_TS).unwrap();
+    fs::write(dir.join("a/keep.ts"), FORMATTED_TS).unwrap();
+
+    let output = Command::new("sh")
+        .args([
+            "-c",
+            r#"cd a/gone && rmdir ../gone && exec "$0" format --list .."#,
+        ])
+        .arg(built_tsv())
+        .current_dir(&*dir)
+        .output()
+        .expect("spawn sh");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(2), "stderr: {stderr}");
+    assert!(
+        stderr.contains(
+            "error: ..: cannot resolve a relative path: the working directory is unavailable"
+        ),
+        "stderr: {stderr}"
+    );
+    assert!(!stdout.contains("skip.ts"), "stdout: {stdout}");
+}
+
+#[test]
 fn test_format_nested_prettierignore_outside_repo_does_not_warn() {
     // the warning is bounded to the TARGET ROOT, and OUTSIDE a repo tsv's regime is
     // `.formatignore`-only at every depth — so a nested `.prettierignore` here is not

@@ -27,11 +27,13 @@ import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+	cpSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	symlinkSync,
 	unlinkSync,
@@ -1495,6 +1497,71 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	// A directory reached by two walks — as an argument (`.`) and as the preloaded
+	// ancestor of another root (`sub`), or under two spellings of one argument — is named
+	// by its absolute path in both, so the warning dedupes to one line. The twin of
+	// `test_format_overlapping_roots_name_a_shadowed_prettierignore_once` in cli_tests.rs.
+	it('format names a shadowed .prettierignore once across overlapping roots', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			mkdirSync(join(dir, '.git'));
+			mkdirSync(join(dir, 'sub'));
+			writeFileSync(join(dir, '.formatignore'), 'af.ts\n');
+			writeFileSync(join(dir, '.prettierignore'), 'pf.ts\n');
+			writeFileSync(join(dir, 'sub', 'keep.ts'), 'const x = 1;\n');
+			const expected = `.prettierignore in ${realpathSync(dir)} is shadowed`;
+			for (const roots of [
+				['.', 'sub'],
+				['.', './']
+			]) {
+				const list = run_cli(['format', '--list', ...roots], undefined, dir);
+				assert.equal(list.status, 0, list.stderr);
+				const shadowed = list.stderr.split('\n').filter((line) => line.includes('is shadowed'));
+				assert.equal(shadowed.length, 1, `${roots.join(' ')}: ${list.stderr}`);
+				assert.ok(shadowed[0].includes(expected), `${roots.join(' ')}: ${list.stderr}`);
+			}
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// A relative root under a deleted working directory has nothing absolute to resolve
+	// against: it is refused rather than walked with no format root, which read no
+	// ancestor's ignore files. Linux-only, where `..` still resolves inside a removed
+	// directory. The twin of `test_format_relative_root_under_a_deleted_cwd_is_refused`.
+	it(
+		'format refuses a relative root under a deleted working directory',
+		{ skip: process.platform !== 'linux' },
+		() => {
+			const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+			try {
+				mkdirSync(join(dir, '.git'));
+				mkdirSync(join(dir, 'a', 'gone'), { recursive: true });
+				writeFileSync(join(dir, '.formatignore'), 'a/skip.ts\n');
+				writeFileSync(join(dir, 'a', 'skip.ts'), 'const x = 1;\n');
+				writeFileSync(join(dir, 'a', 'keep.ts'), 'const x = 1;\n');
+				const result = spawnSync(
+					'sh',
+					[
+						'-c',
+						'cd a/gone && rmdir ../gone && exec "$0" "$1" format --list ..',
+						process.execPath,
+						cli_path
+					],
+					{ encoding: 'utf-8', cwd: dir }
+				);
+				assert.equal(result.status, 2, result.stderr);
+				assert.match(
+					result.stderr,
+					/^error: \.\.: cannot resolve a relative path: the working directory is unavailable$/m
+				);
+				assert.doesNotMatch(result.stdout, /skip\.ts/);
+			} finally {
+				rmSync(dir, { recursive: true, force: true });
+			}
+		}
+	);
+
 	it('format scope is cwd-independent for a non-repo .formatignore', () => {
 		const base = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
@@ -1752,12 +1819,17 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// instance is stranded all the same, so a later innocent file traps with `memory
 	// access out of bounds`, though not in every round. Hence the rounds, each a chain
 	// and four ordinary files, sequentially (`--jobs 1`): the gate is that every error
-	// is a chain's, reinstantiated, and every ordinary file still formats.
+	// is a chain's, reinstantiated, and every ordinary file still formats. The chain is
+	// deeper than a pool worker reaches as well (the WASM module's own stack, near 62,600
+	// terms at `WORKER_STACK_SIZE_MB`), because the sequential route retries a main-thread
+	// overflow in a worker (`retry_overflowed_files`): each chain overflows the main thread
+	// and strands its instance there — which the ordinary files after it prove recovered —
+	// then traps in the retry worker, whose error is the one reported.
 	it('format recovers the engine after a RangeError, not only after a trap', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
 			const rounds = 12;
-			const chain = `${Array.from({ length: 10_000 }, () => 'a').join('+')};\n`;
+			const chain = `${Array.from({ length: 80_000 }, () => 'a').join('+')};\n`;
 			for (let r = 0; r < rounds; r++) {
 				const round = String(r).padStart(2, '0');
 				writeFileSync(join(dir, `r${round}_a_chain.ts`), chain);
@@ -1769,12 +1841,40 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			const error_lines = result.stderr.split('\n').filter((l) => l.startsWith('error: '));
 			assert.equal(error_lines.length, rounds, result.stderr);
 			for (const line of error_lines) {
-				assert.match(line, /_a_chain\.ts: .*\(WASM engine reinstantiated\)$/, result.stderr);
+				// the retry worker's trap, not the main thread's `RangeError` — the proof the
+				// overflow was retried rather than reported where it first happened
+				assert.match(
+					line,
+					/_a_chain\.ts: .*\(WASM engine trapped and was reinstantiated\)$/,
+					result.stderr
+				);
 			}
 			assert.match(
 				result.stderr,
 				new RegExp(`^${rounds * 4} would change, 0 unchanged, ${rounds} errors$`, 'm')
 			);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// A file deep enough to overflow the main thread's ~1 MiB V8 stack but not a pool
+	// worker's gets one verdict on both routes: the sequential route retries it in a worker
+	// (`retry_overflowed_files`), so whether it formats no longer turns on how many OTHER
+	// files its tree holds — which route the default takes.
+	it('format gives a deep file the same verdict on the sequential and worker routes', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(
+				join(dir, 'deep.ts'),
+				`${Array.from({ length: 12_000 }, () => 'a').join(' + ')};\n`
+			);
+			writeFileSync(join(dir, 'small.ts'), 'const  x=1\n');
+			for (const jobs of ['1', '2']) {
+				const result = run_cli(['format', '--check', '--jobs', jobs, dir]);
+				assert.equal(result.status, 1, `--jobs ${jobs}: ${result.stderr}`);
+				assert.match(result.stderr, /^2 would change, 0 unchanged$/m, `--jobs ${jobs}`);
+			}
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}
@@ -1840,6 +1940,61 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	// A pool whose every worker dies before claiming a file — a torn install whose
+	// worker-side entry throws on import — leaves the shared cursor unmoved, so no
+	// file was touched: this thread formats them all rather than sweeping each one
+	// into an error, and says why once (the warning carries each DISTINCT death, and
+	// both workers die the same way). Staged as a copy of the package with a broken
+	// `worker.js`, which only a worker imports; the main thread binds `./index.js`.
+	it('format falls back to one thread when no format worker ran', () => {
+		const pkg_copy = mkdtempSync(join(tmpdir(), 'tsv-torn-worker-'));
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			cpSync(fileURLToPath(new URL(`../${pkg_dir}`, import.meta.url)), pkg_copy, {
+				recursive: true
+			});
+			writeFileSync(join(pkg_copy, 'worker.js'), "throw new Error('torn worker entry');\n");
+			writeFileSync(join(dir, 'a.ts'), 'const  x=1');
+			writeFileSync(join(dir, 'b.ts'), 'const  y=2');
+			const result = spawnSync(
+				process.execPath,
+				[join(pkg_copy, 'cli.js'), 'format', '--check', '--jobs', '2', dir],
+				{ encoding: 'utf-8' }
+			);
+			assert.equal(result.status, 1, result.stderr);
+			assert.match(
+				result.stderr,
+				/^warning: no format worker ran \(torn worker entry\); formatting on one thread$/m
+			);
+			assert.doesNotMatch(result.stderr, /format worker failed/);
+			assert.match(result.stderr, /^2 would change, 0 unchanged$/m);
+		} finally {
+			rmSync(pkg_copy, { recursive: true, force: true });
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	/** The logical CPU count both bins size `--jobs` by — Rust's
+	 * `available_parallelism`, the affinity mask capped by the cgroup CPU quota —
+	 * asked of Deno, whose `navigator.hardwareConcurrency` is that count. Node's
+	 * `availableParallelism()` is the mask alone, so inside a `--cpus`-limited
+	 * container it names more CPUs than either bin prints; it stands in only where
+	 * Deno is not on PATH. Memoized: a Deno start per row would cost a few hundred
+	 * milliseconds for one fact. */
+	let logical_cpus_memo: number | undefined;
+	const logical_cpus = (): number => {
+		if (logical_cpus_memo === undefined) {
+			const deno = spawnSync('deno', ['eval', 'console.log(navigator.hardwareConcurrency)'], {
+				encoding: 'utf-8',
+				cwd: tmpdir()
+			});
+			const count = Number(deno.stdout?.trim());
+			logical_cpus_memo =
+				deno.status === 0 && Number.isInteger(count) && count > 0 ? count : availableParallelism();
+		}
+		return logical_cpus_memo;
+	};
+
 	/** `MAX_WORKERS_PER_LOGICAL_CPU` as cli.js spells it (the row below gates it
 	 * against `cli/stack.rs`). */
 	const MAX_WORKERS_PER_LOGICAL_CPU_JS = (): number => {
@@ -1883,7 +2038,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 				Number(rust_match[1]),
 				'cli.js and cli/stack.rs must state the same --jobs ceiling'
 			);
-			const ceiling = Number(match[1]) * availableParallelism();
+			const ceiling = Number(match[1]) * logical_cpus();
 			assert.equal(result.status, 1, result.stderr);
 			assert.match(
 				result.stderr,
@@ -1905,7 +2060,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
 			writeFileSync(join(dir, 'a.ts'), 'const x = 1;\n');
-			const ceiling = MAX_WORKERS_PER_LOGICAL_CPU_JS() * availableParallelism();
+			const ceiling = MAX_WORKERS_PER_LOGICAL_CPU_JS() * logical_cpus();
 			for (const [raw, printed] of [
 				['+0100000', '100000'],
 				['18446744073709551615', '18446744073709551615']
@@ -1942,6 +2097,74 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			rmSync(dir, { recursive: true, force: true });
 		}
 	});
+
+	// cli.js reserves the native CLI's thread stack in every pool worker, restated by hand
+	// (`WORKER_STACK_SIZE_MB`); this keeps the two spellings from drifting.
+	it('the pool worker stack restates the native STACK_SIZE', () => {
+		const source = readFileSync(new URL(`../${pkg_dir}/cli.js`, import.meta.url), 'utf-8');
+		const js = /const WORKER_STACK_SIZE_MB = (\d+);/.exec(source);
+		assert.ok(js, 'could not read WORKER_STACK_SIZE_MB out of cli.js — did it get renamed?');
+		const rust = readFileSync(
+			new URL('../crates/tsv_cli/src/cli/stack.rs', import.meta.url),
+			'utf-8'
+		);
+		const native = /pub const STACK_SIZE: usize = (\d+) \* 1024 \* 1024;/.exec(rust);
+		assert.ok(native, 'could not read STACK_SIZE out of cli/stack.rs — did it get renamed?');
+		assert.equal(
+			Number(js[1]),
+			Number(native[1]),
+			'cli.js and cli/stack.rs must reserve the same stack'
+		);
+	});
+
+	// Under a cgroup CPU quota the ceiling follows the quota, as the native CLI's
+	// `available_parallelism` does: a 200% quota is two cores. Node's
+	// `availableParallelism()` ignores the quota, so this pins that cli.js applies it
+	// itself (`cgroup_cpu_quota`). Imposing a quota takes a user systemd instance,
+	// which CI runners lack — the row skips there and runs on a developer machine.
+	it(
+		'format --jobs ceiling follows a cgroup CPU quota',
+		{
+			skip:
+				process.platform !== 'linux' ||
+				spawnSync('systemd-run', ['--user', '--scope', '-q', 'true']).status !== 0
+		},
+		() => {
+			const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+			try {
+				writeFileSync(join(dir, 'a.ts'), 'const  x=1');
+				const result = spawnSync(
+					'systemd-run',
+					[
+						'--user',
+						'--scope',
+						'-q',
+						'-p',
+						'CPUQuota=200%',
+						process.execPath,
+						cli_path,
+						'format',
+						'--check',
+						'--jobs',
+						'100000',
+						dir
+					],
+					{ encoding: 'utf-8' }
+				);
+				const ceiling = MAX_WORKERS_PER_LOGICAL_CPU_JS() * Math.min(logical_cpus(), 2);
+				assert.equal(result.status, 1, result.stderr);
+				assert.match(
+					result.stderr,
+					new RegExp(
+						`^warning: --jobs 100000 exceeds this machine's ceiling; using ${ceiling}$`,
+						'm'
+					)
+				);
+			} finally {
+				rmSync(dir, { recursive: true, force: true });
+			}
+		}
+	);
 
 	it('format --jobs with --content exits 2 (path mode only)', () => {
 		const result = run_cli([

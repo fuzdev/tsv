@@ -15,12 +15,12 @@
 //! wrong line. Position alone is not the rule, though: a module whose real error sits
 //! *ahead* of its `export` (definitions first, exports at the bottom) has a script attempt
 //! that reaches further, and reporting that would blame a valid `export` line. So a script
-//! attempt that died on `import` / `export` / `import.meta` — the constructs only a module
-//! holds, marked at their sites (`ParseError::is_goal_gated`) — settles the file as a module
-//! outright, and only past that does the further error win: a broken script's module
-//! attempt dies early at the first sloppy construct, and a broken module's script attempt
-//! dies at its top-level `await` — the one module-only construct with no gate, since at
-//! `Script` the word is an identifier and the attempt fails on whatever follows it.
+//! attempt that died on a module-only construct — an `import` / `export` / `import.meta`
+//! outside a namespace body, or the operand a module reads after a top-level `await` (at
+//! `Script` the word is a name, and the attempt dies on that token) — settles the file as a
+//! module outright (`ParseError::is_goal_gated`), and only past that does the further error
+//! win: a broken sloppy script's module attempt dies early at its first sloppy construct,
+//! while its script attempt reaches the typo.
 //!
 //! prettier reads the same way in practice: its babel parser tolerates `StrictWith`,
 //! `StrictOctalLiteral` and `StrictNumericEscape` at the module goal through error
@@ -35,10 +35,11 @@
 //! Which tests carry the rule and which are controls: `a_sloppy_script_with_a_typo_…`
 //! fails with the attribution reverted to "the module's error, always";
 //! `a_module_with_its_error_ahead_of_its_export_…` and the second half of `a_mixed_file_…`
-//! fail with it reverted to position alone; `a_tie_…` fails with the tie-break's direction
-//! flipped. `a_module_with_a_typo_…` (the module error is the further one anyway) and
-//! `a_named_goal_…` (no fallback runs) hold under every rule and pin the surrounding
-//! contract.
+//! fail with it reverted to position alone, and the arrow-body and top-level-`await` tails
+//! there fail as well with the mark dropped where it is set (the speculation's gate arm,
+//! `Parser::parse`'s operand mark). `a_module_with_a_typo_…` (the module error is the
+//! further one anyway), `a_tie_…` (see its note) and `a_named_goal_…` (no fallback runs)
+//! hold under every rule and pin the surrounding contract.
 
 use bumpalo::Bump;
 
@@ -84,6 +85,12 @@ fn a_sloppy_script_with_a_typo_reports_the_typo() {
         ("legacy octal literal", "var n = 010;\n"),
         ("legacy string escape", "var s = \"\\8\";\n"),
         ("await as a binding name", "var await = 1;\n"),
+        // a namespace body is TypeScript's own module-item context at either goal, so
+        // its `export` is no goal gate and proves nothing about the file
+        (
+            "with statement beside a namespace export",
+            "with (o) {\n\ta.b = 1;\n}\nnamespace N {\n\texport const x = 1;\n}\n",
+        ),
     ] {
         let source = format!("{head}{TYPO}");
         let typo_line = head.lines().count() + 2; // EOF, one past the typo's own line
@@ -132,9 +139,37 @@ fn a_module_with_its_error_ahead_of_its_export_reports_its_own_error() {
         ("export at the bottom", "export { n, f };\n"),
         ("import after the definitions", "import y from 'y';\n"),
         (
+            "decorated export after the definitions",
+            "@dec export class C {}\n",
+        ),
+        (
             "import.meta after the definitions",
             "let m = import.meta;\n",
         ),
+        // the arrow reading of a consequent's annotated head reaches the `import.meta`
+        // before its speculation is rewound; each return type fails the parenthesized
+        // reading at a different token, none of them the gate
+        (
+            "import.meta in a consequent arrow's body, array return type",
+            "let z = a ? (x): T[] => import.meta : w;\n",
+        ),
+        (
+            "import.meta in a consequent arrow's body, generic return type",
+            "let z = a ? (x): Promise<T> => import.meta : w;\n",
+        ),
+        (
+            "import.meta in a consequent arrow's body, keyword return type",
+            "let z = a ? (x): void => import.meta : w;\n",
+        ),
+        // a top-level `await` with an operand: at Script the word is a name, and the
+        // attempt dies on the operand a module would have read
+        ("top-level await statement", "await f();\n"),
+        (
+            "top-level await in a declarator",
+            "const r = await fetch(u);\n",
+        ),
+        ("top-level await in an argument", "f(await g());\n"),
+        ("top-level await using", "await using r = g();\n"),
     ] {
         let source = format!("var n = 010;\nfunction f() {{\n\treturn n;\n}}\n{tail}");
         let (line, column, message) = fallback_error_at(&source);
@@ -153,6 +188,14 @@ fn a_module_with_its_error_ahead_of_its_export_reports_its_own_error() {
 /// literal). The two goals are asked alone first so the case is a tie by evidence, not by
 /// assumption: the tie-break is pinned only if the script attempt's message at that
 /// position is a different one.
+///
+/// ⚠️ That literal is also the operand a module reads after a top-level `await`, so the
+/// script error is a goal gate as well and the module error wins on that alone — which
+/// leaves the tie-break's DIRECTION unpinned. No tie shape is left for it: a tie needs both
+/// goals to stop on one token for different reasons, and the only tokens the two grammars
+/// read differently are the goal gates' own (`await`'s operand, `import`, `export`,
+/// `import.meta`), so a gate settles every tie first. What this pins is the outcome on the
+/// one tie there is.
 #[test]
 fn a_tie_reports_the_module_error() {
     const MODULE_MESSAGE: &str =
@@ -214,28 +257,46 @@ fn a_named_goal_reports_its_own_error() {
     assert!(script.starts_with(TYPO_MESSAGE), "{script}");
 }
 
-/// The mark the attribution reads, at each site that sets it and nowhere else: every
-/// `import` / `export` / `import.meta` refusal at `Script` is a goal gate, while the
-/// module-only construct with no gate (a top-level `await` statement, where `await` is
-/// a name) and a `Module` strictness error are plain errors. The tests above read the
-/// mark through the fallback; this reads it off each attempt directly.
+/// The mark the attribution reads, at each construct that sets it and nowhere else: every
+/// `import` / `export` / `import.meta` refusal at `Script` is a goal gate, and so is the
+/// error a top-level name `await` dies on at the operand a module would have read. An
+/// `await` in a position `Module` refuses too (a non-async function body), an error past
+/// the operand, and a `Module` strictness error are plain errors. The tests above read
+/// the mark through the fallback; this reads it off each attempt directly.
 #[test]
-fn the_goal_gate_mark_is_set_by_the_module_item_refusals_alone() {
+fn the_goal_gate_mark_is_set_by_module_only_constructs_alone() {
     let arena = Bump::new();
     for (label, source) in [
         ("export declaration", "export {};\n"),
         ("side-effect import", "import 'y';\n"),
         ("default import", "import x from 'y';\n"),
         ("import.meta", "let m = import.meta;\n"),
+        // reached inside a speculative parse, which must hand the gate back rather than
+        // rewind it away
+        (
+            "import.meta in a consequent arrow's body",
+            "z = a ? (x): T[] => import.meta : w;\n",
+        ),
+        ("top-level await with an operand", "await x;\n"),
     ] {
         let error = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
-            .expect_err("a module item rejects at Script");
+            .expect_err("a module-only construct rejects at Script");
         assert!(error.is_goal_gated(), "{label}: {error}");
     }
-    let script_await = tsv_ts::parse_with_goal("await x;\n", tsv_ts::Goal::Script, &arena)
-        .expect_err("`await x` is a missing `;` at Script");
-    assert!(!script_await.is_goal_gated(), "{script_await}");
-    let module_octal = tsv_ts::parse_with_goal("var n = 010;\n", tsv_ts::Goal::Module, &arena)
-        .expect_err("a legacy octal rejects at Module");
-    assert!(!module_octal.is_goal_gated(), "{module_octal}");
+    for (label, goal, source) in [
+        (
+            "await in a non-async function body",
+            tsv_ts::Goal::Script,
+            "function f() {\n\tawait x;\n}\n",
+        ),
+        (
+            "an error past the await operand",
+            tsv_ts::Goal::Script,
+            "await + ;\n",
+        ),
+        ("a legacy octal", tsv_ts::Goal::Module, "var n = 010;\n"),
+    ] {
+        let error = tsv_ts::parse_with_goal(source, goal, &arena).expect_err("the source rejects");
+        assert!(!error.is_goal_gated(), "{label}: {error}");
+    }
 }
