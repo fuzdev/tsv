@@ -191,6 +191,22 @@ impl IgnoreStack {
         tsv_discover::is_path_pruned(rel, &self.inner)
     }
 
+    /// The heuristic-shadow warning a walk raises on the way down to `rel` (a
+    /// format-root-relative file path), delegating to
+    /// `tsv_discover::path_heuristic_shadow_warning`: `heuristic_shadow_warning`'s text for
+    /// the first ancestor directory `is_path_pruned` stops at, when the build-output
+    /// heuristic pruned it under a tsv-layer re-include; `undefined` (the JS view of
+    /// `None`) otherwise. The per-file companion to `classify_dir`'s `"prune_warn"` for a
+    /// consumer with no top-down traversal. `loose_root` is the format root's display path
+    /// outside a git repo (`undefined` inside one).
+    pub fn path_heuristic_shadow_warning(
+        &self,
+        rel: &str,
+        loose_root: Option<String>,
+    ) -> Option<String> {
+        tsv_discover::path_heuristic_shadow_warning(rel, loose_root.as_deref(), &self.inner)
+    }
+
     /// The argument error for an explicitly named **file** whose extension tsv
     /// doesn't format, delegating to `tsv_discover::unsupported_extension_error`.
     /// Returns `undefined` (the JS view of `None`) when the extension is

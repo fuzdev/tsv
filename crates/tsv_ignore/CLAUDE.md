@@ -80,7 +80,7 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   only `path`'s **own** last-match, **no ancestor walk**. Equivalent to
   `is_ignored` *only when every ancestor is already known not-ignored* — which
   tsv's discovery guarantees (it prunes ignored dirs before descending and gates
-  the root with the full ancestor-walking answer, `exclusion`), letting it skip the O(depth) re-walk per entry
+  the root with the full ancestor-walking answer, `is_ignored`), letting it skip the O(depth) re-walk per entry
   (the matcher dominates discovery; this roughly halves its self-time on a deep
   tree). A sharp contract — see Known edges.
 - `IgnoreStack::is_reincluded(path, is_dir)` — the per-path `!`-negation polarity
@@ -230,7 +230,7 @@ the file only so a diagnostic can name it.
   **only when the path's ancestors are already cleared**, which the discovery walk
   guarantees: it prunes ignored directories before descending, and the CLI/JS
   walkers gate the initial `root` with the full ancestor-walking answer
-  (`exclusion`, so `tsv format build/sub` under a gitignored `build/` still finds
+  (`is_ignored`, so `tsv format build/sub` under a gitignored `build/` still finds
   nothing — the gate catches it, and warns; the per-entry walk below uses the
   cheaper leaf query). It exists purely for
   that hot path — never call it on an arbitrary path whose ancestors haven't been

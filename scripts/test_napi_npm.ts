@@ -488,6 +488,12 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.equal(stack.should_format_file('a.ts', 'src/a.ts'), true);
 		assert.equal(stack.should_format_file('a.txt', 'src/a.txt'), false);
 		assert.equal(stack.is_path_pruned('node_modules/x.ts'), true);
+		// `dist` is pruned by the `.gitignore` rule, not the heuristic: nothing to say
+		assert.strictEqual(stack.path_heuristic_shadow_warning('dist/x.ts'), undefined);
+		// loose, with a re-include written under the heuristic-pruned `dist`: the warning
+		const loose = new api.IgnoreStack();
+		loose.push_formatignore('', '!dist/a.ts\n');
+		assert.match(loose.path_heuristic_shadow_warning('dist/a.ts')!, /build-output heuristic/);
 		// A formattable extension yields no error, spelled `undefined` like wasm's.
 		assert.strictEqual(stack.unsupported_extension_error('a.ts'), undefined);
 		assert.match(stack.unsupported_extension_error('a.txt')!, /unsupported file extension/);

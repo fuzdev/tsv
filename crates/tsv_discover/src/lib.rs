@@ -268,10 +268,44 @@ fn classify_dir_inner(
 /// [`classify_dir_inner`] so the full-stack assembly skips the incremental-walk
 /// assert; see that fn for why the assembled stack stays faithful.
 pub fn is_path_pruned(rel: &str, stack: &IgnoreStack) -> bool {
+    first_pruned_ancestor(rel, stack).is_some()
+}
+
+/// The warning a walk raises on the way down to `rel`: the [`heuristic_shadow_warning`]
+/// for the first ancestor directory [`is_path_pruned`] stops at, when that directory's
+/// verdict is [`DirVerdict::PruneWithWarning`]. `None` when no ancestor prunes `rel`, and
+/// when the one that does is a plain prune — a safety net, the matcher, or the heuristic
+/// with no tsv-layer re-include written under it. The per-file companion to
+/// [`classify_dir`] + [`heuristic_shadow_warning`], for [`is_path_pruned`]'s consumer: a
+/// document skipped because the heuristic prunes its directory, while a re-include written
+/// to reach it does nothing, is a misconfiguration that consumer can name without a walk.
+///
+/// Only the first pruned ancestor is asked, since a walk stops there. The matcher prune is
+/// the reason the verdict is read rather than [`heuristic_shadow_warning`] alone: a
+/// re-include under a directory a rule excludes is as inert, but that warning would name
+/// the heuristic as the cause. `stack` is [`is_path_pruned`]'s; `loose_root` is
+/// [`heuristic_shadow_warning`]'s.
+pub fn path_heuristic_shadow_warning(
+    rel: &str,
+    loose_root: Option<&str>,
+    stack: &IgnoreStack,
+) -> Option<String> {
+    let (dir, verdict) = first_pruned_ancestor(rel, stack)?;
+    if verdict == DirVerdict::PruneWithWarning {
+        heuristic_shadow_warning(&dir, loose_root, stack)
+    } else {
+        None
+    }
+}
+
+/// The first STRICT ancestor directory of `rel` the traversal would not descend into, with
+/// its verdict — the replay behind [`is_path_pruned`] and
+/// [`path_heuristic_shadow_warning`].
+fn first_pruned_ancestor(rel: &str, stack: &IgnoreStack) -> Option<(String, DirVerdict)> {
     let segments = tsv_ignore::split_segments(rel);
     // a root-level file (or empty path) has no ancestor directories to prune
     if segments.len() < 2 {
-        return false;
+        return None;
     }
     let git_anchors = stack.gitignore_anchors();
     let mut child_rel = String::new();
@@ -283,14 +317,12 @@ pub fn is_path_pruned(rel: &str, stack: &IgnoreStack) -> bool {
             child_rel.push_str(name);
         }
         let heuristic_active = !gitignore_above(&git_anchors, &child_rel);
-        if !matches!(
-            classify_dir_inner(name, &child_rel, heuristic_active, stack),
-            DirVerdict::Descend
-        ) {
-            return true;
+        let verdict = classify_dir_inner(name, &child_rel, heuristic_active, stack);
+        if verdict != DirVerdict::Descend {
+            return Some((child_rel, verdict));
         }
     }
-    false
+    None
 }
 
 /// Whether any `.gitignore` anchor in `anchors` sits at a **strict ancestor**
@@ -849,9 +881,15 @@ mod tests {
     fn heuristic_shadow_warning_lines_readmit_the_directory_alone() {
         // pasted into the file the warning names (its `<file>` filled in), the lines put
         // the pruned directory back in the walk and only the selected file in scope, and
-        // re-include no same-named directory elsewhere — which an unanchored `!dist/` did
-        for anchor in ["", "pkg"] {
-            let rule = "!dist/keep.ts\n";
+        // re-include no same-named directory elsewhere — which an unanchored `!dist/` did.
+        // Each line spells its path literally, so a `[slug]` segment is no character class
+        // and a trailing space survives the line's trim
+        for (anchor, dir, rule) in [
+            ("", "dist", "!dist/keep.ts\n"),
+            ("pkg", "dist", "!dist/keep.ts\n"),
+            ("", "[slug]/dist", "!\\[slug\\]/dist/keep.ts\n"),
+            ("", ".c ", "!.c\\ /keep.ts\n"),
+        ] {
             let under = |path: &str| {
                 if anchor.is_empty() {
                     path.to_string()
@@ -859,7 +897,8 @@ mod tests {
                     format!("{anchor}/{path}")
                 }
             };
-            let d = under("dist");
+            let name = dir.rsplit('/').next().unwrap();
+            let d = under(dir);
             let mut stack = IgnoreStack::new();
             stack.push_formatignore(anchor, rule);
             let warning = heuristic_shadow_warning(&d, None, &stack).unwrap();
@@ -873,22 +912,20 @@ mod tests {
             let mut fixed = IgnoreStack::new();
             fixed.push_formatignore(anchor, &format!("{rule}{}\n", lines.join("\n")));
             assert_eq!(
-                classify_dir("dist", &d, true, &fixed),
+                classify_dir(name, &d, true, &fixed),
                 DirVerdict::Descend,
                 "{d}: {lines:?}"
             );
-            assert!(should_format_file(
-                "keep.ts",
-                &under("dist/keep.ts"),
-                &fixed
-            ));
-            assert!(!should_format_file(
-                "other.ts",
-                &under("dist/other.ts"),
-                &fixed
-            ));
+            assert!(
+                should_format_file("keep.ts", &under(&format!("{dir}/keep.ts")), &fixed),
+                "{d}: {lines:?}"
+            );
+            assert!(
+                !should_format_file("other.ts", &under(&format!("{dir}/other.ts")), &fixed),
+                "{d}: {lines:?}"
+            );
             assert_eq!(
-                classify_dir("dist", &under("lib/dist"), true, &fixed),
+                classify_dir(name, &under(&format!("lib/{name}")), true, &fixed),
                 DirVerdict::Prune,
                 "{d}: {lines:?}"
             );
@@ -1285,5 +1322,89 @@ mod tests {
         let stack = stack_from(&[("", "vendored/\n")], &[]);
         assert!(is_path_pruned("vendored/deep/nested/v.svelte", &stack));
         assert!(!is_path_pruned("src/deep/nested/app.svelte", &stack));
+    }
+
+    #[test]
+    fn path_heuristic_shadow_warning_names_a_reinclude_under_the_pruned_ancestor() {
+        // loose: the heuristic prunes `dist`, which `!dist/keep.ts` was written to reach
+        // into — the walk's per-directory warning, asked of a file under it
+        let stack = stack_from(&[], &[("", "!dist/keep.ts\n")]);
+        let warning = heuristic_shadow_warning("dist", None, &stack);
+        assert!(warning.is_some());
+        assert_eq!(
+            path_heuristic_shadow_warning("dist/keep.ts", None, &stack),
+            warning
+        );
+        // every file under the directory is skipped by the same prune, as the walk warns
+        // once at the directory whichever file the rule names
+        assert_eq!(
+            path_heuristic_shadow_warning("dist/deep/other.ts", None, &stack),
+            warning
+        );
+        // nested, and outside a repo: the deeper ancestor is the one asked
+        let stack = stack_from(&[], &[("pkg", "!dist/keep.ts\n")]);
+        let warning = heuristic_shadow_warning("pkg/dist", Some("/"), &stack);
+        assert!(warning.is_some());
+        assert_eq!(
+            path_heuristic_shadow_warning("pkg/dist/keep.ts", Some("/"), &stack),
+            warning
+        );
+    }
+
+    #[test]
+    fn path_heuristic_shadow_warning_is_silent_for_a_plain_prune() {
+        // nothing prunes the path, or it has no ancestor to prune
+        let stack = stack_from(&[], &[("", "!dist/keep.ts\n")]);
+        assert_eq!(
+            path_heuristic_shadow_warning("src/app.ts", None, &stack),
+            None
+        );
+        assert_eq!(path_heuristic_shadow_warning("keep.ts", None, &stack), None);
+        // the heuristic prunes with no re-include written under the directory
+        assert!(is_path_pruned("dist/keep.ts", &IgnoreStack::new()));
+        assert_eq!(
+            path_heuristic_shadow_warning("dist/keep.ts", None, &IgnoreStack::new()),
+            None
+        );
+        // a safety net prunes whatever is written under it, and says nothing
+        let stack = stack_from(&[], &[("", "!node_modules/pkg/a.ts\n")]);
+        assert!(is_path_pruned("node_modules/pkg/a.ts", &stack));
+        assert_eq!(
+            path_heuristic_shadow_warning("node_modules/pkg/a.ts", None, &stack),
+            None
+        );
+        // the matcher prunes a directory that is no heuristic one: the re-include under it
+        // is as inert, but the heuristic's warning would misname the cause
+        let stack = stack_from(&[], &[("", "vendored/\n!vendored/keep.ts\n")]);
+        assert!(is_path_pruned("vendored/keep.ts", &stack));
+        assert!(heuristic_shadow_warning("vendored", None, &stack).is_some());
+        assert_eq!(
+            path_heuristic_shadow_warning("vendored/keep.ts", None, &stack),
+            None
+        );
+        // a `.gitignore` above turns the heuristic off, so the walk enters `dist`
+        let stack = stack_from(&[("", "# nothing\n")], &[("", "!dist/keep.ts\n")]);
+        assert!(!is_path_pruned("dist/keep.ts", &stack));
+        assert_eq!(
+            path_heuristic_shadow_warning("dist/keep.ts", None, &stack),
+            None
+        );
+    }
+
+    #[test]
+    fn path_heuristic_shadow_warning_asks_only_the_first_pruned_ancestor() {
+        // the walk stops at `.cache`, so the warning is about `.cache`, not `.cache/dist`
+        let stack = stack_from(&[], &[("", "!.cache/dist/keep.ts\n")]);
+        assert_eq!(
+            path_heuristic_shadow_warning(".cache/dist/keep.ts", None, &stack),
+            heuristic_shadow_warning(".cache", None, &stack)
+        );
+        // a rule written inside the pruned directory is one the walk never reads
+        let stack = stack_from(&[], &[("dist", "!sub/keep.ts\n")]);
+        assert!(is_path_pruned("dist/sub/keep.ts", &stack));
+        assert_eq!(
+            path_heuristic_shadow_warning("dist/sub/keep.ts", None, &stack),
+            None
+        );
     }
 }

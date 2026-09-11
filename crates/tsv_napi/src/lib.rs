@@ -366,6 +366,26 @@ impl IgnoreStack {
         tsv_discover::is_path_pruned(&rel, &self.inner)
     }
 
+    /// The heuristic-shadow warning a walk raises on the way down to `rel` (a
+    /// format-root-relative file path): `heuristic_shadow_warning`'s text for the first
+    /// ancestor directory `is_path_pruned` stops at, when the build-output heuristic pruned
+    /// it under a tsv-layer re-include; `undefined` otherwise. The per-file companion to
+    /// `classify_dir`'s `"prune_warn"` for a consumer with no top-down traversal.
+    /// `loose_root` is the format root's display path outside a git repo (`undefined`
+    /// inside one).
+    #[napi(js_name = "path_heuristic_shadow_warning", catch_unwind)]
+    pub fn path_heuristic_shadow_warning(
+        &self,
+        rel: String,
+        loose_root: Option<String>,
+    ) -> Either<String, Undefined> {
+        or_undefined(tsv_discover::path_heuristic_shadow_warning(
+            &rel,
+            loose_root.as_deref(),
+            &self.inner,
+        ))
+    }
+
     /// The argument error for an explicitly named **file** whose extension tsv
     /// doesn't format; `undefined` when the extension is formattable. A method
     /// (not a free function) so it rides the class through the package facade;
@@ -822,6 +842,16 @@ mod tests {
         assert!(matches!(
             stack.prettierignore_outside_repo_warning("d".to_owned(), true, true, false),
             Either::B(())
+        ));
+        assert!(matches!(
+            stack.path_heuristic_shadow_warning("dist/a.ts".to_owned(), None),
+            Either::B(())
+        ));
+        let mut loose = IgnoreStack::new();
+        loose.push_formatignore(String::new(), "!dist/a.ts\n".to_owned());
+        assert!(matches!(
+            loose.path_heuristic_shadow_warning("dist/a.ts".to_owned(), None),
+            Either::A(_)
         ));
     }
 }

@@ -102,7 +102,16 @@ crates (the open-convention stance):
   Pair with `IgnoreStack::is_ignored(rel, false)` for the file-level match.
   `classify_dir` stays the primitive for real traversers, which thread
   `heuristic_active` naturally as they descend. The CLIs never ask it of a path an
-  argument named: see the next entry.
+  argument named: see `excluded_argument_warning`.
+- `path_heuristic_shadow_warning(rel, loose_root, &IgnoreStack) -> Option<String>` —
+  the same replay's warning: `heuristic_shadow_warning` for the first ancestor
+  `is_path_pruned` stops at, when that directory's verdict is `PruneWithWarning`; `None`
+  otherwise. It reads the verdict, not `negation_under` alone, because a re-include under
+  a directory a *rule* excludes is as inert but not the heuristic's doing, and only the
+  first pruned ancestor, since the walk stops there. This is how a consumer with no walk
+  names a `!dist/keep.ts` the heuristic makes a no-op, instead of skipping the file
+  silently. Both `is_path_pruned` and this run one private replay
+  (`first_pruned_ancestor`).
 - `excluded_argument_warning(display, rel, is_dir, loose_root, &IgnoreStack)
   -> Option<String>` — the warning for a path an argument **named** (a file, or a
   directory root) that an ignore file puts out of scope. Whether it IS out of scope is
@@ -184,7 +193,8 @@ crates (the open-convention stance):
   method-for-method twin) — the `format`-gated `IgnoreStack` wrapper exposes
   `classify_dir(name, child_rel, heuristic_active) -> string`
   (`"descend"|"prune"|"prune_warn"`), `should_format_file(name, child_rel) ->
-  bool`, `is_path_pruned(rel) -> bool`, `excluded_argument_warning(display, rel, is_dir,
+  bool`, `is_path_pruned(rel) -> bool`, `path_heuristic_shadow_warning(rel, loose_root?)
+  -> string | undefined`, `excluded_argument_warning(display, rel, is_dir,
   loose_root?) -> string | undefined`, `heuristic_shadow_warning(dir, loose_root?) ->
   string | undefined`,
   `unsupported_extension_error(path) -> string | undefined`,
