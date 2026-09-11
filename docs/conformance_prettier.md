@@ -200,10 +200,13 @@ its tail:
   ([index_signature_key_type_line_comments](../tests/fixtures/typescript/types/type_members/index_signature_key_type_line_comments_prettier_divergence/))
   and value-type
   ([index_signature_value_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_value_line_comment_prettier_divergence/)).
-  **Exception**: an own-line `format-ignore` / `prettier-ignore` directive in the gap
-  is NOT pulled up to trail the `:` — it keeps its authored own-line placement, so the
-  freeze survives a second pass (a head-trailing directive is inert under the placement
-  classification) — see **On single-child type positions** under
+  ⚠️ The `:`→type gap is a **keyword→value** site too (the ⚠️ above): a comment the
+  author put on the `:` line trails it, and an own-line one keeps its own line with the
+  type hanging below
+  ([annotation_own_line_line_comment](../tests/fixtures/typescript/types/comments/annotation_own_line_line_comment_prettier_divergence/)).
+  An own-line `format-ignore` / `prettier-ignore` directive keeps that placement like any
+  comment, so the freeze survives a second pass (a head-trailing directive is inert under
+  the placement classification) — see **On single-child type positions** under
   [§Format-ignore directive](./conformance_prettier_ignore.md#format-ignore-directive).
 - **Before-`:` key/binding gap** — the complement of the colon→type case: a line
   comment between a key/binding name (or its `?`/`!` marker) and the `:`

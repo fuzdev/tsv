@@ -1093,6 +1093,77 @@ const prettier_ignore_frozen_terminator: DivergencePattern = {
 	}
 };
 
+/**
+ * A `prettier-ignore` directive TRAILING a `:` head — an object property's key, an annotation —
+ * which tsv's placement floor reads as inert and prettier honors.
+ *
+ * tsv freezes a construct only under a directive alone on its line, so `k: // prettier-ignore`
+ * leaves the value to format; prettier keeps the comment on the `:` line and freezes the value
+ * anyway (though not at a declarator `=` in the same placement, where it reflows too). The two
+ * outputs then differ only in the value's whitespace: prettier's is the author's, tsv's is
+ * formatted.
+ *
+ * ⚠️ Its blind spot is [`format_ignore_preserved`]'s: a whitespace-only bug in a value that
+ * happens to sit under such a directive passes the content proof. The window is kept to the
+ * value's own lines (those indented past the head) so nothing else in the file is absorbed.
+ */
+const prettier_ignore_trailing_colon_head: DivergencePattern = {
+	id: 'prettier_ignore_trailing_colon_head',
+	description:
+		"a `prettier-ignore` trailing a `:` head (object property, annotation) is inert under tsv's placement floor, so the value formats; prettier freezes it",
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['Format-ignore directive'],
+	fixtures: [
+		'typescript/expressions/objects/value_prettier_ignore_trailing_head_prettier_divergence'
+	],
+	detect(ctx) {
+		const ours_lines = ctx.ours_lines!;
+
+		// CONTENT PROOF — the whole ours/prettier difference is whitespace, so a freeze prettier
+		// applied and tsv did not is all that can have happened: nothing was lost, added or
+		// reordered. A single non-whitespace difference anywhere disables the detector.
+		if (strip_all_ws(ctx.ours) !== strip_all_ws(ctx.prettier)) return null;
+
+		// FAMILY SIGNATURE — a directive TRAILING a `:` on its line in our output (content before
+		// the `:` on the same line; an own-line directive, which both formatters honor, never
+		// matches), and the window of the value it would have frozen: the lines after it indented
+		// past the head's own line. A `case` / `default` label's `:` is excluded — it heads a
+		// statement list rather than a value, and nothing pins what prettier freezes there.
+		const head =
+			/^(\s*)(?!case\b|default\b)\S.*:\s*(?:\/\/\s*prettier-ignore|\/\*\s*prettier-ignore\s*\*\/)\s*$/;
+		const value_lines = new Set<number>();
+		for (let i = 0; i < ours_lines.length; i++) {
+			const m = head.exec(ours_lines[i]);
+			if (!m) continue;
+			const head_indent = m[1].length;
+			for (let k = i + 1; k < ours_lines.length; k++) {
+				const line = ours_lines[k];
+				if (line.trim() === '' || leading_ws(line).length <= head_indent) break;
+				value_lines.add(k);
+			}
+		}
+		if (value_lines.size === 0) return null;
+
+		// A hunk is claimed only when every ours-side line of it lies inside a window — a hunk
+		// reaching past the value is something else's.
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			const ours = hunk.ours_range;
+			if (!ours) return false;
+			for (let k = ours.start; k <= ours.end; k++) if (!value_lines.has(k)) return false;
+			return true;
+		});
+
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'prettier_ignore_trailing_colon_head',
+			confidence: 'certain',
+			hunk_indices,
+			reason:
+				'`prettier-ignore` trailing a `:` head is inert under tsv, so the value formats; prettier freezes it'
+		};
+	}
+};
+
 // ─── Pattern Detectors ──────────────────────────────────────────────────────
 //
 // Ordered from most specific/narrow to most broad.
@@ -4215,6 +4286,7 @@ export const PATTERNS: DivergencePattern[] = [
 	// spelling BOTH formatters honor, where the divergence is the frozen slice's extent.
 	format_ignore_preserved,
 	prettier_ignore_frozen_terminator,
+	prettier_ignore_trailing_colon_head,
 
 	// Terminator-gap comment placement — keyed on a clause-bodied statement, so it runs
 	// ahead of the broad `comment_position`.

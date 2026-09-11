@@ -372,7 +372,6 @@ impl<'a> Printer<'a> {
     ///
     /// **Every** site where a line comment splits a construct's head from its tail
     /// routes here, so the enumeration is the rule's coverage, not a sample: the
-    /// `:`→type annotation and its union arm (`build_type_annotation_doc`), the
     /// marker→`:` before-colon gap (`build_marker_colon_line_continuation`), the
     /// name→`=` initializer gap (`build_initializer_line_continuation`), the
     /// type-parameter pre-keyword gaps — name→`extends` and pre-`=`
@@ -1974,7 +1973,9 @@ impl<'a> Printer<'a> {
     /// Philosophy). Shared by type-parameter constraint/default values (`= `/`extends`),
     /// class-property initializers (`= `), the prefix type operators (`keyof`/`typeof`),
     /// `infer`, the predicate `is` and cast keyword→type gaps, the function-type
-    /// `=>`→return gap, a switch label's `case`→test gap, and the two expression-level
+    /// `=>`→return gap, the annotation `:`→type gap (`build_type_annotation_doc` — every
+    /// annotation, return type and property signature), a switch label's `case`→test gap,
+    /// and the two expression-level
     /// keyword→operand gaps — `new`→callee (`build_new_doc_with_wrapping`) and
     /// `await`→operand (`build_await_doc`), whose tail is the WHOLE operand so a broken
     /// argument list renders at the hang's indent.
@@ -2048,6 +2049,25 @@ impl<'a> Printer<'a> {
         }
         value_block.push(value_doc);
         parts.push(d.indent(d.concat(&value_block)));
+    }
+
+    /// Whether the FIRST comment of an operator→value gap keeps the line the author gave
+    /// it rather than trailing the operator: the gap holds a line comment, so it hangs open
+    /// anyway, and that first comment does not share `op_end`'s line. This is the
+    /// keyword→value rule ([`Self::append_keyword_value_line_comments`]) for the gap
+    /// emitters that place the first comment themselves — a conditional's `?` / `:`→branch
+    /// gap at the value level (`emit_ternary_branch_comments`) and the type level
+    /// (`push_conditional_branch_gap_comments`). A comment there leads the branch, so
+    /// own-line-ness is authorship (conformance_prettier.md §Comment Position Philosophy).
+    pub(crate) fn first_gap_comment_keeps_own_line(
+        &self,
+        comments: &[&internal::Comment],
+        op_end: u32,
+    ) -> bool {
+        comments.iter().any(|c| !c.is_block)
+            && comments
+                .first()
+                .is_some_and(|c| !self.is_same_line(op_end, c.span.start))
     }
 }
 

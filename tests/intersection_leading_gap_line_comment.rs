@@ -15,11 +15,10 @@
 //!
 //! - a **plain line comment** converges in one pass to the trailing-prefix form the
 //!   paren-hoist path already produces (`type T = // c⏎⇥{ x: 1 } & b;`) — probe-verified
-//!   stable at the alias AND annotation hosts (the own-line form is only stable at the
-//!   alias, so it cannot be the universal target). A ONE-member intersection is the
+//!   stable at the alias AND annotation hosts. A ONE-member intersection is the
 //!   exception: transparent, its leading gap is the host's own, so each host answers as
-//!   it does for the `&`-less authoring — the alias keeps the own-line form, the
-//!   annotation pulls the comment up to its continuation;
+//!   it does for the `&`-less authoring — a comment on the `=` / `:` line trails it, and an
+//!   own-line comment keeps its line at both hosts;
 //! - a **directive** (alone on its line) stays own-line and freezes the first member
 //!   (Rule A) — the own-line directive form is the fixed point both hosts keep.
 //!
@@ -118,13 +117,20 @@ fn single_member_alias_line_comment() {
 }
 
 /// Single-member annotation: the comment already survived here, but the body rendered at
-/// column 0 on pass 1 and re-indented on pass 2 — a 2-pass transient. One pass now.
+/// column 0 on pass 1 and re-indented on pass 2 — a 2-pass transient. One pass now, to the
+/// `:`→type gap's own-line form, as at the alias above.
 #[test]
 fn single_member_annotation_line_comment_indent_stable() {
     assert_one_pass(
         "let v:\n\t&\n\t// c\n\t{x: 1};\n",
-        "let v: // c\n\t{ x: 1 };\n",
+        "let v:\n\t// c\n\t{ x: 1 };\n",
     );
+}
+
+/// ...and its twin authored on the `:` line, where the comment trails the `:`.
+#[test]
+fn single_member_annotation_line_comment_on_colon_line() {
+    assert_one_pass("let v: & // c\n\t{x: 1};\n", "let v: // c\n\t{ x: 1 };\n");
 }
 
 /// No-regression control: an own-line BLOCK comment in the leading gap keeps its current

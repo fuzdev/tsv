@@ -1898,6 +1898,67 @@ Deno.test('format_ignore_preserved: negative - divergence ABOVE every directive'
 	assertEquals(match, null);
 });
 
+// ─── prettier_ignore_trailing_colon_head ────────────────────────────────────
+
+Deno.test(
+	'prettier_ignore_trailing_colon_head: positive - prettier freezes the value under a `:`-trailing directive',
+	() => {
+		const prettier =
+			'x = {\n\tk: // prettier-ignore\n\t\tfn([\n\t\t0, 0,\n\t\t1, 0\n\t]),\n\tm: 1\n};';
+		const ours = 'x = {\n\tk: // prettier-ignore\n\t\tfn([0, 0, 1, 0]),\n\tm: 1\n};';
+		const ctx = make_context(ours, prettier, 'typescript');
+		const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
+		assertNotEquals(match, null);
+	}
+);
+
+Deno.test(
+	'prettier_ignore_trailing_colon_head: negative - an own-line directive explains nothing',
+	() => {
+		// Alone on its line the directive is honored by BOTH formatters, so a divergence under it
+		// cannot be the trailing placement's — it is some other layout difference.
+		const prettier = 'x = {\n\tk:\n\t\t// prettier-ignore\n\t\tfn([\n\t\t0, 0\n\t]),\n};';
+		const ours = 'x = {\n\tk:\n\t\t// prettier-ignore\n\t\tfn([0, 0]),\n};';
+		const ctx = make_context(ours, prettier, 'typescript');
+		const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
+		assertEquals(match, null);
+	}
+);
+
+Deno.test(
+	'prettier_ignore_trailing_colon_head: negative - a real content change fails the proof',
+	() => {
+		const prettier = 'x = {\n\tk: // prettier-ignore\n\t\tfn([\n\t\t0, 0\n\t]),\n};';
+		const ours = 'x = {\n\tk: // prettier-ignore\n\t\tfn([0, 1]),\n};';
+		const ctx = make_context(ours, prettier, 'typescript');
+		const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
+		assertEquals(match, null);
+	}
+);
+
+Deno.test('prettier_ignore_trailing_colon_head: negative - a hunk past the frozen value', () => {
+	// The window is the value's own lines; a sibling property's whitespace difference is not
+	// the directive's, and leaving it unclaimed keeps the file honestly `partial`.
+	const prettier = 'x = {\n\tk: // prettier-ignore\n\t\tfn(1),\n\tm: [1, 2]\n};';
+	const ours = 'x = {\n\tk: // prettier-ignore\n\t\tfn(1),\n\tm: [1,   2]\n};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test(
+	'prettier_ignore_trailing_colon_head: negative - a `case` label is not a value head',
+	() => {
+		// A `case` / `default` `:` heads a statement list; nothing pins what prettier freezes under a
+		// directive trailing it, so the detector leaves the hunk unexplained.
+		const prettier = 'switch (x) {\n\tcase 1: // prettier-ignore\n\t\tfn([1,   2]);\n}';
+		const ours = 'switch (x) {\n\tcase 1: // prettier-ignore\n\t\tfn([1, 2]);\n}';
+		const ctx = make_context(ours, prettier, 'typescript');
+		const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
+		assertEquals(match, null);
+	}
+);
+
 // ─── comment_preserved ──────────────────────────────────────────────────────
 
 Deno.test('comment_preserved: positive - prettier drops a MULTI-LINE block comment', () => {

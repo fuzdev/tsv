@@ -980,9 +980,12 @@ impl<'a> Printer<'a> {
     /// true branch, or between `:` and the false branch — into `parts`, returning
     /// whether the branch type must itself drop to its own indented line.
     ///
-    /// The first comment trails the operator (` // c`); a line comment ends its
-    /// line, so each subsequent comment drops to its own indented line rather than
-    /// merging onto the operator's line (`// c1 // c2` would reparse as a single
+    /// A first comment on the operator's line trails it (` // c`); in a gap holding a line
+    /// comment, a first comment the author put on its OWN line keeps that line, leaving the
+    /// operator alone on its own — it leads the branch, so own-line-ness is authorship, the
+    /// rule the value-level conditional shares (`first_gap_comment_keeps_own_line`). A line
+    /// comment ends its line, so each subsequent comment drops to its own indented line
+    /// rather than merging onto the operator's line (`// c1 // c2` would reparse as a single
     /// comment — a boundary loss). A single-line block stays inline (in-place
     /// collapse). A line comment or a multiline block forces the branch onto its
     /// own line (`needs_indent`). The `?`- and `:`-branch loops share this so they
@@ -991,8 +994,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut needs_indent = false;
         let mut prev_was_line_comment = false;
-        for comment in self.comments_to_emit_between(from, to) {
-            if prev_was_line_comment {
+        let comments: CommentVec<'_> = self.comments_to_emit_between(from, to).collect();
+        let first_keeps_own_line = self.first_gap_comment_keeps_own_line(&comments, from);
+        for (i, comment) in comments.iter().enumerate() {
+            if prev_was_line_comment || (i == 0 && first_keeps_own_line) {
                 parts.push(d.hardline());
                 parts.push(d.text(INDENT));
             } else {

@@ -265,12 +265,12 @@ impl<'a> Printer<'a> {
     /// (`owned` ⇒ a bundler annotation or JSDoc cast, never a `format-ignore` directive),
     /// so the to-emit and in-source axes coincide, but naming the in-source one keeps the
     /// module's axis choice single and deliberate (one question, one predicate).
-    /// The same fact also answers the emission-routing question at heads whose default
-    /// line-comment layout trails the first comment after the head (the annotation `:`
-    /// via `build_continuation_indent`): an honored directive must stay own-line, since
-    /// a head-trailing placement is inert and the relocated form would lose the freeze
-    /// on the second pass. Asked for composite children too there — the routing is
-    /// about the directive's own placement, not the freeze target.
+    /// The same fact also answers the emission-routing question at the annotation `:`
+    /// (`build_type_annotation_doc`), which hands an honored directive to its own builder
+    /// so it keeps its line and freezes the value: a head-trailing placement is inert, and
+    /// the relocated form would lose the freeze on the second pass. Asked for composite
+    /// children too there — the routing is about the directive's own placement, not the
+    /// freeze target.
     pub(in crate::printer) fn member_gap_frozen(&self, prev_end: u32, member_start: u32) -> bool {
         self.has_format_ignore
             && self
