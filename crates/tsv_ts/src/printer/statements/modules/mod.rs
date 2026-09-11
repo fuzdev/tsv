@@ -75,14 +75,13 @@ impl<'a> Printer<'a> {
                 .unwrap_or(value),
             None => value,
         };
-        // The keyword→value gate `export default` asks (`comments_force_own_line_between`), plus
-        // a run the author broke after whose break is FORCED: both hang the value, since the
-        // inline continuation would weld the run onto the keyword's line — and, for a `//` run
-        // ending in a block glued to a paren, weld the value onto the block's `*/`.
-        let head = if self.comments_force_own_line_between(keyword_end, value_span.start)
-            || self
-                .breaking_value_leading_run(keyword_end, value_span.start, || value)
-                .is_some()
+        // The keyword→value gate `export default` asks: a comment that forces its own line, or a
+        // run the author broke after whose break is FORCED, hangs the value, since the inline
+        // continuation would weld the run onto the keyword's line — and, for a `//` run ending in
+        // a block glued to a paren, weld the value onto the block's `*/`.
+        let head = if self
+            .keyword_value_hang_doc(keyword_end, value_span.start, || value)
+            .is_some()
         {
             let mut parts: DocBuf = smallvec![keyword_doc];
             self.append_keyword_value_line_comments(
@@ -430,13 +429,10 @@ impl<'a> Printer<'a> {
         // one that broke before it, or by the value's own hard break. The inline continuation
         // below would weld the run onto one line, and the paren spelling's first pass already
         // lands here, so the two spellings had two fixed points one pass apart.
-        let forced_broke_after_run = || {
-            self.breaking_value_leading_run(keyword_end, decl_start, || value_doc)
-                .is_some()
-        };
         if left_spine_run
-            || self.comments_force_own_line_between(keyword_end, decl_start)
-            || forced_broke_after_run()
+            || self
+                .keyword_value_hang_doc(keyword_end, decl_start, || value_doc)
+                .is_some()
         {
             let mut parts: DocBuf = smallvec![keyword_doc];
             self.append_keyword_value_line_comments(&mut parts, keyword_end, decl_start, value_doc);

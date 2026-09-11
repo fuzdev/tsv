@@ -300,42 +300,39 @@ impl<'a> Printer<'a> {
         // Comments between `=>` and the return type (e.g., `() => /* c */ string`)
         // For function types, the annotation span starts at `=` in `=>`
         let arrow_end = return_type.span.start + "=>".len() as u32;
-        // An alone-on-line format-ignore directive in the `=>`→return gap stays
-        // OWN-LINE — the trailing-hang emitter below would relocate it to trail the
-        // `=>` (`=> // prettier-ignore`), an inert placement that loses the freeze on
-        // the second pass — and freezes a non-composite return type verbatim
-        // (`single_child_frozen`; a composite return declines and freezes via its own
-        // leading-run walk, which reaches the directive across the gap's whitespace).
-        // Covers function, constructor, and abstract-constructor types (all route here).
-        if frozen {
-            let value_doc = self.build_routed_child_doc(return_ty);
+        // The `=>`→return gap is a keyword→value gap: when it HANGS the return type, the type
+        // hangs one level in below the run and each comment keeps the line the author gave it
+        // — a same-line comment trails `=>`, an own-line one keeps its line, as at `keyof` /
+        // `await` / `new` / `case` (§Uniform Forced-Continuation Indent).
+        let hang = |value_doc: DocId| {
             let mut parts: DocBuf = smallvec![d.text(arrow)];
             self.append_keyword_value_line_comments(&mut parts, arrow_end, type_start, value_doc);
-            return d.concat(&parts);
+            d.concat(&parts)
+        };
+        // An alone-on-line format-ignore directive in the `=>`→return gap hangs the same way
+        // and freezes a non-composite return type verbatim (`single_child_frozen`; a
+        // composite return declines and freezes via its own leading-run walk, which reaches
+        // the directive across the gap's whitespace). Covers function, constructor, and
+        // abstract-constructor types (all route here).
+        if frozen {
+            return hang(self.build_routed_child_doc(return_ty));
         }
-        // Use break-for-line variant: line comments must force a hardline before
-        // the return type so they don't swallow it (`=> // c\nT`, not `=> // c T`).
-        // `None` on the comment-free path so none of the five layouts below carries an
-        // empty child — every function type (`() => void`, every callback parameter)
-        // reaches one of them.
-        let comments_doc = self
-            .has_comments_to_emit_between(arrow_end, type_start)
-            .then(|| self.build_trailing_comments_hang_next(arrow_end, type_start));
-        // A comment that hangs the return type takes the continuation indent every
-        // other keyword→value gap takes (§Uniform Forced-Continuation Indent) — the
-        // `member_gap_frozen` arm above already gets it from
-        // `append_keyword_value_line_comments`, and this is the same seam without a
-        // directive. The indent wraps the comment run *and* the type, so the hardline
-        // inside the run is what carries it; an inline block hangs nothing, so the
-        // wrapper is gated rather than unconditional (it would be inert, but the gate
-        // states which case it is for).
-        let hangs =
-            comments_doc.is_some() && self.comments_force_own_line_between(arrow_end, type_start);
-        // `<lead><comments><type>`, skipping the comment slot when the gap is bare.
-        let joined = |lead: DocId, ty: DocId| match comments_doc {
-            Some(c) if hangs => d.concat(&[lead, d.indent(d.concat(&[c, ty]))]),
-            Some(c) => d.concat(&[lead, c, ty]),
-            None => d.concat(&[lead, ty]),
+        // `false` on the comment-free path, so none of the layouts below carries an empty
+        // child — every function type (`() => void`, every callback parameter) reaches one
+        // of them.
+        let has_comments = self.has_comments_to_emit_between(arrow_end, type_start);
+        // A comment that forces its own line, or a block run the author broke after whose
+        // break is forced ([`Printer::keyword_value_hang_doc`]), hangs the type; otherwise
+        // the run trails `=>` inline.
+        let hang_or_join = |ty: DocId| {
+            if !has_comments {
+                return d.concat(&[d.text(arrow_sp), ty]);
+            }
+            if let Some(value_doc) = self.keyword_value_hang_doc(arrow_end, type_start, || ty) {
+                return hang(value_doc);
+            }
+            let comments = self.build_trailing_comments_hang_next(arrow_end, type_start);
+            d.concat(&[d.text(arrow_sp), comments, ty])
         };
         // Strip redundant comment-free parens so `($A | $B)` / `($A & $B)` return
         // types get the same hanging layout as the bare form (prettier strips them
@@ -348,10 +345,11 @@ impl<'a> Printer<'a> {
             // handed INTO the union, which binds it to the first member after the pipe
             // its broken layout synthesizes and declines the hug for it — prettier
             // binds that comment to the member, so `() => /* c */ { … } | null` breaks
-            // after the `=>` where the comment-free form hugs. `comments_doc` then
-            // stays out of the hang: exactly one of the two prints the run
+            // after the `=>` where the comment-free form hugs. The gap's own emitter
+            // then stays out of the hang: exactly one of the two prints the run
             // (docs/comments.md hazard 3). A LINE comment is never handed (it cannot
-            // be glued to the member), so it keeps the hug arm's `joined` hang,
+            // be glued to the member), so a hugging union takes the gap's keyword→value
+            // hang (`hang_or_join`), as a simple type does,
             // `function_type_return_hug_union_line_comment_prettier_divergence`.
             let UnionValueDoc {
                 doc: type_doc,
@@ -360,7 +358,7 @@ impl<'a> Printer<'a> {
             } = self.build_union_value_doc(arrow_end, u);
             // A hugging union return hugs `=>` — the same rule as the annotation `:`
             // and predicate `is` seams (`build_hugged_union_after_operator_doc`),
-            // spelled through `joined` because this gap's comment run can hang. A
+            // spelled through `hang_or_join` because this gap's comment run can hang. A
             // brace member (`{ … } | null` / `| void`) owns its own expansion and the
             // void member trails the `}`, the layout the type-alias RHS / `as` cast
             // use; a reference member (`Map<…> | null`) lets its type arguments own
@@ -369,13 +367,13 @@ impl<'a> Printer<'a> {
             // above the member can break — the hang below is for the non-hugging
             // unions only, where a member/gap comment has made the printer decline.
             // A handed run that leaves the hug standing — a multi-line block, the sole
-            // member's leading comment — is already inside `type_doc`: `joined` would
-            // print the gap a second time (docs/comments.md hazard 3).
+            // member's leading comment — is already inside `type_doc`: the gap's emitter
+            // would print it a second time (docs/comments.md hazard 3).
             if hugged {
                 return if run_handed {
                     d.concat(&[d.text(arrow_sp), type_doc])
                 } else {
-                    joined(d.text(arrow_sp), type_doc)
+                    hang_or_join(type_doc)
                 };
             }
             // The gap's unclaimed run rides INSIDE the hang through the value-gap
@@ -385,11 +383,10 @@ impl<'a> Printer<'a> {
             // materializes as the seam breaks, so a block the author broke after
             // keeps its line above the union instead of welding onto the pipe the
             // broken layout synthesizes (`/* c */ | {`).
-            let hung = match comments_doc {
-                Some(_) if !run_handed => {
-                    self.prepend_rhs_comments(type_doc, arrow_end, type_start)
-                }
-                _ => type_doc,
+            let hung = if has_comments && !run_handed {
+                self.prepend_rhs_comments(type_doc, arrow_end, type_start)
+            } else {
+                type_doc
             };
             return d.concat(&[d.text(arrow), hang_after_operator(d, hung)]);
         }
@@ -402,7 +399,7 @@ impl<'a> Printer<'a> {
             // isn't double-indented). The old inline `group(indent(type_doc))` for the
             // huggable branch double-indented the object body.
             let wrapped = self.intersection_hanging_with_indent(i);
-            return joined(d.text(arrow_sp), wrapped);
+            return hang_or_join(wrapped);
         }
         match return_ty {
             // TypeReference with complex type args (like Promise<Result<...>>):
@@ -414,9 +411,9 @@ impl<'a> Printer<'a> {
             {
                 // The type reference's own type arguments wrap internally when too wide.
                 let type_doc = self.build_type_doc(return_ty);
-                joined(d.text(arrow_sp), type_doc)
+                hang_or_join(type_doc)
             }
-            _ => joined(d.text(arrow_sp), self.build_type_doc(return_ty)),
+            _ => hang_or_join(self.build_type_doc(return_ty)),
         }
     }
 

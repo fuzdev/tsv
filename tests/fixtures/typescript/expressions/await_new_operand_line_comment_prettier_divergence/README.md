@@ -29,9 +29,9 @@ What the cases pin, beyond the plain `new`/`await` continuation (c1, c2, c3):
   comment the author wrote *inside* the parens is the separate claim in
   [grouped_operand_comment](../await_yield/grouped_operand_comment_prettier_divergence/).
 - **c5/c6** — a run stays one comment per line, all of it on the continuation.
-- **c7** — an own-line **multiline** block hangs for its own reason (inlining it
-  would reflow the author's break) and takes the same indent, matching the
-  `keyof`/`extends`/`=` siblings that share this shape.
+- **c7/c7c** — a **multiline** block the author broke after hangs for its own reason
+  (inlining it would reflow the author's break) and takes the same indent at both
+  keywords, matching the `keyof`/`extends`/`=` siblings that share this shape.
 - **c8** — in value position the `=` breaks in both formatters (`await fn2()` is a
   poorly breakable chain, so `chooseLayout` hangs it) and the continuation sits one
   level under the hung `await`; only that indent diverges.

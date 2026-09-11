@@ -334,13 +334,12 @@ impl<'a> Printer<'a> {
             // (`case /* p */ /* q */ b:`) — so without this it is dropped. Emitted ahead of
             // any paren this position synthesizes, which is prettier's placement too.
             // A run the author broke after whose break is FORCED hangs too — by a multi-line
-            // comment glued to the test, or by the test's own hard break — as at the
-            // `export default` and `export =` values: the inline arm below would weld the run
-            // onto the `case` line.
+            // comment glued to the test, or by the test's own hard break — as at every
+            // keyword→value gap ([`Printer::keyword_value_hang_doc`]): the inline arm below
+            // would weld the run onto the `case` line.
             if frozen.is_some()
-                || self.has_line_comments_between(test_gap_start, test_start)
                 || self
-                    .breaking_value_leading_run(test_gap_start, test_start, || test_doc)
+                    .keyword_value_hang_doc(test_gap_start, test_start, || test_doc)
                     .is_some()
             {
                 // A `//` here runs to end-of-line, so emitting the gap inline would swallow

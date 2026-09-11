@@ -586,7 +586,7 @@ impl<'a> Printer<'a> {
                     let v = if self
                         .needs_parens(prop.value, super::ParenContext::ObjectPropertyValue)
                     {
-                        d.concat(&[d.text("("), v, d.text(")")])
+                        d.parens(v)
                     } else {
                         v
                     };
@@ -725,6 +725,35 @@ impl<'a> Printer<'a> {
                     // suppression below — exactly the debt that function's ⚠️ names.
                     let hoisted_run =
                         self.hoisted_owned_value_gap_run_opt(colon_pos + 1, prop.value);
+                    // A LINE comment forces the break, and the declarator `=`'s partition
+                    // places it ([`Printer::build_operator_line_comment_hang`]): a comment on
+                    // the `:` line stays there, trailing the `:`, and an own-line one keeps
+                    // its line — both authorings stable. The hang below would push a
+                    // `:`-line `//` down onto a line of its own, a placement the author never
+                    // wrote. The value still takes the outermost claim
+                    // (`build_gap_value_doc`): built bare, a multi-line block it owns
+                    // explodes a conditional (`k: // x⏎/* y⏎*/ a ? b : c`).
+                    if hoisted_run.is_none()
+                        && self.has_line_comments_between(colon_pos + 1, value_start)
+                    {
+                        let value_doc = self.build_gap_value_doc(None, prop.value, || {
+                            self.build_object_property_value_doc(prop.value, value_frozen)
+                        });
+                        let value_doc = if needs_parens {
+                            d.parens(value_doc)
+                        } else {
+                            value_doc
+                        };
+                        return d.group(d.concat(&[
+                            d.group(lhs_doc),
+                            d.text(":"),
+                            self.build_operator_line_comment_hang(
+                                colon_pos,
+                                value_start,
+                                value_doc,
+                            ),
+                        ]));
+                    }
                     let comments_doc = hoisted_run
                         .or_else(|| self.build_value_gap_comments_opt(colon_pos + 1, value_start))
                         .unwrap_or_else(|| d.empty());

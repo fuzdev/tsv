@@ -127,19 +127,6 @@ pub(crate) enum RunLeadingBlank {
     Drop,
 }
 
-/// The shape a **keyword→operand** gap takes — [`Printer::keyword_operand_gap`], whose
-/// doc carries the rule. `new`→callee and `await`→operand are its two sites.
-#[derive(Clone, Copy)]
-pub(crate) enum KeywordOperandGap {
-    /// A comment in the gap ENDS A LINE, so the operand cannot stay on the keyword's
-    /// line: the caller emits its keyword bare and wraps its whole tail in
-    /// `Printer::build_continuation_indent`.
-    Continuation,
-    /// Nothing in the gap ends a line: the run — `None` when the gap holds no comment to
-    /// emit — trails the keyword inline, and the tail keeps the enclosing indent.
-    Inline(Option<DocId>),
-}
-
 /// Who emits a retained paren SHELL's leading **line**-comment run — the one axis
 /// [`Printer::push_paren_shell_leading_run`] and its callers part on.
 ///
@@ -1809,7 +1796,7 @@ impl<'a> Printer<'a> {
     /// multiline block, collapse.
     ///
     /// Use across a gap whose following token must not be swallowed or reflowed — the
-    /// type-construct delimiter/keyword gaps (`=> // leading\nT`, `: // leading\nT`,
+    /// type-construct delimiter/keyword gaps (`: // leading\nT`,
     /// an indexed access's `[`→index, a template-literal type's `${`→type).
     pub(crate) fn build_trailing_comments_hang_next(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
@@ -2003,70 +1990,6 @@ impl<'a> Printer<'a> {
     /// after keywords like `return`/`await`, after operators like `!`/`...`, etc.).
     pub(crate) fn build_rhs_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
         self.build_leading_comment_run_opt(start, end, LeadingGlue::Adjacent)
-    }
-
-    /// The **keyword→operand** gap router, shared by `new`→callee
-    /// (`build_new_doc_with_wrapping`) and `await`→operand (`build_await_doc`) — the two
-    /// expression-level gaps of that shape.
-    ///
-    /// One question, one predicate ([`Printer::comments_force_own_line_between`], i.e.
-    /// the shared `comment_hangs_next`), so the two sites cannot answer differently:
-    ///
-    /// - It **hangs** (a line comment, or a multiline block the author broke after) →
-    ///   [`KeywordOperandGap::Continuation`]: the caller emits its keyword bare and hands
-    ///   its WHOLE tail to [`Printer::append_keyword_value_line_comments`], the
-    ///   keyword→value seam (conformance_prettier.md §Uniform Forced-Continuation Indent
-    ///   for the indent, §Comment Position Philosophy for the run placement — a comment
-    ///   here leads the operand, so an own-line one keeps its line rather than pulling up
-    ///   to trail the keyword). The tail is the whole operand — for `new`, callee, type
-    ///   arguments and argument list alike — so a tail that breaks internally renders at
-    ///   the continuation's indent rather than at the outer column.
-    ///
-    ///   ⚠️ Only the two keyword sites take that seam. The third consumer — a preserved
-    ///   grouping pair's `(`→inner run — takes
-    ///   [`Printer::build_value_slot_continuation_indent`] instead, for the reason stated
-    ///   there: it sits in a slot whose separator someone else already emitted, so the
-    ///   seam's own leading hardline would be a second break. It shares this router only
-    ///   for the split, never for the emission.
-    /// - Otherwise — a **single-line block in ANY authored position** (glued, trailing the
-    ///   keyword, or on its own line) → [`KeywordOperandGap::Inline`]. Nothing forces it
-    ///   off the line, so it trails inline and the author's break is reflowed: the
-    ///   keyword→value rule its `as`/`satisfies`, `export =`, and module-header siblings
-    ///   follow. See conformance_prettier.md §Authored breaks in value position.
-    ///
-    /// ⚠️ The inline arm must NOT go through the continuation `indent` "for uniformity".
-    /// Nothing in the gap ends a line there, so the indent is not inert — it applies to
-    /// every break the tail makes on its own WIDTH, pushing a broken argument list or
-    /// object a level over (`await /* c */ fn({…})`).
-    ///
-    /// ⚠️ Emitting the hang case through `build_rhs_comments_opt` reads as the obvious
-    /// code and was the bug this replaced: that builder picks each separator from the
-    /// comment's AUTHORED position, so an own-line comment kept a hardline while the
-    /// concat glued it to the keyword. The result — comment pulled up, break kept — *is*
-    /// the glued authoring, which reflows inline on the next pass, so the format was not
-    /// idempotent on its own output.
-    ///
-    /// ⚠️ **Do not merge this with `gap_comment_continuation_tail`** (the module-header
-    /// gap emitter) on the strength of their matching gate→{hang, inline} shape. The
-    /// resemblance is structural, not semantic — the *gates differ on purpose* for a
-    /// **glued multiline block** (`kw /* …⏎… */ v`): this gate collapses it inline, while
-    /// the header gap's `has_multiline_block_comments_on_page_between` hangs *any*
-    /// multiline block, glued or not.
-    pub(crate) fn keyword_operand_gap(
-        &self,
-        keyword_end: u32,
-        operand_start: u32,
-    ) -> KeywordOperandGap {
-        if self.comments_force_own_line_between(keyword_end, operand_start) {
-            KeywordOperandGap::Continuation
-        } else {
-            KeywordOperandGap::Inline(
-                self.build_inline_comments_between_doc_trailing_space_opt(
-                    keyword_end,
-                    operand_start,
-                ),
-            )
-        }
     }
 
     /// Like `build_rhs_comments_opt`, but an author blank line after a glued block's
@@ -2663,8 +2586,9 @@ impl<'a> Printer<'a> {
     /// caller's builder, **will break**, or the run holds a multi-line comment) — the gate for
     /// [`push_leading_run_before_breaking_value`](Self::push_leading_run_before_breaking_value)
     /// at the seams whose remaining layouts already render the width-driven case
-    /// (the simple `:` annotation, the spread's dots→argument gap, the `await`
-    /// keyword→argument gap). The arrow's hug arm spells the same pair out itself
+    /// (the simple `:` annotation, the spread's dots→argument gap), and the gate by which a
+    /// keyword→value seam hangs a forced run under its keyword
+    /// ([`Self::keyword_value_hang_doc`]). The arrow's hug arm spells the same pair out itself
     /// — its geometry half is [`Printer::arrow_gap_broke_after_run`], which the
     /// enclosing call must ask too. A value that fits declines,
     /// and the caller keeps its glued path. The declarator and
@@ -2808,6 +2732,70 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The tail after an operator (`=`, a property's `:`) whose gap to the value holds a
+    /// LINE comment, which forces the break: the run is partitioned — a comment on the
+    /// operator's line trails it, the rest lead the value on their own lines (author
+    /// blank lines kept) — and the value hangs one level in. The caller pushes the
+    /// operator itself first; `op_pos` is its position.
+    ///
+    /// The partition is what keeps both authorings of the comment stable: one on the
+    /// operator's line is never pushed onto a line of its own, and an own-line one is never
+    /// pulled up. Shared by [`Self::build_eq_comment_break_rhs`] (declarator, for-loop init,
+    /// enum member, assignment expression), the object property's `:` and the import
+    /// attribute's `:`.
+    pub(crate) fn build_operator_line_comment_hang(
+        &self,
+        op_pos: u32,
+        value_start: u32,
+        value_doc: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let run: CommentVec<'_> = self
+            .comments_to_emit_between(op_pos + 1, value_start)
+            .collect();
+        let mut trailing = DocBuf::new();
+        let mut leading = DocBuf::new();
+        for (ci, comment) in run.iter().enumerate() {
+            if self.is_same_line(op_pos, comment.span.start) {
+                trailing.push(d.text(" "));
+                trailing.push(self.build_comment_doc(comment));
+                // A BLOCK on the operator's line whose break is forced (a `//` below it)
+                // keeps an author blank after it, as prettier does and as the keyword→value
+                // seam does (`append_keyword_value_line_comments`). After a same-line `//`
+                // the blank is dropped instead — prettier's answer at the `=`, pinned by
+                // `multi_block_comment_after_eq`. Only the LAST same-line comment can have
+                // one: anything after a blank is on a later line.
+                if comment.is_block {
+                    let next = self.blank_scan_end_after(
+                        comment,
+                        run.get(ci + 1).map_or(value_start, |c| c.span.start),
+                    );
+                    // The blank line goes AHEAD of the hang's own hardline: inside the indent
+                    // it would carry the indent as trailing whitespace and drop the next line
+                    // to column 0.
+                    if self.has_blank_line_between_strict(comment.span.end, next) {
+                        debug_assert!(
+                            leading.is_empty(),
+                            "no own-line comment precedes a same-line one"
+                        );
+                        trailing.push(d.literalline());
+                    }
+                }
+            } else {
+                leading.push(self.build_comment_doc(comment));
+                self.push_leading_run_separator(
+                    &mut leading,
+                    comment,
+                    run.get(ci + 1).map_or(value_start, |c| c.span.start),
+                );
+            }
+        }
+        d.concat(&[
+            d.concat(&trailing),
+            d.indent_hardline(d.concat(&[d.concat(&leading), value_doc])),
+        ])
+    }
+
     /// Build the `= value` RHS for an initializer whose `=`→value gap
     /// (`eq_pos + 1 .. value_start`) holds a comment that forces break handling,
     /// or `None` when the caller should emit its normal inline `= value` form (no
@@ -2825,9 +2813,11 @@ impl<'a> Printer<'a> {
     /// `=` line, which is not idempotent (the moved comment reads as glued next pass).
     /// A new `=`→value gap should route here rather than re-derive the layout:
     ///
-    /// - **Line comment** after `=`: mandatory break after `=`. A comment on the
-    ///   `=`'s line trails it inline; a comment on its own line leads the value on
-    ///   its own line (author blank lines preserved). Diverges from prettier, which
+    /// - **Line comment** after `=`: mandatory break after `=`, placed by
+    ///   [`Self::build_operator_line_comment_hang`]. A comment on the `=`'s line trails it
+    ///   inline; a comment on its own line leads the value on its own line (author blank
+    ///   lines preserved — after a same-line block too, but not after a same-line `//`,
+    ///   where prettier drops it and so does tsv). Diverges from prettier, which
     ///   relocates the line comment to trail the whole statement — tsv preserves the
     ///   author's placement (see [`conformance_prettier_ts_comments.md` §Comment relocation]).
     /// - **Own-line block, or multiline block the author broke after**: break-after-
@@ -2850,30 +2840,9 @@ impl<'a> Printer<'a> {
             return None;
         }
         if self.has_line_comments_between(eq_pos + 1, value_start) {
-            // Line comment → mandatory break. Partition the run: a comment on the
-            // `=`'s line trails it; the rest lead the value on their own lines.
-            let after_eq: CommentVec<'_> = self
-                .comments_to_emit_between(eq_pos + 1, value_start)
-                .collect();
-            let mut trailing = DocBuf::new();
-            let mut leading = DocBuf::new();
-            for (ci, comment) in after_eq.iter().enumerate() {
-                if self.is_same_line(eq_pos, comment.span.start) {
-                    trailing.push(d.text(" "));
-                    trailing.push(self.build_comment_doc(comment));
-                } else {
-                    leading.push(self.build_comment_doc(comment));
-                    self.push_leading_run_separator(
-                        &mut leading,
-                        comment,
-                        after_eq.get(ci + 1).map_or(value_start, |c| c.span.start),
-                    );
-                }
-            }
             Some(d.concat(&[
                 d.text(operator),
-                d.concat(&trailing),
-                d.indent_hardline(d.concat(&[d.concat(&leading), build_value()])),
+                self.build_operator_line_comment_hang(eq_pos, value_start, build_value()),
             ]))
         } else if self.comment_hangs_value_after_operator(eq_pos + 1, value_start) {
             // The operator→value rule — both conjuncts, and the reasoning for each,

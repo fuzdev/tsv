@@ -11,11 +11,15 @@
 	type C = abstract new () => // prettier-ignore
 	{x:   3};
 
-	// control: a plain comment keeps the trailing relocation
+	// control: a plain comment authored trailing the `=>` stays there
 	type D = () => // c
 	{ x: 1 };
 
+	// control: a plain own-line comment keeps its own line too
+	type E = () => // c
+	{ x: 1 };
+
 	// placement, not spelling: a BLOCK directive alone on its line in the `)`→`=>` gap
-	type E = () /* prettier-ignore */
+	type F = () /* prettier-ignore */
 	=> {x:   4};
 </script>

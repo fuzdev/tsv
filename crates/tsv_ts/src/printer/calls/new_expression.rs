@@ -25,7 +25,6 @@ use super::arg_wrapping::{
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use crate::ast::internal;
-use crate::printer::comments::KeywordOperandGap;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
 };
@@ -62,26 +61,24 @@ impl<'a> Printer<'a> {
         // directive in the gap freezes the CALLEE alone — the type arguments and the argument
         // list follow the callee's span and stay parent-owned, so they keep normalizing.
         let frozen = self.value_head_frozen_span(keyword_end, new_expr.callee.span());
-        match self.keyword_operand_gap(keyword_end, callee_start) {
-            KeywordOperandGap::Continuation => {
-                let tail = self.build_new_doc_after_keyword(new_expr, d.empty(), frozen);
-                let mut parts: DocBuf = smallvec![d.text("new")];
-                self.append_keyword_value_line_comments(
-                    &mut parts,
-                    keyword_end,
-                    callee_start,
-                    tail,
-                );
-                d.concat(&parts)
-            }
-            KeywordOperandGap::Inline(run) => {
-                let keyword = match run {
-                    Some(run) => d.concat(&[d.text("new "), run]),
-                    None => d.text("new "),
-                };
-                self.build_new_doc_after_keyword(new_expr, keyword, frozen)
-            }
+        // The keyword→value gap, shared with `await`→operand: the tail hangs whole below the
+        // run ([`Printer::keyword_value_hang_doc`]), and otherwise the run trails `new` inline.
+        // A resolved freeze always hangs — an honored directive is a comment that forces its own
+        // line — so the inline arm, where the directive would be inert, never meets one.
+        if let Some(tail) = self.keyword_value_hang_doc(keyword_end, callee_start, || {
+            self.build_new_doc_after_keyword(new_expr, d.empty(), frozen)
+        }) {
+            let mut parts: DocBuf = smallvec![d.text("new")];
+            self.append_keyword_value_line_comments(&mut parts, keyword_end, callee_start, tail);
+            return d.concat(&parts);
         }
+        let keyword = match self
+            .build_inline_comments_between_doc_trailing_space_opt(keyword_end, callee_start)
+        {
+            Some(run) => d.concat(&[d.text("new "), run]),
+            None => d.text("new "),
+        };
+        self.build_new_doc_after_keyword(new_expr, keyword, frozen)
     }
 
     /// [`Self::build_new_doc_with_wrapping`] past the keyword, which it emits as

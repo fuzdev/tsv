@@ -28,6 +28,10 @@
 		c7b */
 		Foo();
 
+		await /* c7c
+		c7d */
+		fn2();
+
 		// In value position the continuation sits one level under the statement.
 		const c =
 			await // c8

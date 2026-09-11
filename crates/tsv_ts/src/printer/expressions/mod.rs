@@ -36,7 +36,7 @@ pub(in crate::printer) use self::conditional::ChainBaseTernary;
 use self::operators::{OperatorBuf, SeqLayout};
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::ShareTag;
-use crate::printer::comments::{CommentFilter, CommentSpacing, KeywordOperandGap};
+use crate::printer::comments::{CommentFilter, CommentSpacing};
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
 use crate::printer::{ParenContext, PatternContext, Printer, chain, class_expr_has_decorators};
@@ -410,11 +410,14 @@ impl<'a> Printer<'a> {
     /// Both halves answer to the REPARSE, where the pair is gone and the enclosing gap
     /// reads the run instead:
     ///
-    /// - The `(`→inner run takes the keyword→operand ROUTER
-    ///   ([`Printer::keyword_operand_gap`]), the only split that reproduces what that gap
-    ///   settles on. Emitting it at its authored separators kept an own-line block's
-    ///   hardline against a value that pulls up, which is not idempotent on its own
-    ///   output.
+    /// - The `(`→inner run takes the keyword→value gate's split
+    ///   ([`Printer::comments_force_own_line_between`]: hang, or trail inline), the only
+    ///   split that reproduces what that gap settles on. Emitting it at its authored
+    ///   separators kept an own-line block's hardline against a value that pulls up, which
+    ///   is not idempotent on its own output. The hang is
+    ///   [`Printer::build_value_slot_continuation_indent`], never the keyword seam
+    ///   ([`Printer::append_keyword_value_line_comments`]): the slot's separator is someone
+    ///   else's, so that seam's own leading hardline would be a second break.
     /// - The inner→`)` run defers, and a deferred run must not leave the construct it was
     ///   written in — this pair prints no closer of its own to end the line, so a `//`
     ///   rode out past the whole `{#snippet …}` head and re-parsed there as template TEXT.
@@ -429,12 +432,16 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let inner_span = paren.expression.span();
         let inner = self.build_expression_doc(paren.expression);
-        let inner = match self.keyword_operand_gap(paren.span.start, inner_span.start) {
-            KeywordOperandGap::Continuation => {
-                self.build_value_slot_continuation_indent(paren.span.start, inner_span.start, inner)
+        let inner = if self.comments_force_own_line_between(paren.span.start, inner_span.start) {
+            self.build_value_slot_continuation_indent(paren.span.start, inner_span.start, inner)
+        } else {
+            match self.build_inline_comments_between_doc_trailing_space_opt(
+                paren.span.start,
+                inner_span.start,
+            ) {
+                Some(run) => d.concat(&[run, inner]),
+                None => inner,
             }
-            KeywordOperandGap::Inline(Some(run)) => d.concat(&[run, inner]),
-            KeywordOperandGap::Inline(None) => inner,
         };
         if !self.has_comments_to_emit_between(inner_span.end, paren.span.end) {
             return inner;

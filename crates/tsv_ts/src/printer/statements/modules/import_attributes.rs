@@ -344,13 +344,17 @@ impl<'a> Printer<'a> {
 
         // Comments between `:` and the value.
         let after_colon = colon_pos + 1;
-        if self.has_line_comments_between(after_colon, value_start)
-            || self.has_own_line_value_gap_comment(colon_pos, value_start)
+        if self.has_line_comments_between(after_colon, value_start) {
+            // A line comment can't trail the `:` inline without swallowing the value, so
+            // the value hangs; the comment keeps the line the author gave it — on the `:`
+            // line it trails the `:`, on its own line it keeps that line — through the
+            // declarator `=`'s partition, which the object property's `:` shares.
+            parts.push(self.build_operator_line_comment_hang(colon_pos, value_start, value_doc));
+        } else if self.has_own_line_value_gap_comment(colon_pos, value_start)
             || self.indentable_block_leads_value(after_colon, value_start)
         {
-            // Break after the `:` and hang the value one level, for any of three
-            // reasons: a line comment can't trail the `:` inline without swallowing the
-            // value; a block the author isolated on its own line can only keep it if the
+            // Break after the `:` and hang the value one level, for either of two
+            // reasons: a block the author isolated on its own line can only keep it if the
             // value hangs; and an INDENTABLE block leading the value hangs it whatever
             // the author's own breaks say — prettier routes `ImportAttribute` through
             // `printProperty` → `printAssignment`, so this gap is a `chooseLayout` site
@@ -358,7 +362,7 @@ impl<'a> Printer<'a> {
             // shared verbatim with the declarator, the assignment expression and the
             // object property so the seams cannot drift.
             //
-            // ⚠️ One emitter for all three, and the run's own separators are what tell
+            // ⚠️ One emitter for both, and the run's own separators are what tell
             // them apart: `printLeadingComment` puts a space after a comment the author
             // glued to the value and a hardline after one that owns its line, which is
             // the whole difference between `type:⏎\t/** c⏎\t */ 'json'` and

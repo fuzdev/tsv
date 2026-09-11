@@ -96,15 +96,7 @@ z */ (
 	 */ (
 	aaa ? bbb : ccc));
 
-	// `await` argument: the first comment keeps the keyword's line
-	async function f1() {
-		await /* x */
-		/* y
-		 */ (
-		fn(aaa, bbb));
-	}
-
-	// spread argument: same as `await`
+	// spread argument: the first comment keeps the dots' line
 	const a8 = [.../* x */
 	/* y
 	 */ (

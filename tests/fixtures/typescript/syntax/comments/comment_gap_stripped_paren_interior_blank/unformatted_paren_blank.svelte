@@ -55,15 +55,7 @@
 
 	b));
 
-	// `await` and spread arguments
-	async function f1() {
-		await /* x */
-		(
-
-		{
-			aaa: 1
-		});
-	}
+	// spread argument
 	const a6 = [.../* x */
 	(
 

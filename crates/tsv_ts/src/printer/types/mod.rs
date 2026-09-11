@@ -433,9 +433,10 @@ impl<'a> Printer<'a> {
                 let needs_parens = type_needs_parens_for_prefix_operator(self, o.type_annotation);
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
-                // A line comment or multiline block keeps the comment with the operator
-                // and hangs the operand on the next line, indented one level (the shared
-                // keyword→value layout). A single-line block comment (own-line, trailing,
+                // A line comment, a multiline block, or a block run whose break is forced
+                // (`keyword_value_hang_doc`) keeps the comment with the operator and hangs the
+                // operand on the next line, indented one level (the shared keyword→value
+                // layout). A single-line block comment (own-line, trailing,
                 // or glued) collapses inline (`keyof /* c */ B`) — matching prettier's
                 // fixed point, since the prefix operators are an in-place-collapse gap,
                 // not a relocation. See type_operator_keyword_line_comment /
@@ -462,10 +463,10 @@ impl<'a> Printer<'a> {
                 // builder.
                 let hang = self.keyword_value_stripped_paren_hang(o.type_annotation);
                 let (operand_hang_start, operand_hang_type) = (hang.value_start, hang.value_type);
-                if self.comments_force_own_line_between(keyword_end, operand_hang_start) {
-                    // Type position: a trailing block lifted from the shell trails the
-                    // operand inline.
-                    let value_doc = self.with_claimed_shell_leading_run(hang.claimed_shell, || {
+                // Type position: a trailing block lifted from the shell trails the
+                // operand inline.
+                let hang_value_doc = || {
+                    self.with_claimed_shell_leading_run(hang.claimed_shell, || {
                         let operand_doc = self.build_type_doc(operand_hang_type);
                         let value_doc =
                             if type_needs_parens_for_prefix_operator(self, operand_hang_type) {
@@ -479,7 +480,11 @@ impl<'a> Printer<'a> {
                             operand_hang_type,
                             TrailingBlock::Inline,
                         )
-                    });
+                    })
+                };
+                if let Some(value_doc) =
+                    self.keyword_value_hang_doc(keyword_end, operand_hang_start, hang_value_doc)
+                {
                     let mut parts = smallvec![d.text(o.operator.as_str())];
                     self.append_keyword_value_line_comments(
                         &mut parts,
@@ -533,12 +538,12 @@ impl<'a> Printer<'a> {
                 // Comments between `typeof` and the expression
                 let typeof_end = q.span.start + "typeof".len() as u32;
                 let expr_start = q.expr_name.span().start;
-                // A line comment or multiline block keeps the comment with `typeof` and
-                // hangs the expression on the next line (the shared keyword→value
-                // layout). A single-line block comment (own-line, trailing, or glued)
+                // A line comment, a multiline block, or a block run whose break is forced keeps
+                // the comment with `typeof` and hangs the expression on the next line (the
+                // shared keyword→value layout). A single-line block comment (own-line, trailing, or glued)
                 // collapses inline (`typeof /* c */ x`) like the other prefix operators
                 // (in-place-collapse, not relocation).
-                if self.comments_force_own_line_between(typeof_end, expr_start) {
+                let hang_value_doc = || {
                     let mut value_parts: DocBuf =
                         smallvec![self.build_type_query_expr_name_doc(&q.expr_name)];
                     if let Some(type_args) = &q.type_arguments {
@@ -552,7 +557,11 @@ impl<'a> Printer<'a> {
                         }
                         value_parts.push(self.build_type_arguments_doc(type_args));
                     }
-                    let value_doc = d.concat(&value_parts);
+                    d.concat(&value_parts)
+                };
+                if let Some(value_doc) =
+                    self.keyword_value_hang_doc(typeof_end, expr_start, hang_value_doc)
+                {
                     let mut parts = smallvec![d.text("typeof")];
                     self.append_keyword_value_line_comments(
                         &mut parts, typeof_end, expr_start, value_doc,
@@ -917,13 +926,15 @@ impl<'a> Printer<'a> {
                 // `["infer ", print("typeParameter")]`, so an infer constraint lays
                 // out identically to a `<T extends C>` declaration constraint.
                 let type_param_doc = self.build_type_parameter_doc(&i.type_parameter);
-                // A line comment or multiline block keeps the comment with `infer` and
-                // hangs the name on the next line, indented one level (the shared
-                // keyword→value layout). A single-line block comment (own-line, trailing,
-                // or glued) collapses inline (`infer /* c */ R`) — matching prettier's
-                // fixed point, an in-place-collapse gap. See infer/keyword_line_comment /
-                // infer/keyword_own_line_block_comment.
-                if self.comments_force_own_line_between(infer_end, name_start) {
+                // A line comment, a multiline block, or a block run whose break is forced keeps
+                // the comment with `infer` and hangs the name on the next line, indented one
+                // level (the shared keyword→value layout). A single-line block comment
+                // (own-line, trailing, or glued) collapses inline (`infer /* c */ R`) —
+                // matching prettier's fixed point, an in-place-collapse gap. See
+                // infer/keyword_line_comment / infer/keyword_own_line_block_comment.
+                if let Some(type_param_doc) =
+                    self.keyword_value_hang_doc(infer_end, name_start, || type_param_doc)
+                {
                     let mut parts: DocBuf = smallvec![d.text("infer")];
                     self.append_keyword_value_line_comments(
                         &mut parts,
