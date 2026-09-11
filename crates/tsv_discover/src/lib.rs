@@ -510,7 +510,8 @@ pub fn unresolvable_root_error(root: &str) -> String {
 /// `.gitignore` excludes gets the lines that re-include it and nothing beside it
 /// ([`reinclude_lines`]), for the repo root's own tsv file (read after every `.gitignore`,
 /// so its `!` wins; its `.prettierignore` where that is the file the root reads, since a
-/// `.formatignore` created beside it would shadow every rule in it).
+/// `.formatignore` created beside it would shadow every rule in it) — unless the path holds
+/// a line break no ignore-file line can hold, when the warning says to narrow the rule.
 ///
 /// `display` is the argument as given; `rel` is the path relative to the format root,
 /// `/`-separated; `is_dir` says which kind of argument it is; `stack` holds the layers
@@ -546,12 +547,13 @@ pub fn excluded_argument_warning(
         exclusion.source,
         loose_root,
     );
-    let remedy = if by_gitignore {
+    let remedy = if !by_gitignore {
+        "narrow or negate that rule to format it".to_string()
+    } else if let Some(lines) = reinclude_lines(&segments, exclusion.depth, is_dir) {
         let root_file = stack
             .tsv_layer_source("")
             .unwrap_or(IgnoreSource::Formatignore)
             .file_name();
-        let lines = reinclude_lines(&segments, exclusion.depth, is_dir);
         let order = if lines.len() > 1 {
             ", in that order,"
         } else {
@@ -562,7 +564,8 @@ pub fn excluded_argument_warning(
             quoted_list(&lines)
         )
     } else {
-        "narrow or negate that rule to format it".to_string()
+        "no ignore-file line can hold the line break in its path, so narrow that rule to format it"
+            .to_string()
     };
     Some(if exclusion.depth == segments.len() {
         format!("{display} is excluded by a rule in {rule_file}, {consequence}; {remedy}")
@@ -583,7 +586,17 @@ pub fn excluded_argument_warning(
 /// `!` under a directory that is still excluded. Every line is anchored with a leading
 /// `/`, without which a one-segment pattern matches at every depth, and spells its path
 /// literally ([`pattern_path`]).
-fn reinclude_lines(segments: &[&str], depth: usize, is_dir: bool) -> Vec<String> {
+///
+/// `None` when no line can hold the path: a line feed in any segment splits every line
+/// that spells it, and a file name ending in a carriage return loses it, since a line's
+/// trailing `\r` is stripped with its line ending. Every other line ends in a `/`, and a
+/// `\r` short of a line's end is an ordinary character, in git and here.
+fn reinclude_lines(segments: &[&str], depth: usize, is_dir: bool) -> Option<Vec<String>> {
+    if segments.iter().any(|segment| segment.contains('\n'))
+        || (!is_dir && segments.last().is_some_and(|name| name.ends_with('\r')))
+    {
+        return None;
+    }
     let anchored = |len: usize| {
         let slash = if len < segments.len() || is_dir {
             "/"
@@ -597,7 +610,7 @@ fn reinclude_lines(segments: &[&str], depth: usize, is_dir: bool) -> Vec<String>
         lines.push(format!("/{}/*", pattern_path(&segments[..len])));
         lines.push(format!("!{}", anchored(len + 1)));
     }
-    lines
+    Some(lines)
 }
 
 /// Path segments `/`-joined as a literal ignore-file pattern: in each, the glob
@@ -605,6 +618,11 @@ fn reinclude_lines(segments: &[&str], depth: usize, is_dir: bool) -> Vec<String>
 /// are trailing spaces, which gitignore(5) trims from a line — so a `[slug]` route
 /// directory names itself rather than a one-character class. A leading `#` or `!` needs
 /// no escape: every line spells its path after a `/`.
+///
+/// No escape spells a line feed, nor a carriage return at a line's end, so the callers
+/// keep both out of a line: [`reinclude_lines`] declines such a path, and
+/// [`heuristic_shadow_warning`]'s path is a rule's own literal segments, which hold no
+/// line feed, and each of its lines ends in a `/`.
 fn pattern_path(segments: &[&str]) -> String {
     let mut pattern = String::new();
     for (i, segment) in segments.iter().enumerate() {
@@ -889,6 +907,8 @@ mod tests {
             ("pkg", "dist", "!dist/keep.ts\n"),
             ("", "[slug]/dist", "!\\[slug\\]/dist/keep.ts\n"),
             ("", ".c ", "!.c\\ /keep.ts\n"),
+            // a carriage return mid-line is an ordinary character, and no line ends on one
+            ("", ".c\r", "!.c\r/keep.ts\n"),
         ] {
             let under = |path: &str| {
                 if anchor.is_empty() {
@@ -1022,6 +1042,13 @@ mod tests {
                 "src/a.gen.ts is excluded by a rule in the repo-root .gitignore, so it is not formatted; re-include it by adding `!/src/a.gen.ts` to the repo-root .formatignore"
             )
         );
+        // a path no ignore-file line can hold gets no lines
+        assert_eq!(
+            warn("build/a\nb.ts", "build/a\nb.ts", false).as_deref(),
+            Some(
+                "build/a\nb.ts is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; no ignore-file line can hold the line break in its path, so narrow that rule to format it"
+            )
+        );
         // a nested `.gitignore` is named where it sits; the lines still go to the root
         assert_eq!(
             warn("pkg/out/a.ts", "pkg/out/a.ts", false).as_deref(),
@@ -1151,6 +1178,14 @@ mod tests {
             ("src/q?*.gen.ts", false, &["src/qx.gen.ts"]),
             ("build/back\\slash.ts", false, &["build/backslash.ts"]),
             ("build/space.ts ", false, &["build/space.ts"]),
+            // a carriage return short of a line's end is an ordinary character
+            (
+                "build/d\re/f.ts",
+                false,
+                &["build/dxe/f.ts", "build/d\re/g.ts"],
+            ),
+            ("build/d\r/a.ts", false, &["build/d/a.ts", "build/d\r/b.ts"]),
+            ("build/d\r", true, &["build/d/z.ts"]),
             // a leading `#` or `!` is spelled after a `/`, where neither is special
             ("build/#x.ts", false, &["build/x.ts"]),
             ("build/!y.ts", false, &["build/y.ts"]),
@@ -1172,6 +1207,31 @@ mod tests {
             for other in still_excluded {
                 assert!(fixed.is_ignored(other, false), "{rel}: {other} {lines:?}");
             }
+        }
+    }
+
+    #[test]
+    fn excluded_argument_warning_offers_no_line_that_cannot_hold_the_path() {
+        // a line feed splits any line spelling it, and a carriage return ending a file's own
+        // line is stripped with the line ending, so such a path gets no re-include lines (the
+        // whole text is pinned in `excluded_argument_warning_text_is_stable`)
+        let mut stack = IgnoreStack::new();
+        stack.push_gitignore("", "build/\n*.gen.ts\n");
+        for (rel, is_dir) in [
+            ("build/a\nb.ts", false),
+            ("build/a\nb", true),
+            ("build/a\nb/c.ts", false),
+            ("src/a\nb.gen.ts", false),
+            ("build/z.ts\r", false),
+        ] {
+            let warning = excluded_argument_warning(rel, rel, is_dir, None, &stack)
+                .unwrap_or_else(|| panic!("{rel:?}: no warning"));
+            assert!(
+                warning.ends_with(
+                    "; no ignore-file line can hold the line break in its path, so narrow that rule to format it"
+                ),
+                "{rel:?}: {warning}"
+            );
         }
     }
 
