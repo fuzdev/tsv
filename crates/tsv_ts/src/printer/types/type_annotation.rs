@@ -181,10 +181,11 @@ impl<'a> Printer<'a> {
 
         // Check if there's a line comment between : and the type
         if gap_has_comments && self.has_line_comments_between(colon_end, type_start) {
-            // An own-line format-ignore directive in the gap must stay OWN-LINE — the
-            // continuation indent below trails the first comment after `:`, and a
-            // head-trailing directive is inert under the placement classification, so
-            // the relocated form would lose the freeze on the second pass. Routed for
+            // An own-line format-ignore directive in the gap takes the directive builder,
+            // which freezes the value. Its placement is the one the emitter below gives any
+            // own-line comment: both keep the directive's line, since a head-trailing
+            // directive is inert under the placement classification and the relocated form
+            // would lose the freeze on the second pass. Routed for
             // composite children too: a union child freezes via its own leading-run
             // walk, but the annotation owns the directive's emission either way. An
             // in-shell directive (`: (⏎// prettier-ignore⏎ T)`) routes the same way —
@@ -197,15 +198,16 @@ impl<'a> Printer<'a> {
             {
                 return self.build_annotation_own_line_directive_doc(annotation, parens);
             }
-            // Uniform forced-continuation indent (`build_continuation_indent`): the
-            // first comment trails `:` on its line, then the remaining comments and the
-            // type drop one indent level so the continuation reads as part of this
-            // member, not a sibling. Each line comment terminates at end-of-line —
-            // otherwise a following comment (or the type) is swallowed into its text
-            // (`// a // b` reparses as one comment: a content loss). Uniform across
-            // union, intersection, and simple types — see conformance_prettier.md
-            // §Uniform forced-continuation indent. (Prettier indents only the union
-            // here and leaves intersection/simple flush, so this diverges for those.)
+            // The `:`→type gap is a value gap, so a line comment hangs the type through the
+            // keyword→value emitter (`append_keyword_value_line_comments`): a comment on the
+            // `:` line trails it, an own-line comment keeps its own line — it LEADS the type,
+            // so own-line-ness is authorship — and the type drops one indent level, as at
+            // `keyof` and the function type's `=>`. Each line comment terminates at
+            // end-of-line — otherwise a following comment (or the type) is swallowed into its
+            // text (`// a // b` reparses as one comment: a content loss). Uniform across
+            // union, intersection, and simple types — see conformance_prettier.md §Uniform
+            // forced-continuation indent. (Prettier pulls an own-line comment up and leaves
+            // an intersection or simple type flush, so this diverges for those.)
             //
             // A *block* comment in this gap is handled by the else branch below, NOT
             // here: a newline-broken block compacts to the inline value-side position
@@ -221,10 +223,9 @@ impl<'a> Printer<'a> {
                     parens,
                 )
             });
-            d.concat(&[
-                d.text(":"),
-                self.build_continuation_indent(colon_end, type_start, type_doc),
-            ])
+            let mut parts: DocBuf = smallvec![d.text(":")];
+            self.append_keyword_value_line_comments(&mut parts, colon_end, type_start, type_doc);
+            d.concat(&parts)
         } else {
             // Handle unions/intersections with width-based breaking
             // Short: `param: Type1 | Type2`
@@ -735,41 +736,32 @@ impl<'a> Printer<'a> {
             // A LINE comment in the `:`→member window (it sits in the intersection's
             // leading-`&` gap — a comment before the span would have routed to
             // `build_type_annotation_doc`'s line-comment branch instead): emit the
-            // one-pass fixed point of the reparsed, `&`-less authoring. An own-line
-            // directive keeps its own line and freezes the member (Rule A — a
-            // head-trailing relocation is inert, losing the freeze on pass 2),
-            // mirroring `build_annotation_own_line_directive_doc`; a plain line
-            // comment hangs the member via the uniform continuation indent
-            // (`let v: // c⏎⇥{ x: 1 };`). The inline path below would relocate the
-            // comment to trail `:` with the member at column 0 — a 2-pass transient,
-            // and a lost freeze for a directive.
+            // one-pass fixed point of the reparsed, `&`-less authoring through the same
+            // keyword→value emitter — a comment on the `:` line trails it, an own-line one
+            // keeps its line. An own-line directive also freezes a non-composite member
+            // (Rule A — a head-trailing relocation is inert, losing the freeze on pass 2),
+            // mirroring `build_annotation_own_line_directive_doc`; a union/intersection
+            // sole member builds normally and freezes via its own leading-run walk. The
+            // inline path below would relocate the comment to trail `:` with the member at
+            // column 0 — a 2-pass transient, and a lost freeze for a directive.
+            // TODO: believed unreachable — both callers' line-comment gates see through a
+            // one-member composite before this arm is asked; delete once a planted panic
+            // here also survives `ignore:audit` and `gaps:audit`.
             if self.has_line_comments_between(colon_end, first_type_start) {
                 let child = &intersection.types[0];
-                if self.member_gap_frozen(colon_end, first_type_start) {
-                    let value_doc = if self.single_child_frozen(colon_end, child) {
-                        self.build_frozen_single_child_doc(child)
-                    } else {
-                        // Composite-transparent: a union/intersection sole member
-                        // builds normally and freezes via its own leading-run walk.
-                        self.build_type_doc(child)
-                    };
-                    let mut parts: DocBuf = smallvec![d.text(":")];
-                    self.append_keyword_value_line_comments(
-                        &mut parts,
-                        colon_end,
-                        first_type_start,
-                        value_doc,
-                    );
-                    return d.concat(&parts);
-                }
-                return d.concat(&[
-                    d.text(":"),
-                    self.build_continuation_indent(
-                        colon_end,
-                        first_type_start,
-                        self.build_type_doc(child),
-                    ),
-                ]);
+                let value_doc = if self.single_child_frozen(colon_end, child) {
+                    self.build_frozen_single_child_doc(child)
+                } else {
+                    self.build_type_doc(child)
+                };
+                let mut parts: DocBuf = smallvec![d.text(":")];
+                self.append_keyword_value_line_comments(
+                    &mut parts,
+                    colon_end,
+                    first_type_start,
+                    value_doc,
+                );
+                return d.concat(&parts);
             }
             let mut parts: DocBuf = smallvec![d.text(": ")];
             if let Some(comments_doc) = self

@@ -12,7 +12,8 @@ are each idempotent under both formatters. The divergence is in normalization �
 prettier normalizes the compact form (`? foo : // c\nbar`) to trailing, while
 we normalize it to after `:`.
 
-Note: when multiple line comments appear on their own lines after `:`, prettier
-also keeps them after `:`. The divergence only affects single-line cases.
+An own-line comment or run after `:` keeps its own line under tsv, where prettier pulls the
+first comment up onto the `:` line —
+[branch_own_line_line_comment](../branch_own_line_line_comment_prettier_divergence/).
 
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

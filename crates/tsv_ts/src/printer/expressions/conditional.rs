@@ -716,8 +716,9 @@ impl<'a> Printer<'a> {
         q_parts.push(d.hardline());
         q_parts.push(d.text("?"));
 
-        // Comments between ? and consequent: first trails `?` inline, later ones take
-        // their own indented line (author blanks preserved). The placement's
+        // Comments between ? and consequent: first trails `?` inline (or keeps an own line
+        // the author gave it beside a line comment), later ones take their own indented
+        // line (author blanks preserved). The placement's
         // `on_own_line` is set when a comment can't share the consequent's line (the
         // blank, if any, is preserved below).
         let consequent_placement =
@@ -825,9 +826,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Emit the comments between a ternary operator (`?` or `:`) and its branch value
-    /// into `parts`: the first trails the operator inline (`? /* c */`), each later one
-    /// takes its own indented line (author blanks preserved). Shared by the
-    /// ?→consequent and :→alternate gaps.
+    /// into `parts`: the first trails the operator inline (`? /* c */`) — unless the author
+    /// put it on its own line in a gap holding a line comment, where it keeps that line —
+    /// and each later one takes its own indented line (author blanks preserved). Shared by
+    /// the ?→consequent and :→alternate gaps.
     ///
     /// Returns the branch's [`TernaryBranchPlacement`]: the value drops onto its own line
     /// when a comment can't share it — a line comment, a later own-line comment, or a blank
@@ -845,6 +847,12 @@ impl<'a> Printer<'a> {
             .unwrap_or_default();
         let mut has_line_comment = false;
         let mut last_own_line = false;
+        // In a gap a line comment forces open, a first comment the author put on its OWN
+        // line keeps that line, leaving the operator alone on its own
+        // (`Printer::first_gap_comment_keeps_own_line`); one on the operator's line still
+        // trails it below.
+        let first_keeps_own_line =
+            op_pos.is_some_and(|p| self.first_gap_comment_keeps_own_line(&comments, p + 1));
         for (i, comment) in comments.iter().enumerate() {
             // An HONORED directive keeps the line the author gave it, wherever in the run it
             // sits: sharing a line with the operator (or with the comment before it) is the
@@ -853,7 +861,7 @@ impl<'a> Printer<'a> {
             // the declaration headers and [`Printer::comment_hangs_next`] states for what
             // follows a comment — the emitter never relocates a directive.
             let directive = self.is_honored_directive(comment);
-            if i == 0 && directive {
+            if i == 0 && (directive || first_keeps_own_line) {
                 parts.push(d.hardline());
                 parts.push(d.text(INDENT));
                 last_own_line = true;

@@ -170,6 +170,13 @@ more defensible:
   `:` but freezes the annotation (no relocation), so its frozen form
   (`prettier_variant_frozen`) is one tsv normalizes —
   [trailing annotation head](../tests/fixtures/typescript/types/union_prettier_ignore_trailing_annotation_head_prettier_divergence/)
+- Directive trailing an **object property's `:`** (`k: // prettier-ignore⏎ fn([…])`) —
+  ◆design_choice — the same inert classification; prettier keeps the directive trailing the
+  `:` and freezes the value, as at the annotation head, but leaves the same placement inert
+  after a declarator `=`, where it reflows too (the fixture's control) — so its frozen form
+  (`prettier_variant_frozen`) is one tsv normalizes, and the placement means one thing at
+  both heads —
+  [object property head](../tests/fixtures/typescript/expressions/objects/value_prettier_ignore_trailing_head_prettier_divergence/)
 - `format-ignore` on a union member — ◆design_choice — tsv honors `// format-ignore` at the
   member position identically to `// prettier-ignore`; prettier recognizes only its own
   family and reformats the member (paired with a `prettier-ignore` control) —
@@ -751,10 +758,10 @@ tsv diverges at six places:
   (`Bbb = ccc + ddd // prettier-ignore`) and the freeze is gone, the same second-pass loss its
   `enum` / `namespace` **body** heads show below —
   [member init head](../tests/fixtures/typescript/declarations/enum/member_init_prettier_ignore_head_prettier_divergence/)
-- **Ternary branch** — ◆comment_preservation — the `?`→consequent and `:`→alternate gaps
-  relocate an own-line comment onto the operator's line under **both** formatters, so an honored
-  directive there would be inert; tsv therefore keeps the directive's own line (the `?` or `:`
-  is left dangling and the branch hangs below it) and freezes, while prettier pulls the
+- **Ternary branch** — ◆comment_preservation — prettier relocates an own-line comment in the
+  `?`→consequent and `:`→alternate gaps onto the operator's line, where an honored directive
+  would be inert; tsv keeps the line the author gave any comment there (the `?` or `:` is left
+  alone on its line and the branch hangs below it) and freezes, while prettier pulls the
   directive up. Keeping that line also forces the ternary's **breaking** layout in both
   spellings — a block directive left inline would be glued to the operator, hence inert — where
   prettier collapses the block case on its own second pass (chain pinned). A directive the

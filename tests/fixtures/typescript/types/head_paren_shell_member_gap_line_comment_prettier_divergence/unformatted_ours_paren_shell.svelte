@@ -52,8 +52,7 @@
 
 	// a conditional's `?` branch gap, over a nested conditional's check type
 	type G1 = H1 extends I1
-		? (
-				// c7
+		? ( // c7
 				J1
 			) extends K1 ? L1 : M1
 		: N1;
@@ -61,15 +60,13 @@
 	// its `:` branch twin
 	type O1 = P1 extends Q1
 		? R1
-		: (
-				// c8
+		: ( // c8
 				S1
 			) extends T1 ? U1 : V1;
 
 	// the `?` branch over an intersection head
 	type W1 = X1 extends Y1
-		? (
-				// c9
+		? ( // c9
 				Z1
 			) & A2
 		: B2;
@@ -77,8 +74,7 @@
 	// its `:` branch twin
 	type C2 = D2 extends E2
 		? F2
-		: (
-				// c10
+		: ( // c10
 				G2
 			) & H2;
 

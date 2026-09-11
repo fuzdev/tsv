@@ -5,7 +5,10 @@ type (`{ b: // c\n\t\tX | Y }`).
 
 **tsv** keeps the comment trailing the `:`, with the union dropped to a
 continuation line indented one level. **Prettier** relocates the comment to its
-own line after the `:`. Both forms are stable under their respective formatters.
+own line after the `:`. That own-line form is a fixed point of both formatters — an authored
+own-line comment keeps its line under tsv
+([annotation_own_line_line_comment](../annotation_own_line_line_comment_prettier_divergence/))
+— so the divergence is the trailing authoring alone.
 
 ## Reason
 

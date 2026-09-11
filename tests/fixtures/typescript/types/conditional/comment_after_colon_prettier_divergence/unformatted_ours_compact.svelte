@@ -4,8 +4,8 @@
 	bar;
 
 	// Multiple line comments after : stay after :
-	type B = B extends T ? foo :
-// c1
+	type B = B extends T ? foo
+:// c1
 // c2
 bar;
 

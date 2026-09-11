@@ -23,10 +23,10 @@ type Mid = a &
 ```
 
 **Prettier** lifts it onto the `&`'s line at `Mid` / `Nested` and drops it to its own line
-everywhere else — `divergent_variant_redundant_paren.svelte`, which prettier holds stable
-and tsv rewrites (a third form), so it is a `divergent_variant_*` rather than a dual-stable
-`variant_*`. `unformatted_ours_redundant_paren.svelte` is the authored input, with every
-paren present; tsv normalizes it to `input.svelte`.
+everywhere else — `variant_redundant_paren.svelte`, which both formatters hold stable: under
+tsv an authored own-line comment keeps its line wherever it leads a value.
+`unformatted_ours_redundant_paren.svelte` is the authored input, with every paren present;
+tsv normalizes it to `input.svelte`.
 
 ## Which pair is redundant: the member-parens rule, not the shape
 

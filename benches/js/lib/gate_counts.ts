@@ -463,7 +463,14 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// files, per-file stdout / stderr / exit compared — one differing file, and the 950 shared
 	// rejects re-run at `--source-type script` move nothing either; then the `--all --json`
 	// bucket lists, where every other bucket is file-for-file identical and SAFETY stays 0.
-	typescript: 5175,
+	//
+	// 5175 → 5177: HEAD's view already matched 5176 (the floor was left at 5175); here
+	// `prettier/tests/format/typescript/union/10599.ts` and `…/union/7725.ts` arrive from `known`
+	// and `prettier/tests/format/js/method-chain/comment.js` leaves for `known` — an own-line `//`
+	// after an annotation `:` / return type / property signature, or after either conditional's
+	// `?` / `:`, now keeps its own line (both union files are where prettier keeps it too).
+	// Reasoning and the byte A/B on `CORPUS_FORMAT_UNKNOWN_PIN`.
+	typescript: 5177,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -857,7 +864,28 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// real code — this file, and `js/assignment-comments/function.js`, which gains prettier's
 	// blank after `f6 = /* comment */` and stays `known`. The `--all` run confirms the scope:
 	// `typescript` `unknown` is the only cell that moves in any language.
-	typescript: 72,
+	//
+	// 72 → 69: two causes, measured apart. (1) `prettier/tests/format/js/ignore/issue-9877.js`
+	// leaves for `known`: the `:`-trailing directive above is now a cataloged divergence (tsv's
+	// placement floor, pinned by `value_prettier_ignore_trailing_head_prettier_divergence`) and
+	// claimed by `prettier_ignore_trailing_colon_head` — a tip run before and after adding the
+	// pattern reads 70 → 69, nothing else moving. (2) An own-line `//` after an annotation `:`,
+	// return type, property signature or a conditional's `?` / `:` now keeps its own line:
+	// `…/typescript/import-type/long-module-name/long-module-name4.ts` leaves for `known` and
+	// `…/typescript/arrow/16067.ts` for `partial`.
+	//
+	// Measured by a HEAD-vs-tip byte A/B over the 11,749 `find`-enumerated
+	// `../corpora/collections` + `../prettier/tests/format` files (stdout, stderr and exit code
+	// compared per file): 10 movers, every one that own-line `//` — 2 in real code
+	// (`mdz/src/lib/MdzNodeView.svelte` and `MdzStreamNodeView.svelte`, a destructured
+	// parameter's `}:`, both staying `known`) and 8 in the prettier suites. Their buckets come
+	// from per-directory `--json` runs of a HEAD `--profile corpus` build and the tip:
+	// `union/10599.ts` and `union/7725.ts` known → match, `method-chain/comment.js` match →
+	// known, `long-module-name4.ts` unknown → known, `arrow/16067.ts` unknown → partial, and
+	// `conditional/postfix-ternary-regressions.js`, `keyword-types/keyword-types-with-parens-comments.ts`,
+	// `union/5849.ts` and the two `mdz` files unmoved. The `--all` run confirms the scope:
+	// every `svelte` and `css` bucket is on its pin and SAFETY stays 0.
+	typescript: 69,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.
@@ -970,7 +998,12 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// needed one more thing to close: the callee-paren fix landing beside this one, which is
 	// what carries it to `match` (see `CORPUS_FORMAT_UNKNOWN_PIN`); `partial` is unmoved by
 	// that second half, and 22 is re-measured on the merged tree.
-	typescript: 22,
+	//
+	// 22 → 23: `prettier/tests/format/typescript/arrow/16067.ts` arrives from `unknown` — its
+	// conditional branches' own-line `//` now keep their lines, and the cataloged
+	// `comment_position` pattern claims part of what remains beside four hunks it does not.
+	// Reasoning and the byte A/B on `CORPUS_FORMAT_UNKNOWN_PIN`.
+	typescript: 23,
 	// 9 → 8: `prettier/tests/format/css/parens/parens.css` leaves for `unknown` — its one
 	// explained hunk, the wrapped `progid:` value, is FIXED (tsv freezes the value as
 	// prettier does), leaving the five unexplained hunks it always carried. Reasoning and the

@@ -73,8 +73,8 @@
 	// the block spelling of the same placement, likewise inert
 	const t1 = cond ? /* prettier-ignore */ u1 + v1 : w1;
 
-	// the rule is not the directive's — an ordinary own-line comment in the same gap is
-	// pulled up onto the operator's line and the branch normalizes
+	// the rule is not the directive's — an ordinary comment in the same gap freezes nothing:
+	// authored on the operator's line it trails it, and the branch normalizes
 	const l1 = cond
 		? // c
 			m1 + n1
