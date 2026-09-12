@@ -566,9 +566,13 @@ impl<'a> Printer<'a> {
                 // union, which takes the hanging tail with the run inside. Type position: a
                 // trailing block lifted from a stripped shell trails the value inline
                 // before the `,`/`>`.
-                let value_doc = self.with_claimed_shell_leading_run(head.claimed_shell, || {
-                    self.build_hang_value_doc(head.child, value_type, TrailingBlock::Inline)
-                });
+                let value_doc = self.with_stripped_shell_value(
+                    head.claimed_shell,
+                    head.child,
+                    value_type,
+                    TrailingBlock::Inline,
+                    || self.build_type_doc(value_type),
+                );
                 self.append_keyword_value_line_comments(
                     parts,
                     keyword_end,

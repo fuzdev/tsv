@@ -54,7 +54,7 @@ pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSImportType, TSIntersectionType, TSParenthesizedType, TSType};
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::layout::hang_after_operator;
-use crate::printer::{CommentVec, ShellLeadingRun};
+use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
 use helpers::TypeParenRule;
 use helpers::outermost_paren;
 use helpers::paren_shell_gaps;
@@ -111,17 +111,44 @@ pub(in crate::printer) struct StrippedParenHang<'t> {
     pub(in crate::printer) claimed_shell: Option<Span>,
 }
 
+/// The [`ShellPair`] a prefix type operator's operand sits at — the one position that
+/// RE-MINTS the pair a redundant shell's strip would drop, so the one whose hang seam and
+/// gates must be told ([`ShellPair`]'s claim reading). Reads through the author's shell
+/// exactly as [`type_needs_parens_for_prefix_operator`] does, since what the pair is
+/// re-minted around is the unwrapped operand. Named rather than spelled twice so the
+/// emitter and the alias-`=` gate cannot come to different answers about one operand.
+pub(in crate::printer) fn prefix_operator_shell_pair(
+    p: &Printer<'_>,
+    operand: &TSType<'_>,
+) -> ShellPair {
+    if type_needs_parens_for_prefix_operator(p, operand) {
+        ShellPair::Kept
+    } else {
+        ShellPair::Stripped
+    }
+}
+
 /// Which comments make a stripped paren shell a leading **edge** — the axis the two
 /// questions asked of [`Printer::head_stripped_paren_shell`]'s descent part on. The LINK
 /// SET is one shape and stays one function; only what counts as a run at the bottom of it
 /// differs, and naming the axis is what keeps the two from being read as one answer.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum EdgeRun {
-    /// A `//` only — the **ownership** question ([`Printer::leading_edge_shell_claim`]).
-    /// A gap can host a relocated run only by opening over hardlines, and a line comment
-    /// is the one thing that forces one; a block run renders inline exactly where the
-    /// shell would have printed it, so no gap needs to take it over.
-    LineComment,
+    /// A run that ENDS ITS OWN LINE — a `//`, or a block the author isolated on its own
+    /// line ([`Printer::block_comment_isolated_own_line_between`]) — the **ownership**
+    /// question ([`Printer::leading_edge_shell_claim`]). A gap can host a relocated run
+    /// only by opening over hardlines, so what it must take over is exactly the run that
+    /// forces one; a block the author glued renders inline where the shell prints it, and
+    /// no gap needs it.
+    ///
+    /// ⚠️ The isolated block was once outside this axis, on the reading that "a block run
+    /// renders inline exactly where the shell would have printed it". That is false of the
+    /// isolated one at both ends: the shell's own emitter gives it a `hardline` too, and a
+    /// bare one at the shell's own indent — never the enclosing gap's continuation indent,
+    /// which is the enclosing construct's fact and not the shell's — so the reparse, which
+    /// finds the comment in that gap, laid it out the other way. Same F1 break as the `//`,
+    /// same fix: the gap owns the run.
+    Breaking,
     /// Any comment — the **printed-region** question
     /// ([`Printer::leading_edge_printed_run`]). What a union member's layout splits on is
     /// whether anything at all prints ahead of the member's first code token, and a block
@@ -430,7 +457,12 @@ impl<'a> Printer<'a> {
             }
             TSType::Mapped(m) => self.build_mapped_type_doc(m),
             TSType::TypeOperator(o) => {
-                let needs_parens = type_needs_parens_for_prefix_operator(self, o.type_annotation);
+                // One reading of the operand's paren rule, used twice: as the layout's
+                // `needs_parens` below, and as the [`ShellPair`] the hang seam and its gate
+                // are told (see the ⚠️ further down). Asking it twice is how the emitter and
+                // the seam would come to disagree about one operand.
+                let operand_pair = prefix_operator_shell_pair(self, o.type_annotation);
+                let needs_parens = operand_pair == ShellPair::Kept;
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
                 // A line comment, a multiline block, or a block run whose break is forced
@@ -461,26 +493,33 @@ impl<'a> Printer<'a> {
                 // measure is `keyof`→`(`, which holds nothing, so the inline path below
                 // runs and `build_required_paren_operand_doc` hands the shell to its own
                 // builder.
-                let hang = self.keyword_value_stripped_paren_hang(o.type_annotation);
+                // The pair this position RE-MINTS is the run's own emitter, so a shell
+                // holding one is not stripped out from under it ([`ShellPair`]): a union
+                // under `keyof` keeps its parens, keeps the author's isolated block inside
+                // them — where prettier keeps it too — and stays a fixed point, where
+                // hoisting made the glued and isolated spellings of one comment disagree
+                // across a pass. Asked of the UNWRAPPED operand, the shape the pair would
+                // be re-minted around; a `//` hoists either way.
+                let hang = self
+                    .keyword_value_stripped_paren_hang_with_pair(o.type_annotation, operand_pair);
                 let (operand_hang_start, operand_hang_type) = (hang.value_start, hang.value_type);
                 // Type position: a trailing block lifted from the shell trails the
                 // operand inline.
                 let hang_value_doc = || {
-                    self.with_claimed_shell_leading_run(hang.claimed_shell, || {
-                        let operand_doc = self.build_type_doc(operand_hang_type);
-                        let value_doc =
+                    self.with_stripped_shell_value(
+                        hang.claimed_shell,
+                        o.type_annotation,
+                        operand_hang_type,
+                        TrailingBlock::Inline,
+                        || {
+                            let operand_doc = self.build_type_doc(operand_hang_type);
                             if type_needs_parens_for_prefix_operator(self, operand_hang_type) {
                                 d.parens(operand_doc)
                             } else {
                                 operand_doc
-                            };
-                        self.with_stripped_paren_trailing(
-                            value_doc,
-                            o.type_annotation,
-                            operand_hang_type,
-                            TrailingBlock::Inline,
-                        )
-                    })
+                            }
+                        },
+                    )
                 };
                 if let Some(value_doc) =
                     self.keyword_value_hang_doc(keyword_end, operand_hang_start, hang_value_doc)
@@ -973,8 +1012,10 @@ impl<'a> Printer<'a> {
         // returns empty otherwise). The hang predicate's cheap `matches!` + line-comment
         // scan fail-fast before the collector's `CommentVec` allocates (this runs
         // unconditionally, 3× per conditional type), so composing stays as cheap as the
-        // hand-inlined gates were.
-        self.stripped_paren_hang_has_leading_line_comment(ty)
+        // hand-inlined gates were. Its widening to an isolated own-line BLOCK cannot change
+        // the conjunction: the collector returns a run only for an all-`//` leading gap,
+        // which the gate's line-comment half already implies.
+        self.stripped_paren_hang_has_breaking_leading_run(ty)
             && !self.stripped_paren_leading_line_comments(ty).is_empty()
     }
 
@@ -1023,40 +1064,65 @@ impl<'a> Printer<'a> {
 
     /// Hang-seam analog of [`Self::stripped_paren_has_leading_line_comment`], but
     /// **wider**: true when a possibly multiply-nested redundant paren shell holds a
-    /// leading **line** comment anywhere in its (deep) leading gap — the hang trigger —
-    /// *regardless* of whether it also carries a leading **block** comment (a mixed
-    /// shell, `(/* b */ // c\n X)`) or a **trailing** comment (`(// c\n X /* t */)`).
+    /// leading comment that ENDS ITS OWN LINE anywhere in its (deep) leading gap — a `//`,
+    /// or a block the author isolated on its own line ([`EdgeRun::Breaking`]) — the hang
+    /// trigger — *regardless* of whether it also carries a glued leading **block**
+    /// comment (a mixed shell, `(/* b */ // c\n X)`) or a **trailing** comment
+    /// (`(// c\n X /* t */)`).
     ///
     /// The narrower predicate declines those two shapes to avoid dropping the extra
     /// comment when the caller renders only the stripped inner; the hang seam instead
     /// hoists the whole run losslessly — the leading block + line via the caller's own
     /// leading-comment emitter (the gap window widens to the unwrapped inner's start,
     /// which spans the stripped parens), the trailing comment via
-    /// [`Self::with_stripped_paren_trailing`]. So the seam only needs to know a line
-    /// comment forces the hang; block-leading and trailing no longer decline it.
+    /// [`Self::with_stripped_paren_trailing`]. So the seam only needs to know the run ends
+    /// a line; a glued leading block and a trailing comment no longer decline it.
     ///
     /// Kept separate from the narrow predicate so the union-member / conditional-`extends`
     /// callers of the `stripped_*_leading_line_comments` pair — which retain the paren and
     /// preserve every comment *in place* — are unaffected.
     ///
-    /// Read by the hang seam as "a line comment forces the hang", and by
+    /// Read by the hang seam as "a line-ending comment forces the hang", and by
     /// [`Self::build_open_required_paren_doc`]'s gate as the same underlying fact — the
-    /// deep leading gap holds a `//` — so the two cannot drift on where that gap ends.
-    pub(in crate::printer) fn stripped_paren_hang_has_leading_line_comment(
+    /// deep leading gap holds one — so the two cannot drift on where that gap ends.
+    pub(in crate::printer) fn stripped_paren_hang_has_breaking_leading_run(
         &self,
         ty: &TSType<'_>,
     ) -> bool {
-        self.stripped_paren_hang_has_leading_run(ty, EdgeRun::LineComment)
+        self.stripped_paren_hang_has_breaking_leading_run_with_pair(ty, ShellPair::Stripped)
     }
 
-    /// [`Self::stripped_paren_hang_has_leading_line_comment`] on either axis
+    /// [`Self::stripped_paren_hang_has_breaking_leading_run`] told what the POSITION does
+    /// with the pair ([`ShellPair`]) — the form the hang seam and the gates at a
+    /// re-minting position ask, so the two cannot answer differently about one shell.
+    pub(in crate::printer) fn stripped_paren_hang_has_breaking_leading_run_with_pair(
+        &self,
+        ty: &TSType<'_>,
+        pair: ShellPair,
+    ) -> bool {
+        self.stripped_paren_hang_has_leading_run(ty, EdgeRun::Breaking, pair)
+    }
+
+    /// [`Self::stripped_paren_hang_has_breaking_leading_run`] on either axis
     /// ([`EdgeRun`]) — the one window read, so widening the KIND cannot also move the
     /// window.
-    fn stripped_paren_hang_has_leading_run(&self, ty: &TSType<'_>, run: EdgeRun) -> bool {
+    fn stripped_paren_hang_has_leading_run(
+        &self,
+        ty: &TSType<'_>,
+        run: EdgeRun,
+        pair: ShellPair,
+    ) -> bool {
         outermost_paren(ty).is_some_and(|shell| {
             let (leading, _) = paren_shell_gaps(shell);
             match run {
-                EdgeRun::LineComment => self.has_line_comments_between(leading.start, leading.end),
+                EdgeRun::Breaking => {
+                    self.has_line_comments_between(leading.start, leading.end)
+                        || (pair == ShellPair::Stripped
+                            && self.block_comment_isolated_own_line_between(
+                                leading.start,
+                                leading.end,
+                            ))
+                }
                 EdgeRun::LineOrBlock => {
                     self.has_comments_to_emit_between(leading.start, leading.end)
                 }
@@ -1077,7 +1143,7 @@ impl<'a> Printer<'a> {
     /// Losslessness: the caller's leading-comment emitter (fed the widened gap window)
     /// prints the leading block + line run, and [`Self::with_stripped_paren_trailing`]
     /// prints any comment in the shell's trailing gap — so no comment is dropped by the
-    /// strip. Gated by [`Self::stripped_paren_hang_has_leading_line_comment`].
+    /// strip. Gated by [`Self::stripped_paren_hang_has_breaking_leading_run`].
     ///
     /// ⚠️ Except a shell the trailing-run rule RETAINS
     /// ([`Self::paren_retains_for_trailing_run`]) — the seam declines the hang there and
@@ -1105,9 +1171,24 @@ impl<'a> Printer<'a> {
     /// was built at, and the reparse — which finds the comment right here — applied the
     /// indent, so the two passes disagreed (an F1 violation at every site this seam
     /// serves).
+    ///
+    /// The plain spelling answers [`ShellPair::Stripped`] — the position lays the
+    /// stripped inner out bare, which is every caller but the prefix operator. One that
+    /// re-mints the pair takes [`Self::keyword_value_stripped_paren_hang_with_pair`] instead, and
+    /// must pass the same answer to any GATE it asks about the same shell.
     pub(in crate::printer) fn keyword_value_stripped_paren_hang<'t>(
         &self,
         value: &'t TSType<'t>,
+    ) -> StrippedParenHang<'t> {
+        self.keyword_value_stripped_paren_hang_with_pair(value, ShellPair::Stripped)
+    }
+
+    /// [`Self::keyword_value_stripped_paren_hang`] told what the position does with the
+    /// pair ([`ShellPair`]).
+    pub(in crate::printer) fn keyword_value_stripped_paren_hang_with_pair<'t>(
+        &self,
+        value: &'t TSType<'t>,
+        pair: ShellPair,
     ) -> StrippedParenHang<'t> {
         // A transparent one-member composite IS its member at this seam: the operator is
         // dropped, so its head gap (`: |⏎/* c */⏎{…}`) is the keyword→value gap the caller
@@ -1117,7 +1198,7 @@ impl<'a> Printer<'a> {
         // composite laid the run out by the composite's rules where pass 2, reading the
         // bare member, re-laid it by the seam's (`union_single_member_head_comment`).
         let value = self.transparent_value(value);
-        if self.stripped_paren_hang_has_leading_line_comment(value)
+        if self.stripped_paren_hang_has_breaking_leading_run_with_pair(value, pair)
             && !self.paren_retains_for_trailing_run(value)
         {
             let inner = unwrap_parenthesized(value);
@@ -1156,7 +1237,7 @@ impl<'a> Printer<'a> {
     /// shell that IS the item (a union member hoists it, a retained one keeps its parens),
     /// so only the leading-EDGE half is theirs to claim.
     pub(in crate::printer) fn leading_edge_shell_claim(&self, ty: &TSType<'_>) -> Option<Span> {
-        self.leading_edge_region(ty, EdgeRun::LineComment)
+        self.leading_edge_region(ty, EdgeRun::Breaking)
     }
 
     /// The leading-edge shell's comment region on either axis — one body, so the two
@@ -1499,7 +1580,11 @@ impl<'a> Printer<'a> {
         if downstream_owns_run || self.paren_interior_routed_inner(head).is_some() {
             return None;
         }
-        if self.stripped_paren_hang_has_leading_run(head, run)
+        // [`ShellPair::Stripped`]: a shell at a value's leading EDGE is redundant by
+        // construction — the link it descends through strips it — and the one shape whose
+        // pair survives, a pair the position OPENS around the run, is `downstream_owns_run`
+        // above, which has already returned.
+        if self.stripped_paren_hang_has_leading_run(head, run, ShellPair::Stripped)
             && !self.paren_retains_for_trailing_run(head)
         {
             return Some(HeadRegion::of_shell(head));
@@ -1772,43 +1857,25 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Convenience over [`Self::with_stripped_paren_trailing`] for the common hang site:
-    /// build `inner`'s type doc and append any trailing comment lifted from a stripped
-    /// `original` shell in one call, so callers don't repeat `inner`. `original` /
-    /// `inner` are the seam's `(shell, unwrapped)` pair — equal when nothing was
-    /// stripped, a no-op then. `trailing_block` follows
-    /// [`Self::with_stripped_paren_trailing`]. The prefix-operator site keeps calling
-    /// the lower-level helper directly because it re-parenthesizes the operand first.
+    /// Convenience over [`Self::with_stripped_paren_trailing`] for the hang site that
+    /// emits the shell's leading run ITSELF (`as` / `satisfies`, whose own loop prints it
+    /// inline): build `inner`'s type doc and append any trailing comment lifted from a
+    /// stripped `original` shell in one call, so the caller doesn't repeat `inner`.
+    /// `original` / `inner` are the seam's `(shell, unwrapped)` pair — equal when nothing
+    /// was stripped, a no-op then.
+    ///
+    /// The lift's other half is [`Self::with_stripped_shell_value`], for the seams whose
+    /// GAP emits that run: there the claim must travel with the lift, and one without the
+    /// other is a double-print or a DROP. A site that reaches for this one is asserting it
+    /// has no claim to make.
     pub(in crate::printer) fn build_hang_value_doc(
         &self,
         original: &TSType<'_>,
         inner: &TSType<'_>,
         trailing_block: TrailingBlock,
     ) -> DocId {
-        self.build_hang_value_doc_parens(
-            original,
-            inner,
-            trailing_block,
-            AnnotationParens::AsWritten,
-        )
-    }
-
-    /// [`Self::build_hang_value_doc`] carrying the annotation position's required pair.
-    ///
-    /// The hang has already STRIPPED the authored shell — `inner` is what is left — so
-    /// the pair an arrow's return type requires must be re-added here or the hung
-    /// function type prints bare (`(x: T): // c⏎↹(y: T) => T =>`, whose second `=>` the
-    /// reparse reads as the arrow's own). Every other hang keeps
-    /// [`AnnotationParens::AsWritten`] and is byte-identical.
-    pub(in crate::printer) fn build_hang_value_doc_parens(
-        &self,
-        original: &TSType<'_>,
-        inner: &TSType<'_>,
-        trailing_block: TrailingBlock,
-        parens: AnnotationParens,
-    ) -> DocId {
         self.with_stripped_paren_trailing(
-            self.build_annotation_value_doc(inner, parens),
+            self.build_type_doc(inner),
             original,
             inner,
             trailing_block,
@@ -1861,9 +1928,39 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The two halves a STRIPPED shell owes its caller, around the caller's own value
+    /// build: the **claim** that stands the shell's copy of the leading run down while this
+    /// gap emits it ([`Self::with_claimed_shell_leading_run`]), and the **lift** that
+    /// carries the shell's trailing gap out past the value
+    /// ([`Self::with_stripped_paren_trailing`]).
+    ///
+    /// They travel together for the same reason
+    /// [`Self::leading_edge_claim_and_start`] hands out its own pair in one call: the claim
+    /// alone leaves the shell's trailing comment with no emitter (a DROP), and the lift
+    /// alone leaves the leading run printed twice. Both are no-ops where nothing was
+    /// stripped — `original` and `inner` are then the same node — so a caller reaching a
+    /// hang seam can hand its build through unconditionally.
+    ///
+    /// `build` is the caller's value doc: the plain type doc at most seams
+    /// ([`Self::build_keyword_value_doc`]), the annotation's union / intersection / simple
+    /// arms at the `:`, the re-parenthesized operand at a prefix operator.
+    pub(in crate::printer) fn with_stripped_shell_value(
+        &self,
+        claimed_shell: Option<Span>,
+        original: &TSType<'_>,
+        inner: &TSType<'_>,
+        trailing_block: TrailingBlock,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        self.with_claimed_shell_leading_run(claimed_shell, || {
+            let value_doc = build();
+            self.with_stripped_paren_trailing(value_doc, original, inner, trailing_block)
+        })
+    }
+
     /// The value doc for a resolved [`Self::keyword_value_head`]: the frozen verbatim
-    /// slice, or the hung value with any comment lifted from a stripped shell's trailing
-    /// gap appended ([`Self::build_hang_value_doc`] — `trailing_block` per that seam).
+    /// slice, or the hung value under the stripped shell's claim + lift
+    /// ([`Self::with_stripped_shell_value`] — `trailing_block` per that seam).
     /// Reads the child off the head, so no caller can pair a head with the wrong node.
     pub(in crate::printer) fn build_keyword_value_doc(
         &self,
@@ -1873,9 +1970,13 @@ impl<'a> Printer<'a> {
         if head.frozen {
             self.build_frozen_single_child_doc(head.child)
         } else {
-            self.with_claimed_shell_leading_run(head.claimed_shell, || {
-                self.build_hang_value_doc(head.child, head.value_type, trailing_block)
-            })
+            self.with_stripped_shell_value(
+                head.claimed_shell,
+                head.child,
+                head.value_type,
+                trailing_block,
+                || self.build_annotation_value_doc(head.value_type, AnnotationParens::AsWritten),
+            )
         }
     }
 
@@ -2167,7 +2268,7 @@ impl<'a> Printer<'a> {
         // The `let` is implied by the predicate, which is itself keyed on
         // [`outermost_paren`] — it is spelled out to carry the shell here rather than have
         // the emitter re-derive the window the predicate just measured.
-        if self.stripped_paren_hang_has_leading_line_comment(ty)
+        if self.stripped_paren_hang_has_breaking_leading_run(ty)
             && let Some(shell) = outermost_paren(ty)
         {
             let (leading, trailing) = paren_shell_gaps(shell);
@@ -2261,7 +2362,13 @@ impl<'a> Printer<'a> {
         // below it, inside the shell.
         let (glued, resume) = self.split_open_delimiter_glued_run(paren_open, inner_start);
         let mut body: DocBuf = DocBuf::new();
-        self.push_paren_shell_leading_run(&mut body, resume, inner_start, ShellLeadingRun::Here);
+        self.push_paren_shell_leading_run(
+            &mut body,
+            resume,
+            inner_start,
+            ShellLeadingRun::Here,
+            ShellPair::Kept,
+        );
         body.push(inner_doc);
         // The author BLANK above an own-line comment SURVIVES here, unlike at the hang
         // seams the plain spelling serves ([`TrailingBlank`]): this run's destination is
@@ -2615,6 +2722,7 @@ impl<'a> Printer<'a> {
                 paren_open,
                 handoff.unwrap_or(inner_start),
                 ShellLeadingRun::Here,
+                ShellPair::Stripped,
             );
         }
 

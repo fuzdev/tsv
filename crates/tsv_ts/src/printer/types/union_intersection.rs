@@ -17,10 +17,10 @@ use crate::ast::internal::{
 };
 use crate::printer::CommentVec;
 use crate::printer::LeadingGlue;
-use crate::printer::ShellLeadingRun;
 use crate::printer::comments::TrailingBlank;
 use crate::printer::ignore::LeadingRunFreeze;
 use crate::printer::layout::hang_after_operator;
+use crate::printer::{ShellLeadingRun, ShellPair};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -314,7 +314,7 @@ impl<'a> Printer<'a> {
         // whose own gap is empty and still carry a leading-edge shell inside it
         // (`A | ((⏎// c⏎B)[])`, the author's extra layer), so returning the shallow answer
         // early routed that to the width path and left the shell printing its own run.
-        self.stripped_paren_hang_has_leading_line_comment(t)
+        self.stripped_paren_hang_has_breaking_leading_run(t)
             || self.leading_edge_shell_line_comment(t)
     }
 
@@ -979,7 +979,13 @@ impl<'a> Printer<'a> {
     ) {
         // The same emitter the stripped shell would have used for a run of its own, so
         // separators and author blanks read identically whichever authoring reached it.
-        self.push_paren_shell_leading_run(parts, claim.start, claim.end, ShellLeadingRun::Here);
+        self.push_paren_shell_leading_run(
+            parts,
+            claim.start,
+            claim.end,
+            ShellLeadingRun::Here,
+            ShellPair::Stripped,
+        );
         parts.push(self.with_claimed_shell_leading_run(Some(claim), || {
             self.build_intersection_member_type_doc(member, member_parens)
         }));
@@ -1031,6 +1037,7 @@ impl<'a> Printer<'a> {
                     leading.start,
                     leading.end,
                     ShellLeadingRun::Here,
+                    ShellPair::Stripped,
                 );
             }
         }
@@ -2131,7 +2138,7 @@ impl<'a> Printer<'a> {
                 // the outermost, and `build_parenthesized_union_doc`'s window already
                 // spans from it to the union, so any nesting depth emits the whole run.
                 && let TSType::Union(inner_union) = unwrap_parenthesized(t)
-                && self.stripped_paren_hang_has_leading_line_comment(t)
+                && self.stripped_paren_hang_has_breaking_leading_run(t)
             {
                 // `first_leading` is non-empty only for the first member (see its
                 // declaration); a later member's leading comments were emitted on their
@@ -2559,7 +2566,7 @@ impl<'a> Printer<'a> {
         let TSType::Union(union) = unwrap_parenthesized(t) else {
             return None;
         };
-        self.stripped_paren_hang_has_leading_line_comment(t)
+        self.stripped_paren_hang_has_breaking_leading_run(t)
             .then_some((p, union))
     }
 

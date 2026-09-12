@@ -215,14 +215,13 @@ impl<'a> Printer<'a> {
             // (annotation_leading_block_prettier_divergence).
             // Type position: a trailing block lifted from the shell trails the type
             // inline before the terminator.
-            let type_doc = self.with_claimed_shell_leading_run(hang.claimed_shell, || {
-                self.build_hang_value_doc_parens(
-                    annotation.type_annotation,
-                    ty,
-                    TrailingBlock::Inline,
-                    parens,
-                )
-            });
+            let type_doc = self.with_stripped_shell_value(
+                hang.claimed_shell,
+                annotation.type_annotation,
+                ty,
+                TrailingBlock::Inline,
+                || self.build_annotation_value_doc(ty, parens),
+            );
             let mut parts: DocBuf = smallvec![d.text(":")];
             self.append_keyword_value_line_comments(&mut parts, colon_end, type_start, type_doc);
             d.concat(&parts)
@@ -239,28 +238,39 @@ impl<'a> Printer<'a> {
             // get the bare layout (prettier strips them too); other parens keep the `_`
             // fall-through.
             let value_type = self.unwrap_redundant_parens(ty);
-            match value_type {
-                TSType::Union(u) => {
-                    // The one union seam for every annotation position: a hugging
-                    // union (`{ … } | null`) keeps `: ` glued — a parameter's annotation
-                    // hugs exactly as a variable's or a property's does — and any other
-                    // union hangs after the `:`.
-                    self.build_annotation_union_doc(colon_end, type_start, u, gap_has_comments)
-                }
-                TSType::Intersection(i) => {
-                    // Build intersection with proper indentation for type annotation context:
-                    // `: FirstType &` stays on the same line, continuation types are indented
-                    // Extract comments between `:` and the intersection first
-                    self.build_intersection_type_annotation_doc(i, colon_end)
-                }
-                _ => self.build_simple_type_annotation_doc(
-                    colon_end,
-                    type_start,
-                    ty,
-                    gap_has_comments,
-                    parens,
-                ),
-            }
+            // The stripped shell's pair ([`Printer::with_stripped_shell_value`]), on the
+            // arms reached through a BLOCK run: an isolated own-line block strips a shell
+            // here exactly as a `//` does on the branch above, so this gap emits the run
+            // and the shell's trailing gap rides out past the value. No-ops on every
+            // annotation that stripped nothing.
+            self.with_stripped_shell_value(
+                hang.claimed_shell,
+                annotation.type_annotation,
+                ty,
+                TrailingBlock::Inline,
+                || match value_type {
+                    TSType::Union(u) => {
+                        // The one union seam for every annotation position: a hugging
+                        // union (`{ … } | null`) keeps `: ` glued — a parameter's annotation
+                        // hugs exactly as a variable's or a property's does — and any other
+                        // union hangs after the `:`.
+                        self.build_annotation_union_doc(colon_end, type_start, u, gap_has_comments)
+                    }
+                    TSType::Intersection(i) => {
+                        // Build intersection with proper indentation for type annotation context:
+                        // `: FirstType &` stays on the same line, continuation types are indented
+                        // Extract comments between `:` and the intersection first
+                        self.build_intersection_type_annotation_doc(i, colon_end)
+                    }
+                    _ => self.build_simple_type_annotation_doc(
+                        colon_end,
+                        type_start,
+                        ty,
+                        gap_has_comments,
+                        parens,
+                    ),
+                },
+            )
         }
     }
 
@@ -618,15 +628,29 @@ impl<'a> Printer<'a> {
         let has_comments =
             self.has_comments_to_emit_between(annotation.span.start, annotation.span.end);
 
-        // First check for line comments between `:` and the type.
-        // If there are comments, fall back to build_type_annotation_doc which handles them
-        // properly. A redundant paren shell with a leading line-comment run in the return
-        // type (`(): (// c\n T)`) must delegate just like the bare `(): // c\n T` — widen the
-        // probe to the unwrapped inner's start so the outer paren doesn't hide the comment
-        // (build_type_annotation_doc strips the shell and hangs the type; without this the
-        // wrapping logic below would relocate the comment non-idempotently).
-        let line_comment_probe_end = self.keyword_value_stripped_paren_hang(value).value_start;
-        if has_comments && self.has_line_comments_between(colon_end, line_comment_probe_end) {
+        // First check for a comment run that ENDS ITS LINE between `:` and the type.
+        // If there is one, fall back to build_type_annotation_doc which handles it
+        // properly. A redundant paren shell whose leading run ends a line — a `//` in the
+        // return type (`(): (// c\n T)`), or a block the author isolated on its own line
+        // (`: (⏎/* c */⏎A | B)`) — must delegate just like the bare authoring does: the
+        // probe widens to the unwrapped inner's start so the outer paren cannot hide a
+        // `//`, and the shell's own gap is asked for the second kind through the hang
+        // seam's own predicate, so the delegation and the strip answer one question.
+        // Left to the arms below, the shell stays whole — `unwrap_redundant_parens`
+        // declines one holding comments — and the simple fall-through prints the shell's
+        // own hardline at THIS level, never the gap's hang indent, which is the
+        // annotation's fact and not the shell's; the reparse, finding the comment in that
+        // gap, lays it out the other way.
+        //
+        // ⚠️ Asked of the SHELL, never as "the hang seam moved its window": that window
+        // also moves for a transparent one-member composite's head gap (`: (|/* c */A)`),
+        // which these arms print correctly themselves, and delegating there DOUBLE-PRINTED
+        // the run.
+        let probe_end = self.keyword_value_stripped_paren_hang(value).value_start;
+        if has_comments
+            && (self.has_line_comments_between(colon_end, probe_end)
+                || self.stripped_paren_hang_has_breaking_leading_run(value))
+        {
             return self.build_type_annotation_doc_parens(annotation, parens);
         }
 

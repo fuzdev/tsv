@@ -470,7 +470,17 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// after an annotation `:` / return type / property signature, or after either conditional's
 	// `?` / `:`, now keeps its own line (both union files are where prettier keeps it too).
 	// Reasoning and the byte A/B on `CORPUS_FORMAT_UNKNOWN_PIN`.
-	typescript: 5177,
+	//
+	// 5177 → 5178: `prettier/tests/format/typescript/comments/10260.ts` arrives from `known` —
+	// prettier's own regression test for this shape, a block comment the author isolated on its
+	// own line inside a paren shell, which now keeps that line (and the shell's parens open)
+	// instead of gluing to the type. Measured by a HEAD-vs-tip byte A/B over the 10,536
+	// `find`-enumerated `../corpora/collections` + `../prettier/tests/format` files staged as
+	// two trees and formatted in place by a pre-change and a tip `--profile corpus` CLI: that
+	// file is the ONLY mover, zero in real code, with the per-file error output identical line
+	// for line (950/950) and the formatted/unchanged counts unmoved. `unknown` and `partial`
+	// are exact pins and both hold, so the file can only have come from `known`.
+	typescript: 5178,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
