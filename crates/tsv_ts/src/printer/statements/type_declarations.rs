@@ -401,6 +401,26 @@ impl<'a> Printer<'a> {
             || self.block_comment_isolated_own_line_between(eq_pos + 1, type_start);
 
         if force_break {
+            // A UNION whose gap run ends GLUED to its head prints that run itself, here as
+            // in the union arm below ([`Printer::build_union_value_doc`]): the run splits at
+            // the author's last break, the glued tail landing after the `| ` the broken
+            // layout synthesizes. Emitted by this branch's own loop instead, the tail was
+            // stranded ahead of that pipe (`/* c2 */ | A`), a form prettier never emits —
+            // the same stranding the union arm's decline avoids, at the one shape that
+            // reaches this branch rather than that one (an own-line comment EARLIER in the
+            // run, which is what forces the break here). Stated once, so the split has one
+            // emitter. Asked inside the branch, where the gap provably holds a comment: on
+            // the comment-free path a union pays nothing for it.
+            //
+            // A frozen head or a frozen paren interior declines: the directive's placement
+            // is the freeze machinery's, and the run is the verbatim slice's own.
+            let handed_union = match value_type {
+                TSType::Union(u) if !head.frozen && interior_frozen_inner.is_none() => self
+                    .union_external_leading_run_start(eq_pos + 1, u)
+                    .map(|_| u),
+                _ => None,
+            };
+
             // Line/multiline block comments force type to next line with indent.
             // Line comments stay on `=` line; multiline blocks go into the indent.
             // Example: `type A = // comment\n  B;`
@@ -419,9 +439,14 @@ impl<'a> Printer<'a> {
             // every subsequent comment go on their own line in the indent. Two line
             // comments must not merge onto one line — the second `//` would stop
             // being a delimiter (a boundary loss).
-            let comments: CommentVec<'_> = self
-                .comments_to_emit_between(eq_pos + 1, type_start)
-                .collect();
+            // Empty under a handed union — that run is the union's to place, and exactly
+            // one of the two emits it (docs/comments.md hazard 3).
+            let comments: CommentVec<'_> = match handed_union {
+                Some(_) => CommentVec::new(),
+                None => self
+                    .comments_to_emit_between(eq_pos + 1, type_start)
+                    .collect(),
+            };
             let run_has_line_comment = comments.iter().any(|c| !c.is_block);
             for (idx, comment) in comments.iter().enumerate() {
                 let multiline_block = comment.multiline;
@@ -481,6 +506,17 @@ impl<'a> Printer<'a> {
                     &decl.type_annotation,
                     value_type,
                     TrailingBlock::Inline,
+                )
+            } else if let Some(u) = handed_union {
+                // The union places the whole gap run, split at the author's last break.
+                // Through the same shell claim + lift as every other value here — the
+                // pair a stripped shell owes whatever builds inside it.
+                self.with_stripped_shell_value(
+                    head.claimed_shell,
+                    &decl.type_annotation,
+                    head.value_type,
+                    TrailingBlock::Inline,
+                    || self.build_union_value_doc(eq_pos + 1, u).doc,
                 )
             } else {
                 self.build_keyword_value_doc(&head, TrailingBlock::Inline)
@@ -628,8 +664,11 @@ impl<'a> Printer<'a> {
             // glued comment belongs after the leading `|` its broken layout synthesizes, which
             // only the union arm below can place (`build_union_value_doc`'s hand-off). This arm
             // would print it ahead of the pipe (`/* c2 */ | A`), a form prettier never emits.
-            // TODO: prettier splits that run — `c1` leads the value, `c2` the first member —
-            // and neither arm does yet.
+            // The run is not one claim — prettier SPLITS it, `c1` leading the value and `c2`
+            // the first member — and the split is the union's, stated once at the position
+            // both halves take ([`Printer::union_bound_handed_run_end`]); this arm holds no
+            // half of it, so it declines the shape whole
+            // (`types/comments/union_seam_leading_run_split`).
             if let Some(run) = self.broke_after_value_leading_run(eq_pos + 1, type_start)
                 && !(matches!(value_type, TSType::Union(_))
                     && run.last().is_some_and(|c| self.comment_hugs_next(c)))
