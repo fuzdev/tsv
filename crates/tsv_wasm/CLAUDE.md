@@ -371,7 +371,7 @@ the file a warning names), then queries:
 - `classify_dir(name, child_rel, heuristic_active) -> 'descend' | 'prune' |
   'prune_warn'` — the shared per-directory verdict (`tsv_discover::classify_dir`:
   safety nets, the build-output heuristic, the matcher). On `'prune_warn'` fetch
-  the message via `heuristic_shadow_warning(dir, loose_root?)`.
+  the message via `shadow_warning(dir, loose_root?)`.
 - `should_format_file(name, child_rel) -> bool` — the per-file verdict (a
   formattable extension and not ignored).
 - `is_path_pruned(rel) -> bool` — the per-file form of the directory-prune verdict
@@ -381,11 +381,11 @@ the file a warning names), then queries:
   `.gitignore` anchors, so it takes no extra arguments; pair it with
   `is_ignored(rel, false)` for the file-level match. (`classify_dir` stays the
   primitive for `npm/cli.js`, which threads `heuristic_active` down a real walk.)
-- `path_heuristic_shadow_warning(rel, loose_root?) -> string | undefined` — the same
-  per-file replay's warning: `heuristic_shadow_warning`'s text for the first ancestor
-  `is_path_pruned` stops at, when the heuristic pruned it under a tsv-layer re-include
-  (the `'prune_warn'` a walk would have reached); `undefined` for any other prune, or
-  none.
+- `path_shadow_warning(rel, loose_root?) -> string | undefined` — the same
+  per-file replay's warning: `shadow_warning`'s text for the first ancestor
+  `is_path_pruned` stops at, when it was pruned — by the heuristic or by a rule — under
+  a tsv-layer re-include (the `'prune_warn'` a walk would have reached); `undefined`
+  for any other prune, or none.
 - `excluded_argument_warning(display, rel, is_dir, loose_root?) -> string | undefined`
   — the warning for a path an argument named (a file, or a directory root) that an
   ignore file puts out of scope, naming the file whose rule did it; `undefined` when no
@@ -393,7 +393,7 @@ the file a warning names), then queries:
   excludes (skipped quietly). The scope decision is `is_ignored(rel, is_dir)`, which
   `npm/cli.js` gates every named path on alone (the safety nets and the heuristic grade
   no named path). `loose_root` is the format root's display path outside a repo.
-- `heuristic_shadow_warning(dir, loose_root?) -> string | undefined` (naming the file
+- `shadow_warning(dir, loose_root?) -> string | undefined` (naming the file
   holding the re-include it read from the stack), `prettierignore_outside_repo_warning`,
   `prettierignore_shadowed_warning`, and `gitignore_symlink_warning(path)` — the four
   warning templates, beside `unresolvable_root_error(root)`'s traversal error (methods,
@@ -405,8 +405,8 @@ the file a warning names), then queries:
   receiver is likewise unused (an argument check runs before any matcher exists).
   It carries the rendered extension list, so `npm/cli.js` never hand-mirrors
   `FORMATTABLE_EXTENSIONS`.
-- `is_ignored(path, is_dir)` / `is_empty()` — the raw matcher primitives, still
-  exposed for direct consumers.
+- `is_ignored(path, is_dir)` — the raw matcher primitive, still exposed for direct
+  consumers.
 
 **Every method has a twin on the N-API `IgnoreStack`** (`crates/tsv_napi/src/lib.rs`,
 declared in `crates/tsv_napi/npm/index.d.ts`): `npm/cli.js` ships in both packages and

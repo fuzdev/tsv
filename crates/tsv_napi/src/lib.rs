@@ -333,7 +333,7 @@ impl IgnoreStack {
     /// segment, `child_rel` its format-root-relative `/`-separated path, and
     /// `heuristic_active` is true while no `.gitignore` governs this level. On
     /// `"prune_warn"` the caller fetches the message via
-    /// [`heuristic_shadow_warning`](IgnoreStack::heuristic_shadow_warning).
+    /// [`shadow_warning`](IgnoreStack::shadow_warning).
     ///
     /// A string tag rather than an enum or a struct — same as the wasm side,
     /// and it allocates no JS object on the common descend path.
@@ -366,20 +366,20 @@ impl IgnoreStack {
         tsv_discover::is_path_pruned(&rel, &self.inner)
     }
 
-    /// The heuristic-shadow warning a walk raises on the way down to `rel` (a
-    /// format-root-relative file path): `heuristic_shadow_warning`'s text for the first
-    /// ancestor directory `is_path_pruned` stops at, when the build-output heuristic pruned
-    /// it under a tsv-layer re-include; `undefined` otherwise. The per-file companion to
+    /// The shadow warning a walk raises on the way down to `rel` (a format-root-relative
+    /// file path): `shadow_warning`'s text for the first ancestor directory
+    /// `is_path_pruned` stops at, when it was pruned — by the build-output heuristic or by
+    /// an ignore rule — under a tsv-layer re-include; `undefined` otherwise. The per-file companion to
     /// `classify_dir`'s `"prune_warn"` for a consumer with no top-down traversal.
     /// `loose_root` is the format root's display path outside a git repo (`undefined`
     /// inside one).
-    #[napi(js_name = "path_heuristic_shadow_warning", catch_unwind)]
-    pub fn path_heuristic_shadow_warning(
+    #[napi(js_name = "path_shadow_warning", catch_unwind)]
+    pub fn path_shadow_warning(
         &self,
         rel: String,
         loose_root: Option<String>,
     ) -> Either<String, Undefined> {
-        or_undefined(tsv_discover::path_heuristic_shadow_warning(
+        or_undefined(tsv_discover::path_shadow_warning(
             &rel,
             loose_root.as_deref(),
             &self.inner,
@@ -398,19 +398,19 @@ impl IgnoreStack {
         or_undefined(tsv_discover::unsupported_extension_error(&path))
     }
 
-    /// The heuristic-shadow warning text for a pruned directory `dir`
-    /// (format-root relative); `undefined` when no tsv-layer re-include is written under
-    /// `dir`. The text names the file holding that rule, which it reads from this stack.
+    /// The shadow warning text for a pruned directory `dir` (format-root relative) — pruned
+    /// by the build-output heuristic or by an ignore rule, which the text says;
+    /// `undefined` when no tsv-layer re-include is written under `dir`. The text names the file holding that rule, which it reads from this stack.
     /// `loose_root` is the format root's display path outside a git repo (`undefined`
     /// inside one). Single source of truth with the native CLI — the JS CLI never
     /// templates this string.
-    #[napi(js_name = "heuristic_shadow_warning", catch_unwind)]
-    pub fn heuristic_shadow_warning(
+    #[napi(js_name = "shadow_warning", catch_unwind)]
+    pub fn shadow_warning(
         &self,
         dir: String,
         loose_root: Option<String>,
     ) -> Either<String, Undefined> {
-        or_undefined(tsv_discover::heuristic_shadow_warning(
+        or_undefined(tsv_discover::shadow_warning(
             &dir,
             loose_root.as_deref(),
             &self.inner,
@@ -497,12 +497,6 @@ impl IgnoreStack {
     #[napi(js_name = "unresolvable_root_error", catch_unwind)]
     pub fn unresolvable_root_error(&self, root: String) -> String {
         tsv_discover::unresolvable_root_error(&root)
-    }
-
-    /// Whether no layer carries any rule — callers skip per-path matching.
-    #[napi(js_name = "is_empty", catch_unwind)]
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
     }
 }
 
@@ -799,9 +793,8 @@ mod tests {
     #[cfg(feature = "format")]
     fn ignore_stack_layers_and_verdicts() {
         let mut stack = IgnoreStack::new();
-        assert!(stack.is_empty());
+        assert!(!stack.is_ignored("dist".to_owned(), true));
         stack.push_gitignore(String::new(), "dist/\n".to_owned());
-        assert!(!stack.is_empty());
         assert!(stack.is_ignored("dist".to_owned(), true));
         assert!(!stack.is_ignored("src/a.ts".to_owned(), false));
         assert_eq!(
@@ -816,7 +809,7 @@ mod tests {
         assert!(!stack.should_format_file("a.txt".to_owned(), "src/a.txt".to_owned()));
         assert!(stack.is_path_pruned("node_modules/x.ts".to_owned()));
         stack.pop_gitignore();
-        assert!(stack.is_empty());
+        assert!(!stack.is_ignored("dist".to_owned(), true));
     }
 
     /// The maybe-a-warning methods must yield JS `undefined`, not `null`, for
@@ -844,13 +837,13 @@ mod tests {
             Either::B(())
         ));
         assert!(matches!(
-            stack.path_heuristic_shadow_warning("dist/a.ts".to_owned(), None),
+            stack.path_shadow_warning("dist/a.ts".to_owned(), None),
             Either::B(())
         ));
         let mut loose = IgnoreStack::new();
         loose.push_formatignore(String::new(), "!dist/a.ts\n".to_owned());
         assert!(matches!(
-            loose.path_heuristic_shadow_warning("dist/a.ts".to_owned(), None),
+            loose.path_shadow_warning("dist/a.ts".to_owned(), None),
             Either::A(_)
         ));
     }

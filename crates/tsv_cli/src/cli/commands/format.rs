@@ -1,5 +1,6 @@
 use crate::cli::discover::{
-    Diagnostics, Discovered, FileSink, discover_files, discover_into, path_sort_key,
+    Diagnostics, Discovered, FileSink, discover_files, discover_into, path_from_sort_key,
+    path_sort_key,
 };
 use crate::cli::format_source::{format_source_in, format_source_with_source_type};
 use crate::cli::input::{InputArgs, ParserType, check_source_type_language, parse_source_type_arg};
@@ -74,7 +75,8 @@ pub struct FormatCommand {
 /// Two readers reach it — the streamed path's walk-index sweep and the collected path's
 /// merge — and both mean the same thing: a worker died *outside* `catch_unwind`, which
 /// cannot happen in release (`panic = "abort"` kills the process first). One spelling so
-/// the two cannot drift; `tests/cli_tests.rs` asserts a `--jobs 0` run never produces it.
+/// the two cannot drift; `test_format_jobs_zero_means_one` in `tests/cli_tests.rs`
+/// asserts a `--jobs 0` run never produces it.
 const WORKER_PANICKED: &str = "worker thread panicked";
 
 /// What either path-mode route hands back: the in-scope files with their outcomes,
@@ -128,18 +130,24 @@ impl FormatCommand {
         }
         let goal = parse_source_type_arg(self.source_type.as_deref())
             .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
+        // refused before the input is read: a `--stdin` this would turn away must not
+        // first wait on its writer (an open, empty stdin would hang the refusal)
+        if let Some(parser_type) = self.parser
+            && let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type)
+        {
+            exit_with_error(2, format_args!("Error: {e}"));
+        }
         let input_args = InputArgs {
             content: self.content,
             stdin: self.stdin,
             parser: self.parser,
             file: None,
         };
+        // `--content`/`--stdin` require `--parser`, so the parser resolved here is the flag
+        // the check above already graded
         let (input, parser_type) = input_args
             .resolve()
             .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
-        if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
-            exit_with_error(2, format_args!("Error: {e}"));
-        }
         let formatted = format_source_with_source_type(input.content(), parser_type, goal)
             .unwrap_or_else(|e| exit_with_error(2, format_args!("Parse error: {e}")));
         if self.check {
@@ -180,6 +188,14 @@ impl FormatCommand {
         }
         if self.list && self.check {
             exit_with_error(2, "Error: --list and --check cannot be combined");
+        }
+        // `--jobs` sizes the pool that formats; `--list` never spawns one, so a width
+        // there is the same category error as with `--content`
+        if self.list && self.jobs.is_some() {
+            exit_with_error(
+                2,
+                "Error: --jobs applies to formatting; --list reports the in-scope set without formatting",
+            );
         }
         // --list reports the in-scope set and stops — no formatting, and an
         // empty result is a valid answer (exit 0), unlike the format action
@@ -587,6 +603,11 @@ struct QueueSink<'a> {
 
 impl FileSink for QueueSink<'_> {
     fn push(&mut self, path: PathBuf) {
+        // the walk index is a `u32` to keep the key small; past 2³² files it would alias
+        debug_assert!(
+            self.keys.len() < u32::MAX as usize,
+            "more discovered files than a u32 walk index can address"
+        );
         self.keys
             .push((path_sort_key(&path), self.keys.len() as u32));
         self.batch.push(path);
@@ -652,8 +673,9 @@ fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
         (discovery, claimed)
     });
 
-    // the caller only streams a directory root, which always resolves, so the
-    // bad-argument arm is unreachable here — handled anyway rather than asserted
+    // the caller only streams a directory root it has just seen resolve, so the
+    // bad-argument arm is reached only if the root vanished between that check and the
+    // walk's own — handled rather than asserted, and the pool has nothing queued by then
     let diagnostics = discovery.unwrap_or_else(|bad_args| exit_bad_args(&bad_args));
     report_discovery(&diagnostics);
     exit_if_nothing_in_scope(sink.keys.len(), &diagnostics);
@@ -666,13 +688,13 @@ fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
     }
     let mut files = Vec::with_capacity(sink.keys.len());
     let mut outcomes = Vec::with_capacity(sink.keys.len());
-    for (_, walk_index) in &sink.keys {
+    for (key, walk_index) in &sink.keys {
         // `None` only if a worker died outside catch_unwind (shouldn't happen —
         // and cannot in release, which is `panic = "abort"`). The path went with
-        // the worker, so there is nothing to name in the report.
+        // the worker; its sort key still names it for the report.
         let (path, outcome) = slots[*walk_index as usize].take().unwrap_or_else(|| {
             (
-                PathBuf::new(),
+                path_from_sort_key(key),
                 FileOutcome::Error(WORKER_PANICKED.to_string()),
             )
         });

@@ -15,8 +15,10 @@
  * logical CPUs (`clamp_worker_count`, restated here so both surfaces refuse
  * the same numbers), announced when it bites. Under it, the count is clamped
  * to the file count, and a worker the host refuses narrows the pool (see
- * `format_files_parallel`) rather than failing the run. `--jobs 1`,
- * `--content`/`--stdin`, and `--list` stay on one thread either way.
+ * `format_files_parallel`) rather than failing the run. `--content`/`--stdin` and
+ * `--list` stay on one thread either way, and so does `--jobs 1` — except that a
+ * file whose format ran out of V8's stack on this thread is retried in a
+ * one-worker pool (`retry_overflowed_files`).
  * Which engine a worker binds is decided by whether the main thread's
  * `./index.js` exposes a `wasm_module`: the WASM package hands the compiled
  * module across and the worker initializes from it (compiled code is shared
@@ -243,7 +245,7 @@ Commands:
 Run \`tsv <command> --help\` for command flags.
 `;
 
-const FORMAT_HELP = `Usage: tsv format [<paths...>] [--check] [--list] [--content <s> | --stdin] [--parser <p>] [--source-type <t>]
+const FORMAT_HELP = `Usage: tsv format [<paths...>] [--check] [--list] [--jobs <n>] [--content <s> | --stdin] [--parser <p>] [--source-type <t>]
 
 Format source code in place (near-Prettier output).
 
@@ -336,6 +338,9 @@ const TOP_LEVEL_ARGS = {
  * need it first.
  */
 const WRITE_BACKOFF = new Int32Array(new SharedArrayBuffer(4));
+/** `cpu_topology()`'s one answer per process — declared with the module state, ahead of
+ * the `main()` call, since a `let` below it would sit in its temporal dead zone. */
+let cpu_topology_cache;
 
 /**
  * The strict UTF-8 decoder every byte read takes — one spelling of the parity
@@ -358,8 +363,15 @@ if (isMainThread) {
 
 async function main() {
 	const { values, subcommand } = parse_argv(process.argv.slice(2), TOP_LEVEL_ARGS);
-	// the native `TopLevel::run` order: the version switch first, then the subcommand
+	// the native `TopLevel::run` order: the version switch first, then the subcommand —
+	// and a subcommand beside the switch is refused rather than silently dropped
 	if (values.version) {
+		if (subcommand !== undefined) {
+			exit_with_error(
+				1,
+				'Error: --version cannot be combined with a subcommand\n\nRun tsv --help for more information.'
+			);
+		}
 		print_version();
 		return;
 	}
@@ -545,8 +557,10 @@ function with_arg_policy(ask) {
 /** The refusal for a file whose extension tsv does not handle, or `undefined` for one it
  * does — the binding's `tsv_discover::unsupported_extension_error`, message and all, so
  * this never hand-mirrors the native extension list. */
-function unsupported_extension_error(path) {
-	return with_arg_policy((policy) => policy.unsupported_extension_error(path));
+function unsupported_extension_error(path, policy) {
+	return policy === undefined
+		? with_arg_policy((p) => p.unsupported_extension_error(path))
+		: policy.unsupported_extension_error(path);
 }
 
 /** The traversal error for a relative root the working directory cannot resolve — the
@@ -656,12 +670,19 @@ async function format_paths(values, positionals) {
 	if (values.list && values.check) {
 		exit_with_error(2, 'Error: --list and --check cannot be combined');
 	}
+	// `--jobs` sizes the pool that formats; `--list` spawns none, so a width there is the
+	// same category error as with `--content`. Mirrors the native refusal, word for word.
+	if (values.list && values.jobs !== undefined) {
+		exit_with_error(
+			2,
+			'Error: --jobs applies to formatting; --list reports the in-scope set without formatting'
+		);
+	}
 	// An explicit `--jobs` is held to the machine's ceiling AHEAD of discovery, as the
 	// native CLI sizes its pool before it walks (`run_paths` in `commands/format.rs`):
 	// the clamp's warning then precedes the discovery diagnostics on both bins, and it
-	// fires on an empty scope too. `--list` sizes no pool and warns nothing, on both.
-	const explicit_jobs =
-		values.list || values.jobs === undefined ? undefined : clamp_worker_count(values.jobs);
+	// fires on an empty scope too.
+	const explicit_jobs = values.jobs === undefined ? undefined : clamp_worker_count(values.jobs);
 
 	const {
 		files,
@@ -708,10 +729,18 @@ async function format_paths(values, positionals) {
 	}
 
 	const jobs = resolve_jobs(explicit_jobs, files.length);
-	const outcomes =
+	const run =
 		jobs > 1
 			? await format_files_parallel(files, values.check, jobs)
-			: await retry_overflowed_files(files, format_files(files, values.check), values.check);
+			: { outcomes: format_files(files, values.check), on_main_thread: true };
+	// a deep file's verdict must not turn on which route ran it: a file whose format ran
+	// out of V8's stack on THIS thread is retried in a one-worker pool, whose stack is
+	// the larger reservation — whichever route ran here, the pool's own single-thread
+	// fallbacks included, which return through `run` too. An overflow inside a pool
+	// worker already had that stack, so a retry there could only repeat it
+	const outcomes = run.on_main_thread
+		? await retry_overflowed_files(files, run.outcomes, values.check)
+		: run.outcomes;
 
 	// Buffer the changed-path lines and emit them in one write, matching the
 	// native CLI: a per-path write re-locks stdout for each of (potentially
@@ -756,7 +785,7 @@ function format_one(path, check) {
 	try {
 		source = decode_source(readFileSync(path));
 	} catch (error) {
-		return { kind: 'error', message: `read failed: ${error.message}` };
+		return { kind: 'error', message: `read failed: ${error_message(error)}` };
 	}
 	let formatted;
 	const parser = parser_from_extension(path);
@@ -783,23 +812,30 @@ function format_one(path, check) {
 		if (error instanceof WebAssembly.RuntimeError || error instanceof RangeError) {
 			return {
 				kind: 'error',
-				message: `${error.message}${recover_engine_suffix(error)}`,
+				message: `${error_message(error)}${recover_engine_suffix(error)}`,
 				// V8's own stack ran out before the module's: what a pool worker's larger
 				// stack may still clear (`retry_overflowed_files`)
 				native_stack_overflow: error instanceof RangeError
 			};
 		}
-		return { kind: 'error', message: error.message };
+		return { kind: 'error', message: error_message(error) };
 	}
 	if (formatted === source) return { kind: 'unchanged' };
 	if (!check) {
 		try {
 			writeFileSync(path, formatted);
 		} catch (error) {
-			return { kind: 'error', message: `write failed: ${error.message}` };
+			return { kind: 'error', message: `write failed: ${error_message(error)}` };
 		}
 	}
 	return { kind: 'changed' };
+}
+
+/** A thrown value's message — its own for an `Error`, its string form for anything
+ * else, so a non-`Error` throw never reports as `undefined`. The native side always
+ * holds a `String` here. */
+function error_message(error) {
+	return error instanceof Error ? error.message : String(error);
 }
 
 /** Format every file on this thread — the path below `WORKER_FILE_THRESHOLD`,
@@ -827,7 +863,9 @@ async function retry_overflowed_files(files, outcomes, check) {
 		if (outcomes[i].native_stack_overflow) retry.push(i);
 	}
 	if (retry.length === 0) return outcomes;
-	const retried = await format_files_parallel(
+	// one pass, whatever the pool did: a retry that overflowed again reports that, and a
+	// worker death here reads out through the stranded outcomes, cause and all
+	const { outcomes: retried } = await format_files_parallel(
 		retry.map((i) => files[i]),
 		check,
 		1
@@ -950,7 +988,8 @@ function* cgroup_v1_mounts(group) {
 /** `limit / period` in whole cores, or `Infinity` when either is not a count (an
  * unlimited `max` or `-1`) or the period is zero. */
 function cgroup_quota_cores(limit, period) {
-	if (!/^\d+$/.test(limit ?? '') || !/^\d+$/.test(period ?? '')) return Infinity;
+	// `usize::from_str` takes an optional leading `+`, which the mirror takes too
+	if (!/^\+?\d+$/.test(limit ?? '') || !/^\+?\d+$/.test(period ?? '')) return Infinity;
 	return Number(period) > 0 ? Math.floor(Number(limit) / Number(period)) : Infinity;
 }
 
@@ -961,11 +1000,15 @@ function cgroup_quota_cores(limit, period) {
  * non-Linux platform included — it reads 1 and physical degrades to logical,
  * so the topology can only ever lower a worker count, never raise it. */
 function cpu_topology() {
+	// read once per process: the clamp and the default width both ask, and the answer
+	// is a handful of sysfs/cgroupfs reads that never change under a run
+	if (cpu_topology_cache !== undefined) return cpu_topology_cache;
 	let logical;
 	try {
 		logical = Math.min(availableParallelism(), Math.max(1, cgroup_cpu_quota()));
 	} catch {
-		return { logical: 1, physical: 1 };
+		cpu_topology_cache = { logical: 1, physical: 1 };
+		return cpu_topology_cache;
 	}
 	let siblings = 1;
 	try {
@@ -975,7 +1018,11 @@ function cpu_topology() {
 	} catch {
 		// unreadable (not Linux, or a kernel without the topology sysfs) — no SMT cap
 	}
-	return { logical, physical: Math.max(1, Math.floor(logical / Math.max(1, siblings))) };
+	cpu_topology_cache = {
+		logical,
+		physical: Math.max(1, Math.floor(logical / Math.max(1, siblings)))
+	};
+	return cpu_topology_cache;
 }
 
 /**
@@ -1017,7 +1064,7 @@ function default_jobs() {
  * `Number()`, which reads the empty string as 0 — a trailing comma would then
  * count as a sibling. Mirrors Rust's `parse::<usize>()`, which rejects it. */
 function cpu_index(field) {
-	return /^\s*\d+\s*$/.test(field) ? Number.parseInt(field, 10) : undefined;
+	return /^\s*\+?\d+\s*$/.test(field) ? Number.parseInt(field, 10) : undefined;
 }
 
 /** Length of a Linux CPU-list string (`"0-1"`, `"0,6"`, `"0-3,8-11"`, `"0"`).
@@ -1111,11 +1158,18 @@ function clamp_worker_count(requested) {
  * `new Worker` refused, or every worker died before claiming a file (a torn
  * install whose worker-side import or init rejects: construction succeeds and
  * the death arrives as an `error` event). A worker that dies mid-run does not:
- * every index left unfilled surfaces as an error, because turning one worker's
- * death into a silent "unchanged" would report a clean run over files nobody
- * formatted. A dying worker still posts what it finished (see
- * `run_format_worker`), so "unfilled" means genuinely unformatted rather than
- * "claimed by the worker that died".
+ * every index left unfilled surfaces as an error carrying the death's reason,
+ * because turning one worker's death into a silent "unchanged" would report a
+ * clean run over files nobody formatted. A dying worker still posts what it
+ * finished (see `run_format_worker`), so "unfilled" means genuinely unformatted
+ * rather than "claimed by the worker that died" — and a death that left nothing
+ * unfilled (one that died before claiming, while the others drained the list) only
+ * narrowed the pool, which is a warning, as a refused spawn is: the native rule is
+ * that a thread the OS will not give narrows the pool and never fails the run.
+ *
+ * Returns `{outcomes, on_main_thread}` — the latter true when the pool never ran and
+ * this thread formatted everything, the one case a main-thread stack overflow among
+ * the outcomes can still be retried on a worker's larger stack.
  */
 async function format_files_parallel(files, check, jobs) {
 	const outcomes = new Array(files.length);
@@ -1147,9 +1201,9 @@ async function format_files_parallel(files, check, jobs) {
 				break;
 			}
 			eprint(
-				`warning: could not start format workers (${error.message}); formatting on one thread\n`
+				`warning: could not start format workers (${error_message(error)}); formatting on one thread\n`
 			);
-			return format_files(files, check);
+			return { outcomes: format_files(files, check), on_main_thread: true };
 		}
 	}
 
@@ -1162,16 +1216,12 @@ async function format_files_parallel(files, check, jobs) {
 						for (const { index, outcome } of results) outcomes[index] = outcome;
 					});
 					worker.on('error', (error) => {
-						// Held rather than printed, because whether a death is an error
-						// depends on what the pool did: if no worker claimed a file this
-						// thread formats everything and the deaths are the reason its
-						// warning gives, and otherwise each is printed below as the cause
-						// of the sweep. Not counted either way — the sweep turns every
-						// index nobody reported into its own error, which is the
-						// accounting the summary line reports, and a worker that throws
-						// still posts what it finished, so the sweep lands only on
-						// genuinely unformatted files.
-						worker_errors.push(error.message);
+						// Held rather than printed, because what a death means depends on
+						// what the pool did: if no worker claimed a file this thread
+						// formats everything and the deaths are the reason its warning
+						// gives; otherwise the sweep below decides, by whether any index
+						// went unreported.
+						worker_errors.push(error_message(error));
 						resolve();
 					});
 					worker.on('exit', () => resolve());
@@ -1191,14 +1241,30 @@ async function format_files_parallel(files, check, jobs) {
 		// warning carries its error — a pool of identical failures says it once
 		const why = worker_errors.length > 0 ? ` (${[...new Set(worker_errors)].join('; ')})` : '';
 		eprint(`warning: no format worker ran${why}; formatting on one thread\n`);
-		return format_files(files, check);
+		return { outcomes: format_files(files, check), on_main_thread: true };
 	}
-	for (const message of worker_errors) eprint(`error: format worker failed: ${message}\n`);
-
+	// Every index nobody reported is a file a death left unformatted, and each is its
+	// own error carrying the deaths' reasons (one per distinct death; a worker that
+	// throws still posts what it finished, so these are genuinely unformatted files).
+	// A death that stranded nothing narrowed the pool and the others drained the list:
+	// said as a warning, since every file was formatted, and counted as nothing.
+	const why = [...new Set(worker_errors)].join('; ');
+	let stranded = 0;
 	for (let i = 0; i < outcomes.length; i++) {
-		outcomes[i] ??= { kind: 'error', message: 'not formatted (worker failed)' };
+		if (outcomes[i] !== undefined) continue;
+		stranded++;
+		outcomes[i] = {
+			kind: 'error',
+			message:
+				why === '' ? 'not formatted (worker failed)' : `not formatted (worker failed: ${why})`
+		};
 	}
-	return outcomes;
+	if (stranded === 0 && worker_errors.length > 0) {
+		eprint(
+			`warning: ${worker_errors.length} of ${workers.length} format workers failed (${why}); the others formatted every file\n`
+		);
+	}
+	return { outcomes, on_main_thread: false };
 }
 
 /**
@@ -1245,6 +1311,10 @@ function run_parse({ values, positionals }) {
 	// --source-type is validated upfront (exit 1) like the native CLI; it only
 	// affects the TypeScript parser (svelte is always a module, css has no goal).
 	const source_type = resolve_source_type(values.source_type, 1);
+	// refused before the input is read, so a `--stdin` this turns away never waits on its
+	// writer (the native `ParseCommand::run` order); the file arm, whose parser the
+	// extension picks, is checked after
+	if (flag_parser !== undefined) refuse_source_type_language(flag_parser, source_type, 1);
 
 	// Input precedence mirrors the native `InputArgs::resolve`: --content > --stdin > file.
 	let input;
@@ -1340,17 +1410,36 @@ function write_fd(fd, text) {
 	const buf = Buffer.from(text, 'utf-8');
 	let offset = 0;
 	while (offset < buf.length) {
+		let written;
 		try {
-			offset += writeSync(fd, buf, offset);
+			written = writeSync(fd, buf, offset);
 		} catch (error) {
 			if (error.code === 'EAGAIN') {
 				Atomics.wait(WRITE_BACKOFF, 0, 0, 1);
 				continue;
 			}
 			if (error.code === 'EPIPE') return;
-			throw error;
+			fail_write(fd, error);
 		}
+		// a zero-byte write would never advance the loop: the native `WriteZero`, fatal
+		// there too
+		if (written === 0) fail_write(fd, new Error('wrote zero bytes'));
+		offset += written;
 	}
+}
+
+/** Any other write error — a full disk — aborts loudly, as the native `cli::out`
+ * panics: the message on stderr, then the exit status of the shipped binary's abort
+ * (`panic = "abort"`, SIGABRT, 134) and never a verdict code — an uncaught throw
+ * exited 1 here, which reads as `--check`'s would-change. The message is a
+ * best-effort write, since stderr may be the fd that failed. */
+function fail_write(fd, error) {
+	try {
+		writeSync(2, `failed printing to ${fd === 1 ? 'stdout' : 'stderr'}: ${error_message(error)}\n`);
+	} catch {
+		// nowhere left to say it
+	}
+	process.exit(134);
 }
 
 /** Synchronous stdout write. */
@@ -1406,6 +1495,8 @@ function read_fd_to_end(fd) {
 				Atomics.wait(WRITE_BACKOFF, 0, 0, 1);
 				continue;
 			}
+			// `EINTR` has no arm: libuv retries it inside the sync fs call, where the native
+			// reader loops on `Interrupted` itself
 			if (error.code === 'EOF') break;
 			throw error;
 		}
@@ -1438,16 +1529,19 @@ function read_fd_to_end(fd) {
 function decode_source(buf) {
 	try {
 		return UTF8_STRICT.decode(buf);
-	} catch {
+	} catch (error) {
+		// only a decoding refusal (a `TypeError`) is the bytes' fault; a `RangeError` for
+		// a valid file past V8's string length is not, and must not be blamed on them
+		if (!(error instanceof TypeError)) throw error;
 		throw new Error('stream did not contain valid UTF-8');
 	}
 }
 
-/** Read an ignore file, classifying the outcome so the walk can surface a
- * silently-dropped file and keep precedence by presence. Returns `{kind:
- * 'content', content}` on success, `{kind: 'absent'}` for ENOENT (missing, or
- * raced away after the listing — silent), or `{kind: 'unreadable'}` for any other
- * failure, pushing a non-fatal warning. **Strict UTF-8** (`decode_source`) to match
+/** Read an ignore file: its content, or `undefined` — silently for ENOENT (missing,
+ * or raced away after the listing), with a non-fatal warning for any other failure,
+ * so a present-but-unreadable file is never silently dropped. Which file a
+ * directory's tsv layer is read from was decided by PRESENCE before this read
+ * (`tsv_layer_content`), so an unreadable `.formatignore` still shadows its sibling. **Strict UTF-8** (`decode_source`) to match
  * Rust's `read_to_string` — Node's `readFileSync(path, 'utf-8')` would lossily
  * replace invalid bytes, silently applying a mangled ignore file the native CLI
  * drops — and, for invalid UTF-8, the same failure text, so that warning reads
@@ -1459,11 +1553,13 @@ function decode_source(buf) {
  * `read_ignore_file`. */
 function read_ignore_file(path, warnings) {
 	try {
-		return { kind: 'content', content: decode_source(readFileSync(path)) };
+		return decode_source(readFileSync(path));
 	} catch (error) {
-		if (error.code === 'ENOENT') return { kind: 'absent' };
-		warnings.push(`could not read ${path} (${error.message}); its ignore rules are not applied`);
-		return { kind: 'unreadable' };
+		if (error.code === 'ENOENT') return undefined;
+		warnings.push(
+			`could not read ${path} (${error_message(error)}); its ignore rules are not applied`
+		);
+		return undefined;
 	}
 }
 
@@ -1578,13 +1674,17 @@ function discover_files(paths) {
 	});
 	// Both argument errors, reported together. The extension check applies only to
 	// *file* args (a directory is a scope, filtered by the walk).
-	const bad = paths
-		.map((path, i) => {
-			if (stats[i]?.isDirectory()) return undefined;
-			if (stats[i]?.isFile()) return unsupported_extension_error(path);
-			return `${path}: not a file or directory`;
-		})
-		.filter((message) => message !== undefined);
+	// one policy stack for the whole pass, not one wasm object per file argument (a
+	// pre-commit hook names hundreds)
+	const bad = with_arg_policy((policy) =>
+		paths
+			.map((path, i) => {
+				if (stats[i]?.isDirectory()) return undefined;
+				if (stats[i]?.isFile()) return unsupported_extension_error(path, policy);
+				return `${path}: not a file or directory`;
+			})
+			.filter((message) => message !== undefined)
+	);
 	if (bad.length > 0) {
 		for (const message of bad) eprint(`error: ${message}\n`);
 		process.exit(2);
@@ -1620,7 +1720,9 @@ function discover_files(paths) {
 	}
 	free_file_scope(file_scope);
 	files.sort(compare_paths);
-	files = files.filter((path, i) => path !== files[i - 1]);
+	// exact duplicates (the same spelling twice) drop by adjacency in the sorted list
+	const sorted = files;
+	files = sorted.filter((path, i) => path !== sorted[i - 1]);
 	if (roots_can_overlap(paths, stats)) {
 		const seen = new Set();
 		files = files.filter((path) => {
@@ -1669,7 +1771,9 @@ function roots_can_overlap(paths, stats) {
 
 /** `lines` sorted with exact duplicates removed (the strings are byte-identical only
  * for the same underlying failure, so this collapses repeats without hiding a
- * distinct one). */
+ * distinct one). The default sort compares UTF-16 code units where the native
+ * `Vec<String>` sort compares UTF-8 bytes — the same caveat as `compare_paths`, so a
+ * diagnostics list naming astral-plane paths can order differently across the bins. */
 function sort_dedup(lines) {
 	lines.sort();
 	return lines.filter((line, i) => line !== lines[i - 1]);
@@ -1714,16 +1818,16 @@ function tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, s
 		has_prettierignore,
 		has_formatignore
 	);
-	if (warning != null) warnings.push(warning);
+	if (warning !== undefined) warnings.push(warning);
 	let prettierignore;
 	if (has_formatignore) prettierignore = false;
 	else if (in_repo && has_prettierignore) prettierignore = true;
 	else return null;
-	const r = read_ignore_file(
+	const content = read_ignore_file(
 		join(dir, prettierignore ? PRETTIERIGNORE_FILE : FORMATIGNORE_FILE),
 		warnings
 	);
-	return r.kind === 'content' ? { content: r.content, prettierignore } : null;
+	return content === undefined ? null : { content, prettierignore };
 }
 
 /** Push a `tsv_layer_content` layer onto `stack` at `anchor`, as the file it was read
@@ -1829,9 +1933,9 @@ function push_layers(stack, dir, anchor, in_repo, presence, warnings) {
 	if (presence.gitignore === 'symlink') {
 		warnings.push(stack.gitignore_symlink_warning(join(dir, GITIGNORE_FILE)));
 	} else if (presence.gitignore === 'file') {
-		const gr = read_ignore_file(join(dir, GITIGNORE_FILE), warnings);
-		if (gr.kind === 'content') {
-			stack.push_gitignore(anchor, gr.content);
+		const content = read_ignore_file(join(dir, GITIGNORE_FILE), warnings);
+		if (content !== undefined) {
+			stack.push_gitignore(anchor, content);
 			pushed.gitignore = true;
 		}
 	}
@@ -1857,12 +1961,55 @@ function pop_layers(stack, pushed) {
  * the native `absolute_named_path`.
  */
 function absolute_named_path(path, cwd) {
+	// Graded where it was typed: the parent canonicalized (so `..` and a linked ancestor
+	// resolve once) and the path's own name kept, so a symlink argument is bounded by
+	// the rules at its own path, as git and prettier read it, not where it points. A
+	// path with no name of its own (`.`, `..`, a root) resolves whole. Mirrors the native
+	// `absolute_named_path`; the dedup across overlapping arguments still keys on the
+	// canonical path.
+	const split = lexical_split(path);
 	try {
-		return realpathSync(path);
+		if (split === null) return realpathSync(path);
+		if (split.parent === '') {
+			// a bare name sits in the working directory, canonical already
+			if (cwd === null) throw new Error('no working directory');
+			return join(cwd, split.name);
+		}
+		return join(realpathSync(split.parent), split.name);
 	} catch {
 		if (isAbsolute(path)) return resolve(path);
 		return cwd === null ? null : resolve(cwd, path);
 	}
+}
+
+/** A path's own name and the parent it sits in, as Rust's `Path::file_name` and
+ * `Path::parent` read them: trailing separators and `.` steps drop (so `sub/.` names
+ * `sub`), a bare name's parent is `''` (the working directory), and a path with no
+ * name of its own — `.`, `..`, a root, a drive — is `null`. */
+function lexical_split(path) {
+	const raw = split_path_components(path);
+	let end = raw.length;
+	while (end > 0 && (raw[end - 1] === '' || raw[end - 1] === '.')) end--;
+	if (end === 0) return null;
+	const name = raw[end - 1];
+	// a drive letter alone (`C:`, `C:\`) has no name of its own — on Windows, where the
+	// separator split reads it as one component; on posix `a:` is a name like any other
+	if (name === '..' || (sep === '\\' && /^[A-Za-z]:$/.test(name))) return null;
+	const parent_parts = raw.slice(0, end - 1);
+	if (parent_parts.length === 0) {
+		// a drive-relative `C:x` sits in `C:`, the drive's current directory — which is
+		// what Rust's `canonicalize` of that parent resolves to as well
+		const drive = sep === '\\' ? /^([A-Za-z]:)(.+)$/.exec(name) : null;
+		return drive === null ? { parent: '', name } : { parent: drive[1], name: drive[2] };
+	}
+	// a leading empty component is the root: `['', 'x']` sits in `/`; a lone drive letter
+	// is that drive's root, `C:\` (`C:` alone would be its current directory instead)
+	let parent;
+	if (parent_parts.every((c) => c === '')) parent = sep;
+	else if (sep === '\\' && parent_parts.length === 1 && /^[A-Za-z]:$/.test(parent_parts[0]))
+		parent = parent_parts[0] + sep;
+	else parent = parent_parts.join(sep);
+	return { parent, name };
 }
 
 /**
@@ -2122,11 +2269,24 @@ function collect_recursive(
 	warnings
 ) {
 	const in_repo = loose_root === undefined;
+	// Entry names come back decoded: a name that is not UTF-8 is spelled with U+FFFD, which
+	// names nothing on disk, so such a file reports `read failed` where the native walk
+	// keeps the bytes and formats it (docs/cli.md §Multi-File Formatting, "A non-UTF-8 file
+	// NAME"). A deliberate, permanent split: Node hands the bytes back only as Buffers
+	// (`encoding: 'buffer'`), which would have to travel as a second path type from here
+	// through the ignore-file reads, the sort, the canonical-path dedup (`realpathSync`
+	// resolves a Buffer path through its lossy spelling and fails), the worker handoff and
+	// the report — for a name no published repo holds.
 	let entries;
 	try {
 		entries = readdirSync(dir, { withFileTypes: true });
 	} catch (error) {
-		errors.push(`${dir}: read_dir failed: ${error.message}`);
+		// named by the absolute path, as every ignore-file warning names its directory, so
+		// `tsv format t ./t` reports an unreadable `t/locked` once, not once per spelling —
+		// which also means dropping the `, scandir '<path>'` tail Node appends to its own
+		// message, since that path is the argument's spelling (the code and description
+		// stay: `EACCES: permission denied`, this runtime's wording as sanctioned)
+		errors.push(`${dir_abs}: read_dir failed: ${error_message(error).replace(/, \w+ '.*'$/s, '')}`);
 		return;
 	}
 	// Single pass over the listing for the ignore-file presence flags this dir
@@ -2166,7 +2326,7 @@ function collect_recursive(
 			presence.prettierignore,
 			presence.formatignore
 		);
-		if (warning != null) warnings.push(warning);
+		if (warning !== undefined) warnings.push(warning);
 	}
 	// this dir's own `.gitignore`, if push_layers pushed one, turns the heuristic off for
 	// its children — an unreadable or symlinked one pushes nothing, so the heuristic stays
@@ -2194,7 +2354,7 @@ function collect_recursive(
 				// on `prune_warn` fetch the message from Rust (single source of
 				// truth — the JS CLI never templates it). One warning per pruned dir.
 				if (verdict === 'prune_warn') {
-					const warning = stack.heuristic_shadow_warning(child_rel, loose_root);
+					const warning = stack.shadow_warning(child_rel, loose_root);
 					if (warning !== undefined) warnings.push(warning);
 				}
 				continue;
