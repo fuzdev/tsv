@@ -53,6 +53,7 @@ pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::internal::{TSImportType, TSIntersectionType, TSParenthesizedType, TSType};
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
+use crate::printer::ignore::RoutedScope;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
 use helpers::TypeParenRule;
@@ -902,8 +903,12 @@ impl<'a> Printer<'a> {
                 let routed = if self.member_gap_frozen(dots_end, type_start) {
                     Some((type_start, self.build_routed_child_doc(ty)))
                 } else {
-                    self.paren_interior_routed_inner(ty)
-                        .map(|inner| (inner.span().start, self.build_routed_inner_doc(ty, inner)))
+                    self.paren_interior_routed_inner(ty).map(|inner| {
+                        (
+                            inner.span().start,
+                            self.build_routed_inner_doc(ty, inner, RoutedScope::Transparent),
+                        )
+                    })
                 };
                 if let Some((gap_end, value)) = routed {
                     d.concat(&[
@@ -984,7 +989,11 @@ impl<'a> Printer<'a> {
                             let inner = self.paren_interior_routed_inner(n.element_type)?;
                             (
                                 inner.span().start,
-                                self.build_routed_inner_doc(n.element_type, inner),
+                                self.build_routed_inner_doc(
+                                    n.element_type,
+                                    inner,
+                                    RoutedScope::Transparent,
+                                ),
                             )
                         };
                     Some(self.build_keyword_hang_doc(":", after_colon, gap_end, value_doc))

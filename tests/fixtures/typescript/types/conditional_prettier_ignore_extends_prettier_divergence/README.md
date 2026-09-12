@@ -21,4 +21,13 @@ second pass reformats the type and floats the directive to trail it
 classification, so the authored own-line placement is the only form that holds the
 freeze — for the author, and across tsv's second pass.
 
+`unformatted_ours_paren_shell.svelte` writes the directive **inside** the extends type's
+redundant paren shell (`X extends (⏎// prettier-ignore⏎…⏎)`): the shell strips, the run keeps
+its own line and the inner freezes, so the shelled authoring converges in one pass onto the
+bare authoring's fixed point — one fixed point per formatter, not per authoring. Without it
+the run was relocated past the whole operand to trail it (`X extends { x: 1 }
+// prettier-ignore`), the inert placement the bare form's relocation also lands on. Prettier
+strips the shell too, with the same relocation it applies to the bare form, so it converges
+onto `output_prettier.svelte`; the variant is `_ours_` because only tsv lands on `input`.
+
 See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

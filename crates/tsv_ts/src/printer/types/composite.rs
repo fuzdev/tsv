@@ -21,6 +21,7 @@ use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use crate::printer::LeadingGlue;
+use crate::printer::ignore::RoutedScope;
 use crate::printer::layout::bracketed_list_body;
 use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
 use smallvec::{SmallVec, smallvec};
@@ -87,22 +88,50 @@ pub(in crate::printer) enum ArraySuffixLayout {
     Split { bracket_open: u32 },
 }
 
-/// Whether each conditional branch gap holds an alone-on-line format-ignore directive
-/// — the ROUTING verdicts, resolved by `build_conditional_type_doc_inner`'s break gate (the
-/// directive forces the broken layout) and handed to the broken builder rather than
-/// re-derived there, so the gate and the emission can never disagree about a branch.
+/// How an alone-on-line format-ignore directive ROUTES one conditional branch — the
+/// verdict `build_conditional_type_doc_inner`'s break gate resolves (the directive forces
+/// the broken layout) and hands to the broken builder rather than re-deriving there, so
+/// the gate and the emission can never disagree about a branch.
 #[derive(Clone, Copy)]
-struct BranchRoutes {
-    /// The `extends`-type→true-branch gap (the `?` inside the window).
-    true_route: bool,
-    /// The true-branch→false-branch gap (the `:` inside the window).
-    false_route: bool,
+enum BranchRoute<'t> {
+    /// No honored directive routes this branch.
+    None,
+    /// The directive sits in the operator→branch gap (the `?` / `:` inside the window):
+    /// the branch child freezes whole, over its own span.
+    Gap,
+    /// The directive sits INSIDE the branch's redundant paren shell, past the branch's own
+    /// span start, where the gap window cannot see it
+    /// ([`Printer::paren_interior_routed_inner`]). The shell strips and the branch's window
+    /// widens to the paren-stripped inner carried here — which is what puts the directive in
+    /// the operator gap the routed emitter already owns — with that inner as the freeze
+    /// target. Without it the branch's leading run relocated ACROSS the `?` / `:`, onto a
+    /// construct the comment does not document, and landed there glued (hence inert), so the
+    /// second pass lost the freeze.
+    ShellInterior(&'t TSType<'t>),
 }
 
-impl BranchRoutes {
+impl<'t> BranchRoute<'t> {
+    /// Whether this branch is routed at all — the emitters' arm test, and the term the
+    /// seams that must decline for a routed branch read (the leading-EDGE claim, the
+    /// relocatable-run collector).
+    fn routed(self) -> bool {
+        !matches!(self, Self::None)
+    }
+}
+
+/// Both branches' routes, resolved together by the break gate.
+#[derive(Clone, Copy)]
+struct BranchRoutes<'t> {
+    /// The `extends`-type→true-branch gap (the `?` inside the window).
+    true_route: BranchRoute<'t>,
+    /// The true-branch→false-branch gap (the `:` inside the window).
+    false_route: BranchRoute<'t>,
+}
+
+impl BranchRoutes<'_> {
     /// Whether either branch is routed — the break-gate term.
     fn any(self) -> bool {
-        self.true_route || self.false_route
+        self.true_route.routed() || self.false_route.routed()
     }
 }
 
@@ -110,6 +139,56 @@ impl<'a> Printer<'a> {
     //
     // Conditional Types
     //
+
+    /// How a format-ignore directive routes one conditional BRANCH: the operator→branch
+    /// gap first, then the branch's own paren shell.
+    ///
+    /// The two windows are disjoint by construction — the gap ends at the branch's span
+    /// start, the shell interior opens just past the `(` — so the order only fixes which
+    /// answer a directive in each position gets, never which of two claims wins.
+    fn branch_route<'t>(&self, gap_start: u32, branch: &'t TSType<'t>) -> BranchRoute<'t> {
+        if self.member_gap_frozen(gap_start, branch.span().start) {
+            BranchRoute::Gap
+        } else if let Some(inner) = self.paren_interior_routed_inner(branch) {
+            BranchRoute::ShellInterior(inner)
+        } else {
+            BranchRoute::None
+        }
+    }
+
+    /// [`Printer::leading_edge_claim_and_start`] for a conditional branch — the claim to
+    /// suppress and the branch's printed start, per its route.
+    ///
+    /// A [`BranchRoute::Gap`] branch declines the widening: it is emitted as a verbatim
+    /// slice over its own span, which already carries the shell, so nothing is left for an
+    /// enclosing window to own. A [`BranchRoute::ShellInterior`] branch widens to the
+    /// paren-stripped inner instead — the shell it would otherwise claim IS the branch, and
+    /// the run inside it is the directive this route exists to keep in the operator gap.
+    fn branch_claim_and_start(
+        &self,
+        route: BranchRoute<'_>,
+        branch: &TSType<'_>,
+    ) -> (Option<Span>, u32) {
+        match route {
+            BranchRoute::ShellInterior(inner) => (None, inner.span().start),
+            BranchRoute::Gap | BranchRoute::None => {
+                self.leading_edge_claim_and_start(route.routed(), branch)
+            }
+        }
+    }
+
+    /// The doc for a ROUTED conditional branch — frozen WHOLE either way, which is the
+    /// branch position's own rule (see [`BranchRoute`] and [`RoutedScope::Whole`]): a
+    /// composite branch cannot bind the directive through the member rules, because the
+    /// interposing `?` / `:` blocks their leading-run walk.
+    fn build_routed_branch_doc(&self, route: BranchRoute<'_>, branch: &TSType<'_>) -> DocId {
+        match route {
+            BranchRoute::ShellInterior(inner) => {
+                self.build_routed_inner_doc(branch, inner, RoutedScope::Whole)
+            }
+            BranchRoute::Gap | BranchRoute::None => self.build_frozen_single_child_doc(branch),
+        }
+    }
 
     /// Build doc for conditional type WITHOUT the outer group wrapper.
     /// This is used for nested conditionals which should inherit breaking from their parent.
@@ -130,8 +209,8 @@ impl<'a> Printer<'a> {
         // the window a freeze is read on is the branch's OWN, never the widened one, so an
         // in-shell directive stays the shell's business.
         let routes = BranchRoutes {
-            true_route: self.member_gap_frozen(extends_type_end, c.true_type.span().start),
-            false_route: self.member_gap_frozen(true_type_end, c.false_type.span().start),
+            true_route: self.branch_route(extends_type_end, c.true_type),
+            false_route: self.branch_route(true_type_end, c.false_type),
         };
         // A redundant shell at a branch's leading printed EDGE strips, so its `//` lands in
         // the `?`/`:`→branch gap and the reparse finds it there. Widening the branch START
@@ -139,9 +218,9 @@ impl<'a> Printer<'a> {
         // comment scans off these two positions — and the branch doc then declines the
         // shell's own copy ([`Printer::leading_edge_claim_and_start`]).
         let (true_claim, true_type_start) =
-            self.leading_edge_claim_and_start(routes.true_route, c.true_type);
+            self.branch_claim_and_start(routes.true_route, c.true_type);
         let (false_claim, false_type_start) =
-            self.leading_edge_claim_and_start(routes.false_route, c.false_type);
+            self.branch_claim_and_start(routes.false_route, c.false_type);
 
         // Find ? and : token positions for comment categorization. These positions only
         // bound the comment scans below, so a conditional type with no comment anywhere in
@@ -784,6 +863,31 @@ impl<'a> Printer<'a> {
             return d.concat(&parts);
         }
 
+        // An alone-on-line directive inside a redundant paren SHELL around the extends
+        // type is the shell's own interior seam ([`Printer::paren_interior_routed_inner`]),
+        // invisible to the `single_child_frozen` gate above (whose window ends at the
+        // shell's own span start). The shell strips, the directive keeps the line the
+        // author gave it through the very emitter the bare authoring takes — its window
+        // widened to the paren-stripped inner — and the inner is the freeze target, so the
+        // shelled and paren-free spellings converge on one form. The relocation below would
+        // instead trail the directive on the inner, a placement that is inert under the
+        // floor and loses the freeze on the second pass.
+        if let Some(inner) = self.paren_interior_routed_inner(extends_type) {
+            let value_doc = self.build_routed_inner_doc(
+                extends_type,
+                inner,
+                RoutedScope::TransparentParens(type_needs_parens_for_conditional_extends),
+            );
+            let mut parts: DocBuf = smallvec![];
+            self.append_keyword_value_line_comments(
+                &mut parts,
+                extends_kw_end,
+                inner.span().start,
+                value_doc,
+            );
+            return d.concat(&parts);
+        }
+
         // Comments between `extends` keyword and extends_type
         let comments_after_extends = self.build_comments_between(
             extends_kw_end,
@@ -1022,7 +1126,7 @@ impl<'a> Printer<'a> {
     fn build_conditional_type_doc_with_line_comments(
         &self,
         c: &TSConditionalType<'_>,
-        routes: BranchRoutes,
+        routes: BranchRoutes<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -1056,22 +1160,21 @@ impl<'a> Printer<'a> {
         // and the branch doc declines the shell's own copy of what they now cover. A
         // ROUTED branch takes neither — it is the verbatim slice, which already carries
         // the shell (see the ⚠️ on `Printer::leading_edge_claim_and_start`).
-        let (true_claim, true_type_start) =
-            self.leading_edge_claim_and_start(true_route, c.true_type);
+        let (true_claim, true_type_start) = self.branch_claim_and_start(true_route, c.true_type);
         let (false_claim, false_type_start) =
-            self.leading_edge_claim_and_start(false_route, c.false_type);
+            self.branch_claim_and_start(false_route, c.false_type);
 
         // Detect leading line comments inside parens around true_type / false_type
         // for relocation: prettier moves them to trail extends_type / true_type
         // (e.g., `extends b ? (// c\n  C) : D` → `extends b // c\n  ? C\n  : D`).
         // A FROZEN branch freezes its whole shell verbatim (shell comments ride the
         // slice), so it must not also collect them for relocation (print-once).
-        let true_paren_leading_line_comments: CommentVec<'_> = if true_route {
+        let true_paren_leading_line_comments: CommentVec<'_> = if true_route.routed() {
             CommentVec::new()
         } else {
             self.branch_relocatable_run(c.true_type, extends_type_end, true_type_start)
         };
-        let false_paren_leading_line_comments: CommentVec<'_> = if false_route {
+        let false_paren_leading_line_comments: CommentVec<'_> = if false_route.routed() {
             CommentVec::new()
         } else {
             self.branch_relocatable_run(c.false_type, true_type_end, false_type_start)
@@ -1094,13 +1197,13 @@ impl<'a> Printer<'a> {
         let mut trailing_on_extends_parts: DocBuf = DocBuf::new();
         let mut q_parts = DocBuf::new();
 
-        if true_route {
+        if true_route.routed() {
             let (trailing, branch) = self.build_routed_conditional_branch(
                 extends_type_end,
                 true_type_start,
                 &true_paren_leading_line_comments,
                 "?",
-                self.build_frozen_single_child_doc(c.true_type),
+                self.build_routed_branch_doc(true_route, c.true_type),
             );
             trailing_on_extends_parts.push(trailing);
             q_parts.push(branch);
@@ -1150,7 +1253,7 @@ impl<'a> Printer<'a> {
             );
         }
 
-        if false_route {
+        if false_route.routed() {
             // The `:` branch mirrors the routed `?` emission, except that its
             // same-line comments trail the TRUE branch's line — already inside
             // `q_parts` — instead of a separate buffer.
@@ -1159,7 +1262,7 @@ impl<'a> Printer<'a> {
                 false_type_start,
                 &false_paren_leading_line_comments,
                 ":",
-                self.build_frozen_single_child_doc(c.false_type),
+                self.build_routed_branch_doc(false_route, c.false_type),
             );
             q_parts.push(trailing);
             q_parts.push(branch);
@@ -2238,7 +2341,8 @@ impl<'a> Printer<'a> {
         // under a freeze. Trailing shell-gap comments are lifted after the inner
         // (`with_stripped_paren_trailing`), so every shell comment prints once.
         if let Some(inner) = self.paren_interior_routed_inner(arr.element_type) {
-            let value_doc = self.build_routed_inner_doc(arr.element_type, inner);
+            let value_doc =
+                self.build_routed_inner_doc(arr.element_type, inner, RoutedScope::Transparent);
             let mut parts: DocBuf = smallvec![d.text("(")];
             self.append_keyword_value_line_comments(
                 &mut parts,

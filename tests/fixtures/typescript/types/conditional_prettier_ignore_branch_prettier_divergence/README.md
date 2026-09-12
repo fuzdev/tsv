@@ -35,6 +35,19 @@ fixture's `unformatted_ours_own_line_control.svelte`; here prettier's plain-comm
 relocation target differs from tsv's, so that variant shape can't make a
 prettier-side claim.)
 
+`unformatted_ours_paren_shell.svelte` writes each directive **inside** the branch's
+redundant paren shell (`? (⏎// prettier-ignore⏎…⏎)`): the shell strips, the run keeps its
+own line above the operator and the paren-stripped inner freezes, so the shelled authoring
+converges in one pass onto the bare authoring's fixed point — one fixed point per formatter,
+not per authoring. Without it the run relocated **across** the `?` / `:`, onto a construct
+the comment does not document, and landed there glued (hence inert), so the second pass lost
+the freeze. The composite cell freezes **whole** from the shell too: the shell's `(` is
+transparent to the member rules' leading-run walk, so the union *could* bind the directive
+there, but letting it would give the shelled spelling a first-member-only freeze the bare
+one does not have. Prettier strips the shell too, with the same relocation it applies to the
+bare form, so it converges onto `output_prettier.svelte`; the variant is `_ours_` because
+only tsv lands on `input`.
+
 Branches covered: true (`?`) and false (`:`) — the same placement rule on each.
 
 See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).
