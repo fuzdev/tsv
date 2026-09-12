@@ -137,7 +137,9 @@ pub(crate) enum RunLeadingBlank {
 /// site states which emitter owns the run in the same vocabulary the emitter reads it in.
 ///
 /// The **block** arm is not on this axis: a block comment renders inline inside the shell
-/// wherever the run is emitted, so every value emits it and only the `//` is claimed.
+/// wherever the run is emitted, so every value emits it and only the `//` is claimed. What
+/// the block arm reads instead is [`ShellPair`] — whether the parens it would render
+/// inside survive at all.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ShellLeadingRun {
     /// An upstream emitter already placed the run — the union's own member path
@@ -155,6 +157,39 @@ pub(crate) enum ShellLeadingRun {
     /// This site is the run's only emitter, so it renders inside the pair. True of an
     /// optional tuple element, which has no upstream at all: its run was simply DROPPED.
     Here,
+}
+
+/// Whether the paren pair a shell's leading run ends up inside SURVIVES in the output.
+///
+/// One fact, read at the run's two decision points, which is why it is one type:
+///
+/// - the **emitter** ([`Printer::push_paren_shell_leading_run`]) asks it of the pair it is
+///   printing into — a block the author isolated on its own line keeps that line inside a
+///   pair that stays (prettier keeps it there too), and takes the space inside one that is
+///   stripped, where the line is not the shell's to keep;
+/// - the **claim** ([`Printer::keyword_value_stripped_paren_hang_with_pair`]) asks it of
+///   the POSITION, which is the only thing that knows whether it re-mints a pair around
+///   the stripped inner. Where it does, the run stays inside that pair; where it does not,
+///   the enclosing gap owns the run — and the indent, which is the enclosing construct's
+///   fact and never the shell's.
+///
+/// Not a bare `bool`: the two readings are claims about whose rule applies, and the wrong
+/// one is an F1 break rather than a visible mistake. ⚠️ Claiming inside a pair that SURVIVES
+/// is the F1 break in question — a surviving pair's OPEN form puts a run the author glued to
+/// the `(` on its own line, so pass 2 reads its own output as the isolated authoring and
+/// hoists what pass 1 kept. Own-line-ness is the one break-forcing property a LAYOUT can
+/// create, so a rule keyed on it holds only where its own output reproduces its trigger.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ShellPair {
+    /// The parens are printed around this run — an authored shell the trailing-run rule
+    /// retains, a pair the position requires or re-mints, or the parenthesized-union /
+    /// aligned-object renderings that print their own `(`.
+    Kept,
+    /// The parens are dropped and the run lands in the enclosing gap, which either claims
+    /// it or lays the value out by its own rule — and several of those gaps deliberately
+    /// COLLAPSE an isolated own-line block (the annotation `:` for a non-composite type,
+    /// the prefix operators, a conditional's `extends`).
+    Stripped,
 }
 
 /// How a leading-comment run decides whether a *block* comment hugs the token
@@ -1482,11 +1517,28 @@ impl<'a> Printer<'a> {
         self.split_open_delimiter_glued_run(gap_start, value_start)
     }
 
-    /// Emit a retained-paren SHELL's leading run — the comments in `[start, end)`
-    /// between the shell's `(` and the type it wraps — each followed by its own
-    /// separator: a space for a block (`(/* c */ a | b)`), a `hardline` for a line
-    /// comment, which must end its line or it would swallow the type after it.
-    /// Returns whether a line comment was emitted, i.e. whether the shell must break.
+    /// Emit a paren SHELL's leading run — the comments in `[start, end)` between the
+    /// shell's `(` and the type it wraps — each followed by its own separator: a
+    /// `hardline` for a line comment, which must end its line or it would swallow the type
+    /// after it, and for a block the answer `shell` gives ([`ShellPair`]).
+    /// Returns whether the run forced a line, i.e. whether the shell must break.
+    ///
+    /// Inside a pair that SURVIVES, the block half is prettier's `printLeadingComment` read
+    /// straight: a newline both before and after a block makes its separator a `hardline`,
+    /// one on neither side or on the leading side alone a space. tsv has no
+    /// `TSParenthesizedType` in prettier's AST to disagree about, and prettier keeps such a
+    /// comment inside the parens too — so a shell that glued it was the one place an
+    /// authored line went missing for standing inside parens.
+    ///
+    /// ⚠️ A pair that is **stripped** takes the space at every block instead
+    /// ([`ShellPair::Stripped`]), and that is not a second opinion about the comment: with
+    /// the parens gone the layout is the ENCLOSING gap's, which either claims the run
+    /// ([`Printer::keyword_value_stripped_paren_hang`], the seam that also knows the
+    /// continuation indent) or lays the value out by its own rule — and several of those
+    /// gaps deliberately COLLAPSE an isolated own-line block (the annotation `:`, the
+    /// prefix operators, a conditional's `extends`). A hardline emitted here at the shell's
+    /// own indent is neither answer: it is the placement the bare authoring never produces,
+    /// so the reparse re-laid it and the format stopped being idempotent.
     ///
     /// `line_comments` names who owns them ([`ShellLeadingRun`]):
     /// [`ShellLeadingRun::Upstream`] where an emitter above already placed them (the
@@ -1509,33 +1561,41 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
         line_comments: ShellLeadingRun,
+        shell: ShellPair,
     ) -> bool {
         let d = self.d();
-        let mut has_line_comment = false;
+        let mut forced_line = false;
         let run: CommentVec<'_> = self.comments_to_emit_between(start, end).collect();
         for (i, comment) in run.iter().enumerate() {
-            if comment.is_block {
-                parts.push(self.build_comment_doc(comment));
-                parts.push(d.text(" "));
+            // What follows this comment: the next one, or the type the shell wraps.
+            let next_start = run.get(i + 1).map_or(end, |c| c.span.start);
+            let ends_its_line = if comment.is_block {
+                shell == ShellPair::Kept
+                    && self.block_comment_isolated_own_line(comment, next_start)
             } else if line_comments == ShellLeadingRun::Here {
-                parts.push(self.build_comment_doc(comment));
+                true
+            } else {
+                continue;
+            };
+            parts.push(self.build_comment_doc(comment));
+            if !ends_its_line {
+                parts.push(d.text(" "));
+                continue;
+            }
+            parts.push(d.hardline());
+            forced_line = true;
+            // An author blank between this comment and what follows it is authorship, not
+            // shell structure, and every other opening delimiter keeps it (`fn(`, `{`, `[`,
+            // where prettier keeps it too). Dropping it here made the shells the one
+            // place tsv erased a blank line both its own siblings and prettier
+            // preserve. A blank between the `(` and the FIRST comment is a different
+            // question and stays erased: it sits against the delimiter, where every
+            // formatter — tsv and prettier alike, at every bracket — drops it.
+            if self.has_blank_line_between(comment.span.end, next_start) {
                 parts.push(d.hardline());
-                has_line_comment = true;
-                // An author blank between this comment and what follows it — the next
-                // comment, or the type the shell wraps — is authorship, not shell
-                // structure, and every other opening delimiter keeps it (`fn(`, `{`, `[`,
-                // where prettier keeps it too). Dropping it here made the shells the one
-                // place tsv erased a blank line both its own siblings and prettier
-                // preserve. A blank between the `(` and the FIRST comment is a different
-                // question and stays erased: it sits against the delimiter, where every
-                // formatter — tsv and prettier alike, at every bracket — drops it.
-                let next_start = run.get(i + 1).map_or(end, |c| c.span.start);
-                if self.has_blank_line_between(comment.span.end, next_start) {
-                    parts.push(d.hardline());
-                }
             }
         }
-        has_line_comment
+        forced_line
     }
 
     /// Emit the comment run in `[anchor, end)` PRESERVING each comment's own-line-ness —

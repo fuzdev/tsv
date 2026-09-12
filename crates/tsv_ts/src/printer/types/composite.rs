@@ -22,7 +22,7 @@ use crate::ast::internal::{
 };
 use crate::printer::LeadingGlue;
 use crate::printer::layout::bracketed_list_body;
-use crate::printer::{CommentVec, ShellLeadingRun};
+use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Comment;
 use tsv_lang::INDENT;
@@ -386,11 +386,14 @@ impl<'a> Printer<'a> {
         // when every comment in the gap is a `//`, so there is no block left behind for
         // the emitter to owe — and stating it as the shared axis rather than as a skipped
         // call keeps that reading checkable at the emitter rather than here.
+        // `Stripped`: this branch's shell is gone (the retained one returned above), so
+        // the run's layout is the branch gap's.
         self.push_paren_shell_leading_run(
             &mut parts,
             leading.start,
             leading.end,
             shell_leading_run,
+            ShellPair::Stripped,
         );
         parts.push(self.build_conditional_type_doc_inner(inner));
         self.push_trailing_comments_in_range(&mut parts, trailing.start, trailing.end);
@@ -845,17 +848,18 @@ impl<'a> Printer<'a> {
             // depth (`build_type_doc_maybe_parens`), matching this builder's other arms —
             // not the prefix operator's bare `d.parens`. Type position, so a trailing block
             // lifted from the shell trails the inner inline.
-            let value_doc = self.with_claimed_shell_leading_run(hang.claimed_shell, || {
-                self.with_stripped_paren_trailing(
+            let value_doc = self.with_stripped_shell_value(
+                hang.claimed_shell,
+                extends_type,
+                value_hang_type,
+                TrailingBlock::Inline,
+                || {
                     self.build_type_doc_maybe_parens(
                         value_hang_type,
                         type_needs_parens_for_conditional_extends,
-                    ),
-                    extends_type,
-                    value_hang_type,
-                    TrailingBlock::Inline,
-                )
-            });
+                    )
+                },
+            );
             let mut parts: DocBuf = smallvec![];
             self.append_keyword_value_line_comments(
                 &mut parts,

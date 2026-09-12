@@ -14,7 +14,7 @@ use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
 use crate::printer::{
-    LeadingGlue, MemberBlankScan, MemberBody, MemberFreeze, MemberSeam, ShellLeadingRun,
+    LeadingGlue, MemberBlankScan, MemberBody, MemberFreeze, MemberSeam, ShellLeadingRun, ShellPair,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -649,6 +649,7 @@ impl<'a> Printer<'a> {
                     g,
                     handed.unwrap_or(union.span.start),
                     shell_leading_run,
+                    ShellPair::Kept,
                 );
             }
         }
@@ -742,6 +743,7 @@ impl<'a> Printer<'a> {
                 resume,
                 gap_end,
                 ShellLeadingRun::Here,
+                ShellPair::Kept,
             );
             // A `//` on the `(` line — the author's, or the first this run emits — has to
             // end that line before anything else goes on it, and this builder supplies no

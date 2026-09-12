@@ -175,7 +175,7 @@ pub(in crate::printer) fn outermost_paren<'a>(
 /// between them, so a comment in a doubly-nested shell (`((/* c */ T))`) falls *between* the
 /// two `(`s, where either layer's own window is blind to it. Both halves have been widened
 /// to this window one at a time, each after a bug — the leading half at
-/// [`Printer::stripped_paren_hang_has_leading_line_comment`](super::super::Printer::stripped_paren_hang_has_leading_line_comment),
+/// [`Printer::stripped_paren_hang_has_breaking_leading_run`](super::super::Printer::stripped_paren_hang_has_breaking_leading_run),
 /// the trailing half at
 /// [`Printer::paren_shell_retains_for_trailing_run`](super::super::Printer::paren_shell_retains_for_trailing_run),
 /// where asking only the outer layer's own trailing gap called a shell stripped while the

@@ -13,7 +13,9 @@ use crate::printer::types::helpers::{
     type_needs_parens_for_array_element, type_needs_parens_for_indexed_access_object,
     unwrap_parenthesized,
 };
-use crate::printer::types::{ArraySuffixLayout, TrailingBlock, UnionValueDoc};
+use crate::printer::types::{
+    ArraySuffixLayout, TrailingBlock, UnionValueDoc, prefix_operator_shell_pair,
+};
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ContinuationValue, HeritageKeyword, LeadingGlue,
     MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam,
@@ -271,11 +273,19 @@ impl<'a> Printer<'a> {
                 // SUFFIX down (`keyof (// c⏎ T)[]`) is inside it too — that shell strips
                 // into this same gap and hangs the operand, so reading the operand's start
                 // here made the `=` break for a value that had already broken beneath it.
+                //
+                // The operand's own [`ShellPair`] travels with both reads: a shell whose
+                // pair this position re-mints is not stripped, so a gate that assumed it was
+                // would force a break for a hang that never fires.
+                let pair = prefix_operator_shell_pair(self, o.type_annotation);
                 let hang_start = self
-                    .keyword_value_stripped_paren_hang(o.type_annotation)
+                    .keyword_value_stripped_paren_hang_with_pair(o.type_annotation, pair)
                     .value_start;
                 self.comments_force_own_line_between(kw_end, hang_start)
-                    || self.stripped_paren_hang_has_leading_line_comment(o.type_annotation)
+                    || self.stripped_paren_hang_has_breaking_leading_run_with_pair(
+                        o.type_annotation,
+                        pair,
+                    )
             }
             TSType::TypeQuery(q) => {
                 let kw_end = q.span.start + "typeof".len() as u32;

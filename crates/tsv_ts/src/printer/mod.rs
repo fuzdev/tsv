@@ -56,7 +56,7 @@ use analysis::{
 use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,
     HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
-    MemberGap, MemberSeam, RunLeadingBlank, ShellLeadingRun, StandaloneGlue,
+    MemberGap, MemberSeam, RunLeadingBlank, ShellLeadingRun, ShellPair, StandaloneGlue,
 };
 use decorators::class_expr_has_decorators;
 pub use expressions::assignment::should_inline_logical_expression;
@@ -1742,8 +1742,27 @@ impl<'a> Printer<'a> {
     /// the same hazard [`Self::comment_hangs_next`] documents.
     pub(crate) fn block_comment_isolated_own_line_between(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| {
-            c.is_block && self.is_own_line_comment(c) && self.has_newline_between(c.span.end, next)
+            self.block_comment_isolated_own_line(c, next)
         })
+    }
+
+    /// [`Self::block_comment_isolated_own_line_between`] for ONE comment, `next` being the
+    /// following comment's start or the gap's end — the form an emitter walking a run asks
+    /// of each comment in turn, so the gate and the emitter cannot answer differently
+    /// ([`Self::comment_hangs_next`] states the same discipline for its own pair).
+    ///
+    /// Per comment, deliberately: prettier's `printLeadingComment` decides each separator
+    /// from that comment's own two sides, so `/* c1 */ /* c2 */` written together on an own
+    /// line keeps ONE line between them all (neither is isolated) while `/* c1 */⏎/* c2 */ v`
+    /// splits after `c1` alone.
+    pub(crate) fn block_comment_isolated_own_line(
+        &self,
+        comment: &internal::Comment,
+        next: u32,
+    ) -> bool {
+        comment.is_block
+            && self.is_own_line_comment(comment)
+            && self.has_newline_between(comment.span.end, next)
     }
 
     /// Whether a comment must occupy its own line rather than gluing inline to the
