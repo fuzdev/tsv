@@ -1,0 +1,258 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1159,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 1150,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 182,
+							"end": 189,
+							"property": "a",
+							"value": "a @b"
+						},
+						{
+							"type": "Declaration",
+							"start": 193,
+							"end": 201,
+							"property": "b",
+							"value": "@a @b"
+						},
+						{
+							"type": "Declaration",
+							"start": 205,
+							"end": 214,
+							"property": "c",
+							"value": "1.5 @a"
+						},
+						{
+							"type": "Declaration",
+							"start": 218,
+							"end": 228,
+							"property": "d",
+							"value": "#fff @a"
+						},
+						{
+							"type": "Declaration",
+							"start": 232,
+							"end": 241,
+							"property": "e",
+							"value": "'x' @a"
+						},
+						{
+							"type": "Declaration",
+							"start": 245,
+							"end": 254,
+							"property": "f",
+							"value": "@a 'x'"
+						},
+						{
+							"type": "Declaration",
+							"start": 428,
+							"end": 439,
+							"property": "g",
+							"value": "@a (2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 443,
+							"end": 456,
+							"property": "h",
+							"value": "a @b (2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 460,
+							"end": 479,
+							"property": "i",
+							"value": "f(@a (2.5), 1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 571,
+							"end": 582,
+							"property": "j",
+							"value": "a @(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 586,
+							"end": 595,
+							"property": "k",
+							"value": "@(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 678,
+							"end": 689,
+							"property": "l",
+							"value": "@a / 1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 693,
+							"end": 710,
+							"property": "m",
+							"value": "1.5 / @a (2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 890,
+							"end": 900,
+							"property": "n",
+							"value": "@a*1.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 904,
+							"end": 914,
+							"property": "o",
+							"value": "@a+1.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 918,
+							"end": 928,
+							"property": "p",
+							"value": "@a-1.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 932,
+							"end": 941,
+							"property": "q",
+							"value": "@a1.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 945,
+							"end": 954,
+							"property": "r",
+							"value": "@a#FFF"
+						},
+						{
+							"type": "Declaration",
+							"start": 958,
+							"end": 971,
+							"property": "s",
+							"value": "f(@a:1.50)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1111,
+							"end": 1117,
+							"property": "t",
+							"value": "-@a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1121,
+							"end": 1133,
+							"property": "u",
+							"value": "1.5 * -@a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1137,
+							"end": 1146,
+							"property": "v",
+							"value": "f(-@a)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 1150
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an `@`-word is a member of its own: the ordinary member gap stands on either\n\t\tside of it, whether or not the author wrote one, and its neighbours normalize ",
+				"start": 17,
+				"end": 179
+			},
+			{
+				"type": "CSSComment",
+				"value": " a group after an `@`-word is a second member, not an argument list — `@a` is no\n\t\tfunction name — so the ordinary gap stands there too, inside a function as well ",
+				"start": 258,
+				"end": 425
+			},
+			{
+				"type": "CSSComment",
+				"value": " an empty `@` is a member too, and keeps its authored glue to the group after it ",
+				"start": 483,
+				"end": 568
+			},
+			{
+				"type": "CSSComment",
+				"value": " an operator beside an `@`-word takes the gaps it takes beside any word ",
+				"start": 599,
+				"end": 675
+			},
+			{
+				"type": "CSSComment",
+				"value": " the word's own extent: it ends at whitespace, a quote, a comma, a paren, a\n\t\tbrace, a `/` or another `@`, so `*`, `+`, `-`, `:`, `#`, `.` and a digit are its\n\t\tcontent ",
+				"start": 714,
+				"end": 887
+			},
+			{
+				"type": "CSSComment",
+				"value": " a `-` straight before an `@`-word is an operator glued to it, at the head, after\n\t\tanother operator and inside a function alike ",
+				"start": 975,
+				"end": 1108
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1151,
+			"styles": "\n\tdiv {\n\t\t/* an `@`-word is a member of its own: the ordinary member gap stands on either\n\t\tside of it, whether or not the author wrote one, and its neighbours normalize */\n\t\ta: a @b;\n\t\tb: @a @b;\n\t\tc: 1.5 @a;\n\t\td: #fff @a;\n\t\te: 'x' @a;\n\t\tf: @a 'x';\n\t\t/* a group after an `@`-word is a second member, not an argument list — `@a` is no\n\t\tfunction name — so the ordinary gap stands there too, inside a function as well */\n\t\tg: @a (2.5);\n\t\th: a @b (2.5);\n\t\ti: f(@a (2.5), 1.5);\n\t\t/* an empty `@` is a member too, and keeps its authored glue to the group after it */\n\t\tj: a @(2.5);\n\t\tk: @(2.5);\n\t\t/* an operator beside an `@`-word takes the gaps it takes beside any word */\n\t\tl: @a / 1.5;\n\t\tm: 1.5 / @a (2.5);\n\t\t/* the word's own extent: it ends at whitespace, a quote, a comma, a paren, a\n\t\tbrace, a `/` or another `@`, so `*`, `+`, `-`, `:`, `#`, `.` and a digit are its\n\t\tcontent */\n\t\tn: @a*1.50;\n\t\to: @a+1.50;\n\t\tp: @a-1.50;\n\t\tq: @a1.50;\n\t\tr: @a#FFF;\n\t\ts: f(@a:1.50);\n\t\t/* a `-` straight before an `@`-word is an operator glued to it, at the head, after\n\t\tanother operator and inside a function alike */\n\t\tt: -@a;\n\t\tu: 1.5 * -@a;\n\t\tv: f(-@a);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1160,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

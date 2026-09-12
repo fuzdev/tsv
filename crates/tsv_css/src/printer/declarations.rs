@@ -403,10 +403,17 @@ impl<'a> Printer<'a> {
         // The `font` / custom-property gap rule is this declaration's, so it is set here
         // and cleared at the end rather than threaded through the value builders. Saved
         // and restored like `in_keyframes`, so a nested context cannot leak it.
-        let was_font_shorthand = self.value_scope.font_shorthand;
+        let was_scope = self.value_scope;
         self.value_scope.font_shorthand = property_is_font_shorthand(decl.property);
+        // The whole-value `{…}` block keeps its own braces spaced as authored
+        // (`ValueScope::whole_value_block`); read off the value's text, since the block's
+        // braces are ordinary members once parsed.
+        let value_span = decl.value.span();
+        self.value_scope.whole_value_block =
+            crate::parser::is_whole_value_block(value_span.extract(self.source))
+                .then_some(value_span);
         self.print_css_declaration_in(decl);
-        self.value_scope.font_shorthand = was_font_shorthand;
+        self.value_scope = was_scope;
     }
 
     fn print_css_declaration_in(&mut self, decl: &internal::CssDeclaration<'_>) {

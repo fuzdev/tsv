@@ -92,6 +92,13 @@ pub(crate) struct ValueScope {
     /// The declaration sits in an `@utility` block, where a word followed by `*` is
     /// glued — Tailwind's `--value(--tab-size-*)`.
     pub(crate) in_utility_at_rule: bool,
+    /// The declaration's whole value is one `{…}` block (`--x: { color: red; }`), and
+    /// this is its span. css-syntax-3 singles that block out ("a top-level {}-block is
+    /// only allowed as the entire value of a non-custom property"), and prettier never
+    /// grades it at the value level — it reads the declaration as a nested rule, or
+    /// throws — so its own braces keep their authored gaps where a brace *inside* a
+    /// value is glued to its interior. `css/values/variables/block_value_*`.
+    pub(crate) whole_value_block: Option<Span>,
 }
 
 /// What a value's surroundings contribute to its separator rule: its [`ValueScope`] plus
@@ -166,6 +173,13 @@ fn is_possible_font_size(value: &CssValue<'_>, source: &str) -> bool {
         }
         _ => false,
     }
+}
+
+/// Is this member a word spelled exactly `text` — the `{`, `}` and lone `@` members
+/// the run splitter emits, which postcss also carries as `value-word` nodes keyed on
+/// their text (`isLeftCurlyBraceNode`, `isRightCurlyBraceNode`, the empty `atword`)?
+fn is_word_spelled(value: &CssValue<'_>, source: &str, text: &str) -> bool {
+    matches!(value, CssValue::Identifier { span } if span.extract(source) == text)
 }
 
 /// Does the source hold nothing at all between these two members?
@@ -711,6 +725,37 @@ impl<'a> Printer<'a> {
             return false;
         }
         if next_op == Some(ValueOperator::Colon) {
+            return true;
+        }
+
+        // "Ignore `@` in Less (i.e. `@@var;`)": an EMPTY `@`-word — a lone `@` — glues to
+        // the member after it. ⚠️ tsv glues it only where the author did: prettier's arm
+        // welds `@ a` into `@a`, turning a `<delim-token>` and an `<ident-token>` into
+        // one `<at-keyword-token>`, which in a custom property's value is a different
+        // token sequence, not a different spacing
+        // (`css/values/operators/atword_empty_gap_prettier_divergence`). A non-empty
+        // `@`-word has no glued arm at all — the one that looks like it,
+        // `isAtWordPlaceholderNode`, requires prettier's own template placeholder — so
+        // `@a(2.5)` takes the ordinary member gap below like `(1.5)(2.5)` does.
+        if is_word_spelled(current, source, "@") && authored_glued(current, next) {
+            return true;
+        }
+
+        // "Ignore spaces after `{` and before `}`" (prettier's SCSS-interpolation arms,
+        // which run for a `{` / `}` word in plain CSS too — reachable in a custom
+        // property's value): a brace is always glued to the block's interior, and to the
+        // member outside it only as authored. ⚠️ The **whole-value** block's own pair is
+        // the exception, spaced as authored on both faces (`ValueScope::whole_value_block`).
+        let inward = is_word_spelled(current, source, "{") || is_word_spelled(next, source, "}");
+        let outward = is_word_spelled(next, source, "{") || is_word_spelled(current, source, "}");
+        let whole = ctx.scope.whole_value_block;
+        let on_whole_block_face = whole.is_some_and(|w| {
+            (current.span().start == w.start && is_word_spelled(current, source, "{"))
+                || (next.span().end == w.end && is_word_spelled(next, source, "}"))
+        });
+        if (inward && !on_whole_block_face)
+            || ((inward || outward) && authored_glued(current, next))
+        {
             return true;
         }
 

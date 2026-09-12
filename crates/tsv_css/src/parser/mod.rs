@@ -8,6 +8,7 @@ mod declarations;
 mod pseudo;
 mod selectors;
 mod value;
+pub(crate) use value::operators::is_whole_value_block;
 
 use crate::ast::internal::{Comment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, Token, TokenKind};

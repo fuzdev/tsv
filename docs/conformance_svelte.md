@@ -54,6 +54,7 @@ catalog entry.
 - `;` inside a simple block or `var()` fallback (`(x;y)`, `[x;y]`, `var(--d, ;)`) — Rejected (`css_empty_declaration`); the same class as the function case, extended to `()` / `[]` simple blocks and the `var()` fallback — all balanced units per CSS Syntax 3, so an inner `;` is content — tsv (and prettier) keep the declaration whole — [balanced_semicolon](../tests/fixtures/css/values/balanced_semicolon_svelte_divergence/)
 - `<general-enclosed>` `@supports` condition with `;` (`@supports (margin: 0;)`, `@supports foo(a; b)`) — Rejected (`css_empty_declaration`); per CSS Conditional 3 a `<general-enclosed>` = `(<any-value>)` / `fn(<any-value>)` admits any balanced token run incl. `;`, so it parses (evaluates false) — tsv (and prettier) keep it stable — [supports_general_enclosed](../tests/fixtures/css/at_rules/supports_general_enclosed_svelte_divergence/)
 - Block-valued custom properties — Rejected (`css_expected_identifier`) — [block_value](../tests/fixtures/css/values/variables/block_value_svelte_prettier_divergence/)
+- Brace block inside a custom property's value (`--a: a{1.5}c(2.5)`) — Rejected (`css_expected_identifier`); tsv accepts, per css-syntax-3 §"Consume a declaration" (a custom property keeps the original text of its tokens; only a non-custom property refuses a top-level `{}`-block beside any other value, and both parsers reject `b: a{1.5}c`), and formats it as prettier does — [brace_block](../tests/fixtures/css/values/operators/brace_block_svelte_divergence/)
 
 ### CSS Parser Corrections (corpus-enforced)
 

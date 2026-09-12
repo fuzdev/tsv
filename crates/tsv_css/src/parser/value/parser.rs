@@ -88,6 +88,13 @@ pub(crate) struct ValueParser<'a> {
     /// [`Self::sub_parser`] beneath it. See
     /// [`super::operators::split_value_run`]'s `in_group`.
     in_group: bool,
+
+    /// Whether a `+` opening this range's first run welds onto the word after it —
+    /// [`super::operators::split_value_run`]'s `head_welds`. True for a declaration's
+    /// whole value; false inside a group (its `(` is a node to postcss, so a `+` there is
+    /// an operator) and for every comma element but the first. A whitespace element
+    /// straight after an operator member welds whatever this says.
+    head_welds: bool,
 }
 
 /// Outcome of `ValueParser::fast_scan` — the single-pass classification of a value.
@@ -138,6 +145,7 @@ impl<'a> ValueParser<'a> {
             end: source.len(),
             base_offset: base_span.start,
             in_group,
+            head_welds: !in_group,
         }
     }
 
@@ -179,6 +187,47 @@ impl<'a> ValueParser<'a> {
             end: self.start + range_end,
             base_offset: self.base_offset, // Same base offset
             in_group: self.in_group,       // A group's interior stays a group's
+            head_welds: self.head_welds,
+        }
+    }
+
+    /// [`Self::sub_parser`] for one element of a list: the element's head welds a `+`
+    /// only when this range's own head does and nothing precedes it, or when the member
+    /// just before it is an operator (`1.5 / +a` welds across the authored gap).
+    fn element_parser(
+        &self,
+        range_start: usize,
+        range_end: usize,
+        values: &[CssValue<'_>],
+    ) -> ValueParser<'a> {
+        let mut sub = self.sub_parser(range_start, range_end);
+        sub.head_welds = (values.is_empty() && self.head_welds)
+            || values.last().is_some_and(|v| self.member_is_operator(v));
+        sub
+    }
+
+    /// Is this member an operator to postcss — the node kind its `operator()` reads as
+    /// "the last node is an operator" before welding a `+`?
+    ///
+    /// A [`CssValue::Operator`] is one unless it is the `:` (a `colon` node there:
+    /// `f(a: +b)` → `f(a: + b)`). A whitespace-separated operator stands ALONE in its run,
+    /// which the splitter leaves a single token, so it reaches the list as an
+    /// [`CssValue::Identifier`] spelled with the operator's own byte — the same node to
+    /// postcss (`a - +b` → `a - +b`, `a / +b` → `a / +b`), so it is read here by its
+    /// text. ⚠️ Only the weld reads it this way; the separator rule still prints a lone
+    /// operator element as an ordinary member (`/ 2.5`, `+ 2.5` keep their gap where
+    /// prettier glues them), which is a residual of its own, not this predicate's.
+    fn member_is_operator(&self, value: &CssValue<'_>) -> bool {
+        // Spans are absolute; the member is inside this range, so both offsets clear
+        // `base_offset` (a debug underflow here would be a span from another document).
+        let text = |span: Span| {
+            &self.source
+                [(span.start - self.base_offset) as usize..(span.end - self.base_offset) as usize]
+        };
+        match value {
+            CssValue::Operator { span } => text(*span) != ":",
+            CssValue::Identifier { span } => matches!(text(*span), "/" | "*" | "+" | "-"),
+            _ => false,
         }
     }
 
@@ -480,7 +529,7 @@ impl<'a> ValueParser<'a> {
             return;
         }
         let value_end = value_start + core.len();
-        let sub = self.sub_parser(value_start, value_end);
+        let sub = self.element_parser(value_start, value_end, values);
         // Same guard as `split_top_level`: a first non-empty element whose raw end
         // reaches EOF is parsed as a single leaf (the classify/cursor disagreement
         // safety, reachable only via leading delimiters — `fast_scan` never runs on a
@@ -592,7 +641,7 @@ impl<'a> ValueParser<'a> {
                 });
             } else if value_end > value_start {
                 // Non-empty value
-                let sub_parser = self.sub_parser(value_start, value_end);
+                let sub_parser = self.element_parser(value_start, value_end, &values);
                 // Progress guard: the cursor reached EOF without finding a
                 // delimiter (`value_end_raw == text.len()`) and this is the only
                 // element, so the whole range is a single value — `classify_separators`
@@ -640,7 +689,7 @@ impl<'a> ValueParser<'a> {
     /// stores no copied string.
     fn build_leaf<'arena>(&self, text: &'a str, arena: &'arena Bump) -> CssValue<'arena> {
         let span = self.absolute_span();
-        super::parse_single_value(text, span, self.in_group, arena)
+        super::parse_single_value(text, span, self.in_group, self.head_welds, arena)
             .unwrap_or(CssValue::Identifier { span })
     }
 
@@ -933,6 +982,7 @@ mod tests {
             end: 9,
             base_offset: 100,
             in_group: false,
+            head_welds: true,
         };
 
         assert_eq!(parser.text(), "blue");
@@ -961,6 +1011,7 @@ mod tests {
             end: 9,   // "blue" ends at byte 9
             base_offset: 100,
             in_group: false,
+            head_welds: true,
         };
 
         let abs_span = parser.absolute_span();
@@ -1035,6 +1086,7 @@ mod tests {
             end: 2, // Empty range
             base_offset: 0,
             in_group: false,
+            head_welds: true,
         };
 
         assert_eq!(parser.text(), "");
