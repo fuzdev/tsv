@@ -101,6 +101,27 @@ pub(crate) fn print_node_inner<'a>(
             paren_comment_end,
             followed_by_non_null,
         } => {
+            // The base's erased-paren freeze, armed by the chain seam
+            // (`chain::analysis::build_linearized_chain_doc`): the verbatim slice stands in
+            // for the base's doc, and the pair this position may print closes around it
+            // exactly as it does around a built one.
+            if let Some(frozen) = printer.frozen_chain_base_span(expr) {
+                // The enclosing statement's own pair rides outside the slice, for the reason
+                // [`Printer::build_left_spine_operand_doc_if`] gives: a frozen base is exactly
+                // the node an expression statement wraps so its line does not open with `{` /
+                // `function` / `class`, and the slice replaces the builder that reads that
+                // target (`({b:  1}).k;` would otherwise print `{b:  1}.k;`, which does not
+                // parse).
+                let slice = printer.wrap_frozen_position_pair(
+                    expr,
+                    printer.build_frozen_expression_doc(expr, frozen),
+                );
+                return if *needs_parens {
+                    d.parens(slice)
+                } else {
+                    slice
+                };
+            }
             if *needs_parens {
                 // Asked BEFORE any base doc is built — building one can re-mark the
                 // target from a nested value position inside the ternary's own branches.

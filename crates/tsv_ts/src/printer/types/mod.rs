@@ -53,7 +53,7 @@ pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::internal::{TSImportType, TSIntersectionType, TSParenthesizedType, TSType};
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
-use crate::printer::ignore::RoutedScope;
+use crate::printer::ignore::{RoutedScope, is_freeze_target};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
 use helpers::TypeParenRule;
@@ -110,6 +110,33 @@ pub(in crate::printer) struct StrippedParenHang<'t> {
     /// ([`Printer::with_claimed_shell_leading_run`]). `None` where the shell was
     /// substituted away, and where no hang fired.
     pub(in crate::printer) claimed_shell: Option<Span>,
+    /// Whether the strip above was forced by an alone-on-line **format-ignore directive**
+    /// in the shell's interior ([`Printer::paren_interior_routed_inner`]), in which case
+    /// `value_type` is not only what the caller builds but what it must FREEZE.
+    ///
+    /// The two travel together because a head that stripped the shell and forgot the
+    /// freeze loses the directive outright: the run lands in the head's gap, where the
+    /// next pass reads it and freezes — so the first pass must too, or the author's bytes
+    /// are normalized once and the two passes disagree about what the directive did. Each
+    /// caller still spells its own frozen build (the paren rule differs per position); the
+    /// verdict and the window are resolved here, once.
+    pub(in crate::printer) routed: bool,
+}
+
+impl<'t> StrippedParenHang<'t> {
+    /// The hang for a value taken WHOLE — no shell claim, the window opening at the value's
+    /// own start. Three sites: the paren-STRIPPED inner (twice, `routed` saying whether a
+    /// format-ignore directive in the stripped shell's interior is what stripped it, and so
+    /// whether the caller owes the freeze) and a frozen head's child, where the freeze is
+    /// the head's own and the strip probe never ran.
+    fn for_value(value: &'t TSType<'t>, routed: bool) -> Self {
+        Self {
+            value_start: value.span().start,
+            value_type: value,
+            claimed_shell: None,
+            routed,
+        }
+    }
 }
 
 /// The [`ShellPair`] a prefix type operator's operand sits at — the one position that
@@ -234,6 +261,13 @@ pub(in crate::printer) struct KeywordValueHead<'t> {
     /// The hang seam's [`StrippedParenHang::claimed_shell`], carried so the value
     /// builders that emit this gap's run suppress the shell's own copy of it.
     pub(in crate::printer) claimed_shell: Option<Span>,
+    /// Whether the child was a paren shell whose INTERIOR holds an alone-on-line
+    /// format-ignore directive ([`Printer::paren_interior_routed_inner`]), in which case
+    /// `value_type` is the paren-stripped inner AND the freeze target: the shell drops and
+    /// the run routes through this gap's own-line-preserving emitter, where a second pass
+    /// reads the directive back. A head-glued placement is inert under the floor, so a
+    /// stripped-but-unfrozen inner loses the freeze outright.
+    pub(in crate::printer) routed: bool,
 }
 
 impl<'t> KeywordValueHead<'t> {
@@ -251,6 +285,7 @@ impl<'t> KeywordValueHead<'t> {
             child,
             value_type: child,
             claimed_shell: None,
+            routed: false,
         }
     }
 }
@@ -533,7 +568,17 @@ impl<'a> Printer<'a> {
                         operand_hang_type,
                         TrailingBlock::Inline,
                         || {
-                            let operand_doc = self.build_type_doc(operand_hang_type);
+                            // A shell the seam stripped on a format-ignore DIRECTIVE's
+                            // account: the run hangs in the `keyof`→operand gap below, so
+                            // the operand is the frozen slice the next pass also reads
+                            // there ([`StrippedParenHang::routed`]). The pair rule is the
+                            // position's own either way — a re-minted required pair closes
+                            // around the slice exactly as it does around a built operand.
+                            let operand_doc = if hang.routed {
+                                self.build_frozen_single_child_doc(operand_hang_type)
+                            } else {
+                                self.build_type_doc(operand_hang_type)
+                            };
                             if type_needs_parens_for_prefix_operator(self, operand_hang_type) {
                                 d.parens(operand_doc)
                             } else {
@@ -1304,15 +1349,33 @@ impl<'a> Printer<'a> {
         // composite laid the run out by the composite's rules where pass 2, reading the
         // bare member, re-laid it by the seam's (`union_single_member_head_comment`).
         let value = self.transparent_value(value);
-        if self.stripped_paren_hang_has_breaking_leading_run_with_pair(value, pair)
-            && !self.paren_retains_for_trailing_run(value)
+        // An alone-on-line format-ignore DIRECTIVE in the shell's interior strips the shell
+        // whatever the breaking-run question below answers — the `//` spelling it already
+        // answers yes for, and the own-line BLOCK spelling it does not, which is a
+        // placement the floor honors all the same. The head then freezes the inner
+        // ([`StrippedParenHang::routed`]), so the shelled authoring lands on the fixed
+        // point the bare, paren-free one already holds.
+        //
+        // A composite inner is left to the question below: its own `(`-transparent
+        // leading-run walk reaches the same directive and Rule A freezes its first member,
+        // so routing it here would make the head and the member rules both claim one
+        // directive. A shell the trailing-run rule RETAINS is left to it too — that pair
+        // survives on the trailing `//`'s account, and stripping it would carry that
+        // comment out of the construct it was written in.
+        //
+        // Read once, because it is the same precondition on both strips below.
+        let retains_for_trailing_run = self.paren_retains_for_trailing_run(value);
+        if !retains_for_trailing_run
+            && let Some(inner) = self
+                .paren_interior_routed_inner(value)
+                .filter(|inner| is_freeze_target(inner))
         {
-            let inner = unwrap_parenthesized(value);
-            return StrippedParenHang {
-                value_start: inner.span().start,
-                value_type: inner,
-                claimed_shell: None,
-            };
+            return StrippedParenHang::for_value(inner, true);
+        }
+        if !retains_for_trailing_run
+            && self.stripped_paren_hang_has_breaking_leading_run_with_pair(value, pair)
+        {
+            return StrippedParenHang::for_value(unwrap_parenthesized(value), false);
         }
         // `false`: a frozen head never reaches here — [`Self::keyword_value_head`] is the
         // freeze-aware resolver every such head goes through, and it substitutes its own
@@ -1324,6 +1387,7 @@ impl<'a> Printer<'a> {
             value_start,
             value_type: value,
             claimed_shell,
+            routed: false,
         }
     }
 
@@ -1502,17 +1566,33 @@ impl<'a> Printer<'a> {
     /// twice, or (with the suppression) leave an empty pair. The intersection link asks a
     /// wider question, because its member builder answers a union operand differently —
     /// see [`Self::intersection_member_run_owned_downstream`]. A shell the trailing-run
-    /// rule retains, and one holding a routed format-ignore directive, decline for the
-    /// reasons the seam above and [`Self::paren_interior_routed_inner`] give.
+    /// rule retains declines for the reason the seam above gives.
+    ///
+    /// A shell holding a **routed** format-ignore directive
+    /// ([`Self::paren_interior_routed_inner`]) is claimed like any other, and the claim is
+    /// what the directive needs: the run lands in the enclosing gap's own-line-preserving
+    /// emitter at that gap's continuation indent, and the shell's emitter freezes the
+    /// stripped inner under the claim ([`Self::build_parenthesized_type_unwrap_doc`]). The
+    /// one link that declines it is the ARRAY element, whose own routed arm
+    /// ([`Self::build_array_type_doc`]) emits that run itself inside a re-synthesized pair.
+    /// Declined at every link instead — the seam's first reading — the shell was left to
+    /// print the run with a bare `hardline` at its own indent, the F1 break the ⚠️ above
+    /// describes, and the directive landed glued to the enclosing head, where tsv's own
+    /// placement floor reads it inert.
     fn head_stripped_paren_shell<'t>(
         &self,
         ty: &'t TSType<'t>,
         run: EdgeRun,
     ) -> Option<HeadRegion> {
         match ty {
-            TSType::Array(a) => self.required_pair_head_shell(
+            // The ONE link whose own arm owns a routed shell's run (see the ⚠️ above):
+            // `build_array_type_doc` keeps the pair and emits the interior run inside it.
+            TSType::Array(a) => self.leading_edge_shell(
                 a.element_type,
-                type_needs_parens_for_array_element,
+                self.required_paren_pair_opens_for_leading_run(
+                    a.element_type,
+                    type_needs_parens_for_array_element,
+                ) || self.paren_interior_routed_inner(a.element_type).is_some(),
                 run,
             ),
             TSType::IndexedAccess(i) => self.required_pair_head_shell(
@@ -1683,7 +1763,7 @@ impl<'a> Printer<'a> {
         downstream_owns_run: bool,
         run: EdgeRun,
     ) -> Option<HeadRegion> {
-        if downstream_owns_run || self.paren_interior_routed_inner(head).is_some() {
+        if downstream_owns_run {
             return None;
         }
         // [`ShellPair::Stripped`]: a shell at a value's leading EDGE is redundant by
@@ -2016,11 +2096,7 @@ impl<'a> Printer<'a> {
     ) -> KeywordValueHead<'t> {
         let frozen = self.single_child_frozen(gap_start, child);
         let hang = if frozen {
-            StrippedParenHang {
-                value_start: child.span().start,
-                value_type: child,
-                claimed_shell: None,
-            }
+            StrippedParenHang::for_value(child, false)
         } else {
             self.keyword_value_stripped_paren_hang(child)
         };
@@ -2031,6 +2107,7 @@ impl<'a> Printer<'a> {
             child,
             value_type: hang.value_type,
             claimed_shell: hang.claimed_shell,
+            routed: hang.routed,
         }
     }
 
@@ -2075,6 +2152,11 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         if head.frozen {
             self.build_frozen_single_child_doc(head.child)
+        } else if head.routed {
+            // The paren-stripped inner, frozen, with any trailing shell-gap comment lifted
+            // out after it so the strip stays lossless. `value_type` is already filtered to
+            // a freeze target, which is the arm this scope takes here.
+            self.build_routed_inner_doc(head.child, head.value_type, RoutedScope::Transparent)
         } else {
             self.with_stripped_shell_value(
                 head.claimed_shell,
@@ -2743,11 +2825,28 @@ impl<'a> Printer<'a> {
         // would print it twice; emitting it here INSTEAD gave it a bare `hardline` at this
         // shell's own indent, never the gap's continuation indent, so the two passes
         // disagreed (`Printer::with_claimed_shell_leading_run`).
+        // A claimed run that holds an alone-on-line format-ignore directive carries a
+        // second fact with it: the claim is what puts the directive in the enclosing gap,
+        // which is the only placement that survives tsv's own floor, and the stripped
+        // inner is what the directive then freezes. Read HERE rather than at the claiming
+        // gap because this is the one emitter that knows the run was claimed at all —
+        // every gap that can claim a leading-edge shell would otherwise have to repeat it.
+        // The scope is the whole inner, composite and all — a first-member-only freeze would
+        // normalize operands the paren-free authoring of the same directive keeps, and
+        // prettier freezes the whole inner here too. That is `RoutedScope::Whole`'s rule,
+        // spelled as the bare [`Printer::build_frozen_single_child_doc`] rather than through
+        // [`Printer::build_routed_inner_doc`]: this arm is reached only with BOTH shell gaps
+        // comment-free, so the trailing lift that seam adds has nothing to carry.
+        let mut routed_under_claim = None;
         if has_leading && self.shell_leading_run_claimed(paren_open, inner_start) {
             has_leading = false;
+            routed_under_claim = self.paren_shell_routed_inner(p);
         }
         if !has_leading && !has_trailing {
-            return self.build_type_doc(p.type_annotation);
+            return match routed_under_claim {
+                Some(inner) => self.build_frozen_single_child_doc(inner),
+                None => self.build_type_doc(p.type_annotation),
+            };
         }
 
         // A **line** comment in the trailing gap keeps its place INSIDE the parens, so
@@ -2832,6 +2931,14 @@ impl<'a> Printer<'a> {
             );
         }
 
+        // ⚠️ No freeze on this path, even though the run it just printed may be an
+        // alone-on-line directive: the gap that prints its own run is the union MEMBER's,
+        // whose sanctioned form puts the run after the `| ` it synthesizes
+        // (`| // prettier-ignore⏎  {x:  1}`). That is a separator-trailing placement, which
+        // tsv's own floor reads as INERT — so a first pass that froze there would lose the
+        // freeze on the second and break F1. The freeze belongs to the placements that keep
+        // the directive's own line: the claim above, and the heads that emit the gap
+        // themselves ([`StrippedParenHang::routed`]).
         parts.push(match (handoff, effective_inner) {
             (Some(_), TSType::Union(u)) => self.build_union_value_doc(paren_open + 1, u).doc,
             _ => self.build_type_doc(p.type_annotation),

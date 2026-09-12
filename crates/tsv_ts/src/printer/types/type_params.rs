@@ -9,6 +9,7 @@ use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer,
 use crate::ast::internal::{
     self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
 };
+use crate::printer::ignore::RoutedScope;
 use crate::printer::layout::{bracketed_list_body, fluid_after_operator};
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -453,6 +454,15 @@ impl<'a> Printer<'a> {
         group_id: GroupId,
     ) {
         let d = self.d();
+        // The clarity-paren rule this site adds to the head protocol, read by both
+        // directive arms below and spelled again on the ordinary path: a *conditional*
+        // CONSTRAINT keeps the parens it requires (the `=` default position strips them —
+        // see the ordinary path's own note for why the grammar, not taste, decides it).
+        let member_parens: TypeParenRule = if group_id == GroupId::TypeParameterConstraint {
+            |_, t| matches!(t, TSType::Conditional(_))
+        } else {
+            |_, _| false
+        };
         // An alone-on-line format-ignore directive in the keyword→value gap freezes a
         // non-composite value verbatim (the head's `frozen`; a union/intersection value
         // declines and freezes via its own leading-run walk). The head checked the
@@ -464,14 +474,26 @@ impl<'a> Printer<'a> {
         if let Some(keyword_end) = head.gap_start
             && head.frozen
         {
-            let member_parens: TypeParenRule = if group_id == GroupId::TypeParameterConstraint {
-                |_, t| matches!(t, TSType::Conditional(_))
-            } else {
-                |_, _| false
-            };
             let frozen_doc = self.build_frozen_head_doc(head.child, member_parens);
             // Under a freeze the head's window already ends at the child's own start.
             self.push_hang_or_inline_value(parts, keyword_end, head.value_start, frozen_doc);
+            return;
+        }
+        // The same directive written INSIDE the value's redundant paren shell
+        // (`extends (⏎// prettier-ignore⏎{x:  1})`): the head strips the shell and widened
+        // its window to the paren-stripped inner, so the run lands in the very emitter the
+        // bare authoring takes above and the inner is the freeze target — the two
+        // authorings of one claim reaching one form. Same clarity-paren rule as the frozen
+        // arm, so a conditional constraint keeps the pair it requires.
+        if let Some(keyword_end) = head.gap_start
+            && head.routed
+        {
+            let value_doc = self.build_routed_inner_doc(
+                head.child,
+                head.value_type,
+                RoutedScope::TransparentParens(member_parens),
+            );
+            self.push_hang_or_inline_value(parts, keyword_end, head.value_start, value_doc);
             return;
         }
         // Strip redundant comment-free parens so `(A | B)` / `(A & B)` constraints

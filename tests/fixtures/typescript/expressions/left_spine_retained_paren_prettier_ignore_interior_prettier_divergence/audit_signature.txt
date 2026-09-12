@@ -1,0 +1,23 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// a pair the printer RETAINS keeps the frozen operand inside it: the `as` operand→keyword
+	// gap is ASI-sensitive, so a run that ends a line holds the pair open
+	const a = // prettier-ignore
+		{ x: 1 } as T;
+
+	// `satisfies` answers the same way
+	const b = // prettier-ignore
+		{ x: 2 } satisfies T;
+
+	// a non-null operand that needs precedence parens holds them for its own reason
+	const c = // prettier-ignore
+		(d ?? e)!;
+</script>

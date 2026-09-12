@@ -33,6 +33,11 @@
 		// prettier-ignore
 		rrr  +  sss;
 
+	// a BLOCK body freezes whole, braces included
+	const www = () =>
+		// prettier-ignore
+		{   xxx  ;   };
+
 	// a sibling arrow the freeze does not reach still normalizes
 	const ttt = () => uuu + vvv;
 </script>

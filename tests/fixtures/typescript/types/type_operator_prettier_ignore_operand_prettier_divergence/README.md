@@ -15,7 +15,10 @@ type-argument list that breaks lands exactly where the same list does with an or
 that gap (`type AA`). `unformatted_ours_past_the_slice` re-spells only what sits outside a
 freeze — those type arguments and the union's later members — and pins that it all normalizes. Parens the operand **requires** are the
 printer's, not the author's, so they ride outside the slice; a redundant paren drops under the
-freeze, which is what `unformatted_ours_paren_shell` pins.
+freeze, which is what `unformatted_ours_paren_shell` pins. A directive the author wrote
+**inside** that shell (`unformatted_ours_paren_interior`) strips it just the same and freezes the
+paren-stripped inner, so that authoring converges on `input` in one pass too — one fixed point
+per formatter, not per authoring.
 
 A union or intersection operand **declines** the whole-operand freeze: it keeps its required
 parens and claims the directive through its own leading run, so Rule A applies inside and the

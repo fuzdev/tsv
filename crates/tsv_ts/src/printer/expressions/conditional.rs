@@ -451,16 +451,24 @@ impl<'a> Printer<'a> {
         // (context-free: a template call arg indents its test the same as a
         // `<script>` one; at a template expression ROOT the generic
         // `build_conditional_doc` passes false, matching the plugin's flush test).
-        let test = if indent_binary_test {
-            // The term does not fire, so the ordinary dispatch's continuation-indent
-            // default is already the answer.
-            self.build_expression_doc(cond.test)
-        } else {
-            // shouldNotIndent = true (grandparent is assignment, variable, etc.) — an
-            // explicit opt-out, through the seam that owns the owned-comment prepend so
-            // the two arms cannot disagree about it.
-            self.build_flat_chain_expression_doc(cond.test)
-        };
+        //
+        // Wrapped in the TEST's own erased-paren freeze
+        // ([`Printer::build_left_spine_operand_doc`], which also gives the frozen test the
+        // position pairs its own builder would have) — a paren around the whole conditional
+        // is a different authoring and lands in the enclosing head's gap instead, where it
+        // freezes the value whole.
+        let test = self.build_left_spine_operand_doc(cond.span.start, cond.test, || {
+            if indent_binary_test {
+                // The term does not fire, so the ordinary dispatch's continuation-indent
+                // default is already the answer.
+                self.build_expression_doc(cond.test)
+            } else {
+                // shouldNotIndent = true (grandparent is assignment, variable, etc.) — an
+                // explicit opt-out, through the seam that owns the owned-comment prepend so
+                // the two arms cannot disagree about it.
+                self.build_flat_chain_expression_doc(cond.test)
+            }
+        });
         // Several test-position expressions get parens (Prettier: needs-parentheses.js).
         // See `ternary_test_needs_parens` for the arrow/yield semantics vs the
         // `as`/`satisfies`/assignment/`??` clarity cases.
@@ -683,7 +691,10 @@ impl<'a> Printer<'a> {
         // non-breaking path, so the load-bearing arrow/yield parens (and the
         // `as`/`satisfies` clarity parens) are never dropped just because a branch
         // carries a line comment.
-        let test = self.parenthesize_ternary_test(cond.test, self.build_expression_doc(cond.test));
+        let test_doc = self.build_left_spine_operand_doc(cond.span.start, cond.test, || {
+            self.build_expression_doc(cond.test)
+        });
+        let test = self.parenthesize_ternary_test(cond.test, test_doc);
         // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
         // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
         let test = self.wrap_for_init_in(cond.test, test);

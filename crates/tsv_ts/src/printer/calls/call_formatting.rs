@@ -137,15 +137,33 @@ fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -
     // around a callee — the removed-paren comments (`(/* c */ it)(…)`), the type arguments
     // and the gap before them (`it/* c */ <T>(…)`) — applies to it below. A branch that
     // returns a doc assembled from its own callee skips every one of those, `<T>` included.
-    let callee_doc = test_call_flat
-        .then(|| build_test_callee_flat_doc(call.callee, printer))
-        .flatten()
-        .unwrap_or_else(|| {
-            callee_parens.as_ref().map_or_else(
-                || printer.build_expression_doc(call.callee),
-                |parens| parens.build_body_doc(printer),
-            )
-        });
+    // The CALLEE's erased-paren freeze, over the region the `prepend_removed_paren_comments`
+    // below emits (`(⏎// prettier-ignore⏎f⏎)(1)`) — the bare-callee twin of the chain base's
+    // (`Printer::build_left_spine_operand_doc`).
+    //
+    // ⚠️ Only where the position prints NO pair of its own. A callee that takes a required
+    // pair has that pair emitted around a doc the printer BUILDS (`CalleeParens`, the owned
+    // pair), and a verbatim slice cannot be reached into — frozen there, a decorated class
+    // expression came out as `@dec class {}()`, which does not parse. The coarser claim one
+    // level out still honors the directive: it leads the whole statement, and the statement
+    // freeze keeps the author's pair inside its slice.
+    let callee_freezes = callee_parens.is_none() && !owned_pair;
+    let callee_doc = printer.build_left_spine_operand_doc_if(
+        callee_freezes,
+        call.span.start,
+        call.callee,
+        || {
+            test_call_flat
+                .then(|| build_test_callee_flat_doc(call.callee, printer))
+                .flatten()
+                .unwrap_or_else(|| {
+                    callee_parens.as_ref().map_or_else(
+                        || printer.build_expression_doc(call.callee),
+                        |parens| parens.build_body_doc(printer),
+                    )
+                })
+        },
+    );
 
     let callee = if owned_pair {
         printer.build_owned_required_pair_doc(

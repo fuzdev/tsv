@@ -218,8 +218,8 @@ type-parameter default `=` / named-tuple `label:` / tuple-rest `...` / mapped-ty
 and `[K in ...]` key / conditional `?` · `:` branches and `extends` head / function- and constructor-type
 return `=>` / predicate `is` / `as` · `satisfies` / indexed-access `[` index /
 prefix type operator `keyof` · `readonly` · `unique` / `typeof` type query / `infer` /
-angle-assertion `<` / required-paren interior).** The same placement classification honors
-a directive before a head's single child:
+angle-assertion `<` / template-literal-type `${` / required-paren interior).** The same
+placement classification honors a directive before a head's single child:
 an own-line directive between the head token and the child freezes the child whole —
 unless the (paren-transparent) child is a union or intersection **the directive is
 adjacent to**, in which case the member rules above apply unchanged (first member
@@ -292,6 +292,36 @@ precede:
   conditional's `?` · `:` branches and the function type's `=>` return the directive
   relocation of the bullet above applies unchanged —
   [frozen gap shell](../tests/fixtures/typescript/types/head_paren_shell_frozen_gap_line_comment_prettier_divergence/)
+- Paren-**shell interior**, at the child and at a leading EDGE — ◆comment_preservation
+  ◆prettier_bug — a directive the author wrote inside a redundant paren shell is not in the
+  head's gap at all (that window stops at the shell's own span start, so a frozen whole-shell
+  slice can never double-print a comment the gap also sees). Every head instead **strips** the
+  shell, hands the run to its own own-line-preserving emitter and freezes the paren-stripped
+  inner, so the shelled authoring lands on the bare authoring's fixed point in ONE pass — the
+  shell is redundant by construction, so the two spellings are one program and one claim.
+  That holds where the shell IS the child (`as` · `satisfies`, predicate `is`, the alias `=`,
+  the annotation `:`, the mapped `]:` value, a type-parameter `extends` · `=`, a prefix type
+  operator, the tuple rest `...` and named-tuple `label:`, the template-literal `${`) and
+  where it sits at the child's leading **EDGE** (a conditional type's CHECK type, an
+  indexed access's object, an intersection's first member, a tuple element's optional `?`),
+  where the run is the ENCLOSING gap's to emit and the shell stands down under that gap's
+  claim ([§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)'s
+  leading-EDGE entries). Prettier relocates the directive out of the shell to trail the
+  enclosing head and freezes from there — a placement inert under tsv's floor, and one
+  prettier's own second pass walks away from. Left unstripped the shell printed the run
+  itself, with a bare `hardline` at its own indent and the directive glued to the head, which
+  is an F1 break at the conditional check and a silent loss of the freeze everywhere else —
+  [conditional check](../tests/fixtures/typescript/types/conditional_prettier_ignore_check_paren_interior_prettier_divergence/),
+  and the `unformatted_ours_paren_interior` / `unformatted_ours_paren_shell` variants on each
+  head's own fixture.
+
+  Two positions answer differently, and for reasons of their own. The **array element** keeps
+  its pair and emits the run inside it (the interior rule below), since a composite element
+  needs that pair anyway. And a **union's FIRST member** keeps today's answer: the union's own
+  sanctioned form puts the run after the `| ` it synthesizes, which is a separator-trailing
+  placement the floor reads as INERT — so a freeze there would be lost on the second pass, and
+  the directive is inert instead. Both are two-authoring residuals, not closed gaps.
+
 - Mapped-type key: in-bracket directive freezes the binding only — ◆design_choice — an
   own-line directive inside the bracket, before `K in ...`, freezes only the binding in
   tsv, while prettier's mapped-type handler freezes the whole mapped type — including
@@ -386,6 +416,13 @@ position, and under the standing glued classification:
   multi-line frozen parameter, keeps the list flat around the frozen slice
   (`prettier_variant_frozen` pins its stable form) —
   [params glued](../tests/fixtures/typescript/declarations/function/params_prettier_ignore_glued_inert_prettier_divergence/)
+
+A **sole parameter** whose annotation carries an honored directive declines the
+object-type **hug**: that layout prints the `:`→type run inline, gluing the directive to the
+parameter head, so the freeze would be lost on the next pass. The breakable path honors it
+through the annotation's own route, which is where every other annotation position honors it,
+and prettier hugs and relocates instead —
+[param annotation](../tests/fixtures/typescript/types/param_annotation_prettier_ignore_own_line_prettier_divergence/).
 
 **On argument and element lists.** Rule A again, unchanged: an own-line directive in the
 `(`→first-argument / `[`→first-element gap or between two items freezes the **following
@@ -576,6 +613,56 @@ tsv diverges at nine places:
   `build_prefixed_head_doc` does one delimiter out for the prefixed heads, and the unprefixed
   `{…}` values — expression tag, attribute value, `bind:` value — owe the identical shape —
   [braced value trailing line](../tests/fixtures/svelte/syntax/prettier_ignore/braced_value_trailing_line_prettier_divergence/)
+
+- Directive inside the grouping parens the parser **ERASES** ahead of a construct's leftmost
+  operand — ◆comment_preservation ◆prettier_bug — `(⏎// prettier-ignore⏎{x:  1}⏎) + 1`, and the
+  same shape at a ternary's test, a member chain's base, a bare callee, a non-null operand, a
+  tagged template's tag and a sequence's first operand. Value-side parens leave no node behind,
+  so the directive lands *inside* the construct's span: no enclosing value head can see it (a
+  head reads the gap BEFORE its value), and the construct itself answers — the operand it
+  precedes freezes, Rule A's child scope, while the operands around it normalize. A
+  whole-construct slice is not a candidate: it would have to contain the `)` the strip removes.
+  The run itself keeps the line the author gave it, hoisted ahead of the construct, which is
+  where the reparse reads it — so this is the freeze catching up with a placement tsv already
+  had. Prettier relocates the directive to trail the head and freezes from there, a placement
+  inert under tsv's floor, and its own second pass then reformats what it froze. The type
+  side's *leading-EDGE shell* entry (under §On single-child type positions) is the same
+  question where the paren survives as a node. Seven hosts diverge — the ternary test, the
+  member base, the non-null operand, the tagged tag, the sequence's first operand, a chain base
+  the printer needs a pair around, and a bare callee —
+  [left-spine paren interior](../tests/fixtures/typescript/expressions/left_spine_paren_prettier_ignore_interior_prettier_divergence/);
+  the **binary chain's** first operand is the one host prettier converges with, so both
+  authorings are an ordinary match there —
+  [left-spine paren interior converged](../tests/fixtures/typescript/expressions/left_spine_paren_prettier_ignore_interior/)
+
+  Two things ride OUTSIDE the slice, and both have to: the **position's paren target** — the
+  pair an expression statement puts around the node that would otherwise open its line with
+  `{` / `function` / `class`, and the arrow body's leftmost-object pair — since the slice
+  replaces the very builder that reads those targets, and without them the output does not
+  parse. And a position that RE-MINTS a required pair around the operand declines the freeze
+  outright (a callee that needs one, an IIFE's or a sealed chain's owned pair): that pair is
+  emitted around a doc the printer builds, so the directive is honored one level out instead:
+  the hoisted run leads the whole statement, and the statement's own freeze holds that form —
+  pair included — from the next pass on. A coarser claim, and one pass late, since this pass
+  normalizes the operand before the run reaches the statement gap, so the author's own bytes
+  normalize once (`UNHONORED CallExpression.callee` in the `ignore:audit` ratchet).
+- Directive inside a pair the printer **RETAINS** ahead of that same operand —
+  ◆comment_preservation ◆prettier_bug — the pair survives for a reason of its own rather than
+  the directive's (the `as` · `satisfies` operand→keyword gap is ASI-sensitive, so a run that
+  ends a line holds the pair open; a non-null operand may need precedence parens), so the
+  directive keeps its own line INSIDE it and the reparse reads it in the very same place.
+  Prettier strips the pair and relocates the directive to trail the head, then reformats on
+  its second pass the operand it froze —
+  [left-spine retained paren interior](../tests/fixtures/typescript/expressions/left_spine_retained_paren_prettier_ignore_interior_prettier_divergence/)
+- Frozen **arrow body** that opens with `{` — ◆prettier_bug — the unfrozen path parenthesizes
+  the leftmost OBJECT inside the body (`() => ({ x: 1 }) | M`); a verbatim slice cannot be
+  reached into, so the pair goes around the whole body instead. Prettier emits the body bare
+  there and the result **does not parse** — its own next pass cannot read it back — so there is
+  no parity to keep: a formatter's output has to parse —
+  [arrow body object leaf](../tests/fixtures/typescript/expressions/arrow/body_prettier_ignore_object_leaf_paren_prettier_divergence/)
+- A **BLOCK** arrow body freezes whole, braces included — the statement-shaped twin of the
+  expression body's freeze, which the `=>`→body head did not ask for. Prettier freezes it too,
+  and self-stably, so `arrow/body_prettier_ignore_head`'s block cell is an ordinary match
 
 `yield`'s hanging-paren layout carries its own pre-existing comment relocation (see
 [§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)); the freeze rides on it rather than adding a

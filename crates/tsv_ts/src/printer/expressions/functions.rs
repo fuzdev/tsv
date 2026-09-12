@@ -466,6 +466,32 @@ impl<'a> Printer<'a> {
             && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
             && self.param_delimiter_gaps_empty(&params[0], open, close, comments_present)
             && !self.param_has_decorators(&params[0])
+            && !self.param_annotation_holds_own_line_directive(&params[0])
+    }
+
+    /// Whether a lone parameter's annotation carries an honored own-line format-ignore
+    /// directive — in its `:`→type gap, or inside that type's redundant paren shell
+    /// ([`Printer::paren_interior_routed_inner`]).
+    ///
+    /// It declines the hug, the third precondition beside the two delimiter gaps and the
+    /// decorator: the hug arm prints the `:`→literal run INLINE
+    /// ([`Printer::build_hugged_literal_param_doc`]), which glues the directive to the
+    /// parameter's `p:` — a placement tsv's own floor reads as inert, so the freeze is lost
+    /// on the second pass and the author's bytes normalize once. The breakable path honors
+    /// it through the annotation's own directive route, which is also where every other
+    /// annotation position (a declarator, a class property, a signature member) honors it,
+    /// so declining is what keeps the sole-parameter spelling agreeing with its siblings.
+    fn param_annotation_holds_own_line_directive(&self, param: &internal::Expression<'_>) -> bool {
+        let internal::Expression::Identifier(id) = param else {
+            return false;
+        };
+        id.type_annotation().is_some_and(|ann| {
+            let colon_end = ann.span.start + 1;
+            self.member_gap_frozen(colon_end, ann.type_annotation.span().start)
+                || self
+                    .paren_interior_routed_inner(ann.type_annotation)
+                    .is_some()
+        })
     }
 
     /// Build a doc with `context` active so the outermost curried arrow chain in
@@ -1035,7 +1061,15 @@ impl<'a> Printer<'a> {
         let body_start = block.span.start;
         let has_post_arrow_comments = self.has_comments_to_emit_between(arrow_end, body_start);
 
-        let block_doc = self.arrow_block_body_doc(block);
+        // The `=>`→body head's freeze for a BLOCK body, the statement-shaped twin of the
+        // expression body's ([`Printer::gap_frozen_span`]): an own-line directive in the gap
+        // freezes the block whole, braces included. A block owes no terminator, so the
+        // emission is the plain node slice — the same one the `export default` declaration
+        // values take. Prettier freezes here too, and self-stably.
+        let block_doc = match self.gap_frozen_span(arrow_end, block.span) {
+            Some(frozen) => self.build_frozen_node_doc(frozen),
+            None => self.arrow_block_body_doc(block),
+        };
 
         // A line comment (or own-line block comment) between `=>` and the block
         // body must break so the comment sits on its own line and the `{` drops

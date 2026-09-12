@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 985,
+	"end": 1092,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -220,9 +220,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " a sibling arrow the freeze does not reach still normalizes",
+			"value": " a BLOCK body freezes whole, braces included",
 			"start": 883,
-			"end": 944,
+			"end": 929,
 			"loc": {
 				"start": {
 					"line": 36,
@@ -230,6 +230,38 @@
 				},
 				"end": {
 					"line": 36,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 951,
+			"end": 969,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a sibling arrow the freeze does not reach still normalizes",
+			"start": 990,
+			"end": 1051,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
 					"column": 62
 				}
 			}
@@ -238,19 +270,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 984,
+		"end": 1091,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 975,
+			"end": 1082,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 38,
+					"line": 43,
 					"column": 9
 				}
 			},
@@ -1210,37 +1242,37 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 946,
-					"end": 974,
+					"start": 931,
+					"end": 987,
 					"loc": {
 						"start": {
 							"line": 37,
 							"column": 1
 						},
 						"end": {
-							"line": 37,
-							"column": 29
+							"line": 39,
+							"column": 17
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 952,
-							"end": 973,
+							"start": 937,
+							"end": 986,
 							"loc": {
 								"start": {
 									"line": 37,
 									"column": 7
 								},
 								"end": {
-									"line": 37,
-									"column": 28
+									"line": 39,
+									"column": 16
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 952,
-								"end": 955,
+								"start": 937,
+								"end": 940,
 								"loc": {
 									"start": {
 										"line": 37,
@@ -1251,19 +1283,152 @@
 										"column": 10
 									}
 								},
-								"name": "ttt"
+								"name": "www"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 958,
-								"end": 973,
+								"start": 943,
+								"end": 986,
 								"loc": {
 									"start": {
 										"line": 37,
 										"column": 13
 									},
 									"end": {
-										"line": 37,
+										"line": 39,
+										"column": 16
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 972,
+									"end": 986,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 2
+										},
+										"end": {
+											"line": 39,
+											"column": 16
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 976,
+											"end": 982,
+											"loc": {
+												"start": {
+													"line": 39,
+													"column": 6
+												},
+												"end": {
+													"line": 39,
+													"column": 12
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 976,
+												"end": 979,
+												"loc": {
+													"start": {
+														"line": 39,
+														"column": 6
+													},
+													"end": {
+														"line": 39,
+														"column": 9
+													}
+												},
+												"name": "xxx"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 951,
+											"end": 969
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a BLOCK body freezes whole, braces included",
+							"start": 883,
+							"end": 929
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1053,
+					"end": 1081,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 29
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1059,
+							"end": 1080,
+							"loc": {
+								"start": {
+									"line": 42,
+									"column": 7
+								},
+								"end": {
+									"line": 42,
+									"column": 28
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1059,
+								"end": 1062,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 7
+									},
+									"end": {
+										"line": 42,
+										"column": 10
+									}
+								},
+								"name": "ttt"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 1065,
+								"end": 1080,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 13
+									},
+									"end": {
+										"line": 42,
 										"column": 28
 									}
 								},
@@ -1274,29 +1439,29 @@
 								"params": [],
 								"body": {
 									"type": "BinaryExpression",
-									"start": 964,
-									"end": 973,
+									"start": 1071,
+									"end": 1080,
 									"loc": {
 										"start": {
-											"line": 37,
+											"line": 42,
 											"column": 19
 										},
 										"end": {
-											"line": 37,
+											"line": 42,
 											"column": 28
 										}
 									},
 									"left": {
 										"type": "Identifier",
-										"start": 964,
-										"end": 967,
+										"start": 1071,
+										"end": 1074,
 										"loc": {
 											"start": {
-												"line": 37,
+												"line": 42,
 												"column": 19
 											},
 											"end": {
-												"line": 37,
+												"line": 42,
 												"column": 22
 											}
 										},
@@ -1305,15 +1470,15 @@
 									"operator": "+",
 									"right": {
 										"type": "Identifier",
-										"start": 970,
-										"end": 973,
+										"start": 1077,
+										"end": 1080,
 										"loc": {
 											"start": {
-												"line": 37,
+												"line": 42,
 												"column": 25
 											},
 											"end": {
-												"line": 37,
+												"line": 42,
 												"column": 28
 											}
 										},
@@ -1328,8 +1493,8 @@
 						{
 							"type": "Line",
 							"value": " a sibling arrow the freeze does not reach still normalizes",
-							"start": 883,
-							"end": 944
+							"start": 990,
+							"end": 1051
 						}
 					]
 				}

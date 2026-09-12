@@ -439,6 +439,18 @@ pub struct Printer<'a> {
     /// suppress a run nothing else prints, which is a DROP
     /// ([`comments.md`](../../../../docs/comments.md) hazard 1).
     pub(crate) claimed_shell_leading_run: Cell<Option<Span>>,
+    /// The span a linearized chain's BASE freezes — an alone-on-line format-ignore directive
+    /// in the grouping parens the parser erased ahead of it
+    /// ([`Printer::left_spine_operand_frozen_span`]).
+    ///
+    /// A cell because the base's doc is built deep inside the chain's layout selection
+    /// (`chain::printing::print_node_inner`), which the chain's own seam
+    /// (`chain::analysis::build_linearized_chain_doc`) is the only place that knows the
+    /// chain's leading region. **Span-keyed and NOT consumed on read**: a conditional group
+    /// builds the same chain doc more than once, and a freeze that fired only on the first
+    /// build would make the candidates disagree about the base's bytes. Save/restored around
+    /// the build like [`Printer::claimed_shell_leading_run`].
+    pub(crate) frozen_chain_base: Cell<Option<Span>>,
     /// The parent context for a curried arrow-chain value, set by the enclosing
     /// printer (assignment chokepoint, call-argument printer, binary-operand
     /// printer) just before the chain is built. The arrow printer reads and
@@ -575,6 +587,7 @@ impl<'a> Printer<'a> {
             inline_member_call_tail: Cell::new(None),
             claimed_owned_comment_start: Cell::new(None),
             claimed_shell_leading_run: Cell::new(None),
+            frozen_chain_base: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
             chain_arg_share_active: Cell::new(false),
