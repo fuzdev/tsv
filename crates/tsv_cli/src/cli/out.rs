@@ -45,7 +45,8 @@
 //! *other* write error still panics, exactly as the macros did — a report truncated by
 //! a full disk with nothing said about it is the worse failure.
 //!
-//! **Scope: the shipped bin.** `tsv_debug` keeps `println!`/`eprintln!` at its ~1,160
+//! **Scope: the shipped bin.** `tsv_debug` keeps `println!`/`eprintln!` (and
+//! `write!`/`writeln!` to a locked handle, which abort the same way) at its ~1,160
 //! write sites and still aborts on a closed reader. That is deliberate, not an
 //! oversight to finish: it ships in no artifact, its output is a developer's to read,
 //! and a panic there names the problem rather than hiding it. The one line of its
@@ -68,9 +69,7 @@ const WOULD_BLOCK_MAX_WAIT: Duration = Duration::from_millis(1);
 /// and `format --content`'s output are already newline-terminated strings, and
 /// `parse`'s wire bytes must not take a UTF-8 round trip.
 pub fn write_stdout(bytes: &[u8]) {
-    let stdout = io::stdout();
-    let mut out = stdout.lock();
-    write_or_stop(&mut out, bytes, "stdout");
+    write_or_stop(&mut io::stdout().lock(), bytes, "stdout");
 }
 
 /// Write `bytes` to stderr verbatim, stopping quietly if the consumer closed the pipe.
@@ -78,9 +77,7 @@ pub fn write_stdout(bytes: &[u8]) {
 /// The diagnostics reach this through [`err_line!`](crate::err_line) rather than
 /// calling it directly.
 pub fn write_stderr(bytes: &[u8]) {
-    let stderr = io::stderr();
-    let mut out = stderr.lock();
-    write_or_stop(&mut out, bytes, "stderr");
+    write_or_stop(&mut io::stderr().lock(), bytes, "stderr");
 }
 
 /// Print `message` as one stderr line and exit with `code` — the shape every

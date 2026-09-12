@@ -918,7 +918,18 @@ fn test_format_help_extension_list_is_rendered_from_the_const() {
 /// is: one a `.formatignore` rule excludes is skipped quietly and left untouched, and a run
 /// whose every argument was such a file is not the empty-run error (a pre-commit hook with
 /// only ignored files staged). A directory the rules exclude still is, and warns, naming
-/// the rule's file. Mirrored by `scripts/test_npm.ts`.
+/// the rule's file.
+///
+/// **A deliberate hand-mirrored pair with `scripts/test_npm.ts`** — one of the two the
+/// shared table (`tests/discovery/scenarios.json`) cannot take, both for the same reason.
+/// That runner invokes `format --list`, where an empty scope is a valid answer that exits
+/// 0, while what these pin is the **format action's** exit code: 0 here when every
+/// argument was an excluded file, and 2 with nothing written for the other one, the
+/// unsupported-extension refusal (whose *discovery* half the table does hold, as an
+/// `error` case). The table took the pairs that were purely about the walk once it grew a
+/// multi-argument case; widening it to drive the writing action would mix the walk's
+/// question with the command's, so these two stay — visibly, rather than as silent second
+/// copies.
 #[test]
 fn test_format_explicit_file_an_ignore_rule_excludes_is_skipped() {
     let dir = temp_dir("excluded_explicit_file");
@@ -958,115 +969,14 @@ fn test_format_explicit_file_an_ignore_rule_excludes_is_skipped() {
     assert_eq!(fs::read_to_string(&d).unwrap(), "const   x=1");
 }
 
-/// File arguments share one ignore scope, moved from each argument's directory to the
-/// next's: a directory's own `.gitignore` applies to the files under it and to nothing the
-/// scope moves on to, whatever order the arguments come in, and a nested repository is its
-/// own format root. Mirrored by `scripts/test_npm.ts`.
-#[test]
-fn test_format_list_scopes_each_file_argument_by_its_own_directory() {
-    let dir = temp_dir("file_argument_scopes");
-    fs::create_dir_all(dir.join(".git")).unwrap();
-    fs::create_dir_all(dir.join("inner/.git")).unwrap();
-    fs::write(dir.join(".gitignore"), "*.gen.ts\n").unwrap();
-    let files = [
-        "a/x.ts",
-        "a/y.ts",
-        "a/sub/x.ts",
-        "b/x.ts",
-        "r.gen.ts",
-        "inner/q.gen.ts",
-    ];
-    for file in files {
-        let path = dir.join(file);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, "x").unwrap();
-    }
-    fs::write(dir.join("a/.gitignore"), "x.ts\n").unwrap();
-    let arg = |file: &str| dir.join(file).to_string_lossy().into_owned();
-
-    // out of order, so the scope pops back out of `a/` and re-enters it
-    let mut args = vec!["format".to_string(), "--list".to_string()];
-    for file in [
-        "a/x.ts",
-        "inner/q.gen.ts",
-        "b/x.ts",
-        "a/sub/x.ts",
-        "r.gen.ts",
-        "a/y.ts",
-    ] {
-        args.push(arg(file));
-    }
-    let output = tsv(&args.iter().map(String::as_str).collect::<Vec<_>>());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
-    let expected: Vec<String> = ["a/y.ts", "b/x.ts", "inner/q.gen.ts"]
-        .iter()
-        .map(|file| arg(file))
-        .collect();
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert_eq!(
-        stdout.lines().collect::<Vec<_>>(),
-        expected,
-        "stderr: {stderr}"
-    );
-}
-
-/// A named path reads no ignore file inside a directory a rule excludes, as the walk that
-/// prunes the directory reads none: a named file there is skipped quietly despite the
-/// shadowed `.prettierignore` beside that directory's `.formatignore` (and, on unix, a
-/// symlinked `.gitignore` below it), and a named directory under it warns only that it is
-/// excluded. Mirrored by `scripts/test_npm.ts`.
-#[test]
-fn test_format_named_path_reads_no_ignore_file_inside_an_excluded_directory() {
-    let dir = temp_dir("excluded_directory_ignore_files");
-    fs::create_dir_all(dir.join(".git")).unwrap();
-    fs::create_dir_all(dir.join("vendor/sub")).unwrap();
-    fs::write(dir.join(".formatignore"), "vendor/\n").unwrap();
-    fs::write(dir.join("vendor/.formatignore"), "").unwrap();
-    fs::write(dir.join("vendor/.prettierignore"), "").unwrap();
-    #[cfg(unix)]
-    std::os::unix::fs::symlink("../../.formatignore", dir.join("vendor/sub/.gitignore")).unwrap();
-    for file in ["keep.ts", "vendor/x.ts", "vendor/sub/y.ts"] {
-        fs::write(dir.join(file), "x").unwrap();
-    }
-    let arg = |file: &str| dir.join(file).to_string_lossy().into_owned();
-
-    // the walk prunes vendor/ without a word…
-    let output = tsv(&["format", "--list", dir.path().to_str().unwrap()]);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
-    assert_eq!(
-        String::from_utf8_lossy(&output.stdout).trim(),
-        arg("keep.ts"),
-        "stderr: {stderr}"
-    );
-    assert!(!stderr.contains("warning"), "stderr: {stderr}");
-
-    // …a named file under it is skipped as quietly…
-    let output = tsv(&[
-        "format",
-        "--list",
-        arg("vendor/x.ts").as_str(),
-        arg("vendor/sub/y.ts").as_str(),
-    ]);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
-    assert!(output.stdout.is_empty(), "stderr: {stderr}");
-    assert!(!stderr.contains("warning"), "stderr: {stderr}");
-
-    // …and a named directory under it warns that it is excluded, and of nothing inside
-    let output = tsv(&["format", "--list", arg("vendor/sub").as_str()]);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
-    assert!(
-        stderr.contains("which a rule in the repo-root .formatignore excludes"),
-        "stderr: {stderr}"
-    );
-    assert!(
-        !stderr.contains("shadowed") && !stderr.contains("symbolic link"),
-        "stderr: {stderr}"
-    );
-}
+// The two behaviors that used to sit here — one ignore scope moved across file
+// arguments, and a named path reading no ignore file inside an excluded directory —
+// are in the SHARED table now (`tests/discovery/scenarios.json`, the
+// `file_arguments_share_one_scope_moved_per_directory` and
+// `explicit_path_reads_no_ignore_file_inside_an_excluded_directory` scenarios), which
+// gained a multi-argument case shape for exactly this. They were a hand-mirrored pair —
+// one test here, one in `scripts/test_npm.ts` — which is the drift that table exists to
+// remove: it now holds them for all three walkers from one place.
 
 /// A named file whose name holds a line feed is warned about like any other a `.gitignore`
 /// excludes, but offered no re-include lines: the name would split each one across two

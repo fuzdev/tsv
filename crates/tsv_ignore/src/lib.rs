@@ -310,8 +310,7 @@ impl IgnoreStack {
     /// it for an arbitrary path whose ancestors haven't been cleared; that is what
     /// [`is_ignored`](Self::is_ignored) is for.
     pub fn is_ignored_leaf(&self, path: &str, is_dir: bool) -> bool {
-        let segments = path_segments(path);
-        !segments.is_empty() && self.last_match_at(&segments, is_dir) == Some(true)
+        self.leaf_polarity(path, is_dir) == Some(true)
     }
 
     /// Whether `path` is explicitly *re-included* — the last rule matching this
@@ -320,11 +319,23 @@ impl IgnoreStack {
     /// ignored nor re-included. tsv's discovery uses this to let an explicit
     /// re-include override the build-output heuristic.
     pub fn is_reincluded(&self, path: &str, is_dir: bool) -> bool {
+        self.leaf_polarity(path, is_dir) == Some(false)
+    }
+
+    /// The polarity of the last rule matching `path` **itself**, with no ancestor walk —
+    /// the one query behind [`is_ignored_leaf`](Self::is_ignored_leaf) and
+    /// [`is_reincluded`](Self::is_reincluded), which are its two readings.
+    /// `Some(true)` excludes, `Some(false)` re-includes, `None` is a path no rule
+    /// mentions — which a segment-less path (`""`, `"."`) always is, since there is
+    /// nothing for a rule to match. Stating that once is the point: the two public
+    /// forms spelled the empty case twice, in two styles, and neither spelling was the
+    /// interesting half of either answer.
+    fn leaf_polarity(&self, path: &str, is_dir: bool) -> Option<bool> {
         let segments = path_segments(path);
         if segments.is_empty() {
-            return false;
+            return None;
         }
-        self.last_match_at(&segments, is_dir) == Some(false)
+        self.last_match_at(&segments, is_dir)
     }
 
     /// The deepest pushed **tsv layer** holding a negation (`!`) anchored *strictly

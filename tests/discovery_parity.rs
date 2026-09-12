@@ -15,8 +15,10 @@
 //! Each scenario materializes its `tree` in a fresh tempdir (string = file,
 //! null = empty dir, `{"symlink": target}` = a symlink, unix only; a `.git` entry
 //! makes a dir look like a repo root without a real git binary), then for each
-//! case calls `discover_files` on
-//! `<root>/<target>`. A case carries **either** `expected` — the discovered
+//! case calls `discover_files` on its arguments — `<root>/<target>`, or one
+//! `<root>/<t>` per entry of a `targets` list, which is what reaches the
+//! behavior a *set* of arguments decides (see [`case_targets`]). A case carries
+//! **either** `expected` — the discovered
 //! files, relative to the tempdir root and `/`-joined — **or** `error`, a
 //! substring of the argument error that must fail the run upfront with nothing
 //! discovered.
@@ -85,18 +87,49 @@ fn symlink(_target: &str, link: &Path) {
     panic!("{link:?}: a scenario holding a symlink is skipped off unix");
 }
 
-/// Run one case: discover under `<root>/<target>`. `Ok` carries the in-scope
-/// files as root-relative, `/`-joined strings in discovery (sorted) order; `Err`
-/// carries the **argument** errors that failed the run upfront (an unresolvable
-/// path, or a named file whose extension tsv doesn't format), which an `error`
-/// case asserts against.
-fn discover_case(root: &Path, target: &str) -> Result<(Vec<String>, Vec<String>), Vec<String>> {
-    let arg = if target.is_empty() {
-        root.to_path_buf()
-    } else {
-        root.join(target)
-    };
-    let discovered = discover_files(&[arg.to_string_lossy().into_owned()])?;
+/// The arguments one case invokes discovery with, each resolved against `root`: its
+/// `targets` list, or its single `target` — exactly one of the two, so a one-argument
+/// case stays a one-liner while a multi-argument one is expressible at all. `""` is the
+/// tempdir root itself.
+///
+/// A case carrying `targets` is the only way the table reaches what a *set* of arguments
+/// decides: the one ignore scope file arguments share as it moves from each one's
+/// directory to the next's (`FileScope`), and the canonical-path dedup that only
+/// overlapping roots run. Those were pinned by a hand-mirrored test on each bin before
+/// the shape existed — which is the drift this table exists to remove.
+fn case_targets(case: &Value) -> Vec<String> {
+    match case.get("targets") {
+        Some(targets) => targets
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t.as_str().unwrap().to_string())
+            .collect(),
+        None => vec![case["target"].as_str().unwrap().to_string()],
+    }
+}
+
+/// Run one case: discover under each of its `targets`, in one invocation. `Ok` carries
+/// the in-scope files as root-relative, `/`-joined strings in discovery (sorted) order;
+/// `Err` carries the **argument** errors that failed the run upfront (an unresolvable
+/// path, or a named file whose extension tsv doesn't format), which an `error` case
+/// asserts against.
+fn discover_case(
+    root: &Path,
+    targets: &[String],
+) -> Result<(Vec<String>, Vec<String>), Vec<String>> {
+    let args: Vec<String> = targets
+        .iter()
+        .map(|target| {
+            let arg = if target.is_empty() {
+                root.to_path_buf()
+            } else {
+                root.join(target)
+            };
+            arg.to_string_lossy().into_owned()
+        })
+        .collect();
+    let discovered = discover_files(&args)?;
     // Normalize separators on BOTH sides before stripping: discovery emits
     // native separators, so on Windows the root prefix ends in `\` where this
     // pattern expects `/` — stripping the un-normalized string never matches
@@ -154,8 +187,10 @@ fn discovery_matches_shared_scenarios() {
         materialize(&root, tree);
 
         for case in scenario["cases"].as_array().unwrap() {
-            let target = case["target"].as_str().unwrap();
-            let actual = discover_case(&root, target);
+            let targets = case_targets(case);
+            // what a failure names the case by: the one target, or the whole list
+            let target = targets.join(" ");
+            let actual = discover_case(&root, &targets);
             // A case carries either `expected` (the in-scope set) or `error` (a
             // substring of the argument error that must fail the run upfront).
             match (case.get("error").and_then(Value::as_str), actual) {

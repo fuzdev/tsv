@@ -145,6 +145,12 @@ pub(crate) fn parse_segment(s: &str) -> Option<Seg> {
 /// precedes it and the next character is not `]`; the element a range consumed
 /// cannot open another (`[a-c-e]` is `a`–`c`, `-`, `e`), and the high end may be
 /// escaped (`[a-\]]`).
+///
+/// One arm of that loop is deliberately absent: git's POSIX bracket expression
+/// (`[[:alpha:]]`), which `wildmatch` reads as a named class where this reads `[`,
+/// `:`, `a`, … as plain members. prettier's `ignore` doesn't implement it either, so
+/// tsv tracks prettier there — a listed known edge (the crate's `CLAUDE.md`), which
+/// is why "every edge" above is the reading order's, not the grammar's.
 fn parse_class(chars: &[char], open: usize) -> Option<(Tok, usize)> {
     let mut i = open + 1;
     let mut negated = false;

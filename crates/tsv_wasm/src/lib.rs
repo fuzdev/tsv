@@ -579,6 +579,18 @@ struct Options {
 #[cfg_attr(test, derive(Clone))]
 enum OptionValue {
     Undefined,
+    /// The only key that accepts one is `locations`, which is parse-only — so a
+    /// format-only build classifies a boolean and then never reads the payload.
+    /// Kept rather than cfg'd away: [`OptionValue::classify`] is the one place the
+    /// three shapes are named, and a variant that appears under one feature would
+    /// make the `Str(_) | Other` refusal arms read differently per build.
+    #[cfg_attr(
+        not(feature = "parse"),
+        expect(
+            dead_code,
+            reason = "the payload is read only by the parse-only `locations` arm"
+        )
+    )]
     Bool(bool),
     Str(String),
     /// Anything else — a number, an object, `null` — which no key accepts.

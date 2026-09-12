@@ -2227,6 +2227,16 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// to the ignore files, which bound it as they bound the walk: an excluded one is
 	// skipped with a warning, untouched, and a run whose every argument was such a file
 	// exits 0. Mirrors the native CLI.
+	//
+	// A deliberate hand-mirrored pair with tests/cli_tests.rs — one of the two the shared
+	// table cannot take, both for the same reason. That runner invokes `format --list`,
+	// where an empty scope is a valid answer that exits 0, while what these pin is the
+	// FORMAT ACTION's exit code: 0 here when every argument was an excluded file, and 2
+	// with nothing written for the other one, the unsupported-extension refusal above
+	// (whose discovery half the table does hold, as an `error` case). The table took the
+	// pairs that were purely about the walk once it grew a multi-argument case; widening it
+	// to drive the writing action would mix the walk's question with the command's, so
+	// these two stay — visibly, rather than as silent second copies.
 	it('format holds an explicit file arg to the extension check, then to the ignore files', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
@@ -2273,83 +2283,14 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
-	// file arguments share one ignore scope, moved from each argument's directory to the
-	// next's: a directory's own .gitignore applies to the files under it and to nothing the
-	// scope moves on to, whatever order the arguments come in, and a nested repository is
-	// its own format root. Mirrors tests/cli_tests.rs
-	it('format --list scopes each file argument by its own directory', () => {
-		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
-		try {
-			mkdirSync(join(dir, '.git'));
-			mkdirSync(join(dir, 'inner', '.git'), { recursive: true });
-			writeFileSync(join(dir, '.gitignore'), '*.gen.ts\n');
-			for (const file of [
-				'a/x.ts',
-				'a/y.ts',
-				'a/sub/x.ts',
-				'b/x.ts',
-				'r.gen.ts',
-				'inner/q.gen.ts'
-			]) {
-				mkdirSync(dirname(join(dir, file)), { recursive: true });
-				writeFileSync(join(dir, file), 'x');
-			}
-			writeFileSync(join(dir, 'a', '.gitignore'), 'x.ts\n');
-			// out of order, so the scope pops back out of `a/` and re-enters it
-			const order = ['a/x.ts', 'inner/q.gen.ts', 'b/x.ts', 'a/sub/x.ts', 'r.gen.ts', 'a/y.ts'];
-			const result = run_cli(['format', '--list', ...order.map((file) => join(dir, file))]);
-			assert.equal(result.status, 0, result.stderr);
-			assert.deepEqual(
-				result.stdout.trim().split('\n'),
-				['a/y.ts', 'b/x.ts', 'inner/q.gen.ts'].map((file) => join(dir, file))
-			);
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
-	});
-
-	// a named path reads no ignore file inside a directory a rule excludes, as the walk that
-	// prunes the directory reads none: a named file there is skipped quietly despite the
-	// shadowed .prettierignore beside that directory's .formatignore (and, off Windows, a
-	// symlinked .gitignore below it), and a named directory under it warns only that it is
-	// excluded. Mirrors tests/cli_tests.rs
-	it('format --list reads no ignore file inside an excluded directory', () => {
-		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
-		try {
-			mkdirSync(join(dir, '.git'));
-			mkdirSync(join(dir, 'vendor', 'sub'), { recursive: true });
-			writeFileSync(join(dir, '.formatignore'), 'vendor/\n');
-			writeFileSync(join(dir, 'vendor', '.formatignore'), '');
-			writeFileSync(join(dir, 'vendor', '.prettierignore'), '');
-			if (process.platform !== 'win32') {
-				symlinkSync('../../.formatignore', join(dir, 'vendor', 'sub', '.gitignore'));
-			}
-			for (const file of ['keep.ts', 'vendor/x.ts', 'vendor/sub/y.ts']) {
-				writeFileSync(join(dir, file), 'x');
-			}
-			// the walk prunes vendor/ without a word…
-			const walked = run_cli(['format', '--list', dir]);
-			assert.equal(walked.status, 0, walked.stderr);
-			assert.doesNotMatch(walked.stderr, /warning/);
-			// …a named file under it is skipped as quietly…
-			const files = run_cli([
-				'format',
-				'--list',
-				join(dir, 'vendor', 'x.ts'),
-				join(dir, 'vendor', 'sub', 'y.ts')
-			]);
-			assert.equal(files.status, 0, files.stderr);
-			assert.equal(files.stdout, '');
-			assert.doesNotMatch(files.stderr, /warning/);
-			// …and a named directory under it warns that it is excluded, and of nothing inside
-			const named_dir = run_cli(['format', '--list', join(dir, 'vendor', 'sub')]);
-			assert.equal(named_dir.status, 0, named_dir.stderr);
-			assert.match(named_dir.stderr, /which a rule in the repo-root \.formatignore excludes/);
-			assert.doesNotMatch(named_dir.stderr, /shadowed|symbolic link/);
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
-	});
+	// The two behaviors that used to sit here — one ignore scope moved across file
+	// arguments, and a named path reading no ignore file inside an excluded directory —
+	// are in the SHARED table now (tests/discovery/scenarios.json, the
+	// file_arguments_share_one_scope_moved_per_directory and
+	// explicit_path_reads_no_ignore_file_inside_an_excluded_directory scenarios), which
+	// gained a multi-argument case shape for exactly this. They were a hand-mirrored pair
+	// — one test here, one in tests/cli_tests.rs — which is the drift that table exists
+	// to remove: it now holds them for all three walkers from one place.
 
 	it('parse --content prints compact JSON with trailing newline', () => {
 		const result = run_cli(['parse', '--content', 'const x = 1;', '--parser', 'typescript']);
