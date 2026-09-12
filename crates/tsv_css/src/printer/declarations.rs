@@ -6,6 +6,7 @@
 //! - Width-based wrapping for long lists
 //! - Doc building for width calculations
 
+use super::values::ValueCtx;
 use super::{Printer, value_normalization};
 use crate::ast::internal::{self, CssValue};
 use tsv_lang::Span;
@@ -113,6 +114,15 @@ pub(super) fn list_has_closing_comma(
     source
         .get(last.span().end_usize()..list_end)
         .is_some_and(|tail| crate::escapes::trim_end_preserving_escape(tail).ends_with(','))
+}
+
+/// Does this property's value take prettier's `font`-shorthand gap rule?
+///
+/// `getPropOfDeclNode` reaches for the enclosing declaration's property from inside the
+/// value walk; tsv sets it on the printer for the declaration's duration instead
+/// (`Printer::value_scope`).
+fn property_is_font_shorthand(property: &str) -> bool {
+    property == "font" || property.starts_with("--")
 }
 
 impl<'a> Printer<'a> {
@@ -360,13 +370,14 @@ impl<'a> Printer<'a> {
     /// Value comments aren't in the CSS AST, so a comment-bearing list isn't routed
     /// here (the dispatch guard); it stays on the source-extracting comment path.
     fn print_decl_value_list(&mut self, decl: &internal::CssDeclaration<'_>) {
+        let ctx = self.value_ctx();
         let doc = match &decl.value {
             CssValue::CommaSeparated { values, span } => {
-                let fill = self.build_comma_fill_doc(values, span.end_usize());
+                let fill = self.build_comma_fill_doc(values, span.end_usize(), ctx);
                 self.build_broken_head_value_decl_doc(fill, &[])
             }
             CssValue::List { values, .. } => {
-                let parts = self.build_space_fill_parts(values);
+                let parts = self.build_space_fill_parts(values, ctx);
                 let fill = self.d().fill(&parts);
                 if Self::is_grid_row_property(decl.property) {
                     self.build_broken_head_value_decl_doc(fill, &[])
@@ -389,6 +400,16 @@ impl<'a> Printer<'a> {
 
     /// Format a CSS declaration (property: value;)
     pub(super) fn print_css_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
+        // The `font` / custom-property gap rule is this declaration's, so it is set here
+        // and cleared at the end rather than threaded through the value builders. Saved
+        // and restored like `in_keyframes`, so a nested context cannot leak it.
+        let was_font_shorthand = self.value_scope.font_shorthand;
+        self.value_scope.font_shorthand = property_is_font_shorthand(decl.property);
+        self.print_css_declaration_in(decl);
+        self.value_scope.font_shorthand = was_font_shorthand;
+    }
+
+    fn print_css_declaration_in(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write_indent();
 
         // The block-child juncture's boundary run (`a {<NBSP>color: red }`,
@@ -570,7 +591,8 @@ impl<'a> Printer<'a> {
     ) {
         self.write_broken_value_head(plan.hoisted);
         self.indent_level += 1;
-        self.print_css_value_multiline(&decl.value, plan.first_members);
+        let ctx = self.value_ctx();
+        self.print_css_value_multiline(&decl.value, plan.first_members, ctx);
         self.indent_level -= 1;
         self.write_declaration_end(decl);
     }
@@ -597,7 +619,7 @@ impl<'a> Printer<'a> {
             self.print_decl_function_with_comments(decl, decl_source, name_span, args, span);
         } else {
             self.write(": ");
-            let doc = self.build_value_function_doc(name_span, args, span);
+            let doc = self.build_value_function_doc(name_span, args, span, self.value_ctx());
             // Reserve the trailing `;` plus any ` !important` tail for the OUTERMOST
             // function group's fit decision (the property + `: ` + tail + `;` boundary).
             // Counting the tail makes an `!important` function wrap when the keyword
@@ -955,6 +977,7 @@ impl<'a> Printer<'a> {
         &mut self,
         value: &'v CssValue<'v>,
         first_members: Option<&'v [CssValue<'v>]>,
+        ctx: ValueCtx,
     ) {
         let CssValue::CommaSeparated { values, span } = value else {
             // Unreachable via `multiline_plan` (which matches on `CommaSeparated`); fall
@@ -991,7 +1014,7 @@ impl<'a> Printer<'a> {
                     Some(members) if i == 0 => members,
                     _ => list_values,
                 };
-                self.build_space_fill_value_doc(members)
+                self.build_space_fill_value_doc(members, ctx)
             } else {
                 self.build_css_value_doc(val)
             };
@@ -1024,7 +1047,12 @@ impl<'a> Printer<'a> {
     ///
     /// The bare fill: the `;` reserve and the break-after-the-colon group are the caller's
     /// (`build_broken_head_value_decl_doc`).
-    fn build_comma_fill_doc(&self, values: &[CssValue<'_>], list_end: usize) -> DocId {
+    fn build_comma_fill_doc(
+        &self,
+        values: &[CssValue<'_>],
+        list_end: usize,
+        ctx: ValueCtx,
+    ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         for (i, val) in values.iter().enumerate() {
@@ -1035,12 +1063,12 @@ impl<'a> Printer<'a> {
             {
                 // Space-separated values: build as group(indent(fill([sub1, line, sub2])))
                 // so fill can break within items with continuation indent
-                let sub_parts = self.build_space_fill_parts(list_values);
+                let sub_parts = self.build_space_fill_parts(list_values, ctx);
                 let sub_fill = d.fill(&sub_parts);
                 let sub_indented = d.indent(sub_fill);
                 parts.push(d.group(sub_indented));
             } else {
-                parts.push(self.build_css_value_doc(val));
+                parts.push(self.build_css_value_doc_in(val, ctx));
             }
             if i < values.len() - 1 {
                 // Separator: ", " in flat mode, ",\n" when broken
@@ -1056,22 +1084,6 @@ impl<'a> Printer<'a> {
         }
 
         d.fill(&parts)
-    }
-
-    /// Build fill parts for space-separated values (shared helper)
-    ///
-    /// Returns `[val1, line, val2, line, val3]` — suitable for `d.fill()`.
-    /// Used by both declaration wrapping and function arg wrapping.
-    pub(super) fn build_space_fill_parts(&self, values: &[CssValue<'_>]) -> DocBuf {
-        let d = self.d();
-        let mut parts = DocBuf::with_capacity(values.len() * 2);
-        for (i, val) in values.iter().enumerate() {
-            parts.push(self.build_css_value_doc(val));
-            if i < values.len() - 1 {
-                parts.push(d.line());
-            }
-        }
-        parts
     }
 
     /// The declaration doc of a space-separated value given its fill: `: ` + `indent(fill)`.

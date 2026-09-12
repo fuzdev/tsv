@@ -81,6 +81,13 @@ pub(crate) struct ValueParser<'a> {
 
     /// Base offset in full CSS document (for absolute span calculation)
     base_offset: u32,
+
+    /// Whether this range sits inside a function's argument list or a parenthesized
+    /// group — the only place a `:` is a value operator rather than content. Set by
+    /// [`super::functions::parse_function_arguments`] and inherited by every
+    /// [`Self::sub_parser`] beneath it. See
+    /// [`super::operators::split_value_run`]'s `in_group`.
+    in_group: bool,
 }
 
 /// Outcome of `ValueParser::fast_scan` — the single-pass classification of a value.
@@ -120,11 +127,17 @@ impl<'a> ValueParser<'a> {
     /// let parser = ValueParser::new("red, blue", Span { start: 50, end: 59 });
     /// ```
     pub fn new(source: &'a str, base_span: Span) -> Self {
+        Self::new_within(source, base_span, false)
+    }
+
+    /// [`Self::new`], saying whether the range is inside a group (see [`Self::in_group`]).
+    pub fn new_within(source: &'a str, base_span: Span, in_group: bool) -> Self {
         Self {
             source,
             start: 0,
             end: source.len(),
             base_offset: base_span.start,
+            in_group,
         }
     }
 
@@ -165,6 +178,7 @@ impl<'a> ValueParser<'a> {
             start: self.start + range_start, // Offset into same source
             end: self.start + range_end,
             base_offset: self.base_offset, // Same base offset
+            in_group: self.in_group,       // A group's interior stays a group's
         }
     }
 
@@ -585,10 +599,23 @@ impl<'a> ValueParser<'a> {
                 // and the cursor disagreed (a value opening with a delimiter, e.g.
                 // `,a b`). Re-`parse()`ing the identical range would re-classify it the
                 // same way and recurse forever, so parse it as a leaf instead.
-                if values.is_empty() && value_end_raw == text.len() {
-                    values.push(sub_parser.parse_single(arena));
+                let parsed = if values.is_empty() && value_end_raw == text.len() {
+                    sub_parser.parse_single(arena)
                 } else {
-                    values.push(sub_parser.parse(arena)); // Recursive, but same source!
+                    sub_parser.parse(arena) // Recursive, but same source!
+                };
+                // An operator run is FLATTENED into the list around it, because the
+                // separator rule reads across the element boundary: `1.5 /2.5` is a
+                // number, an operator and a number to prettier exactly as `1.5/2.5` is,
+                // and only the authored gap between them differs. A whitespace element
+                // holds no top-level whitespace or comma by construction, so the only
+                // thing that can come back as a `List` here is such a run
+                // (`super::parse_single_value`'s first arm).
+                match parsed {
+                    CssValue::List { values: run, .. } if kind == SplitKind::Whitespace => {
+                        values.extend_from_slice(run);
+                    }
+                    v => values.push(v),
                 }
             }
 
@@ -613,7 +640,8 @@ impl<'a> ValueParser<'a> {
     /// stores no copied string.
     fn build_leaf<'arena>(&self, text: &'a str, arena: &'arena Bump) -> CssValue<'arena> {
         let span = self.absolute_span();
-        super::parse_single_value(text, span, arena).unwrap_or(CssValue::Identifier { span })
+        super::parse_single_value(text, span, self.in_group, arena)
+            .unwrap_or(CssValue::Identifier { span })
     }
 
     /// Parse single value (leaf node), trimming first.
@@ -904,6 +932,7 @@ mod tests {
             start: 5,
             end: 9,
             base_offset: 100,
+            in_group: false,
         };
 
         assert_eq!(parser.text(), "blue");
@@ -931,6 +960,7 @@ mod tests {
             start: 5, // "blue" starts at byte 5
             end: 9,   // "blue" ends at byte 9
             base_offset: 100,
+            in_group: false,
         };
 
         let abs_span = parser.absolute_span();
@@ -1004,6 +1034,7 @@ mod tests {
             start: 2,
             end: 2, // Empty range
             base_offset: 0,
+            in_group: false,
         };
 
         assert_eq!(parser.text(), "");

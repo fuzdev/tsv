@@ -15,11 +15,168 @@
 //! specialized doc builders for each value type.
 
 use super::{Printer, value_normalization};
-use crate::ast::internal::{CssValue, StringCooked};
+use crate::ast::internal::{Color, CssValue, StringCooked};
 use std::borrow::Cow;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::printing::format_string_literal;
+
+/// A value operator's kind, read back off the single byte
+/// `parser::value::operators::split_value_run` emitted as a
+/// [`CssValue::Operator`].
+///
+/// The kind is what the separator rule turns on, and it is not stored on the node: the
+/// byte IS the kind, so reading it at print time keeps the AST at one field (the
+/// span-for-verbatim idiom every other leaf takes).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ValueOperator {
+    /// `/` — a division. Glued or spaced by its neighbours' kinds.
+    Division,
+    /// `*` — a multiplication. Always spaced.
+    Multiplication,
+    /// `+` — an addition. Like `Division`, but reached by a different disjunct.
+    Addition,
+    /// `-` — a subtraction. Never spaced by tsv where the author glued it.
+    Subtraction,
+    /// `:` — a key/value colon inside a group. Never spaced *before*; the space after it
+    /// is the colon's own, not a separator.
+    Colon,
+}
+
+impl ValueOperator {
+    /// The operator this member is, or `None` when the member is an operand.
+    fn of(value: &CssValue<'_>, source: &str) -> Option<Self> {
+        let CssValue::Operator { span } = value else {
+            return None;
+        };
+        match span.extract(source).as_bytes() {
+            [b'/'] => Some(Self::Division),
+            [b'*'] => Some(Self::Multiplication),
+            [b'+'] => Some(Self::Addition),
+            [b'-'] => Some(Self::Subtraction),
+            [b':'] => Some(Self::Colon),
+            // Unreachable: the value splitter is the only producer of the node and emits
+            // one of the five above. Reading an operand rather than defaulting to a kind
+            // keeps the conservative answer (an ordinary member gap) if it ever isn't.
+            _ => {
+                debug_assert!(
+                    false,
+                    "a CssValue::Operator over {:?}",
+                    span.extract(source)
+                );
+                None
+            }
+        }
+    }
+
+    /// Is this one of the `<calc-sum>` operators css-values-4 requires whitespace around
+    /// — the pair prettier prints exactly as authored inside `calc()`?
+    const fn is_sum(self) -> bool {
+        matches!(self, Self::Addition | Self::Subtraction)
+    }
+}
+
+/// Where in the document a value sits, as its separator rule reads it — the part of
+/// [`ValueCtx`] that is fixed before the value is reached and does not change as the
+/// recursion descends.
+///
+/// prettier asks both of these of the *path* (`getPropOfDeclNode`, `insideAtRuleNode`),
+/// walking up from the node. tsv has no path, so the printer parks the answers for the
+/// declaration's duration (`Printer::value_scope`) instead of threading them through
+/// every doc builder.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct ValueScope {
+    /// The declaration is `font` or a custom property, whose glued `/` beside a font-size
+    /// operand stays glued (prettier's §"Formatting `font` property", `isPossibleFontSize`).
+    pub(crate) font_shorthand: bool,
+    /// The declaration sits in an `@utility` block, where a word followed by `*` is
+    /// glued — Tailwind's `--value(--tab-size-*)`.
+    pub(crate) in_utility_at_rule: bool,
+}
+
+/// What a value's surroundings contribute to its separator rule: its [`ValueScope`] plus
+/// the one bit the value recursion itself accumulates.
+#[derive(Clone, Copy)]
+pub(crate) struct ValueCtx {
+    /// Fixed before the value is reached.
+    pub(crate) scope: ValueScope,
+    /// Some enclosing function is `calc()` — prettier's
+    /// `insideValueFunctionNode(path, "calc")`. Its `+` / `-` gaps print as authored,
+    /// because css-values-4 makes that gap the difference between a valid expression and
+    /// an invalid one, so a formatter must not invent or remove one. ⚠️ `calc()` only:
+    /// `min()` / `max()` / `clamp()` take the ordinary rule, as they do in prettier.
+    pub(crate) in_calc: bool,
+}
+
+impl ValueCtx {
+    /// The context a function's arguments inherit: `calc()` is sticky once entered.
+    fn within_function(self, is_calc: bool) -> Self {
+        Self {
+            in_calc: self.in_calc || is_calc,
+            ..self
+        }
+    }
+}
+
+/// Is this member one of prettier's `value-word`s — the kind that makes an adjacent
+/// operator take a space?
+///
+/// A named or hex colour is one: postcss gives `red` and `#fff` a `value-word` node and
+/// only flags them, where tsv folds the flag into the node kind. An `rgb()` / `hsl()`
+/// colour is a **function** there, so it answers [`is_func_member`] instead.
+fn is_word_member(value: &CssValue<'_>) -> bool {
+    matches!(
+        value,
+        CssValue::Identifier { .. }
+            | CssValue::Color {
+                color: Color::Named | Color::Hex,
+                ..
+            }
+    )
+}
+
+/// Is this member one of prettier's `value-func`s?
+///
+/// ⚠️ A **nameless** group is not: postcss gives `(1.5)` a `value-paren_group`, a node
+/// neither this nor [`is_word_member`] claims, and the whole of the operator-before-group
+/// rule turns on that. A colour *function* is one, tsv having folded it into `Color`.
+fn is_func_member(value: &CssValue<'_>, source: &str) -> bool {
+    match value {
+        CssValue::Function { name_span, .. } => !name_span.extract(source).is_empty(),
+        CssValue::Color {
+            color: Color::Rgb { .. } | Color::Hsl { .. },
+            ..
+        } => true,
+        CssValue::SupportsCondition { .. } => true,
+        _ => false,
+    }
+}
+
+/// Could this member stand where a `font` shorthand's font-size does — prettier's
+/// `isPossibleFontSize`, the operand its `/` carve-out keys on?
+fn is_possible_font_size(value: &CssValue<'_>, source: &str) -> bool {
+    match value {
+        CssValue::Dimension { .. } => true,
+        CssValue::Function { name_span, .. } => {
+            let name = name_span.extract(source);
+            ["var", "calc", "min", "max", "clamp"]
+                .iter()
+                .any(|kw| name.eq_ignore_ascii_case(kw))
+                || name.starts_with("--")
+        }
+        _ => false,
+    }
+}
+
+/// Does the source hold nothing at all between these two members?
+///
+/// prettier's `hasEmptyRawBefore`, read off the document rather than off a `raws` field —
+/// which is the whole of tsv's divergence at a parenthesized group, whose node prettier
+/// synthesizes without one and therefore can only ever read as "not glued". See
+/// [conformance_prettier_css.md §CSS: Values](../../../../docs/conformance_prettier_css.md#css-values).
+fn authored_glued(prev: &CssValue<'_>, next: &CssValue<'_>) -> bool {
+    prev.span().end == next.span().start
+}
 
 impl<'a> Printer<'a> {
     /// Format a CSS value
@@ -48,8 +205,28 @@ impl<'a> Printer<'a> {
     /// builders for each value type. Handles source fidelity by extracting
     /// from source where appropriate.
     pub(super) fn build_css_value_doc(&self, value: &CssValue<'_>) -> DocId {
+        self.build_css_value_doc_in(value, self.value_ctx())
+    }
+
+    /// The value context the printer's own state supplies: the two declaration-scoped
+    /// bits, with `in_calc` left for the recursion to set where it enters one.
+    pub(super) fn value_ctx(&self) -> ValueCtx {
+        ValueCtx {
+            scope: self.value_scope,
+            in_calc: false,
+        }
+    }
+
+    /// [`Self::build_css_value_doc`] carrying the surroundings its separator rule reads
+    /// ([`ValueCtx`]) — an enclosing `calc()` and the `font`/custom-property carve-out.
+    /// Neither is a property of the value, so both ride down the recursion rather than
+    /// being re-derived at each level.
+    pub(super) fn build_css_value_doc_in(&self, value: &CssValue<'_>, ctx: ValueCtx) -> DocId {
         match value {
             CssValue::Identifier { span } => self.build_identifier_doc(*span),
+            // The operator's single byte, verbatim. Whether a space stands beside it is
+            // the enclosing list's question, never this node's (`value_gap_is_glued`).
+            CssValue::Operator { span } => self.d().source_span(*span, self.source),
             CssValue::String { content, span } => self.build_string_doc(content, *span),
             CssValue::Dimension { span, .. } => self.build_dimension_doc(*span),
             CssValue::Color { color, span } => self.build_color_doc(color, *span),
@@ -57,11 +234,11 @@ impl<'a> Printer<'a> {
                 name_span,
                 args,
                 span,
-            } => self.build_value_function_doc(*name_span, args, *span),
+            } => self.build_value_function_doc(*name_span, args, *span, ctx),
             CssValue::SupportsCondition {
                 name, condition, ..
             } => self.build_supports_condition_doc(name, condition),
-            CssValue::List { values, .. } => self.build_separated_values_doc(values, " "),
+            CssValue::List { values, .. } => self.build_value_list_doc(values, ctx),
             CssValue::CommaSeparated { values, span } => {
                 let joined = self.build_separated_values_doc(values, ", ");
                 // Joining N elements writes N-1 commas, so an authored closing comma —
@@ -174,7 +351,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a color value
     ///
     /// Preserves color syntax (hex, rgb, hsl, etc.) from source.
-    fn build_color_doc(&self, color: &crate::ast::internal::Color, span: Span) -> DocId {
+    fn build_color_doc(&self, color: &Color, span: Span) -> DocId {
         // A verbatim named color comes back `Cow::Borrowed` (== source[span]) and is
         // emitted as a zero-allocation `DocText::SourceSpan`, like the identifier /
         // dimension paths; hex and function syntaxes own their reconstructed text.
@@ -226,8 +403,12 @@ impl<'a> Printer<'a> {
         name_span: Span,
         args: &[CssValue<'_>],
         span: Span,
+        ctx: ValueCtx,
     ) -> DocId {
         let d = self.d();
+        // `calc()` is sticky down the whole subtree, which is prettier's
+        // `insideValueFunctionNode(path, "calc")` — an ancestor walk, not a parent test.
+        let ctx = ctx.within_function(self.function_name_is(name_span, "calc"));
         // `url` is opaque whether or not its content was parsed, so it answers first and
         // in one place — the prelude path leaves `@import url(a.css)` unparsed (empty
         // args) while a declaration value parses them, and both want the same verbatim
@@ -341,9 +522,9 @@ impl<'a> Printer<'a> {
             // use fill with line() separators so content can break at operators.
             // Matches prettier's group(indent(fill(parts))) pattern.
             if let CssValue::List { values, .. } = arg {
-                inner_parts.push(self.build_space_fill_value_doc(values));
+                inner_parts.push(self.build_space_fill_value_doc(values, ctx));
             } else {
-                inner_parts.push(self.build_css_value_doc(arg));
+                inner_parts.push(self.build_css_value_doc_in(arg, ctx));
             }
             if i < args.len() - 1 {
                 inner_parts.push(d.text(","));
@@ -384,9 +565,13 @@ impl<'a> Printer<'a> {
     ///     (100vw - var(--a))
     /// )
     /// ```
-    pub(super) fn build_space_fill_value_doc(&self, values: &[CssValue<'_>]) -> DocId {
+    pub(super) fn build_space_fill_value_doc(
+        &self,
+        values: &[CssValue<'_>],
+        ctx: ValueCtx,
+    ) -> DocId {
         let d = self.d();
-        let parts = self.build_space_fill_parts(values);
+        let parts = self.build_space_fill_parts(values, ctx);
         d.group(d.indent(d.fill(&parts)))
     }
 
@@ -437,9 +622,172 @@ impl<'a> Printer<'a> {
         name.as_bytes().contains(&b'\\') && crate::escapes::decodes_to_ascii_ignore_case(name, kw)
     }
 
-    /// Build a doc for a value list joined by `sep` — `" "` for a space-separated
-    /// list (`CssValue::List`), `", "` for a comma-separated one
-    /// (`CssValue::CommaSeparated`).
+    /// The members of a space-separated value list, each gap decided on its own, with
+    /// `separator` standing in every gap that takes one.
+    ///
+    /// **One walk for both shapes**: a flat list spends a `" "` and a wrapping fill spends
+    /// a `line`, and that is the whole of the difference. Spelled twice, the two would
+    /// drift on which gaps exist — the hazard the call-argument printers already paid for
+    /// — and a gap that is a separator in one and glue in the other is a formatter that
+    /// contradicts itself across the print-width boundary.
+    ///
+    /// A glued gap contributes **no part at all**, which is what keeps an operator the
+    /// author glued from becoming a wrap point: `1.5/2.5` is three members and one fill
+    /// item.
+    fn build_value_member_parts(
+        &self,
+        values: &[CssValue<'_>],
+        ctx: ValueCtx,
+        separator: DocId,
+    ) -> DocBuf {
+        let mut parts = DocBuf::with_capacity(values.len() * 2);
+        for (i, value) in values.iter().enumerate() {
+            parts.push(self.build_css_value_doc_in(value, ctx));
+            if i + 1 < values.len() && !self.value_gap_is_glued(values, i, ctx) {
+                parts.push(separator);
+            }
+        }
+        parts
+    }
+
+    /// Build a doc for a space-separated value list — the **flat** spelling of
+    /// [`Self::build_value_member_parts`].
+    pub(super) fn build_value_list_doc(&self, values: &[CssValue<'_>], ctx: ValueCtx) -> DocId {
+        let d = self.d();
+        let parts = self.build_value_member_parts(values, ctx, d.text(" "));
+        d.concat(&parts)
+    }
+
+    /// The same members as `line`-separated fill parts — the **wrapping** spelling.
+    ///
+    /// `[val1, line, val2, line, val3]`, suitable for `DocArena::fill`, used by both
+    /// declaration wrapping and function-argument wrapping.
+    pub(super) fn build_space_fill_parts(&self, values: &[CssValue<'_>], ctx: ValueCtx) -> DocBuf {
+        let d = self.d();
+        self.build_value_member_parts(values, ctx, d.line())
+    }
+
+    /// Does the gap between members `i` and `i + 1` take **no** separator?
+    ///
+    /// prettier's `printCommaSeparatedValueGroup` loop, transcribed for the `css` parser:
+    /// every arm below is one of its `continue`s, in its order, and anything that reaches
+    /// the end takes the default `line`. Its SCSS/Less arms (interpolation, at-words,
+    /// control directives, `~`, property lookups) are dropped — none of those nodes can
+    /// exist here — as is the `url()` arm, whose interior tsv keeps opaque, and the
+    /// `grid` arm, which tsv answers with its own row plan (`grid_multirow_plan`).
+    ///
+    /// ⚠️ One deliberate divergence, and it is in [`authored_glued`]: prettier asks
+    /// `hasEmptyRawBefore`, a field its parser never sets on a synthesized
+    /// `value-paren_group`, so an operator before a group can only ever read as
+    /// un-glued there. tsv asks the document instead, so `1.5/(2.5)` keeps the glue
+    /// `(1.5)/2.5` already keeps. See `docs/conformance_prettier_css.md` §CSS: Values.
+    pub(super) fn value_gap_is_glued(
+        &self,
+        values: &[CssValue<'_>],
+        i: usize,
+        ctx: ValueCtx,
+    ) -> bool {
+        let source = self.source;
+        let current = &values[i];
+        let Some(next) = values.get(i + 1) else {
+            return true;
+        };
+        let previous = i.checked_sub(1).map(|p| &values[p]);
+        let next_next = values.get(i + 2);
+
+        let current_op = ValueOperator::of(current, source);
+        let next_op = ValueOperator::of(next, source);
+
+        // "Ignore colon": the loop contributes no separator on either side of a `:`, and
+        // prettier's `value-colon` node then prints `[":", line]` — so the space belongs
+        // to the colon, not to the gap. ⚠️ The two arms are ORDERED: read the other way
+        // round, a `:` followed by a `:` (`f(a::b)` → `f(a: : b)`) would lose the first
+        // one's space to the second one's "nothing before a colon".
+        if current_op == Some(ValueOperator::Colon) {
+            return false;
+        }
+        if next_op == Some(ValueOperator::Colon) {
+            return true;
+        }
+
+        // A `/` with nothing before it binds to what follows (prettier's
+        // `!iPrevNode && isDivisionNode(iNode)`, written for `-fb-url(/abs/path/)`).
+        if previous.is_none() && current_op == Some(ValueOperator::Division) {
+            return true;
+        }
+
+        let is_word = |v: Option<&CssValue<'_>>| v.is_some_and(is_word_member);
+        let is_func = |v: Option<&CssValue<'_>>| v.is_some_and(|v| is_func_member(v, source));
+        let require_space_before = is_func(next_next)
+            || is_word(next_next)
+            || is_func(Some(current))
+            || is_word(Some(current));
+        let require_space_after =
+            is_func(Some(next)) || is_word(Some(next)) || is_func(previous) || is_word(previous);
+
+        // "Ignore Tailwind `@utility` directive": a word followed by `*` is glued there,
+        // which is the one place a `*` takes no space (`--value(--tab-size-*)`).
+        if ctx.scope.in_utility_at_rule
+            && next_op == Some(ValueOperator::Multiplication)
+            && is_word_member(current)
+        {
+            return true;
+        }
+
+        // "Formatting `/`, `+`, `-` sign". A `*` on either side takes the rule out, and so
+        // does `calc()`, whose own arm follows.
+        let beside_multiplication = current_op == Some(ValueOperator::Multiplication)
+            || next_op == Some(ValueOperator::Multiplication);
+        let sign_keeps_its_gap = (next_op == Some(ValueOperator::Division)
+            && !require_space_before)
+            || (current_op == Some(ValueOperator::Division) && !require_space_after)
+            || (next_op == Some(ValueOperator::Addition) && !require_space_before)
+            || (current_op == Some(ValueOperator::Addition) && !require_space_after)
+            || next_op == Some(ValueOperator::Subtraction)
+            || current_op == Some(ValueOperator::Subtraction);
+        // A run of operators is glued from its first onward even where the author spaced
+        // it — prettier's second disjunct, which reads the operator's own neighbours.
+        let glued = authored_glued(current, next)
+            || (current_op.is_some()
+                && previous.is_none_or(|p| ValueOperator::of(p, source).is_some()));
+        if !beside_multiplication && !ctx.in_calc && sign_keeps_its_gap && glued {
+            return true;
+        }
+
+        // Inside `calc()` a `+` / `-` gap prints exactly as authored: css-values-4
+        // requires whitespace on both sides of those two, so the gap is the difference
+        // between a valid expression and an invalid one and is not a formatter's to move.
+        if ctx.in_calc
+            && (current_op.is_some_and(ValueOperator::is_sum)
+                || next_op.is_some_and(ValueOperator::is_sum))
+            && authored_glued(current, next)
+        {
+            return true;
+        }
+
+        // The `font` shorthand and a custom property keep a glued `/` beside a font-size
+        // operand (prettier's §"Formatting `font` property"). ⚠️ The second arm reads the
+        // gap on the operator's OWN left, not this gap.
+        if ctx.scope.font_shorthand {
+            if next_op == Some(ValueOperator::Division)
+                && authored_glued(current, next)
+                && is_possible_font_size(current, source)
+            {
+                return true;
+            }
+            if current_op == Some(ValueOperator::Division)
+                && previous.is_some_and(|p| authored_glued(p, current))
+                && previous.is_some_and(|p| is_possible_font_size(p, source))
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Build a doc for a value list joined by `sep` — `", "` for a comma-separated list
+    /// (`CssValue::CommaSeparated`), `" "` for the `url()` string-plus-comment region.
     pub(crate) fn build_separated_values_doc(
         &self,
         values: &[CssValue<'_>],

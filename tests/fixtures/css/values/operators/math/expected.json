@@ -1,0 +1,189 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 743,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 734,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 71,
+							"end": 88,
+							"property": "margin",
+							"value": "1.5 * 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 92,
+							"end": 110,
+							"property": "padding",
+							"value": "1.5 * 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 114,
+							"end": 128,
+							"property": "width",
+							"value": "aa * bb"
+						},
+						{
+							"type": "Declaration",
+							"start": 211,
+							"end": 226,
+							"property": "height",
+							"value": "1.5+2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 230,
+							"end": 244,
+							"property": "top",
+							"value": "1.5 + 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 248,
+							"end": 262,
+							"property": "right",
+							"value": "aa + bb"
+						},
+						{
+							"type": "Declaration",
+							"start": 367,
+							"end": 382,
+							"property": "bottom",
+							"value": "1.5-2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 386,
+							"end": 397,
+							"property": "left",
+							"value": "aa-bb"
+						},
+						{
+							"type": "Declaration",
+							"start": 533,
+							"end": 547,
+							"property": "flex",
+							"value": "#fff + 5"
+						},
+						{
+							"type": "Declaration",
+							"start": 551,
+							"end": 564,
+							"property": "order",
+							"value": "#FFF-5"
+						},
+						{
+							"type": "Declaration",
+							"start": 658,
+							"end": 680,
+							"property": "z-index",
+							"value": "calc(1.5+2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 684,
+							"end": 704,
+							"property": "gap",
+							"value": "calc(1.5 + 2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 708,
+							"end": 730,
+							"property": "inset",
+							"value": "calc(1.5 * 2.5)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 734
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " `*` is always spaced, however it was authored ",
+				"start": 17,
+				"end": 68
+			},
+			{
+				"type": "CSSComment",
+				"value": " `+` keeps a glued pair glued, and spaces one whose neighbour is a word ",
+				"start": 132,
+				"end": 208
+			},
+			{
+				"type": "CSSComment",
+				"value": " a run that starts with an ident character absorbs `-`, so `-` never\n\t\topens a gap of its own ",
+				"start": 266,
+				"end": 364
+			},
+			{
+				"type": "CSSComment",
+				"value": " `+` ends the run, so the hex colour before it is a colour and folds;\n\t\t`-` does not, so the same run stays one opaque token ",
+				"start": 401,
+				"end": 530
+			},
+			{
+				"type": "CSSComment",
+				"value": " inside calc() a glued `+` or `-` is kept as authored, where `*` is\n\t\tstill spaced ",
+				"start": 568,
+				"end": 655
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 735,
+			"styles": "\n\tdiv {\n\t\t/* `*` is always spaced, however it was authored */\n\t\tmargin: 1.5 * 2.5;\n\t\tpadding: 1.5 * 2.5;\n\t\twidth: aa * bb;\n\t\t/* `+` keeps a glued pair glued, and spaces one whose neighbour is a word */\n\t\theight: 1.5+2.5;\n\t\ttop: 1.5 + 2.5;\n\t\tright: aa + bb;\n\t\t/* a run that starts with an ident character absorbs `-`, so `-` never\n\t\topens a gap of its own */\n\t\tbottom: 1.5-2.5;\n\t\tleft: aa-bb;\n\t\t/* `+` ends the run, so the hex colour before it is a colour and folds;\n\t\t`-` does not, so the same run stays one opaque token */\n\t\tflex: #fff + 5;\n\t\torder: #FFF-5;\n\t\t/* inside calc() a glued `+` or `-` is kept as authored, where `*` is\n\t\tstill spaced */\n\t\tz-index: calc(1.5+2.5);\n\t\tgap: calc(1.5 + 2.5);\n\t\tinset: calc(1.5 * 2.5);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 744,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

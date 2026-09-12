@@ -1,0 +1,208 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 941,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 932,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 138,
+							"end": 153,
+							"property": "margin",
+							"value": "1.5/2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 157,
+							"end": 175,
+							"property": "padding",
+							"value": "1.5 / 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 179,
+							"end": 194,
+							"property": "width",
+							"value": "1.5 /2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 198,
+							"end": 214,
+							"property": "height",
+							"value": "1.5/ 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 339,
+							"end": 350,
+							"property": "top",
+							"value": "a/1.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 354,
+							"end": 369,
+							"property": "left",
+							"value": "#FFF/1.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 443,
+							"end": 458,
+							"property": "right",
+							"value": "1.5 / aa"
+						},
+						{
+							"type": "Declaration",
+							"start": 462,
+							"end": 482,
+							"property": "bottom",
+							"value": "1.5 / f(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 486,
+							"end": 504,
+							"property": "flex",
+							"value": "f(2.5) / 1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 605,
+							"end": 631,
+							"property": "border-width",
+							"value": "1.5/2.5 / aa"
+						},
+						{
+							"type": "Declaration",
+							"start": 671,
+							"end": 695,
+							"property": "outline-width",
+							"value": "1.5px/2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 745,
+							"end": 761,
+							"property": "column-gap",
+							"value": "/1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 901,
+							"end": 913,
+							"property": "font",
+							"value": "1.5/aa"
+						},
+						{
+							"type": "Declaration",
+							"start": 917,
+							"end": 928,
+							"property": "--a",
+							"value": "1.5/aa"
+						}
+					]
+				},
+				"start": 9,
+				"end": 932
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a `/` between two numbers is an operator: both sides normalize and the\n\t\tauthored gap is kept exactly as written ",
+				"start": 17,
+				"end": 135
+			},
+			{
+				"type": "CSSComment",
+				"value": " a run that starts with an ident character absorbs the `/`, so it is one\n\t\ttoken and nothing inside it normalizes ",
+				"start": 218,
+				"end": 336
+			},
+			{
+				"type": "CSSComment",
+				"value": " a word or a function on either side of the operator spaces it ",
+				"start": 373,
+				"end": 440
+			},
+			{
+				"type": "CSSComment",
+				"value": " the rule is per pair, so one chain can be glued at one operator and\n\t\tspaced at the next ",
+				"start": 508,
+				"end": 602
+			},
+			{
+				"type": "CSSComment",
+				"value": " a unit ends at the operator ",
+				"start": 635,
+				"end": 668
+			},
+			{
+				"type": "CSSComment",
+				"value": " a leading `/` takes no space after it ",
+				"start": 699,
+				"end": 742
+			},
+			{
+				"type": "CSSComment",
+				"value": " the `font` shorthand and a custom property keep a glued `/` beside a\n\t\tnumber, a var(), a calc(), a min(), a max() or a clamp() ",
+				"start": 765,
+				"end": 898
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 933,
+			"styles": "\n\tdiv {\n\t\t/* a `/` between two numbers is an operator: both sides normalize and the\n\t\tauthored gap is kept exactly as written */\n\t\tmargin: 1.5/2.5;\n\t\tpadding: 1.5 / 2.5;\n\t\twidth: 1.5 /2.5;\n\t\theight: 1.5/ 2.5;\n\t\t/* a run that starts with an ident character absorbs the `/`, so it is one\n\t\ttoken and nothing inside it normalizes */\n\t\ttop: a/1.50;\n\t\tleft: #FFF/1.50;\n\t\t/* a word or a function on either side of the operator spaces it */\n\t\tright: 1.5 / aa;\n\t\tbottom: 1.5 / f(2.5);\n\t\tflex: f(2.5) / 1.5;\n\t\t/* the rule is per pair, so one chain can be glued at one operator and\n\t\tspaced at the next */\n\t\tborder-width: 1.5/2.5 / aa;\n\t\t/* a unit ends at the operator */\n\t\toutline-width: 1.5px/2.5;\n\t\t/* a leading `/` takes no space after it */\n\t\tcolumn-gap: /1.5;\n\t\t/* the `font` shorthand and a custom property keep a glued `/` beside a\n\t\tnumber, a var(), a calc(), a min(), a max() or a clamp() */\n\t\tfont: 1.5/aa;\n\t\t--a: 1.5/aa;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 942,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

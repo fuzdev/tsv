@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 443,
+		"end": 444,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 434,
+					"end": 435,
 					"children": [
 						{
 							"type": "Declaration",
@@ -113,14 +113,14 @@
 						{
 							"type": "Declaration",
 							"start": 410,
-							"end": 430,
+							"end": 431,
 							"property": "bottom",
-							"value": "(a b c\\ )(d)"
+							"value": "(a b c\\ ) (d)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 434
+				"end": 435
 			}
 		],
 		"comments": [
@@ -147,14 +147,14 @@
 		],
 		"content": {
 			"start": 7,
-			"end": 435,
-			"styles": "\n\tdiv {\n\t\twidth: 50px\\ ;\n\t\theight: var(--a, 50px\\ );\n\t\tmargin: calc(1px\\ );\n\t\ttop: calc\\ (1px);\n\t\tcolor: a\\ b;\n\t\tpadding: var(--b, x\\,y);\n\t\tgap: a, b\\,;\n\t\tinset: a\\+b;\n\t\t/* the whitespace normalizer's own delimiter strips reach the payload too: a value\n\t\tthe comment path re-emits from source, and a paren shell the value parser left opaque */\n\t\tleft: (1px\\ ) /* c */;\n\t\tright: f(1px\\ , 2px) /* c */;\n\t\tbottom: (a b c\\ )(d);\n\t}\n",
+			"end": 436,
+			"styles": "\n\tdiv {\n\t\twidth: 50px\\ ;\n\t\theight: var(--a, 50px\\ );\n\t\tmargin: calc(1px\\ );\n\t\ttop: calc\\ (1px);\n\t\tcolor: a\\ b;\n\t\tpadding: var(--b, x\\,y);\n\t\tgap: a, b\\,;\n\t\tinset: a\\+b;\n\t\t/* the whitespace normalizer's own delimiter strips reach the payload too: a value\n\t\tthe comment path re-emits from source, and a paren shell the value parser left opaque */\n\t\tleft: (1px\\ ) /* c */;\n\t\tright: f(1px\\ , 2px) /* c */;\n\t\tbottom: (a b c\\ ) (d);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 444,
+	"end": 445,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

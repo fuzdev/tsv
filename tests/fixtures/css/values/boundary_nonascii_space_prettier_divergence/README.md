@@ -25,18 +25,23 @@ content: <NBSP> 'z';
 ```
 
 For an **identifier** value (`font-family: <NBSP>q`) prettier keeps it glued, so tsv
-**matches** prettier there. A **function** value diverges on one side only: led by the
-space (`<NBSP>calc(1px)`) prettier keeps it glued, trailed by one (`calc(1px)<NBSP>`) it
-splits the space off as its own word and inserts a space (`calc(1px) <NBSP>`), while tsv
-keeps both glued:
+**matches** prettier there. A **function** value is glued on one side and split on the
+other, and tsv now answers it the same way: led by the space (`<NBSP>calc(1px)`) the run
+is one token and stays glued, trailed by one (`calc(1px)<NBSP>`) the `)` ends the member
+and the space is a member of its own, so a separator stands between them. The two cells
+below therefore **match** prettier:
 
 ```
-width: calc(1px)<NBSP>;
-height: <NBSP>calc(1px)<NBSP>;
+width: calc(1px) <NBSP>;
+height: <NBSP>calc(1px) <NBSP>;
 ```
 
-So the string cases and the function-trailing case diverge. tsv is the more defensible
-side on those: it does not split adjacent glued value tokens, so the run stays one token
+That is not a special case for this character — it is the ordinary member gap every
+closed run takes (`(1.5)(2.5)` → `(1.5) (2.5)`), and the distinction from the identifier
+row is postcss's too: `q<NBSP>` is one word where `calc(1px)` is a function with a word
+after it. See [operators/paren_group_boundary](../operators/paren_group_boundary/).
+
+So only the string cases diverge. tsv is the more defensible side on those: it does not split adjacent glued value tokens, so the run stays one token
 and its bytes are preserved verbatim — the same lossless form it emits for the pure-ASCII
 analog `content: a'y'` (tsv keeps `a'y'`; prettier splits to `a 'y'`) and for the list
 case above. Both formatters keep their own output idempotent.

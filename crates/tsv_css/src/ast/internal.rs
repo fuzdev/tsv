@@ -561,6 +561,18 @@ pub enum CssValue<'arena> {
         span: Span,
     },
 
+    /// A value **operator** token — `/`, `*`, `+`, `-` or `:` — split out of a run by
+    /// `parser::value::operators::split_value_run`.
+    ///
+    /// The byte is recovered from `span` at print time (span-for-verbatim, like
+    /// `Identifier`), so the variant stores only where it is. Its *kind* is read back off
+    /// that byte by the printer's separator rule
+    /// (`printer::values::ValueOperator::at`), which is the only consumer that needs it.
+    ///
+    /// An operator is never a value in its own right: it exists only as a member of the
+    /// `List` its run was flattened into, beside the operands it joins.
+    Operator { span: Span },
+
     /// Space-separated list of values
     List {
         values: &'arena [CssValue<'arena>],
@@ -579,6 +591,7 @@ impl CssValue<'_> {
     pub fn span(&self) -> Span {
         match self {
             CssValue::Identifier { span, .. } => *span,
+            CssValue::Operator { span, .. } => *span,
             CssValue::String { span, .. } => *span,
             CssValue::Dimension { span, .. } => *span,
             CssValue::Color { span, .. } => *span,
