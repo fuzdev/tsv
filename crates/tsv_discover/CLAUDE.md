@@ -6,7 +6,8 @@
 The single home of the decisions `tsv format`'s directory walk makes: the
 always-pruned safety nets, the build-output heuristic, the formattable-extension
 check, the heuristic-shadow warning, the `.prettierignore`-shadowed warning, the
-`.prettierignore`-outside-a-repo warning, and the gate on a path an argument names
+`.prettierignore`-outside-a-repo warning, the symlinked-`.gitignore` warning, the
+unresolvable-root error, and the gate on a path an argument names
 (`excluded_argument_warning`). The three discovery surfaces — the
 native CLI (`tsv_cli`), the WASM CLI (`crates/tsv_wasm/npm/cli.js`), and the VS
 Code extension — call into it instead of reimplementing the decision, so they
@@ -63,6 +64,9 @@ crates (the open-convention stance):
   the same line ("No parser could be inferred"). The extension list in the message
   renders from `FORMATTABLE_EXTENSIONS`, so a new language flows through; the text
   is produced once here, like `heuristic_shadow_warning`.
+- `formattable_extension_list(separator)` — the extension set rendered as prose
+  (`".ts, .mts, …"`), the one spelling behind every message that lists it (the
+  refusal above, the CLI's nothing-in-scope error).
 - `is_safety_net(name)` — whether a directory name is an always-pruned safety net.
   A **complete, context-free** decision (safety nets prune in every mode, no
   override), so a caller walking its own tree can short-circuit before building an
@@ -125,11 +129,17 @@ crates (the open-convention stance):
   excludes, whether or not a `.gitignore` does too — skipped quietly, as prettier skips
   it, since a pre-commit hook would otherwise warn about such a file on every commit that
   stages it. Every other exclusion warns, naming the file the rule sits in
-  (`IgnoreStack::exclusion`'s `IgnoreSource` and `anchor_depth`). A tsv rule excluding
-  the path at all is the one named (`IgnoreStack::tsv_exclusion`, preferred over the
+  (`IgnoreStack::exclusion`'s `IgnoreSource` and `anchor_depth`). A tsv rule that
+  bounds the path is the one named (`IgnoreStack::tsv_exclusion`, preferred over the
   whole stack's witness), since re-including past a `.gitignore` would leave it standing
   — and, added to the same file, override it; a tsv rule excluding a directory is the
-  user's to narrow. A path only a `.gitignore` excludes gets the anchored lines that
+  user's to narrow. When a `.gitignore` excludes an ancestor *above* the directory the
+  tsv rule excludes, the tsv rule is not what bounds the path (narrowing it leaves the
+  ancestor excluded, and every `!` under an excluded directory is inert), so the
+  `.gitignore` exclusion is named and undone and the tsv rule is named after it —
+  overridden by those lines when it sits in the root's own tsv file (a later line wins
+  there), the second blocker to narrow when it sits in a deeper one — one warning naming
+  both, never a second warning after the first remedy. A path only a `.gitignore` excludes gets the anchored lines that
   re-include it and nothing beside it (`!/build/`, `/build/*`, `!/build/a.ts`), every
   path spelled literally (`pattern_path` escapes `*`, `?`, `[`, `]`, `\` and trailing
   spaces, so a `[slug]` directory is no character class), for the file the repo root
@@ -157,6 +167,15 @@ crates (the open-convention stance):
   and outside a repo (format root = filesystem root) in any file, while an unanchored
   one-segment `!dist/` re-includes a `dist` at every depth. `loose_root` is
   `excluded_argument_warning`'s. Produced once here; both bindings fetch it directly.
+- `gitignore_symlink_warning(path) -> String` — the warning for an in-tree `.gitignore`
+  that is a symbolic link: git never reads one in a working tree (gitignore(5)), so its
+  rules are dropped and the build-output heuristic stays on for its subtree, which the
+  warning is what makes visible. `.formatignore`/`.prettierignore` keep reading through
+  links, as prettier does.
+- `unresolvable_root_error(root) -> String` — the traversal error for a relative
+  directory root that cannot be made absolute because the working directory itself is
+  gone: walked anyway it would anchor on no format root and read no ancestor's ignore
+  files, silently widening the scope, so the walk refuses it.
 - `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
   has_formatignore) -> Option<String>` — the heads-up when, **outside a git
   repo**, a `.prettierignore` sits in the **target root** with no sibling
@@ -204,14 +223,17 @@ crates (the open-convention stance):
   `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
   has_formatignore) -> string | undefined`, and the sibling
   `prettierignore_shadowed_warning(dir, in_repo, has_prettierignore,
-  has_formatignore) -> string | undefined`. The string-tag encoding
+  has_formatignore) -> string | undefined`, and `gitignore_symlink_warning(path) ->
+  string`. The string-tag encoding
   (rather than a wasm-bindgen enum or a returned struct) needs no
   `patch_npm_package.ts` change and allocates no JS class on the common
   descend path; the `prune_warn` arm fetches the text via the separate method.
-  `npm/cli.js` calls the per-directory `classify_dir` (it does a real walk) and
-  the per-argument `unsupported_extension_error` (through a throwaway stack — the
-  receiver is unused, an argument check running before any matcher exists), and
-  keeps no policy *decision* of its own (the literal extension list does appear in its help/error text, hand-mirrored from the native CLI — the decision stays here).
+  `npm/cli.js` does a real walk, so it calls the per-directory `classify_dir` /
+  `should_format_file` and every warning producer above (`heuristic_shadow_warning`,
+  both `.prettierignore` ones, `gitignore_symlink_warning`,
+  `excluded_argument_warning`), plus the per-argument `unsupported_extension_error`
+  (through a throwaway stack — the receiver is unused, an argument check running
+  before any matcher exists), and keeps no policy *decision* of its own (the literal extension list does appear in its help/error text, hand-mirrored from the native CLI — the decision stays here).
 - **VS Code extension** (`vscode_extension_tsv_format`) — assembles an
   `IgnoreStack` per open document and calls `is_ignored(rel, false) ||
   is_path_pruned(rel)`. It has no directory walk, so `is_path_pruned` is its entry

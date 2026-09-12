@@ -41,6 +41,7 @@
 //! assert!(should_format_file("app.ts", "src/app.ts", &stack));
 //! ```
 
+use std::fmt::Write as _;
 use std::path::Path;
 use tsv_ignore::{IgnoreSource, IgnoreStack};
 
@@ -119,6 +120,7 @@ pub fn is_formattable(name: &str) -> bool {
 /// native CLI and the WASM CLI emit the identical text. `parse <file>` refuses with
 /// the same message (the parser dispatch behind a path is the same one), which is
 /// why it says what tsv *handles* rather than what it formats.
+#[must_use]
 pub fn unsupported_extension_error(path: &str) -> Option<String> {
     (!is_formattable(path)).then(|| {
         let list = formattable_extension_list(", ");
@@ -285,6 +287,7 @@ pub fn is_path_pruned(rel: &str, stack: &IgnoreStack) -> bool {
 /// re-include under a directory a rule excludes is as inert, but that warning would name
 /// the heuristic as the cause. `stack` is [`is_path_pruned`]'s; `loose_root` is
 /// [`heuristic_shadow_warning`]'s.
+#[must_use]
 pub fn path_heuristic_shadow_warning(
     rel: &str,
     loose_root: Option<&str>,
@@ -375,6 +378,7 @@ pub fn should_format_file(name: &str, child_rel: &str, stack: &IgnoreStack) -> b
 /// is [`excluded_argument_warning`]'s, the format root's display path outside a git
 /// repo. Produced **once**, here, so the native CLI and the WASM binding emit the
 /// identical text.
+#[must_use]
 pub fn heuristic_shadow_warning(
     d: &str,
     loose_root: Option<&str>,
@@ -420,6 +424,7 @@ pub fn heuristic_shadow_warning(
 /// so this costs no extra filesystem access. Produced **once**, here, like
 /// `heuristic_shadow_warning`, so the native CLI and the WASM binding emit the
 /// identical text.
+#[must_use]
 pub fn prettierignore_outside_repo_warning(
     dir: &str,
     in_repo: bool,
@@ -446,6 +451,7 @@ pub fn prettierignore_outside_repo_warning(
 /// warns — rare, and the fix still applies), so it costs no extra filesystem
 /// access. Both decision and text live here, so the native CLI and WASM binding
 /// stay in lockstep. Same argument order as `prettierignore_outside_repo_warning`.
+#[must_use]
 pub fn prettierignore_shadowed_warning(
     dir: &str,
     in_repo: bool,
@@ -470,6 +476,7 @@ pub fn prettierignore_shadowed_warning(
 /// own path. The tsv layer (`.formatignore` / `.prettierignore`) keeps reading through
 /// links, as prettier does, so only this name takes the warning. Produced **once**, here,
 /// so the native CLI and the WASM binding emit the identical text.
+#[must_use]
 pub fn gitignore_symlink_warning(path: &str) -> String {
     format!(
         "{path} is a symbolic link, which git does not follow in a working tree; its ignore rules are not applied"
@@ -482,6 +489,7 @@ pub fn gitignore_symlink_warning(path: &str) -> String {
 /// ancestors' ignore files, silently widening the scope, so the walk refuses it instead.
 /// `root` is the argument as given. Produced **once**, here, so the native CLI and the
 /// WASM binding emit the identical text.
+#[must_use]
 pub fn unresolvable_root_error(root: &str) -> String {
     format!("{root}: cannot resolve a relative path: the working directory is unavailable")
 }
@@ -504,9 +512,16 @@ pub fn unresolvable_root_error(root: &str) -> String {
 /// touches one. Every other exclusion warns — a `.gitignore` rule is about version
 /// control, so one excluding a named file is a surprise, and a named directory is a scope
 /// someone typed — naming the file whose rule did it and how to undo it. A tsv rule is the
-/// user's to narrow, and is the one named wherever it excludes the path at all
+/// user's to narrow, and is the one named wherever it is what bounds the path
 /// ([`IgnoreStack::tsv_exclusion`]): re-including the path past a `.gitignore` would leave
-/// that rule standing, and, added to the same file, override it. A path only a
+/// that rule standing, and, added to the same file, override it. Where a `.gitignore`
+/// excludes an ancestor directory *above* the one the tsv rule excludes, the tsv rule is
+/// not what bounds the path — narrowing it leaves the ancestor excluded, and git's
+/// parent-directory rule keeps every `!` under an excluded directory inert — so the
+/// `.gitignore` exclusion is the one named and undone, and the tsv rule is named after it:
+/// overridden by those lines when it sits in the root's own tsv file (a later line wins
+/// there), the second blocker to narrow when it sits in a deeper one — one warning
+/// stating both, not one per rerun. A path only a
 /// `.gitignore` excludes gets the lines that re-include it and nothing beside it
 /// ([`reinclude_lines`]), for the repo root's own tsv file (read after every `.gitignore`,
 /// so its `!` wins; its `.prettierignore` where that is the file the root reads, since a
@@ -522,6 +537,7 @@ pub fn unresolvable_root_error(root: &str) -> String {
 /// filesystem root and a path is named absolutely; inside one it is `None`, and paths read
 /// relative to the repo root. Produced **once**, here, so the native CLI and the WASM
 /// binding emit the identical text.
+#[must_use]
 pub fn excluded_argument_warning(
     display: &str,
     rel: &str,
@@ -529,27 +545,36 @@ pub fn excluded_argument_warning(
     loose_root: Option<&str>,
     stack: &IgnoreStack,
 ) -> Option<String> {
-    let exclusion = stack
-        .tsv_exclusion(rel, is_dir)
-        .or_else(|| stack.exclusion(rel, is_dir))?;
-    let by_gitignore = exclusion.source == IgnoreSource::Gitignore;
-    if !is_dir && !by_gitignore {
+    let exclusion = stack.exclusion(rel, is_dir)?;
+    let tsv_exclusion = stack.tsv_exclusion(rel, is_dir);
+    // a named file a tsv rule excludes is a deliberate opt-out, skipped quietly, whether
+    // or not a `.gitignore` excludes it too
+    if !is_dir && tsv_exclusion.is_some() {
         return None;
     }
+    // The rule to name is a tsv rule excluding the path over the `.gitignore` rule that
+    // excludes it first (re-including past the `.gitignore` would leave the tsv rule
+    // standing) — but only where that tsv rule is what bounds the path. A `.gitignore`
+    // excluding an ANCESTOR the tsv rule sits under bounds it on its own: narrowing the
+    // tsv rule leaves the ancestor excluded, and no `!` under an excluded directory can
+    // reach the path (git's parent-directory rule), so that exclusion is the one to undo,
+    // and the tsv rule is named as the second blocker rather than the only one.
+    let (named, also_tsv) = match tsv_exclusion {
+        Some(tsv) if exclusion.depth < tsv.depth => (exclusion, Some(tsv)),
+        Some(tsv) => (tsv, None),
+        None => (exclusion, None),
+    };
+    let by_gitignore = named.source == IgnoreSource::Gitignore;
     let segments = tsv_ignore::split_segments(rel);
     let consequence = if is_dir {
         "so nothing under it is formatted"
     } else {
         "so it is not formatted"
     };
-    let rule_file = ignore_file_display(
-        &segments[..exclusion.anchor_depth],
-        exclusion.source,
-        loose_root,
-    );
-    let remedy = if !by_gitignore {
+    let rule_file = ignore_file_display(&segments[..named.anchor_depth], named.source, loose_root);
+    let mut remedy = if !by_gitignore {
         "narrow or negate that rule to format it".to_string()
-    } else if let Some(lines) = reinclude_lines(&segments, exclusion.depth, is_dir) {
+    } else if let Some(lines) = reinclude_lines(&segments, named.depth, is_dir) {
         let root_file = stack
             .tsv_layer_source("")
             .unwrap_or(IgnoreSource::Formatignore)
@@ -567,10 +592,31 @@ pub fn excluded_argument_warning(
         "no ignore-file line can hold the line break in its path, so narrow that rule to format it"
             .to_string()
     };
-    Some(if exclusion.depth == segments.len() {
+    if let Some(tsv) = also_tsv {
+        let tsv_file = ignore_file_display(&segments[..tsv.anchor_depth], tsv.source, loose_root);
+        let excluded = if tsv.depth == segments.len() {
+            "it".to_string()
+        } else {
+            path_display(&segments[..tsv.depth], loose_root)
+        };
+        // the lines go to the root's own tsv file, where a later line wins: a tsv rule in
+        // that file is overridden by them, one in a deeper file is not and stays to narrow
+        if tsv.anchor_depth == 0 {
+            let _ = write!(
+                remedy,
+                ", which also override the rule in {tsv_file} that excludes {excluded}"
+            );
+        } else {
+            let _ = write!(
+                remedy,
+                ", and narrow or negate the rule in {tsv_file} that excludes {excluded} too"
+            );
+        }
+    }
+    Some(if named.depth == segments.len() {
         format!("{display} is excluded by a rule in {rule_file}, {consequence}; {remedy}")
     } else {
-        let dir = path_display(&segments[..exclusion.depth], loose_root);
+        let dir = path_display(&segments[..named.depth], loose_root);
         format!(
             "{display} is inside {dir}, which a rule in {rule_file} excludes, {consequence}; {remedy}"
         )
@@ -666,7 +712,10 @@ fn ignore_file_display(dir: &[&str], source: IgnoreSource, loose_root: Option<&s
 /// Format-root-relative segments as a user reads them: `/`-joined inside a repo, where
 /// the format root is the repo root, and joined onto `loose_root` outside one, where the
 /// format root is the filesystem root and the relative form would read as a path under
-/// the working directory.
+/// the working directory. The separator is read off `loose_root`'s own spelling — a
+/// backslash anywhere in it means a Windows root — which is sound only because every
+/// caller passes the FILESYSTEM root (`/`, `C:\`), never a directory whose name could
+/// hold a backslash on posix.
 fn path_display(segments: &[&str], loose_root: Option<&str>) -> String {
     let Some(root) = loose_root else {
         return segments.join("/");
@@ -1124,18 +1173,49 @@ mod tests {
         // and, added to the same file, override it — so a file it excludes stays quiet and
         // a directory names it
         let mut stack = IgnoreStack::new();
-        stack.push_gitignore("", "vendor/\n");
+        stack.push_gitignore("", "vendor/\nsame/\n");
         stack.push_gitignore("pkg", "out/\n");
-        stack.push_formatignore("", "vendor/x.ts\nvendor/lib/\n");
+        stack.push_formatignore("", "vendor/x.ts\nvendor/lib/\nsame/\n");
         stack.push_formatignore("pkg", "out/*.ts\n");
         let warn = |rel, is_dir| excluded_argument_warning(rel, rel, is_dir, None, &stack);
         assert_eq!(warn("vendor/x.ts", false), None);
         assert_eq!(warn("pkg/out/a.ts", false), None);
+        // a named file a tsv rule excludes only through an ancestor is quiet too
+        assert_eq!(warn("vendor/lib/z.ts", false), None);
+        // the `.gitignore` excludes `vendor` ABOVE the tsv rule's `vendor/lib`: narrowing
+        // the tsv rule alone leaves `vendor` excluded and every `!` under it inert, so the
+        // warning undoes the `.gitignore` exclusion and names the tsv rule as the second
+        // blocker — one warning, not a second one after the first remedy is followed
         assert_eq!(
             warn("vendor/lib", true).as_deref(),
             Some(
-                "vendor/lib is excluded by a rule in the repo-root .formatignore, so nothing under it is formatted; narrow or negate that rule to format it"
+                "vendor/lib is inside vendor, which a rule in the repo-root .gitignore excludes, so nothing under it is formatted; re-include it by adding `!/vendor/`, `/vendor/*` and `!/vendor/lib/`, in that order, to the repo-root .formatignore, which also override the rule in the repo-root .formatignore that excludes it"
             )
+        );
+        // a tsv rule at the `.gitignore` rule's own depth is what bounds the path (a `!`
+        // there re-includes past both), and is the one named
+        assert_eq!(
+            warn("same", true).as_deref(),
+            Some(
+                "same is excluded by a rule in the repo-root .formatignore, so nothing under it is formatted; narrow or negate that rule to format it"
+            )
+        );
+        // a tsv rule excluding a directory BETWEEN the `.gitignore`'d ancestor and the
+        // path names that directory as what it excludes
+        assert!(warn("vendor/lib/deep", true).is_some_and(|warning| warning.ends_with(
+            "to the repo-root .formatignore, which also override the rule in the repo-root .formatignore that excludes vendor/lib"
+        )));
+        // a tsv rule in a DEEPER file is not overridden by lines in the root's, so it
+        // stays the user's to narrow, and is named as the second blocker
+        let mut deeper = IgnoreStack::new();
+        deeper.push_gitignore("", "pkg/vendor/\n");
+        deeper.push_formatignore("", "");
+        deeper.push_formatignore("pkg", "vendor/lib/\n");
+        assert!(
+            excluded_argument_warning("pkg/vendor/lib", "pkg/vendor/lib", true, None, &deeper)
+                .is_some_and(|warning| warning.ends_with(
+                    "to the repo-root .formatignore, and narrow or negate the rule in pkg/.formatignore that excludes it too"
+                ))
         );
         // a path only a `.gitignore` excludes still gets the lines that re-include it
         assert!(

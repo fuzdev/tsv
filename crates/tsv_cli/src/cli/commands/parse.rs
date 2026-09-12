@@ -1,4 +1,4 @@
-use crate::cli::input::{InputArgs, ParserType};
+use crate::cli::input::{InputArgs, ParserType, check_source_type_language, parse_source_type_arg};
 use crate::cli::out::{exit_with_error, write_stdout};
 use crate::json_utils::indent_json_with_tabs;
 use argh::FromArgs;
@@ -25,7 +25,8 @@ pub struct ParseCommand {
 
     /// parse goal for TypeScript: script | module (default: module). `script`
     /// parses a standalone script — `await` is an ordinary identifier and
-    /// `import`/`export`/`import.meta` are errors; the script is sloppy unless a
+    /// top-level `import`/`export`, `for await` and `import.meta` are errors; the
+    /// script is sloppy unless a
     /// `"use strict"` directive prologue says otherwise. TypeScript only — an error
     /// with svelte/css.
     #[argh(option)]
@@ -87,44 +88,6 @@ impl ParseCommand {
         write_stdout(&json);
         write_stdout(b"\n");
     }
-}
-
-/// Parse the `--source-type` argument into a [`tsv_ts::Goal`]. Absent stays
-/// **absent** — `module`/`script` map to the goals, and what an unnamed source
-/// type means is the caller's to decide: `parse` reads it as `Module` (the wire's
-/// `Program.sourceType` is a claim, so one grammar produces it), `format` as the
-/// module-then-script fallback. Shared by both.
-pub(crate) fn parse_source_type_arg(
-    source_type: Option<&str>,
-) -> Result<Option<tsv_ts::Goal>, String> {
-    match source_type {
-        None => Ok(None),
-        Some(s) => tsv_ts::Goal::from_source_type(s)
-            .map(Some)
-            .ok_or_else(|| format!("invalid --source-type '{s}' (expected 'script' or 'module')")),
-    }
-}
-
-/// Refuse a `--source-type` on a language that has no goal axis. Svelte hard-wires
-/// `Module` and CSS has no goal, so a caller naming one there asked for something
-/// that cannot be honored and must be told — the stance every binding takes
-/// (`tsv_wasm`'s `read_options`, `tsv_ffi`'s `ffi_source_type`, `tsv_napi`), so the
-/// CLI is not the one surface where the flag is silently dropped — the JS mirror
-/// (`crates/tsv_wasm/npm/cli.js`, the bin of both npm CLIs) carries the same
-/// refusal word for word, so the two shipped `tsv` bins cannot drift. Shared by
-/// `parse` and `format`; the flag's *value* is validated ahead of this by
-/// `parse_source_type_arg`, so this only asks whether it was named at all.
-pub(crate) fn check_source_type_language(
-    source_type: Option<&str>,
-    parser_type: ParserType,
-) -> Result<(), String> {
-    if source_type.is_some() && parser_type != ParserType::TypeScript {
-        return Err(format!(
-            "--source-type is only supported for typescript (the {} parser has no source type)",
-            parser_type.name()
-        ));
-    }
-    Ok(())
 }
 
 fn parse_to_json(

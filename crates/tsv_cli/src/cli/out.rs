@@ -53,7 +53,9 @@
 //! output that does come through here is `clamp_worker_count`'s `--jobs` warning,
 //! because that function is this crate's.
 
+use std::borrow::Cow;
 use std::io::{self, Write};
+use std::path::Path;
 use std::time::Duration;
 
 /// The first wait after a `WouldBlock` — about what a fast consumer takes to drain a
@@ -78,6 +80,22 @@ pub fn write_stdout(bytes: &[u8]) {
 /// calling it directly.
 pub fn write_stderr(bytes: &[u8]) {
     write_or_stop(&mut io::stderr().lock(), bytes, "stderr");
+}
+
+/// A path as the bytes it has, for a stdout listing: `Path::display` spells a non-UTF-8
+/// name with U+FFFD, and the changed-path report and `--list` are for scripting over,
+/// so a line there must name the file on disk. Unix paths are bytes; elsewhere the
+/// lossy spelling is the only one there is. Diagnostics on stderr keep `display`.
+pub fn path_bytes(path: &Path) -> Cow<'_, [u8]> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        Cow::Borrowed(path.as_os_str().as_bytes())
+    }
+    #[cfg(not(unix))]
+    {
+        Cow::Owned(path.to_string_lossy().into_owned().into_bytes())
+    }
 }
 
 /// Print `message` as one stderr line and exit with `code` — the shape every

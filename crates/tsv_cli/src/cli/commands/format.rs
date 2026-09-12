@@ -1,14 +1,12 @@
-use crate::cli::commands::parse::{check_source_type_language, parse_source_type_arg};
 use crate::cli::discover::{
     Diagnostics, Discovered, FileSink, discover_files, discover_into, path_sort_key,
 };
 use crate::cli::format_source::{format_source_in, format_source_with_source_type};
-use crate::cli::input::{InputArgs, ParserType};
-use crate::cli::out::{exit_with_error, write_stdout};
+use crate::cli::input::{InputArgs, ParserType, check_source_type_language, parse_source_type_arg};
+use crate::cli::out::{exit_with_error, path_bytes, write_stdout};
 use crate::cli::stack::{clamp_worker_count, sized_thread};
 use crate::err_line;
 use argh::FromArgs;
-use std::fmt::Write as _;
 use std::fs;
 use std::num::NonZeroUsize;
 use std::panic::{self, AssertUnwindSafe};
@@ -58,7 +56,7 @@ pub struct FormatCommand {
     #[argh(switch)]
     list: bool,
 
-    /// worker thread count (default: 1.5x physical cores; explicit values capped at 4x logical)
+    /// worker thread count (default: sized to this machine, at most 1.5x physical cores; explicit values capped at 4x logical)
     #[argh(option)]
     jobs: Option<usize>,
 
@@ -82,7 +80,9 @@ const WORKER_PANICKED: &str = "worker thread panicked";
 /// What either path-mode route hands back: the in-scope files with their outcomes,
 /// index-aligned and in sorted-path order, plus how many traversal errors the walk
 /// reported (counted into the summary's error total; the messages were already
-/// printed). The caller cannot tell which route produced it.
+/// printed). The caller cannot tell which route produced it — save for one ordering
+/// on stderr: the collected route reports the walk's diagnostics before any file is
+/// formatted, the streamed one after the last is, since its walk runs beside the pool.
 struct Formatted {
     files: Vec<PathBuf>,
     outcomes: Vec<FileOutcome>,
@@ -193,11 +193,12 @@ impl FormatCommand {
             // re-locks stdout and flushes for each of (potentially thousands of)
             // lines, which dominates `--list` on a large tree; one buffered write is
             // dramatically cheaper.
-            let mut listing = String::new();
+            let mut listing = Vec::new();
             for path in &files {
-                let _ = writeln!(listing, "{}", path.display());
+                listing.extend_from_slice(&path_bytes(path));
+                listing.push(b'\n');
             }
-            write_stdout(listing.as_bytes());
+            write_stdout(&listing);
             if !diagnostics.errors.is_empty() {
                 process::exit(2);
             }
@@ -238,15 +239,16 @@ impl FormatCommand {
         // dominates `--check` on a large unformatted tree. The common case (few
         // changes) keeps the buffer tiny. Errors stay per-line on stderr (rare,
         // and stderr is for immediate diagnostics).
-        let (mut changed, mut unchanged) = (0u32, 0u32);
-        let mut errors = discovery_errors as u32;
-        let mut changed_paths = String::new();
+        let (mut changed, mut unchanged) = (0usize, 0usize);
+        let mut errors = discovery_errors;
+        let mut changed_paths = Vec::new();
         for (path, outcome) in files.iter().zip(&outcomes) {
             match outcome {
                 FileOutcome::Unchanged => unchanged += 1,
                 FileOutcome::Changed => {
                     changed += 1;
-                    let _ = writeln!(changed_paths, "{}", path.display());
+                    changed_paths.extend_from_slice(&path_bytes(path));
+                    changed_paths.push(b'\n');
                 }
                 FileOutcome::Error(e) => {
                     errors += 1;
@@ -254,7 +256,7 @@ impl FormatCommand {
                 }
             }
         }
-        write_stdout(changed_paths.as_bytes());
+        write_stdout(&changed_paths);
 
         let action = if self.check {
             "would change"

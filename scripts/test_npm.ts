@@ -1429,6 +1429,55 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	// a named path's ignore verdict reads its relative path by the PLATFORM's
+	// separator, as the native `path_to_rel` does — `\\` is a filename byte on
+	// posix, so `a\\b.ts` is one segment a `/a/b.ts` rule cannot match (rel_under
+	// once split on both spellings everywhere, and skipped the file quietly)
+	it(
+		'format keeps a backslash in a named posix file name as one segment',
+		{ skip: process.platform === 'win32' },
+		() => {
+			const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+			try {
+				mkdirSync(join(dir, '.git'));
+				writeFileSync(join(dir, '.formatignore'), '/a/b.ts\n');
+				writeFileSync(join(dir, 'a\\b.ts'), 'const   x=1');
+				const result = run_cli(['format', '--check', 'a\\b.ts'], undefined, dir);
+				assert.equal(result.status, 1, result.stderr);
+				assert.match(result.stdout, /a\\b\.ts/);
+				assert.doesNotMatch(result.stderr, /warning/);
+			} finally {
+				rmSync(dir, { recursive: true, force: true });
+			}
+		}
+	);
+
+	// the changed-path order is Rust's `Path::components()` order: a doubled or `.`
+	// step in an argument's spelling is no component, so `t//b/y.ts` sorts as
+	// `t/b/y.ts` — after `t/a/x.ts`, where a raw split put the empty component first
+	it('format orders reported paths by their normalized components', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			mkdirSync(join(dir, 'a'));
+			mkdirSync(join(dir, 'b'));
+			writeFileSync(join(dir, 'a', 'x.ts'), 'const x = 1;\n');
+			writeFileSync(join(dir, 'b', 'y.ts'), 'const x = 1;\n');
+			// each argument keeps its own spelling in the emitted path (a trailing
+			// separator is not doubled); only the ORDER reads the normalized components
+			for (const [b, listed] of [
+				['.//b', './/b/y.ts'],
+				['./b/', './b/y.ts'],
+				['b/.', 'b/./y.ts']
+			]) {
+				const result = run_cli(['format', '--list', b, './a'], undefined, dir);
+				assert.equal(result.status, 0, result.stderr);
+				assert.deepEqual(result.stdout.trimEnd().split('\n'), ['./a/x.ts', listed], b);
+			}
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	// --list binary contract (read-only, exit codes, flag rejection). *Which*
 	// files the ignore files admit is pinned for both CLIs by the shared table
 	// in the `discovery parity` suite below; this only covers the --list contract.

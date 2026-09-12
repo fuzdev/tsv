@@ -1274,6 +1274,99 @@ fn test_format_dedup_symlink_alias() {
     assert_eq!(stdout.lines().count(), 1, "stdout: {stdout}");
 }
 
+#[cfg(unix)]
+#[test]
+fn test_format_walks_non_utf8_names_by_their_own_bytes() {
+    // a file or directory name that is not UTF-8 is joined onto the walk's paths as the
+    // bytes it has: the lossy U+FFFD spelling the matcher reads names nothing on disk, so
+    // emitting it would report a phantom `No such file or directory` and lose the subtree
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+    let dir = temp_dir("non_utf8_names");
+    let file = dir.join(OsStr::from_bytes(b"fo\xffo.ts"));
+    let sub = dir.join(OsStr::from_bytes(b"di\xffr"));
+    fs::write(&file, UNFORMATTED_TS).unwrap();
+    fs::create_dir(&sub).unwrap();
+    fs::write(sub.join("g.ts"), UNFORMATTED_TS).unwrap();
+
+    let list = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(
+        list.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&list.stderr)
+    );
+    assert!(
+        list.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&list.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&list.stdout).lines().count(), 2);
+    let lists = |needle: &[u8]| list.stdout.windows(needle.len()).any(|w| w == needle);
+    assert!(
+        lists(b"fo\xffo.ts"),
+        "{}",
+        String::from_utf8_lossy(&list.stdout)
+    );
+    assert!(
+        lists(b"di\xffr/g.ts"),
+        "{}",
+        String::from_utf8_lossy(&list.stdout)
+    );
+
+    let output = tsv(&["format", dir.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read_to_string(&file).unwrap(), FORMATTED_TS);
+    assert_eq!(fs::read_to_string(sub.join("g.ts")).unwrap(), FORMATTED_TS);
+}
+
+#[test]
+fn test_format_jobs_above_the_ceiling_is_announced() {
+    // an explicit --jobs past `4 × logical` is clamped, and said so — the flag means
+    // "use this width", so a quietly narrower run would be the worse answer
+    let dir = temp_dir("jobs_ceiling");
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    let output = tsv(&[
+        "format",
+        "--check",
+        "--jobs",
+        "1000000000",
+        dir.to_str().unwrap(),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("warning: --jobs 1000000000 exceeds this machine's ceiling; using "),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn test_format_invalid_utf8_file_is_reported_and_left_alone() {
+    // the read is strict UTF-8: a lossy one would write U+FFFD back over the author's
+    // bytes and call the file formatted
+    let dir = temp_dir("invalid_utf8_file");
+    let bad = dir.join("bad.ts");
+    let bytes = b"const x = '\xff';\n";
+    fs::write(&bad, bytes).unwrap();
+    fs::write(dir.join("ok.ts"), UNFORMATTED_TS).unwrap();
+    let output = tsv(&["format", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("read failed: stream did not contain valid UTF-8"),
+        "stderr: {stderr}"
+    );
+    assert_eq!(fs::read(&bad).unwrap(), bytes);
+    // the error is isolated: the sibling still formats
+    assert_eq!(fs::read_to_string(dir.join("ok.ts")).unwrap(), FORMATTED_TS);
+}
+
 #[test]
 fn test_format_missing_arg_fails_fast() {
     let dir = temp_dir("missing_fail_fast");

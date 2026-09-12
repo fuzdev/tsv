@@ -169,7 +169,7 @@
 		},
 		{
 			"name": "explicit_path_a_tsv_rule_also_excludes_names_that_rule",
-			"note": "a .formatignore rule excluding a named path is the one reported even where a .gitignore excludes the path first — re-including past the .gitignore would leave that rule standing, and, added to the same file, override it: a file it excludes is skipped quietly, a directory names it, and a path only the .gitignore excludes still gets the lines that re-include it",
+			"note": "a .formatignore rule excluding a named path is reported even where a .gitignore excludes the path first — re-including past the .gitignore would leave that rule standing, and, added to the same file, override it: a file it excludes is skipped quietly, a directory names it, and a path only the .gitignore excludes still gets the lines that re-include it. Where the .gitignore excludes an ANCESTOR above the tsv rule's directory, that exclusion bounds the path on its own (every `!` under an excluded directory is inert), so the warning undoes it and names the tsv rule as the second blocker — one warning, not one per rerun",
 			"tree": {
 				".git/": null,
 				".gitignore": "vendor/\n",
@@ -180,7 +180,7 @@
 			},
 			"cases": [
 				{"target": "vendor/x.ts", "expected": [], "no_warns": ["excluded"]},
-				{"target": "vendor/lib", "expected": [], "warns": ["vendor/lib is excluded by a rule in the repo-root .formatignore, so nothing under it is formatted; narrow or negate that rule to format it"]},
+				{"target": "vendor/lib", "expected": [], "warns": ["vendor/lib is inside vendor, which a rule in the repo-root .gitignore excludes, so nothing under it is formatted; re-include it by adding `!/vendor/`, `/vendor/*` and `!/vendor/lib/`, in that order, to the repo-root .formatignore, which also override the rule in the repo-root .formatignore that excludes it"]},
 				{"target": "vendor/y.ts", "expected": [], "warns": ["vendor/y.ts is inside vendor, which a rule in the repo-root .gitignore excludes, so it is not formatted; re-include it by adding `!/vendor/`, `/vendor/*` and `!/vendor/y.ts`, in that order, to the repo-root .formatignore"]}
 			]
 		},

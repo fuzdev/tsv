@@ -1503,8 +1503,10 @@ function rel_under(format_root, abs) {
 	const rel = path_relative(format_root, abs);
 	if (rel === '') return '';
 	if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
-	return rel
-		.split(/[/\\]/)
+	// `path.relative` hands back a normalized path, so the filter is belt-and-braces;
+	// the split is the platform's (`\` is a filename byte on posix, and a file named
+	// `a\b.ts` must reach the matcher as one segment, as it does on the native CLI)
+	return split_path_components(rel)
 		.filter((s) => s !== '' && s !== '.')
 		.join('/');
 }
@@ -2028,18 +2030,41 @@ function ends_with_sep(path) {
 	return path.endsWith('/') || (sep === '\\' && path.endsWith('\\'));
 }
 
-/** Component-wise path ordering matching Rust's `PathBuf` ordering — a
- * separator splits components and a shorter prefix sorts first, so `a/y.ts`
- * precedes `a-b/x.ts` (plain string order would invert them: `-` < `/`). The
- * parity claim is scoped to ASCII/BMP names: JS compares UTF-16 code units
- * while Rust compares UTF-8 bytes, so astral-plane names (≥ U+10000) order
- * differently. A Windows path's drive prefix rides along as one leading
- * component where Rust splits it into `Prefix` + `RootDir`, which reaches the
- * same verdict for every pair sharing a root. */
+/** A path's components spelled as Rust's `Path::components()` yields them: a
+ * leading separator is the root component (its own spelling, `/`), a `.`
+ * survives only at the head, and every other `.` and empty component (a
+ * doubled or trailing separator) is normalized away — so `t//b/y.ts`,
+ * `t/./b/y.ts` and `t/b/y.ts` are one sequence. What `compare_paths` orders;
+ * the emitted paths keep the argument's spelling, this only decides their order. */
+function path_components(path) {
+	const raw = split_path_components(path);
+	const components = [];
+	for (let i = 0; i < raw.length; i++) {
+		const c = raw[i];
+		if (c === '') {
+			if (i === 0 && raw.length > 1) components.push(sep);
+		} else if (c !== '.' || i === 0) {
+			components.push(c);
+		}
+	}
+	return components;
+}
+
+/** Component-wise path ordering matching the native CLI's `path_sort_key` — a
+ * separator splits components (normalized by `path_components`, so a doubled
+ * or `.` step in the argument's spelling moves nothing), each compares by its
+ * own spelling (the root as `/`, `.` and `..` as written), and a shorter
+ * prefix sorts first, so `a/y.ts` precedes `a-b/x.ts` (plain string order
+ * would invert them: `-` < `/`). The parity claim is scoped to ASCII/BMP
+ * names: JS compares UTF-16 code units while Rust compares UTF-8 bytes, so
+ * astral-plane names (≥ U+10000) order differently. A Windows path's drive
+ * prefix rides along as one leading component where Rust splits it into
+ * `Prefix` + `RootDir`, which reaches the same verdict for every pair sharing
+ * a root. */
 function compare_paths(a, b) {
 	if (a === b) return 0;
-	const as = split_path_components(a);
-	const bs = split_path_components(b);
+	const as = path_components(a);
+	const bs = path_components(b);
 	const len = Math.min(as.length, bs.length);
 	for (let i = 0; i < len; i++) {
 		if (as[i] !== bs[i]) return as[i] < bs[i] ? -1 : 1;
