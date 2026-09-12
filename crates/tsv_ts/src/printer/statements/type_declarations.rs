@@ -3,7 +3,6 @@
 
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
-use crate::printer::ignore::{RoutedScope, is_freeze_target};
 use crate::printer::layout::{
     fluid_after_operator, fluid_after_operator_unindented, hang_after_operator,
     hang_after_operator_unindented,
@@ -361,30 +360,19 @@ impl<'a> Printer<'a> {
         //
         // An alone-on-line format-ignore directive in the `=`→RHS gap freezes a
         // non-composite RHS verbatim (`single_child_frozen`; a union/intersection RHS
-        // declines and freezes via its own leading-run walk). The frozen path keeps
-        // the UNWIDENED window — an in-shell directive stays on the ordinary paths —
-        // and the directive itself is emitted by the comment machinery below either
-        // way (own-line comments already keep their own line here).
+        // declines and freezes via its own leading-run walk), over the UNWIDENED window:
+        // the directive itself is emitted by the comment machinery below either way, since
+        // own-line comments already keep their own line here.
+        //
+        // The same directive written INSIDE a redundant paren shell
+        // (`type P = (⏎// prettier-ignore⏎{x:  1});`) is the same resolver's other answer
+        // ([`StrippedParenHang::routed`]): the shell strips, this widened window routes the
+        // whole leading run through the force-break emission below, and the paren-stripped
+        // INNER freezes — so the shelled and bare authorings reach one fixed point. The
+        // head carries that verdict as `routed`, which the union hand-off below reads.
         let head = self.keyword_value_head(eq_pos + 1, &decl.type_annotation);
-        // An alone-on-line directive INSIDE a redundant paren shell
-        // (`type P = (⏎// prettier-ignore⏎{x:  1});`) hoists with the shell strip:
-        // the widened window routes the whole leading run through the force-break
-        // emission below (the directive keeps its own line) and the paren-stripped
-        // INNER freezes, converging in ONE pass to the same fixed point the bare
-        // authoring holds. Taken only when the inner actually freezes — a composite
-        // inner keeps the ordinary strip-hang seam, where its own leading-run walk
-        // (Rule A) reaches the same directive. It overrides the head seam's window,
-        // the one head that widens past a shell under a freeze.
-        let interior_frozen_inner = if head.frozen {
-            None
-        } else {
-            self.paren_interior_routed_inner(&decl.type_annotation)
-                .filter(|inner| is_freeze_target(inner))
-        };
-        let (type_start, value_type) = match interior_frozen_inner {
-            Some(inner) => (inner.span().start, inner),
-            None => (head.value_start, head.value_type),
-        };
+        let type_start = head.value_start;
+        let value_type = head.value_type;
         let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
 
         // A leading comment between `=` and the RHS forces the value onto its own
@@ -415,7 +403,7 @@ impl<'a> Printer<'a> {
             // A frozen head or a frozen paren interior declines: the directive's placement
             // is the freeze machinery's, and the run is the verbatim slice's own.
             let handed_union = match value_type {
-                TSType::Union(u) if !head.frozen && interior_frozen_inner.is_none() => self
+                TSType::Union(u) if !head.frozen && !head.routed => self
                     .union_external_leading_run_start(eq_pos + 1, u)
                     .map(|_| u),
                 _ => None,
@@ -498,17 +486,7 @@ impl<'a> Printer<'a> {
             // lifted from the shell; type position, so a trailing block trails the value
             // inline before the `;`. A frozen RHS is the verbatim
             // slice instead (redundant parens drop unless the shell holds a comment).
-            let type_doc = if interior_frozen_inner.is_some() {
-                // The frozen paren-stripped inner, with any trailing shell-gap
-                // comment lifted after it so the strip stays lossless. `value_type` is
-                // already filtered to a freeze target above, which is the arm
-                // `build_routed_inner_doc`'s routing takes here.
-                self.build_routed_inner_doc(
-                    &decl.type_annotation,
-                    value_type,
-                    RoutedScope::Transparent,
-                )
-            } else if let Some(u) = handed_union {
+            let type_doc = if let Some(u) = handed_union {
                 // The union places the whole gap run, split at the author's last break.
                 // Through the same shell claim + lift as every other value here — the
                 // pair a stripped shell owes whatever builds inside it.
@@ -603,7 +581,7 @@ impl<'a> Printer<'a> {
             // widens the window to the inner's start, so its directive trips the
             // same gate.
             debug_assert!(
-                !head.frozen && interior_frozen_inner.is_none(),
+                !head.frozen && !head.routed,
                 "an alone-on-line directive always takes the force-break branch"
             );
             // Under the head's claim: a transparent one-member composite at the value's

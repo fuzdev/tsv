@@ -9,6 +9,7 @@
 
 use super::Printer;
 use crate::ast::internal::{TSLiteralType, TSType, TemplateElement, TemplateLiteralType};
+use crate::printer::ignore::is_freeze_target;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -107,12 +108,57 @@ impl<'a> Printer<'a> {
             // interpolation's, and a `//` there hangs the type exactly as one written
             // after a bare `${` does.
             let t = self.transparent_value(t);
-            self.comments_force_own_line_between(
-                Self::interp_dollar_brace_end(&template.quasis[i]),
-                t.span().start,
-            ) || self
-                .interp_trailing_gap_forces_break(t.span().end, template.quasis[i + 1].span.start)
+            let dollar_brace_end = Self::interp_dollar_brace_end(&template.quasis[i]);
+            // The builder's own widening over a routed paren shell
+            // ([`Self::interp_type_and_freeze`]) — the gap this gate measures is the one it
+            // moves.
+            let (t, _) = self.interp_type_and_freeze(dollar_brace_end, t);
+            self.comments_force_own_line_between(dollar_brace_end, t.span().start)
+                || self.interp_trailing_gap_forces_break(
+                    t.span().end,
+                    template.quasis[i + 1].span.start,
+                )
         })
+    }
+
+    /// One interpolation's effective type and freeze verdict: `(type, frozen)`.
+    ///
+    /// An alone-on-line format-ignore directive in the `${`→type gap freezes the type — the
+    /// single-child head rule with the `${` as the delimiter
+    /// ([`Printer::single_child_frozen`]; a composite type declines and applies Rule A
+    /// through its own leading-run walk). The same directive written inside the type's
+    /// redundant paren SHELL strips that shell and freezes the paren-stripped inner, which
+    /// is what the returned type names: the gap then reaches the run, so this
+    /// interpolation's own emitter keeps the line the author gave it. Left in the shell, the
+    /// shell printed the run itself, glued behind the `${` where the floor reads it inert,
+    /// and the second pass normalized the frozen bytes (F1).
+    ///
+    /// The gap's own directive wins over an in-shell one, as at every head: its window
+    /// deliberately stops at the type's own span start, so the two can never both fire.
+    ///
+    /// A **composite** inner strips the shell just the same but does not freeze here: its own
+    /// `(`-transparent leading-run walk reaches the same directive and Rule A freezes its
+    /// first member, so freezing whole would be two claims on one directive. The strip is
+    /// still this seam's to report — the window has to reach the run either way, or the shell
+    /// prints it glued behind the `${` and the freeze Rule A applied is lost on the next pass.
+    ///
+    /// Resolved here rather than at each reader because the **break gate**
+    /// ([`Self::template_literal_type_breaks_for_comment`], which the alias `=` asks whether
+    /// the value owns its own comment break) measures the very gap this widening moves: read
+    /// unwidened there, the gate saw a comment-free `${`→`(` gap and dropped the template
+    /// below the `=`, where the next pass — the shell gone — hugged it.
+    fn interp_type_and_freeze<'t>(
+        &self,
+        dollar_brace_end: u32,
+        t: &'t TSType<'t>,
+    ) -> (&'t TSType<'t>, bool) {
+        if self.single_child_frozen(dollar_brace_end, t) {
+            return (t, true);
+        }
+        match self.paren_interior_routed_inner(t) {
+            Some(inner) => (inner, is_freeze_target(inner)),
+            None => (t, false),
+        }
     }
 
     /// Whether a `${`→type gap's comment run was authored on its own line (a newline before
@@ -215,6 +261,9 @@ impl<'a> Printer<'a> {
                 // (`template_literal_interp_single_member_head_line_comment`).
                 let t = self.transparent_value(&template.types[i]);
                 let dollar_brace_end = Self::interp_dollar_brace_end(quasi);
+                // The freeze verdict and the (possibly paren-stripped) type, from the one
+                // resolver the break gate above also reads.
+                let (t, frozen) = self.interp_type_and_freeze(dollar_brace_end, t);
                 let type_start = t.span().start;
                 let type_end = t.span().end;
                 // The closing `}`: the next quasi's span opens there (its `raw_span` opens
@@ -232,7 +281,11 @@ impl<'a> Printer<'a> {
                 } else {
                     d.empty()
                 };
-                let type_doc = self.build_type_doc(t);
+                let type_doc = if frozen {
+                    self.build_frozen_single_child_doc(t)
+                } else {
+                    self.build_type_doc(t)
+                };
                 let flat_str = self.render_arena_doc_flat(type_doc);
 
                 // Position includes: current pos + "${" (2) + type + "}" (1)

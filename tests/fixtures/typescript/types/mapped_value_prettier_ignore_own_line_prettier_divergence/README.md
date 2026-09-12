@@ -28,4 +28,10 @@ agrees and does not relocate. `unformatted_ours_spaces.svelte` perturbs whitespa
 outside the frozen slices; tsv normalizes it to input (prettier does not — it
 relocates the non-union directive).
 
+`unformatted_ours_paren_interior.svelte` writes the directive **inside** the value
+type's redundant paren shell (`[K in keyof T]: (⏎// prettier-ignore⏎{x:   1})`): the
+shell strips, the run keeps its own line in this same `]:` gap, and the paren-stripped
+inner freezes — so the shelled authoring converges in one pass onto the bare
+authoring's fixed point. One fixed point per formatter, not per authoring.
+
 See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

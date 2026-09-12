@@ -454,13 +454,18 @@ impl<'a> Printer<'a> {
             // non-null assertion that seals a parenthesized chain (`` (a?.b)!`x` ``) keeps
             // the parens via the sealed-base rendering. This must happen BEFORE adding
             // removed-paren comments so comments stay outside.
-            let tag_doc = if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
-                sealed
-            } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
-                d.parens(self.build_expression_doc(tagged.tag))
-            } else {
-                self.build_expression_doc(tagged.tag)
-            };
+            // The TAG's own erased-paren freeze — the region this arm's
+            // `prepend_removed_paren_comments` below already emits
+            // ([`Printer::build_left_spine_operand_doc`]).
+            let tag_doc = self.build_left_spine_operand_doc(tagged.span.start, tagged.tag, || {
+                if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
+                    sealed
+                } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
+                    d.parens(self.build_expression_doc(tagged.tag))
+                } else {
+                    self.build_expression_doc(tagged.tag)
+                }
+            });
             // Check for comments between removed parentheses and tag
             // e.g., (/* comment */ tag)`template` has tagged.span.start at '(' and tag.span.start at 'tag'
             self.prepend_removed_paren_comments(tagged.span.start, tagged.tag.span().start, tag_doc)

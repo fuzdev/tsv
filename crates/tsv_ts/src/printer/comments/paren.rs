@@ -1090,7 +1090,14 @@ impl<'a> Printer<'a> {
             // `(/* c⏎d */ x) as T` path never reaches, since the shell is built only when
             // the gap holds a comment the EMIT axis can see (an un-owned run member) or
             // the operand→keyword gap needs the parens for ASI.
-            _ => self.build_expression_doc_claiming_outermost(expr),
+            // An alone-on-line format-ignore directive in the run just emitted freezes the
+            // operand ([`Printer::build_left_spine_operand_doc`]): this pair is RETAINED, so
+            // the directive keeps the line the author gave it inside it and the reparse
+            // reads it in the very same place — a first pass that did not freeze would
+            // normalize the author's bytes and then hold that form for good.
+            _ => self.build_left_spine_operand_doc(leading_start, expr, || {
+                self.build_expression_doc_claiming_outermost(expr)
+            }),
         });
         if let Some((trailing, _needs_break)) =
             self.trailing_paren_comment_parts(expr_end, inner_end)

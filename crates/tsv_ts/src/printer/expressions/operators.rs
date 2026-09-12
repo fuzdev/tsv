@@ -665,7 +665,12 @@ impl<'a> Printer<'a> {
         // Collect all operands (with spans) and operators in the chain
         let mut operands: OperandBuf = OperandBuf::new();
         let mut operators: OperatorBuf = OperatorBuf::new();
-        self.collect_binary_chain_with_spans(binary, &mut operands, &mut operators);
+        self.collect_binary_chain_with_spans(
+            binary,
+            &mut operands,
+            &mut operators,
+            binary.span.start,
+        );
 
         if operands.len() <= 1 {
             // Single operand, shouldn't happen but handle gracefully
@@ -1258,22 +1263,32 @@ impl<'a> Printer<'a> {
         expr: &internal::BinaryExpression<'_>,
         operands: &mut OperandBuf,
         operators: &mut OperatorBuf,
+        chain_start: u32,
     ) {
         // Recursively flatten left side if it can be chained with current operator
-        if let Expression::BinaryExpression(left_binary) = expr.left {
-            if expr.operator.can_flatten_with(left_binary.operator) {
-                self.collect_binary_chain_with_spans(left_binary, operands, operators);
-            } else {
+        match expr.left {
+            Expression::BinaryExpression(left_binary)
+                if expr.operator.can_flatten_with(left_binary.operator) =>
+            {
+                self.collect_binary_chain_with_spans(left_binary, operands, operators, chain_start);
+            }
+            left => {
+                // The LEFTMOST operand — the first one the collector pushes — takes the
+                // erased-paren freeze over the chain's leading region, which the chain itself
+                // emits ([`Self::wrap_chain_with_paren_comments`]). A later operand's shell
+                // keeps the ordinary builder: its erased-paren region belongs to the operator
+                // gap before it, which is a separate question.
+                let doc = self.build_left_spine_operand_doc_if(
+                    operands.is_empty(),
+                    chain_start,
+                    left,
+                    || self.build_binary_operand_doc(left, expr.operator, false),
+                );
                 operands.push(ChainOperand {
-                    doc: self.build_binary_operand_doc(expr.left, expr.operator, false),
-                    span: expr.left.span(),
+                    doc,
+                    span: left.span(),
                 });
             }
-        } else {
-            operands.push(ChainOperand {
-                doc: self.build_binary_operand_doc(expr.left, expr.operator, false),
-                span: expr.left.span(),
-            });
         }
 
         // Add current operator
@@ -1286,7 +1301,7 @@ impl<'a> Printer<'a> {
         if let Expression::BinaryExpression(right_binary) = expr.right
             && expr.operator.rebalances_with(right_binary.operator)
         {
-            self.collect_binary_chain_with_spans(right_binary, operands, operators);
+            self.collect_binary_chain_with_spans(right_binary, operands, operators, chain_start);
             return;
         }
 
@@ -1636,9 +1651,12 @@ impl<'a> Printer<'a> {
     ///
     /// **Rule A** over the operand list: an own-line directive in the gap after the
     /// previous operand's comma freezes the FOLLOWING operand over its own node span, and
-    /// the separating `,` stays parent-owned. The first operand has no such gap here — a
-    /// directive before it leads the *sequence node*, which is the enclosing value head's
-    /// question ([`Printer::value_head_frozen_span`]).
+    /// the separating `,` stays parent-owned. The FIRST operand's gap is the sequence's own
+    /// erased-paren region instead ([`Printer::left_spine_operand_frozen_span`]): a directive
+    /// the author wrote inside grouping parens the parser dropped sits between the sequence's
+    /// span start and that operand's, which is inside the node and so invisible to the
+    /// enclosing value head. A directive ahead of the whole node is that head's question
+    /// ([`Printer::value_head_frozen_span`]).
     ///
     /// The assignment clarity parens are the printer's, not the author's, so they land
     /// OUTSIDE the frozen slice, exactly as an argument's do
@@ -1652,9 +1670,11 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let expr = &seq.expressions[i];
-        let frozen = (i > 0)
-            .then(|| self.gap_frozen_span(seq.expressions[i - 1].span().end, expr.span()))
-            .flatten();
+        let frozen = if i > 0 {
+            self.gap_frozen_span(seq.expressions[i - 1].span().end, expr.span())
+        } else {
+            self.left_spine_operand_frozen_span(seq.span.start, expr)
+        };
         // A later operand's MULTI-LINE owned comment is claimed here, outside the operand's own
         // group: the comma gap's run is emitted on the to-emit axis and never sees it, so claimed
         // by the innermost node its hard break explodes an operand prettier keeps flat

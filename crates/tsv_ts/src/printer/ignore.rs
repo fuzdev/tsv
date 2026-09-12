@@ -508,15 +508,27 @@ impl<'a> Printer<'a> {
         &self,
         shell: &'t TSType<'t>,
     ) -> Option<&'t TSType<'t>> {
+        self.paren_shell_routed_inner(outermost_paren(shell)?)
+    }
+
+    /// [`Self::paren_interior_routed_inner`] asked of the shell NODE rather than of the
+    /// type that may carry one — for the shell's own emitter, which holds the
+    /// `TSParenthesizedType` and has already established that there is a shell.
+    ///
+    /// One body, so the routing verdict a head routes on and the one the shell's emitter
+    /// reads to freeze its stripped inner cannot come apart.
+    pub(in crate::printer) fn paren_shell_routed_inner<'t>(
+        &self,
+        shell: &'t internal::TSParenthesizedType<'t>,
+    ) -> Option<&'t TSType<'t>> {
         if !self.has_format_ignore {
             return None;
         }
-        let p = outermost_paren(shell)?;
         // The window is [`paren_shell_gaps`]' deep leading half — redundant layers strip
         // as a unit, so an in-shell directive binds from the OUTERMOST `(`.
-        let (leading, _) = paren_shell_gaps(p);
+        let (leading, _) = paren_shell_gaps(shell);
         self.member_gap_frozen(leading.start, leading.end)
-            .then_some(unwrap_parenthesized(shell))
+            .then(|| unwrap_parenthesized(shell.type_annotation))
     }
 
     /// [`Self::member_gap_frozen`] for list item `i`, the single home of the
@@ -593,6 +605,148 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn gap_frozen_span(&self, prev_end: u32, span: Span) -> Option<Span> {
         self.member_gap_frozen(prev_end, span.start).then_some(span)
+    }
+
+    /// The freeze a construct's LEFTMOST operand takes when an alone-on-line format-ignore
+    /// directive sits in the grouping parens the PARSER erased ahead of it — the value side's
+    /// leading-EDGE question (`(⏎// prettier-ignore⏎{b:  1}⏎) ? c : d`, `… + 1`, `….k`,
+    /// `… as T`, `…!`, `…(1)`, `` …`t` ``, `…, y`).
+    ///
+    /// Those parens leave no node behind, so the directive lands in the region between the
+    /// construct's own span start and its operand's — *inside* the construct's span. The
+    /// enclosing value head therefore cannot see it ([`Self::value_head_frozen_span`] reads
+    /// the gap BEFORE the value) and the construct itself has to answer, exactly as the type
+    /// side's leading-edge links answer for a paren shell they strip. Each construct already
+    /// EMITS that region ([`Printer::removed_paren_comments_opt`] /
+    /// [`Printer::prepend_removed_paren_comments`], which hoist the run ahead of the whole
+    /// construct — where the reparse reads it too), so the freeze is all that was missing:
+    /// without it the author's bytes normalized on the first pass and the directive, read
+    /// back from the head's gap on the second, then froze a form it never chose.
+    ///
+    /// The scope is that ONE operand — the construct the directive precedes, Rule A's child
+    /// scope. The whole construct is not a candidate: its slice would have to contain the `)`
+    /// the strip removes.
+    ///
+    /// ⚠️ The operand is the construct's IMMEDIATE child, never the left spine's leaf. A walk
+    /// to the leaf freezes the wrong unit the moment the author parenthesized more than one
+    /// level of it (`(⏎// prettier-ignore⏎a.b⏎) ? c : d` must freeze `a.b`, not `a`), and each
+    /// construct asking about its own child is what makes the outermost region — the one the
+    /// author's parens actually wrapped — the one that answers.
+    ///
+    /// An operand the author left bare collapses the region to nothing, so the scan is empty;
+    /// the `has_format_ignore` gate inside [`Self::gap_frozen_span`] is what a directive-free
+    /// document pays.
+    #[inline]
+    pub(in crate::printer) fn left_spine_operand_frozen_span(
+        &self,
+        node_start: u32,
+        operand: &internal::Expression<'_>,
+    ) -> Option<Span> {
+        self.gap_frozen_span(node_start, operand.span())
+    }
+
+    /// The pair a frozen LEFTMOST operand would have taken from a POSITION TARGET, had its
+    /// own builder run: the expression statement's
+    /// ([`Printer::maybe_wrap_expr_stmt_paren`] — the node that must not open the line with
+    /// `{` / `function` / `class`) and the arrow body's leftmost-object one
+    /// ([`Printer::arrow_body_object_parens_target`], whose `{` would read as a block body).
+    ///
+    /// Both are cells the node's OWN builder reads, and a verbatim slice replaces that
+    /// builder — so a freeze that skipped them printed `{b:  1}.k;`, `class {}();` and
+    /// `() =>⏎{b:  1}.k`, none of which parse. The pairs go outside the slice, where the
+    /// unfrozen path puts them too.
+    ///
+    /// Both are matched by span and neither is consumed, so re-running this across a
+    /// conditional group's candidates is sound.
+    pub(in crate::printer) fn wrap_frozen_position_pair(
+        &self,
+        operand: &internal::Expression<'_>,
+        doc: DocId,
+    ) -> DocId {
+        let span = operand.span();
+        let doc = if self.arrow_body_object_parens_target.get() == Some(span) {
+            self.d().parens(doc)
+        } else {
+            doc
+        };
+        self.maybe_wrap_expr_stmt_paren(span, doc)
+    }
+
+    /// [`Self::left_spine_operand_frozen_span`] resolved to the operand's doc: the verbatim
+    /// slice when the freeze fires, else the construct's own build, taken lazily.
+    #[inline]
+    pub(in crate::printer) fn build_left_spine_operand_doc(
+        &self,
+        node_start: u32,
+        operand: &internal::Expression<'_>,
+        ordinary: impl FnOnce() -> DocId,
+    ) -> DocId {
+        self.build_left_spine_operand_doc_if(true, node_start, operand, ordinary)
+    }
+
+    /// [`Self::build_left_spine_operand_doc`] told whether the position can take the freeze
+    /// at all.
+    ///
+    /// `false` is a position that prints a REQUIRED pair of its own around the operand — a
+    /// callee that needs one, an IIFE's or a sealed chain's owned pair. That pair is emitted
+    /// around a doc the printer BUILDS, and a verbatim slice cannot be reached into, so a
+    /// freeze there drops the pair and can emit output that does not parse. The directive is
+    /// still honored one level out, where the hoisted run leads the whole statement and the
+    /// statement's own freeze holds that form — pair included — from the NEXT pass on. A
+    /// coarser claim, and one pass late: this pass normalizes the operand before the run
+    /// reaches the statement gap, so the author's own bytes are normalized once
+    /// (`UNHONORED CallExpression.callee` in the `ignore:audit` ratchet).
+    #[inline]
+    pub(in crate::printer) fn build_left_spine_operand_doc_if(
+        &self,
+        can_freeze: bool,
+        node_start: u32,
+        operand: &internal::Expression<'_>,
+        ordinary: impl FnOnce() -> DocId,
+    ) -> DocId {
+        match can_freeze
+            .then(|| self.left_spine_operand_frozen_span(node_start, operand))
+            .flatten()
+        {
+            Some(frozen) => self.wrap_frozen_position_pair(
+                operand,
+                self.build_frozen_expression_doc(operand, frozen),
+            ),
+            None => ordinary(),
+        }
+    }
+
+    /// Run `build` with a linearized chain's BASE freeze armed
+    /// ([`Printer::frozen_chain_base`]) — the chain's own spelling of
+    /// [`Self::build_left_spine_operand_doc`], which it cannot use directly because the
+    /// base's doc is built inside the layout selection rather than by the seam that knows
+    /// the chain's leading region.
+    ///
+    /// A no-op with no freeze, so every chain door hands its build through unconditionally.
+    pub(in crate::printer) fn with_frozen_chain_base<T>(
+        &self,
+        frozen: Option<Span>,
+        build: impl FnOnce() -> T,
+    ) -> T {
+        if frozen.is_none() {
+            return build();
+        }
+        let saved = self.frozen_chain_base.replace(frozen);
+        let built = build();
+        self.frozen_chain_base.set(saved);
+        built
+    }
+
+    /// The armed base freeze, when it is THIS node's
+    /// ([`Printer::frozen_chain_base`] — span-keyed, so a chain nested inside the base's own
+    /// doc reads nothing).
+    pub(in crate::printer) fn frozen_chain_base_span(
+        &self,
+        base: &internal::Expression<'_>,
+    ) -> Option<Span> {
+        self.frozen_chain_base
+            .get()
+            .filter(|frozen| *frozen == base.span())
     }
 
     /// The value-side analog of [`Self::single_child_frozen`]: a construct that holds ONE
@@ -1240,13 +1394,32 @@ impl<'a> Printer<'a> {
         ctx: ParenContext,
     ) -> DocId {
         let doc = self.build_frozen_expression_doc(value, frozen);
-        if self.needs_parens(value, ctx) {
+        if self.needs_parens(value, ctx) || self.frozen_slice_needs_pair(frozen, ctx) {
             // Parens outside the claimed comment, exactly as the ordinary path nests them
             // (`d.parens(build_expression_doc(..))`, whose owned-comment prepend is inside).
             self.d().parens(doc)
         } else {
             doc
         }
+    }
+
+    /// Whether a frozen SLICE needs a paren pair its node does not — an arrow body whose
+    /// slice opens with `{`, which the grammar reads as a block body.
+    ///
+    /// The rule is about the slice rather than the node, and that is the whole reason it
+    /// exists: the unfrozen path has a finer pair available and takes it, parenthesizing the
+    /// leftmost OBJECT inside the expression (`() => ({ b: 1 }) | M`). A verbatim slice cannot
+    /// be reached into, so the only pair left is one around the whole body — and without it
+    /// the output does not reparse AT ALL (`() =>⏎// prettier-ignore⏎{b:  1} | M`). Prettier
+    /// emits exactly that and cannot read it back either, so there is no parity to keep: a
+    /// formatter's output has to parse.
+    ///
+    /// Only the arrow body asks. Every other [`ParenContext`] either already parenthesizes
+    /// the shapes that can open with `{` (an object expression at a value head is its own
+    /// node, which `needs_parens` answers) or sits where a leading `{` is unambiguous.
+    fn frozen_slice_needs_pair(&self, frozen: Span, ctx: ParenContext) -> bool {
+        matches!(ctx, ParenContext::ArrowBody)
+            && self.source.as_bytes().get(frozen.start as usize) == Some(&b'{')
     }
 
     /// [`Self::build_frozen_value_doc`] at an ARGUMENT or ELEMENT item, the family that

@@ -61,7 +61,7 @@ impl<'a> Printer<'a> {
     /// starts the enclosing expression statement (set by `build_expression_statement_doc`
     /// via `leftmost_no_lookahead`). Consumes the target so it fires exactly once:
     /// `(class {}).foo` wraps the class, not the whole member expression.
-    fn maybe_wrap_expr_stmt_paren(&self, span: Span, doc: DocId) -> DocId {
+    pub(in crate::printer) fn maybe_wrap_expr_stmt_paren(&self, span: Span, doc: DocId) -> DocId {
         // Matched by span, not consumed: a chain may rebuild its base across
         // conditional-group variants (`({a: 1}).b().c()`), so consuming the target on
         // the first (possibly discarded) build would leave the selected variant
@@ -1100,11 +1100,16 @@ impl<'a> Printer<'a> {
             // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]);
             // left inside, its body's forced break explodes an operand prettier keeps flat.
             // Asked only where the pair is KEPT — see that seam's ⚠️.
-            let operand = if needs_parens {
-                self.build_expression_doc_claiming_outermost(expression)
-            } else {
-                self.build_expression_doc(expression)
-            };
+            // The cast's own erased-paren freeze: `cast_start` opens at the grouping `(`
+            // the parser dropped, so an alone-on-line directive inside it is the cast's to
+            // honor ([`Printer::build_left_spine_operand_doc`]).
+            let operand = self.build_left_spine_operand_doc(cast_start, expression, || {
+                if needs_parens {
+                    self.build_expression_doc_claiming_outermost(expression)
+                } else {
+                    self.build_expression_doc(expression)
+                }
+            });
             parts.push(if expands {
                 self.build_expanding_parens_body_doc(operand)
             } else {
@@ -1397,10 +1402,18 @@ impl<'a> Printer<'a> {
             let expands = self.ternary_takes_extra_indent(non_null_expr.expression);
             // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
             // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
-            let inner_doc = self
-                .build_value_with_outermost_owned_comment(non_null_expr.expression, || {
-                    self.build_expression_doc_with_indent_on_break(non_null_expr.expression)
-                });
+            // The operand's erased-paren freeze on the RETAINED-pair path too: the pair
+            // survives, so the directive keeps its own line inside it and the reparse reads
+            // it in the same place ([`Printer::build_left_spine_operand_doc`]).
+            let inner_doc = self.build_left_spine_operand_doc(
+                non_null_expr.span.start,
+                non_null_expr.expression,
+                || {
+                    self.build_value_with_outermost_owned_comment(non_null_expr.expression, || {
+                        self.build_expression_doc_with_indent_on_break(non_null_expr.expression)
+                    })
+                },
+            );
             let argument_end = non_null_expr.expression.span().end;
             // A leading run that occupies a line — a `//`, an own-line block — takes
             // the family's expanded shell: `( // c` glue, the operand one indent in,
@@ -1490,7 +1503,15 @@ impl<'a> Printer<'a> {
                 self,
             )
         } else {
-            let inner_doc = self.build_expression_doc(non_null_expr.expression);
+            // The OPERAND's erased-paren freeze, over the same region `leading` above emits
+            // ([`Printer::build_left_spine_operand_doc`]): with the parens stripped the
+            // directive hangs ahead of the operand, which is where the reparse reads it, so
+            // the first pass must freeze what the second one would.
+            let inner_doc = self.build_left_spine_operand_doc(
+                non_null_expr.span.start,
+                non_null_expr.expression,
+                || self.build_expression_doc(non_null_expr.expression),
+            );
             d.concat(&[inner_doc, d.text("!")])
         };
 

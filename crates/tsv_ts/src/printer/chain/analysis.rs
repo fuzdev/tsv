@@ -951,8 +951,22 @@ pub fn build_linearized_chain_doc(
     printer: &Printer<'_>,
 ) -> DocId {
     let (head_start, head_end) = chain_head_comment_window(nodes, head_expr, chain_start);
+    // The BASE's erased-paren freeze, over the very region the prepend below emits: an
+    // alone-on-line format-ignore directive the author wrote inside grouping parens the
+    // parser dropped ahead of the base (`(⏎// prettier-ignore⏎{b:  1}⏎).k`) sits INSIDE the
+    // chain's span, so no enclosing head can see it and the chain owes the freeze. Armed as
+    // a cell because the base's doc is built inside the layout selection below
+    // ([`Printer::with_frozen_chain_base`]); the scope is that one operand, Rule A's child
+    // scope, since a whole-chain slice would have to contain the `)` the strip removes.
+    let frozen_base = match nodes.first() {
+        Some(ChainNode::Base { expr: base, .. }) => {
+            printer.left_spine_operand_frozen_span(head_start, base)
+        }
+        _ => None,
+    };
     let groups = group_chain_nodes(nodes, printer);
-    let chain_doc = build_chain_doc(&groups, span, printer);
+    let chain_doc =
+        printer.with_frozen_chain_base(frozen_base, || build_chain_doc(&groups, span, printer));
     printer.prepend_removed_paren_comments(head_start, head_end, chain_doc)
 }
 
