@@ -871,9 +871,50 @@ impl<'a> Printer<'a> {
                 let dots_end = r.span.start + "...".len() as u32;
                 let ty = self.transparent_value(r.type_annotation);
                 let type_start = ty.span().start;
-                // Break a line comment so it can't swallow the rest-element type.
-                let comments_doc = self.build_trailing_comments_hang_next(dots_end, type_start);
-                d.concat(&[d.text("..."), comments_doc, self.build_type_doc(ty)])
+                // The `...`→type head, the type-side twin of a spread's `...`→argument gap
+                // ([`Self::build_spread_doc`]): an own-line directive freezes the element
+                // type, and the directive keeps the line the author gave it.
+                //
+                // It is asked AHEAD of the ordinary emission below, which glues the gap's run
+                // to the `...` itself — a delimiter's line, which tsv's placement floor reads
+                // as inert. Pass 1 would print the frozen bytes under a welded directive and
+                // pass 2 would read no freeze and normalize them: a silent loss with nothing
+                // dropped and no gate firing. So the directive keeps its own line and the type
+                // hangs below it through the uniform forced-continuation indent — the same
+                // answer the spread's `...`, `keyof`'s operand and a named member's `label:`
+                // give their own gaps, and the same divergence: prettier pulls the directive
+                // onto the `...` line and honors it there anyway.
+                //
+                // Composite-transparent through [`Self::build_routed_child_doc`]: a Union /
+                // Intersection operand declines the freeze and applies Rule A instead, since
+                // the directive is ADJACENT to it — the composite's own leading run reaches
+                // back across whitespace alone and claims it, so its first member freezes.
+                // The head still owns the own-line emission, so the two can never both claim
+                // one directive.
+                //
+                // An IN-SHELL directive ([`Self::paren_interior_routed_inner`]) takes the
+                // same emission with the window widened to the paren-stripped inner's
+                // start, so the whole leading run reaches the hang and the shell drops —
+                // converging in ONE pass to the fixed point the bare authoring already
+                // holds, which is the value-side spread's answer at this same delimiter.
+                // Without it the shell's run was hoisted onto the `...` line and the freeze
+                // it had just earned was inert on the next pass.
+                let routed = if self.member_gap_frozen(dots_end, type_start) {
+                    Some((type_start, self.build_routed_child_doc(ty)))
+                } else {
+                    self.paren_interior_routed_inner(ty)
+                        .map(|inner| (inner.span().start, self.build_routed_inner_doc(ty, inner)))
+                };
+                if let Some((gap_end, value)) = routed {
+                    d.concat(&[
+                        d.text("..."),
+                        self.build_continuation_indent(dots_end, gap_end, value),
+                    ])
+                } else {
+                    // Break a line comment so it can't swallow the rest-element type.
+                    let comments_doc = self.build_trailing_comments_hang_next(dots_end, type_start);
+                    d.concat(&[d.text("..."), comments_doc, self.build_type_doc(ty)])
+                }
             }
             TSType::Optional(o) => {
                 // The optional element is the SOLE emitter of its operand shell's leading
@@ -926,12 +967,27 @@ impl<'a> Printer<'a> {
                 // directive — alone on its line by the placement floor — keeps its own
                 // line: the default emission below trails the first comment after `:`,
                 // a placement that reads as inert on the second pass.
+                // An IN-SHELL directive (`paren_interior_routed_inner`) takes the same
+                // hang with the window widened to the paren-stripped inner's start, so the
+                // shell's leading run reaches the emitter and the shell drops — converging
+                // in one pass to the fixed point the bare authoring holds (and to prettier's
+                // own form). Without it the run was hoisted onto the `label:` line, where
+                // the placement floor reads it as inert and the next pass loses the freeze.
                 let frozen_tail = after_colon.and_then(|after_colon| {
-                    self.single_child_frozen(after_colon, n.element_type)
-                        .then(|| {
-                            let frozen_doc = self.build_frozen_single_child_doc(n.element_type);
-                            self.build_keyword_hang_doc(":", after_colon, type_start, frozen_doc)
-                        })
+                    let (gap_end, value_doc) =
+                        if self.single_child_frozen(after_colon, n.element_type) {
+                            (
+                                type_start,
+                                self.build_frozen_single_child_doc(n.element_type),
+                            )
+                        } else {
+                            let inner = self.paren_interior_routed_inner(n.element_type)?;
+                            (
+                                inner.span().start,
+                                self.build_routed_inner_doc(n.element_type, inner),
+                            )
+                        };
+                    Some(self.build_keyword_hang_doc(":", after_colon, gap_end, value_doc))
                 });
                 let tail = frozen_tail.unwrap_or_else(|| {
                     // Comments between `:` and the element type; a line comment breaks so it

@@ -25,6 +25,13 @@ via `audit_signature.txt`). The same rule at the annotation head:
 [annotation_prettier_ignore_own_line](../annotation_prettier_ignore_own_line_prettier_divergence/).
 `unformatted_ours_spaces.svelte` perturbs whitespace outside the frozen slice; tsv
 normalizes it to input (prettier does not — it relocates the directive).
+`unformatted_ours_paren_shell.svelte` writes the directive **inside** the element type's
+redundant paren shell (`label: (⏎// prettier-ignore⏎…⏎)`): the shell strips, the run keeps
+its own line and the inner freezes, so the shelled authoring converges in one pass onto the
+bare authoring's fixed point — one fixed point per formatter, not per authoring. Prettier
+strips the shell too, but with the same relocation it applies to the bare form, so it
+converges onto `output_prettier.svelte` instead; the variant is `_ours_` because only tsv
+lands on `input`.
 
 The union-element placement matches prettier — the ordinary
 [named_tuple_prettier_ignore_element](../named_tuple_prettier_ignore_element/) fixture;

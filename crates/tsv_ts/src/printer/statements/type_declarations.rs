@@ -500,13 +500,10 @@ impl<'a> Printer<'a> {
             // slice instead (redundant parens drop unless the shell holds a comment).
             let type_doc = if interior_frozen_inner.is_some() {
                 // The frozen paren-stripped inner, with any trailing shell-gap
-                // comment lifted after it so the strip stays lossless.
-                self.with_stripped_paren_trailing(
-                    self.build_frozen_single_child_doc(value_type),
-                    &decl.type_annotation,
-                    value_type,
-                    TrailingBlock::Inline,
-                )
+                // comment lifted after it so the strip stays lossless. `value_type` is
+                // already filtered to a freeze target above, which is the arm
+                // `build_routed_inner_doc`'s routing takes here.
+                self.build_routed_inner_doc(&decl.type_annotation, value_type)
             } else if let Some(u) = handed_union {
                 // The union places the whole gap run, split at the author's last break.
                 // Through the same shell claim + lift as every other value here — the

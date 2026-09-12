@@ -303,9 +303,7 @@ impl<'a> Printer<'a> {
                 self.build_frozen_head_doc(child, frozen_annotation_parens(parens)),
             )
         } else if let Some(inner) = self.paren_interior_routed_inner(child) {
-            let inner_doc = self.build_routed_child_doc(inner);
-            let stripped =
-                self.with_stripped_paren_trailing(inner_doc, child, inner, TrailingBlock::Inline);
+            let stripped = self.build_routed_inner_doc(child, inner);
             (
                 inner.span().start,
                 self.wrap_annotation_required_pair(stripped, parens),

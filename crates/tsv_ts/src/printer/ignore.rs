@@ -65,6 +65,7 @@
 
 use super::ParenContext;
 use super::Printer;
+use super::types::TrailingBlock;
 use super::types::helpers::{TypeParenRule, outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
 use crate::ast::internal::{self, Comment, TSType};
@@ -1471,6 +1472,29 @@ impl<'a> Printer<'a> {
         } else {
             self.build_type_doc(child)
         }
+    }
+
+    /// The value doc for a head whose child is a paren SHELL that
+    /// [`Self::paren_interior_routed_inner`] routed: the routed inner, plus the comments the
+    /// shell's TRAILING gap holds lifted out after it.
+    ///
+    /// The two halves are one question — a strip is lossless only if what the shell held on
+    /// BOTH sides still prints. The routing hands the leading run to the head's own emitter
+    /// (that is what widening the window to `inner.span().start` buys); this lifts the
+    /// trailing half, so every shell comment prints exactly once. Spelled here rather than at
+    /// each head because a head that remembered one half and forgot the other would drop a
+    /// comment with no gate firing (`docs/comments.md` hazard 1).
+    ///
+    /// Every routed head uses it, the alias `=` included — it pre-filters its inner to a
+    /// freeze target, which is exactly the arm [`Self::build_routed_child_doc`] takes there,
+    /// so the shared spelling costs it nothing.
+    pub(in crate::printer) fn build_routed_inner_doc(
+        &self,
+        shell: &TSType<'_>,
+        inner: &TSType<'_>,
+    ) -> DocId {
+        let inner_doc = self.build_routed_child_doc(inner);
+        self.with_stripped_paren_trailing(inner_doc, shell, inner, TrailingBlock::Inline)
     }
 
     /// Whether a parenthesized member's shell — the bytes between `(` and the inner type,
