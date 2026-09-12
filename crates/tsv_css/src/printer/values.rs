@@ -595,10 +595,14 @@ impl<'a> Printer<'a> {
     ///   character cannot spell `kw` however it decodes — `calc(` refuses `url` on one
     ///   compare.
     ///
-    /// What survives both is an escape-spelled name, from an `@import` prelude or from the
-    /// value classifier (`parser::value::is_function_name`, which reads an escape as the
-    /// ident content it is), and nothing else — which is where the escape walk lives. No
-    /// corpus holds one.
+    /// What survives both is a LONGER name whose first byte could still begin `kw`, which
+    /// since the value classifier reads postcss's word rather than the spec's ident sequence
+    /// (`parser::value::is_function_name`) is two things rather than one: an escape-spelled
+    /// name, from an `@import` prelude or from that classifier, and a name carrying the
+    /// punctuation a word admits (`u/rl`, `url/`). Only the first can match, and the walk
+    /// below is where that is settled — it requires a `\` in the name before it decodes
+    /// anything, so a punctuation-bearing name refuses on one `memchr` and `url/(a.png)`
+    /// stays the generic function prettier also prints. No corpus holds either.
     #[inline]
     fn function_name_is(&self, name_span: Span, kw: &str) -> bool {
         let name = &self.source.as_bytes()[name_span.range()];

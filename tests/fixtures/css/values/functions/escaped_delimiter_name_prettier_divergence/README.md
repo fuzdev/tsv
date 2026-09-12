@@ -22,12 +22,15 @@ all that separates the two sides: the hex forms `a\28 b(.10)` and `a\29 b(.10)` 
 delimiter byte, and prettier normalizes those, agreeing with tsv (pinned by the plain
 sibling [escaped_name](../escaped_name/)).
 
-The escaped **open** paren is the one payload where the two agree: `a\(b(...)` leaves the
-name region ending in a dangling `\`, which is not a valid escape and so not an ident
-sequence, so tsv refuses the function and prints the declaration verbatim — the same output
-prettier reaches by unbalancing. That agreement is what keeps the value parser's
-escape-blind search for the opening `(` sound, and it is pinned as a control in
-[escaped_name](../escaped_name/).
+The escaped **open** paren is the payload tsv refuses outright: `a\(b(...)` leaves the name
+region ending in a dangling `\`, which is not a valid escape and so not word content, so tsv
+reads no function and prints the declaration verbatim — the same output prettier reaches by
+unbalancing. That refusal is what keeps the value parser's escape-blind search for the
+opening `(` sound, and the agreeing cell is pinned as a control in
+[escaped_name](../escaped_name/). It is **wider than that agreement**, though: where the
+escaped `(` happens to *balance* at the value's end, prettier reads its own one-byte word `\`
+as the name and normalizes inside (`a\(2.50)` → `a\(2.5)`, `\(2.50)` → `\(2.5)`), so those
+cells are an accepted cost of keeping the search blind rather than a shape the two agree on.
 
 No `output_prettier.*`: on tsv's canonical form (`input`) prettier agrees, so the
 divergence lives only in `prettier_variant_numbers` — a form prettier keeps stable that

@@ -1,0 +1,195 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1065,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 1056,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 233,
+							"end": 244,
+							"property": "b",
+							"value": "aa/(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 248,
+							"end": 265,
+							"property": "c",
+							"value": "aa/f(1.5, 2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 269,
+							"end": 283,
+							"property": "d",
+							"value": "aa/bb/(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 346,
+							"end": 359,
+							"property": "e",
+							"value": "#FFF/(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 443,
+							"end": 490,
+							"property": "f",
+							"value": "aa!(1.5) aa#(1.5) aa$(1.5) aa%(1.5) aa&(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 494,
+							"end": 541,
+							"property": "g",
+							"value": "aa.(1.5) aa<(1.5) aa=(1.5) aa>(1.5) aa?(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 545,
+							"end": 583,
+							"property": "h",
+							"value": "aa](1.5) aa^(1.5) aa|(1.5) aa~(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 630,
+							"end": 641,
+							"property": "i",
+							"value": ".aa(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 645,
+							"end": 656,
+							"property": "j",
+							"value": "]aa(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 824,
+							"end": 838,
+							"property": "k",
+							"value": "a[bb]c(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 842,
+							"end": 858,
+							"property": "l",
+							"value": "a[1.50]c(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1025,
+							"end": 1036,
+							"property": "m",
+							"value": "/aa(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1040,
+							"end": 1052,
+							"property": "n",
+							"value": "a\\(b(.10)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 1056
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " the value layer's oracle is postcss-values-parser, whose word ends at a small set\n\t\tof characters — a `/` is not one of them, so `aa/` is a function NAME and its\n\t\targuments normalize like any other function's ",
+				"start": 15,
+				"end": 230
+			},
+			{
+				"type": "CSSComment",
+				"value": " the name is emitted as written, hex-looking or not ",
+				"start": 287,
+				"end": 343
+			},
+			{
+				"type": "CSSComment",
+				"value": " every other character the word admits, each measured against the oracle ",
+				"start": 363,
+				"end": 440
+			},
+			{
+				"type": "CSSComment",
+				"value": " one of them may also OPEN the name ",
+				"start": 587,
+				"end": 627
+			},
+			{
+				"type": "CSSComment",
+				"value": " a `[…]` block's interior is word TEXT rather than a group the oracle descends\n\t\tinto, so the whole region is the name and its own number is kept as written ",
+				"start": 660,
+				"end": 821
+			},
+			{
+				"type": "CSSComment",
+				"value": " controls: a leading `/` is an operator, so the name that follows it is the\n\t\tordinary ident one, and a quote or a dangling `\\` is no word character at all ",
+				"start": 862,
+				"end": 1022
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1057,
+			"styles": "\n\ta {\n\t\t/* the value layer's oracle is postcss-values-parser, whose word ends at a small set\n\t\tof characters — a `/` is not one of them, so `aa/` is a function NAME and its\n\t\targuments normalize like any other function's */\n\t\tb: aa/(1.5);\n\t\tc: aa/f(1.5, 2.5);\n\t\td: aa/bb/(1.5);\n\t\t/* the name is emitted as written, hex-looking or not */\n\t\te: #FFF/(1.5);\n\t\t/* every other character the word admits, each measured against the oracle */\n\t\tf: aa!(1.5) aa#(1.5) aa$(1.5) aa%(1.5) aa&(1.5);\n\t\tg: aa.(1.5) aa<(1.5) aa=(1.5) aa>(1.5) aa?(1.5);\n\t\th: aa](1.5) aa^(1.5) aa|(1.5) aa~(1.5);\n\t\t/* one of them may also OPEN the name */\n\t\ti: .aa(1.5);\n\t\tj: ]aa(1.5);\n\t\t/* a `[…]` block's interior is word TEXT rather than a group the oracle descends\n\t\tinto, so the whole region is the name and its own number is kept as written */\n\t\tk: a[bb]c(1.5);\n\t\tl: a[1.50]c(1.5);\n\t\t/* controls: a leading `/` is an operator, so the name that follows it is the\n\t\tordinary ident one, and a quote or a dangling `\\` is no word character at all */\n\t\tm: /aa(1.5);\n\t\tn: a\\(b(.10);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1066,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

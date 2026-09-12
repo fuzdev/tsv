@@ -612,8 +612,18 @@ fn is_css_ident_code_point(ch: char) -> bool {
 ///
 /// The characters the class does hold (`.`, `/`, non-ASCII, and every ident code point) are
 /// right; what it lacks is the ~20 punctuation characters above and the tokenizer's
-/// digit-initial axis. TODO: take the extent from the oracle's tokenizer rather than from
-/// this class.
+/// digit-initial axis.
+///
+/// TODO: take the extent from the oracle's tokenizer rather than from this class. The
+/// **AST** path has since done exactly that for the function-name question —
+/// `parser::value::is_value_word_code_point` states the word class as the oracle's exclusion
+/// set, measured code point by code point — so the transcription this TODO wants already
+/// exists to copy from, and the remaining work is this path's own: a widening here changes
+/// at-rule preludes and comment-bearing values, the recasing direction, so it owes its own
+/// fixtures rather than a shared predicate. Note the two are not the same class even once
+/// both are right: the AST path refuses `{` / `}` and admits `[` / `]`, which is the
+/// oracle's asymmetry at a *function name*, while the list above is about how far a
+/// `<hash-token>`'s word reaches.
 fn is_hash_word_char(ch: char) -> bool {
     is_css_ident_code_point(ch) || ch == '.' || ch == '/'
 }

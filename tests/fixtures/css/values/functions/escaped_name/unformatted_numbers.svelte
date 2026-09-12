@@ -9,8 +9,8 @@
 		mask-image: u\72 l(a.png);
 		/* a hex escape spelling `(` is ident content like any other */
 		outline-color: a\28 b(.10);
-		/* a raw escaped `(` leaves a dangling `\` at the name's end — not an ident
-		sequence, so this is no function at all and stays verbatim */
+		/* a raw escaped `(` leaves a dangling `\` at the name's end — not word
+		content, so this is no function at all and stays verbatim */
 		background-color: a\(b(.10);
 	}
 </style>
