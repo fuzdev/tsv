@@ -123,6 +123,35 @@ enum FrozenTerminator {
 /// A Union/Intersection (paren-unwrapped) declines, so the member rules keep applying
 /// via the composite's own leading-run walk — the first member freezes (Rule A) — and
 /// the head rules and the member rules can never both claim one directive.
+/// The freeze SCOPE a routed head takes over its paren-stripped inner — the one axis
+/// [`Printer::build_routed_inner_doc`]'s callers disagree on, and the reason they share a
+/// seam rather than a family of near-identical names.
+#[derive(Clone, Copy)]
+pub(in crate::printer) enum RoutedScope {
+    /// Composite-transparent ([`Printer::build_routed_child_doc`]): a Union / Intersection
+    /// inner declines the freeze and applies Rule A through its own leading-run walk, which
+    /// reaches the same in-shell directive; anything else freezes whole. The head's child
+    /// never needs a precedence pair here, so a source paren is always redundant and drops.
+    /// The annotation `:`, alias `=`, named-tuple `label:`, tuple-rest `...` and array-element
+    /// heads.
+    Transparent,
+    /// [`Self::Transparent`] for a head whose child CAN need a precedence pair the strip has
+    /// to re-add — the conditional's `extends` operand, where a conditional or function-type
+    /// inner takes one. The two arms are the bare authoring's own two arms at that head, so
+    /// the shelled and paren-free spellings converge on one form.
+    TransparentParens(TypeParenRule),
+    /// Frozen WHOLE, composite or not — the conditional-type BRANCHES, the one position where
+    /// composite-transparency would be wrong.
+    ///
+    /// A composite branch has nothing to bind the directive to in the paren-free authoring
+    /// (the interposing `?` / `:` blocks the member rules' leading-run walk), so it freezes
+    /// whole, operators and all. Inside the shell the `(` IS transparent and the composite
+    /// could bind it — taking that would hand the shelled spelling a first-member-only freeze
+    /// the bare one does not have, so the branch keeps its own scope and the two authorings
+    /// land on one form.
+    Whole,
+}
+
 pub(in crate::printer) fn is_freeze_target(child: &TSType<'_>) -> bool {
     !matches!(
         unwrap_parenthesized(child),
@@ -1485,15 +1514,28 @@ impl<'a> Printer<'a> {
     /// each head because a head that remembered one half and forgot the other would drop a
     /// comment with no gate firing (`docs/comments.md` hazard 1).
     ///
-    /// Every routed head uses it, the alias `=` included — it pre-filters its inner to a
-    /// freeze target, which is exactly the arm [`Self::build_routed_child_doc`] takes there,
-    /// so the shared spelling costs it nothing.
+    /// Every routed head uses it, and [`RoutedScope`] is the one axis they disagree on —
+    /// named at the call site rather than picked by choosing among near-identical function
+    /// names, so the lift above can never be the thing a new head forgets. The alias `=`
+    /// pre-filters its inner to a freeze target, which is exactly the arm
+    /// [`RoutedScope::Transparent`] takes there, so the shared spelling costs it nothing.
     pub(in crate::printer) fn build_routed_inner_doc(
         &self,
         shell: &TSType<'_>,
         inner: &TSType<'_>,
+        scope: RoutedScope,
     ) -> DocId {
-        let inner_doc = self.build_routed_child_doc(inner);
+        let inner_doc = match scope {
+            RoutedScope::Transparent => self.build_routed_child_doc(inner),
+            RoutedScope::TransparentParens(member_parens) => {
+                if is_freeze_target(inner) {
+                    self.build_frozen_head_doc(inner, member_parens)
+                } else {
+                    self.build_type_doc_maybe_parens(inner, member_parens)
+                }
+            }
+            RoutedScope::Whole => self.build_frozen_single_child_doc(inner),
+        };
         self.with_stripped_paren_trailing(inner_doc, shell, inner, TrailingBlock::Inline)
     }
 

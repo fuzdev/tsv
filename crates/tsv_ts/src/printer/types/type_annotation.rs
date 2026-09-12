@@ -8,6 +8,7 @@
 use super::helpers::{TypeParenRule, type_args_should_wrap_for_return_type, unwrap_parenthesized};
 use super::{CommentSpacing, Printer, TrailingBlock, UnionValueDoc};
 use crate::ast::internal::{self, TSType};
+use crate::printer::ignore::RoutedScope;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -303,7 +304,7 @@ impl<'a> Printer<'a> {
                 self.build_frozen_head_doc(child, frozen_annotation_parens(parens)),
             )
         } else if let Some(inner) = self.paren_interior_routed_inner(child) {
-            let stripped = self.build_routed_inner_doc(child, inner);
+            let stripped = self.build_routed_inner_doc(child, inner, RoutedScope::Transparent);
             (
                 inner.span().start,
                 self.wrap_annotation_required_pair(stripped, parens),

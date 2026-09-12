@@ -3,7 +3,7 @@
 
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
-use crate::printer::ignore::is_freeze_target;
+use crate::printer::ignore::{RoutedScope, is_freeze_target};
 use crate::printer::layout::{
     fluid_after_operator, fluid_after_operator_unindented, hang_after_operator,
     hang_after_operator_unindented,
@@ -503,7 +503,11 @@ impl<'a> Printer<'a> {
                 // comment lifted after it so the strip stays lossless. `value_type` is
                 // already filtered to a freeze target above, which is the arm
                 // `build_routed_inner_doc`'s routing takes here.
-                self.build_routed_inner_doc(&decl.type_annotation, value_type)
+                self.build_routed_inner_doc(
+                    &decl.type_annotation,
+                    value_type,
+                    RoutedScope::Transparent,
+                )
             } else if let Some(u) = handed_union {
                 // The union places the whole gap run, split at the author's last break.
                 // Through the same shell claim + lift as every other value here — the

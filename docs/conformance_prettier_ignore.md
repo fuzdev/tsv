@@ -227,7 +227,11 @@ freezes). Adjacency is what makes that split well-defined: the composite claims 
 directive through its own leading run, which crosses only whitespace and the
 transparent `|` / `&` / `(`. At the conditional branches the interposing `?` / `:`
 token blocks that run, so a composite branch has nothing to bind to and freezes
-**whole**, operators and all — prettier's scope there too. The ordinary fixtures
+**whole**, operators and all — prettier's scope there too. A directive the author wrote
+inside the branch's paren **shell** freezes whole as well, though the `(` there is
+transparent and the composite could bind it: the two authorings of one claim settle on one
+form, so the shelled spelling takes the branch position's scope rather than a
+first-member-only freeze of its own. The ordinary fixtures
 `alias_prettier_ignore_value`, `annotation_prettier_ignore_union_member`,
 `named_tuple_prettier_ignore_element`, `mapped_prettier_ignore_signature` (a
 directive above a mapped type's `[K in ...]: V` clause freezes the whole clause — the

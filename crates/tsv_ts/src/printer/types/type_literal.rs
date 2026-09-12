@@ -340,7 +340,7 @@ impl<'a> Printer<'a> {
     ///
     /// Special case: intersection with trailing object type builds a custom doc
     /// so that `})` can be aligned properly (one indent level past the base).
-    pub(super) fn build_type_doc_maybe_parens(
+    pub(in crate::printer) fn build_type_doc_maybe_parens(
         &self,
         ts_type: &TSType<'_>,
         needs_parens: TypeParenRule,
