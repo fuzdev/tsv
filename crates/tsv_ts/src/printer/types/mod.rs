@@ -465,6 +465,26 @@ impl<'a> Printer<'a> {
                 let needs_parens = operand_pair == ShellPair::Kept;
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
+                // An alone-on-line format-ignore directive in the keyword→operand gap hangs the
+                // same way and freezes a non-composite operand verbatim
+                // (`single_child_frozen`; a union / intersection operand declines and freezes
+                // via its own leading-run walk, which reaches the directive across the gap's
+                // whitespace and the transparent `(`). The precedence parens are the
+                // printer's, not the author's, so they ride outside the slice — the freeze is
+                // told the same `type_needs_parens_for_prefix_operator` rule the layouts below
+                // apply, so a bare operand that needs them gets them re-synthesized and a
+                // source-parenthesized one freezes whole.
+                if self.single_child_frozen(keyword_end, o.type_annotation) {
+                    return self.build_keyword_hang_doc(
+                        o.operator.as_str(),
+                        keyword_end,
+                        o.type_annotation.span().start,
+                        self.build_frozen_head_doc(
+                            o.type_annotation,
+                            type_needs_parens_for_prefix_operator,
+                        ),
+                    );
+                }
                 // A line comment, a multiline block, or a block run whose break is forced
                 // (`keyword_value_hang_doc`) keeps the comment with the operator and hangs the
                 // operand on the next line, indented one level (the shared keyword→value
@@ -524,14 +544,12 @@ impl<'a> Printer<'a> {
                 if let Some(value_doc) =
                     self.keyword_value_hang_doc(keyword_end, operand_hang_start, hang_value_doc)
                 {
-                    let mut parts = smallvec![d.text(o.operator.as_str())];
-                    self.append_keyword_value_line_comments(
-                        &mut parts,
+                    return self.build_keyword_hang_doc(
+                        o.operator.as_str(),
                         keyword_end,
                         operand_hang_start,
                         value_doc,
                     );
-                    return d.concat(&parts);
                 }
                 // `None` on the comment-free `keyof T` / `readonly T[]` — no empty child.
                 // The window is the hang's: a block in a transparent one-member composite's
@@ -577,18 +595,24 @@ impl<'a> Printer<'a> {
                 // Comments between `typeof` and the expression
                 let typeof_end = q.span.start + "typeof".len() as u32;
                 let expr_start = q.expr_name.span().start;
-                // A line comment, a multiline block, or a block run whose break is forced keeps
-                // the comment with `typeof` and hangs the expression on the next line (the
-                // shared keyword→value layout). A single-line block comment (own-line, trailing, or glued)
-                // collapses inline (`typeof /* c */ x`) like the other prefix operators
-                // (in-place-collapse, not relocation).
-                let hang_value_doc = || {
-                    let mut value_parts: DocBuf =
-                        smallvec![self.build_type_query_expr_name_doc(&q.expr_name)];
+                // An alone-on-line format-ignore directive in the `typeof`→name gap hangs the
+                // same way and freezes the entity NAME verbatim. The slice is the name's own
+                // span, so type arguments — which sit past it — stay parent-owned and still
+                // normalize, the same scope split as `new`'s frozen callee.
+                // Everything from the entity name rightwards, which is what the gap HANGS:
+                // the name (verbatim when frozen), the name→`<` gap's comments and the type
+                // arguments. Both are past the frozen slice, so they stay parent-owned and
+                // normalize — the same scope split as `new`'s frozen callee. ⚠️ They belong
+                // INSIDE the hung value, not concatenated after it: appended outside, a
+                // type-argument list that breaks renders a level short of the indent its
+                // unfrozen twin gives it. And the gap must be ASKED — omitting it DROPPED
+                // `typeof⏎// prettier-ignore⏎b /* c */ <D>`'s comment (docs/comments.md
+                // hazard 4).
+                let query_value_doc = |name_doc: DocId| {
+                    let mut value_parts: DocBuf = smallvec![name_doc];
                     if let Some(type_args) = &q.type_arguments {
-                        let gap_start = q.expr_name.span().end;
                         if let Some(doc) = self.build_name_to_type_params_comments_opt(
-                            gap_start,
+                            q.expr_name.span().end,
                             type_args.span.start,
                             CommentSpacing::Trailing,
                         ) {
@@ -598,14 +622,28 @@ impl<'a> Printer<'a> {
                     }
                     d.concat(&value_parts)
                 };
+                // An alone-on-line format-ignore directive in the `typeof`→name gap hangs the
+                // same way and freezes the entity NAME verbatim.
+                if let Some(frozen) = self.gap_frozen_span(typeof_end, q.expr_name.span()) {
+                    return self.build_keyword_hang_doc(
+                        "typeof",
+                        typeof_end,
+                        expr_start,
+                        query_value_doc(self.build_frozen_span_doc(frozen)),
+                    );
+                }
+                // A line comment, a multiline block, or a block run whose break is forced keeps
+                // the comment with `typeof` and hangs the expression on the next line (the
+                // shared keyword→value layout). A single-line block comment (own-line, trailing, or glued)
+                // collapses inline (`typeof /* c */ x`) like the other prefix operators
+                // (in-place-collapse, not relocation).
+                let hang_value_doc =
+                    || query_value_doc(self.build_type_query_expr_name_doc(&q.expr_name));
                 if let Some(value_doc) =
                     self.keyword_value_hang_doc(typeof_end, expr_start, hang_value_doc)
                 {
-                    let mut parts = smallvec![d.text("typeof")];
-                    self.append_keyword_value_line_comments(
-                        &mut parts, typeof_end, expr_start, value_doc,
-                    );
-                    return d.concat(&parts);
+                    return self
+                        .build_keyword_hang_doc("typeof", typeof_end, expr_start, value_doc);
                 }
                 let mut parts: DocBuf = smallvec![d.text("typeof ")];
                 if let Some(comments) = self
@@ -892,14 +930,7 @@ impl<'a> Printer<'a> {
                     self.single_child_frozen(after_colon, n.element_type)
                         .then(|| {
                             let frozen_doc = self.build_frozen_single_child_doc(n.element_type);
-                            let mut tail: DocBuf = smallvec![d.text(":")];
-                            self.append_keyword_value_line_comments(
-                                &mut tail,
-                                after_colon,
-                                type_start,
-                                frozen_doc,
-                            );
-                            d.concat(&tail)
+                            self.build_keyword_hang_doc(":", after_colon, type_start, frozen_doc)
                         })
                 });
                 let tail = frozen_tail.unwrap_or_else(|| {
@@ -960,6 +991,18 @@ impl<'a> Printer<'a> {
                 // Comments between `infer` and the type parameter name
                 let infer_end = i.span.start + "infer".len() as u32;
                 let name_start = i.type_parameter.name.span.start;
+                // An alone-on-line format-ignore directive in the `infer`→name gap hangs the
+                // same way and freezes the type parameter verbatim — the whole
+                // `C extends D` clause, since the constraint is part of the parameter the
+                // directive precedes.
+                if let Some(frozen) = self.gap_frozen_span(infer_end, i.type_parameter.span) {
+                    return self.build_keyword_hang_doc(
+                        "infer",
+                        infer_end,
+                        name_start,
+                        self.build_frozen_span_doc(frozen),
+                    );
+                }
                 // Delegate the name + optional `extends C` constraint to the shared
                 // type-parameter doc builder — prettier's `printInferType` is
                 // `["infer ", print("typeParameter")]`, so an infer constraint lays
@@ -974,14 +1017,12 @@ impl<'a> Printer<'a> {
                 if let Some(type_param_doc) =
                     self.keyword_value_hang_doc(infer_end, name_start, || type_param_doc)
                 {
-                    let mut parts: DocBuf = smallvec![d.text("infer")];
-                    self.append_keyword_value_line_comments(
-                        &mut parts,
+                    return self.build_keyword_hang_doc(
+                        "infer",
                         infer_end,
                         name_start,
                         type_param_doc,
                     );
-                    return d.concat(&parts);
                 }
                 // A block comment glued to the name stays inline (`infer /* c */ R`).
                 let comments_doc = self.build_trailing_comments_hang_next(infer_end, name_start);

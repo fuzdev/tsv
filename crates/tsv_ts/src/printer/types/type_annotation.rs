@@ -151,7 +151,6 @@ impl<'a> Printer<'a> {
         annotation: &internal::TSTypeAnnotation<'_>,
         parens: AnnotationParens,
     ) -> DocId {
-        let d = self.d();
         // Check for comments between `:` and the type
         let colon_end = annotation.span.start + 1; // After the `:`
         // A redundant paren shell with a leading line-comment run (`: (// c\n T)`) strips
@@ -222,9 +221,7 @@ impl<'a> Printer<'a> {
                 TrailingBlock::Inline,
                 || self.build_annotation_value_doc(ty, parens),
             );
-            let mut parts: DocBuf = smallvec![d.text(":")];
-            self.append_keyword_value_line_comments(&mut parts, colon_end, type_start, type_doc);
-            d.concat(&parts)
+            self.build_keyword_hang_doc(":", colon_end, type_start, type_doc)
         } else {
             // Handle unions/intersections with width-based breaking
             // Short: `param: Type1 | Type2`
@@ -298,7 +295,6 @@ impl<'a> Printer<'a> {
         annotation: &internal::TSTypeAnnotation<'_>,
         parens: AnnotationParens,
     ) -> DocId {
-        let d = self.d();
         let colon_end = annotation.span.start + 1;
         let child = annotation.type_annotation;
         let (gap_end, value_doc) = if self.single_child_frozen(colon_end, child) {
@@ -320,9 +316,7 @@ impl<'a> Printer<'a> {
                 self.build_annotation_value_doc(child, parens),
             )
         };
-        let mut parts: DocBuf = smallvec![d.text(":")];
-        self.append_keyword_value_line_comments(&mut parts, colon_end, gap_end, value_doc);
-        d.concat(&parts)
+        self.build_keyword_hang_doc(":", colon_end, gap_end, value_doc)
     }
 
     /// Emit `: <block-comments> <type>` for a simple annotation — the fall-through
@@ -778,14 +772,7 @@ impl<'a> Printer<'a> {
                 } else {
                     self.build_type_doc(child)
                 };
-                let mut parts: DocBuf = smallvec![d.text(":")];
-                self.append_keyword_value_line_comments(
-                    &mut parts,
-                    colon_end,
-                    first_type_start,
-                    value_doc,
-                );
-                return d.concat(&parts);
+                return self.build_keyword_hang_doc(":", colon_end, first_type_start, value_doc);
             }
             let mut parts: DocBuf = smallvec![d.text(": ")];
             if let Some(comments_doc) = self

@@ -1719,14 +1719,12 @@ impl<'a> Printer<'a> {
                 } else {
                     d.join(item_docs, ", ")
                 };
-                let mut parts = smallvec![d.text(keyword.as_str())];
-                self.append_keyword_value_line_comments(
-                    &mut parts,
+                return self.build_keyword_hang_doc(
+                    keyword.as_str(),
                     kw_end,
                     items[0].span.start,
                     value_doc,
                 );
-                return d.concat(&parts);
             }
         }
 
@@ -2049,6 +2047,30 @@ impl<'a> Printer<'a> {
         }
         value_block.push(value_doc);
         parts.push(d.indent(d.concat(&value_block)));
+    }
+
+    /// [`Self::append_keyword_value_line_comments`] for the caller whose WHOLE prefix ahead of
+    /// the gap is one token — `new`, `await`, `infer`, `typeof`, a prefix type operator, an
+    /// annotation's `:`, a function type's `=>`, a declaration header's keyword. Thirteen seams
+    /// spelled the same three lines, and with them the emitter's ⚠️ above: the token goes in
+    /// **bare**, because that seam owns every separator after it. Stating it once is what keeps a
+    /// fourteenth from restating it wrong — the same reason the freeze routes through one head
+    /// helper rather than one `if` per arm.
+    ///
+    /// A caller with more than the token ahead of the gap — a `)` before a return type's `=>`, a
+    /// key before an object member's `:`, a `[` after an already-built object — still builds its
+    /// own `parts` and appends into it; this is the wrapper, not a replacement.
+    pub(crate) fn build_keyword_hang_doc(
+        &self,
+        keyword: &'static str,
+        keyword_end: u32,
+        value_start: u32,
+        value_doc: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts: DocBuf = smallvec![d.text(keyword)];
+        self.append_keyword_value_line_comments(&mut parts, keyword_end, value_start, value_doc);
+        d.concat(&parts)
     }
 
     /// Whether the FIRST comment of an operator→value gap keeps the line the author gave
