@@ -408,6 +408,10 @@ fn preload_ancestors(
 /// ([`preload_ancestors`]) and for each directory a file argument's scope moves into
 /// ([`FileScope::enter`]); `stack` must already hold what this pushed for every ancestor of
 /// `dir`.
+///
+/// The gate is all this adds to [`push_layers`], which the descent reaches too: the
+/// preload differs from a walked directory only in [probing](IgnorePresence::probe) for
+/// the files a listing would have named.
 fn push_dir_layers(
     dir: &Path,
     format_root: &Path,
@@ -419,38 +423,104 @@ fn push_dir_layers(
     if stack.is_ignored(&anchor, true) {
         return None;
     }
-    // No listing, so presence is probed — by the descent's own rule (`is_ignore_file`), so
-    // a directory reads the same files whether it is walked or preloaded. A
-    // present-but-unreadable `.formatignore` still shadows (`read_ignore_file` warns and
-    // yields no rules rather than falling through), and only an absent one hands the level
-    // to `.prettierignore`.
-    let has_formatignore = is_ignore_file(&dir.join(FORMATIGNORE_FILE));
-    let has_prettierignore = in_repo && is_ignore_file(&dir.join(PRETTIERIGNORE_FILE));
+    Some(push_layers(
+        dir,
+        &anchor,
+        in_repo,
+        IgnorePresence::probe(dir, in_repo),
+        stack,
+        warnings,
+    ))
+}
+
+/// Which of one directory's ignore files are there — the facts [`push_layers`] decides
+/// over, so the two walks learn presence their own way (a [probe](Self::probe) for a
+/// directory no listing is held for, the listing itself in [`collect_recursive`]) and
+/// read the same files either way.
+///
+/// `prettierignore` is presence, not a decision to read: `tsv_layer_content` consults it
+/// only inside a repo, and outside one it feeds the target root's heads-up
+/// ([`prettierignore_outside_repo_warning`]) instead. It is also the one field a caller
+/// may leave `false` unasked — see [`Self::probe`].
+#[derive(Clone, Copy, Default)]
+struct IgnorePresence {
+    formatignore: bool,
+    prettierignore: bool,
+    gitignore: GitignorePresence,
+}
+
+impl IgnorePresence {
+    /// The presence at `dir` probed a file at a time — what a directory no listing is
+    /// held for costs. `.formatignore` and `.prettierignore` take the descent's own rule
+    /// ([`is_ignore_file`]), `.gitignore` git's ([`GitignorePresence::at`]).
+    ///
+    /// Outside a repo `.prettierignore` is left `false` unprobed: nothing reads it there
+    /// but the target root's heads-up, which only the descent raises — and outside a repo
+    /// the format root is the *filesystem* root, so an ancestor chain is long enough that
+    /// a stat per level is worth not paying.
+    fn probe(dir: &Path, in_repo: bool) -> Self {
+        Self {
+            formatignore: is_ignore_file(&dir.join(FORMATIGNORE_FILE)),
+            prettierignore: in_repo && is_ignore_file(&dir.join(PRETTIERIGNORE_FILE)),
+            gitignore: if in_repo {
+                GitignorePresence::at(&dir.join(GITIGNORE_FILE))
+            } else {
+                GitignorePresence::Absent
+            },
+        }
+    }
+}
+
+/// Push one directory's ignore layers onto `stack` at `anchor`, returning which it
+/// pushed — the single statement of the ladder both walks run, so a preload and a
+/// descent cannot drift on it.
+///
+/// The tsv layer first ([`tsv_layer_content`], which also warns about a
+/// `.prettierignore` its sibling shadows), then the `.gitignore`, which pushes only from
+/// a regular file: a symlinked one git does not follow and an unreadable one has no
+/// rules to apply, so both warn and push nothing — leaving the build-output heuristic on
+/// for the subtree, which the warning is what makes visible. Nothing here is gated on
+/// `in_repo` beyond what `tsv_layer_content` gates itself: outside a repo
+/// `presence.gitignore` is already [`GitignorePresence::Absent`], by the rule each caller
+/// read it with.
+///
+/// `dir` is the directory's **absolute** path — the one spelling its ignore files are
+/// read by and every ignore-file diagnostic names it by, whichever root or argument
+/// spelling reached it (see [`tsv_layer_content`]).
+fn push_layers(
+    dir: &Path,
+    anchor: &str,
+    in_repo: bool,
+    presence: IgnorePresence,
+    stack: &mut IgnoreStack,
+    warnings: &mut Vec<String>,
+) -> PushedLayers {
     let mut pushed = PushedLayers::default();
-    if let Some(layer) =
-        tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, warnings)
-    {
-        layer.push_onto(stack, &anchor);
+    if let Some(layer) = tsv_layer_content(
+        dir,
+        presence.formatignore,
+        presence.prettierignore,
+        in_repo,
+        warnings,
+    ) {
+        layer.push_onto(stack, anchor);
         pushed.tsv = true;
     }
-    // `.gitignore` layer: only inside a git repo, and never through a symlink, which git
-    // does not follow (`GitignorePresence`)
-    if in_repo {
-        let gitignore = dir.join(GITIGNORE_FILE);
-        match GitignorePresence::at(&gitignore) {
-            GitignorePresence::Absent => {}
-            GitignorePresence::Symlink => warnings.push(tsv_discover::gitignore_symlink_warning(
-                &gitignore.to_string_lossy(),
-            )),
-            GitignorePresence::File => {
-                if let IgnoreRead::Content(content) = read_ignore_file(&gitignore, warnings) {
-                    stack.push_gitignore(&anchor, &content);
-                    pushed.gitignore = true;
-                }
+    match presence.gitignore {
+        GitignorePresence::Absent => {}
+        GitignorePresence::Symlink => warnings.push(tsv_discover::gitignore_symlink_warning(
+            &dir.join(GITIGNORE_FILE).to_string_lossy(),
+        )),
+        GitignorePresence::File => {
+            if let IgnoreRead::Content(content) =
+                read_ignore_file(&dir.join(GITIGNORE_FILE), warnings)
+            {
+                stack.push_gitignore(anchor, &content);
+                pushed.gitignore = true;
             }
         }
     }
-    Some(pushed)
+    pushed
 }
 
 /// Which layers one directory pushed onto a stack — what taking it back off pops.
@@ -545,11 +615,15 @@ fn collect_file(path: &str, cwd: Option<&Path>, scope: &mut FileScope, out: &mut
         out.errors.push(tsv_discover::unresolvable_root_error(path));
         return false;
     };
-    let Some(dir_abs) = file_abs.parent() else {
-        // an absolute path to a file always has a parent; the arm keeps the walk total
-        out.files.push(PathBuf::from(path));
-        return false;
-    };
+    // An absolute path to a *file* always has a parent — only the filesystem root has
+    // none, and `classify_args` already answered `is_file()`. Falling back to the path
+    // itself keeps the arm total the one way that still grades the file: scoping on it
+    // resolves the same format root and the same `rel`, where an arm that pushed the
+    // file unchecked would do the one thing this module refuses everywhere else — take
+    // a named path with no format root and none of its ancestors' rules
+    // (`absolute_named_path`'s `None` exists to prevent exactly that). A directory
+    // probe on a file is harmless: the ignore-file stats simply fail.
+    let dir_abs = file_abs.parent().unwrap_or(&file_abs);
     scope.enter(dir_abs, &mut out.warnings);
     let rel = rel_to(&scope.format_root, &file_abs);
     if !scope.stack.is_ignored(&rel, false) {
@@ -740,18 +814,17 @@ fn collect_recursive(
     // needs, rather than a linear scan per name. `read_dir` order is arbitrary
     // (not sorted), so there's nothing to short-circuit on; one pass bounds the
     // cost on a large directory regardless of how many names we check.
-    let (mut has_formatignore, mut has_prettierignore) = (false, false);
-    let mut gitignore = GitignorePresence::Absent;
+    let mut presence = IgnorePresence::default();
     for (name, file_type) in &entries {
         let n = name.as_os_str();
         let present = if n == OsStr::new(FORMATIGNORE_FILE) {
-            &mut has_formatignore
+            &mut presence.formatignore
         } else if n == OsStr::new(PRETTIERIGNORE_FILE) {
-            &mut has_prettierignore
+            &mut presence.prettierignore
         } else {
             if in_repo && n == OsStr::new(GITIGNORE_FILE) {
                 // git's presence rule, which the listing's unfollowed file type answers
-                gitignore = GitignorePresence::of_listing(*file_type);
+                presence.gitignore = GitignorePresence::of_listing(*file_type);
             }
             continue;
         };
@@ -761,55 +834,40 @@ fn collect_recursive(
         *present =
             file_type.is_file() || (file_type.is_symlink() && is_ignore_file(&dir.abs.join(n)));
     }
-    let tsv_pushed = if let Some(layer) = tsv_layer_content(
+    // the ladder itself is `push_layers`, shared with the ancestor preload
+    // (`push_dir_layers`) — this path differs only in having read presence off the
+    // listing instead of probing for it
+    let pushed = push_layers(
         dir.abs,
-        has_formatignore,
-        has_prettierignore,
+        dir_rel,
         in_repo,
+        presence,
+        stack,
         &mut out.warnings,
-    ) {
-        layer.push_onto(stack, dir_rel);
-        true
-    } else {
-        false
-    };
+    );
     // outside a git repo a target-root `.prettierignore` is silently skipped (tsv
     // reads `.formatignore` there) — warn, from the listing already in hand (no
     // extra stat), pointing at the rename / `git init` fixes. Bounded to the
     // target root: outside a repo tsv's regime is `.formatignore`-only at every
     // depth (the hierarchical `.prettierignore` read is repo-only), so this is a
     // courtesy heads-up at the entry point, not a per-directory scan — and a subdir
-    // target has no `.git` boundary to anchor an upward walk on.
+    // target has no `.git` boundary to anchor an upward walk on. The preload raises
+    // it for no ancestor, which is why `IgnorePresence::probe` can leave
+    // `prettierignore` unasked outside a repo where this reads it.
     if is_target_root
         && let Some(warning) = prettierignore_outside_repo_warning(
             &dir.abs.to_string_lossy(),
             in_repo,
-            has_prettierignore,
-            has_formatignore,
+            presence.prettierignore,
+            presence.formatignore,
         )
     {
         out.warnings.push(warning);
     }
-    // `.gitignore` layer: only inside a repo (`gitignore` stays `Absent` outside one);
-    // it turns the heuristic off for this dir's children. A present-but-unreadable
-    // `.gitignore` warns (inside `read_ignore_file`) and is *not* pushed — so the
-    // heuristic stays on for this subtree, which the warning makes visible — and a
-    // symlinked one, which git does not follow, takes the same path with its own warning.
-    if gitignore == GitignorePresence::Symlink {
-        out.warnings.push(tsv_discover::gitignore_symlink_warning(
-            &dir.abs.join(GITIGNORE_FILE).to_string_lossy(),
-        ));
-    }
-    let git_pushed = if gitignore == GitignorePresence::File
-        && let IgnoreRead::Content(content) =
-            read_ignore_file(&dir.abs.join(GITIGNORE_FILE), &mut out.warnings)
-    {
-        stack.push_gitignore(dir_rel, &content);
-        true
-    } else {
-        false
-    };
-    let child_heuristic = heuristic_active && !git_pushed;
+    // this dir's own `.gitignore`, if `push_layers` pushed one, turns the heuristic off
+    // for its children — an unreadable or symlinked one pushes nothing, so the heuristic
+    // stays on for the subtree and the warning it raised is what makes that visible
+    let child_heuristic = heuristic_active && !pushed.gitignore;
 
     for (name, file_type) in &entries {
         let name = name.to_string_lossy();
@@ -872,12 +930,7 @@ fn collect_recursive(
     // and for a buffer that is already empty.
     out.files.flush();
 
-    if git_pushed {
-        stack.pop_gitignore();
-    }
-    if tsv_pushed {
-        stack.pop_tsv();
-    }
+    pushed.pop_from(stack);
 }
 
 /// Whether `path` names an ignore file: a regular file, reached through a symlink
@@ -895,8 +948,11 @@ fn is_ignore_file(path: &Path) -> bool {
 /// which the walk reports ([`tsv_discover::gitignore_symlink_warning`]) and otherwise
 /// treats as a file whose rules could not be read; anything but a regular file or a link
 /// is absent, as for the tsv layer.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 enum GitignorePresence {
+    /// The default so [`IgnorePresence`] can start from one: a directory outside a repo
+    /// never asks, and a listing that never names a `.gitignore` never sets it.
+    #[default]
     Absent,
     File,
     Symlink,

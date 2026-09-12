@@ -523,33 +523,35 @@ function refuse_source_type_language(parser, source_type, code) {
 }
 
 /**
- * The refusal for a file whose extension tsv does not handle, or `undefined` for one
- * it does — `tsv_discover::unsupported_extension_error` through the binding, message
- * and all, so this never hand-mirrors the native extension list. It rides the
- * `IgnoreStack` class (the receiver is unused), so a throwaway stack is the whole
- * cost of reaching it — freed on the spot, since no wasm-backed handle may outlive
- * into a run that can `reinstantiate`.
+ * Call `ask` with a throwaway `IgnoreStack`, freeing it on the spot.
+ *
+ * The argument refusals below are `tsv_discover`'s, taken through the binding so this
+ * file never hand-mirrors their text — and they ride the `IgnoreStack` class (the
+ * receiver is unused) because a class is what the package facade re-exports. Both come
+ * BEFORE any walk has a stack to ask, so each needs one of its own; the `finally` is not
+ * optional, since no wasm-backed handle may outlive discovery into a run that can
+ * `reinstantiate`.
  */
-function unsupported_extension_error(path) {
+function with_arg_policy(ask) {
 	const arg_policy = new IgnoreStack();
 	try {
-		return arg_policy.unsupported_extension_error(path);
+		return ask(arg_policy);
 	} finally {
 		free_ignore_stack(arg_policy);
 	}
 }
 
+/** The refusal for a file whose extension tsv does not handle, or `undefined` for one it
+ * does — the binding's `tsv_discover::unsupported_extension_error`, message and all, so
+ * this never hand-mirrors the native extension list. */
+function unsupported_extension_error(path) {
+	return with_arg_policy((policy) => policy.unsupported_extension_error(path));
+}
+
 /** The traversal error for a relative root the working directory cannot resolve — the
- * binding's `tsv_discover::unresolvable_root_error`, taken through a throwaway stack
- * as `unsupported_extension_error` takes its own, since the refusal comes before
- * `collect_root` assembles one. */
+ * binding's `tsv_discover::unresolvable_root_error`. */
 function unresolvable_root_error(root) {
-	const arg_policy = new IgnoreStack();
-	try {
-		return arg_policy.unresolvable_root_error(root);
-	} finally {
-		free_ignore_stack(arg_policy);
-	}
+	return with_arg_policy((policy) => policy.unresolvable_root_error(root));
 }
 
 /** Extension-based parser detection, mirroring the native `ParserType::from_extension`. */
@@ -1213,11 +1215,15 @@ async function format_files_parallel(files, check, jobs) {
  * a per-file message: the send is enqueued before the exception propagates, so
  * the parent gets the partial batch and only then the `error` event (verified
  * on Node and Bun; the package test pins the ordering by spawning this file as
- * a worker with a cursor `Atomics.add` rejects). A hard abort — OOM, a kill —
- * still loses the batch, and there the conservative over-report is the right
- * answer anyway. (An OOM under an inherited heap limit is process-fatal, not
- * worker-scoped — a worker-scoped one would need `resourceLimits`, which this
- * pool deliberately doesn't set.)
+ * a worker with a cursor `Atomics.add` rejects). A termination this `finally`
+ * never runs — a heap OOM, a kill — still loses the batch, and there the
+ * conservative over-report is the right answer anyway. (A Node worker carries its
+ * own old-gen cap, 2048 MiB, whether or not `resourceLimits` is passed — the pool
+ * passes `stackSizeMb` alone and Node fills the rest with those same defaults, so
+ * it neither sets nor moves the heap limit — and exceeding it arrives as an
+ * `ERR_WORKER_OUT_OF_MEMORY` `error` event rather than killing the process. The
+ * parent survives it; the batch does not, since the worker is terminated before
+ * the `finally` can post.)
  */
 function run_format_worker() {
 	const { files, check, cursor } = workerData;
@@ -1725,23 +1731,61 @@ function preload_ancestors(stack, dirs, format_root, in_repo, warnings) {
  * (`preload_ancestors`) and for each directory a file argument's scope moves into
  * (`enter_file_scope`); `stack` must already hold what this pushed for every ancestor of
  * `dir`. Mirrors the native `push_dir_layers`.
+ *
+ * The gate is all this adds to `push_layers`, which the descent reaches too: the preload
+ * differs from a walked directory only in PROBING for the files a listing would have
+ * named (`probe_ignore_presence`).
  * @returns {{tsv: boolean, gitignore: boolean} | null}
  */
 function push_dir_layers(stack, dir, format_root, in_repo, warnings) {
 	const anchor = rel_under(format_root, dir) ?? '';
 	if (stack.is_ignored(anchor, true)) return null;
-	// No listing, so presence is probed — by the descent's own rule (is_ignore_file), so a
-	// directory reads the same files whether it is walked or preloaded. A
-	// present-but-unreadable `.formatignore` still shadows (read_ignore_file warns and
-	// yields no rules rather than falling through), and only an absent one hands the level
-	// to `.prettierignore`.
-	const has_formatignore = is_ignore_file(join(dir, FORMATIGNORE_FILE));
-	const has_prettierignore = in_repo && is_ignore_file(join(dir, PRETTIERIGNORE_FILE));
+	return push_layers(stack, dir, anchor, in_repo, probe_ignore_presence(dir, in_repo), warnings);
+}
+
+/**
+ * Which of one directory's ignore files are there, probed a file at a time — what a
+ * directory no listing is held for costs. `.formatignore` and `.prettierignore` take the
+ * descent's own rule (is_ignore_file), `.gitignore` git's (gitignore_presence).
+ *
+ * Outside a repo `.prettierignore` is left false unprobed: nothing reads it there but the
+ * target root's heads-up, which only the descent raises — and outside a repo the format
+ * root is the FILESYSTEM root, so an ancestor chain is long enough that a stat per level
+ * is worth not paying. Mirrors the native `IgnorePresence::probe`.
+ * @returns {{formatignore: boolean, prettierignore: boolean, gitignore: string}}
+ */
+function probe_ignore_presence(dir, in_repo) {
+	return {
+		formatignore: is_ignore_file(join(dir, FORMATIGNORE_FILE)),
+		prettierignore: in_repo && is_ignore_file(join(dir, PRETTIERIGNORE_FILE)),
+		gitignore: in_repo ? gitignore_presence(join(dir, GITIGNORE_FILE)) : 'absent'
+	};
+}
+
+/**
+ * Push one directory's ignore layers onto `stack` at `anchor`, returning which it pushed
+ * — the single statement of the ladder both walks run, so a preload and a descent cannot
+ * drift on it.
+ *
+ * The tsv layer first (tsv_layer_content, which also warns about a `.prettierignore` its
+ * sibling shadows), then the `.gitignore`, which pushes only from a regular file: a
+ * symlinked one git does not follow and an unreadable one has no rules to apply, so both
+ * warn and push nothing — leaving the build-output heuristic on for the subtree, which
+ * the warning is what makes visible. Nothing here is gated on `in_repo` beyond what
+ * tsv_layer_content gates itself: outside a repo `presence.gitignore` is already
+ * `'absent'`, by the rule each caller read it with.
+ *
+ * `dir` is the directory's ABSOLUTE path — the one spelling its ignore files are read by
+ * and every ignore-file diagnostic names it by, whichever root or argument spelling
+ * reached it (see tsv_layer_content). Mirrors the native `push_layers`.
+ * @returns {{tsv: boolean, gitignore: boolean}}
+ */
+function push_layers(stack, dir, anchor, in_repo, presence, warnings) {
 	const pushed = { tsv: false, gitignore: false };
 	const layer = tsv_layer_content(
 		dir,
-		has_formatignore,
-		has_prettierignore,
+		presence.formatignore,
+		presence.prettierignore,
 		in_repo,
 		stack,
 		warnings
@@ -1750,22 +1794,27 @@ function push_dir_layers(stack, dir, format_root, in_repo, warnings) {
 		push_tsv_layer(stack, anchor, layer);
 		pushed.tsv = true;
 	}
-	// `.gitignore` layer: only inside a git repo, and never through a symlink, which git
-	// does not follow (gitignore_presence)
-	if (in_repo) {
-		const gitignore = join(dir, GITIGNORE_FILE);
-		const presence = gitignore_presence(gitignore);
-		if (presence === 'symlink') {
-			warnings.push(stack.gitignore_symlink_warning(gitignore));
-		} else if (presence === 'file') {
-			const gr = read_ignore_file(gitignore, warnings);
-			if (gr.kind === 'content') {
-				stack.push_gitignore(anchor, gr.content);
-				pushed.gitignore = true;
-			}
+	// the path is built only in the two arms that need it — most directories have no
+	// `.gitignore`, and outside a repo none is ever read
+	if (presence.gitignore === 'symlink') {
+		warnings.push(stack.gitignore_symlink_warning(join(dir, GITIGNORE_FILE)));
+	} else if (presence.gitignore === 'file') {
+		const gr = read_ignore_file(join(dir, GITIGNORE_FILE), warnings);
+		if (gr.kind === 'content') {
+			stack.push_gitignore(anchor, gr.content);
+			pushed.gitignore = true;
 		}
 	}
 	return pushed;
+}
+
+/** Take back off `stack` what one `push_layers` put on it — a traversal unwinding out of
+ * a directory, or a file scope popping back to a shallower one. `pushed` may be the
+ * `null` `push_dir_layers` returns for a directory a rule excludes, which pushed nothing.
+ * Mirrors the native `PushedLayers::pop_from`. */
+function pop_layers(stack, pushed) {
+	if (pushed?.tsv) stack.pop_tsv();
+	if (pushed?.gitignore) stack.pop_gitignore();
 }
 
 /**
@@ -1833,9 +1882,7 @@ function enter_file_scope(scope, dir, warnings) {
 		shared++;
 	}
 	while (scope.dirs.length > shared) {
-		const { pushed } = scope.dirs.pop();
-		if (pushed?.tsv) scope.stack.pop_tsv();
-		if (pushed?.gitignore) scope.stack.pop_gitignore();
+		pop_layers(scope.stack, scope.dirs.pop().pushed);
 	}
 	for (const level of chain.slice(shared)) {
 		scope.dirs.push({
@@ -2030,63 +2077,45 @@ function collect_recursive(
 	// needs, rather than a scan per name; `readdir` order is arbitrary so there's
 	// nothing to short-circuit on. An ignore file's content is still opened only
 	// when present (below). Mirrors the native collect_recursive.
-	let has_formatignore = false;
-	let has_prettierignore = false;
-	// `.gitignore` takes git's presence rule (gitignore_presence), which the listing's own
-	// entry type answers: a link is not followed
-	let gitignore = 'absent';
+	const presence = { formatignore: false, prettierignore: false, gitignore: 'absent' };
 	for (const e of entries) {
 		if (e.name === GITIGNORE_FILE) {
-			if (in_repo) gitignore = e.isSymbolicLink() ? 'symlink' : e.isFile() ? 'file' : 'absent';
+			// `.gitignore` takes git's presence rule (gitignore_presence), which the
+			// listing's own entry type answers: a link is not followed
+			if (in_repo) {
+				presence.gitignore = e.isSymbolicLink() ? 'symlink' : e.isFile() ? 'file' : 'absent';
+			}
 			continue;
 		}
 		if (e.name !== FORMATIGNORE_FILE && e.name !== PRETTIERIGNORE_FILE) continue;
 		// the preload's presence rule (is_ignore_file): a listing's file type does not
 		// follow a symlink, so only a link costs the stat that asks what it points at
 		if (!e.isFile() && !(e.isSymbolicLink() && is_ignore_file(join(dir_abs, e.name)))) continue;
-		if (e.name === FORMATIGNORE_FILE) has_formatignore = true;
-		else has_prettierignore = true;
+		if (e.name === FORMATIGNORE_FILE) presence.formatignore = true;
+		else presence.prettierignore = true;
 	}
-	const tsv = tsv_layer_content(
-		dir_abs,
-		has_formatignore,
-		has_prettierignore,
-		in_repo,
-		stack,
-		warnings
-	);
-	let tsv_pushed = false;
-	if (tsv !== null) {
-		push_tsv_layer(stack, dir_rel, tsv);
-		tsv_pushed = true;
-	}
+	// the ladder itself is push_layers, shared with the ancestor preload
+	// (push_dir_layers) — this path differs only in having read presence off the listing
+	// instead of probing for it
+	const pushed = push_layers(stack, dir_abs, dir_rel, in_repo, presence, warnings);
 	// outside a git repo a target-root `.prettierignore` is silently skipped (tsv
 	// reads `.formatignore` there) — warn (decision + text from Rust, single source
-	// of truth with the native CLI), pointing at the rename / `git init` fixes.
+	// of truth with the native CLI), pointing at the rename / `git init` fixes. The
+	// preload raises it for no ancestor, which is why probe_ignore_presence can leave
+	// `prettierignore` unasked outside a repo where this reads it.
 	if (is_target_root) {
 		const warning = stack.prettierignore_outside_repo_warning(
 			dir_abs,
 			in_repo,
-			has_prettierignore,
-			has_formatignore
+			presence.prettierignore,
+			presence.formatignore
 		);
 		if (warning != null) warnings.push(warning);
 	}
-	// `.gitignore` layer: only inside a repo (`gitignore` stays 'absent' outside one);
-	// turns the heuristic off for children. A present-but-unreadable `.gitignore` warns
-	// and is not pushed — so the heuristic stays on, which the warning makes visible —
-	// and a symlinked one, which git does not follow, takes the same path with its own.
-	let git_pushed = false;
-	if (gitignore === 'symlink') {
-		warnings.push(stack.gitignore_symlink_warning(join(dir_abs, GITIGNORE_FILE)));
-	} else if (gitignore === 'file') {
-		const r = read_ignore_file(join(dir_abs, GITIGNORE_FILE), warnings);
-		if (r.kind === 'content') {
-			stack.push_gitignore(dir_rel, r.content);
-			git_pushed = true;
-		}
-	}
-	const child_heuristic = heuristic_active && !git_pushed;
+	// this dir's own `.gitignore`, if push_layers pushed one, turns the heuristic off for
+	// its children — an unreadable or symlinked one pushes nothing, so the heuristic stays
+	// on for the subtree and the warning it raised is what makes that visible
+	const child_heuristic = heuristic_active && !pushed.gitignore;
 
 	for (const entry of entries) {
 		// PathBuf::push parity: insert the platform separator, and only when the
@@ -2132,6 +2161,5 @@ function collect_recursive(
 		}
 	}
 
-	if (git_pushed) stack.pop_gitignore();
-	if (tsv_pushed) stack.pop_tsv();
+	pop_layers(stack, pushed);
 }

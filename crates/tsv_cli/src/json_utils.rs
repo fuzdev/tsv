@@ -168,9 +168,6 @@ mod tests {
         assert_eq!(indent(&once), once);
     }
 
-    /// Depth costs a counter, not a frame: nesting far past any deserializer's
-    /// recursion limit indents in one pass. (The output is quadratic in the depth —
-    /// every level's closer carries its full indent — so the depth stays modest.)
     /// The no-panic contract over input the writer would never emit — an unterminated
     /// string, a backslash at the end, unbalanced closers, an empty document — which
     /// is what the bounds-checked escape skip and the saturating depth exist for.
@@ -193,6 +190,9 @@ mod tests {
         }
     }
 
+    /// Depth costs a counter, not a frame: nesting far past any deserializer's
+    /// recursion limit indents in one pass. (The output is quadratic in the depth —
+    /// every level's closer carries its full indent — so the depth stays modest.)
     #[test]
     fn depth_is_not_bounded() {
         let n = 3_000;

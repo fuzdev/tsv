@@ -1440,6 +1440,33 @@ describe('invalid UTF-8 parity: both CLIs refuse, and neither rewrites the file'
 	}
 });
 
+/**
+ * Run `args` through both bins and assert they reach the same verdict: the native CLI
+ * agrees with the row (`accepted`), `cli.js` agrees with the native CLI, and a refusal
+ * is worded identically.
+ *
+ * The two suites below differ only in the rows they feed this — the repeated-option
+ * table and the `--jobs` table — and both want the same three assertions in the same
+ * order, including the diagnostic that names which bin went the other way. Stated once
+ * so a fourth assertion (or a better message) cannot land on one table and miss the
+ * other. `accepted` is checked against the NATIVE bin first: a row that disagrees with
+ * argh is a stale row, and blaming the mirror for it would send the next reader to the
+ * wrong file.
+ */
+function assert_verdict_parity(args: Array<string>, accepted: boolean): void {
+	const native = run_native(args);
+	const mirror = run_mirror(args);
+	assert.equal(native.status, accepted ? 0 : 1, `native disagrees with the row: ${native.stderr}`);
+	assert.equal(
+		mirror.status,
+		native.status,
+		`cli.js ${mirror.status === 0 ? 'accepted' : 'refused'} what the native CLI did not: ${mirror.stderr || native.stderr}`
+	);
+	if (native.status !== 0) {
+		assert.equal(mirror.stderr, native.stderr, 'the two bins must word this refusal alike');
+	}
+}
+
 // Repeated value-taking options. argh refuses a second `--content`/`--parser`/
 // `--source-type`/`--jobs` ("duplicate values provided", exit 1), and `cli.js`,
 // parsing by argh's grammar, refuses the same way — the
@@ -1504,23 +1531,9 @@ describe('repeated-option parity: both CLIs refuse a second value, and neither r
 
 	for (const { args, refused, why } of repeated) {
 		it(`${args.join(' ')} is ${refused ? 'refused' : 'accepted'} by both (${why})`, () => {
-			const native = run_native(args);
-			const mirror = run_mirror(args);
 			// A refusal is exit 1 (an argument error on both sides); acceptance is
 			// a clean 0, which is why the controls are invocations that do no work.
-			assert.equal(
-				native.status,
-				refused ? 1 : 0,
-				`the native CLI disagrees with the row: ${native.stderr}`
-			);
-			assert.equal(
-				mirror.status,
-				native.status,
-				`cli.js ${mirror.status === 0 ? 'accepted' : 'refused'} what the native CLI did not: ${mirror.stderr || native.stderr}`
-			);
-			if (native.status !== 0) {
-				assert.equal(mirror.stderr, native.stderr, 'the two bins must word this refusal alike');
-			}
+			assert_verdict_parity(args, !refused);
 		});
 	}
 });
@@ -1551,22 +1564,7 @@ describe('--jobs parity: both CLIs accept exactly what a Rust usize accepts', ()
 
 	for (const { value, accepted, why } of rows) {
 		it(`--jobs ${JSON.stringify(value)} is ${accepted ? 'accepted' : 'refused'} by both (${why})`, () => {
-			const args = ['format', '--jobs', value, '--list', empty_dir];
-			const native = run_native(args);
-			const mirror = run_mirror(args);
-			assert.equal(
-				native.status,
-				accepted ? 0 : 1,
-				`native disagrees with the row: ${native.stderr}`
-			);
-			assert.equal(
-				mirror.status,
-				native.status,
-				`cli.js ${mirror.status === 0 ? 'accepted' : 'refused'} what the native CLI did not: ${mirror.stderr || native.stderr}`
-			);
-			if (native.status !== 0) {
-				assert.equal(mirror.stderr, native.stderr, 'the two bins must word this refusal alike');
-			}
+			assert_verdict_parity(['format', '--jobs', value, '--list', empty_dir], accepted);
 		});
 	}
 });

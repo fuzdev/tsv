@@ -1,5 +1,5 @@
 {
-	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, the scope of a named path, argument rejection, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list <root>/<target>`. A case carries EITHER `expected` — the in-scope files, relative to the tempdir root, in exact sorted order — OR `error`, a substring of the argument error that must fail the run upfront (exit 2, nothing listed). An `expected` case may add `warns`: substrings each of which some warning the walk emits must carry, and `no_warns`: substrings no warning may carry (exit code and stdout untouched either way) — the one pin on the warnings channel as a walk PRODUCT, where the texts themselves are tsv_discover's unit tests'. A tree value may also be `{\"symlink\": \"<target>\"}`, a symbolic link to `<target>` resolved from the link's own directory; a scenario holding one needs unix, and both harnesses skip it elsewhere. Names are ASCII so Rust's PathBuf order and cli.js's compare_paths agree (see cli.js compare_paths for the astral-plane/Windows caveat).",
+	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, the scope of a named path, argument rejection, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list` on the case's arguments: `<root>/<target>`, or one `<root>/<t>` per entry of a `targets` LIST in its place. `targets` is the only way the table reaches what a SET of arguments decides — the one ignore scope file arguments share as it moves from each one's directory to the next's, and the canonical-path dedup only overlapping roots run — both of which were pinned by a hand-mirrored test on each bin before the shape existed, which is the drift this table exists to remove. A case carries EITHER `expected` — the in-scope files, relative to the tempdir root, in exact sorted order — OR `error`, a substring of the argument error that must fail the run upfront (exit 2, nothing listed). An `expected` case may add `warns`: substrings each of which some warning the walk emits must carry, and `no_warns`: substrings no warning may carry (exit code and stdout untouched either way) — the one pin on the warnings channel as a walk PRODUCT, where the texts themselves are tsv_discover's unit tests'. A tree value may also be `{\"symlink\": \"<target>\"}`, a symbolic link to `<target>` resolved from the link's own directory; a scenario holding one needs unix, and both harnesses skip it elsewhere. Names are ASCII so Rust's PathBuf order and cli.js's compare_paths agree (see cli.js compare_paths for the astral-plane/Windows caveat).",
 	"scenarios": [
 		{
 			"name": "respects_prettierignore",
@@ -149,7 +149,7 @@
 		},
 		{
 			"name": "explicit_path_reads_no_ignore_file_inside_an_excluded_directory",
-			"note": "a named path reads no ignore file inside a directory a rule excludes, as the walk that prunes the directory reads none: a named file there is skipped quietly despite the .prettierignore its directory's .formatignore shadows, and a named directory under it warns only that it is excluded",
+			"note": "a named path reads no ignore file inside a directory a rule excludes, as the walk that prunes the directory reads none: a named file there is skipped quietly despite the .prettierignore its directory's .formatignore shadows, and a named directory under it warns only that it is excluded. Naming TWO of them at once moves the shared file scope into the excluded directory and then deeper, reading nothing at either level — verified by mutation to be the only case here that catches a walk reading the symlinked .gitignore below it",
 			"tree": {
 				".git/": null,
 				".formatignore": "vendor/\n",
@@ -157,11 +157,13 @@
 				"vendor/.prettierignore": "",
 				"vendor/x.ts": "x",
 				"vendor/sub/y.ts": "x",
+				"vendor/sub/.gitignore": {"symlink": "../../.formatignore"},
 				"keep.ts": "x"
 			},
 			"cases": [
 				{"target": "", "expected": ["keep.ts"], "no_warns": ["shadowed"]},
-				{"target": "vendor/x.ts", "expected": [], "no_warns": ["shadowed", "excluded"]},
+				{"target": "vendor/x.ts", "expected": [], "no_warns": ["shadowed", "excluded", "symbolic link"]},
+				{"targets": ["vendor/x.ts", "vendor/sub/y.ts"], "expected": [], "no_warns": ["shadowed", "excluded", "symbolic link"]},
 				{"target": "vendor/sub", "expected": [], "warns": ["vendor/sub is inside vendor, which a rule in the repo-root .formatignore excludes, so nothing under it is formatted; narrow or negate that rule to format it"], "no_warns": ["shadowed"]}
 			]
 		},
@@ -478,6 +480,26 @@
 			"cases": [
 				{"target": "", "expected": ["fix/dist/keep.ts", "pkg/a.ts"], "warns": ["pkg/dist is skipped by tsv's build-output heuristic, so a re-include under it in pkg/.formatignore does nothing; re-include the directory itself there with `!/dist/` (then `/dist/*` + `!/dist/<file>` to select files within it)"], "no_warns": ["fix/"]},
 				{"target": "pkg", "expected": ["pkg/a.ts"], "warns": ["pkg/dist is skipped by tsv's build-output heuristic, so a re-include under it in pkg/.formatignore"]}
+			]
+		},
+		{
+			"name": "file_arguments_share_one_scope_moved_per_directory",
+			"note": "file arguments share ONE ignore scope, moved from each argument's directory to the next's. Two things that decides, both verified by mutation to be pinned HERE and nowhere else in this table: a nested repository is its own format root even when it is reached as a LATER argument (a run whose first argument fixed the format root lists inner/q.gen.ts as ignored by the outer *.gen.ts), and a directory's own .gitignore layers per directory rather than at the format root (a/.gitignore's floating x.ts reaches a/sub/x.ts and stops at b/x.ts). The order is deliberately out of order so the scope pops back out of a/ and re-enters it — but note what that does NOT pin: failing to pop is inert for the file SET, since a layer only matches a path its anchor is a strict prefix of, so a stale sibling or deeper layer can never speak. What popping buys is a bounded stack, not a different answer. The second case is the WALK's own verdict over the same tree, so the named-path and walked answers sit side by side: the walk prunes the nested repo's .git but reads no .gitignore across the boundary either, and it never reaches inner/q.gen.ts at all",
+			"tree": {
+				".git/": null,
+				"inner/.git/": null,
+				".gitignore": "*.gen.ts\n",
+				"a/.gitignore": "x.ts\n",
+				"a/x.ts": "x",
+				"a/y.ts": "x",
+				"a/sub/x.ts": "x",
+				"b/x.ts": "x",
+				"r.gen.ts": "x",
+				"inner/q.gen.ts": "x"
+			},
+			"cases": [
+				{"targets": ["a/x.ts", "inner/q.gen.ts", "b/x.ts", "a/sub/x.ts", "r.gen.ts", "a/y.ts"], "expected": ["a/y.ts", "b/x.ts", "inner/q.gen.ts"]},
+				{"target": "", "expected": ["a/y.ts", "b/x.ts"]}
 			]
 		}
 	]

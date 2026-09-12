@@ -213,6 +213,15 @@ impl FormatCommand {
         // formatting — explicit file arguments are trivial to discover, and
         // multiple roots need the canonical-path dedup, which is set-wide (see
         // `discover_into`). Both paths report in sorted-path order.
+        //
+        // The `is_dir` here is a second `stat` on the one argument — `classify_args`
+        // takes its own inside whichever route this picks — rather than a
+        // classification threaded out of discovery: the route has to be chosen before
+        // the walk that would classify it, and one extra `stat` on ONE path is cheaper
+        // than the API that would avoid it. A race between the two readings is benign:
+        // discovery's is the one that decides how the argument is treated, and the only
+        // cost of having picked the streaming route for what turns out to be a file is
+        // the set-wide dedup it skips, which a single argument cannot need.
         let Formatted {
             files,
             outcomes,
@@ -683,24 +692,54 @@ fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
 /// it too when the pool comes up empty — the fallback and the worker cannot drift
 /// apart if there is only one of them.
 fn drain_queue(queue: &FileQueue, check: bool) -> Vec<(usize, PathBuf, FileOutcome)> {
-    // one AST `Bump` and one `DocArena` per worker, reused across its files — see
-    // `drain_indexed`, which does the same
-    let mut arena = bumpalo::Bump::new();
-    let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
+    let mut arenas = WorkerArenas::new();
     let mut outcomes = Vec::new();
     while let Some((i, path)) = queue.claim() {
-        let outcome = format_file(&path, check, &arena, &doc_arena);
-        arena.reset();
-        doc_arena.reset();
+        let outcome = arenas.format(&path, check);
         outcomes.push((i, path, outcome));
     }
     outcomes
 }
 
+/// One worker's reusable arenas, and the only way to reach [`format_file`].
+///
+/// **The rewind is the contract, so it lives here rather than at each caller.** Each
+/// `reset()` keeps the largest chunk and rewinds, so only the first file (and any that
+/// grow past the high-water mark) pays an alloc — the rest reuse it. Both drain loops
+/// ([`drain_queue`] and [`drain_indexed`]) wanted that, and both spelled the setup and
+/// the two resets themselves; a loop that forgot one, or an early `continue` past it,
+/// would grow a worker's arena monotonically over its whole share of the tree. Owning
+/// the pair makes the rewind structural instead of a rule stated in three doc comments.
+struct WorkerArenas {
+    ast: bumpalo::Bump,
+    doc: tsv_lang::doc::arena::DocArena,
+}
+
+impl WorkerArenas {
+    fn new() -> Self {
+        Self {
+            ast: bumpalo::Bump::new(),
+            doc: tsv_lang::doc::arena::DocArena::new(),
+        }
+    }
+
+    /// Format one file into the arenas, then rewind both.
+    ///
+    /// The `&mut self` is what makes the resets sound: the per-file AST and doc tree
+    /// borrow the arenas and are dropped inside [`format_file`], which returns an owned
+    /// [`FileOutcome`], so nothing borrowed from either arena is alive by the time this
+    /// returns.
+    fn format(&mut self, path: &Path, check: bool) -> FileOutcome {
+        let outcome = format_file(path, check, &self.ast, &self.doc);
+        self.ast.reset();
+        self.doc.reset();
+        outcome
+    }
+}
+
 /// Format one file into the worker's reusable arenas, writing in place when the
-/// output differs (unless `check`). Nothing borrowed from `arena`/`doc_arena`
-/// escapes, so the caller resets both after this returns (see `drain_queue` /
-/// `drain_indexed`).
+/// output differs (unless `check`). Reached only through [`WorkerArenas::format`],
+/// which rewinds both arenas once this has returned its owned outcome.
 fn format_file(
     path: &Path,
     check: bool,
@@ -782,22 +821,14 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
 /// A function rather than a closure inside the spawn loop because the caller runs it
 /// too when the pool comes up empty (see [`spawn_pool`]).
 fn drain_indexed(files: &[PathBuf], check: bool, next: &AtomicUsize) -> Vec<(usize, FileOutcome)> {
+    let mut arenas = WorkerArenas::new();
     let mut outcomes = Vec::new();
-    // One AST `Bump` and one `DocArena` per worker, reused across its files: each
-    // `reset()` keeps the largest chunk and rewinds, so only the first file (and any
-    // that grow past the high-water mark) pays an alloc — the rest reuse it. The
-    // per-file AST and doc tree borrow the arenas and are dropped inside
-    // `format_file` (which returns an owned outcome), so the `&mut` resets are sound.
-    let mut arena = bumpalo::Bump::new();
-    let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
     loop {
         let i = next.fetch_add(1, Ordering::Relaxed);
         if i >= files.len() {
             break;
         }
-        outcomes.push((i, format_file(&files[i], check, &arena, &doc_arena)));
-        arena.reset();
-        doc_arena.reset();
+        outcomes.push((i, arenas.format(&files[i], check)));
     }
     outcomes
 }

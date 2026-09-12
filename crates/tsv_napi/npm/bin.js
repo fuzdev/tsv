@@ -15,9 +15,9 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { constants } from 'node:os';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { constants } from 'node:os';
 import { dirname, join } from 'node:path';
 import { platform_triple } from './platform.js';
 
