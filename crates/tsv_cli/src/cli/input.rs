@@ -20,17 +20,51 @@ impl Input {
 
     /// Read from stdin
     pub fn from_stdin() -> Result<Self, String> {
-        let mut buffer = String::new();
-        io::stdin()
-            .read_to_string(&mut buffer)
-            .map_err(|e| format!("Error reading from stdin: {e}"))?;
-        Ok(Input(buffer))
+        read_stdin_to_string()
+            .map(Input)
+            .map_err(|e| format!("Error reading from stdin: {e}"))
     }
 
     /// Direct string content
     pub fn from_content(content: String) -> Self {
         Input(content)
     }
+}
+
+/// Read stdin to EOF as strict UTF-8, waiting out `WouldBlock` the way
+/// `cli::out::write_or_stop` does. Whether fd 0 blocks belongs to the open file
+/// description this process shares with its parent, and a Node parent that opens its
+/// own piped `process.stdin` flips it to non-blocking under the child — where
+/// `read_to_string` answers the first momentarily empty pipe with `EAGAIN`, reporting
+/// a slow writer as a read error. Any other error, and invalid UTF-8, stay errors; the
+/// UTF-8 one keeps `read_to_string`'s own wording, which `cli.js` mirrors.
+fn read_stdin_to_string() -> io::Result<String> {
+    use crate::cli::out::{WOULD_BLOCK_MAX_WAIT, WOULD_BLOCK_MIN_WAIT};
+    let mut stdin = io::stdin().lock();
+    let mut bytes = Vec::new();
+    let mut chunk = vec![0_u8; 64 * 1024];
+    let mut wait = WOULD_BLOCK_MIN_WAIT;
+    loop {
+        match stdin.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => {
+                bytes.extend_from_slice(&chunk[..n]);
+                wait = WOULD_BLOCK_MIN_WAIT;
+            }
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                std::thread::sleep(wait);
+                wait = (wait * 2).min(WOULD_BLOCK_MAX_WAIT);
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    String::from_utf8(bytes).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "stream did not contain valid UTF-8",
+        )
+    })
 }
 
 /// Parser/formatter type

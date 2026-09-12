@@ -8,11 +8,11 @@ use std::sync::Once;
 /// Test helper; panicking on spawn failure is the desired behavior.
 #[allow(clippy::expect_used)]
 fn tsv(args: &[&str]) -> std::process::Output {
-    // The `--` matters: without it a leading-flag argument (`tsv --version`)
-    // is parsed by cargo itself instead of being forwarded — subcommand-first
-    // invocations only dodged that by starting with a non-flag word.
-    Command::new("cargo")
-        .args(["run", "-p", "tsv_cli", "-q", "--"])
+    // the binary `built_tsv` built once, not a `cargo run` per call: a cargo
+    // invocation per test is slow, and a `cargo run -p tsv_cli` resolves features
+    // for that package alone where the outer `cargo test --workspace` unified them,
+    // so a call could relink the binary under a sibling test mid-spawn
+    Command::new(built_tsv())
         .args(args)
         .output()
         .expect("Failed to execute command")
@@ -24,8 +24,7 @@ fn tsv(args: &[&str]) -> std::process::Output {
 fn tsv_stdin(args: &[&str], input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;
-    let mut child = Command::new("cargo")
-        .args(["run", "-p", "tsv_cli", "-q", "--"])
+    let mut child = Command::new(built_tsv())
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -1367,6 +1366,58 @@ fn test_format_invalid_utf8_file_is_reported_and_left_alone() {
     assert_eq!(fs::read_to_string(dir.join("ok.ts")).unwrap(), FORMATTED_TS);
 }
 
+#[cfg(unix)]
+#[test]
+fn test_format_non_utf8_argument_is_refused_at_the_argv_boundary() {
+    // a path ARGUMENT that is not UTF-8 is refused before any command runs — argh reads
+    // `&str`, so the walk's byte-faithful join reaches such a name only through a
+    // directory. The refusal is a plain exit 1 with the name spelled lossily, not a panic
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+    let dir = temp_dir("non_utf8_argument");
+    let file = dir.join(OsStr::from_bytes(b"fo\xffo.ts"));
+    fs::write(&file, UNFORMATTED_TS).unwrap();
+    let output = Command::new(built_tsv())
+        .arg("format")
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.starts_with("Invalid utf8: "), "stderr: {stderr}");
+    assert!(!stderr.contains("panicked"), "stderr: {stderr}");
+    assert_eq!(fs::read_to_string(&file).unwrap(), UNFORMATTED_TS);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_format_does_not_follow_a_symlink_cycle() {
+    // a directory symlink pointing back up the tree is not followed: the walk terminates
+    // and lists each real file once. `test_format_dedup_symlink_alias` covers a link
+    // NAMED as an argument; this is the link a walk discovers
+    let dir = temp_dir("symlink_cycle");
+    let sub = dir.join("sub");
+    fs::create_dir(&sub).unwrap();
+    fs::write(sub.join("a.ts"), UNFORMATTED_TS).unwrap();
+    std::os::unix::fs::symlink("..", sub.join("loop")).unwrap();
+    std::os::unix::fs::symlink(".", sub.join("self")).unwrap();
+
+    let list = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(
+        list.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&list.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&list.stdout);
+    assert_eq!(stdout.lines().count(), 1, "stdout: {stdout}");
+    assert!(stdout.contains("sub/a.ts"), "stdout: {stdout}");
+
+    let output = tsv(&["format", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(sub.join("a.ts")).unwrap(), FORMATTED_TS);
+}
+
 #[test]
 fn test_format_missing_arg_fails_fast() {
     let dir = temp_dir("missing_fail_fast");
@@ -2678,6 +2729,28 @@ fn test_format_closed_pipe_consumer_is_not_a_crash() {
     }
 }
 
+/// `--list`'s single buffered write is the largest the CLI makes, and it takes the
+/// same quiet stop: a listing cut short by `| head` is not an error.
+#[cfg(unix)]
+#[test]
+fn test_format_list_closed_pipe_is_not_a_crash() {
+    let tree = pipe_overflow_tree("closed_pipe_list");
+    let run = tsv_piped(tree.path(), "format --list .", "| head -2 >/dev/null");
+    assert_no_pipe_panic("--list", &run);
+    assert_eq!(
+        run.code,
+        0,
+        "--list reported a failure: {}",
+        String::from_utf8_lossy(&run.out.stderr)
+    );
+    // and listed nothing it formatted
+    let pad = "p".repeat(150);
+    assert_eq!(
+        fs::read_to_string(tree.path().join(format!("{pad}_0.ts"))).unwrap(),
+        UNFORMATTED_TS
+    );
+}
+
 /// The closed pipe does not overwrite the exit code, because for `--check` the exit
 /// code **is** the API.
 ///
@@ -2781,6 +2854,38 @@ fn test_parse_closed_pipe_is_not_a_parse_error() {
 /// reader keys on the report itself rather than on a clock: its first byte arrives only
 /// once the report's first write has landed and filled the buffer, so however long the
 /// formatting took, the writer's next attempt meets a full socket.
+/// The read side of the same rule: a non-blocking stdin — flipped under the child by a
+/// parent that opens its own piped `process.stdin` — is waited out, not reported as
+/// `Resource temporarily unavailable` the moment the writer pauses.
+#[cfg(unix)]
+#[test]
+fn test_format_stdin_non_blocking_is_waited_out_not_a_read_error() {
+    use std::io::Write as _;
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::UnixStream;
+    use std::process::Stdio;
+
+    let (reader, mut writer) = UnixStream::pair().expect("socket pair");
+    reader.set_nonblocking(true).expect("set O_NONBLOCK");
+    let child = Command::new(built_tsv())
+        .args(["format", "--stdin", "--parser", "typescript"])
+        .stdin(Stdio::from(OwnedFd::from(reader)))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn tsv");
+    // the slow writer: the first half, a pause long enough for the child to find the
+    // socket empty, then the rest and EOF
+    writer.write_all(b"const   x   =").expect("first half");
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    writer.write_all(b"   1;\n").expect("second half");
+    drop(writer);
+    let output = child.wait_with_output().expect("wait");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
+    assert_eq!(String::from_utf8_lossy(&output.stdout), FORMATTED_TS);
+}
+
 #[cfg(unix)]
 #[test]
 fn test_format_non_blocking_stdout_is_waited_out_not_a_crash() {

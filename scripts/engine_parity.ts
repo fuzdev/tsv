@@ -166,9 +166,13 @@ interface RunResult {
 	stderr: string;
 }
 
-async function run(bin: string[], cwd: string): Promise<RunResult> {
+async function run(
+	bin: string[],
+	cwd: string,
+	args: string[] = ['format', '.']
+): Promise<RunResult> {
 	const command = new Deno.Command(bin[0]!, {
-		args: [...bin.slice(1), 'format', '.'],
+		args: [...bin.slice(1), ...args],
 		cwd,
 		stdout: 'piped',
 		stderr: 'piped'
@@ -228,6 +232,15 @@ async function grade(root: string): Promise<RootReport> {
 		}
 		if (native_run.stderr !== wasm_run.stderr) {
 			findings.push('the diagnostics differ (stderr)');
+		}
+		// The DRIVER half over what a single `.` root never exercises: overlapping roots
+		// (the canonical-path dedup), and spellings the sort must read through (`.//`,
+		// `./`) — the two classes a raw component split in `cli.js` once inverted.
+		const LIST_ROOTS = ['format', '--list', './/', './', '.'];
+		const native_list = await run([native!.path], trees[0]!, LIST_ROOTS);
+		const wasm_list = await run(['node', wasm_cli], trees[1]!, LIST_ROOTS);
+		if (native_list.status !== wasm_list.status || native_list.stdout !== wasm_list.stdout) {
+			findings.push('the --list over spelled, overlapping roots differs');
 		}
 		// The claim that matters: the bytes on disk.
 		let differing = 0;

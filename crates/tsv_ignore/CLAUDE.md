@@ -189,6 +189,10 @@ the file only so a diagnostic can name it.
   parity is thus scoped to ASCII segments (the `git_oracle` and unit tests are
   ASCII, with `glob_is_code_point_granular` pinning the multibyte behavior). Rare
   in practice — `?`/classes over multibyte names are unusual, and `*` is unaffected.
+  The same edge covers a name that is **not** UTF-8: the CLIs hand the matcher its
+  lossy spelling, where a maximal invalid sequence is one U+FFFD, so `?` matches a
+  truncated `\xf0\x9f` that git needs `??` for (probed 2026-09-12); `*` and literal
+  segments are unaffected, since no UTF-8 rule can spell the bytes.
 
 - **POSIX bracket classes** (`[[:alpha:]]`) are not supported — prettier's
   matcher doesn't rely on them either. They are read as ordinary class members, so

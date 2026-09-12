@@ -60,10 +60,10 @@ use std::time::Duration;
 
 /// The first wait after a `WouldBlock` — about what a fast consumer takes to drain a
 /// pipe buffer — doubled on each one in a row, up to [`WOULD_BLOCK_MAX_WAIT`].
-const WOULD_BLOCK_MIN_WAIT: Duration = Duration::from_micros(50);
+pub(crate) const WOULD_BLOCK_MIN_WAIT: Duration = Duration::from_micros(50);
 
 /// The longest wait between retries against a consumer that is slow to drain.
-const WOULD_BLOCK_MAX_WAIT: Duration = Duration::from_millis(1);
+pub(crate) const WOULD_BLOCK_MAX_WAIT: Duration = Duration::from_millis(1);
 
 /// Write `bytes` to stdout verbatim, stopping quietly if the consumer closed the pipe.
 ///

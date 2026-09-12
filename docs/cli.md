@@ -420,12 +420,17 @@ pool workers take the same reservation, so the 4 MiB worker row in the table abo
     therefore loops over `writeSync`, honors partial writes, sleeps 1 ms and
     retries on `EAGAIN`, and goes quiet on `EPIPE`. The two bins reach `EAGAIN`
     by different roads — `cli.js` flips its own fd, the native CLI inherits a
-    flipped one — and answer it alike.
+    flipped one — and answer it alike. **The read side takes the same rule**: a
+    parent that opens its own piped `process.stdin` flips fd 0 the same way, and
+    `--stdin` on either bin (`Input::from_stdin`, `cli.js`'s `read_fd_to_end`)
+    waits out `EAGAIN` there too rather than reporting a slow writer as a read
+    error the moment the pipe is momentarily empty.
 
     A consumer that is merely **slow** gets every line on both bins: `EPIPE`
     ends the output, `EAGAIN` is waited out, and any other write error is a
     failure. Pinned by `tests/cli_tests.rs` (`*_closed_pipe_*`, `*_slow_pipe_*`,
     `*_non_blocking_stdout_*`) and `scripts/test_npm.ts`'s twin rows.
+  - **A non-UTF-8 file NAME**: the native walk joins each entry's raw bytes, so a file or directory whose name is not UTF-8 is discovered, formatted, and listed by its own bytes on unix (the changed-path report and `--list` print paths as bytes there, `cli::out::path_bytes`; elsewhere the U+FFFD spelling is all there is). Two limits: such a name reaches the matcher in its lossy spelling, so a `?` or class counts one U+FFFD where git counts each byte (the multibyte edge `tsv_ignore`'s CLAUDE.md scopes the git parity to ASCII by), and a non-UTF-8 path given as an *argument* is refused at the argv boundary (`Invalid utf8: …`, exit 1 — argh reads `&str`), so it is reachable only through a directory. `cli.js` sees such a name only as Node spells it, lossily, on every route.
   - **Invalid UTF-8 in a source file**: reading is **strict UTF-8 on both CLIs**
     — the native one because Rust's `read_to_string` refuses invalid bytes, and
     `cli.js` because it decodes through `TextDecoder(..., {fatal: true})` rather

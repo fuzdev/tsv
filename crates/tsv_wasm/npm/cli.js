@@ -39,6 +39,7 @@ import {
 	lstatSync,
 	readdirSync,
 	readFileSync,
+	readSync,
 	realpathSync,
 	statSync,
 	writeFileSync,
@@ -1381,10 +1382,37 @@ function exit_argh(output) {
  * failure (`format` uses 2, `parse` uses 1 — mirroring the native CLI). */
 function read_stdin(exit_code) {
 	try {
-		return decode_source(readFileSync(0));
+		return decode_source(read_fd_to_end(0));
 	} catch (error) {
 		exit_with_error(exit_code, `Error: Error reading from stdin: ${error.message}`);
 	}
+}
+
+/** Read `fd` to EOF, waiting out `EAGAIN` as `write_fd` does. Whether fd 0 blocks
+ * belongs to the open file description this process shares with its parent, and a
+ * Node parent that opens its own piped `process.stdin` flips it to non-blocking
+ * under the child — where `readFileSync(0)` throws the moment the pipe is
+ * momentarily empty, reporting a slow writer as a read error. The same rule the
+ * native `Input::from_stdin` holds. */
+function read_fd_to_end(fd) {
+	const chunks = [];
+	const chunk = Buffer.allocUnsafe(64 * 1024);
+	for (;;) {
+		let n;
+		try {
+			n = readSync(fd, chunk, 0, chunk.length, null);
+		} catch (error) {
+			if (error.code === 'EAGAIN') {
+				Atomics.wait(WRITE_BACKOFF, 0, 0, 1);
+				continue;
+			}
+			if (error.code === 'EOF') break;
+			throw error;
+		}
+		if (n === 0) break;
+		chunks.push(Buffer.from(chunk.subarray(0, n)));
+	}
+	return Buffer.concat(chunks);
 }
 
 /**
@@ -1503,12 +1531,12 @@ function rel_under(format_root, abs) {
 	const rel = path_relative(format_root, abs);
 	if (rel === '') return '';
 	if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
-	// `path.relative` hands back a normalized path, so the filter is belt-and-braces;
-	// the split is the platform's (`\` is a filename byte on posix, and a file named
-	// `a\b.ts` must reach the matcher as one segment, as it does on the native CLI)
-	return split_path_components(rel)
-		.filter((s) => s !== '' && s !== '.')
-		.join('/');
+	// `path.relative` hands back a normalized path — no `.` or empty component — so
+	// the split alone spells it; the split is the platform's (`\` is a filename byte on
+	// posix, and a file named `a\b.ts` must reach the matcher as one segment, as it does
+	// on the native CLI). `path_components` is the other normalizer here, for ORDER,
+	// and keeps a head `.` this must not
+	return split_path_components(rel).join('/');
 }
 
 /** Directories from `format_root` (inclusive) down to `leaf` (inclusive),
@@ -2035,7 +2063,10 @@ function ends_with_sep(path) {
  * survives only at the head, and every other `.` and empty component (a
  * doubled or trailing separator) is normalized away — so `t//b/y.ts`,
  * `t/./b/y.ts` and `t/b/y.ts` are one sequence. What `compare_paths` orders;
- * the emitted paths keep the argument's spelling, this only decides their order. */
+ * the emitted paths keep the argument's spelling, this only decides their order.
+ * A Windows UNC path's two leading separators fold to one root component where
+ * Rust reads a single `Prefix`, which, like the drive-prefix caveat on
+ * `compare_paths`, reaches the same verdict for every pair sharing that root. */
 function path_components(path) {
 	const raw = split_path_components(path);
 	const components = [];
