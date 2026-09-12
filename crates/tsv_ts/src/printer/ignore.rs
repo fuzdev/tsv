@@ -649,7 +649,7 @@ impl<'a> Printer<'a> {
     /// own builder run: the expression statement's
     /// ([`Printer::maybe_wrap_expr_stmt_paren`] — the node that must not open the line with
     /// `{` / `function` / `class`) and the arrow body's leftmost-object one
-    /// ([`Printer::arrow_body_object_parens_target`], whose `{` would read as a block body).
+    /// ([`Printer::arrow_body_leftmost_parens_target`], whose `{` would read as a block body).
     ///
     /// Both are cells the node's OWN builder reads, and a verbatim slice replaces that
     /// builder — so a freeze that skipped them printed `{b:  1}.k;`, `class {}();` and
@@ -664,7 +664,7 @@ impl<'a> Printer<'a> {
         doc: DocId,
     ) -> DocId {
         let span = operand.span();
-        let doc = if self.arrow_body_object_parens_target.get() == Some(span) {
+        let doc = if self.arrow_body_leftmost_parens_target.get() == Some(span) {
             self.d().parens(doc)
         } else {
             doc

@@ -144,6 +144,7 @@ pub(crate) fn parse_single_value<'arena>(
     s: &str,
     span: Span,
     in_group: bool,
+    head_welds: bool,
     arena: &'arena Bump,
 ) -> Option<CssValue<'arena>> {
     if s.is_empty() {
@@ -156,7 +157,7 @@ pub(crate) fn parse_single_value<'arena>(
     // misread: `(1.5)(2.5)` ends in a `)` without being one function, and `1.5/2.5` starts
     // with a number without being one dimension. It answers `None` for a single-token run,
     // which is nearly every value, so the leaf path below is untouched.
-    if let Some(tokens) = operators::split_value_run(s, in_group) {
+    if let Some(tokens) = operators::split_value_run(s, in_group, head_welds) {
         let mut values = bumpalo::collections::Vec::with_capacity_in(tokens.len(), arena);
         for token in tokens {
             let member = &s[token.start..token.end];
@@ -170,8 +171,11 @@ pub(crate) fn parse_single_value<'arena>(
                 // Every operand is re-classified from scratch, which is what gets the
                 // number after the operator to its normalizer. The recursion terminates:
                 // a member is strictly shorter than the run unless the run was one token,
-                // and that case returned `None` above.
-                parse_single_value(member, member_span, in_group, arena)
+                // and that case returned `None` above. A member's head always welds: an
+                // operand that opens with a `+` is either the weld the split just made
+                // (which must not be split again) or a signed number (which the number
+                // production claims ahead of the test).
+                parse_single_value(member, member_span, in_group, true, arena)
                     .unwrap_or(CssValue::Identifier { span: member_span })
             });
         }
@@ -405,6 +409,13 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
 /// which prints it spaced from the group beside it — a cataloged divergence
 /// (`css/values/functions/number_shaped_name_prettier_divergence`), not a miss.
 fn is_function_name(name: &str) -> bool {
+    // A welded `+` heads the word it welded onto (`+a(2.5)` is the function `+a` to
+    // postcss, and the split hands it here whole); an interior `+` never reaches this
+    // position, since the split ends a word at it.
+    let name = match name.strip_prefix('+') {
+        Some(rest) if !rest.is_empty() => rest,
+        _ => name,
+    };
     // The escape-free name, which is every name a stylesheet really holds: `\` is not word
     // content, so this pass already stops on the first one and the walk below is entered
     // only for a name that has one (or is genuinely not a name at all).
@@ -561,8 +572,11 @@ mod function_name_tests {
             }
             let want = !EXCLUDED.contains(&c);
             // Three positions, so a positional rule cannot creep into what is a pure
-            // character class.
+            // character class — save the ONE positional rule the name owns: a `+` at
+            // the head is the weld (`+a(2.5)` is the function `+a` to postcss), and
+            // the run splitter never hands an interior or trailing `+` here.
             for name in [format!("aa{c}bb"), format!("{c}aa"), format!("aa{c}")] {
+                let want = want || (c == '+' && name == "+aa");
                 assert_eq!(
                     is_function_name(&name),
                     want,
@@ -570,6 +584,11 @@ mod function_name_tests {
                 );
             }
         }
+        assert!(is_function_name("+aa"), "a welded `+` heads a name");
+        assert!(
+            !is_function_name("+"),
+            "a lone `+` is an operator, never a name"
+        );
         // The ASCII whitespace the sweep's printable range does not reach.
         for c in ['\t', '\n', '\r', '\u{b}', '\u{c}'] {
             assert!(

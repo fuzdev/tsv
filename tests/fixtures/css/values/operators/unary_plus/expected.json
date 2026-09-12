@@ -1,0 +1,244 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 916,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 907,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 172,
+							"end": 182,
+							"property": "a",
+							"value": "+a(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 186,
+							"end": 191,
+							"property": "b",
+							"value": "+a"
+						},
+						{
+							"type": "Declaration",
+							"start": 195,
+							"end": 203,
+							"property": "c",
+							"value": "+#FFF"
+						},
+						{
+							"type": "Declaration",
+							"start": 207,
+							"end": 218,
+							"property": "d",
+							"value": "+a * 1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 222,
+							"end": 230,
+							"property": "e",
+							"value": "+a, b"
+						},
+						{
+							"type": "Declaration",
+							"start": 314,
+							"end": 330,
+							"property": "f",
+							"value": "1.5 / +a(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 334,
+							"end": 345,
+							"property": "g",
+							"value": "1.5 * +a"
+						},
+						{
+							"type": "Declaration",
+							"start": 349,
+							"end": 360,
+							"property": "h",
+							"value": "1.5 - +a"
+						},
+						{
+							"type": "Declaration",
+							"start": 364,
+							"end": 371,
+							"property": "i",
+							"value": "+ +a"
+						},
+						{
+							"type": "Declaration",
+							"start": 375,
+							"end": 394,
+							"property": "j",
+							"value": "f(1.5 / +a(2.5))"
+						},
+						{
+							"type": "Declaration",
+							"start": 562,
+							"end": 577,
+							"property": "k",
+							"value": "1.5 + a(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 581,
+							"end": 595,
+							"property": "l",
+							"value": "f(+ a(2.5))"
+						},
+						{
+							"type": "Declaration",
+							"start": 599,
+							"end": 607,
+							"property": "m",
+							"value": "(+ a)"
+						},
+						{
+							"type": "Declaration",
+							"start": 611,
+							"end": 623,
+							"property": "n",
+							"value": "f(a, + b)"
+						},
+						{
+							"type": "Declaration",
+							"start": 716,
+							"end": 725,
+							"property": "o",
+							"value": "+(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 729,
+							"end": 736,
+							"property": "p",
+							"value": "+'x'"
+						},
+						{
+							"type": "Declaration",
+							"start": 740,
+							"end": 747,
+							"property": "q",
+							"value": "+ @a"
+						},
+						{
+							"type": "Declaration",
+							"start": 809,
+							"end": 816,
+							"property": "r",
+							"value": "+1.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 820,
+							"end": 833,
+							"property": "s",
+							"value": "1.5 / +2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 887,
+							"end": 903,
+							"property": "t",
+							"value": "calc(+a(2.5))"
+						}
+					]
+				},
+				"start": 9,
+				"end": 907
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a `+` opening the value welds onto the word after it — the sign is the word's\n\t\town — and a function named that way still normalizes its arguments ",
+				"start": 17,
+				"end": 169
+			},
+			{
+				"type": "CSSComment",
+				"value": " straight after an operator it welds too, across an authored gap or none ",
+				"start": 234,
+				"end": 311
+			},
+			{
+				"type": "CSSComment",
+				"value": " anywhere else the `+` is an operator and takes an operator's gaps: after a\n\t\tmember, at the head of a function's arguments or of a group, and after a comma ",
+				"start": 398,
+				"end": 559
+			},
+			{
+				"type": "CSSComment",
+				"value": " it welds onto a word only: a group, a string and an `@`-word keep it an operator ",
+				"start": 627,
+				"end": 713
+			},
+			{
+				"type": "CSSComment",
+				"value": " a signed number is a number, whatever precedes it ",
+				"start": 751,
+				"end": 806
+			},
+			{
+				"type": "CSSComment",
+				"value": " calc() prints its authored gap either way ",
+				"start": 837,
+				"end": 884
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 908,
+			"styles": "\n\tdiv {\n\t\t/* a `+` opening the value welds onto the word after it — the sign is the word's\n\t\town — and a function named that way still normalizes its arguments */\n\t\ta: +a(2.5);\n\t\tb: +a;\n\t\tc: +#FFF;\n\t\td: +a * 1.5;\n\t\te: +a, b;\n\t\t/* straight after an operator it welds too, across an authored gap or none */\n\t\tf: 1.5 / +a(2.5);\n\t\tg: 1.5 * +a;\n\t\th: 1.5 - +a;\n\t\ti: + +a;\n\t\tj: f(1.5 / +a(2.5));\n\t\t/* anywhere else the `+` is an operator and takes an operator's gaps: after a\n\t\tmember, at the head of a function's arguments or of a group, and after a comma */\n\t\tk: 1.5 + a(2.5);\n\t\tl: f(+ a(2.5));\n\t\tm: (+ a);\n\t\tn: f(a, + b);\n\t\t/* it welds onto a word only: a group, a string and an `@`-word keep it an operator */\n\t\to: +(2.5);\n\t\tp: +'x';\n\t\tq: + @a;\n\t\t/* a signed number is a number, whatever precedes it */\n\t\tr: +1.5;\n\t\ts: 1.5 / +2.5;\n\t\t/* calc() prints its authored gap either way */\n\t\tt: calc(+a(2.5));\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 917,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
