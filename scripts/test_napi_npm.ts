@@ -1144,6 +1144,8 @@ const USAGE_ROWS: Array<{ args: Array<string>; exit: number; says: string }> = [
 		says: '--source-type applies to'
 	},
 	{ args: ['format', '--list', '--check', 'x.ts'], exit: 2, says: '--list and --check' },
+	// `parse` — a directory is refused by name, ahead of the extension check
+	{ args: ['parse', '.'], exit: 1, says: '.: is a directory (one file is expected)' },
 	// PRECEDENCE — each row is faulty in two or more ways, and names the winner
 	{
 		args: ['format', '--content', 'x', '--parser', 'ts', '--jobs', '2', '--list', 'x.ts'],

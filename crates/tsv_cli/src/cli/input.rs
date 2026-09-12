@@ -13,8 +13,12 @@ impl Input {
 
     /// Read from file path
     pub fn from_file(path: &str) -> Result<Self, String> {
-        let content =
-            fs::read_to_string(path).map_err(|e| format!("Error reading file '{path}': {e}"))?;
+        let content = fs::read_to_string(path).map_err(|e| {
+            format!(
+                "Error reading file '{}': {e}",
+                tsv_discover::quote_path(path)
+            )
+        })?;
         Ok(Input(content))
     }
 
@@ -149,6 +153,16 @@ impl InputArgs {
                 .ok_or("--stdin requires --parser <svelte|typescript|css>")?;
             Ok((Input::from_stdin()?, parser_type))
         } else if let Some(path) = self.file {
+            // a directory is refused by name ahead of the parser choice: every command
+            // resolving through here reads one file (`tsv parse`, the `tsv_debug` commands),
+            // and the read below would report `Is a directory` under a message that calls
+            // it one. Neutral wording for that reason; `cli.js` mirrors it word for word
+            if fs::metadata(&path).is_ok_and(|metadata| metadata.is_dir()) {
+                return Err(format!(
+                    "{}: is a directory (one file is expected)",
+                    tsv_discover::quote_path(&path)
+                ));
+            }
             let parser_type = match self.parser {
                 Some(parser_type) => parser_type,
                 None => {

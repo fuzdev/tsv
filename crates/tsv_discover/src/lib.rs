@@ -41,6 +41,7 @@
 //! assert!(should_format_file("app.ts", "src/app.ts", &stack));
 //! ```
 
+use std::borrow::Cow;
 use std::fmt::Write as _;
 use std::path::Path;
 use tsv_ignore::{IgnoreSource, IgnoreStack, Negation, NegationTail};
@@ -125,7 +126,10 @@ pub fn is_formattable(name: &str) -> bool {
 pub fn unsupported_extension_error(path: &str) -> Option<String> {
     (!is_formattable(path)).then(|| {
         let list = formattable_extension_list(", ");
-        format!("{path}: unsupported file extension (tsv handles {list})")
+        format!(
+            "{}: unsupported file extension (tsv handles {list})",
+            quote_path(path)
+        )
     })
 }
 
@@ -148,6 +152,89 @@ pub fn formattable_extension_list(separator: &str) -> String {
         list.push_str(ext);
     }
     list
+}
+
+/// A path as a diagnostic or a listing spells it: verbatim, unless it holds a character
+/// no line can carry — a control character (U+0000–U+001F, U+007F) or a double quote — in
+/// which case the whole path is wrapped in double quotes and C-escaped, the shape git
+/// prints such a path in (`core.quotePath=false`): `\a` `\b` `\t` `\n` `\v` `\f` `\r`
+/// `\"` `\\` by name, any other control character as three octal digits (`\033`), and
+/// every other character as itself. A backslash escapes inside a quoted path but does not
+/// trigger the quoting on its own, since on Windows every path holds one — so a quoted
+/// path unquotes exactly as git's does, while a plain path prints as it is.
+///
+/// One rule for every printed path, in both `tsv` bins, so a warning that names a path
+/// stays one line (a line feed in the name split it, a carriage return garbled the
+/// terminal) and a `--list` or changed-path line stays readable by the routine that reads
+/// `git ls-files`: a line beginning with `"` is quoted, any other names the file exactly.
+/// The re-include *patterns* a warning offers are not paths and stay literal — they are
+/// meant to be pasted into an ignore file, which reads no escapes — and the ignore-file
+/// names in prose (`the repo-root .gitignore`) hold nothing to quote.
+#[must_use]
+pub fn quote_path(path: &str) -> Cow<'_, str> {
+    match quote_path_bytes(path.as_bytes()) {
+        Cow::Borrowed(_) => Cow::Borrowed(path),
+        // only ASCII bytes are rewritten, each into ASCII, so the quoted form of UTF-8 is
+        // UTF-8 and the lossy conversion is a plain copy
+        Cow::Owned(bytes) => Cow::Owned(String::from_utf8_lossy(&bytes).into_owned()),
+    }
+}
+
+/// [`quote_path`] for a caller that already owns the path: handed back untouched when
+/// nothing in it needs quoting, so the common case moves the `String` rather than
+/// copying it.
+#[must_use]
+pub fn quote_path_owned(path: String) -> String {
+    if path.bytes().any(path_byte_needs_quoting) {
+        quote_path(&path).into_owned()
+    } else {
+        path
+    }
+}
+
+/// [`quote_path`] over a path's own bytes — how a listing names a non-UTF-8 file on unix.
+/// A byte outside ASCII prints as itself in either form, as git prints it.
+#[must_use]
+pub fn quote_path_bytes(path: &[u8]) -> Cow<'_, [u8]> {
+    if !path.iter().any(|&byte| path_byte_needs_quoting(byte)) {
+        return Cow::Borrowed(path);
+    }
+    let mut out = Vec::with_capacity(path.len() + 2);
+    out.push(b'"');
+    for &byte in path {
+        let named = match byte {
+            0x07 => b'a',
+            0x08 => b'b',
+            b'\t' => b't',
+            b'\n' => b'n',
+            0x0b => b'v',
+            0x0c => b'f',
+            b'\r' => b'r',
+            b'"' | b'\\' => byte,
+            _ if path_byte_needs_quoting(byte) => {
+                out.extend_from_slice(&[
+                    b'\\',
+                    b'0' + (byte >> 6),
+                    b'0' + ((byte >> 3) & 7),
+                    b'0' + (byte & 7),
+                ]);
+                continue;
+            }
+            _ => {
+                out.push(byte);
+                continue;
+            }
+        };
+        out.extend_from_slice(&[b'\\', named]);
+    }
+    out.push(b'"');
+    Cow::Owned(out)
+}
+
+/// The bytes that make [`quote_path`] quote: the ASCII controls, and the double quote
+/// that would otherwise be read as a quoted path's opening.
+const fn path_byte_needs_quoting(byte: u8) -> bool {
+    byte.is_ascii_control() || byte == b'"'
 }
 
 /// Whether a directory `name` is an always-pruned [safety net](SAFETY_NET_DIRS)
@@ -576,6 +663,7 @@ pub fn prettierignore_outside_repo_warning(
     has_formatignore: bool,
 ) -> Option<String> {
     (!in_repo && has_prettierignore && !has_formatignore).then(|| {
+        let dir = quote_path(dir);
         format!(
             ".prettierignore in {dir} is not read outside a git repo (tsv reads .formatignore there); rename it to .formatignore, or run `git init`, for it to apply"
         )
@@ -603,6 +691,7 @@ pub fn prettierignore_shadowed_warning(
     has_formatignore: bool,
 ) -> Option<String> {
     (in_repo && has_prettierignore && has_formatignore).then(|| {
+        let dir = quote_path(dir);
         format!(
             ".prettierignore in {dir} is shadowed by a sibling .formatignore and is not applied; move its patterns into .formatignore to keep them"
         )
@@ -622,6 +711,7 @@ pub fn prettierignore_shadowed_warning(
 /// so the native CLI and the WASM binding emit the identical text.
 #[must_use]
 pub fn gitignore_symlink_warning(path: &str) -> String {
+    let path = quote_path(path);
     format!(
         "{path} is a symbolic link, which git does not follow in a working tree; its ignore rules are not applied"
     )
@@ -635,6 +725,7 @@ pub fn gitignore_symlink_warning(path: &str) -> String {
 /// WASM binding emit the identical text.
 #[must_use]
 pub fn unresolvable_root_error(root: &str) -> String {
+    let root = quote_path(root);
     format!("{root}: cannot resolve a relative path: the working directory is unavailable")
 }
 
@@ -811,6 +902,7 @@ pub fn excluded_argument_warning(
         // witness with no tsv exclusion cannot happen — the witness IS a tsv rule)
         (false, _, _) => "narrow or negate that rule to format it".to_string(),
     };
+    let display = quote_path(display);
     Some(if named.depth == segments.len() {
         format!("{display} is excluded by a rule in {rule_file}, {consequence}; {remedy}")
     } else {
@@ -911,13 +1003,13 @@ fn ignore_file_display(dir: &[&str], source: IgnoreSource, loose_root: Option<&s
 /// Format-root-relative segments as a user reads them: `/`-joined inside a repo, where
 /// the format root is the repo root, and joined onto `loose_root` outside one, where the
 /// format root is the filesystem root and the relative form would read as a path under
-/// the working directory. The separator is read off `loose_root`'s own spelling — a
+/// the working directory — and quoted as every printed path is ([`quote_path`]). The separator is read off `loose_root`'s own spelling — a
 /// backslash anywhere in it means a Windows root — which is sound only because every
 /// caller passes the FILESYSTEM root (`/`, `C:\`, a `\\?\` or UNC prefix), never a
 /// directory whose name could hold a backslash on posix; asserted in debug builds.
 fn path_display(segments: &[&str], loose_root: Option<&str>) -> String {
     let Some(root) = loose_root else {
-        return segments.join("/");
+        return quote_path_owned(segments.join("/"));
     };
     let trimmed = root.trim_end_matches(['/', '\\']);
     debug_assert!(
@@ -930,12 +1022,13 @@ fn path_display(segments: &[&str], loose_root: Option<&str>) -> String {
         display.push(separator);
         display.push_str(segment);
     }
-    display
+    quote_path_owned(display)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::borrow::Cow;
 
     fn tsv_stack(content: &str) -> IgnoreStack {
         let mut stack = IgnoreStack::new();
@@ -1297,6 +1390,117 @@ mod tests {
     }
 
     #[test]
+    fn quote_path_leaves_a_plain_path_alone() {
+        for path in [
+            "src/a.ts",
+            "k l.ts",
+            "mé.ts",
+            "i\\j.ts",
+            "C:\\src\\a.ts",
+            "",
+            "'a'.ts",
+            "a`b.ts",
+            ".",
+        ] {
+            assert!(
+                matches!(quote_path(path), Cow::Borrowed(p) if p == path),
+                "{path:?}"
+            );
+            assert!(
+                matches!(quote_path_bytes(path.as_bytes()), Cow::Borrowed(_)),
+                "{path:?}"
+            );
+        }
+        // a byte outside ASCII prints as itself, as git prints it under
+        // `core.quotePath=false`
+        assert!(matches!(quote_path_bytes(b"t\xffu.ts"), Cow::Borrowed(_)));
+        assert_eq!(quote_path_owned("k l.ts".to_owned()), "k l.ts");
+        assert_eq!(quote_path_owned("a\nb.ts".to_owned()), r#""a\nb.ts""#);
+    }
+
+    #[test]
+    fn quote_path_c_quotes_a_control_character_or_a_double_quote() {
+        // git's own spellings (`git ls-files` under `core.quotePath=false`, git 2.47)
+        for (path, quoted) in [
+            ("a\nb.ts", r#""a\nb.ts""#),
+            ("c\rd.ts", r#""c\rd.ts""#),
+            ("e\tf.ts", r#""e\tf.ts""#),
+            ("g\"h.ts", r#""g\"h.ts""#),
+            ("n\u{1}o.ts", r#""n\001o.ts""#),
+            ("p\u{7f}q.ts", r#""p\177q.ts""#),
+            ("r\u{1b}s.ts", r#""r\033s.ts""#),
+            ("x\u{b}y\u{c}z\u{8}\u{7}.ts", r#""x\vy\fz\b\a.ts""#),
+            // a backslash escapes inside a quoted path, though it never triggers the quoting
+            ("i\\j\n.ts", r#""i\\j\n.ts""#),
+            // a character outside ASCII prints as itself even inside the quotes
+            ("v\né.ts", "\"v\\né.ts\""),
+            ("build/a\nb.ts", r#""build/a\nb.ts""#),
+            ("\"", r#""\"""#),
+        ] {
+            assert_eq!(&*quote_path(path), quoted, "{path:?}");
+            assert_eq!(
+                &*quote_path_bytes(path.as_bytes()),
+                quoted.as_bytes(),
+                "{path:?}"
+            );
+        }
+        assert_eq!(&*quote_path_bytes(b"v\n\xffw.ts"), b"\"v\\n\xffw.ts\"");
+    }
+
+    /// Every builder that names a path prints it through `quote_path`; the ignore-file
+    /// PATTERNS a warning offers stay literal, since they are pasted rather than read.
+    #[test]
+    fn every_path_a_message_names_is_quoted() {
+        assert_eq!(
+            unsupported_extension_error("a\nb.json").unwrap(),
+            "\"a\\nb.json\": unsupported file extension (tsv handles .ts, .mts, .cts, .js, .mjs, .cjs, .svelte, .css)"
+        );
+        assert!(
+            gitignore_symlink_warning("d\n/.gitignore")
+                .starts_with("\"d\\n/.gitignore\" is a symbolic link")
+        );
+        assert!(unresolvable_root_error("e\"f").starts_with("\"e\\\"f\": cannot resolve"));
+        assert!(
+            prettierignore_outside_repo_warning("/tmp/x\ty", false, true, false)
+                .unwrap()
+                .starts_with(".prettierignore in \"/tmp/x\\ty\" is not read")
+        );
+        assert!(
+            prettierignore_shadowed_warning("pkg\u{1b}", true, true, true)
+                .unwrap()
+                .starts_with(".prettierignore in \"pkg\\033\" is shadowed")
+        );
+        // a directory in the path, the ignore file named by its directory, and the
+        // re-include lines: the first two quoted, the lines spelled literally (a tab is a
+        // character a pattern can hold, so it stays a tab there)
+        let mut stack = IgnoreStack::new();
+        stack.push_gitignore("", "bu\tild/\n");
+        stack.push_gitignore("we\"ird", "out/\n");
+        assert_eq!(
+            excluded_argument_warning("./bu\tild/x.ts", "bu\tild/x.ts", false, None, &stack)
+                .as_deref(),
+            Some(
+                "\"./bu\\tild/x.ts\" is inside \"bu\\tild\", which a rule in the repo-root .gitignore excludes, so it is not formatted; re-include it by adding `!/bu\tild/`, `/bu\tild/*` and `!/bu\tild/x.ts`, in that order, to the repo-root .formatignore"
+            )
+        );
+        assert_eq!(
+            excluded_argument_warning("we\"ird/out", "we\"ird/out", true, None, &stack).as_deref(),
+            Some(
+                "\"we\\\"ird/out\" is excluded by a rule in \"we\\\"ird/.gitignore\", so nothing under it is formatted; re-include it by adding `!/we\"ird/out/` to the repo-root .formatignore"
+            )
+        );
+        // outside a repo the absolute spelling is what gets quoted
+        let mut loose = IgnoreStack::new();
+        loose.push_formatignore("home/u", "gen*/\n");
+        assert_eq!(
+            excluded_argument_warning("gen\r", "home/u/gen\r", true, Some("/"), &loose).as_deref(),
+            Some(
+                "\"gen\\r\" is excluded by a rule in /home/u/.formatignore, so nothing under it is formatted; narrow or negate that rule to format it"
+            )
+        );
+    }
+
+    #[test]
     fn excluded_argument_warning_text_is_stable() {
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "build/\n*.gen.ts\n");
@@ -1329,11 +1533,12 @@ mod tests {
                 "src/a.gen.ts is excluded by a rule in the repo-root .gitignore, so it is not formatted; re-include it by adding `!/src/a.gen.ts` to the repo-root .formatignore"
             )
         );
-        // a path no ignore-file line can hold gets no lines
+        // a path no ignore-file line can hold gets no lines — and is quoted, so the warning
+        // stays one line
         assert_eq!(
             warn("build/a\nb.ts", "build/a\nb.ts", false).as_deref(),
             Some(
-                "build/a\nb.ts is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; no ignore-file line can hold the line break in its path, so narrow that rule to format it"
+                "\"build/a\\nb.ts\" is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; no ignore-file line can hold the line break in its path, so narrow that rule to format it"
             )
         );
         // a nested `.gitignore` is named where it sits; the lines still go to the root

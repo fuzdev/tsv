@@ -762,7 +762,7 @@ async function format_paths(values, positionals) {
 			changed_paths.push(files[i]);
 		} else {
 			errors++;
-			eprint(`error: ${files[i]}: ${outcome.message}\n`);
+			eprint(`error: ${quote_path(files[i])}: ${outcome.message}\n`);
 		}
 	}
 	print(join_lines(changed_paths));
@@ -1333,6 +1333,18 @@ function run_parse({ values, positionals }) {
 		input = read_stdin(1);
 	} else if (positionals.length > 0) {
 		const path = positionals[0];
+		// A directory is refused by name ahead of the parser choice, as the native
+		// `InputArgs::resolve` refuses it: this command reads one file, and the read
+		// below would report `EISDIR` under a message that calls it one.
+		let is_dir = false;
+		try {
+			is_dir = statSync(path).isDirectory();
+		} catch {
+			// not there, or unreadable: the read below reports it
+		}
+		if (is_dir) {
+			exit_with_error(1, `Error: ${quote_path(path)}: is a directory (one file is expected)`);
+		}
 		if (flag_parser === undefined) {
 			// The path's extension picks the parser, so it must be one tsv handles: the
 			// dispatch has no unknown arm, and a `.md` would otherwise parse as
@@ -1350,7 +1362,7 @@ function run_parse({ values, positionals }) {
 		try {
 			input = decode_source(readFileSync(path));
 		} catch (error) {
-			exit_with_error(1, `Error: Error reading file '${path}': ${error.message}`);
+			exit_with_error(1, `Error: Error reading file '${quote_path(path)}': ${error.message}`);
 		}
 	} else {
 		exit_with_error(1, 'Error: No input provided. Use a file path, --content, or --stdin');
@@ -1557,7 +1569,7 @@ function read_ignore_file(path, warnings) {
 	} catch (error) {
 		if (error.code === 'ENOENT') return undefined;
 		warnings.push(
-			`could not read ${path} (${error_message(error)}); its ignore rules are not applied`
+			`could not read ${quote_path(path)} (${error_message(error)}); its ignore rules are not applied`
 		);
 		return undefined;
 	}
@@ -1681,7 +1693,7 @@ function discover_files(paths) {
 			.map((path, i) => {
 				if (stats[i]?.isDirectory()) return undefined;
 				if (stats[i]?.isFile()) return unsupported_extension_error(path, policy);
-				return `${path}: not a file or directory`;
+				return `${quote_path(path)}: not a file or directory`;
 			})
 			.filter((message) => message !== undefined)
 	);
@@ -1780,11 +1792,67 @@ function sort_dedup(lines) {
 }
 
 /** `paths` as one newline-terminated block — the shape both bulk stdout writes
- * take, so a listing and a changed-path report cannot drift apart. */
+ * take, so a listing and a changed-path report cannot drift apart — each line one
+ * path as `quote_path` spells it. */
 function join_lines(paths) {
 	let block = '';
-	for (const path of paths) block += `${path}\n`;
+	for (const path of paths) block += `${quote_path(path)}\n`;
 	return block;
+}
+
+/**
+ * A path as a diagnostic or a listing spells it — `tsv_discover::quote_path`, restated
+ * by hand (as `clamp_worker_count` is) for the paths cli.js names itself; the warnings
+ * the binding builds arrive quoted already. Verbatim, unless the path holds a control
+ * character (U+0000–U+001F, U+007F) or a double quote, in which case the whole path is
+ * wrapped in double quotes and C-escaped the way git prints such a path under
+ * `core.quotePath=false`: `\a` `\b` `\t` `\n` `\v` `\f` `\r` `\"` `\\` by name, any
+ * other control character as three octal digits, everything else as itself. A backslash
+ * escapes inside a quoted path but never triggers the quoting — every Windows path holds
+ * one — so a quoted path unquotes as git's does and a plain path prints as it is. One
+ * rule so a warning naming a path stays one line and a `--list` line stays readable by
+ * whatever reads `git ls-files`: a line beginning with `"` is quoted, any other names
+ * the file exactly. Over code units, which agrees with the native bytes on every
+ * character the rule touches (all ASCII).
+ */
+function quote_path(path) {
+	if (!/[\x00-\x1f\x7f"]/.test(path)) return path;
+	let quoted = '"';
+	for (const ch of path) {
+		switch (ch) {
+			case '\x07':
+				quoted += '\\a';
+				break;
+			case '\b':
+				quoted += '\\b';
+				break;
+			case '\t':
+				quoted += '\\t';
+				break;
+			case '\n':
+				quoted += '\\n';
+				break;
+			case '\v':
+				quoted += '\\v';
+				break;
+			case '\f':
+				quoted += '\\f';
+				break;
+			case '\r':
+				quoted += '\\r';
+				break;
+			case '"':
+				quoted += '\\"';
+				break;
+			case '\\':
+				quoted += '\\\\';
+				break;
+			default:
+				quoted +=
+					ch < ' ' || ch === '\x7f' ? `\\${ch.charCodeAt(0).toString(8).padStart(3, '0')}` : ch;
+		}
+	}
+	return `${quoted}"`;
 }
 
 /**
@@ -2286,7 +2354,9 @@ function collect_recursive(
 		// which also means dropping the `, scandir '<path>'` tail Node appends to its own
 		// message, since that path is the argument's spelling (the code and description
 		// stay: `EACCES: permission denied`, this runtime's wording as sanctioned)
-		errors.push(`${dir_abs}: read_dir failed: ${error_message(error).replace(/, \w+ '.*'$/s, '')}`);
+		errors.push(
+			`${quote_path(dir_abs)}: read_dir failed: ${error_message(error).replace(/, \w+ '.*'$/s, '')}`
+		);
 		return;
 	}
 	// Single pass over the listing for the ignore-file presence flags this dir

@@ -57,6 +57,7 @@ use std::borrow::Cow;
 use std::io::{self, Write};
 use std::path::Path;
 use std::time::Duration;
+use tsv_discover::{quote_path_bytes, quote_path_owned};
 
 /// The first wait after a `WouldBlock` — about what a fast consumer takes to drain a
 /// pipe buffer — doubled on each one in a row, up to [`WOULD_BLOCK_MAX_WAIT`].
@@ -82,20 +83,33 @@ pub fn write_stderr(bytes: &[u8]) {
     write_or_stop(&mut io::stderr().lock(), bytes, "stderr");
 }
 
-/// A path as the bytes it has, for a stdout listing: `Path::display` spells a non-UTF-8
-/// name with U+FFFD, and the changed-path report and `--list` are for scripting over,
-/// so a line there must name the file on disk. Unix paths are bytes; elsewhere the
-/// lossy spelling is the only one there is. Diagnostics on stderr keep `display`.
+/// A path as a stdout listing names it: the bytes it has, since `Path::display` spells a
+/// non-UTF-8 name with U+FFFD and the changed-path report and `--list` are for scripting
+/// over, so a line there must name the file on disk — unix paths are bytes; elsewhere the
+/// lossy spelling is the only one there is — quoted by the one rule every printed path
+/// takes ([`tsv_discover::quote_path`]: a control character or a double quote in the
+/// name C-quotes the whole path, as `git ls-files` prints it, so a line holds exactly one
+/// path and a line beginning with `"` is a quoted one). Diagnostics on stderr take
+/// [`path_text`].
 pub fn path_bytes(path: &Path) -> Cow<'_, [u8]> {
     #[cfg(unix)]
     {
         use std::os::unix::ffi::OsStrExt;
-        Cow::Borrowed(path.as_os_str().as_bytes())
+        quote_path_bytes(path.as_os_str().as_bytes())
     }
     #[cfg(not(unix))]
     {
-        Cow::Owned(path.to_string_lossy().into_owned().into_bytes())
+        Cow::Owned(quote_path_owned(path.to_string_lossy().into_owned()).into_bytes())
     }
+}
+
+/// A path as a stderr diagnostic names it: `Path::display`'s spelling — U+FFFD for a
+/// non-UTF-8 name, which a diagnostic can bear where a listing cannot — quoted by the
+/// same rule as [`path_bytes`], so a name holding a line feed does not split the
+/// `error:` or `warning:` line it sits on. The warnings `tsv_discover` builds arrive
+/// quoted already; this covers the paths the CLI names itself.
+pub fn path_text(path: &Path) -> String {
+    quote_path_owned(path.to_string_lossy().into_owned())
 }
 
 /// Print `message` as one stderr line and exit with `code` — the shape every

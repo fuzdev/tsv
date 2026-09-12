@@ -5,9 +5,11 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use tsv_discover::{
     DirVerdict, classify_dir, prettierignore_outside_repo_warning, prettierignore_shadowed_warning,
-    should_format_file, unsupported_extension_error,
+    quote_path, should_format_file, unsupported_extension_error,
 };
 use tsv_ignore::IgnoreStack;
+
+use crate::cli::out::path_text;
 
 /// tsv's native ignore file, discovered hierarchically (one per directory, in a
 /// repo from the repo root down, outside a repo from the filesystem root down).
@@ -162,7 +164,7 @@ pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
     files.dedup();
     if roots_can_overlap(&args) {
         let mut seen: HashSet<PathBuf> = HashSet::with_capacity(files.len());
-        files.retain(|p| seen.insert(fs::canonicalize(p).unwrap_or_else(|_| p.clone())));
+        files.retain(|p| seen.insert(canonicalize(p).unwrap_or_else(|_| p.clone())));
     }
     Ok(Discovered { files, diagnostics })
 }
@@ -180,7 +182,7 @@ fn roots_can_overlap(args: &[Arg<'_>]) -> bool {
         let Arg::Dir(path) = arg else {
             return true;
         };
-        let Ok(canonical) = fs::canonicalize(path) else {
+        let Ok(canonical) = canonicalize(Path::new(path)) else {
             return true;
         };
         roots.push(canonical);
@@ -237,7 +239,7 @@ fn classify_args(paths: &[String]) -> Result<Vec<Arg<'_>>, Vec<String>> {
                 Some(error) => bad.push(error),
                 None => args.push(Arg::File(p)),
             },
-            _ => bad.push(format!("{p}: not a file or directory")),
+            _ => bad.push(format!("{}: not a file or directory", quote_path(p))),
         }
     }
     if bad.is_empty() { Ok(args) } else { Err(bad) }
@@ -249,7 +251,9 @@ fn walk_args(args: &[Arg<'_>], sink: &mut dyn FileSink) -> Diagnostics {
     // canonical cwd so it compares cleanly with canonicalized roots below; `None` when it
     // cannot be resolved (a deleted working directory), which only a relative root that
     // fails to canonicalize ever asks for
-    let cwd = std::env::current_dir().and_then(fs::canonicalize).ok();
+    let cwd = std::env::current_dir()
+        .and_then(|cwd| canonicalize(&cwd))
+        .ok();
 
     // accumulate directly into the walk struct so it threads one `&mut` sink
     // rather than a parallel set of vectors
@@ -667,10 +671,45 @@ fn absolute_named_path(path: &Path, cwd: Option<&Path>) -> Option<PathBuf> {
         (Some(parent), Some(name)) if parent.as_os_str().is_empty() => {
             cwd.map(|cwd| cwd.join(name))
         }
-        (Some(parent), Some(name)) => fs::canonicalize(parent).ok().map(|p| p.join(name)),
-        _ => fs::canonicalize(path).ok(),
+        (Some(parent), Some(name)) => canonicalize(parent).ok().map(|p| p.join(name)),
+        _ => canonicalize(path).ok(),
     };
     lexical.or_else(|| absolutize(path, cwd))
+}
+
+/// `fs::canonicalize` as this module reads it: the resolved path, with the **verbatim
+/// prefix** Windows returns it under (`\\?\C:\…`, `\\?\UNC\server\share\…`) taken off.
+/// Left on, it reaches two places that read the path as text: every diagnostic naming a
+/// path outside a repo, whose format root is the filesystem root and would print as
+/// `\\?\C:\`, and [`FileScope::enter`], which compares one argument's directory against
+/// the last one's — an argument [`absolutize`] had to spell (its parent would not
+/// canonicalize) sits beside one that did, and the two spellings of one directory read
+/// as a move to another format root, rebuilding a scope that need not move. Stripping
+/// changes no file access: std re-adds the prefix itself wherever a path needs it. A
+/// no-op wherever a canonical path begins with `/`.
+fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
+    fs::canonicalize(path).map(strip_verbatim_prefix)
+}
+
+/// [`canonicalize`]'s prefix strip, on the path's text: `\\?\C:\a` → `C:\a`,
+/// `\\?\UNC\s\v\a` → `\\s\v\a`, anything else as it is (a verbatim prefix over
+/// some other shape — a device path — keeps the spelling that names it).
+fn strip_verbatim_prefix(path: PathBuf) -> PathBuf {
+    let Some(text) = path.to_str() else {
+        return path;
+    };
+    let Some(rest) = text.strip_prefix(r"\\?\") else {
+        return path;
+    };
+    if let Some(unc) = rest.strip_prefix(r"UNC\") {
+        PathBuf::from(format!(r"\\{unc}"))
+    } else if rest.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+        && rest.as_bytes().get(1) == Some(&b':')
+    {
+        PathBuf::from(rest)
+    } else {
+        path
+    }
 }
 
 /// The format root above `dir` and whether it is a repo root: inside a git repo the repo
@@ -801,8 +840,10 @@ fn collect_recursive(
                 let entry = match entry {
                     Ok(entry) => entry,
                     Err(e) => {
-                        out.errors
-                            .push(format!("{}: read_dir entry failed: {e}", dir.abs.display()));
+                        out.errors.push(format!(
+                            "{}: read_dir entry failed: {e}",
+                            path_text(dir.abs)
+                        ));
                         continue;
                     }
                 };
@@ -810,7 +851,7 @@ fn collect_recursive(
                     Ok(file_type) => entries.push((entry.file_name(), file_type)),
                     Err(e) => out.errors.push(format!(
                         "{}: file_type failed: {e}",
-                        dir.abs.join(entry.file_name()).display()
+                        path_text(&dir.abs.join(entry.file_name()))
                     )),
                 }
             }
@@ -819,7 +860,7 @@ fn collect_recursive(
         // so `tsv format t ./t` reports an unreadable `t/locked` once, not once per spelling
         Err(e) => {
             out.errors
-                .push(format!("{}: read_dir failed: {e}", dir.abs.display()));
+                .push(format!("{}: read_dir failed: {e}", path_text(dir.abs)));
             return;
         }
     }
@@ -1154,9 +1195,37 @@ fn read_ignore_file(path: &Path, warnings: &mut Vec<String>) -> Option<String> {
         Err(e) => {
             warnings.push(format!(
                 "could not read {} ({e}); its ignore rules are not applied",
-                path.display()
+                path_text(path)
             ));
             None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_verbatim_prefix;
+    use std::path::PathBuf;
+
+    /// The strip is a text rule, so it grades on any host: what Windows' `canonicalize`
+    /// returns loses its `\\?\` prefix, and every other spelling is left alone.
+    #[test]
+    fn strip_verbatim_prefix_takes_off_what_windows_canonicalize_adds() {
+        let strip = |text: &str| strip_verbatim_prefix(PathBuf::from(text));
+        assert_eq!(strip(r"\\?\C:\repo\src"), PathBuf::from(r"C:\repo\src"));
+        assert_eq!(strip(r"\\?\C:\"), PathBuf::from(r"C:\"));
+        assert_eq!(
+            strip(r"\\?\UNC\server\share\src"),
+            PathBuf::from(r"\\server\share\src")
+        );
+        // a device path keeps the spelling that names it; a plain path is untouched
+        for untouched in [
+            r"\\?\pipe\x",
+            r"C:\repo\src",
+            "/home/u/src",
+            r"\\server\share",
+        ] {
+            assert_eq!(strip(untouched), PathBuf::from(untouched), "{untouched}");
         }
     }
 }

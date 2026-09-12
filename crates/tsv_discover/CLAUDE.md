@@ -7,8 +7,9 @@ The single home of the decisions `tsv format`'s directory walk makes: the
 always-pruned safety nets, the build-output heuristic, the formattable-extension
 check, the heuristic-shadow warning, the `.prettierignore`-shadowed warning, the
 `.prettierignore`-outside-a-repo warning, the symlinked-`.gitignore` warning, the
-unresolvable-root error, and the gate on a path an argument names
-(`excluded_argument_warning`). The three discovery surfaces — the
+unresolvable-root error, the gate on a path an argument names
+(`excluded_argument_warning`), and the quoting every printed path takes
+(`quote_path`). The three discovery surfaces — the
 native CLI (`tsv_cli`), the WASM CLI (`crates/tsv_wasm/npm/cli.js`), and the VS
 Code extension — call into it instead of reimplementing the decision, so they
 agree **by construction** rather than by hand-mirrored constants and templates
@@ -67,6 +68,22 @@ crates (the open-convention stance):
 - `formattable_extension_list(separator)` — the extension set rendered as prose
   (`".ts, .mts, …"`), the one spelling behind every message that lists it (the
   refusal above, the CLI's nothing-in-scope error).
+- `quote_path(path) -> Cow<str>` / `quote_path_bytes(bytes) -> Cow<[u8]>` — a path as
+  a diagnostic or a listing spells it: verbatim, unless it holds a control character
+  (U+0000–U+001F, U+007F) or a double quote, in which case the whole path is wrapped in
+  double quotes and C-escaped the way `git ls-files` prints such a name under
+  `core.quotePath=false` (`\a` `\b` `\t` `\n` `\v` `\f` `\r` `\"` `\\` by name, any
+  other control character as three octal digits, every other byte as itself — a byte
+  outside ASCII stays raw even inside the quotes). A backslash escapes inside a quoted
+  path but never triggers the quoting, since every Windows path holds one. Every
+  warning and error this crate builds spells its paths through it (the re-include
+  *patterns* a warning offers stay literal — they are pasted into an ignore file, which
+  reads no escapes), and the CLIs route the paths they name themselves through the same
+  rule (`tsv_cli::cli::out::path_bytes` / `path_text`; `cli.js` restates it by hand). The
+  byte form is what a unix listing names a non-UTF-8 file by; only ASCII is ever
+  rewritten, so the `str` form is the byte form on UTF-8. Spellings pinned against git
+  2.47's own output. Rationale: [`docs/cli.md`](../../docs/cli.md) §Multi-File
+  Formatting, "A path holding a control character or a double quote".
 - `is_safety_net(name)` — whether a directory name is an always-pruned safety net.
   A **complete, context-free** decision (safety nets prune in every mode, no
   override), so a caller walking its own tree can short-circuit before building an
@@ -227,7 +244,10 @@ crates (the open-convention stance):
   `Discovered::warnings` channel; uses `should_format_file` for the file branch;
   pushes any `prettierignore_shadowed_warning` per directory; and, at the target
   root only, pushes any `prettierignore_outside_repo_warning` into the same
-  channel. The FS walk, format-root resolution, and ignore-file reading stay
+  channel; and spells every path it names itself — the `--list`/changed-path
+  lines (`cli::out::path_bytes`), its `error:` lines, traversal errors, ignore-file
+  warnings and bad-argument errors (`path_text`, `quote_path`) — by `quote_path`. The FS
+  walk, format-root resolution, and ignore-file reading stay
   there.
 - **`tsv_wasm`** (and **`tsv_napi`**, whose `format`-gated `#[napi]` wrapper is a
   method-for-method twin) — the `format`-gated `IgnoreStack` wrapper exposes
@@ -251,7 +271,7 @@ crates (the open-convention stance):
   both `.prettierignore` ones, `gitignore_symlink_warning`,
   `excluded_argument_warning`), plus the per-argument `unsupported_extension_error`
   (through a throwaway stack — the receiver is unused, an argument check running
-  before any matcher exists), and keeps no policy *decision* of its own (the literal extension list does appear in its help/error text, hand-mirrored from the native CLI — the decision stays here).
+  before any matcher exists), and keeps no policy *decision* of its own (the literal extension list does appear in its help/error text, hand-mirrored from the native CLI — the decision stays here). `quote_path` is the one text rule it restates by hand (its own `quote_path`), for the paths it names itself — the `--list`/changed-path lines, `error:` lines, its traversal and argument errors — since the binding's warnings arrive quoted already.
 - **VS Code extension** (`vscode_extension_tsv_format`) — assembles an
   `IgnoreStack` per open document and calls `is_ignored(rel, false) ||
   is_path_pruned(rel)`. It has no directory walk, so `is_path_pruned` is its entry

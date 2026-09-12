@@ -995,13 +995,192 @@ fn test_format_named_file_with_a_line_break_gets_no_reinclude_lines() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert_eq!(output.status.code(), Some(0), "stderr: {stderr}");
     assert!(output.stdout.is_empty(), "stderr: {stderr}");
+    // the argument is quoted, so the warning stays one line
     assert!(
         stderr.contains(
-            "a\nb.ts is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; no ignore-file line can hold the line break in its path, so narrow that rule to format it"
+            "/build/a\\nb.ts\" is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; no ignore-file line can hold the line break in its path, so narrow that rule to format it"
         ),
         "stderr: {stderr}"
     );
+    assert_eq!(stderr.lines().count(), 1, "stderr: {stderr}");
     assert!(!stderr.contains('`'), "stderr: {stderr}");
+}
+
+/// A path holding a control character or a double quote is printed C-quoted, as `git
+/// ls-files` prints one (`core.quotePath=false`), everywhere a path is printed: the
+/// `--list` and changed-path lines on stdout, the per-file error line, a traversal error,
+/// an ignore-file warning and the warning naming an excluded argument. Every other path —
+/// a space, a backslash, a character outside ASCII — prints as it is, and the re-include
+/// PATTERNS a warning offers stay literal. Unix only: Windows forbids the characters.
+#[cfg(unix)]
+#[test]
+fn test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = temp_dir("quoted_paths");
+    fs::create_dir_all(dir.join(".git")).unwrap();
+    fs::create_dir_all(dir.join("build")).unwrap();
+    fs::write(dir.join(".gitignore"), "build/\n").unwrap();
+    fs::write(dir.join("a\nb.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("c\rd.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("e\"f.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("g\u{1b}h.ts"), "const x = \n").unwrap(); // a parse error
+    fs::write(dir.join("i\\j.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("k l.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("mé.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("build/n\to.ts"), UNFORMATTED_TS).unwrap();
+
+    let list = tsv_in_dir(dir.path(), &["format", "--list", "."]);
+    assert_eq!(list.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&list.stdout)
+            .lines()
+            .collect::<Vec<_>>(),
+        [
+            r#""./a\nb.ts""#,
+            r#""./c\rd.ts""#,
+            r#""./e\"f.ts""#,
+            r#""./g\033h.ts""#,
+            "./i\\j.ts",
+            "./k l.ts",
+            "./mé.ts",
+        ]
+    );
+
+    let check = tsv_in_dir(dir.path(), &["format", "--check", "."]);
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert_eq!(check.status.code(), Some(2), "stderr: {stderr}");
+    assert_eq!(
+        String::from_utf8_lossy(&check.stdout)
+            .lines()
+            .collect::<Vec<_>>(),
+        [
+            r#""./a\nb.ts""#,
+            r#""./c\rd.ts""#,
+            r#""./e\"f.ts""#,
+            "./i\\j.ts",
+            "./k l.ts",
+            "./mé.ts",
+        ]
+    );
+    assert!(
+        stderr
+            .lines()
+            .any(|line| line.starts_with(r#"error: "./g\033h.ts": "#)),
+        "stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("6 would change, 0 unchanged, 1 errors"),
+        "stderr: {stderr}"
+    );
+
+    // the argument warning quotes the path in prose and spells the patterns literally
+    let named = tsv_in_dir(dir.path(), &["format", "--list", "build/n\to.ts"]);
+    let stderr = String::from_utf8_lossy(&named.stderr);
+    assert_eq!(named.status.code(), Some(0), "stderr: {stderr}");
+    assert_eq!(
+        stderr.trim_end(),
+        "warning: \"build/n\\to.ts\" is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; re-include it by adding `!/build/`, `/build/*` and `!/build/n\to.ts`, in that order, to the repo-root .formatignore"
+    );
+
+    // a traversal error and an ignore-file warning name their directory quoted too
+    fs::create_dir_all(dir.join("lo\nck")).unwrap();
+    fs::create_dir_all(dir.join("we\nird")).unwrap();
+    fs::write(dir.join("we\nird/.formatignore"), b"\xff\n").unwrap();
+    fs::write(dir.join("we\nird/w.ts"), FORMATTED_TS).unwrap();
+    fs::set_permissions(dir.join("lo\nck"), fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read_dir(dir.join("lo\nck")).is_ok() {
+        return; // root reads anything: nothing more to grade
+    }
+    let walk = tsv_in_dir(dir.path(), &["format", "--list", "."]);
+    let stderr = String::from_utf8_lossy(&walk.stderr);
+    assert_eq!(walk.status.code(), Some(2), "stderr: {stderr}");
+    let root = dir.path().to_str().unwrap();
+    assert!(
+        stderr.contains(&format!("error: \"{root}/lo\\nck\": read_dir failed: ")),
+        "stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains(&format!(
+            "warning: could not read \"{root}/we\\nird/.formatignore\" ("
+        )),
+        "stderr: {stderr}"
+    );
+    assert!(
+        String::from_utf8_lossy(&walk.stdout).contains("\"./we\\nird/w.ts\"\n"),
+        "stdout: {}",
+        String::from_utf8_lossy(&walk.stdout)
+    );
+    // every diagnostic is exactly one line: two `error:`/`warning:` heads, one line each
+    let heads = stderr
+        .lines()
+        .filter(|l| l.starts_with("error: ") || l.starts_with("warning: "))
+        .count();
+    assert_eq!(heads, stderr.lines().count(), "stderr: {stderr}");
+}
+
+/// A bad path argument and a `parse` read failure quote the path the same way.
+#[cfg(unix)]
+#[test]
+fn test_argument_errors_quote_a_path_holding_a_control_character() {
+    let dir = temp_dir("quoted_argument_errors");
+    let missing = dir.join("no\nfile.ts");
+    let missing = missing.to_str().unwrap();
+    let root = dir.path().to_str().unwrap();
+
+    let format = tsv(&["format", missing]);
+    assert_eq!(format.status.code(), Some(2));
+    assert_eq!(
+        String::from_utf8_lossy(&format.stderr).trim_end(),
+        format!("error: \"{root}/no\\nfile.ts\": not a file or directory")
+    );
+
+    let parse = tsv(&["parse", missing]);
+    assert_eq!(parse.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&parse.stderr).starts_with(&format!(
+            "Error: Error reading file '\"{root}/no\\nfile.ts\"': "
+        )),
+        "stderr: {}",
+        String::from_utf8_lossy(&parse.stderr)
+    );
+
+    let json = dir.join("da\"ta.json");
+    fs::write(&json, "[]").unwrap();
+    let unsupported = tsv(&["format", json.to_str().unwrap()]);
+    assert_eq!(unsupported.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&unsupported.stderr).starts_with(&format!(
+            "error: \"{root}/da\\\"ta.json\": unsupported file extension"
+        )),
+        "stderr: {}",
+        String::from_utf8_lossy(&unsupported.stderr)
+    );
+}
+
+/// `parse` reads one file: a directory is refused by name, ahead of the extension check
+/// and of a `--parser` override, rather than read and reported as a file that could not
+/// be read.
+#[test]
+fn test_parse_refuses_a_directory_by_name() {
+    let dir = temp_dir("parse_directory");
+    fs::create_dir_all(dir.join("src.ts")).unwrap();
+    let path = dir.join("src.ts");
+    let path = path.to_str().unwrap();
+    let expected = format!("Error: {path}: is a directory (one file is expected)\n");
+    for args in [
+        vec!["parse", path],
+        vec!["parse", "--parser", "typescript", path],
+        vec!["parse", "--pretty", path],
+    ] {
+        let output = tsv(&args);
+        assert_eq!(output.status.code(), Some(1), "{args:?}");
+        assert_eq!(
+            String::from_utf8_lossy(&output.stderr),
+            expected,
+            "{args:?}"
+        );
+        assert!(output.stdout.is_empty(), "{args:?}");
+    }
 }
 
 /// An explicitly named file is held to the extension check before anything else: the
