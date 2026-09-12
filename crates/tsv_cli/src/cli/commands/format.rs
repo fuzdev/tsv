@@ -4,7 +4,7 @@ use crate::cli::discover::{
 };
 use crate::cli::format_source::{format_source_in, format_source_with_source_type};
 use crate::cli::input::{InputArgs, ParserType, check_source_type_language, parse_source_type_arg};
-use crate::cli::out::{exit_with_error, path_bytes, write_stdout};
+use crate::cli::out::{exit_with_error, path_bytes, path_text, write_stdout};
 use crate::cli::stack::{clamp_worker_count, sized_thread};
 use crate::err_line;
 use argh::FromArgs;
@@ -268,7 +268,7 @@ impl FormatCommand {
                 }
                 FileOutcome::Error(e) => {
                     errors += 1;
-                    err_line!("error: {}: {e}", path.display());
+                    err_line!("error: {}: {e}", path_text(path));
                 }
             }
         }

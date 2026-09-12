@@ -1381,6 +1381,97 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	// A path holding a control character or a double quote is printed C-quoted, as
+	// `git ls-files` prints one, everywhere a path is printed — the native pin is
+	// `tests/cli_tests.rs`'s `test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it`;
+	// every other path prints as it is, and a warning's re-include patterns stay literal.
+	it('a path holding a control character is quoted wherever it prints', { skip: !posix }, () => {
+		const tree = mkdtempSync(join(tmpdir(), 'tsv-quoted-'));
+		try {
+			mkdirSync(join(tree, '.git'));
+			mkdirSync(join(tree, 'build'));
+			writeFileSync(join(tree, '.gitignore'), 'build/\n');
+			for (const name of [
+				'a\nb.ts',
+				'c\rd.ts',
+				'e"f.ts',
+				'i\\j.ts',
+				'k l.ts',
+				'mé.ts',
+				'build/n\to.ts'
+			]) {
+				writeFileSync(join(tree, name), 'const   x=1\n');
+			}
+			writeFileSync(join(tree, 'g\x1bh.ts'), 'const x = \n');
+			const list = run_cli(['format', '--list', '.'], undefined, tree);
+			assert.equal(list.status, 0, list.stderr);
+			assert.deepEqual(list.stdout.split('\n'), [
+				'"./a\\nb.ts"',
+				'"./c\\rd.ts"',
+				'"./e\\"f.ts"',
+				'"./g\\033h.ts"',
+				'./i\\j.ts',
+				'./k l.ts',
+				'./mé.ts',
+				''
+			]);
+			const check = run_cli(['format', '--check', '.'], undefined, tree);
+			assert.equal(check.status, 2, check.stderr);
+			assert.deepEqual(check.stdout.split('\n'), [
+				'"./a\\nb.ts"',
+				'"./c\\rd.ts"',
+				'"./e\\"f.ts"',
+				'./i\\j.ts',
+				'./k l.ts',
+				'./mé.ts',
+				''
+			]);
+			assert.match(check.stderr, /^error: "\.\/g\\033h\.ts": /m);
+			assert.match(check.stderr, /6 would change, 0 unchanged, 1 errors/);
+			const named = run_cli(['format', '--list', 'build/n\to.ts'], undefined, tree);
+			assert.equal(named.status, 0, named.stderr);
+			assert.equal(
+				named.stderr,
+				'warning: "build/n\\to.ts" is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; re-include it by adding `!/build/`, `/build/*` and `!/build/n\to.ts`, in that order, to the repo-root .formatignore\n'
+			);
+			// a bad argument and a `parse` read failure quote the path the same way
+			const missing = run_cli(['format', join(tree, 'no\nfile.ts')]);
+			assert.equal(missing.status, 2);
+			assert.equal(missing.stderr, `error: "${tree}/no\\nfile.ts": not a file or directory\n`);
+			const parse = run_cli(['parse', join(tree, 'no\nfile.ts')]);
+			assert.equal(parse.status, 1);
+			assert.ok(
+				parse.stderr.startsWith(`Error: Error reading file '"${tree}/no\\nfile.ts"': `),
+				parse.stderr
+			);
+		} finally {
+			rmSync(tree, { recursive: true, force: true });
+		}
+	});
+
+	// `parse` reads one file: a directory is refused by name, ahead of the extension
+	// check and of a `--parser` override. The native pin is `test_parse_refuses_a_directory_by_name`.
+	it('parse refuses a directory by name', () => {
+		const tree = mkdtempSync(join(tmpdir(), 'tsv-parse-dir-'));
+		try {
+			const dir = join(tree, 'src.ts');
+			mkdirSync(dir);
+			const expected = `Error: ${dir}: is a directory (one file is expected)\n`;
+			for (const args of [
+				['parse', dir],
+				['parse', '--parser', 'typescript', dir],
+				['parse', '--pretty', dir]
+			]) {
+				const result = run_cli(args);
+				assert.equal(result.status, 1, args.join(' '));
+				assert.equal(result.stderr, expected, args.join(' '));
+				assert.equal(result.stdout, '', args.join(' '));
+			}
+		} finally {
+			rmSync(tree, { recursive: true, force: true });
+		}
+	});
+
 	it('format --content prints formatted source', () => {
 		const result = run_cli(['format', '--content', 'const   x=1', '--parser', 'typescript']);
 		assert.equal(result.status, 0);
