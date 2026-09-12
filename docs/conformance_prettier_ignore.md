@@ -214,8 +214,8 @@ more defensible:
   touched.
 
 **On single-child type positions (annotation `:` / alias `=` / constraint `extends` /
-type-parameter default `=` / named-tuple `label:` / mapped-type `]:` value and `[K in ...]`
-key / conditional `?` · `:` branches and `extends` head / function- and constructor-type
+type-parameter default `=` / named-tuple `label:` / tuple-rest `...` / mapped-type `]:` value
+and `[K in ...]` key / conditional `?` · `:` branches and `extends` head / function- and constructor-type
 return `=>` / predicate `is` / `as` · `satisfies` / indexed-access `[` index /
 prefix type operator `keyof` · `readonly` · `unique` / `typeof` type query / `infer` /
 angle-assertion `<` / required-paren interior).** The same placement classification honors
@@ -239,7 +239,7 @@ precede:
 
 - Own-line directive kept own-line at a single-child head — ◆comment_preservation
   ◆prettier_bug — at the annotation `:`, constraint `extends`, default `=`, named-tuple
-  `label:`, mapped-type `]:`, conditional-branch `?` · `:`, conditional-`extends`,
+  `label:`, tuple-rest `...`, mapped-type `]:`, conditional-branch `?` · `:`, conditional-`extends`,
   function/constructor-return `)` · `=>`, predicate `is`, `as` · `satisfies`, prefix
   type operator (`keyof` / `readonly` / `unique`), `typeof` type query, `infer`, and
   indexed-access `[` heads, prettier relocates an own-line directive before a
@@ -254,7 +254,9 @@ precede:
   pinned via each fixture's `audit_signature.txt`. (The conditional-branch and return-`=>`
   relocations are the self-stable minority; the return-`)` gap — whose child is the whole
   `=> T` annotation rather than a type — relocates non-idempotently but never loses the
-  freeze, its second pass only rejoining the `=> T` onto the `)` line.) Prettier itself
+  freeze, its second pass only rejoining the `=> T` onto the `)` line. The tuple-rest `...` head is
+  the same shape: prettier's second pass keeps the freeze and only collapses a
+  block-spelled element onto one line.) Prettier itself
   keeps the directive own-line
   at the alias `=` and assertion `<` heads and before every union child —
   [annotation](../tests/fixtures/typescript/types/annotation_prettier_ignore_own_line_prettier_divergence/),
@@ -267,7 +269,8 @@ precede:
   [predicate](../tests/fixtures/typescript/types/type_predicate_prettier_ignore_type_prettier_divergence/),
   [as/satisfies](../tests/fixtures/typescript/expressions/as_satisfies_prettier_ignore_type_prettier_divergence/),
   [indexed index](../tests/fixtures/typescript/types/indexed_access_prettier_ignore_index_prettier_divergence/),
-  [prefix operator / type query / infer](../tests/fixtures/typescript/types/type_operator_prettier_ignore_operand_prettier_divergence/).
+  [prefix operator / type query / infer](../tests/fixtures/typescript/types/type_operator_prettier_ignore_operand_prettier_divergence/),
+  [tuple rest](../tests/fixtures/typescript/types/tuple/rest_prettier_ignore_own_line_prettier_divergence/).
   At the `typeof` query the child is the entity NAME, so type arguments — which sit past
   it — stay parent-owned and normalize, the same scope split as `new`'s frozen callee;
   at `infer` the child is the type PARAMETER, so its `extends` constraint rides inside

@@ -2238,13 +2238,7 @@ impl<'a> Printer<'a> {
         // under a freeze. Trailing shell-gap comments are lifted after the inner
         // (`with_stripped_paren_trailing`), so every shell comment prints once.
         if let Some(inner) = self.paren_interior_routed_inner(arr.element_type) {
-            let inner_doc = self.build_routed_child_doc(inner);
-            let value_doc = self.with_stripped_paren_trailing(
-                inner_doc,
-                arr.element_type,
-                inner,
-                TrailingBlock::Inline,
-            );
+            let value_doc = self.build_routed_inner_doc(arr.element_type, inner);
             let mut parts: DocBuf = smallvec![d.text("(")];
             self.append_keyword_value_line_comments(
                 &mut parts,
