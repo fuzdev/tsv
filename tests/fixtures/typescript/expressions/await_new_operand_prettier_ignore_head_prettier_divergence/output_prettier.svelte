@@ -32,6 +32,17 @@
 		const uuu = await // prettier-ignore
 		(vvv  ??  www);
 
+		// A callee the author wrote with NO argument list of its own keeps a pair around the
+		// frozen slice: the printed form of a `new` always carries one, so without the pair
+		// the argument list past the slice would bind to the inner `new` instead.
+		const a2 = new // prettier-ignore
+		new  B2();
+
+		// One the author DID write an argument list for needs no pair — the slice ends past
+		// its own `(`…`)`, so nothing after it can be absorbed.
+		const c2 = new // prettier-ignore
+		new  D2(e2)();
+
 		// A directive the author put on the keyword's line is INERT under the placement
 		// floor: the comment keeps the line it was written on and the operand normalizes.
 		const xxx = new // prettier-ignore

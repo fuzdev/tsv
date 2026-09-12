@@ -30,6 +30,11 @@ use tsv_lang::source_scan::{
 /// own separator, out of the declarator that owned it.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ShellTail {
+    // TODO: an assignment RHS inside a `for` header takes this tail too — the header's
+    // declarator threads `ForClauseSeparator`, but `build_assignment_layout`'s shell does
+    // not — so `for (a = (b + c /* t */); ;)` defers the block past the clause `;` (frozen)
+    // or out of the statement entirely (unfrozen), neither of which is a fixed point. The
+    // tail belongs with the assignment's own caller, which is the only frame that knows.
     /// A statement value position — a declarator initializer, an assignment RHS, a
     /// `return` / `throw` argument, `export default`. A following `;` ends the statement,
     /// so a trailing block defers past it (see [`Printer::build_expression_doc_with_paren_comments`]).
@@ -1703,10 +1708,18 @@ impl<'a> Printer<'a> {
         // — the same rule that keeps a synthesized paren from landing inside an owned
         // comment (`docs/comments.md`). The two paths that return early supply their own
         // pair: a sequence self-parenthesizes, and the keep-paren path RETAINS the shell,
-        // which already parenthesizes the `in` — wrapping either would double it.
-        let wrap_in = |doc: DocId| match tail {
-            ShellTail::ForClauseSeparator => self.wrap_for_init_in(expr, doc),
-            ShellTail::StatementTerminator => doc,
+        // which already parenthesizes the `in` — wrapping either would double it. A FROZEN
+        // value takes the wrap in the same place, but asks the SLICE's question rather than
+        // the node's ([`Printer::wrap_frozen_for_init_in`]) — a verbatim slice has no inner
+        // positions to parenthesize a deeper `in` at — and skips it where the calling
+        // POSITION already supplies a pair (`position_parens`, which is how
+        // `for (let k = (a = b in c); ;)` keeps exactly one).
+        let wrap_in = |doc: DocId| match (tail, frozen) {
+            (ShellTail::ForClauseSeparator, Some(frozen)) => {
+                self.wrap_frozen_for_init_in(expr, frozen, position_parens, doc)
+            }
+            (ShellTail::ForClauseSeparator, None) => self.wrap_for_init_in(expr, doc),
+            (ShellTail::StatementTerminator, _) => doc,
         };
 
         if !self.has_trailing_paren_comments(expr_end, boundary_end) {

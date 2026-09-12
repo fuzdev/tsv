@@ -25,6 +25,7 @@ use super::arg_wrapping::{
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use crate::ast::internal;
+use crate::printer::comments::next_significant_byte;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
 };
@@ -78,6 +79,61 @@ impl<'a> Printer<'a> {
         self.build_new_doc_after_keyword(new_expr, keyword, frozen)
     }
 
+    /// The frozen `new`→callee doc: the position's own pair
+    /// ([`Printer::build_frozen_value_doc`]), plus the one pair the SLICE requires that the
+    /// position does not.
+    ///
+    /// A `new` callee written without an argument list (`new (new X)()`) is the case. The
+    /// printed form of a `new` expression always carries one — `build_new_doc` emits `()`
+    /// even where the author wrote none — so the unfrozen callee is unambiguous and
+    /// `needs_parens` leaves it bare (`new new X()()` binds the outer `()` to the outer
+    /// `new`). A verbatim slice carries only what the author wrote: bare, `new new X()`
+    /// hands the `()` to the INNER `new` instead. The meaning survives (an empty argument
+    /// list and none are the same construction), but the next pass reads a callee that now
+    /// HAS an argument list and appends a second pair, so the output has no fixed point.
+    ///
+    /// The pair is a property of the slice, not of the position, which is why it is
+    /// answered here rather than in [`fn@crate::printer::needs_parens`] — the unfrozen
+    /// callee must keep printing bare.
+    fn build_frozen_new_callee_doc(
+        &self,
+        callee: &internal::Expression<'_>,
+        frozen: Span,
+    ) -> DocId {
+        let doc = self.build_frozen_value_doc(callee, frozen, ParenContext::NewCallee);
+        if self.frozen_new_callee_absorbs_arguments(callee) {
+            self.d().parens(doc)
+        } else {
+            doc
+        }
+    }
+
+    /// Whether a frozen `new` callee's slice would ABSORB the argument list printed after
+    /// it — true for a `new` expression the author wrote with no argument list of its own.
+    ///
+    /// Everything between the inner `new`'s callee (with its type arguments) and its own
+    /// span end is either that callee's closing shell parens, trivia, or the argument list,
+    /// so the list is present exactly when a `(` turns up in the walk. Reading the source
+    /// rather than `arguments.is_empty()` is what separates `new X` from `new X()`, which
+    /// parse to the same node.
+    fn frozen_new_callee_absorbs_arguments(&self, callee: &internal::Expression<'_>) -> bool {
+        let internal::Expression::NewExpression(inner) = callee else {
+            return false;
+        };
+        let head_end = inner
+            .type_arguments
+            .as_ref()
+            .map_or_else(|| inner.callee.span().end, |args| args.span.end);
+        let mut pos = head_end;
+        while let Some(i) = next_significant_byte(self.source, pos, inner.span.end) {
+            if self.source.as_bytes()[i] == b'(' {
+                return false;
+            }
+            pos = i as u32 + 1;
+        }
+        true
+    }
+
     /// [`Self::build_new_doc_with_wrapping`] past the keyword, which it emits as
     /// `keyword` — `new ` on the ordinary path, and `empty()` where the caller has
     /// already emitted `new` and the gap's continuation supplies the separator.
@@ -107,7 +163,7 @@ impl<'a> Printer<'a> {
         // holds a call (`new (fn(k).a.B)()`), and frozen, where the mark is simply inert.
         self.mark_new_callee_member_lookups(new_expr.callee);
         let callee = if let Some(frozen) = frozen {
-            self.build_frozen_value_doc(new_expr.callee, frozen, ParenContext::NewCallee)
+            self.build_frozen_new_callee_doc(new_expr.callee, frozen)
         } else if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
             sealed
         } else if let Some(parens) =

@@ -283,7 +283,7 @@ impl<'a> Printer<'a> {
                 // its base across conditional-group variants, and a nested call-argument
                 // object has a different span so it never matches.
                 let needs_arrow_parens =
-                    self.arrow_body_object_parens_target.get() == Some(obj.span);
+                    self.arrow_body_leftmost_parens_target.get() == Some(obj.span);
                 let doc = self.build_object_doc(obj);
                 let doc = if needs_arrow_parens {
                     self.d().parens(doc)
@@ -312,12 +312,20 @@ impl<'a> Printer<'a> {
             }
             Expression::ClassExpression(class_expr) => {
                 let doc = self.build_class_expression_doc(class_expr);
+                // A DECORATED class expression at the leftmost position of an arrow body
+                // takes the same pair its object twin above takes, and for the same
+                // reason: `@` is not a token `ConciseBody` admits, so `() => @dec class
+                // {}.k` does not reparse. Only a decorated class is ever the target
+                // (`leftmost_arrow_body_parens_span`), so the kind needs no second test
+                // here. It breaks its parens open like the statement-start form below —
+                // the decorator owns its own line either way.
                 // A decorated class expression that self-wraps at an expression-statement
                 // start (`(@dec class {}).foo`, `(@dec class {})()`) breaks its parens
                 // open + indents, like the bare-statement form; an undecorated
                 // `(class {}).foo` keeps the flat wrap.
-                if self.expr_stmt_paren_target.get() == Some(class_expr.span)
-                    && class_expr_has_decorators(class_expr)
+                if self.arrow_body_leftmost_parens_target.get() == Some(class_expr.span)
+                    || (self.expr_stmt_paren_target.get() == Some(class_expr.span)
+                        && class_expr_has_decorators(class_expr))
                 {
                     self.build_break_open_parens(doc)
                 } else {

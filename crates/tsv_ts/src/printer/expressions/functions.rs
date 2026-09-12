@@ -11,6 +11,7 @@ use crate::printer::ArrowChainContext;
 use crate::printer::LeadingGlue;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
+use crate::printer::class_expr_has_decorators;
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
@@ -62,22 +63,30 @@ fn arrow_body_always_hugs(expr: &internal::Expression<'_>, source: &str) -> bool
         && !has_newline_before_position(source, expr.span().start))
 }
 
-/// Span of the ObjectExpression at an expression's leftmost (no-lookahead) position,
-/// or `None` if the leftmost token isn't an object literal.
+/// Span of the node at an expression's leftmost (no-lookahead) position that an arrow
+/// body must parenthesize, or `None` if the leftmost token needs no pair.
 ///
-/// In arrow bodies, `{...}` at the start is ambiguous with a block statement and needs
-/// parens around *just the object* — e.g. `{} as T`, `{}.prop`, `{} && a`, `{} ? a : b`,
-/// `{}.b++`. Delegates to the shared `leftmost_no_lookahead` walk (prettier's
+/// Two node kinds qualify, for one reason — a concise body cannot START with their first
+/// token, so the pair goes around *just that node*:
+///
+/// - an **object literal**, whose `{` is ambiguous with a block body — `{} as T`,
+///   `{}.prop`, `{} && a`, `{} ? a : b`, `{}.b++`;
+/// - a **decorated class expression**, whose `@` is not a token `ConciseBody` admits —
+///   `@dec class {}.k`, `@dec class {}()`, `@dec class {} ? a : b`, and the rest of the
+///   same eight shapes. An *undecorated* `class {}` opens a concise body fine and stays
+///   bare, as prettier keeps it.
+///
+/// Delegates to the shared `leftmost_no_lookahead` walk (prettier's
 /// `startsWithNoLookaheadToken`, also used by the expression-statement paren path) and
-/// keeps the result only when it's an object. Assignment and sequence *bodies* are
+/// keeps the result only when it is one of those two. Assignment and sequence *bodies* are
 /// excluded — they get whole-body parens instead — matching prettier's
 /// needs-parentheses.js arrow-body carve-out (which still recurses through *nested*
 /// assignments/sequences, so the carve-out guards only the top-level body type).
 ///
-/// Returns the object's span so the printer wraps exactly that node (keyed by span,
-/// robust to a chain rebuilding its base across conditional-group variants) and never
-/// a same-shaped object nested deeper.
-fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<Span> {
+/// Returns the node's span so the printer wraps exactly it (keyed by span, robust to a
+/// chain rebuilding its base across conditional-group variants) and never a same-shaped
+/// node nested deeper.
+fn leftmost_arrow_body_parens_span(expr: &internal::Expression<'_>) -> Option<Span> {
     if matches!(
         expr,
         internal::Expression::AssignmentExpression(_) | internal::Expression::SequenceExpression(_)
@@ -86,6 +95,7 @@ fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<Span> {
     }
     match leftmost_no_lookahead(expr) {
         internal::Expression::ObjectExpression(o) => Some(o.span),
+        internal::Expression::ClassExpression(c) if class_expr_has_decorators(c) => Some(c.span),
         _ => None,
     }
 }
@@ -193,10 +203,10 @@ fn walk_arrow_chain<'a, 'arena>(
     }
 }
 
-/// Whether an expression has an ObjectExpression at its leftmost position.
-/// See [`leftmost_object_span`].
-pub(in crate::printer) fn has_leftmost_object_expression(expr: &internal::Expression<'_>) -> bool {
-    leftmost_object_span(expr).is_some()
+/// Whether an expression's leftmost position holds a node an arrow body must
+/// parenthesize. See [`leftmost_arrow_body_parens_span`].
+pub(in crate::printer) fn has_leftmost_arrow_body_parens(expr: &internal::Expression<'_>) -> bool {
+    leftmost_arrow_body_parens_span(expr).is_some()
 }
 
 /// Check if an expression is a huggable pattern for function parameters.
@@ -921,7 +931,7 @@ impl<'a> Printer<'a> {
             });
             parts.push(d.indent_hardline(body_doc));
         } else if matches!(expr, internal::Expression::ConditionalExpression(_))
-            && !has_leftmost_object_expression(expr)
+            && !has_leftmost_arrow_body_parens(expr)
         {
             // Prettier's shouldAddParensIfNotBreak: ternary body gets conditional
             // parens when inline, no parens when on its own line.
@@ -1495,7 +1505,7 @@ impl<'a> Printer<'a> {
                     // own internal indent, and does so however the chain broke.
                     d.concat(&[d.text(" "), self.build_arrow_body_doc(expr)])
                 } else if matches!(expr, internal::Expression::ConditionalExpression(_))
-                    && !has_leftmost_object_expression(expr)
+                    && !has_leftmost_arrow_body_parens(expr)
                     && !should_break_chain
                 {
                     // Ternary body: parens when inline, none when broken
@@ -2030,16 +2040,21 @@ impl<'a> Printer<'a> {
         }
         // An arrow body is a value gap (`mark_jsdoc_cast_value_gap`).
         self.mark_jsdoc_cast_value_gap(expr);
-        // Object at leftmost position in arrow body needs parens to avoid block ambiguity.
-        // Examples: `() => ({}) as T`, `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`.
-        // The span target tells build_expression_doc to wrap exactly that ObjectExpression
-        // in parens when reached. Keyed by span (not a bool) so it survives a chain base
-        // being rebuilt across conditional-group variants, and never matches a same-shaped
-        // object nested deeper (e.g. a call argument). Saved/restored for nested arrows.
-        if let Some(obj_span) = leftmost_object_span(expr) {
-            let prev = self.arrow_body_object_parens_target.replace(Some(obj_span));
+        // The node at the arrow body's leftmost position needs parens so the body does not
+        // start with a token `ConciseBody` rejects — an object's `{` (read as a block) or a
+        // decorated class's `@` ([`leftmost_arrow_body_parens_span`]).
+        // Examples: `() => ({}) as T`, `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`,
+        // `() => (@dec class {}).k`.
+        // The span target tells build_expression_doc to wrap exactly that node in parens
+        // when reached. Keyed by span (not a bool) so it survives a chain base being
+        // rebuilt across conditional-group variants, and never matches a same-shaped node
+        // nested deeper (e.g. a call argument). Saved/restored for nested arrows.
+        if let Some(leftmost_span) = leftmost_arrow_body_parens_span(expr) {
+            let prev = self
+                .arrow_body_leftmost_parens_target
+                .replace(Some(leftmost_span));
             let doc = self.build_flat_chain_expression_doc(expr);
-            self.arrow_body_object_parens_target.set(prev);
+            self.arrow_body_leftmost_parens_target.set(prev);
             return prepend(doc);
         }
 
@@ -2133,11 +2148,21 @@ impl<'a> Printer<'a> {
         // the same bytes; for a ternary the run belongs inside its layout parens.
         let leading = self.arrow_gap_leading_run(sig_end, body_start);
         match frozen {
-            Some(frozen) => prepend_leading(
-                self.d(),
-                leading,
-                self.build_frozen_value_doc(expr, frozen, ParenContext::ArrowBody),
-            ),
+            Some(frozen) => {
+                // A concise body is `[?In]`, so under a `for` header's init the slice owes
+                // the ambient pair — and over the SLICE, since a verbatim body has no inner
+                // positions to parenthesize a deeper `in` at
+                // ([`Printer::wrap_frozen_for_init_in`]). `build_frozen_value_doc` supplies
+                // the POSITION's pair from the same `needs_parens` answer, which is what
+                // keeps a root `in` body (or an assignment one) at exactly one pair.
+                let position_parens = self.needs_parens(expr, ParenContext::ArrowBody);
+                let body = self.build_frozen_value_doc(expr, frozen, ParenContext::ArrowBody);
+                prepend_leading(
+                    self.d(),
+                    leading,
+                    self.wrap_frozen_for_init_in(expr, frozen, position_parens, body),
+                )
+            }
             None => self.build_arrow_body_doc_with_leading(expr, leading),
         }
     }

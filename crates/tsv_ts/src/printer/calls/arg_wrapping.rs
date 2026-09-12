@@ -19,7 +19,7 @@ use super::arg_predicates::{
 };
 use crate::ast::internal;
 use crate::printer::expressions::functions::{
-    arrow_signature_has_breaking_comments, arrow_token_end, has_leftmost_object_expression,
+    arrow_signature_has_breaking_comments, arrow_token_end, has_leftmost_arrow_body_parens,
     prepend_leading,
 };
 use smallvec::{SmallVec, smallvec};
@@ -439,7 +439,7 @@ pub(super) fn prebuild_expand_last_break_body(
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && (arrow_body_is_call_through_non_null(body_expr)
             || (matches!(&**body_expr, internal::Expression::ConditionalExpression(_))
-                && !has_leftmost_object_expression(body_expr)))
+                && !has_leftmost_arrow_body_parens(body_expr)))
     {
         let body_doc = build_arrow_body_like_arrow(printer, body_expr);
         return Some((body_expr.span().start, body_doc));
@@ -1096,7 +1096,7 @@ fn prebuild_arrow_gap_break_body(
             Some((block.span.start, printer.arrow_block_body_doc(block)))
         }
         internal::ArrowFunctionBody::Expression(body) => {
-            if has_leftmost_object_expression(body) {
+            if has_leftmost_arrow_body_parens(body) {
                 return None;
             }
             Some((

@@ -57,6 +57,7 @@ use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,
     HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
     MemberGap, MemberSeam, RunLeadingBlank, ShellLeadingRun, ShellPair, StandaloneGlue,
+    next_significant_byte,
 };
 use decorators::class_expr_has_decorators;
 pub use expressions::assignment::should_inline_logical_expression;
@@ -275,18 +276,20 @@ pub struct Printer<'a> {
     /// It is the *list* that goes flat, never a parameter's own doc — a destructured pattern
     /// still expands on its own, which is why this is not a `remove_lines` over the signature.
     pub(crate) test_call_flat_params: Cell<bool>,
-    /// Span of the ObjectExpression at the leftmost position of an arrow body that must
-    /// be wrapped in parens to avoid block ambiguity — `() => ({}) as Logger`,
-    /// `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`. Matches prettier's
-    /// `startsWithNoLookaheadToken` traversal. Keyed by span (not consumed) so a chain
-    /// rebuilding its base across conditional-group variants wraps consistently, and a
-    /// same-shaped object nested deeper (a call argument) never matches.
-    pub(crate) arrow_body_object_parens_target: Cell<Option<Span>>,
+    /// Span of the node at the leftmost position of an arrow body that must be wrapped in
+    /// parens because a concise body cannot start with its first token — an object's `{`
+    /// (read as a block body) or a decorated class's `@`: `() => ({}) as Logger`,
+    /// `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`,
+    /// `() => (@dec class {}).k`. Matches prettier's `startsWithNoLookaheadToken`
+    /// traversal. Keyed by span (not consumed) so a chain rebuilding its base across
+    /// conditional-group variants wraps consistently, and a same-shaped node nested
+    /// deeper (a call argument) never matches.
+    pub(crate) arrow_body_leftmost_parens_target: Cell<Option<Span>>,
     /// Span of the object/function/class node that starts an expression statement
     /// and must be wrapped in parens, even when nested as the leftmost token of a
     /// member/binary/etc. chain: `(class {}).foo`, `({}).foo`, `(class {}) + 1`,
     /// `({a: 1}).b().c()`. Matches prettier's `startsWithNoLookaheadToken` traversal.
-    /// Keyed by span (not consumed, like `arrow_body_object_parens_target`) so a chain
+    /// Keyed by span (not consumed, like `arrow_body_leftmost_parens_target`) so a chain
     /// rebuilding its base across conditional-group variants wraps consistently; cleared
     /// once per statement in `build_expression_statement_doc`.
     pub(crate) expr_stmt_paren_target: Cell<Option<Span>>,
@@ -576,7 +579,7 @@ impl<'a> Printer<'a> {
             skip_arrow_chain: Cell::new(false),
             expand_last_arg_flat_params: Cell::new(false),
             test_call_flat_params: Cell::new(false),
-            arrow_body_object_parens_target: Cell::new(None),
+            arrow_body_leftmost_parens_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
             ternary_hang_target: Cell::new(None),
             assignment_value_target: Cell::new(None),
@@ -680,6 +683,135 @@ impl<'a> Printer<'a> {
         } else {
             doc
         }
+    }
+
+    /// [`Self::wrap_for_init_in`] for a value the position FROZE.
+    ///
+    /// The ambient rule asks "is this node an `in` binary?" of the node a position holds,
+    /// and that is enough for a printed value: every `in` deeper in the tree reaches a
+    /// position of its own, which parenthesizes it there. A frozen slice has no deeper
+    /// positions — it prints verbatim — so the question becomes "does this slice hand the
+    /// header a bare `in` anywhere?" ([`Self::frozen_slice_hands_header_a_bare_in`]) and the
+    /// one pair goes around the whole slice.
+    ///
+    /// `already_parenthesized` is the calling position's own answer to "is something else
+    /// already putting a pair around this slice?" — its clarity parens, a retained author
+    /// shell, a ternary branch's pair. Each site holds that fact; a second pair is valid but
+    /// is neither prettier's output nor the unfrozen twin's.
+    ///
+    /// The wrap is keyed on the ambient init flag, not on the calling position's own `[?In]`
+    /// threading, so a frozen arrow body at a `[+In]` host under the init (a call argument, an
+    /// object value, a template substitution) takes the pair too. That matches its unfrozen
+    /// twin, which prettier parenthesizes as well; prettier's FROZEN output prints that one
+    /// bare and still parses, so it is the one cell of this family where tsv adds a pair a
+    /// valid prettier output lacks. One answer is the NODE's rather
+    /// than the position's and so is read here: every caller reaches
+    /// [`Self::build_frozen_expression_doc`], which gives a `SequenceExpression` back the
+    /// grouping pair it prints for itself. (The `for` init CLAUSE is the one place a frozen
+    /// sequence prints bare, and it asks the walk directly rather than through this
+    /// wrapper.)
+    pub(crate) fn wrap_frozen_for_init_in(
+        &self,
+        expr: &internal::Expression<'_>,
+        frozen: Span,
+        already_parenthesized: bool,
+        doc: DocId,
+    ) -> DocId {
+        let self_parenthesizing = matches!(expr, internal::Expression::SequenceExpression(_));
+        if self.in_for_init.get()
+            && !already_parenthesized
+            && !self_parenthesizing
+            && self.frozen_slice_hands_header_a_bare_in(expr, frozen.end)
+        {
+            self.arena.parens(doc)
+        } else {
+            doc
+        }
+    }
+
+    /// Whether a frozen slice printed bare in a `for` header's init would hand the header
+    /// an `in` it reads as the `for (x in y)` separator.
+    ///
+    /// The walk descends exactly the child positions the grammar threads `[?In]` through:
+    /// a sequence's operands, an assignment's value (plain and compound), a binary's two
+    /// operands (logical operators included), a conditional's test and ALTERNATE, an
+    /// arrow's concise body, a `yield` / `yield*` argument, and an `as` / `satisfies`
+    /// operand. A conditional's CONSEQUENT is absent on purpose: ecma262 gives it
+    /// `AssignmentExpression[+In]` whatever the conditional's own parameter, so an `in`
+    /// there is already legal (`for (a ? b in c : d; ;)` parses).
+    ///
+    /// Everything else is absent because its operand cannot BE an unparenthesized `in`
+    /// binary: a prefix operator (`!`, `typeof`, `void`, `delete`, a sign, `await`, a
+    /// `<T>` assertion) binds tighter, so `typeof a in b` is `(typeof a) in b` and the
+    /// `in` is the root the walk already answers; a postfix `!`, a member access, a chain
+    /// base and a template tag are the same story; and a call or `new` argument, an array
+    /// element, an object value, a computed index, a template substitution and any braced
+    /// body are `[+In]` in their own right.
+    ///
+    /// ⚠️ Two of those `[+In]` positions carry a spec-vs-tsc split rather than a clean
+    /// skip: an **array element** and a **parameter default**. The spec threads `[+In]`
+    /// into both, so `for (['a' in b]; ;)` and `for (function (q = 'a' in b) {}; ;)` are
+    /// legal and V8 accepts them, but tsc reports `',' expected`; tsv's own parser sides
+    /// with tsc on the arrow spelling (`for ((q = 'a' in b) => 1; ;) {}` is rejected at parse), and its
+    /// unfrozen printer supplies the pair like prettier does. The frozen path supplies it
+    /// too for a BARE element or default, through this position's own `needs_parens`. What
+    /// is left is a DESCENDED `in` there (`[c || 'a' in b]`), which this walk does not reach
+    /// because it does not descend into a `[+In]` position. Pre-existing, and not
+    /// re-synthesized by the freeze.
+    ///
+    /// A child the AUTHOR parenthesized stops the walk: the slice is verbatim, so it
+    /// carries that pair. The test is the next significant byte past the child, bounded by
+    /// the slice's own end — unbounded it would find the pair the slice EXCLUDES (a clause
+    /// written `(aaa, bbb in ccc)` freezes as `aaa, bbb in ccc`, with the author's `)`
+    /// sitting just past the span) and call every such clause already parenthesized.
+    ///
+    /// Prettier's rule is the mirror image and has no boundary at all
+    /// (`isPathInForStatementInitializer` walks every ancestor to the root), so the two
+    /// agree on which `in`s are covered; they differ only in where the pair can go, which
+    /// is what a verbatim slice decides.
+    pub(crate) fn frozen_slice_hands_header_a_bare_in(
+        &self,
+        expr: &internal::Expression<'_>,
+        slice_end: u32,
+    ) -> bool {
+        use internal::Expression as E;
+        if is_in_binary(expr) {
+            return true;
+        }
+        let mut reaches = |child: &internal::Expression<'_>| {
+            !self.frozen_slice_child_is_parenthesized(child, slice_end)
+                && self.frozen_slice_hands_header_a_bare_in(child, slice_end)
+        };
+        match expr {
+            E::SequenceExpression(seq) => seq.expressions.iter().any(&mut reaches),
+            E::AssignmentExpression(assign) => reaches(assign.right),
+            E::BinaryExpression(binary) => reaches(binary.left) || reaches(binary.right),
+            E::ConditionalExpression(cond) => reaches(cond.test) || reaches(cond.alternate),
+            E::ArrowFunctionExpression(arrow) => match &arrow.body {
+                internal::ArrowFunctionBody::Expression(body) => reaches(body),
+                internal::ArrowFunctionBody::BlockStatement(_) => false,
+            },
+            // `yield AssignmentExpression[?In]`, `yield*` alike; a bare `yield` has none.
+            E::YieldExpression(yield_expr) => yield_expr.argument.is_some_and(&mut reaches),
+            // `'a' in b as T` parses as a cast OVER the binary, so the `in` is the cast's
+            // operand rather than the root.
+            E::TSAsExpression(cast) => reaches(cast.expression),
+            E::TSSatisfiesExpression(cast) => reaches(cast.expression),
+            _ => false,
+        }
+    }
+
+    /// Whether the author wrote a grouping pair around `child` inside a frozen slice that
+    /// ends at `slice_end` — read as "the next significant byte past the child, still
+    /// inside the slice, is `)`". See [`Self::frozen_slice_hands_header_a_bare_in`] for why
+    /// the bound is load-bearing.
+    fn frozen_slice_child_is_parenthesized(
+        &self,
+        child: &internal::Expression<'_>,
+        slice_end: u32,
+    ) -> bool {
+        next_significant_byte(self.source, child.span().end, slice_end)
+            .is_some_and(|pos| self.source.as_bytes()[pos] == b')')
     }
 
     /// Print-context-aware wrapper over the free [`fn@needs_parens`]: supplies the
