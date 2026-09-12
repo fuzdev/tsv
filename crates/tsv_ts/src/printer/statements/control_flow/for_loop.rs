@@ -598,7 +598,7 @@ impl<'a> Printer<'a> {
         if let Some(init) = &stmt.init {
             inner_parts.push(init_frozen.map_or_else(
                 || self.build_for_init_doc(init),
-                |frozen| self.build_frozen_node_doc(frozen),
+                |frozen| self.build_frozen_init_clause_doc(init, frozen),
             ));
         }
         // The init clause→`;` gap comments bind to the `;` like a list separator.
@@ -1022,14 +1022,26 @@ impl<'a> Printer<'a> {
                         self.push_for_clause_comma_gap(&mut docs, prev_end, e.span().start);
                         // Rule A, the same as the general sequence printer's: an own-line
                         // directive in the comma gap freezes the FOLLOWING operand. The `[~In]`
-                        // wrap `build_elem` may apply is moot on a verbatim slice.
+                        // wrap `build_elem` would apply is owed by the frozen arm too — the
+                        // pair sits outside the operand's node span, so a verbatim slice drops
+                        // it — and this site asks no `needs_parens`, so it spells the wrap
+                        // itself, below, over the SLICE
+                        // ([`Printer::wrap_frozen_for_init_in`]). Nothing else parenthesizes
+                        // an operand, so `already_parenthesized` is false.
                         self.gap_frozen_span(prev_end, e.span())
                     } else {
                         None
                     };
                     docs.push(frozen.map_or_else(
                         || build_elem(e),
-                        |frozen| self.build_frozen_expression_doc(e, frozen),
+                        |frozen| {
+                            self.wrap_frozen_for_init_in(
+                                e,
+                                frozen,
+                                false,
+                                self.build_frozen_expression_doc(e, frozen),
+                            )
+                        },
                     ));
                     if i == 0 {
                         first_end = docs.len();
@@ -1795,6 +1807,40 @@ impl<'a> Printer<'a> {
             binding_start,
             continuation,
         )
+    }
+
+    /// The frozen `(`→init clause doc: the verbatim slice, plus the `[~In]` pair the clause
+    /// owes when the whole clause IS an `in` binary.
+    ///
+    /// Those parens are the printer's, not the author's — they sit outside the clause's own
+    /// node span, so the slice drops them and the header reparses as a for-in head
+    /// (`for (a in b; ;)` does not parse at all). The header's own `(` is no substitute: it
+    /// is exactly the delimiter the restriction exists to disambiguate.
+    ///
+    /// The question is the SLICE's, not the clause node's: a clause whose own root is not an
+    /// `in` binary can still hand the header one through a `[?In]`-threaded position, and
+    /// [`Printer::frozen_slice_hands_header_a_bare_in`] states which those are. The walk is
+    /// asked directly rather than through [`Printer::wrap_frozen_for_init_in`] because the
+    /// ambient flag that wrapper reads is turned on INSIDE `build_for_init_doc`, which this
+    /// arm replaces. Nothing else parenthesizes this position — the header's own `(` is the
+    /// delimiter the restriction exists to disambiguate.
+    ///
+    /// The clause is the one value head whose sibling rule runs the other way, which is why
+    /// this is spelled here rather than through [`Printer::build_frozen_expression_doc`]: a
+    /// `SequenceExpression` clause prints BARE here (`for (a, b; ;)`), where that builder
+    /// re-synthesizes the grouping pair every other position needs.
+    fn build_frozen_init_clause_doc(&self, init: &internal::ForInit<'_>, frozen: Span) -> DocId {
+        let doc = self.build_frozen_node_doc(frozen);
+        match init {
+            // This clause IS the init; it needs no ambient flag to know it.
+            internal::ForInit::Expression(expr)
+                if self.frozen_slice_hands_header_a_bare_in(expr, frozen.end) =>
+            {
+                self.d().parens(doc)
+            }
+            internal::ForInit::Expression(_) => doc,
+            internal::ForInit::VariableDeclaration(_) => doc,
+        }
     }
 
     fn build_for_init_doc(&self, init: &internal::ForInit<'_>) -> DocId {

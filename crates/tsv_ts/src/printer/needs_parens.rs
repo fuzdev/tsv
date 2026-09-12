@@ -348,13 +348,19 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Unlike await, yield has lower precedence than binary/conditional, so those don't need parens
         ParenContext::YieldArgument => matches!(expr, Expression::AssignmentExpression(_)),
 
-        // Arrow body: `() => ({})`, `() => (x = y)`
+        // Arrow body: `() => ({})`, `() => (x = y)`, `() => (@dec class {})`
         // Note: ConditionalExpression is handled specially in build_arrow_body_doc
         // using if_break - parens only when inline, not when on new line
-        ParenContext::ArrowBody => matches!(
-            expr,
-            Expression::ObjectExpression(_) | Expression::AssignmentExpression(_)
-        ),
+        ParenContext::ArrowBody => match expr {
+            Expression::ObjectExpression(_) | Expression::AssignmentExpression(_) => true,
+            // A DECORATED class expression cannot open a concise body: `@` is not a token
+            // `ConciseBody` admits, so `() => @dec class {}` does not reparse. An
+            // undecorated `class {}` opens one fine and stays bare, as prettier keeps it.
+            // The same leftmost-token question a composite body asks through
+            // `leftmost_arrow_body_parens_span`, at the body's own root.
+            Expression::ClassExpression(c) => class_expr_has_decorators(c),
+            _ => false,
+        },
 
         // Object property value: `{key: (a = b)}`
         // Assignment expressions need parens in object literals (not in ObjectPattern)

@@ -11,6 +11,13 @@ argument list** — which sit past the callee — stay parent-owned and still no
 it (`fn2(  jjj  )`). Parens the operand **requires** are the printer's, not the author's, so
 they ride outside the slice exactly as at every other value head.
 
+One of those pairs is required by the SLICE rather than by the position: a callee that is an
+argument-less `new` (`new (new  B2)()`). The printed form of a `new` always carries an
+argument list, so the unfrozen callee needs no parens — `new new B2()()` binds the outer
+`()` to the outer `new` — but a slice carries only what the author wrote, and bare
+`new new  B2()` hands that `()` to the inner `new`, growing a second pair on the next pass.
+A callee the author DID write an argument list for needs nothing (`new  D2(e2)()`).
+
 Both formatters honor the directive. They differ on **where the comment sits**: tsv keeps a
 comment the author gave its own line on that line, while prettier pulls it up to trail the
 keyword.
@@ -43,7 +50,9 @@ and is unchanged by the directive.
   keyword's line is inert here, so the comment keeps its line and the operand normalizes.
 - **prettier**: honors the freeze with the comment pulled onto the keyword's line
   (`output_prettier.svelte`), and is not idempotent on the block spelling — its second pass
-  collapses the whole expression back onto one line (`audit_signature.txt`).
+  collapses the whole expression back onto one line (`audit_signature.txt`). It drops the
+  argument-less `new` callee's pair as well, and grows the extra `()` on that same second
+  pass before settling.
 
 ## Reason
 

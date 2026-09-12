@@ -1086,7 +1086,18 @@ impl<'a> Printer<'a> {
         // Parenthesize an `in` RHS inside a for-header init (`for (a = (b in c);…)`);
         // a no-op elsewhere. The assignment builder is the RHS's only build site and
         // never routes it through `needs_parens`, so the for-init rule is applied here.
-        let right_doc = self.wrap_for_init_in(right_expr, right_doc);
+        //
+        // Skipped where the shell builder RETAINED the author's pair, which already
+        // parenthesizes the `in` — the rule [`Printer::build_shell_value_doc`] states for
+        // its own two early returns, which this wrap sits outside of.
+        let right_doc = if rhs_info
+            .boundary
+            .is_some_and(|end| self.shell_value_keeps_own_parens(right_expr, end, false))
+        {
+            right_doc
+        } else {
+            self.wrap_for_init_in(right_expr, right_doc)
+        };
 
         // Validate static heuristic: if is_poorly_breakable_chain classified this
         // expression as poorly breakable (no good internal break points), the printed
@@ -1221,7 +1232,9 @@ impl<'a> Printer<'a> {
     /// hardline and no width-decided form could keep the value beside the operator anyway.
     /// The slice replaces the RHS's doc, so no POSITION paren is added here: the ordinary
     /// path leaves that to the caller too (an object property and a class field each apply
-    /// their own `needs_parens` before choosing this layout).
+    /// their own `needs_parens` before choosing this layout). The ambient `for`-init
+    /// `[~In]` pair is the one exception, for the same reason it is one on the unfrozen
+    /// path: no caller asks `needs_parens` for an assignment RHS, so this builder owes it.
     ///
     /// `boundary` is the gap the RHS's own grouping shell lives in
     /// (`RhsCommentInfo::boundary`), threaded for exactly the reason the ordinary path
@@ -1244,6 +1257,21 @@ impl<'a> Printer<'a> {
             }
             None => self.build_frozen_expression_doc(right_expr, frozen),
         };
+        // Parenthesize an `in` RHS inside a `for` header init, exactly where and for the
+        // reason the unfrozen layout does it (`build_assignment_layout`): the assignment
+        // builder is the RHS's only build site and never routes it through `needs_parens`,
+        // so the ambient rule is applied here. A no-op everywhere else.
+        //
+        // Two things differ from the unfrozen twin, and both follow from the slice printing
+        // verbatim: the question is the SLICE's ([`Printer::wrap_frozen_for_init_in`]), since
+        // a frozen RHS has no inner positions to parenthesize a deeper `in` at; and a
+        // RETAINED author shell (the keep-paren early return of
+        // [`Printer::build_shell_value_doc`], which that builder's own doc names as the pair
+        // it must not wrap twice) already encloses the slice.
+        let shell_keeps_parens =
+            boundary.is_some_and(|end| self.shell_value_keeps_own_parens(right_expr, end, false));
+        let frozen_doc =
+            self.wrap_frozen_for_init_in(right_expr, frozen, shell_keeps_parens, frozen_doc);
         let rhs = match comments {
             Some(comments_doc) => d.concat(&[comments_doc, frozen_doc]),
             None => frozen_doc,

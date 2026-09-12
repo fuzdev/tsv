@@ -27,8 +27,28 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Bodyless `declare global` — ◆prettier_bug — [global_shorthand](../tests/fixtures/typescript/declarations/namespace/global_shorthand_prettier_divergence/)
 - Hugged sole-parameter object type — ◆design_choice — [sole_param_hug_authored_expansion](../tests/fixtures/typescript/declarations/function/sole_param_hug_authored_expansion_prettier_divergence/), [parameter_decorator_object_group](../tests/fixtures/typescript/typescript_specific/decorators/parameter_decorator_object_group_prettier_divergence/)
 - Sequence trailing line-comment convergence — ◆prettier_bug — [deferred_trailing_line_comment](../tests/fixtures/typescript/expressions/sequence/deferred_trailing_line_comment_prettier_divergence/)
+- Arrow-body leftmost decorated class parens — ◆prettier_bug — [body_leftmost_decorated_class](../tests/fixtures/typescript/expressions/arrow/body_leftmost_decorated_class_prettier_divergence/)
 
 **Instantiation expression parens**: Prettier strips parentheses from ternary and binary expressions in `TSInstantiationExpression` (`(x ? y : z)<T>` → `x ? y : z<T>`), changing semantics. Without parens, `<T>` only applies to the last operand. tsv preserves parens to maintain the original meaning. Both formatters agree on preserving parens for assignment expressions (`(x = y)<T>`). A class-expression operand in `export default` position — `export default (class {}<T>)` — is the same bug but sharper: stripping the parens makes the leading `class {}` a class _declaration_, so Prettier's output re-parses to a `ClassDeclaration` plus a dangling `<T>;` statement (a different AST), while tsv keeps the parens (adjudicated by `export_default_needs_parens`; see [export_default_instantiation](../tests/fixtures/typescript/modules/exports/default_wrappable_leftmost_operators/instantiation_prettier_divergence/)).
+
+**Arrow-body leftmost decorated class parens**: An arrow's concise body cannot START with
+`@` — the grammar admits a decorator only ahead of a class in a declaration-ish position —
+so a **decorated class expression** at the body's leftmost position needs a paren pair
+around the class alone, the answer a leftmost object literal already gets for its `{`
+(prettier's `startsWithNoLookaheadToken`, which tsv mirrors in
+`leftmost_arrow_body_parens_span`). Prettier drops the pair at every shape that rule
+reaches — `() => (@dec class {}).bbb`, `…()`, `… ? a : b`, and the bare
+`() => (@dec class {})` — and the result parses under no parser: tsc reports
+`'{' expected`, and so does prettier's own TypeScript parser on its own output. Prettier is
+nevertheless idempotent on that output at the `.svelte` level, because
+prettier-plugin-svelte catches that `SyntaxError` and passes the script block through
+verbatim — so the fixture's missing `audit_signature.txt` is the ordinary F4b fixed point. An *undecorated* `class {}` opens a
+concise body fine and stays bare in both tools, and at **statement** position both already
+parenthesize (`(@dec class {}).nnn;`) — the fixture carries both as controls. A frozen body
+whose **root** is the class takes the same pair, outside the verbatim slice, like every
+other required pair at a value head; a frozen **composite** body still prints pair-less,
+since the slice is emitted from the arrow-body position and never reaches the leftmost
+node's target — the plain-object twin (`{a: 1}.k`) is the older half of that one gap.
 
 **Constrained infer extends-operand parens**: An `infer X extends C` only ever appears in a conditional type's extends-type, so a trailing token always follows the constraint. When a _nested_ arrow's return abuts the enclosing `? :`, the parens TypeScript requires are the only thing keeping the parse unambiguous, and Prettier strips them, emitting output that **fails to re-parse** (acorn-typescript rejects it): `M extends (() => () => infer U extends string) ? …` → `M extends () => () => infer U extends string ? …` (Prettier's `needs-parentheses` rule only inspects the immediate return type). tsv keeps the parens, staying valid. Two related forms are preserved by both formatters: the _conditional-type_ infer constraint (`X extends infer U extends (A extends B ? C : D) ? …` — Prettier keeps these parens) and the single-arrow return (`M extends (() => infer U extends string) ? …` — Prettier's single-level rule covers it; see [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens/), where tsv matches). A bare `<T extends (A extends B ? C : D)>` type-parameter declaration is unaffected: the `>` terminates it, so Prettier strips and tsv matches.
 

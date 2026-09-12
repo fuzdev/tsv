@@ -1,0 +1,1489 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1141,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A concise body cannot START with `@`, so a DECORATED class expression at the body's",
+			"start": 20,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leftmost position takes a paren pair of its own — around the class alone, exactly as",
+			"start": 108,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a leftmost object literal does. The pair breaks open, since the decorator owns a line.",
+			"start": 197,
+			"end": 286,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A frozen body whose ROOT is the class takes the same pair — it is the position's, so",
+			"start": 508,
+			"end": 595,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " it rides outside the slice. A frozen COMPOSITE body is not this fixture's claim: the",
+			"start": 597,
+			"end": 684,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " slice is emitted from the position, which never reaches the leftmost node.",
+			"start": 686,
+			"end": 763,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 785,
+			"end": 803,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An UNDECORATED class opens a concise body fine and stays bare, and a leftmost object",
+			"start": 827,
+			"end": 914,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 1
+				},
+				"end": {
+					"line": 38,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keeps the pair it always had.",
+			"start": 916,
+			"end": 948,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At statement position the same leftmost rule already parenthesized the class.",
+			"start": 1021,
+			"end": 1101,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 1
+				},
+				"end": {
+					"line": 43,
+					"column": 81
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1140,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1131,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 48,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 288,
+					"end": 338,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 294,
+							"end": 337,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 294,
+								"end": 297,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 10
+									}
+								},
+								"name": "aaa"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 300,
+								"end": 337,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 13
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "MemberExpression",
+									"start": 308,
+									"end": 337,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 7
+										}
+									},
+									"object": {
+										"type": "ClassExpression",
+										"start": 313,
+										"end": 329,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 11
+											}
+										},
+										"decorators": [
+											{
+												"type": "Decorator",
+												"start": 313,
+												"end": 317,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 3
+													},
+													"end": {
+														"line": 7,
+														"column": 7
+													}
+												},
+												"expression": {
+													"type": "Identifier",
+													"start": 314,
+													"end": 317,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 4
+														},
+														"end": {
+															"line": 7,
+															"column": 7
+														}
+													},
+													"name": "dec"
+												}
+											}
+										],
+										"id": null,
+										"superClass": null,
+										"body": {
+											"type": "ClassBody",
+											"start": 327,
+											"end": 329,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 9
+												},
+												"end": {
+													"line": 8,
+													"column": 11
+												}
+											},
+											"body": []
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 334,
+										"end": 337,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 4
+											},
+											"end": {
+												"line": 9,
+												"column": 7
+											}
+										},
+										"name": "bbb"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A concise body cannot START with `@`, so a DECORATED class expression at the body's",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " leftmost position takes a paren pair of its own — around the class alone, exactly as",
+							"start": 108,
+							"end": 195
+						},
+						{
+							"type": "Line",
+							"value": " a leftmost object literal does. The pair breaks open, since the decorator owns a line.",
+							"start": 197,
+							"end": 286
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 341,
+					"end": 387,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 347,
+							"end": 386,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 347,
+								"end": 350,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 10
+									}
+								},
+								"name": "ccc"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 353,
+								"end": 386,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 13
+									},
+									"end": {
+										"line": 15,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "ClassExpression",
+									"start": 366,
+									"end": 382,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 11
+										}
+									},
+									"decorators": [
+										{
+											"type": "Decorator",
+											"start": 366,
+											"end": 370,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 3
+												},
+												"end": {
+													"line": 13,
+													"column": 7
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 367,
+												"end": 370,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 4
+													},
+													"end": {
+														"line": 13,
+														"column": 7
+													}
+												},
+												"name": "dec"
+											}
+										}
+									],
+									"id": null,
+									"superClass": null,
+									"body": {
+										"type": "ClassBody",
+										"start": 380,
+										"end": 382,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 9
+											},
+											"end": {
+												"line": 14,
+												"column": 11
+											}
+										},
+										"body": []
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 390,
+					"end": 438,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 396,
+							"end": 437,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 396,
+								"end": 399,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 7
+									},
+									"end": {
+										"line": 17,
+										"column": 10
+									}
+								},
+								"name": "ddd"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 402,
+								"end": 437,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 13
+									},
+									"end": {
+										"line": 21,
+										"column": 5
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 410,
+									"end": 437,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 21,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "ClassExpression",
+										"start": 415,
+										"end": 431,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 3
+											},
+											"end": {
+												"line": 20,
+												"column": 11
+											}
+										},
+										"decorators": [
+											{
+												"type": "Decorator",
+												"start": 415,
+												"end": 419,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 3
+													},
+													"end": {
+														"line": 19,
+														"column": 7
+													}
+												},
+												"expression": {
+													"type": "Identifier",
+													"start": 416,
+													"end": 419,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 4
+														},
+														"end": {
+															"line": 19,
+															"column": 7
+														}
+													},
+													"name": "dec"
+												}
+											}
+										],
+										"id": null,
+										"superClass": null,
+										"body": {
+											"type": "ClassBody",
+											"start": 429,
+											"end": 431,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 9
+												},
+												"end": {
+													"line": 20,
+													"column": 11
+												}
+											},
+											"body": []
+										}
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 441,
+					"end": 505,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 447,
+							"end": 504,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 29,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 447,
+								"end": 450,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 10
+									}
+								},
+								"name": "eee"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 453,
+								"end": 504,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 13
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 461,
+									"end": 504,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 8
+										}
+									},
+									"test": {
+										"type": "ClassExpression",
+										"start": 466,
+										"end": 482,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 3
+											},
+											"end": {
+												"line": 26,
+												"column": 11
+											}
+										},
+										"decorators": [
+											{
+												"type": "Decorator",
+												"start": 466,
+												"end": 470,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 3
+													},
+													"end": {
+														"line": 25,
+														"column": 7
+													}
+												},
+												"expression": {
+													"type": "Identifier",
+													"start": 467,
+													"end": 470,
+													"loc": {
+														"start": {
+															"line": 25,
+															"column": 4
+														},
+														"end": {
+															"line": 25,
+															"column": 7
+														}
+													},
+													"name": "dec"
+												}
+											}
+										],
+										"id": null,
+										"superClass": null,
+										"body": {
+											"type": "ClassBody",
+											"start": 480,
+											"end": 482,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 9
+												},
+												"end": {
+													"line": 26,
+													"column": 11
+												}
+											},
+											"body": []
+										}
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 492,
+										"end": 495,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 5
+											},
+											"end": {
+												"line": 28,
+												"column": 8
+											}
+										},
+										"name": "fff"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 501,
+										"end": 504,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 5
+											},
+											"end": {
+												"line": 29,
+												"column": 8
+											}
+										},
+										"name": "ggg"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 765,
+					"end": 824,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 771,
+							"end": 823,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 7
+								},
+								"end": {
+									"line": 36,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 771,
+								"end": 774,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 7
+									},
+									"end": {
+										"line": 34,
+										"column": 10
+									}
+								},
+								"name": "hhh"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 777,
+								"end": 823,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 13
+									},
+									"end": {
+										"line": 36,
+										"column": 19
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "ClassExpression",
+									"start": 807,
+									"end": 822,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 3
+										},
+										"end": {
+											"line": 36,
+											"column": 18
+										}
+									},
+									"decorators": [
+										{
+											"type": "Decorator",
+											"start": 807,
+											"end": 811,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 3
+												},
+												"end": {
+													"line": 36,
+													"column": 7
+												}
+											},
+											"expression": {
+												"type": "Identifier",
+												"start": 808,
+												"end": 811,
+												"loc": {
+													"start": {
+														"line": 36,
+														"column": 4
+													},
+													"end": {
+														"line": 36,
+														"column": 7
+													}
+												},
+												"name": "dec"
+											}
+										}
+									],
+									"id": null,
+									"superClass": null,
+									"body": {
+										"type": "ClassBody",
+										"start": 820,
+										"end": 822,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 16
+											},
+											"end": {
+												"line": 36,
+												"column": 18
+											}
+										},
+										"body": []
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 785,
+											"end": 803
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen body whose ROOT is the class takes the same pair — it is the position's, so",
+							"start": 508,
+							"end": 595
+						},
+						{
+							"type": "Line",
+							"value": " it rides outside the slice. A frozen COMPOSITE body is not this fixture's claim: the",
+							"start": 597,
+							"end": 684
+						},
+						{
+							"type": "Line",
+							"value": " slice is emitted from the position, which never reaches the leftmost node.",
+							"start": 686,
+							"end": 763
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 950,
+					"end": 981,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 956,
+							"end": 980,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 7
+								},
+								"end": {
+									"line": 40,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 956,
+								"end": 959,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 7
+									},
+									"end": {
+										"line": 40,
+										"column": 10
+									}
+								},
+								"name": "iii"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 962,
+								"end": 980,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 13
+									},
+									"end": {
+										"line": 40,
+										"column": 31
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "MemberExpression",
+									"start": 968,
+									"end": 980,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 19
+										},
+										"end": {
+											"line": 40,
+											"column": 31
+										}
+									},
+									"object": {
+										"type": "ClassExpression",
+										"start": 968,
+										"end": 976,
+										"loc": {
+											"start": {
+												"line": 40,
+												"column": 19
+											},
+											"end": {
+												"line": 40,
+												"column": 27
+											}
+										},
+										"id": null,
+										"superClass": null,
+										"body": {
+											"type": "ClassBody",
+											"start": 974,
+											"end": 976,
+											"loc": {
+												"start": {
+													"line": 40,
+													"column": 25
+												},
+												"end": {
+													"line": 40,
+													"column": 27
+												}
+											},
+											"body": []
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 977,
+										"end": 980,
+										"loc": {
+											"start": {
+												"line": 40,
+												"column": 28
+											},
+											"end": {
+												"line": 40,
+												"column": 31
+											}
+										},
+										"name": "jjj"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An UNDECORATED class opens a concise body fine and stays bare, and a leftmost object",
+							"start": 827,
+							"end": 914
+						},
+						{
+							"type": "Line",
+							"value": " keeps the pair it always had.",
+							"start": 916,
+							"end": 948
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 983,
+					"end": 1018,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 36
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 989,
+							"end": 1017,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 7
+								},
+								"end": {
+									"line": 41,
+									"column": 35
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 989,
+								"end": 992,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 7
+									},
+									"end": {
+										"line": 41,
+										"column": 10
+									}
+								},
+								"name": "kkk"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 995,
+								"end": 1017,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 13
+									},
+									"end": {
+										"line": 41,
+										"column": 35
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "MemberExpression",
+									"start": 1001,
+									"end": 1017,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 19
+										},
+										"end": {
+											"line": 41,
+											"column": 35
+										}
+									},
+									"object": {
+										"type": "ObjectExpression",
+										"start": 1002,
+										"end": 1012,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 20
+											},
+											"end": {
+												"line": 41,
+												"column": 30
+											}
+										},
+										"properties": [
+											{
+												"type": "Property",
+												"start": 1004,
+												"end": 1010,
+												"loc": {
+													"start": {
+														"line": 41,
+														"column": 22
+													},
+													"end": {
+														"line": 41,
+														"column": 28
+													}
+												},
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 1004,
+													"end": 1007,
+													"loc": {
+														"start": {
+															"line": 41,
+															"column": 22
+														},
+														"end": {
+															"line": 41,
+															"column": 25
+														}
+													},
+													"name": "lll"
+												},
+												"value": {
+													"type": "Literal",
+													"start": 1009,
+													"end": 1010,
+													"loc": {
+														"start": {
+															"line": 41,
+															"column": 27
+														},
+														"end": {
+															"line": 41,
+															"column": 28
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												},
+												"kind": "init"
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1014,
+										"end": 1017,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 32
+											},
+											"end": {
+												"line": 41,
+												"column": 35
+											}
+										},
+										"name": "mmm"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1103,
+					"end": 1130,
+					"loc": {
+						"start": {
+							"line": 44,
+							"column": 1
+						},
+						"end": {
+							"line": 47,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 1103,
+						"end": 1129,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 1
+							},
+							"end": {
+								"line": 47,
+								"column": 6
+							}
+						},
+						"object": {
+							"type": "ClassExpression",
+							"start": 1107,
+							"end": 1122,
+							"loc": {
+								"start": {
+									"line": 45,
+									"column": 2
+								},
+								"end": {
+									"line": 46,
+									"column": 10
+								}
+							},
+							"decorators": [
+								{
+									"type": "Decorator",
+									"start": 1107,
+									"end": 1111,
+									"loc": {
+										"start": {
+											"line": 45,
+											"column": 2
+										},
+										"end": {
+											"line": 45,
+											"column": 6
+										}
+									},
+									"expression": {
+										"type": "Identifier",
+										"start": 1108,
+										"end": 1111,
+										"loc": {
+											"start": {
+												"line": 45,
+												"column": 3
+											},
+											"end": {
+												"line": 45,
+												"column": 6
+											}
+										},
+										"name": "dec"
+									}
+								}
+							],
+							"id": null,
+							"superClass": null,
+							"body": {
+								"type": "ClassBody",
+								"start": 1120,
+								"end": 1122,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 8
+									},
+									"end": {
+										"line": 46,
+										"column": 10
+									}
+								},
+								"body": []
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 1126,
+							"end": 1129,
+							"loc": {
+								"start": {
+									"line": 47,
+									"column": 3
+								},
+								"end": {
+									"line": 47,
+									"column": 6
+								}
+							},
+							"name": "nnn"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At statement position the same leftmost rule already parenthesized the class.",
+							"start": 1021,
+							"end": 1101
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

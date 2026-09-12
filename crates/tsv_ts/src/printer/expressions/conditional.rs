@@ -320,11 +320,20 @@ impl<'a> Printer<'a> {
         op_pos: Option<u32>,
     ) -> Option<DocId> {
         let frozen = self.frozen_ternary_branch_span(expr, op_pos)?;
-        Some(self.parenthesize_ternary_branch(
+        // The ambient `for`-init `[~In]` pair, which the unfrozen branch takes one line down
+        // (`wrap_for_init_in` at each branch's build site) and no `needs_parens` here
+        // supplies: `parenthesize_ternary_branch` asks the branch-shape question only. Over
+        // the SLICE, since a frozen branch has no inner positions of its own
+        // ([`Printer::wrap_frozen_for_init_in`]) — and skipped where the branch's own pair
+        // already encloses it.
+        let branch_parens = ternary_branch_needs_parens(expr);
+        let inner = self.wrap_frozen_for_init_in(
             expr,
+            frozen,
+            branch_parens,
             self.build_frozen_expression_doc(expr, frozen),
-            None,
-        ))
+        );
+        Some(self.parenthesize_ternary_branch(expr, inner, None))
     }
 
     /// Wrap a ternary test doc in parens when its `expr` needs them (arrow/yield are

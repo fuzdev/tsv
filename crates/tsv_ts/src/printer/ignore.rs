@@ -1445,6 +1445,16 @@ impl<'a> Printer<'a> {
     /// rule belongs here rather than at [`Self::build_frozen_value_doc`] because it is a
     /// property of the node, not of the position: the cast interior needs it too.
     ///
+    /// ⚠️ The ambient `[~In]` pair a `for` header's init owes is deliberately NOT applied
+    /// here. It is one question with one answer, and `needs_parens` already ORs it ahead of
+    /// every context — so [`Self::build_frozen_value_doc`], which every positional caller
+    /// routes through, has it. Asking again here doubled the pair at eleven positions (a
+    /// call / `new` argument, an array element, a spread, an object property value, a
+    /// template `${}`, an arrow body, a binding or parameter default, a class field). The
+    /// frozen sites that bypass `needs_parens` supply it themselves, exactly as their
+    /// unfrozen twins do: [`Printer::build_shell_value_doc`]'s `ForClauseSeparator` tail,
+    /// the assignment RHS, the `for` clause's sequence operands and the ternary branches.
+    ///
     /// The value heads whose value is span-shaped rather than an `Expression` (a `for` init
     /// clause, a for-in/of left, a restricted production's operand — where the layout's own
     /// hanging parens ARE the grouping, so a re-synthesized pair would double it) take

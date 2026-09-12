@@ -287,6 +287,33 @@ first operand, so the whole sequence freezes — the value-head rule above. A
 sequence prints its own grouping parens, and they are re-synthesized around a
 frozen operand so its grouping survives.
 
+#### Required pairs a freeze re-synthesizes
+
+A frozen slice is the node's own bytes, so a paren the *printer* would have
+supplied has to be re-synthesized around it. Three such pairs are not clarity
+parens at all — without them the output does not reparse, or reparses as
+something else:
+
+- an **`in` binary lexically under a `for` header's init**, which the ambient
+  `[~In]` rule parenthesizes wherever it sits — the clause itself, an assignment
+  or compound RHS, a declarator initializer, a call argument, an array element, a
+  sequence's second-or-later operand, a ternary branch (bare, `for (a in b; ;)`
+  reads as a for-in head). The rule is asked ONCE per position: a position that
+  routes through the paren rule already has it, and only a frozen site that
+  bypasses that rule spells the wrap itself;
+- a **decorated class expression at an arrow body's leftmost position**, which a
+  concise body cannot start with (`() => (@dec class {}).k`);
+- a **`new` callee the author wrote with no argument list of its own**
+  (`new (new X)()`), where the printed `()` past the slice would otherwise bind
+  to the inner `new` — the one pair required by the SLICE rather than by the
+  position, since the unfrozen form supplies the inner `()` itself.
+
+⚠️ The heading is the list, not an invariant over every position. One known gap
+remains: a frozen **composite** arrow body loses the pair its leftmost child
+needs (`() =>⏎// format-ignore⏎{a: 1}.k`, and the decorated-class twin), because
+a frozen body is emitted from the position rather than from the leftmost node
+that would have asked for the pair.
+
 ### On assignment-family value heads
 
 An assignment operator is a delimiter like any other, so an own-line directive in
