@@ -429,9 +429,9 @@ const DISCOVERY_BATCH: usize = 8;
 /// Narrowing is safe because the work is *claimed*, not partitioned: however few
 /// workers exist drain the whole list between them. It is the answer the JS CLI
 /// already gives for the same situation (`crates/tsv_wasm/npm/cli.js`), warning text
-/// included, and the caller's own thread is the floor under it — both call sites
-/// format on it when the pool comes up empty, so "no thread was available" costs
-/// parallelism rather than the run.
+/// included, and the caller's own thread is the floor under it — [`join_pool`] runs
+/// the same drain there when the pool comes up empty, so "no thread was available"
+/// costs parallelism rather than the run.
 fn spawn_pool<'scope, F, T>(
     scope: &'scope thread::Scope<'scope, '_>,
     jobs: usize,
@@ -467,6 +467,30 @@ where
         }
     }
     handles
+}
+
+/// Every outcome the pool produced, in no particular order — and when [`spawn_pool`]
+/// came up empty, `fallback`'s: the calling thread runs the same drain the workers
+/// would have, so a refused pool costs parallelism rather than the run (or, worse, a
+/// run that formats nothing and reads every unclaimed file out as a panic from a
+/// worker that never existed). The one join for both discovery paths, so the fallback
+/// cannot drift between them; a worker that died outside `catch_unwind` contributes
+/// nothing, and its files read out as [`WORKER_PANICKED`] at the caller.
+fn join_pool<T>(
+    handles: Vec<thread::ScopedJoinHandle<'_, Vec<T>>>,
+    fallback: impl FnOnce() -> Vec<T>,
+) -> Vec<T> {
+    let mut outcomes = if handles.is_empty() {
+        fallback()
+    } else {
+        Vec::new()
+    };
+    for handle in handles {
+        if let Ok(mut claimed) = handle.join() {
+            outcomes.append(&mut claimed);
+        }
+    }
+    outcomes
 }
 
 /// Releases the pool if the producer unwinds.
@@ -646,7 +670,8 @@ fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
     // The scope's two products: the walk's diagnostics and every claimed outcome.
     let (discovery, claimed): (Result<Diagnostics, Vec<String>>, Vec<_>) = thread::scope(|scope| {
         let _release = ReleasePoolOnUnwind(&queue);
-        let handles = spawn_pool(scope, jobs, || drain_queue(&queue, check));
+        let worker = || drain(check, || queue.claim());
+        let handles = spawn_pool(scope, jobs, worker);
 
         // this thread is the producer
         let discovery = discover_into(paths, &mut sink);
@@ -655,22 +680,10 @@ fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
         // draining, so it costs nothing on the wall
         sink.keys.sort_unstable();
 
-        // A pool the OS refused outright leaves this thread as the only worker. It
-        // has already walked, so nothing streams — but the alternative is a run that
-        // formats nothing and reports every file as a panic from a worker that never
-        // existed (the slot sweep below), which is the lie an unclamped `--jobs 0`
-        // would tell. The queue is finished, so this drains what the walk left and stops.
-        let mut claimed = if handles.is_empty() {
-            drain_queue(&queue, check)
-        } else {
-            Vec::new()
-        };
-        for handle in handles {
-            if let Ok(mut outcomes) = handle.join() {
-                claimed.append(&mut outcomes);
-            }
-        }
-        (discovery, claimed)
+        // A pool the OS refused outright leaves this thread as the only worker. It has
+        // already walked, so nothing streams — the queue is finished, so the fallback
+        // drains what the walk left and stops.
+        (discovery, join_pool(handles, worker))
     });
 
     // the caller only streams a directory root it has just seen resolve, so the
@@ -708,18 +721,20 @@ fn format_streamed(paths: &[String], check: bool, jobs: usize) -> Formatted {
     }
 }
 
-/// One streamed worker's whole life: claim a path, format it, keep the outcome
-/// against the index it was claimed at. Returns when the walk is done and the queue
-/// is drained.
-///
-/// A function rather than a closure inside the spawn loop because the producer runs
-/// it too when the pool comes up empty — the fallback and the worker cannot drift
-/// apart if there is only one of them.
-fn drain_queue(queue: &FileQueue, check: bool) -> Vec<(usize, PathBuf, FileOutcome)> {
+/// One worker's whole life, on either discovery path: `claim` the next file — a
+/// streamed path taken out of the [`FileQueue`], or the next index of a collected
+/// list — format it, keep the outcome against the index it was claimed at; stop when
+/// `claim` has nothing left. The one loop behind both pools, so the two ways files
+/// reach them cannot drift on what happens to a file once claimed — and the loop the
+/// calling thread runs itself when the pool comes up empty ([`join_pool`]).
+fn drain<P: AsRef<Path>>(
+    check: bool,
+    mut claim: impl FnMut() -> Option<(usize, P)>,
+) -> Vec<(usize, P, FileOutcome)> {
     let mut arenas = WorkerArenas::new();
     let mut outcomes = Vec::new();
-    while let Some((i, path)) = queue.claim() {
-        let outcome = arenas.format(&path, check);
+    while let Some((i, path)) = claim() {
+        let outcome = arenas.format(path.as_ref(), check);
         outcomes.push((i, path, outcome));
     }
     outcomes
@@ -729,11 +744,11 @@ fn drain_queue(queue: &FileQueue, check: bool) -> Vec<(usize, PathBuf, FileOutco
 ///
 /// **The rewind is the contract, so it lives here rather than at each caller.** Each
 /// `reset()` keeps the largest chunk and rewinds, so only the first file (and any that
-/// grow past the high-water mark) pays an alloc — the rest reuse it. Both drain loops
-/// ([`drain_queue`] and [`drain_indexed`]) wanted that, and both spelled the setup and
-/// the two resets themselves; a loop that forgot one, or an early `continue` past it,
-/// would grow a worker's arena monotonically over its whole share of the tree. Owning
-/// the pair makes the rewind structural instead of a rule stated in three doc comments.
+/// grow past the high-water mark) pays an alloc — the rest reuse it. The drain loop
+/// ([`drain`]) wants that, and its two predecessors each spelled the setup and the two
+/// resets themselves; a loop that forgot one, or an early `continue` past it, would
+/// grow a worker's arena monotonically over its whole share of the tree. Owning the
+/// pair makes the rewind structural instead of a rule stated in a doc comment.
 struct WorkerArenas {
     ast: bumpalo::Bump,
     doc: tsv_lang::doc::arena::DocArena,
@@ -813,21 +828,17 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
     merged.resize_with(files.len(), || None);
 
     thread::scope(|scope| {
-        let handles = spawn_pool(scope, workers, || drain_indexed(files, check, &next));
-        // A pool the OS refused outright leaves this thread as the only worker —
-        // otherwise every slot stays `None` and reads out below as a panic from a
-        // worker that never existed.
-        if handles.is_empty() {
-            for (i, outcome) in drain_indexed(files, check, &next) {
-                merged[i] = Some(outcome);
-            }
-        }
-        for handle in handles {
-            if let Ok(outcomes) = handle.join() {
-                for (i, outcome) in outcomes {
-                    merged[i] = Some(outcome);
-                }
-            }
+        // the next index off the shared counter — dynamic load balancing with no lock,
+        // and results that land in input order without one either
+        let worker = || {
+            drain(check, || {
+                let i = next.fetch_add(1, Ordering::Relaxed);
+                (i < files.len()).then(|| (i, &files[i]))
+            })
+        };
+        let handles = spawn_pool(scope, workers, worker);
+        for (i, _, outcome) in join_pool(handles, worker) {
+            merged[i] = Some(outcome);
         }
     });
 
@@ -836,25 +847,6 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
         .into_iter()
         .map(|outcome| outcome.unwrap_or_else(|| FileOutcome::Error(WORKER_PANICKED.to_string())))
         .collect()
-}
-
-/// One collected worker's whole life: take the next index off the shared counter,
-/// format that file, keep the pair — dynamic load balancing with no lock, and
-/// results that land in input order without one either.
-///
-/// A function rather than a closure inside the spawn loop because the caller runs it
-/// too when the pool comes up empty (see [`spawn_pool`]).
-fn drain_indexed(files: &[PathBuf], check: bool, next: &AtomicUsize) -> Vec<(usize, FileOutcome)> {
-    let mut arenas = WorkerArenas::new();
-    let mut outcomes = Vec::new();
-    loop {
-        let i = next.fetch_add(1, Ordering::Relaxed);
-        if i >= files.len() {
-            break;
-        }
-        outcomes.push((i, arenas.format(&files[i], check)));
-    }
-    outcomes
 }
 
 #[cfg(test)]

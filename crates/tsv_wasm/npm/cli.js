@@ -1362,7 +1362,7 @@ function run_parse({ values, positionals }) {
 		try {
 			input = decode_source(readFileSync(path));
 		} catch (error) {
-			exit_with_error(1, `Error: Error reading file '${quote_path(path)}': ${error.message}`);
+			exit_with_error(1, `Error: Error reading file ${quote_path(path)}: ${error.message}`);
 		}
 	} else {
 		exit_with_error(1, 'Error: No input provided. Use a file path, --content, or --stdin');
@@ -1783,12 +1783,30 @@ function roots_can_overlap(paths, stats) {
 
 /** `lines` sorted with exact duplicates removed (the strings are byte-identical only
  * for the same underlying failure, so this collapses repeats without hiding a
- * distinct one). The default sort compares UTF-16 code units where the native
- * `Vec<String>` sort compares UTF-8 bytes — the same caveat as `compare_paths`, so a
- * diagnostics list naming astral-plane paths can order differently across the bins. */
+ * distinct one), in the order the native `Vec<String>` sort gives — code points
+ * (`compare_code_points`), which a plain `sort()` is not. */
 function sort_dedup(lines) {
-	lines.sort();
+	lines.sort(compare_code_points);
 	return lines.filter((line, i) => line !== lines[i - 1]);
+}
+
+/**
+ * String order by code point — the order UTF-8 bytes sort in, which is what the
+ * native bin sorts paths and diagnostics by (`path_sort_key`, `Vec<String>`). JS's
+ * own `<` compares UTF-16 code units, and the two disagree exactly where a surrogate
+ * meets a unit at or above U+E000: an astral-plane character (U+10000 and up, two
+ * units from U+D800) sorts above every BMP one by code point but below U+E000..U+FFFF
+ * by unit — so `😀.ts` would list ahead of `０.ts` here and behind it natively. At the
+ * first unit the two strings differ on, `codePointAt` reads the whole character a
+ * surrogate pair encodes (a lone surrogate reads as itself, which is also what its
+ * WTF-8 bytes sort as), and a shared prefix sorts first, as its bytes do.
+ */
+function compare_code_points(a, b) {
+	const len = Math.min(a.length, b.length);
+	for (let i = 0; i < len; i++) {
+		if (a.charCodeAt(i) !== b.charCodeAt(i)) return a.codePointAt(i) - b.codePointAt(i);
+	}
+	return a.length - b.length;
 }
 
 /** `paths` as one newline-terminated block — the shape both bulk stdout writes
@@ -2301,9 +2319,9 @@ function path_components(path) {
  * or `.` step in the argument's spelling moves nothing), each compares by its
  * own spelling (the root as `/`, `.` and `..` as written), and a shorter
  * prefix sorts first, so `a/y.ts` precedes `a-b/x.ts` (plain string order
- * would invert them: `-` < `/`). The parity claim is scoped to ASCII/BMP
- * names: JS compares UTF-16 code units while Rust compares UTF-8 bytes, so
- * astral-plane names (≥ U+10000) order differently. A Windows path's drive
+ * would invert them: `-` < `/`). Components compare by code point
+ * (`compare_code_points`), the order the native key's UTF-8 bytes give, so an
+ * astral-plane name orders the same on both bins. A Windows path's drive
  * prefix rides along as one leading component where Rust splits it into
  * `Prefix` + `RootDir`, which reaches the same verdict for every pair sharing
  * a root. */
@@ -2313,7 +2331,7 @@ function compare_paths(a, b) {
 	const bs = path_components(b);
 	const len = Math.min(as.length, bs.length);
 	for (let i = 0; i < len; i++) {
-		if (as[i] !== bs[i]) return as[i] < bs[i] ? -1 : 1;
+		if (as[i] !== bs[i]) return compare_code_points(as[i], bs[i]);
 	}
 	return as.length - bs.length;
 }

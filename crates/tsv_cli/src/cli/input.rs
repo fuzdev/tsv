@@ -14,10 +14,9 @@ impl Input {
     /// Read from file path
     pub fn from_file(path: &str) -> Result<Self, String> {
         let content = fs::read_to_string(path).map_err(|e| {
-            format!(
-                "Error reading file '{}': {e}",
-                tsv_discover::quote_path(path)
-            )
+            // the `<path>: detail` shape every other path diagnostic takes, with no
+            // quotes of its own: a name `quote_path` quotes would otherwise read `'"…"'`
+            format!("Error reading file {}: {e}", tsv_discover::quote_path(path))
         })?;
         Ok(Input(content))
     }

@@ -1381,6 +1381,39 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	// The sorted-path order both listings promise is code-point order, the native sort
+	// key's byte order — on every name, including one the two runtimes encode
+	// differently: an astral-plane character sits above every BMP one by code point but
+	// below U+E000..U+FFFF by UTF-16 unit, which is what a plain `sort()` reads. The
+	// native pin is `tests/cli_tests.rs`'s `test_format_lists_in_code_point_order`.
+	it('sorted-path order is code-point order', () => {
+		const tree = mkdtempSync(join(tmpdir(), 'tsv-code-point-order-'));
+		try {
+			mkdirSync(join(tree, '.git'));
+			writeFileSync(join(tree, '.gitignore'), '*.ts\n');
+			// U+FF10 (fullwidth zero) and U+1F600 (a grinning face): UTF-8 bytes EF BC 90 vs
+			// F0 9F 98 80, UTF-16 units FF10 vs D83D DE00
+			for (const name of ['\uff10.ts', '\u{1f600}.ts']) {
+				writeFileSync(join(tree, name), 'const   x=1\n');
+			}
+			for (const name of ['\uff10.css', '\u{1f600}.css']) {
+				writeFileSync(join(tree, name), 'a{}\n');
+			}
+			const list = run_cli(['format', '--list', '.'], undefined, tree);
+			assert.equal(list.status, 0, list.stderr);
+			assert.equal(list.stdout, './\uff10.css\n./\u{1f600}.css\n');
+			// the diagnostics channel sorts the same way
+			const named = run_cli(['format', '--list', '\u{1f600}.ts', '\uff10.ts'], undefined, tree);
+			assert.equal(named.status, 0, named.stderr);
+			assert.deepEqual(
+				named.stderr.split('\n').map((line) => line.split(' is excluded')[0]),
+				['warning: \uff10.ts', 'warning: \u{1f600}.ts', '']
+			);
+		} finally {
+			rmSync(tree, { recursive: true, force: true });
+		}
+	});
+
 	// A path holding a control character or a double quote is printed C-quoted, as
 	// `git ls-files` prints one, everywhere a path is printed — the native pin is
 	// `tests/cli_tests.rs`'s `test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it`;
@@ -1441,7 +1474,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			const parse = run_cli(['parse', join(tree, 'no\nfile.ts')]);
 			assert.equal(parse.status, 1);
 			assert.ok(
-				parse.stderr.startsWith(`Error: Error reading file '"${tree}/no\\nfile.ts"': `),
+				parse.stderr.startsWith(`Error: Error reading file "${tree}/no\\nfile.ts": `),
 				parse.stderr
 			);
 		} finally {

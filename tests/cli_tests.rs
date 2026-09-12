@@ -998,7 +998,7 @@ fn test_format_named_file_with_a_line_break_gets_no_reinclude_lines() {
     // the argument is quoted, so the warning stays one line
     assert!(
         stderr.contains(
-            "/build/a\\nb.ts\" is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; no ignore-file line can hold the line break in its path, so narrow that rule to format it"
+            "/build/a\\nb.ts\" is inside build, which a rule in the repo-root .gitignore excludes, so it is not formatted; no ignore-file line can spell the control character in its path, so narrow that rule to format it"
         ),
         "stderr: {stderr}"
     );
@@ -1118,6 +1118,43 @@ fn test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it()
     assert_eq!(heads, stderr.lines().count(), "stderr: {stderr}");
 }
 
+/// The sorted-path order both listings promise is code-point order — what the native
+/// sort key's bytes give — on every name, including one the two bins encode
+/// differently: an astral-plane character sits above every BMP one by code point but
+/// below U+E000..U+FFFF by UTF-16 unit, which is what a plain JS sort would read. The
+/// JS pin is `scripts/test_npm.ts`'s "sorted-path order is code-point order".
+#[test]
+fn test_format_lists_in_code_point_order() {
+    let dir = temp_dir("code_point_order");
+    fs::create_dir_all(dir.join(".git")).unwrap();
+    fs::write(dir.join(".gitignore"), "*.ts\n").unwrap();
+    // U+FF10 (fullwidth zero) and U+1F600 (a grinning face): bytes EF BC 90 vs F0 9F 98 80,
+    // UTF-16 units FF10 vs D83D DE00
+    fs::write(dir.join("\u{ff10}.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("\u{1f600}.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("\u{ff10}.css"), "a{}\n").unwrap();
+    fs::write(dir.join("\u{1f600}.css"), "a{}\n").unwrap();
+
+    let list = tsv_in_dir(dir.path(), &["format", "--list", "."]);
+    assert_eq!(list.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&list.stdout),
+        "./\u{ff10}.css\n./\u{1f600}.css\n"
+    );
+    // the diagnostics channel sorts the same way
+    let named = tsv_in_dir(
+        dir.path(),
+        &["format", "--list", "\u{1f600}.ts", "\u{ff10}.ts"],
+    );
+    let stderr = String::from_utf8_lossy(&named.stderr);
+    assert_eq!(named.status.code(), Some(0), "stderr: {stderr}");
+    let heads: Vec<&str> = stderr
+        .lines()
+        .map(|line| line.split(" is excluded").next().unwrap())
+        .collect();
+    assert_eq!(heads, ["warning: \u{ff10}.ts", "warning: \u{1f600}.ts"]);
+}
+
 /// A bad path argument and a `parse` read failure quote the path the same way.
 #[cfg(unix)]
 #[test]
@@ -1138,7 +1175,7 @@ fn test_argument_errors_quote_a_path_holding_a_control_character() {
     assert_eq!(parse.status.code(), Some(1));
     assert!(
         String::from_utf8_lossy(&parse.stderr).starts_with(&format!(
-            "Error: Error reading file '\"{root}/no\\nfile.ts\"': "
+            "Error: Error reading file \"{root}/no\\nfile.ts\": "
         )),
         "stderr: {}",
         String::from_utf8_lossy(&parse.stderr)
