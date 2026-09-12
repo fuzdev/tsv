@@ -158,7 +158,7 @@ impl IgnoreStack {
     /// segment, `child_rel` its format-root-relative `/`-separated path, and
     /// `heuristic_active` is true while no `.gitignore` governs this level. On
     /// `"prune_warn"` the caller fetches the message via
-    /// [`heuristic_shadow_warning`](IgnoreStack::heuristic_shadow_warning).
+    /// [`shadow_warning`](IgnoreStack::shadow_warning).
     ///
     /// A string tag (rather than a wasm-bindgen enum or a returned struct) keeps
     /// the package facade / `patch_npm_package.ts` unchanged and allocates no JS
@@ -191,20 +191,15 @@ impl IgnoreStack {
         tsv_discover::is_path_pruned(rel, &self.inner)
     }
 
-    /// The heuristic-shadow warning a walk raises on the way down to `rel` (a
-    /// format-root-relative file path), delegating to
-    /// `tsv_discover::path_heuristic_shadow_warning`: `heuristic_shadow_warning`'s text for
-    /// the first ancestor directory `is_path_pruned` stops at, when the build-output
-    /// heuristic pruned it under a tsv-layer re-include; `undefined` (the JS view of
-    /// `None`) otherwise. The per-file companion to `classify_dir`'s `"prune_warn"` for a
+    /// The shadow warning a walk raises on the way down to `rel` (a format-root-relative
+    /// file path), delegating to `tsv_discover::path_shadow_warning`: `shadow_warning`'s
+    /// text for the first ancestor directory `is_path_pruned` stops at, when it was pruned
+    /// — by the build-output heuristic or by an ignore rule — under a tsv-layer
+    /// re-include; `undefined` (the JS view of `None`) otherwise. The per-file companion to `classify_dir`'s `"prune_warn"` for a
     /// consumer with no top-down traversal. `loose_root` is the format root's display path
     /// outside a git repo (`undefined` inside one).
-    pub fn path_heuristic_shadow_warning(
-        &self,
-        rel: &str,
-        loose_root: Option<String>,
-    ) -> Option<String> {
-        tsv_discover::path_heuristic_shadow_warning(rel, loose_root.as_deref(), &self.inner)
+    pub fn path_shadow_warning(&self, rel: &str, loose_root: Option<String>) -> Option<String> {
+        tsv_discover::path_shadow_warning(rel, loose_root.as_deref(), &self.inner)
     }
 
     /// The argument error for an explicitly named **file** whose extension tsv
@@ -219,19 +214,15 @@ impl IgnoreStack {
         tsv_discover::unsupported_extension_error(path)
     }
 
-    /// The heuristic-shadow warning text for a pruned directory `dir`
-    /// (format-root relative), delegating to `tsv_discover::heuristic_shadow_warning`;
-    /// `undefined` (the JS view of `None`) when no tsv-layer re-include is written under
-    /// `dir`. The text names the file holding that rule, which it reads from this stack.
+    /// The shadow warning text for a pruned directory `dir` (format-root relative) — pruned
+    /// by the build-output heuristic or by an ignore rule, which the text says —
+    /// delegating to `tsv_discover::shadow_warning`; `undefined` (the JS view of `None`)
+    /// when no tsv-layer re-include is written under `dir`. The text names the file holding that rule, which it reads from this stack.
     /// `loose_root` is the format root's display path outside a git repo (`undefined`
     /// inside one). Single source of truth with the native CLI — the JS CLI never
     /// templates this string.
-    pub fn heuristic_shadow_warning(
-        &self,
-        dir: &str,
-        loose_root: Option<String>,
-    ) -> Option<String> {
-        tsv_discover::heuristic_shadow_warning(dir, loose_root.as_deref(), &self.inner)
+    pub fn shadow_warning(&self, dir: &str, loose_root: Option<String>) -> Option<String> {
+        tsv_discover::shadow_warning(dir, loose_root.as_deref(), &self.inner)
     }
 
     /// The `.prettierignore`-outside-a-repo warning text for the target root `dir`
@@ -323,11 +314,6 @@ impl IgnoreStack {
             loose_root.as_deref(),
             &self.inner,
         )
-    }
-
-    /// Whether no layer carries any rule — callers skip per-path matching.
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
     }
 }
 

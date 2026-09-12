@@ -59,8 +59,21 @@ struct Rule {
     segs: Vec<Seg>,
     /// `!`-prefixed: re-includes a path an earlier rule excluded.
     negated: bool,
+    /// For a negated rule, its segments as the author wrote them after the `!` and any
+    /// leading `/` — what a diagnostic re-spells anchored, from any segment on
+    /// ([`NegationRule::pattern`]). `None` for every other rule, which no diagnostic
+    /// quotes.
+    spelling: Option<Box<[SpelledSeg]>>,
     /// trailing-`/`: matches directories only.
     dir_only: bool,
+}
+
+/// One segment of a negated rule as its author spelled it (trailing spaces trimmed,
+/// escapes kept), and whether a `\/` rather than a bare `/` ended it.
+#[derive(Debug)]
+struct SpelledSeg {
+    text: Box<str>,
+    escaped_separator: bool,
 }
 
 impl Rule {
@@ -73,13 +86,44 @@ impl Rule {
 
     /// For a negated rule, its fixed leading path — the run of literal (non-glob)
     /// segments before the first wildcard or `**` — expressed relative to the
-    /// rule's layer. `None` for a non-negated rule. A *floating* negation
-    /// (`!name`, which parses to a leading `**`) yields an empty path, so it is
-    /// never anchored strictly under any directory. Powers
-    /// [`IgnoreStack::negation_under`].
-    fn negation_leading_path(&self) -> Option<Vec<String>> {
-        self.negated
-            .then(|| self.segs.iter().map_while(Seg::literal).collect())
+    /// rule's layer, and how the rule continues past that run. `None` for a
+    /// non-negated rule. A *floating* negation (`!name`, which parses to a leading
+    /// `**`) yields an empty path, so it is never anchored strictly under any
+    /// directory. Powers [`IgnoreStack::negation_under`].
+    fn negation_leading_path(&self) -> Option<(Vec<String>, NegationTail)> {
+        self.negated.then(|| {
+            let leading: Vec<String> = self.segs.iter().map_while(Seg::literal).collect();
+            let tail = match &self.segs[leading.len()..] {
+                [] => NegationTail::None,
+                [Seg::Glob(_)] => NegationTail::Children,
+                _ => NegationTail::Descendants,
+            };
+            (leading, tail)
+        })
+    }
+
+    /// A negated rule's pattern from its `skip`th segment on, spelled as the author
+    /// did — for a file `skip` directories below the rule's own, where the same rule
+    /// anchored reads `/` + this. Empty for a non-negated rule.
+    fn spelling_from(&self, skip: usize) -> String {
+        let Some(segs) = self.spelling.as_deref() else {
+            return String::new();
+        };
+        let mut pattern = String::new();
+        for (i, seg) in segs.iter().enumerate().skip(skip) {
+            if i > skip {
+                pattern.push_str(if segs[i - 1].escaped_separator {
+                    "\\/"
+                } else {
+                    "/"
+                });
+            }
+            pattern.push_str(&seg.text);
+        }
+        if self.dir_only {
+            pattern.push('/');
+        }
+        pattern
     }
 }
 
@@ -102,8 +146,11 @@ impl IgnoreRules {
         Self { rules }
     }
 
-    /// Whether there are no rules (no ignore files, or only comments/blanks).
-    /// Callers use this to skip per-file matching entirely.
+    /// Whether there are no rules (no ignore files, or only comments/blanks) — what the
+    /// parse tests grade a dropped line by. The stack never asks it: an empty layer
+    /// matches nothing, and its presence alone can still set the regime
+    /// ([`IgnoreStack::has_gitignore_layers`]).
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.rules.is_empty()
     }
@@ -239,8 +286,7 @@ impl IgnoreStack {
     /// `.gitignore`. `anchor` is the directory relative to the format root,
     /// `/`-separated (empty string = the root).
     pub fn push_formatignore(&mut self, anchor: &str, content: &str) {
-        self.tsv
-            .push(Layer::new(anchor, content, IgnoreSource::Formatignore));
+        self.push_tsv(anchor, content, IgnoreSource::Formatignore);
     }
 
     /// Push one directory's `.prettierignore` as a tsv layer — the file a caller reads in
@@ -249,19 +295,18 @@ impl IgnoreStack {
     /// file a diagnostic names ([`Exclusion::source`],
     /// [`tsv_layer_source`](Self::tsv_layer_source)).
     pub fn push_prettierignore(&mut self, anchor: &str, content: &str) {
-        self.tsv
-            .push(Layer::new(anchor, content, IgnoreSource::Prettierignore));
+        self.push_tsv(anchor, content, IgnoreSource::Prettierignore);
+    }
+
+    /// The one tsv-layer push behind the two public names, which differ only in the
+    /// file a diagnostic names.
+    fn push_tsv(&mut self, anchor: &str, content: &str, source: IgnoreSource) {
+        self.tsv.push(Layer::new(anchor, content, source));
     }
 
     /// Pop the most recently pushed tsv layer (a DFS unwinding out of a directory).
     pub fn pop_tsv(&mut self) {
         self.tsv.pop();
-    }
-
-    /// Whether no layer carries any rule — callers skip per-path matching.
-    pub fn is_empty(&self) -> bool {
-        self.gitignore.iter().all(|l| l.rules.is_empty())
-            && self.tsv.iter().all(|l| l.rules.is_empty())
     }
 
     /// Whether any `.gitignore` layer has been pushed — true even for an
@@ -338,47 +383,76 @@ impl IgnoreStack {
         self.last_match_at(&segments, is_dir)
     }
 
-    /// The deepest pushed **tsv layer** holding a negation (`!`) anchored *strictly
-    /// under* `prefix` (a `/`-separated directory path relative to the format root), or
-    /// `None`. "Anchored strictly under" means the rule's fixed leading path — its layer's
-    /// anchor plus the rule's run of literal (non-glob) segments — has `prefix` as a strict
-    /// prefix (equal or longer fails). Only a layer anchored strictly *above* `prefix` is
-    /// read: a directory's own ignore files classify only what lies inside it, and a walk
-    /// that prunes `prefix` never reads them.
+    /// Every **tsv-layer** negation (`!`) anchored *under* `prefix` (a `/`-separated
+    /// directory path relative to the format root), or `None` when there is none.
+    /// "Anchored under" means the rule's fixed leading path — its layer's anchor plus the
+    /// rule's run of literal (non-glob) segments — has `prefix` as a prefix, and the rule
+    /// reaches beneath it: a literal segment beyond the prefix, or a glob tail (`!dist/*.ts`
+    /// is as inert under a pruned `dist` as `!dist/keep.ts`; a path equal to the prefix
+    /// with no tail is the directory itself, not under it). Only a layer anchored strictly
+    /// *above* `prefix` is read: a directory's own ignore files classify only what lies
+    /// inside it, and a walk that prunes `prefix` never reads them.
     ///
     /// `.gitignore` layers are not consulted; among tsv-layer rules only anchored
     /// negations count. A floating `!keep.ts` (parsed with a leading `**`) targets any
     /// depth, so it is never "under" one directory; and `!dist/` re-includes the directory
     /// itself, which is not *under* it.
     ///
-    /// tsv's discovery uses this to warn when its build-output heuristic prunes a
-    /// directory that a tsv-layer `!` was trying to re-include *into* — that re-include is
-    /// a silent no-op, because git's parent-directory rule (matched in the `.gitignore`
-    /// regime) blocks re-including a descendant of an excluded directory. The sanctioned
-    /// escape is re-including the directory itself, which
-    /// [`is_reincluded`](Self::is_reincluded) detects instead; the witness names the file
-    /// the rule was written in, the one that escape belongs in. The deepest layer is the
-    /// one reported because its rules are read last, so a line added there wins.
+    /// tsv's discovery uses this to warn when a directory a tsv-layer `!` was trying to
+    /// re-include *into* is pruned — by its build-output heuristic or by a rule — since
+    /// that re-include is a silent no-op: git's parent-directory rule (matched in the
+    /// `.gitignore` regime) blocks re-including a descendant of an excluded directory. The
+    /// sanctioned escape is re-including the directory itself, which
+    /// [`is_reincluded`](Self::is_reincluded) detects instead. The witness names the
+    /// deepest file holding such a rule, whose rules are read last, so a line added there
+    /// wins — and carries every such rule from every layer above the prefix, spelled
+    /// relative to that file, because the escape's `/dir/*` line silences each one it
+    /// does not re-spell after it.
     pub fn negation_under(&self, prefix: &str) -> Option<Negation> {
         let prefix_segs = split_segments(prefix);
-        self.tsv.iter().rev().find_map(|layer| {
-            let holds = layer.anchor.len() < prefix_segs.len()
-                && layer.rules.rules.iter().any(|rule| {
-                    rule.negation_leading_path().is_some_and(|leading| {
-                        // the fixed path the negation is anchored to is `layer.anchor`
-                        // followed by `leading`; `prefix_segs` must be a *strict*
-                        // prefix of it (all match, and at least one segment beyond)
-                        let mut concrete = layer.anchor.iter().chain(&leading);
-                        prefix_segs
-                            .iter()
-                            .all(|seg| concrete.next().is_some_and(|c| c.as_str() == *seg))
-                            && concrete.next().is_some()
-                    })
-                });
-            holds.then_some(Negation {
-                anchor_depth: layer.anchor.len(),
-                source: layer.source,
+        // every anchored re-include reaching under the prefix, with its layer's depth and
+        // file, in read order: layers shallow to deep, then file order within one
+        let mut found = Vec::new();
+        for layer in &self.tsv {
+            if layer.anchor.len() >= prefix_segs.len() {
+                continue;
+            }
+            for rule in &layer.rules.rules {
+                let Some((leading, tail)) = rule.negation_leading_path() else {
+                    continue;
+                };
+                // the fixed path the negation is anchored to is `layer.anchor` followed
+                // by `leading`; `prefix_segs` must be a prefix of it, with the rule
+                // reaching *under* the prefix — a literal segment beyond it, or a glob tail
+                let mut concrete = layer.anchor.iter().chain(&leading);
+                let reaches_under = prefix_segs
+                    .iter()
+                    .all(|seg| concrete.next().is_some_and(|c| c.as_str() == *seg))
+                    && (concrete.next().is_some() || tail != NegationTail::None);
+                if reaches_under {
+                    found.push((layer.anchor.len(), layer.source, leading, tail, rule));
+                }
+            }
+        }
+        // the deepest layer holding one names the file; every rule is re-spelled relative
+        // to it by dropping the segments between its own file's directory and that one —
+        // segments its leading path holds, since the prefix runs through both
+        let &(anchor_depth, source, ..) = found.iter().max_by_key(|f| f.0)?;
+        let rules = found
+            .into_iter()
+            .map(|(depth, _, leading, tail, rule)| {
+                let skip = anchor_depth - depth;
+                NegationRule {
+                    leading: leading[skip..].to_vec(),
+                    tail,
+                    pattern: rule.spelling_from(skip),
+                }
             })
+            .collect();
+        Some(Negation {
+            anchor_depth,
+            source,
+            rules,
         })
     }
 
@@ -411,6 +485,17 @@ impl IgnoreStack {
     pub fn exclusion(&self, path: &str, is_dir: bool) -> Option<Exclusion> {
         first_exclusion(path, is_dir, |prefix, dir| {
             last_match_layer(self.gitignore.iter().chain(&self.tsv), prefix, dir)
+        })
+    }
+
+    /// [`exclusion`](Self::exclusion) over the `.gitignore` layers alone — what excludes
+    /// `path` once every tsv layer is set aside. A tsv rule at a prefix is the witness
+    /// [`exclusion`](Self::exclusion) names there, so this is how a diagnostic learns a
+    /// `.gitignore` rule stands behind it, at that depth or below (narrowing the tsv rule
+    /// alone would leave the path excluded).
+    pub fn gitignore_exclusion(&self, path: &str, is_dir: bool) -> Option<Exclusion> {
+        first_exclusion(path, is_dir, |prefix, dir| {
+            last_match_layer(self.gitignore.iter(), prefix, dir)
         })
     }
 
@@ -491,16 +576,49 @@ pub struct Exclusion {
     pub source: IgnoreSource,
 }
 
-/// Where [`IgnoreStack::negation_under`] found a negation written under a directory.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Where [`IgnoreStack::negation_under`] found negations written under a directory, and
+/// what each was trying to reach — enough for a diagnostic to spell the lines that would.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Negation {
     /// How many leading segments of the queried directory name the directory holding the
-    /// rule's file, counted as [`split_segments`] splits it — always fewer than the
-    /// directory's own, since only a layer anchored above it is read.
+    /// file every rule here is spelled for — the deepest tsv file holding one, counted as
+    /// [`split_segments`] splits the directory, and always fewer than its own segments,
+    /// since only a layer anchored above it is read.
     pub anchor_depth: usize,
-    /// The file the rule was read from: a `.formatignore` or `.prettierignore`, never a
-    /// `.gitignore`.
+    /// That file: a `.formatignore` or `.prettierignore`, never a `.gitignore`.
     pub source: IgnoreSource,
+    /// Every negation reaching under the directory, from every tsv layer above it, in
+    /// read order (shallower files first, then file order) — each spelled relative to
+    /// the file `anchor_depth` names. Never empty.
+    pub rules: Vec<NegationRule>,
+}
+
+/// One rule of a [`Negation`], relative to the file the negation is spelled for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NegationRule {
+    /// The rule's fixed leading path relative to that file's directory — its literal
+    /// segments up to the first wildcard or `**`, each as it matches (unescaped). The
+    /// queried directory is a prefix of it.
+    pub leading: Vec<String>,
+    /// How the rule continues past `leading`.
+    pub tail: NegationTail,
+    /// The pattern relative to that file's directory, spelled as the author wrote it
+    /// (escapes and any trailing `/` kept; no leading `/` or `!`) — with `!/` ahead of it,
+    /// the same rule anchored there.
+    pub pattern: String,
+}
+
+/// What follows a [`NegationRule`]'s literal leading path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NegationTail {
+    /// Nothing: the path's last segment is the file or directory the rule names.
+    None,
+    /// One glob segment (`!dist/*.ts`): the rule names direct children of the path's
+    /// last directory.
+    Children,
+    /// More than that, or a `**` (`!dist/**/x`, `!dist/*/x`): the rule reaches into
+    /// directories below the path's last one.
+    Descendants,
 }
 
 /// Whether one `/`-delimited component of a path is a meaningful segment. Empty
@@ -675,9 +793,21 @@ fn parse_line(raw: &str) -> Option<Rule> {
     if !anchored {
         segs.insert(0, Seg::DoubleStar);
     }
+    // a negated rule keeps its author's spelling, segment by segment, for the diagnostic
+    // that re-spells it anchored in another file
+    let spelling = negated.then(|| {
+        raw_segs
+            .into_iter()
+            .map(|(text, escaped_separator)| SpelledSeg {
+                text: Box::from(text),
+                escaped_separator,
+            })
+            .collect()
+    });
     Some(Rule {
         segs,
         negated,
+        spelling,
         dir_only,
     })
 }
@@ -707,7 +837,7 @@ fn strip_trailing_spaces(line: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::{Exclusion, IgnoreRules, IgnoreSource, IgnoreStack, Negation};
+    use super::{Exclusion, IgnoreRules, IgnoreSource, IgnoreStack, NegationRule, NegationTail};
 
     fn ig(content: &str) -> IgnoreRules {
         IgnoreRules::parse(content)
@@ -986,14 +1116,69 @@ mod tests {
         // file under a pruned `dist`)
         let mut stack = IgnoreStack::new();
         stack.push_formatignore("", "!dist/keep.ts\n");
+        let negation = stack.negation_under("dist").unwrap();
+        assert_eq!(negation.anchor_depth, 0);
+        assert_eq!(negation.source, IgnoreSource::Formatignore);
         assert_eq!(
-            stack.negation_under("dist"),
-            Some(Negation {
-                anchor_depth: 0,
-                source: IgnoreSource::Formatignore
-            })
+            negation.rules,
+            [NegationRule {
+                leading: vec!["dist".into(), "keep.ts".into()],
+                tail: NegationTail::None,
+                pattern: "dist/keep.ts".into(),
+            }]
         );
         assert_eq!(stack.negation_under("build"), None); // unrelated dir
+
+        // a glob tail reaches under the directory as a literal one does — `!dist/*.ts`
+        // is as inert under a pruned `dist` — so the literal run may end AT the
+        // directory when the rule continues past it; the pattern keeps the author's
+        // spelling (escapes, the trailing `/`) less any leading `/`, since it is only
+        // ever re-spelled anchored. Every rule under the directory is reported, in file
+        // order, with the tail graded by how far past its literal path it reaches
+        let mut stack = IgnoreStack::new();
+        stack.push_formatignore(
+            "",
+            "!dist/*.ts\n!/build/**/keep.ts\n!out/sub/\n!dist/a\\ b/*/x.ts\n!dist/deep/**\n",
+        );
+        let dist = stack.negation_under("dist").unwrap();
+        assert_eq!(
+            dist.rules
+                .iter()
+                .map(|r| (r.leading.join("/"), r.tail, r.pattern.as_str()))
+                .collect::<Vec<_>>(),
+            [
+                ("dist".to_string(), NegationTail::Children, "dist/*.ts"),
+                (
+                    "dist/a b".to_string(),
+                    NegationTail::Descendants,
+                    "dist/a\\ b/*/x.ts"
+                ),
+                (
+                    "dist/deep".to_string(),
+                    NegationTail::Descendants,
+                    "dist/deep/**"
+                ),
+            ]
+        );
+        let anchored = stack.negation_under("build").unwrap();
+        assert_eq!(anchored.rules.len(), 1);
+        assert_eq!(anchored.rules[0].leading, ["build"]);
+        assert_eq!(anchored.rules[0].tail, NegationTail::Descendants);
+        assert_eq!(anchored.rules[0].pattern, "build/**/keep.ts");
+        let dir_only = stack.negation_under("out").unwrap();
+        assert_eq!(dir_only.rules.len(), 1);
+        assert_eq!(dir_only.rules[0].leading, ["out", "sub"]);
+        assert_eq!(dir_only.rules[0].tail, NegationTail::None);
+        assert_eq!(dir_only.rules[0].pattern, "out/sub/");
+        assert_eq!(stack.negation_under("out/sub"), None); // the leaf itself, not under it
+
+        // an escaped separator is kept as one, since `**\/` and `**/` are two rules
+        let mut stack = IgnoreStack::new();
+        stack.push_formatignore("", "!dist/**\\/x.ts\n");
+        assert_eq!(
+            stack.negation_under("dist").unwrap().rules[0].pattern,
+            "dist/**\\/x.ts"
+        );
 
         // re-including the directory ITSELF is not "under" it (that's the
         // sanctioned escape, detected by is_reincluded, not here)
@@ -1025,19 +1210,43 @@ mod tests {
     }
 
     #[test]
+    fn stack_gitignore_exclusion_reads_the_gitignore_layers_alone() {
+        // the `.gitignore` half of `exclusion`: what excludes the path once every tsv layer
+        // is set aside — a tsv rule at the same prefix is the witness `exclusion` names,
+        // and this is how a caller learns a `.gitignore` rule stands behind it
+        let mut stack = IgnoreStack::new();
+        stack.push_gitignore("", "same/\nvendor/lib/\n");
+        stack.push_formatignore("", "same/\nvendor/\nonly.ts\n");
+        let same = stack.gitignore_exclusion("same", true).unwrap();
+        assert_eq!(
+            (same.depth, same.anchor_depth, same.source),
+            (1, 0, IgnoreSource::Gitignore)
+        );
+        assert_eq!(
+            stack.exclusion("same", true).unwrap().source,
+            IgnoreSource::Formatignore
+        );
+        // deeper than the tsv rule that excludes the path first
+        let lib = stack.gitignore_exclusion("vendor/lib", true).unwrap();
+        assert_eq!(lib.depth, 2);
+        assert_eq!(stack.exclusion("vendor/lib", true).unwrap().depth, 1);
+        // a path only a tsv rule excludes
+        assert_eq!(stack.gitignore_exclusion("only.ts", false), None);
+        assert!(stack.is_ignored("only.ts", false));
+    }
+
+    #[test]
     fn stack_negation_under_respects_layer_anchor() {
         // a deeper tsv layer's negation is anchored at its own directory: a
         // `!dist/keep.ts` in `foo/.prettierignore` is under `foo/dist`, not `dist`,
         // and the witness names that file
         let mut stack = IgnoreStack::new();
         stack.push_prettierignore("foo", "!dist/keep.ts\n");
-        assert_eq!(
-            stack.negation_under("foo/dist"),
-            Some(Negation {
-                anchor_depth: 1,
-                source: IgnoreSource::Prettierignore
-            })
-        );
+        let negation = stack.negation_under("foo/dist").unwrap();
+        assert_eq!(negation.anchor_depth, 1);
+        assert_eq!(negation.source, IgnoreSource::Prettierignore);
+        // the leading path is relative to the rule's own file
+        assert_eq!(negation.rules[0].leading, ["dist", "keep.ts"]);
         assert_eq!(stack.negation_under("dist"), None);
 
         // a root negation with a nested anchored path sits under each strict
@@ -1062,17 +1271,29 @@ mod tests {
     fn stack_negation_under_reports_the_deepest_layer_holding_one() {
         // the rules of the deepest layer are read last, so a directory re-include added
         // there wins — it is the witness, and a later-pushed layer holding no negation
-        // under the directory does not displace it
+        // under the directory does not displace it. Every layer's rules under the
+        // directory ride along, re-spelled relative to that file: the root's
+        // `!pkg/dist/a.ts` reads `dist/a.ts` in `pkg/.prettierignore`
         let mut stack = IgnoreStack::new();
-        stack.push_formatignore("", "!pkg/dist/a.ts\n");
+        stack.push_formatignore("", "!pkg/dist/a.ts\n!pkg/dist/sub/**\n");
         stack.push_prettierignore("pkg", "!dist/b.ts\n");
         stack.push_formatignore("lib", "!dist/c.ts\n");
+        let negation = stack.negation_under("pkg/dist").unwrap();
         assert_eq!(
-            stack.negation_under("pkg/dist"),
-            Some(Negation {
-                anchor_depth: 1,
-                source: IgnoreSource::Prettierignore
-            })
+            (negation.anchor_depth, negation.source),
+            (1, IgnoreSource::Prettierignore)
+        );
+        assert_eq!(
+            negation
+                .rules
+                .iter()
+                .map(|r| (r.leading.join("/"), r.pattern.as_str()))
+                .collect::<Vec<_>>(),
+            [
+                ("dist/a.ts".to_string(), "dist/a.ts"),
+                ("dist/sub".to_string(), "dist/sub/**"),
+                ("dist/b.ts".to_string(), "dist/b.ts"),
+            ]
         );
     }
 
@@ -1254,11 +1475,10 @@ mod tests {
     #[test]
     fn stack_empty_and_blank_layers_ignore_nothing() {
         let mut stack = IgnoreStack::new();
-        assert!(stack.is_empty());
         stack.push_gitignore("", "");
         stack.push_formatignore("", "# just a comment\n");
-        assert!(stack.is_empty());
         assert!(!stack.is_ignored("a/x.ts", false));
+        assert!(stack.has_gitignore_layers()); // an empty `.gitignore` still sets the regime
     }
 
     /// The full hierarchical oracle tree:

@@ -57,7 +57,8 @@ re-deriving it from these primitives.
 
 - `IgnoreRules::parse(content)` — compile one ignore file's text (a leading UTF-8
   BOM is skipped, as git does).
-- `IgnoreRules::is_empty()` — the stack skips per-file matching when true.
+- `IgnoreRules::is_empty()` — test-only, what the parse tests grade a dropped line by
+  (an empty layer matches nothing; its presence alone still sets the regime).
 - `IgnoreRules::is_ignored(path, is_dir)` — `path` relative to the ignore-file
   root, `/`-separated; test-only, since the stack layers `last_match` itself.
 
@@ -85,15 +86,25 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   tree). A sharp contract — see Known edges.
 - `IgnoreStack::is_reincluded(path, is_dir)` — the per-path `!`-negation polarity
   (no ancestor prune), so a caller's heuristic can defer to an explicit re-include.
-- `IgnoreStack::negation_under(prefix) -> Option<Negation>` — the deepest **tsv
-  layer** holding a negation anchored *strictly under* `prefix` (its layer anchor +
-  leading literal segments has `prefix` as a strict prefix), as `Negation {
-  anchor_depth, source }`: the directory holding the rule's file, and the file. Only
+- `IgnoreStack::negation_under(prefix) -> Option<Negation>` — every **tsv-layer**
+  negation anchored *under* `prefix` (its layer anchor + leading literal segments has
+  `prefix` as a prefix, and the rule reaches under it: a literal segment beyond, or a
+  glob tail — `!dist/*.ts` is as inert under a pruned `dist` as `!dist/keep.ts`), as
+  `Negation { anchor_depth, source, rules }`: the directory holding the deepest such
+  rule's file, that file, and every such rule from every layer above `prefix` in read
+  order, each a `NegationRule { leading, tail, pattern }` — its literal leading path
+  (unescaped, as it matches), how it continues past that (`NegationTail`: `None`, one
+  glob segment naming `Children`, or `Descendants` for a `**` or more), and the pattern
+  spelled as the author wrote it — all relative to that deepest file, a shallower file's
+  rule re-spelled by dropping the segments between the two (a `\/` kept as one). Only
   anchored negations count — a floating `!keep.ts` (leading `**`) and a dir-self
-  `!dist/` both return `None` — and only layers anchored strictly above `prefix` (a
-  walk pruning `prefix` never reads the files at or below it). Lets a caller warn when
-  its heuristic prunes a directory a `!dir/<file>` re-include was targeting (a no-op),
-  naming the file the escape belongs in — the deepest, whose rules are read last.
+  `!dist/` both return `None` — and only layers anchored strictly above `prefix` (a walk
+  pruning `prefix` never reads the files at or below it). Lets a caller warn when a
+  prune — the heuristic's or a rule's — makes a `!dir/<file>` re-include a no-op, naming
+  the file the escape belongs in (the deepest, whose rules are read last) and spelling
+  the lines that reach what every rule named (`tsv_discover::shadow_warning`) — every
+  one, since the escape's `/dir/*` line silences each re-include it does not re-spell
+  after it.
   `.gitignore` layers are not consulted.
 - `IgnoreStack::has_gitignore_layers()` — whether any `.gitignore` layer is pushed
   (true even for an empty one — mere presence turns a caller's heuristic off, as in
@@ -104,7 +115,6 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   discovery replay with **no** top-down walk (the VS Code extension, via
   `tsv_discover::is_path_pruned`) reconstruct each ancestor's `heuristic_active` —
   the heuristic is off at a level once a `.gitignore` anchored above it is present.
-- `IgnoreStack::is_empty()` — callers skip per-path matching when true.
 - `IgnoreStack::exclusion(path, is_dir) -> Option<Exclusion>` — the witness behind
   `is_ignored`: the shallowest excluded prefix of `path` (`Exclusion::depth`), the
   directory holding the excluding rule's file (`anchor_depth`), both counted in
@@ -115,9 +125,14 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
 - `IgnoreStack::tsv_exclusion(path, is_dir) -> Option<Exclusion>` — `exclusion` over the
   tsv layers alone, every `.gitignore` layer set aside. `Some` only where `exclusion` is
   (tsv layers are read last), and the same answer wherever `exclusion`'s witness is a tsv
-  layer. `tsv_discover` prefers it for a named path: a `.formatignore`/`.prettierignore`
-  rule excluding the path is the one to report even where a `.gitignore` excludes it
-  first, since re-including past the `.gitignore` would leave that rule standing.
+  layer. `tsv_discover` reads it for a named path, beside the next query, to decide the
+  remedy: a `.formatignore`/`.prettierignore` rule is the user's to narrow, and a
+  named *file* one excludes is skipped quietly.
+- `IgnoreStack::gitignore_exclusion(path, is_dir) -> Option<Exclusion>` — `exclusion`
+  over the `.gitignore` layers alone. A tsv rule at a prefix is the witness `exclusion`
+  names there, so this is how a diagnostic learns a `.gitignore` rule stands behind it,
+  at that depth or below — where narrowing the tsv rule alone would leave the path
+  excluded, and the remedy is the re-include lines instead.
 - `IgnoreStack::tsv_layer_source(anchor) -> Option<IgnoreSource>` — which file the tsv
   layer at `anchor` was read from. `tsv_discover` asks it of the format root, so a
   remedy names the file the root reads rather than one whose creation would shadow it.

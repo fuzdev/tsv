@@ -211,6 +211,13 @@ if (posix) {
  * staging per run. */
 const empty_dir = mkdtempSync(join(tmpdir(), 'tsv_jobs_'));
 
+/** One already-formatted file for the `--jobs` parity rows, which need a run that
+ * SUCCEEDS on an accepted width: `--list` refuses `--jobs` outright (both bins), and a
+ * `--check` over an empty scope is the nothing-in-scope error. Module scope and cleaned
+ * up by the file's one `after`, like `empty_dir`. */
+const jobs_dir = mkdtempSync(join(tmpdir(), 'tsv_jobs_check_'));
+writeFileSync(join(jobs_dir, 'a.ts'), 'const x = 1;\n');
+
 /** Scratch tree for the invalid-UTF-8 parity rows, which need real files on
  * disk to prove neither bin rewrote one. Module scope for the same reason as
  * `empty_dir` — the file's one `after` owns the cleanup. */
@@ -230,6 +237,7 @@ after(() => {
 		staged_signal,
 		staged_signal_usr1,
 		empty_dir,
+		jobs_dir,
 		utf8_dir
 	]) {
 		if (!dir) continue;
@@ -478,9 +486,8 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	// truthiness checks and only bites a consumer testing `=== undefined`.
 	it('IgnoreStack mirrors the wasm discovery surface', () => {
 		const stack = new api.IgnoreStack();
-		assert.equal(stack.is_empty(), true);
+		assert.equal(stack.is_ignored('dist', true), false);
 		stack.push_gitignore('', 'dist/\n');
-		assert.equal(stack.is_empty(), false);
 		assert.equal(stack.is_ignored('dist', true), true);
 		assert.equal(stack.is_ignored('src/a.ts', false), false);
 		assert.equal(stack.classify_dir('node_modules', 'node_modules', false), 'prune');
@@ -488,12 +495,13 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.equal(stack.should_format_file('a.ts', 'src/a.ts'), true);
 		assert.equal(stack.should_format_file('a.txt', 'src/a.txt'), false);
 		assert.equal(stack.is_path_pruned('node_modules/x.ts'), true);
-		// `dist` is pruned by the `.gitignore` rule, not the heuristic: nothing to say
-		assert.strictEqual(stack.path_heuristic_shadow_warning('dist/x.ts'), undefined);
+		// `dist` is pruned by the `.gitignore` rule with no re-include written under it:
+		// nothing to say
+		assert.strictEqual(stack.path_shadow_warning('dist/x.ts'), undefined);
 		// loose, with a re-include written under the heuristic-pruned `dist`: the warning
 		const loose = new api.IgnoreStack();
 		loose.push_formatignore('', '!dist/a.ts\n');
-		assert.match(loose.path_heuristic_shadow_warning('dist/a.ts')!, /build-output heuristic/);
+		assert.match(loose.path_shadow_warning('dist/a.ts')!, /build-output heuristic/);
 		// A formattable extension yields no error, spelled `undefined` like wasm's.
 		assert.strictEqual(stack.unsupported_extension_error('a.ts'), undefined);
 		assert.match(stack.unsupported_extension_error('a.txt')!, /unsupported file extension/);
@@ -504,7 +512,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			undefined
 		);
 		stack.pop_gitignore();
-		assert.equal(stack.is_empty(), true);
+		assert.equal(stack.is_ignored('dist', true), false);
 	});
 
 	it('parse errors and engine errors are thrown JS errors', () => {
@@ -1564,7 +1572,7 @@ describe('--jobs parity: both CLIs accept exactly what a Rust usize accepts', ()
 
 	for (const { value, accepted, why } of rows) {
 		it(`--jobs ${JSON.stringify(value)} is ${accepted ? 'accepted' : 'refused'} by both (${why})`, () => {
-			assert_verdict_parity(['format', '--jobs', value, '--list', empty_dir], accepted);
+			assert_verdict_parity(['format', '--jobs', value, '--check', jobs_dir], accepted);
 		});
 	}
 });

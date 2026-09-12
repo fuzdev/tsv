@@ -64,7 +64,7 @@ pub struct Diagnostics {
     pub errors: Vec<String>,
     /// Non-fatal diagnostics — reported to stderr by the caller but **not**
     /// counted as errors (no effect on the exit code or stdout): the
-    /// heuristic-shadow warning ([`tsv_discover::heuristic_shadow_warning`]), the
+    /// shadow warning ([`tsv_discover::shadow_warning`]), the
     /// `.prettierignore`-shadowed-by-a-sibling-`.formatignore` warning
     /// ([`prettierignore_shadowed_warning`]), the `.prettierignore`-outside-a-repo
     /// warning ([`prettierignore_outside_repo_warning`]), the excluded-argument warning
@@ -512,9 +512,7 @@ fn push_layers(
             &dir.join(GITIGNORE_FILE).to_string_lossy(),
         )),
         GitignorePresence::File => {
-            if let IgnoreRead::Content(content) =
-                read_ignore_file(&dir.join(GITIGNORE_FILE), warnings)
-            {
+            if let Some(content) = read_ignore_file(&dir.join(GITIGNORE_FILE), warnings) {
                 stack.push_gitignore(anchor, &content);
                 pushed.gitignore = true;
             }
@@ -649,15 +647,30 @@ fn loose_root(format_root: &Path, in_repo: bool) -> Option<Cow<'_, str>> {
     (!in_repo).then(|| format_root.to_string_lossy())
 }
 
-/// A named path made absolute: canonicalized, or joined onto the working directory
-/// ([`absolutize`]) when it will not canonicalize. `None` is a relative path with no
-/// working directory to join it onto, which the caller refuses
+/// A named path made absolute, **at the location it was typed**: its parent directory
+/// canonicalized (so `..` and a linked ancestor resolve once) and its own name kept, so a
+/// path that is itself a symbolic link is graded — by the ignore files, and for the format
+/// root above it — where the link sits, not where it points. That is how git reads
+/// `check-ignore link.ts` and prettier its ignore files: a rule naming `link.ts` excludes
+/// it, and a link into a gitignored `build/` is not under `build/`. (Resolving the link
+/// instead graded the target, and spelled a warning's re-include lines for a path the
+/// argument never named.) The dedup across overlapping arguments still keys on the
+/// canonical path, since two spellings of one file are the same file wherever either is
+/// graded. A path with no name of its own (`.`, `..`, a root) canonicalizes whole.
+/// Falls back to [`absolutize`] when the parent will not canonicalize; `None` is a
+/// relative path with no working directory to join it onto, which the caller refuses
 /// ([`tsv_discover::unresolvable_root_error`]): taken as named, it would anchor on no
 /// format root and read none of its ancestors' ignore files, silently widening the scope.
 fn absolute_named_path(path: &Path, cwd: Option<&Path>) -> Option<PathBuf> {
-    fs::canonicalize(path)
-        .ok()
-        .or_else(|| absolutize(path, cwd))
+    let lexical = match (path.parent(), path.file_name()) {
+        // `Path::parent` of a bare name is `""`: the working directory, canonical already
+        (Some(parent), Some(name)) if parent.as_os_str().is_empty() => {
+            cwd.map(|cwd| cwd.join(name))
+        }
+        (Some(parent), Some(name)) => fs::canonicalize(parent).ok().map(|p| p.join(name)),
+        _ => fs::canonicalize(path).ok(),
+    };
+    lexical.or_else(|| absolutize(path, cwd))
 }
 
 /// The format root above `dir` and whether it is a repo root: inside a git repo the repo
@@ -715,7 +728,7 @@ fn tsv_layer_content(
     } else {
         return None;
     };
-    let content = read_ignore_file(&dir.join(file), warnings).content()?;
+    let content = read_ignore_file(&dir.join(file), warnings)?;
     Some(TsvLayer {
         content,
         prettierignore,
@@ -788,24 +801,25 @@ fn collect_recursive(
                 let entry = match entry {
                     Ok(entry) => entry,
                     Err(e) => {
-                        out.errors.push(format!(
-                            "{}: read_dir entry failed: {e}",
-                            dir.listed.display()
-                        ));
+                        out.errors
+                            .push(format!("{}: read_dir entry failed: {e}", dir.abs.display()));
                         continue;
                     }
                 };
                 match entry.file_type() {
                     Ok(file_type) => entries.push((entry.file_name(), file_type)),
-                    Err(e) => out
-                        .errors
-                        .push(format!("{}: file_type failed: {e}", entry.path().display())),
+                    Err(e) => out.errors.push(format!(
+                        "{}: file_type failed: {e}",
+                        dir.abs.join(entry.file_name()).display()
+                    )),
                 }
             }
         }
+        // named by the absolute path, as every ignore-file warning names its directory,
+        // so `tsv format t ./t` reports an unreadable `t/locked` once, not once per spelling
         Err(e) => {
             out.errors
-                .push(format!("{}: read_dir failed: {e}", dir.listed.display()));
+                .push(format!("{}: read_dir failed: {e}", dir.abs.display()));
             return;
         }
     }
@@ -898,9 +912,8 @@ fn collect_recursive(
             match classify_dir(&name, &child_rel, child_heuristic, stack) {
                 DirVerdict::Prune => continue,
                 DirVerdict::PruneWithWarning => {
-                    out.warnings.extend(tsv_discover::heuristic_shadow_warning(
-                        &child_rel, loose_root, stack,
-                    ));
+                    out.warnings
+                        .extend(tsv_discover::shadow_warning(&child_rel, loose_root, stack));
                     continue;
                 }
                 DirVerdict::Descend => {}
@@ -1091,6 +1104,24 @@ pub(crate) fn path_sort_key(path: &Path) -> Vec<u8> {
     key
 }
 
+/// The path a [`path_sort_key`] was taken from, rebuilt from its components — for a
+/// report slot whose `PathBuf` went with the worker that died holding it, so the report
+/// can still name the file. Exact on unix, where a component is its own bytes; a lossy
+/// spelling elsewhere, which a diagnostic can bear.
+pub(crate) fn path_from_sort_key(key: &[u8]) -> PathBuf {
+    let mut path = PathBuf::new();
+    for component in key.split(|&b| b == 0).skip(1) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            path.push(OsStr::from_bytes(component));
+        }
+        #[cfg(not(unix))]
+        path.push(String::from_utf8_lossy(component).as_ref());
+    }
+    path
+}
+
 /// A relative path's `Normal` components joined with `/` (the form ignore rules
 /// match against). Empty for the format root itself.
 fn path_to_rel(path: &Path) -> String {
@@ -1103,48 +1134,29 @@ fn path_to_rel(path: &Path) -> String {
         .join("/")
 }
 
-/// The outcome of reading an ignore file the walk is about to consult.
-enum IgnoreRead {
-    /// Read succeeded.
-    Content(String),
-    /// Not there — nothing to apply, silently (genuinely absent, or deleted
-    /// between the directory listing and this read).
-    Absent,
-    /// Present but unreadable (invalid UTF-8, permissions, …). A non-fatal
-    /// warning was pushed and the rules are dropped. Distinct from `Absent` so a
-    /// precedence decision (`.formatignore` shadowing `.prettierignore`) doesn't
-    /// fall through to a lower-precedence file on a mere read error.
-    Unreadable,
-}
-
-impl IgnoreRead {
-    /// The content if the read succeeded, else `None` (any warning was already
-    /// pushed). For callers that don't distinguish `Absent` from `Unreadable`.
-    fn content(self) -> Option<String> {
-        match self {
-            IgnoreRead::Content(c) => Some(c),
-            IgnoreRead::Absent | IgnoreRead::Unreadable => None,
-        }
-    }
-}
-
-/// Read an ignore file, classifying the outcome so the walk can both surface a
-/// silently-dropped file and keep precedence by *presence*. A `NotFound` error is
-/// `Absent` (genuinely missing, or raced away after the listing — not the user's
-/// problem, no warning). Any other error (invalid UTF-8 — `read_to_string` is
-/// strict — permissions, …) pushes a non-fatal warning to `warnings` (the file is
-/// there but its rules won't apply, the exact silent footgun this surfaces) and
-/// yields `Unreadable`. Mirrors the JS `read_ignore_file`.
-fn read_ignore_file(path: &Path, warnings: &mut Vec<String>) -> IgnoreRead {
+/// Read an ignore file: its content, or `None` — silently for a `NotFound` error
+/// (genuinely missing, or raced away after the listing — not the user's problem), with
+/// a non-fatal warning pushed to `warnings` for any other error (invalid UTF-8 —
+/// `read_to_string` is strict — permissions, …: the file is there but its rules won't
+/// apply, the exact silent footgun this surfaces). Precedence between a directory's tsv
+/// files is decided by *presence* before this read, so the two `None`s need no telling
+/// apart. Mirrors the JS `read_ignore_file`.
+fn read_ignore_file(path: &Path, warnings: &mut Vec<String>) -> Option<String> {
     match fs::read_to_string(path) {
-        Ok(content) => IgnoreRead::Content(content),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => IgnoreRead::Absent,
+        Ok(content) => Some(content),
+        // not there — nothing to apply, silently (genuinely absent, or deleted between
+        // the directory listing and this read)
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        // present but unreadable: warned, and no rules. Which file the directory's tsv
+        // layer is read from was decided by PRESENCE before this read
+        // (`tsv_layer_content`), so an unreadable `.formatignore` still shadows its
+        // sibling `.prettierignore` rather than falling through to it
         Err(e) => {
             warnings.push(format!(
                 "could not read {} ({e}); its ignore rules are not applied",
                 path.display()
             ));
-            IgnoreRead::Unreadable
+            None
         }
     }
 }

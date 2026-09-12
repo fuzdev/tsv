@@ -63,7 +63,7 @@ crates (the open-convention stance):
   top-level-array `.json` a *successful* rewrite into invalid JSON. Prettier draws
   the same line ("No parser could be inferred"). The extension list in the message
   renders from `FORMATTABLE_EXTENSIONS`, so a new language flows through; the text
-  is produced once here, like `heuristic_shadow_warning`.
+  is produced once here, like `shadow_warning`.
 - `formattable_extension_list(separator)` — the extension set rendered as prose
   (`".ts, .mts, …"`), the one spelling behind every message that lists it (the
   refusal above, the CLI's nothing-in-scope error).
@@ -107,14 +107,13 @@ crates (the open-convention stance):
   `classify_dir` stays the primitive for real traversers, which thread
   `heuristic_active` naturally as they descend. The CLIs never ask it of a path an
   argument named: see `excluded_argument_warning`.
-- `path_heuristic_shadow_warning(rel, loose_root, &IgnoreStack) -> Option<String>` —
-  the same replay's warning: `heuristic_shadow_warning` for the first ancestor
+- `path_shadow_warning(rel, loose_root, &IgnoreStack) -> Option<String>` —
+  the same replay's warning: `shadow_warning` for the first ancestor
   `is_path_pruned` stops at, when that directory's verdict is `PruneWithWarning`; `None`
-  otherwise. It reads the verdict, not `negation_under` alone, because a re-include under
-  a directory a *rule* excludes is as inert but not the heuristic's doing, and only the
-  first pruned ancestor, since the walk stops there. This is how a consumer with no walk
-  names a `!dist/keep.ts` the heuristic makes a no-op, instead of skipping the file
-  silently. Both `is_path_pruned` and this run one private replay
+  otherwise. It reads the verdict rather than asking `shadow_warning` directly so a
+  safety-net prune stays silent as it does on a walk, and asks only the first pruned
+  ancestor, since the walk stops there. This is how a consumer with no walk names a
+  `!dist/keep.ts` a prune makes a no-op, instead of skipping the file silently. Both `is_path_pruned` and this run one private replay
   (`first_pruned_ancestor`).
 - `excluded_argument_warning(display, rel, is_dir, loose_root, &IgnoreStack)
   -> Option<String>` — the warning for a path an argument **named** (a file, or a
@@ -153,20 +152,39 @@ crates (the open-convention stance):
   `loose_root` is the format root's display path outside a repo, where paths are named
   absolutely; inside one (`None`) they read relative to the repo root.
 - `DirVerdict { Descend, Prune, PruneWithWarning }` — on `PruneWithWarning` the
-  caller fetches the text from `heuristic_shadow_warning`, which takes display context
+  caller fetches the text from `shadow_warning`, which takes display context
   (`loose_root`) the per-directory verdict has no other use for — the same fetch
   `npm/cli.js` makes across the binding boundary (which can't carry a tagged-union
   payload as one primitive — see below).
-- `heuristic_shadow_warning(d, loose_root, &IgnoreStack) -> Option<String>` — the
-  warning when the heuristic prunes a directory a tsv-layer `!` re-include was written
-  under; `None` when none is (`IgnoreStack::negation_under`, the query behind
-  `PruneWithWarning`). It names the file holding the rule (the deepest, whose rules are
-  read last) and spells the directory escape for that file, anchored and relative to
-  its directory — `!/dist/` (then `/dist/*` + `!/dist/<file>`) in `pkg/.formatignore`
-  for a pruned `pkg/dist` — because a root-relative line does nothing in a nested file,
+- `shadow_warning(d, loose_root, &IgnoreStack) -> Option<String>` — the
+  warning when a pruned directory has a tsv-layer `!` re-include written under it;
+  `None` when none is (`IgnoreStack::negation_under`, the query behind
+  `PruneWithWarning`). The text says what pruned it — the build-output heuristic, or an
+  ignore rule and its file (`IgnoreStack::exclusion`) — names the file holding the
+  re-include (the deepest, whose rules are read last) and spells, for that file, the
+  lines that reach what the rules named (`shadow_reinclude_lines`): from the pruned
+  directory down to the deepest directory in each rule's literal path, each re-included
+  then its contents excluded again, parents first, then every rule's own pattern
+  anchored — `!/dist/`, `/dist/*`, `!/dist/keep.ts` in `pkg/.formatignore` for a pruned
+  `pkg/dist` under `!dist/keep.ts`, with `!/dist/sub/`, `/dist/sub/*` between for
+  `!dist/sub/keep.ts` (a `/dist/*` alone would close `dist/sub` again; nothing pins a
+  direct child only). Every re-include under the directory is re-spelled, from every
+  file above it (a shallower file's relative to the named one), because the `/dist/*`
+  line silences each one it does not re-spell after it. A rule reaching below its
+  deepest literal directory (`!dist/**/keep.ts`, `!dist/*/keep.ts`) opens that subtree
+  with git's every-directory-no-file idiom instead — `/dist/**` then `!/dist/**/` —
+  since a `/dist/*` would close the directories it reaches into. Anchored and relative
+  to the file's directory, because a root-relative line does nothing in a nested file,
   and outside a repo (format root = filesystem root) in any file, while an unanchored
-  one-segment `!dist/` re-includes a `dist` at every depth. `loose_root` is
-  `excluded_argument_warning`'s. Produced once here; both bindings fetch it directly.
+  one-segment `!dist/` re-includes a `dist` at every depth. A tsv layer is read after
+  every `.gitignore` and a later line wins within a file, so the lines override the
+  excluding rule wherever it sits — except a tsv rule in a file deeper than the
+  re-include's, which is read after it: then the text says to narrow or negate that
+  rule instead, adding the lines beside it where a `.gitignore` rule stands behind it
+  (`IgnoreStack::gitignore_exclusion`), which narrowing alone would leave in force. A
+  re-include whose pattern ends in a carriage return gets the directory escape alone,
+  since no line can hold it. `loose_root` is `excluded_argument_warning`'s. Produced
+  once here; both bindings fetch it directly.
 - `gitignore_symlink_warning(path) -> String` — the warning for an in-tree `.gitignore`
   that is a symbolic link: git never reads one in a working tree (gitignore(5)), so its
   rules are dropped and the build-output heuristic stays on for its subtree, which the
@@ -205,7 +223,7 @@ crates (the open-convention stance):
   format (alongside the not-a-file-or-directory check, so the run fails before
   anything is written); and in `collect_recursive`: matches
   `classify_dir`'s `DirVerdict` and, on `PruneWithWarning`, pushes
-  `heuristic_shadow_warning`'s text into the
+  `shadow_warning`'s text into the
   `Discovered::warnings` channel; uses `should_format_file` for the file branch;
   pushes any `prettierignore_shadowed_warning` per directory; and, at the target
   root only, pushes any `prettierignore_outside_repo_warning` into the same
@@ -215,9 +233,9 @@ crates (the open-convention stance):
   method-for-method twin) — the `format`-gated `IgnoreStack` wrapper exposes
   `classify_dir(name, child_rel, heuristic_active) -> string`
   (`"descend"|"prune"|"prune_warn"`), `should_format_file(name, child_rel) ->
-  bool`, `is_path_pruned(rel) -> bool`, `path_heuristic_shadow_warning(rel, loose_root?)
+  bool`, `is_path_pruned(rel) -> bool`, `path_shadow_warning(rel, loose_root?)
   -> string | undefined`, `excluded_argument_warning(display, rel, is_dir,
-  loose_root?) -> string | undefined`, `heuristic_shadow_warning(dir, loose_root?) ->
+  loose_root?) -> string | undefined`, `shadow_warning(dir, loose_root?) ->
   string | undefined`,
   `unsupported_extension_error(path) -> string | undefined`,
   `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
@@ -229,7 +247,7 @@ crates (the open-convention stance):
   `patch_npm_package.ts` change and allocates no JS class on the common
   descend path; the `prune_warn` arm fetches the text via the separate method.
   `npm/cli.js` does a real walk, so it calls the per-directory `classify_dir` /
-  `should_format_file` and every warning producer above (`heuristic_shadow_warning`,
+  `should_format_file` and every warning producer above (`shadow_warning`,
   both `.prettierignore` ones, `gitignore_symlink_warning`,
   `excluded_argument_warning`), plus the per-argument `unsupported_extension_error`
   (through a throwaway stack — the receiver is unused, an argument check running

@@ -1366,6 +1366,219 @@ fn test_format_invalid_utf8_file_is_reported_and_left_alone() {
     assert_eq!(fs::read_to_string(dir.join("ok.ts")).unwrap(), FORMATTED_TS);
 }
 
+/// `--jobs` sizes the pool that formats; `--list` spawns none, so a width there is the
+/// same category error as with `--content`, refused the same way — not accepted silently
+/// past the clamp warning.
+#[test]
+fn test_format_list_with_jobs_is_refused() {
+    let dir = temp_dir("list_jobs");
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    let output = tsv(&["format", "--list", "--jobs", "2", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Error: --jobs applies to formatting; --list reports the in-scope set without formatting"),
+        "stderr: {stderr}"
+    );
+}
+
+/// `--version` beside a subcommand is refused rather than printing the version and
+/// dropping the rest — the one argv shape argh accepts that means two things at once.
+#[test]
+fn test_version_with_a_subcommand_is_refused() {
+    let output = tsv(&["--version", "format", "--check", "/nonexistent"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Error: --version cannot be combined with a subcommand"),
+        "stderr: {stderr}"
+    );
+    assert!(stderr.contains("Run tsv --help for more information."));
+    let alone = tsv(&["--version"]);
+    assert_eq!(alone.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&alone.stdout).starts_with("tsv "));
+}
+
+/// A traversal error names its directory absolutely, as every ignore-file warning does,
+/// so two spellings of one root (`t ./t`) report an unreadable subdirectory once.
+#[cfg(unix)]
+#[test]
+fn test_format_traversal_error_reports_once_across_spellings() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = temp_dir("traversal_error_dedup");
+    fs::create_dir_all(dir.join("t/locked")).unwrap();
+    fs::write(dir.join("t/a.ts"), FORMATTED_TS).unwrap();
+    // empty, so the mode alone makes it unreadable and the guard can still remove it
+    fs::set_permissions(dir.join("t/locked"), fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read_dir(dir.join("t/locked")).is_ok() {
+        return; // root reads anything: nothing to grade
+    }
+    let output = tsv_in_dir(dir.path(), &["format", "--list", "t", "./t"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(2), "stderr: {stderr}");
+    let reports: Vec<&str> = stderr
+        .lines()
+        .filter(|l| l.contains("read_dir failed"))
+        .collect();
+    assert_eq!(reports.len(), 1, "stderr: {stderr}");
+    let absolute = dir.join("t/locked");
+    assert!(
+        reports[0].contains(absolute.to_str().unwrap()),
+        "the error names the directory absolutely: {stderr}"
+    );
+    // the overlap dedup keeps the first spelling in sorted order, `./t` ahead of `t`
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .collect::<Vec<_>>(),
+        ["./t/a.ts"]
+    );
+}
+
+/// A `--source-type` the parser has no goal for is refused before stdin is read, so the
+/// refusal cannot hang on a writer that has not finished — an open, empty stdin here.
+#[test]
+fn test_stdin_source_type_refusal_does_not_wait_for_input() {
+    use std::process::Stdio;
+    for (args, code) in [
+        (
+            &[
+                "format",
+                "--stdin",
+                "--parser",
+                "css",
+                "--source-type",
+                "module",
+            ][..],
+            2,
+        ),
+        (
+            &[
+                "parse",
+                "--stdin",
+                "--parser",
+                "svelte",
+                "--source-type",
+                "script",
+            ][..],
+            1,
+        ),
+    ] {
+        let mut child = Command::new(built_tsv())
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn tsv");
+        // stdin stays open and empty: a refusal that read first would wait here forever
+        let started = std::time::Instant::now();
+        let status = loop {
+            if let Some(status) = child.try_wait().expect("try_wait") {
+                break status;
+            }
+            assert!(
+                started.elapsed() < std::time::Duration::from_secs(5),
+                "{args:?} waited on stdin instead of refusing"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+        let output = child.wait_with_output().expect("wait");
+        assert_eq!(status.code(), Some(code), "{args:?}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("--source-type is only supported for typescript"),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+/// A write error that is neither a closed nor a slow reader — a full disk — aborts
+/// loudly, with a verdict that is none of 0/1/2: a report lost with nothing said about it
+/// would be worse than a crash. Pinned so the exit code stays out of the verdict range.
+#[cfg(unix)]
+#[test]
+fn test_format_write_error_aborts_loudly() {
+    use std::process::Stdio;
+    let Ok(full) = fs::OpenOptions::new().write(true).open("/dev/full") else {
+        return;
+    };
+    let dir = temp_dir("write_error");
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    let output = Command::new(built_tsv())
+        .args(["format", "--list", "."])
+        .current_dir(dir.path())
+        .stdout(Stdio::from(full))
+        .stderr(Stdio::piped())
+        .output()
+        .expect("run tsv");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !matches!(output.status.code(), Some(0..=2)),
+        "a lost report must not read as a verdict: {:?}, stderr: {stderr}",
+        output.status
+    );
+    assert!(
+        stderr.contains("failed printing to stdout"),
+        "stderr: {stderr}"
+    );
+}
+
+/// Two hard links to one inode inside a walked tree are two names in scope: nothing reads
+/// inodes, so each name is read and formatted on its own. A `--check` lists both; a
+/// sequential format rewrites the inode through whichever name the walk reaches first
+/// and finds the other already formatted, so it reports one name — which one is the
+/// walk's order, not the sort's — and a second run has nothing left.
+#[cfg(unix)]
+#[test]
+fn test_format_hard_links_are_two_names_in_scope() {
+    let dir = temp_dir("hard_links");
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    fs::hard_link(dir.join("a.ts"), dir.join("b.ts")).unwrap();
+
+    let check = tsv_in_dir(dir.path(), &["format", "--check", "."]);
+    assert_eq!(
+        check.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&check.stdout);
+    assert_eq!(stdout.lines().collect::<Vec<_>>(), ["./a.ts", "./b.ts"]);
+
+    let format = tsv_in_dir(dir.path(), &["format", "--jobs", "1", "."]);
+    assert_eq!(
+        format.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&format.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&format.stdout);
+    let changed: Vec<&str> = stdout.lines().collect();
+    assert_eq!(
+        changed.len(),
+        1,
+        "one rewrite reaches both names, stdout: {stdout}"
+    );
+    assert!(
+        changed[0] == "./a.ts" || changed[0] == "./b.ts",
+        "stdout: {stdout}"
+    );
+    assert_eq!(fs::read_to_string(dir.join("a.ts")).unwrap(), FORMATTED_TS);
+    assert_eq!(fs::read_to_string(dir.join("b.ts")).unwrap(), FORMATTED_TS);
+
+    let again = tsv_in_dir(dir.path(), &["format", "."]);
+    assert_eq!(again.status.code(), Some(0));
+    assert!(
+        again.stdout.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&again.stdout)
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn test_format_non_utf8_argument_is_refused_at_the_argv_boundary() {
@@ -1725,7 +1938,7 @@ fn test_format_heuristic_shadow_warns_for_anchored_negation() {
     );
     assert!(
         stderr.contains(
-            "/.formatignore does nothing; re-include the directory itself there with `!/build/`"
+            "/.formatignore does nothing; re-include it by adding `!/build/`, `/build/*` and `!/build/keep.ts`, in that order, to "
         ),
         "stderr: {stderr}"
     );

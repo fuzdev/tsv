@@ -46,7 +46,7 @@
 //! a full disk with nothing said about it is the worse failure.
 //!
 //! **Scope: the shipped bin.** `tsv_debug` keeps `println!`/`eprintln!` (and
-//! `write!`/`writeln!` to a locked handle, which abort the same way) at its ~1,160
+//! `write!`/`writeln!` to a locked handle, which abort the same way) at its many
 //! write sites and still aborts on a closed reader. That is deliberate, not an
 //! oversight to finish: it ships in no artifact, its output is a developer's to read,
 //! and a panic there names the problem rather than hiding it. The one line of its

@@ -465,7 +465,7 @@
 			]
 		},
 		{
-			"name": "heuristic_shadow_warning_names_the_rules_file",
+			"name": "shadow_warning_names_the_rules_file",
 			"note": "the build-output heuristic prunes a dist/ that a tsv-layer `!` re-include was written under, and the warning names the file holding that rule, with the directory re-include spelled for that file — anchored and relative to its directory, since a repo-root-relative `!pkg/dist/` pasted into pkg/.formatignore is anchored to pkg and does nothing. Applied (fix/.prettierignore), the anchored lines admit fix/dist and select keep.ts in it, while fix/sub/dist — which an unanchored `!dist/` would re-include too — stays pruned, and unwarned",
 			"tree": {
 				".git/": null,
@@ -478,8 +478,74 @@
 				"fix/sub/dist/x.ts": "x"
 			},
 			"cases": [
-				{"target": "", "expected": ["fix/dist/keep.ts", "pkg/a.ts"], "warns": ["pkg/dist is skipped by tsv's build-output heuristic, so a re-include under it in pkg/.formatignore does nothing; re-include the directory itself there with `!/dist/` (then `/dist/*` + `!/dist/<file>` to select files within it)"], "no_warns": ["fix/"]},
+				{"target": "", "expected": ["fix/dist/keep.ts", "pkg/a.ts"], "warns": ["pkg/dist is skipped by tsv's build-output heuristic, so a re-include under it in pkg/.formatignore does nothing; re-include it by adding `!/dist/`, `/dist/*` and `!/dist/keep.ts`, in that order, to pkg/.formatignore"], "no_warns": ["fix/"]},
 				{"target": "pkg", "expected": ["pkg/a.ts"], "warns": ["pkg/dist is skipped by tsv's build-output heuristic, so a re-include under it in pkg/.formatignore"]}
+			]
+		},
+		{
+			"name": "a_reinclude_under_a_gitignored_dir_warns",
+			"note": "a `!dist/keep.ts` under a directory a .gitignore rule excludes is as inert as under the heuristic (git's parent-directory rule), and the walk says so, naming the rule as the cause and spelling the ladder for the re-include's own file — which, applied (fixed/), admits exactly the file",
+			"tree": {
+				"warn/.git/": null,
+				"warn/.gitignore": "dist/\n",
+				"warn/.formatignore": "!dist/keep.ts\n",
+				"warn/dist/keep.ts": "x",
+				"warn/src/a.ts": "x",
+				"fixed/.git/": null,
+				"fixed/.gitignore": "dist/\n",
+				"fixed/.formatignore": "!dist/keep.ts\n!/dist/\n/dist/*\n!/dist/keep.ts\n",
+				"fixed/dist/keep.ts": "x",
+				"fixed/dist/other.ts": "x",
+				"fixed/src/a.ts": "x"
+			},
+			"cases": [
+				{"target": "warn", "expected": ["warn/src/a.ts"], "warns": ["dist is excluded by a rule in the repo-root .gitignore, so a re-include under it in the repo-root .formatignore does nothing; re-include it by adding `!/dist/`, `/dist/*` and `!/dist/keep.ts`, in that order, to the repo-root .formatignore"]},
+				{"target": "fixed", "expected": ["fixed/dist/keep.ts", "fixed/src/a.ts"], "no_warns": ["dist"]}
+			]
+		},
+		{
+			"name": "a_reinclude_ladder_covers_every_rule_and_a_deep_tail",
+			"note": "the ladder re-spells every re-include written under the pruned directory (a `/dist/*` line would silence each one it did not), and a rule reaching below the directory (`!dist/**/keep.ts`) opens its subtree with `/dist/**` + `!/dist/**/` in place of `/dist/*`, git's every-directory-no-file idiom; applied (fixed/), exactly what the rules name is in scope, at any depth, and nothing beside it",
+			"tree": {
+				"warn/.git/": null,
+				"warn/.gitignore": "dist/\n",
+				"warn/.formatignore": "!dist/a.ts\n!dist/**/keep.ts\n",
+				"warn/dist/a.ts": "x",
+				"warn/dist/sub/keep.ts": "x",
+				"warn/src/b.ts": "x",
+				"fixed/.git/": null,
+				"fixed/.gitignore": "dist/\n",
+				"fixed/.formatignore": "!dist/a.ts\n!dist/**/keep.ts\n!/dist/\n/dist/**\n!/dist/**/\n!/dist/a.ts\n!/dist/**/keep.ts\n",
+				"fixed/dist/a.ts": "x",
+				"fixed/dist/other.ts": "x",
+				"fixed/dist/sub/keep.ts": "x",
+				"fixed/dist/sub/other.ts": "x",
+				"fixed/dist/sub/deep/keep.ts": "x",
+				"fixed/src/b.ts": "x"
+			},
+			"cases": [
+				{"target": "warn", "expected": ["warn/src/b.ts"], "warns": ["dist is excluded by a rule in the repo-root .gitignore, so a re-include under it in the repo-root .formatignore does nothing; re-include it by adding `!/dist/`, `/dist/**`, `!/dist/**/`, `!/dist/a.ts` and `!/dist/**/keep.ts`, in that order, to the repo-root .formatignore"]},
+				{"target": "fixed", "expected": ["fixed/dist/a.ts", "fixed/dist/sub/deep/keep.ts", "fixed/dist/sub/keep.ts", "fixed/src/b.ts"], "no_warns": ["dist"]}
+			]
+		},
+		{
+			"name": "a_symlinked_argument_is_graded_where_it_is_typed",
+			"note": "a path argument that is itself a symbolic link is bounded by the ignore files at the path typed, as git check-ignore and prettier read it — not where it points: a link a .gitignore names is skipped (warned, as any gitignore-only file exclusion is), a link into a gitignored build/ is not under build/, and a linked directory root is bounded by the rules of the repo it sits in even when it points outside that repo",
+			"tree": {
+				"repo/.git/": null,
+				"repo/.gitignore": "build/\nlink.ts\nlinkdir/\n",
+				"repo/src/real.ts": "x",
+				"repo/build/gen.ts": "x",
+				"repo/link.ts": {"symlink": "src/real.ts"},
+				"repo/loose.ts": {"symlink": "build/gen.ts"},
+				"repo/linkdir": {"symlink": "../out"},
+				"repo/okdir": {"symlink": "../out"},
+				"out/o.ts": "x"
+			},
+			"cases": [
+				{"targets": ["repo/link.ts", "repo/loose.ts"], "expected": ["repo/loose.ts"], "warns": ["repo/link.ts is excluded by a rule in the repo-root .gitignore, so it is not formatted; re-include it by adding `!/link.ts` to the repo-root .formatignore"], "no_warns": ["loose.ts", "build"]},
+				{"target": "repo/linkdir", "expected": [], "warns": ["repo/linkdir is excluded by a rule in the repo-root .gitignore, so nothing under it is formatted; re-include it by adding `!/linkdir/` to the repo-root .formatignore"]},
+				{"target": "repo/okdir", "expected": ["repo/okdir/o.ts"]}
 			]
 		},
 		{

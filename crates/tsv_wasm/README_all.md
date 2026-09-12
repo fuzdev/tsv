@@ -75,7 +75,7 @@ To run tsv across threads, compile once and share: the main entry exports `wasm_
 
 ### File scoping (`IgnoreStack`)
 
-For tooling that needs tsv's exact file scoping, the package also exports the `IgnoreStack` class — the hierarchical `.gitignore` matcher with tsv's `.formatignore`/`.prettierignore` layer, plus tsv's discovery policy (`classify_dir`, `should_format_file`, `is_path_pruned`, `path_heuristic_shadow_warning`, `excluded_argument_warning`, `unsupported_extension_error`, `heuristic_shadow_warning`, `prettierignore_outside_repo_warning`, `prettierignore_shadowed_warning`, `gitignore_symlink_warning`); [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) documents it with examples.
+For tooling that needs tsv's exact file scoping, the package also exports the `IgnoreStack` class — the hierarchical `.gitignore` matcher with tsv's `.formatignore`/`.prettierignore` layer, plus tsv's discovery policy (`classify_dir`, `should_format_file`, `is_path_pruned`, `path_shadow_warning`, `excluded_argument_warning`, `unsupported_extension_error`, `shadow_warning`, `prettierignore_outside_repo_warning`, `prettierignore_shadowed_warning`, `gitignore_symlink_warning`); [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) documents it with examples.
 
 ## Status
 

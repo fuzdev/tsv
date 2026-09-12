@@ -30,6 +30,14 @@ pub enum Subcommand {
 impl TopLevel {
     pub fn run(self) {
         if self.version {
+            // a subcommand beside the switch would be silently dropped otherwise — the
+            // one argv shape argh accepts that means two things at once
+            if self.nested.is_some() {
+                out::exit_with_error(
+                    1,
+                    "Error: --version cannot be combined with a subcommand\n\nRun tsv --help for more information.",
+                );
+            }
             out_line!("tsv {}", env!("CARGO_PKG_VERSION"));
             return;
         }

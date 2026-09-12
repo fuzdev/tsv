@@ -25,12 +25,15 @@
 
 import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
+	chmodSync,
 	cpSync,
 	existsSync,
+	linkSync,
 	mkdirSync,
 	mkdtempSync,
+	openSync,
 	readdirSync,
 	readFileSync,
 	realpathSync,
@@ -1178,6 +1181,206 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	);
 
+	// The flag combos both bins refuse rather than accept silently: `--jobs` sizes a
+	// pool `--list` never spawns, and `--version` beside a subcommand would drop it.
+	it('--list with --jobs is refused like --content with --jobs', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-list-jobs-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const   x=1\n');
+			const result = run_cli(['format', '--list', '--jobs', '2', '.'], undefined, dir);
+			assert.equal(result.status, 2);
+			assert.equal(result.stdout, '');
+			assert.match(
+				result.stderr,
+				/^Error: --jobs applies to formatting; --list reports the in-scope set without formatting$/m
+			);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('--version with a subcommand is refused', () => {
+		const result = run_cli(['--version', 'format', '--check', '/nonexistent']);
+		assert.equal(result.status, 1);
+		assert.equal(result.stdout, '');
+		assert.match(result.stderr, /^Error: --version cannot be combined with a subcommand$/m);
+		assert.match(result.stderr, /Run tsv --help for more information\./);
+		const alone = run_cli(['--version']);
+		assert.equal(alone.status, 0);
+		assert.match(alone.stdout, /^tsv \d/);
+	});
+
+	// A traversal error names its directory absolutely, as every ignore-file warning
+	// does, so two spellings of one root report an unreadable subdirectory once.
+	it('a traversal error is reported once across spellings of one root', { skip: !posix }, () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-traversal-dedup-'));
+		try {
+			mkdirSync(join(dir, 't', 'locked'), { recursive: true });
+			writeFileSync(join(dir, 't', 'a.ts'), 'const x = 1;\n');
+			chmodSync(join(dir, 't', 'locked'), 0o000);
+			let readable = true;
+			try {
+				readdirSync(join(dir, 't', 'locked'));
+			} catch {
+				readable = false;
+			}
+			if (readable) return; // root reads anything: nothing to grade
+			const result = run_cli(['format', '--list', 't', './t'], undefined, dir);
+			assert.equal(result.status, 2, result.stderr);
+			const reports = result.stderr.split('\n').filter((l) => l.includes('read_dir failed'));
+			assert.equal(reports.length, 1, result.stderr);
+			assert.ok(reports[0]!.includes(join(realpathSync(dir), 't', 'locked')), result.stderr);
+			assert.deepEqual(result.stdout.trim().split('\n'), ['./t/a.ts']);
+		} finally {
+			chmodSync(join(dir, 't', 'locked'), 0o755);
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// A `--source-type` the parser has no goal for is refused before stdin is read, so
+	// the refusal cannot hang on a writer that has not finished (an open, empty stdin).
+	it('a --stdin refusal does not wait for input', async () => {
+		for (const [args, code] of [
+			[['format', '--stdin', '--parser', 'css', '--source-type', 'module'], 2],
+			[['parse', '--stdin', '--parser', 'svelte', '--source-type', 'script'], 1]
+		] as Array<[Array<string>, number]>) {
+			const child = spawn(process.execPath, [cli_path, ...args], {
+				stdio: ['pipe', 'pipe', 'pipe']
+			});
+			let stderr = '';
+			child.stderr.setEncoding('utf-8').on('data', (chunk: string) => {
+				stderr += chunk;
+			});
+			// stdin stays open and empty
+			const status = await new Promise<number | null>((resolve, reject) => {
+				const timer = setTimeout(() => {
+					// a child that read first is waiting on us: end it, or the runner waits on it
+					child.kill();
+					reject(new Error(`${args.join(' ')} waited on stdin instead of refusing`));
+				}, 5000);
+				child.on('close', (s) => {
+					clearTimeout(timer);
+					resolve(s);
+				});
+				child.on('error', reject);
+			});
+			assert.equal(status, code, stderr);
+			assert.match(stderr, /--source-type is only supported for typescript/);
+		}
+	});
+
+	// A write error that is neither a closed nor a slow reader — a full disk — aborts
+	// loudly with the shipped native binary's abort status, never a verdict code (an
+	// uncaught throw exited 1, which reads as `--check`'s would-change).
+	it('a write error aborts loudly, not with a verdict code', { skip: !posix }, () => {
+		if (!existsSync('/dev/full')) return;
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-write-error-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const   x=1\n');
+			const result = spawnSync(process.execPath, [cli_path, 'format', '--list', '.'], {
+				encoding: 'utf-8',
+				cwd: dir,
+				stdio: ['ignore', openSync('/dev/full', 'w'), 'pipe']
+			});
+			assert.equal(result.status, 134, result.stderr);
+			assert.match(result.stderr, /^failed printing to stdout: ENOSPC/m);
+			assert.doesNotMatch(result.stderr, /^\s*at /m, `a stack trace leaked: ${result.stderr}`);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// The READ side of the pipe rule. Whether fd 0 blocks belongs to the open file
+	// description the CLI shares with its parent, and a Node parent that opens its own
+	// piped `process.stdin` while the CLI runs flips it: libuv opens the pipe handle
+	// non-blocking. A `readFileSync(0)` then throws `EAGAIN` the moment the writer
+	// pauses, reporting a slow writer as a read error; `read_fd_to_end` waits it out.
+	// The shim below IS that parent: it spawns the CLI with an inherited stdin and then
+	// touches `process.stdin`, in that order — libuv resets fds 0–2 to blocking in the
+	// child ahead of its exec, and `spawn` returns only once the exec has happened, so a
+	// flip made before the spawn is undone and one made after lands on the running
+	// child. The control run proves the flip: the same shim over a child that reads
+	// with `readFileSync(0)` dies of `EAGAIN`, so the row cannot pass vacuously on a
+	// Node that stopped flipping. The native twin (`tests/cli_tests.rs`'s
+	// `test_format_stdin_non_blocking_is_waited_out_not_a_read_error`) hands the
+	// binary a non-blocking socket end directly.
+	const STDIN_FLIP_SHIM = `
+		const { spawn } = require('node:child_process');
+		const child = spawn(process.argv[1], process.argv.slice(2), { stdio: 'inherit' });
+		process.stdin;
+		child.on('exit', (code) => process.exit(code ?? 1));
+	`;
+	/** `node -e STDIN_FLIP_SHIM -- <command...>`, its stdin written in two halves around
+	 * a pause long enough for the child to find the pipe empty. */
+	const run_under_stdin_flip = (command: Array<string>) =>
+		new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+			const child = spawn(process.execPath, ['-e', STDIN_FLIP_SHIM, '--', ...command], {
+				stdio: ['pipe', 'pipe', 'pipe']
+			});
+			let stdout = '';
+			let stderr = '';
+			child.stdout.setEncoding('utf-8').on('data', (chunk: string) => {
+				stdout += chunk;
+			});
+			child.stderr.setEncoding('utf-8').on('data', (chunk: string) => {
+				stderr += chunk;
+			});
+			child.on('error', reject);
+			child.on('close', (status) => resolve({ status, stdout, stderr }));
+			child.stdin.write('const   x   =');
+			setTimeout(() => child.stdin.end('   1;\n'), 200);
+		});
+	it('a non-blocking stdin is waited out, not a read error', { skip: !posix }, async () => {
+		const control = await run_under_stdin_flip([
+			process.execPath,
+			'-e',
+			"process.stdout.write(require('node:fs').readFileSync(0, 'utf8'))"
+		]);
+		assert.match(
+			control.stderr,
+			/EAGAIN/,
+			`the shim did not flip fd 0 to non-blocking: ${control.stderr}`
+		);
+		const result = await run_under_stdin_flip([
+			process.execPath,
+			cli_path,
+			'format',
+			'--stdin',
+			'--parser',
+			'typescript'
+		]);
+		assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+		assert.equal(result.stdout, 'const x = 1;\n');
+	});
+
+	// Two hard links to one inode are two names in scope: nothing reads inodes, so a
+	// `--check` lists both, and a format rewrites the inode through the first name and
+	// finds the other already formatted. The native pin is `tests/cli_tests.rs`'s
+	// `test_format_hard_links_are_two_names_in_scope`.
+	it('hard links to one inode are two names in scope', { skip: !posix }, () => {
+		const tree = mkdtempSync(join(tmpdir(), 'tsv-hardlink-'));
+		try {
+			writeFileSync(join(tree, 'a.ts'), 'const   x=1\n');
+			linkSync(join(tree, 'a.ts'), join(tree, 'b.ts'));
+			const check = run_cli(['format', '--check', '.'], undefined, tree);
+			assert.equal(check.status, 1, check.stderr);
+			assert.deepEqual(check.stdout.trim().split('\n'), ['./a.ts', './b.ts']);
+			const result = run_cli(['format', '--jobs', '1', '.'], undefined, tree);
+			assert.equal(result.status, 0, result.stderr);
+			assert.equal(
+				result.stdout.trim().split('\n').length,
+				1,
+				`one rewrite reaches both names: ${result.stdout}`
+			);
+			assert.equal(readFileSync(join(tree, 'b.ts'), 'utf-8'), 'const x = 1;\n');
+			const again = run_cli(['format', '.'], undefined, tree);
+			assert.equal(again.status, 0, again.stderr);
+			assert.equal(again.stdout, '');
+		} finally {
+			rmSync(tree, { recursive: true, force: true });
+		}
+	});
+
 	it('format --content prints formatted source', () => {
 		const result = run_cli(['format', '--content', 'const   x=1', '--parser', 'typescript']);
 		assert.equal(result.status, 0);
@@ -1510,8 +1713,8 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
-	// #5 diagnostic parity: the heuristic-shadow warning (mirrors the native
-	// `heuristic_shadow_warning` text). Non-fatal — stderr only, exit 0, --list
+	// #5 diagnostic parity: the shadow warning (mirrors the native
+	// `shadow_warning` text). Non-fatal — stderr only, exit 0, --list
 	// stdout stays clean, build/ stays pruned.
 	it('format warns when the heuristic prunes a dir an anchored `!` targets', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
@@ -1531,7 +1734,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			// directory (outside a repo the file itself is named absolutely)
 			assert.match(
 				list.stderr,
-				/\/\.formatignore does nothing; re-include the directory itself there with `!\/build\/`/
+				/\/\.formatignore does nothing; re-include it by adding `!\/build\/`, `\/build\/\*` and `!\/build\/keep\.ts`, in that order, to /
 			);
 
 			// a floating `!keep.ts` must NOT warn (targets any depth, not build/)
@@ -2140,10 +2343,11 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 				assert.ok(warning_at !== -1, `no clamp warning on an empty scope: ${result.stderr}`);
 				assert.ok(error_at !== -1, result.stderr);
 				assert.ok(warning_at < error_at, `the clamp warns after discovery: ${result.stderr}`);
-				// `--list` sizes no pool, so it warns nothing
+				// `--list` sizes no pool, so a width there is refused outright, never clamped
 				const listed = run_cli(['format', '--list', '--jobs', '100000', empty]);
-				assert.equal(listed.status, 0, listed.stderr);
+				assert.equal(listed.status, 2, listed.stderr);
 				assert.doesNotMatch(listed.stderr, /exceeds this machine's ceiling/);
+				assert.match(listed.stderr, /--jobs applies to formatting/);
 			} finally {
 				rmSync(empty, { recursive: true, force: true });
 			}
