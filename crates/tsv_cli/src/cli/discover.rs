@@ -869,8 +869,11 @@ fn collect_recursive(
     // stays on for the subtree and the warning it raised is what makes that visible
     let child_heuristic = heuristic_active && !pushed.gitignore;
 
-    for (name, file_type) in &entries {
-        let name = name.to_string_lossy();
+    for (name_os, file_type) in &entries {
+        // the matcher and the extension test read the name as text, lossily for the
+        // rare non-UTF-8 one — the paths the walk emits and descends into are joined
+        // from the raw `OsStr` below, since a U+FFFD spelling names nothing on disk
+        let name = name_os.to_string_lossy();
         // Only a directory (to classify) or a formattable file (to take a verdict)
         // needs the relative path — and on an app repo most entries are neither (the
         // lockfiles, the `.md`, the images, and any symlink, which the walk never
@@ -905,8 +908,8 @@ fn collect_recursive(
             // the child reads its own ignore files (and pushes/pops its own layers)
             // when we recurse into it. The paths are built only here, so a pruned dir
             // or a non-formatted file never pays for the allocations.
-            let listed = dir.listed.join(name.as_ref());
-            let abs = dir.abs.join(name.as_ref());
+            let listed = dir.listed.join(name_os);
+            let abs = dir.abs.join(name_os);
             collect_recursive(
                 WalkDir {
                     listed: &listed,
@@ -920,7 +923,7 @@ fn collect_recursive(
                 out,
             );
         } else if should_format_file(&name, &child_rel, stack) {
-            out.files.push(dir.listed.join(name.as_ref()));
+            out.files.push(dir.listed.join(name_os));
         }
     }
 
@@ -1058,6 +1061,14 @@ fn absolutize(path: &Path, cwd: Option<&Path>) -> Option<PathBuf> {
 /// `IgnoreStack` layers want). `format_root` is always an ancestor-or-equal of
 /// `path`, so the `strip_prefix` never fails; `""` means `path` *is* the root.
 fn rel_to(format_root: &Path, path: &Path) -> String {
+    // `""` on a failed strip would read as the root itself and walk the path with none
+    // of its ancestors' rules, so the invariant is asserted rather than absorbed
+    debug_assert!(
+        path.starts_with(format_root),
+        "{} is not under its format root {}",
+        path.display(),
+        format_root.display()
+    );
     path.strip_prefix(format_root)
         .map(path_to_rel)
         .unwrap_or_default()

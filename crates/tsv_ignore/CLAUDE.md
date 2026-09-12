@@ -192,8 +192,9 @@ the file only so a diagnostic can name it.
 
 - **POSIX bracket classes** (`[[:alpha:]]`) are not supported — prettier's
   matcher doesn't rely on them either. They are read as ordinary class members, so
-  `[[:alpha:]]` is the class `[:alph` followed by a literal `]` (git matches one ASCII
-  letter), and a malformed `[[:bogus:]]`, which git never matches, matches here.
+  `[[:alpha:]]` is the class `[[:alpha:]` — members `[`, `:`, `a`, `l`, `p`, `h` — followed
+  by a literal `]` (git matches one ASCII letter), and a malformed `[[:bogus:]]`, which
+  git never matches, matches here.
 
 - **A `/` inside a bracket class** (`a[/]b.ts`, `x[!/]y.ts`) — a pattern is split on
   `/` before its classes are read, so the class is cut open and the rule never
