@@ -217,6 +217,7 @@ more defensible:
 type-parameter default `=` / named-tuple `label:` / mapped-type `]:` value and `[K in ...]`
 key / conditional `?` · `:` branches and `extends` head / function- and constructor-type
 return `=>` / predicate `is` / `as` · `satisfies` / indexed-access `[` index /
+prefix type operator `keyof` · `readonly` · `unique` / `typeof` type query / `infer` /
 angle-assertion `<` / required-paren interior).** The same placement classification honors
 a directive before a head's single child:
 an own-line directive between the head token and the child freezes the child whole —
@@ -239,7 +240,8 @@ precede:
 - Own-line directive kept own-line at a single-child head — ◆comment_preservation
   ◆prettier_bug — at the annotation `:`, constraint `extends`, default `=`, named-tuple
   `label:`, mapped-type `]:`, conditional-branch `?` · `:`, conditional-`extends`,
-  function/constructor-return `)` · `=>`, predicate `is`, `as` · `satisfies`, and
+  function/constructor-return `)` · `=>`, predicate `is`, `as` · `satisfies`, prefix
+  type operator (`keyof` / `readonly` / `unique`), `typeof` type query, `infer`, and
   indexed-access `[` heads, prettier relocates an own-line directive before a
   non-composite child to trail the head (`let v: // prettier-ignore`) and dedents the
   frozen slice; tsv keeps the author's own-line placement and freezes the same span. A
@@ -264,7 +266,12 @@ precede:
   [fn/ctor return](../tests/fixtures/typescript/types/function_type_prettier_ignore_return_prettier_divergence/),
   [predicate](../tests/fixtures/typescript/types/type_predicate_prettier_ignore_type_prettier_divergence/),
   [as/satisfies](../tests/fixtures/typescript/expressions/as_satisfies_prettier_ignore_type_prettier_divergence/),
-  [indexed index](../tests/fixtures/typescript/types/indexed_access_prettier_ignore_index_prettier_divergence/)
+  [indexed index](../tests/fixtures/typescript/types/indexed_access_prettier_ignore_index_prettier_divergence/),
+  [prefix operator / type query / infer](../tests/fixtures/typescript/types/type_operator_prettier_ignore_operand_prettier_divergence/).
+  At the `typeof` query the child is the entity NAME, so type arguments — which sit past
+  it — stay parent-owned and normalize, the same scope split as `new`'s frozen callee;
+  at `infer` the child is the type PARAMETER, so its `extends` constraint rides inside
+  the freeze
 - Frozen item over a **leading-edge paren shell** — ◆comment_preservation — the gaps that
   hand a stripped shell's leading `//` to their own emitter
   ([§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)'s

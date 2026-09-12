@@ -29,7 +29,6 @@ use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
 };
 use crate::printer::{ParenContext, Printer};
-use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -68,9 +67,7 @@ impl<'a> Printer<'a> {
         if let Some(tail) = self.keyword_value_hang_doc(keyword_end, callee_start, || {
             self.build_new_doc_after_keyword(new_expr, d.empty(), frozen)
         }) {
-            let mut parts: DocBuf = smallvec![d.text("new")];
-            self.append_keyword_value_line_comments(&mut parts, keyword_end, callee_start, tail);
-            return d.concat(&parts);
+            return self.build_keyword_hang_doc("new", keyword_end, callee_start, tail);
         }
         let keyword = match self
             .build_inline_comments_between_doc_trailing_space_opt(keyword_end, callee_start)

@@ -1447,14 +1447,7 @@ impl<'a> Printer<'a> {
         if let Some(argument_doc) =
             self.keyword_value_hang_doc(keyword_end, argument_start, || argument_doc)
         {
-            let mut parts: DocBuf = smallvec![d.text("await")];
-            self.append_keyword_value_line_comments(
-                &mut parts,
-                keyword_end,
-                argument_start,
-                argument_doc,
-            );
-            return d.concat(&parts);
+            return self.build_keyword_hang_doc("await", keyword_end, argument_start, argument_doc);
         }
         debug_assert!(frozen.is_none(), "an await→operand freeze must hang");
         match self.build_inline_comments_between_doc_trailing_space_opt(keyword_end, argument_start)

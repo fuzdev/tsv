@@ -304,11 +304,8 @@ impl<'a> Printer<'a> {
         // hangs one level in below the run and each comment keeps the line the author gave it
         // — a same-line comment trails `=>`, an own-line one keeps its line, as at `keyof` /
         // `await` / `new` / `case` (§Uniform Forced-Continuation Indent).
-        let hang = |value_doc: DocId| {
-            let mut parts: DocBuf = smallvec![d.text(arrow)];
-            self.append_keyword_value_line_comments(&mut parts, arrow_end, type_start, value_doc);
-            d.concat(&parts)
-        };
+        let hang =
+            |value_doc: DocId| self.build_keyword_hang_doc(arrow, arrow_end, type_start, value_doc);
         // An alone-on-line format-ignore directive in the `=>`→return gap hangs the same way
         // and freezes a non-composite return type verbatim (`single_child_frozen`; a
         // composite return declines and freezes via its own leading-run walk, which reaches
