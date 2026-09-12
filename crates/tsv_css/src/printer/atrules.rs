@@ -287,7 +287,13 @@ impl<'a> Printer<'a> {
             // nested context can't leak the flag.
             let was_in_keyframes = self.in_keyframes;
             self.in_keyframes = crate::parser::is_keyframes_atrule(atrule.name);
+            // The same save/restore for `@utility`, whose body's values glue a trailing
+            // `*` (see `Printer::in_utility_at_rule`).
+            let was_in_utility = self.value_scope.in_utility_at_rule;
+            self.value_scope.in_utility_at_rule =
+                was_in_utility || atrule.name.eq_ignore_ascii_case("utility");
             self.print_css_block_children(block.children, 0);
+            self.value_scope.in_utility_at_rule = was_in_utility;
             self.in_keyframes = was_in_keyframes;
             self.indent_level -= 1;
 

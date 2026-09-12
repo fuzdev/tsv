@@ -1,0 +1,127 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 515,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 506,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 150,
+							"end": 169,
+							"property": "margin",
+							"value": "(1.5) (2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 173,
+							"end": 193,
+							"property": "padding",
+							"value": "(1.5) (2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 252,
+							"end": 269,
+							"property": "height",
+							"value": "(1.5)/2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 333,
+							"end": 351,
+							"property": "width",
+							"value": "1.5 * (2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 487,
+							"end": 502,
+							"property": "font",
+							"value": "1.5/(2.5)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 506
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " two adjacent groups are two members of one value, so they take the\n\t\tordinary member gap whether or not the author wrote one ",
+				"start": 17,
+				"end": 147
+			},
+			{
+				"type": "CSSComment",
+				"value": " an operator glued AFTER a group keeps its glue ",
+				"start": 197,
+				"end": 249
+			},
+			{
+				"type": "CSSComment",
+				"value": " `*` is spaced beside a group as it is anywhere else ",
+				"start": 273,
+				"end": 330
+			},
+			{
+				"type": "CSSComment",
+				"value": " the `font` carve-out keeps a glued `/` before a group, so prettier's own\n\t\toutput holds the glue this shape otherwise loses ",
+				"start": 355,
+				"end": 484
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 507,
+			"styles": "\n\tdiv {\n\t\t/* two adjacent groups are two members of one value, so they take the\n\t\tordinary member gap whether or not the author wrote one */\n\t\tmargin: (1.5) (2.5);\n\t\tpadding: (1.5) (2.5);\n\t\t/* an operator glued AFTER a group keeps its glue */\n\t\theight: (1.5)/2.5;\n\t\t/* `*` is spaced beside a group as it is anywhere else */\n\t\twidth: 1.5 * (2.5);\n\t\t/* the `font` carve-out keeps a glued `/` before a group, so prettier's own\n\t\toutput holds the glue this shape otherwise loses */\n\t\tfont: 1.5/(2.5);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 516,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -39,7 +39,9 @@ pub fn parse_function_arguments<'arena>(
         end: parent_span.end - trim_end_offset as u32,
     };
 
-    let parser = ValueParser::new(trimmed, adjusted_span);
+    // A function's argument list IS a group, which is what lets a `:` inside it be an
+    // operator (`f(a: 1.5)`) where the same byte at a declaration's top level is not.
+    let parser = ValueParser::new_within(trimmed, adjusted_span, true);
     let value = parser.parse(arena);
 
     // Function arguments are comma-separated, so we expect CommaSeparated

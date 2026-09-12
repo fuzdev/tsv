@@ -65,6 +65,14 @@ pub(crate) struct Printer<'a> {
     /// keyframe-selector keywords can be lowercased (they're case-insensitive
     /// keywords there; outside keyframes a `from`/`to` type selector is preserved).
     pub(crate) in_keyframes: bool,
+    /// Where the value being printed sits, as its separator rule reads it: inside an
+    /// `@utility` block (Tailwind's directive, whose `--value(--name-*)` glues its
+    /// trailing `*`), and whether the declaration is a `font` shorthand or a custom
+    /// property. Both are fixed before the value is reached, so they are parked here for
+    /// the declaration's duration rather than threaded through every value doc builder;
+    /// the one genuinely value-scoped bit, an enclosing `calc()`, rides the recursion
+    /// instead (`values::ValueCtx`).
+    pub(crate) value_scope: values::ValueScope,
     /// Whether `source` holds a boundary-whitespace member ANYWHERE — the document-level
     /// precondition every claim in [`boundary_ws`] is gated on. See
     /// [`boundary_ws::source_holds_boundary_ws`] for why one scan can answer for all of them.
@@ -105,6 +113,7 @@ impl<'a> Printer<'a> {
             comments,
             line_table,
             in_keyframes: false,
+            value_scope: values::ValueScope::default(),
             holds_boundary_ws: boundary_ws::source_holds_boundary_ws(source),
             comment_free_gap: CommentFreeWindow::new(comments),
         }

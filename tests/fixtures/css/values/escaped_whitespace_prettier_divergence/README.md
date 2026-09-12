@@ -27,7 +27,7 @@ follows:
 | `inset: a\+b;` | `inset: a\+ b;` | the **escaped `+`** is read as an operator and gets operator spacing — one ident `a+b` becomes two values |
 | `left: (1px\ ) /* c */;` | `left: (1px\) /* c */;` | `\)` escapes the group's closer, as in the `calc` row |
 | `right: f(1px\ , 2px) /* c */;` | `right: f(1px\, 2px) /* c */;` | `\,` is no longer a separator — two arguments become one |
-| `bottom: (a b c\ )(d);` | `bottom: (a b c\) (d);` | same closer as the `left` row, in a shell the value parser leaves opaque |
+| `bottom: (a b c\ ) (d);` | `bottom: (a b c\) (d);` | same closer as the `left` row, in a shell the value parser leaves opaque. The gap between the two groups is the ordinary member gap and both formatters write it ([operators/paren_group_boundary](../operators/paren_group_boundary/)); only the escape's payload differs |
 
 The `gap` row is also the boundary of a separate tsv rule: a comma **closing** a
 value is authored content tsv keeps ([comma_closing](../lists/comma_closing_prettier_divergence/)),

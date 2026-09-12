@@ -511,7 +511,17 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// selector printer, the last standard-CSS at-rule missing from the prelude routing
 	// table. Reasoning and the bucket-list diff on `CORPUS_FORMAT_UNKNOWN_PIN`'s `18 → 14`
 	// step.
-	css: 141
+	//
+	// 141 → 143: the value reader gains OPERATOR tokens (`12px/1.5` is a dimension, a `/`
+	// and a dimension, not one opaque leaf), so each gap is decided by its two neighbours'
+	// kinds rather than joined with a fixed space. `css/color/color-adjuster.css` arrives
+	// from `unknown` (15 → 14, which names the change) and
+	// `css/tailwind/utility-directive.css` from `known`. Measured by set-diffing the
+	// `--all --json` bucket lists across a split-disabled and a tip `--profile corpus`
+	// build over the whole 9,305-file gates view: `partial` / `safety` / `errors` /
+	// `expected_errors` come back identical file-for-file and the svelte and typescript
+	// buckets are unmoved in every field. Reasoning on `CORPUS_FORMAT_UNKNOWN_PIN`.
+	css: 143
 };
 
 /**
@@ -961,7 +971,14 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// / `errors` / `expected_errors` identical file-for-file, `match` unmoved at 141
 	// (`colon/colon.css`, the other `progid:` file, carries nothing the pass would touch),
 	// and the full `--all` run has `typescript` and `svelte` unmoved in every bucket.
-	css: 15
+	//
+	// 15 → 14: `color/color-adjuster.css` LEAVES for `match` — the value reader gains
+	// OPERATOR tokens, so the colour-adjuster file's `l(+ 20%)` / `rgb(- #900)` /
+	// `rgb(* 1%)` arguments take prettier's own sign spacing instead of tsv's fixed
+	// member join, and the file has no hunk left. The same change carries
+	// `tailwind/utility-directive.css` from `known` to `match` (`match` 141 → 143 in the
+	// same step, which names the measurement and its A/B).
+	css: 14
 };
 
 /**

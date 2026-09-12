@@ -8,6 +8,7 @@ pub(crate) mod cursor;
 pub mod dimensions;
 pub mod functions;
 pub mod lists;
+pub(crate) mod operators;
 pub(crate) mod parser;
 pub(crate) mod scan;
 pub mod strings;
@@ -21,6 +22,7 @@ use tsv_lang::Span;
 // The per-kind parsers the dispatch below calls. Internal to the value parser — like
 // `classify_separators`, none of them is part of the crate's surface.
 use colors::{parse_color, parse_color_function};
+
 use dimensions::parse_dimension;
 use functions::parse_function_arguments;
 use strings::parse_string_literal;
@@ -141,10 +143,42 @@ fn locate_value(value_str: &str) -> Option<(&str, usize)> {
 pub(crate) fn parse_single_value<'arena>(
     s: &str,
     span: Span,
+    in_group: bool,
     arena: &'arena Bump,
 ) -> Option<CssValue<'arena>> {
     if s.is_empty() {
         return None;
+    }
+
+    // An operator run is several members, not a leaf — `12px/1.5` is a dimension, a `/`
+    // and a dimension, and every classification below then runs on each of them. Asked
+    // first because the run's own shape is what the rest of this function would otherwise
+    // misread: `(1.5)(2.5)` ends in a `)` without being one function, and `1.5/2.5` starts
+    // with a number without being one dimension. It answers `None` for a single-token run,
+    // which is nearly every value, so the leaf path below is untouched.
+    if let Some(tokens) = operators::split_value_run(s, in_group) {
+        let mut values = bumpalo::collections::Vec::with_capacity_in(tokens.len(), arena);
+        for token in tokens {
+            let member = &s[token.start..token.end];
+            let member_span = Span {
+                start: span.start + token.start as u32,
+                end: span.start + token.end as u32,
+            };
+            values.push(if token.is_operator {
+                CssValue::Operator { span: member_span }
+            } else {
+                // Every operand is re-classified from scratch, which is what gets the
+                // number after the operator to its normalizer. The recursion terminates:
+                // a member is strictly shorter than the run unless the run was one token,
+                // and that case returned `None` above.
+                parse_single_value(member, member_span, in_group, arena)
+                    .unwrap_or(CssValue::Identifier { span: member_span })
+            });
+        }
+        return Some(CssValue::List {
+            values: values.into_bump_slice(),
+            span,
+        });
     }
 
     // String literal

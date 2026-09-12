@@ -12,6 +12,6 @@
 		the comment path re-emits from source, and a paren shell the value parser left opaque */
 		left: (1px\ ) /* c */;
 		right: f(1px\ , 2px) /* c */;
-		bottom: (a b c\ )(d);
+		bottom: (a b c\ ) (d);
 	}
 </style>
