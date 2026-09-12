@@ -300,14 +300,19 @@ pub(crate) fn parse_single_value<'arena>(
 /// or an escape (`a\(b(c)`) — and the search stops on it either way. The name validation
 /// refuses both, for two different reasons, and neither is a special case:
 ///
-/// - a `'` is not an ident code point, so `'x'fn` is not an ident sequence;
+/// - a quote is not word content — the oracle tokenizes a string on its own and prints it as
+///   a separate member (`'x' fn(1.5)`), so `'x'fn` is no one word;
 /// - the byte before an escaped `(` is the escape's own `\`, so `name_part` ends in a
 ///   **dangling** `\` — not a valid escape (§4.3.7 needs a code point after it), and so not
-///   an ident sequence either.
+///   word content either.
 ///
 /// So a mis-located `(` always yields a name the validation rejects, and the value falls back
 /// to an opaque identifier printed verbatim. That is lossless, and on both shapes it is what
 /// prettier emits too (it unbalances on the escaped paren and splits the glued string).
+/// ⚠️ The dangling-`\` half is **wider than the agreement**: where that escaped `(` happens to
+/// *balance* at the value's end, prettier reads its own one-byte word `\` as the name and
+/// normalizes inside (`a\(2.50)` → `a\(2.5)`). Keeping the search blind is worth that cell;
+/// `css/values/functions/escaped_delimiter_name_prettier_divergence` records it.
 fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
     // CSS whitespace only (CSS Syntax 3 §4.2), like every other value-boundary trim: a
     // Unicode `str::trim` would cut a non-ASCII space (an NBSP) out of the name's span, and
@@ -375,46 +380,105 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
     Some((name_part, args))
 }
 
-/// Whether `name` is a CSS **ident sequence** — the production a `<function-token>`'s name is
-/// (CSS Syntax 3 §"Consume an ident-like token": an ident sequence immediately followed by a
-/// `(`).
+/// Whether `name` is a function NAME — the **word** postcss-values-parser reads ahead of a
+/// `(`, which is this layer's oracle rather than CSS Syntax 3's.
 ///
-/// Ident content is an ident code point *or an escape* (§"Consume an ident sequence"), so
-/// `\66 n`, `v\61 r` and `a\28 b` are the names `fn`, `var` and `a(b` and each is a real
-/// function — the printer then reads the name from its span, so the author's spelling
-/// survives. The ident code points are taken as the ASCII set plus `is_alphanumeric`'s
-/// non-ASCII letters and digits, which is what this position has always accepted (`fé(…)`).
+/// ⚠️ Deliberately **not** the spec's ident sequence. A `<function-token>`'s name is one
+/// (§"Consume an ident-like token") and an ident code point is only a letter, a digit, `-`,
+/// `_` or the non-ASCII set (§"ident code point"), so `aa/`, `50%` and `aa!` are no names to
+/// the spec at all — they are to postcss-values-parser, the parser behind prettier's CSS
+/// printer, whose `<function-token>` is a `word` token glued to a `(`. The value layer
+/// already reads that oracle rather than the spec's tokenizer: the operator run (`12px/1.5`)
+/// and the nameless `()`-block are the same transcription. Reading the spec's production here
+/// instead dropped every such value onto the verbatim [`CssValue::Identifier`] path, which
+/// switches **every** value normalization off for the whole declaration (`aa/(2.50)` kept its
+/// `2.50` where `aaf(2.50)` normalized). [`is_value_word_code_point`] holds the class.
 ///
-/// An escape is what makes this more than a character-class test, and it is also what keeps
-/// [`extract_function_parts`]'s escape-blind search for the opening `(` sound — see the ⚠️
-/// there. A `\` that starts no valid escape (a dangling one at the end of the name, or one
-/// before a newline) is not ident content and refuses.
+/// An escape is word content to both readings (§"Consume an ident sequence"), so `\66 n`,
+/// `v\61 r` and `a\28 b` are the names `fn`, `var` and `a(b` and each is a real function —
+/// the printer then reads the name from its span, so the author's spelling survives. A `\`
+/// that starts no valid escape (a dangling one at the name's end, or one before a newline) is
+/// not word content and refuses, which is what keeps [`extract_function_parts`]'s
+/// escape-blind search for the opening `(` sound — see the ⚠️ there.
+///
+/// ⚠️ A word whose text **is a number** is a name here and a `value-number` to the oracle,
+/// which prints it spaced from the group beside it — a cataloged divergence
+/// (`css/values/functions/number_shaped_name_prettier_divergence`), not a miss.
 fn is_function_name(name: &str) -> bool {
-    // The escape-free name, which is every name a stylesheet really holds: `\` is not an
-    // ident code point, so this pass already stops on the first one and the walk below is
-    // entered only for a name that has one (or is genuinely not a name at all).
-    if name.chars().all(is_ident_code_point) {
+    // The escape-free name, which is every name a stylesheet really holds: `\` is not word
+    // content, so this pass already stops on the first one and the walk below is entered
+    // only for a name that has one (or is genuinely not a name at all).
+    if name.chars().all(is_value_word_code_point) {
         return true;
     }
-    escaped_name_is_ident_sequence(name)
+    escaped_name_is_value_word(name)
 }
 
-/// An ident code point: the ASCII ident set plus the crate's non-ASCII threshold. Named
-/// once so the fast pass above and the escape walk below cannot drift — a name accepted by
-/// one and refused by the other would be a function whose recognition depended on whether
-/// it carried an escape.
+/// A code point that is **word content** to the value oracle. Named once so the fast pass
+/// above and the escape walk below cannot drift — a name accepted by one and refused by the
+/// other would be a function whose recognition depended on whether it carried an escape.
+///
+/// Stated as what it **excludes**, because that is the finite half and the only half the
+/// oracle fixes. Everything else is word content — whether it continues
+/// postcss-values-parser's own word (`wordEndRe`'s complement: `#`, `$`, `%`, `.`, `/`, `<`,
+/// `=`, `?`, `^`) or becomes a word token of its own that `splitWord` glues back on (`!`,
+/// `&`, `>`, `|`, `~`, `` ` ``). The two are indistinguishable here, because tsv takes the
+/// whole region as one name and emits it from its span, and prettier prints the glued run
+/// back the same way. `[` and `]` are word content for the same reason plus one more: a
+/// `[…]` block's interior is word TEXT to the oracle, not a descended-into group
+/// (`a[1.50]c(2.50)` → `a[1.50]c(2.5)` — the bracketed number is kept and only the argument
+/// normalizes), so the whole region really is the name. Three exclusions, each measured:
+///
+/// - **the oracle reads across it** — whitespace (`<whitespace-token>`), `,` (comma), `:`
+///   (colon), `@` (atword), `*` and `+` (operator), `'` and `"` (string), `{` and `}` (their
+///   own token kinds). The first eight put a space or a separate member in prettier's output
+///   (`aa @(1.5)`, `aa * (1.5)`, `'x' fn(1.5)`), so a name holding one would print glued
+///   against it. The braces are the subtler pair: prettier glues them, but it tokenizes the
+///   word *between* them on its own and canonicalizes it, so taking the region whole would
+///   freeze content the oracle rewrites (`a{1.50}c(2.50)` → `a{1.5}c(2.5)`, reachable on a
+///   custom property). That is a run-split question, not a name-grammar one.
+/// - **it cannot occur in the region** — `;`, which terminates the declaration on both sides
+///   before any value is read, and `(`, which *is* `paren_pos` by construction.
+/// - **soundness** — `\` and `)`. A dangling `\` is what makes
+///   [`extract_function_parts`]'s escape-blind search for the opening `(` sound (see the ⚠️
+///   there), and prettier unbalances on a stray `)` and emits the declaration verbatim
+///   (`a)(2.50)`), so tsv refuses it too. ⚠️ The bracket pair opens no third hazard:
+///   `matching_close_paren` is quote- and escape-aware but not bracket-aware, yet a `)`
+///   inside a `[…]` keeps the refusal above and an *unbalanced* `(` inside one is rejected by
+///   both parsers at the declaration level (`a[(]c(2.50)`), so the reachable names are
+///   bracket-closed and paren-free.
 ///
 /// ⚠️ The non-ASCII half is the **lexer's** (`is_non_ascii_identifier_codepoint`, every code
-/// point at or above U+00A0), not `char::is_alphanumeric`. This position re-reads a token
-/// the lexer already read, so a narrower class here refuses a name the lexer accepted: `a°`
-/// is one identifier to the lexer, and reading it as a non-name dropped the whole value
-/// onto the verbatim `Identifier` path, silently switching off every value normalization
-/// for that declaration (`a°(1.50)` kept its `1.50` where `aé(1.50)` normalized).
-fn is_ident_code_point(c: char) -> bool {
-    c.is_ascii_alphanumeric()
-        || c == '-'
-        || c == '_'
-        || crate::lexer::is_non_ascii_identifier_codepoint(c)
+/// point at or above U+00A0) rather than the exclusion above, which is wider than anything
+/// measured up there. This position re-reads a token the lexer already read, so a narrower
+/// class refuses a name the lexer accepted: `a°` is one identifier to the lexer, and reading
+/// it as a non-name dropped the whole value onto the verbatim `Identifier` path, silently
+/// switching off every value normalization for that declaration (`a°(1.50)` kept its `1.50`
+/// where `aé(1.50)` normalized).
+fn is_value_word_code_point(c: char) -> bool {
+    if c.is_ascii() {
+        return !matches!(
+            c,
+            // the oracle reads across it
+            ' ' | '\t' | '\n' | '\r' | '\u{b}' | '\u{c}'
+                | ','
+                | ':'
+                | '@'
+                | '*'
+                | '+'
+                | '\''
+                | '"'
+                | '{'
+                | '}'
+                // cannot occur in the region
+                | ';'
+                | '('
+                // soundness
+                | '\\'
+                | ')'
+        );
+    }
+    crate::lexer::is_non_ascii_identifier_codepoint(c)
 }
 
 /// The escaped tail of [`is_function_name`] — outlined and cold, so the escape walk stays off
@@ -422,13 +486,13 @@ fn is_ident_code_point(c: char) -> bool {
 /// takes (`printer::values::function_name_is`).
 #[cold]
 #[inline(never)]
-fn escaped_name_is_ident_sequence(name: &str) -> bool {
+fn escaped_name_is_value_word(name: &str) -> bool {
     let bytes = name.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'\\' {
-            // Steps the escape whole, terminator included, so `a\29 b` is one ident and not
-            // an ident, a space and another ident. The single definition every value scanner
+            // Steps the escape whole, terminator included, so `a\29 b` is one word and not
+            // a word, a space and another word. The single definition every value scanner
             // shares (`crate::escapes::escape_len`).
             let Some(len) = crate::escapes::escape_len(name, i) else {
                 return false;
@@ -441,7 +505,7 @@ fn escaped_name_is_ident_sequence(name: &str) -> bool {
         let Some(ch) = name[i..].chars().next() else {
             return false;
         };
-        if !is_ident_code_point(ch) {
+        if !is_value_word_code_point(ch) {
             return false;
         }
         i += ch.len_utf8();
@@ -453,32 +517,95 @@ fn escaped_name_is_ident_sequence(name: &str) -> bool {
 mod function_name_tests {
     use super::{extract_function_parts, is_function_name};
 
-    /// A `<function-token>`'s name is an ident sequence, and an escape is ident content
-    /// (CSS Syntax 3 §"Consume an ident sequence"), whatever it spells.
+    /// An escape is word content (CSS Syntax 3 §"Consume an ident sequence" — the one half
+    /// the oracle and the spec agree on), whatever it spells.
     #[test]
-    fn an_escape_is_ident_content() {
+    fn an_escape_is_word_content() {
         // Escape-free, then the hex spellings, then the literal ones — including the four
         // whose payload byte is what prettier's own tokenizer reads as structure.
         for name in [
             "fn", "a-b_1", "fé", r"\66 n", r"v\61 r", r"a\28 b", r"a\29 b", r"\31 fn", r"a\)b",
             r#"a\"b"#, r"a\'b", r"a\\b", r"a\ b", r"\-fn",
         ] {
-            assert!(is_function_name(name), "{name:?} is an ident sequence");
+            assert!(is_function_name(name), "{name:?} is a word");
         }
     }
 
-    /// A `\` that starts no valid escape is not ident content — and that is what keeps
-    /// [`extract_function_parts`]'s escape-blind search for the opening `(` sound, since a
-    /// `(` found *inside* an escape always leaves the name ending in one.
+    /// The name is postcss-values-parser's **word**, not the spec's ident sequence, and this
+    /// is the whole character class in one table: every printable ASCII code point, graded
+    /// against the exclusion set `is_value_word_code_point` declares. Exhaustive on purpose —
+    /// a hand-written pair of "these are in, these are out" lists leaves whatever neither
+    /// mentions ungraded, which is how the first cut of this rule shipped with `[` refused for
+    /// a reason that turned out to be false.
+    ///
+    /// `\` is the one code point this sweep cannot grade, because mid-name it is not a bare
+    /// character at all: `aa\bb` holds the valid escape `\b`, which IS word content. Its
+    /// exclusion is about the **dangling** spelling and
+    /// [`a_dangling_backslash_is_not_word_content`] owns it.
     #[test]
-    fn a_dangling_backslash_is_not_ident_content() {
-        assert!(!is_function_name("a\\"), "a trailing backslash");
-        assert!(!is_function_name("\\"), "a lone backslash");
-        assert!(!is_function_name("a\\\nb"), "a backslash before a newline");
-        // Not ident code points at all.
-        assert!(!is_function_name("'x'fn"), "a glued string");
-        assert!(!is_function_name("a b"), "a space");
-        assert!(!is_function_name("a.b"), "a dot");
+    fn the_word_class_is_exactly_this_exclusion_set() {
+        /// Every printable-ASCII code point `is_value_word_code_point` refuses, with the
+        /// group it belongs to. Grouped exactly as the predicate's doc groups them, so a
+        /// change to one has to move the other.
+        const EXCLUDED: &[char] = &[
+            // the oracle reads across it
+            ' ', ',', ':', '@', '*', '+', '\'', '"', '{', '}',
+            // cannot occur in the region
+            ';', '(',
+            // soundness (`\` is graded by the dangling-backslash test, not here)
+            ')',
+        ];
+        for c in (0x20u8..=0x7e).map(char::from) {
+            if c == '\\' {
+                continue;
+            }
+            let want = !EXCLUDED.contains(&c);
+            // Three positions, so a positional rule cannot creep into what is a pure
+            // character class.
+            for name in [format!("aa{c}bb"), format!("{c}aa"), format!("aa{c}")] {
+                assert_eq!(
+                    is_function_name(&name),
+                    want,
+                    "{name:?}: expected word content = {want}"
+                );
+            }
+        }
+        // The ASCII whitespace the sweep's printable range does not reach.
+        for c in ['\t', '\n', '\r', '\u{b}', '\u{c}'] {
+            assert!(
+                !is_function_name(&format!("aa{c}bb")),
+                "{c:?} is whitespace"
+            );
+        }
+        // Non-ASCII keeps the lexer's threshold rather than the exclusion set, so that a name
+        // the lexer read as one identifier is not refused here (`a°(1.50)`).
+        assert!(is_function_name("a\u{b0}"), "U+00B0 is at or above U+00A0");
+        assert!(!is_function_name("a\u{85}"), "U+0085 is below it");
+    }
+
+    /// The *reasons* behind the exclusion set above, one cell each — the table says which
+    /// code points, these say why, on the whole-name shapes the oracle was measured at.
+    #[test]
+    fn the_exclusion_set_reasons() {
+        // Read across: the oracle tokenizes a string, a comma, a colon, an atword or an
+        // operator on its own and prints it as a separate member (`'x' fn(1.5)`, `aa @(1.5)`).
+        for name in ["'x'fn", "\"x\"fn", "a b", "a,b", "a:b", "a@b", "a*b", "a+b"] {
+            assert!(!is_function_name(name), "{name:?} is printed separately");
+        }
+        // The braces are glued but tokenized apart, and the oracle canonicalizes the word
+        // between them (`a{1.50}c(2.50)` → `a{1.5}c(2.5)`), so a region holding one would
+        // freeze content prettier rewrites. A `;` cannot reach here at all.
+        for name in ["a;b", "a{b", "a}b", "a{1.50}c"] {
+            assert!(!is_function_name(name), "{name:?} is read across");
+        }
+        // Soundness: prettier unbalances on a stray `)` and emits the value verbatim.
+        assert!(!is_function_name("a)b"), "a stray close paren");
+        // A `[…]` block's interior IS word text to the oracle, kept verbatim while only the
+        // argument normalizes (`a[1.50]c(2.50)` → `a[1.50]c(2.5)`), so the whole region is
+        // the name — the pair's asymmetry with the braces above is the oracle's.
+        for name in ["a[b]c", "a[1.50]c", "a[b]"] {
+            assert!(is_function_name(name), "{name:?} is a word");
+        }
     }
 
     /// The whole seam: which values read as a function, and where the name and arguments

@@ -1,0 +1,149 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 609,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 600,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 262,
+							"end": 273,
+							"property": "b",
+							"value": "50%(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 277,
+							"end": 289,
+							"property": "c",
+							"value": "1e5%(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 293,
+							"end": 303,
+							"property": "d",
+							"value": "1#(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 307,
+							"end": 318,
+							"property": "e",
+							"value": "1.5(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 395,
+							"end": 405,
+							"property": "f",
+							"value": ".5(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 409,
+							"end": 419,
+							"property": "g",
+							"value": "0a(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 555,
+							"end": 565,
+							"property": "h",
+							"value": "a0(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 569,
+							"end": 580,
+							"property": "i",
+							"value": "a.5(1.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 584,
+							"end": 596,
+							"property": "j",
+							"value": "1.5 (1.5)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 600
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " postcss's `splitWord` reads a word matching its own NUMBER production as a\n\t\tnumeric node, never a function name, and then fabricates a gap ahead of the group\n\t\tit synthesizes — tsv reads the whole word as the name and keeps the authoring ",
+				"start": 15,
+				"end": 259
+			},
+			{
+				"type": "CSSComment",
+				"value": " the number is the name, so tsv emits the author's spelling of it ",
+				"start": 322,
+				"end": 392
+			},
+			{
+				"type": "CSSComment",
+				"value": " controls: a word the number production does not match is a name on both sides,\n\t\tand an authored gap is a gap on both sides ",
+				"start": 423,
+				"end": 552
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 601,
+			"styles": "\n\ta {\n\t\t/* postcss's `splitWord` reads a word matching its own NUMBER production as a\n\t\tnumeric node, never a function name, and then fabricates a gap ahead of the group\n\t\tit synthesizes — tsv reads the whole word as the name and keeps the authoring */\n\t\tb: 50%(1.5);\n\t\tc: 1e5%(1.5);\n\t\td: 1#(1.5);\n\t\te: 1.5(1.5);\n\t\t/* the number is the name, so tsv emits the author's spelling of it */\n\t\tf: .5(1.5);\n\t\tg: 0a(1.5);\n\t\t/* controls: a word the number production does not match is a name on both sides,\n\t\tand an authored gap is a gap on both sides */\n\t\th: a0(1.5);\n\t\ti: a.5(1.5);\n\t\tj: 1.5 (1.5);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 610,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

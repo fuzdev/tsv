@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 614,
+		"end": 609,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 11,
-					"end": 605,
+					"end": 600,
 					"children": [
 						{
 							"type": "Declaration",
@@ -77,15 +77,15 @@
 						},
 						{
 							"type": "Declaration",
-							"start": 574,
-							"end": 601,
+							"start": 569,
+							"end": 596,
 							"property": "background-color",
 							"value": "a\\(b(.10)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 605
+				"end": 600
 			}
 		],
 		"comments": [
@@ -115,21 +115,21 @@
 			},
 			{
 				"type": "CSSComment",
-				"value": " a raw escaped `(` leaves a dangling `\\` at the name's end — not an ident\n\t\tsequence, so this is no function at all and stays verbatim ",
+				"value": " a raw escaped `(` leaves a dangling `\\` at the name's end — not word\n\t\tcontent, so this is no function at all and stays verbatim ",
 				"start": 432,
-				"end": 571
+				"end": 566
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 606,
-			"styles": "\n\ta {\n\t\t/* an escape is ident content, so an escape-spelled name is still a function */\n\t\tcolor: \\66 n(0.1);\n\t\tborder-color: v\\61 r(--a, 0.1);\n\t\t/* the url recognizer decodes the name: quoted content takes the string path */\n\t\tbackground: u\\72 l('a.png');\n\t\t/* unquoted url content stays opaque */\n\t\tmask-image: u\\72 l(a.png);\n\t\t/* a hex escape spelling `(` is ident content like any other */\n\t\toutline-color: a\\28 b(0.1);\n\t\t/* a raw escaped `(` leaves a dangling `\\` at the name's end — not an ident\n\t\tsequence, so this is no function at all and stays verbatim */\n\t\tbackground-color: a\\(b(.10);\n\t}\n",
+			"end": 601,
+			"styles": "\n\ta {\n\t\t/* an escape is ident content, so an escape-spelled name is still a function */\n\t\tcolor: \\66 n(0.1);\n\t\tborder-color: v\\61 r(--a, 0.1);\n\t\t/* the url recognizer decodes the name: quoted content takes the string path */\n\t\tbackground: u\\72 l('a.png');\n\t\t/* unquoted url content stays opaque */\n\t\tmask-image: u\\72 l(a.png);\n\t\t/* a hex escape spelling `(` is ident content like any other */\n\t\toutline-color: a\\28 b(0.1);\n\t\t/* a raw escaped `(` leaves a dangling `\\` at the name's end — not word\n\t\tcontent, so this is no function at all and stays verbatim */\n\t\tbackground-color: a\\(b(.10);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 615,
+	"end": 610,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
