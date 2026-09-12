@@ -685,8 +685,12 @@ fn absolute_named_path(path: &Path, cwd: Option<&Path>) -> Option<PathBuf> {
 /// the last one's — an argument [`absolutize`] had to spell (its parent would not
 /// canonicalize) sits beside one that did, and the two spellings of one directory read
 /// as a move to another format root, rebuilding a scope that need not move. Stripping
-/// changes no file access: std re-adds the prefix itself wherever a path needs it. A
-/// no-op wherever a canonical path begins with `/`.
+/// changes no file access: std re-adds the prefix itself wherever a path needs it
+/// (`maybe_verbatim`, behind every fs entry point — a path past the legacy limit is
+/// re-prefixed, a shorter absolute one passes to Win32 as spelled, which is the spelling
+/// every walked path, joined from the argument, takes anyway; a name only a verbatim path
+/// reaches, a trailing dot or space Win32 normalizes away, was never reached through the
+/// walk either). A no-op wherever a canonical path begins with `/`.
 fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
     fs::canonicalize(path).map(strip_verbatim_prefix)
 }

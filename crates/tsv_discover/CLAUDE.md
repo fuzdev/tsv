@@ -78,12 +78,13 @@ crates (the open-convention stance):
   path but never triggers the quoting, since every Windows path holds one. Every
   warning and error this crate builds spells its paths through it (the re-include
   *patterns* a warning offers stay literal — they are pasted into an ignore file, which
-  reads no escapes), and the CLIs route the paths they name themselves through the same
-  rule (`tsv_cli::cli::out::path_bytes` / `path_text`; `cli.js` restates it by hand). The
-  byte form is what a unix listing names a non-UTF-8 file by; only ASCII is ever
-  rewritten, so the `str` form is the byte form on UTF-8. Spellings pinned against git
-  2.47's own output. Rationale: [`docs/cli.md`](../../docs/cli.md) §Multi-File
-  Formatting, "A path holding a control character or a double quote".
+  reads no escapes — so one that would hold a control character other than a tab is not
+  offered at all, `line_can_spell`), and the CLIs route the paths they name themselves
+  through the same rule (`tsv_cli::cli::out::path_bytes` / `path_text`; `cli.js` restates
+  it by hand). The byte form is what a unix listing names a non-UTF-8 file by; only ASCII
+  is ever rewritten, so the `str` form is the byte form on UTF-8. Spellings pinned
+  against git 2.47's own output. Rationale: [`docs/cli.md`](../../docs/cli.md)
+  §Multi-File Formatting, "A path holding a control character or a double quote".
 - `is_safety_net(name)` — whether a directory name is an always-pruned safety net.
   A **complete, context-free** decision (safety nets prune in every mode, no
   override), so a caller walking its own tree can short-circuit before building an
@@ -160,10 +161,12 @@ crates (the open-convention stance):
   path spelled literally (`pattern_path` escapes `*`, `?`, `[`, `]`, `\` and trailing
   spaces, so a `[slug]` directory is no character class), for the file the repo root
   reads (`IgnoreStack::tsv_layer_source` — its `.prettierignore` where it has no
-  `.formatignore`, since creating one would shadow it). A path no line can hold — a
-  line feed in any segment, or a file name ending in `\r`, which a line's end strips —
-  gets no lines (`reinclude_lines` declines it) and is told to narrow the rule instead;
-  a `\r` anywhere else is an ordinary character. The callers' stack stops at a
+  `.formatignore`, since creating one would shadow it). A path holding a control
+  character other than a tab — a line feed, which splits any line; a file name ending in
+  `\r`, which a line's end strips; any other, which an ignore file could hold only raw and
+  a warning will not print — gets no lines (`reinclude_lines` declines it, by
+  `line_can_spell`) and is told to narrow the rule instead; a tab is spelled raw, as both
+  CLIs pin. The callers' stack stops at a
   directory a rule excludes, as the walk reads no ignore file inside one, so a rule in
   such a file can still exclude the path once the directory is re-included.
   `loose_root` is the format root's display path outside a repo, where paths are named
@@ -199,8 +202,10 @@ crates (the open-convention stance):
   re-include's, which is read after it: then the text says to narrow or negate that
   rule instead, adding the lines beside it where a `.gitignore` rule stands behind it
   (`IgnoreStack::gitignore_exclusion`), which narrowing alone would leave in force. A
-  re-include whose pattern ends in a carriage return gets the directory escape alone,
-  since no line can hold it. `loose_root` is `excluded_argument_warning`'s. Produced
+  re-include no line can spell — its pattern ends in a carriage return, or its pattern or
+  literal path holds any other control character but a tab (`line_can_spell`) — gets the
+  directory escape alone, and a pruned directory whose own name holds one gets no line at
+  all. `loose_root` is `excluded_argument_warning`'s. Produced
   once here; both bindings fetch it directly.
 - `gitignore_symlink_warning(path) -> String` — the warning for an in-tree `.gitignore`
   that is a symbolic link: git never reads one in a working tree (gitignore(5)), so its
