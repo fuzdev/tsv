@@ -418,11 +418,26 @@ impl<'a> Printer<'a> {
     /// question the `line` implies, since only an enclosing group can decide one. Both
     /// come from the same walk on purpose: a caller that re-derived the flag from the
     /// source would be a second reading of one fact, free to drift from the emission.
-    fn build_member_leading_block_comments(&self, start: u32, end: u32) -> (DocId, bool) {
+    ///
+    /// An author **blank** after a comment survives every non-glue arm, as prettier's
+    /// `printLeadingComment` appends its extra `hardline` after both of its break
+    /// separators. `run_end` is where the RUN ends, which is what the LAST comment's blank
+    /// question measures to — equal to `emit_end` at every site but the union-bound half of a
+    /// split handed run ([`Self::union_bound_handed_run_end`]), whose emission stops
+    /// mid-run and whose last blank is the one before the pipe. The scan itself stops at
+    /// the next comment in SOURCE (`blank_scan_end_after`), owned comments included, so a
+    /// comment's own newlines are never read as an author's blank (docs/comments.md
+    /// hazard 5).
+    fn build_member_leading_block_comments(
+        &self,
+        start: u32,
+        emit_end: u32,
+        run_end: u32,
+    ) -> (DocId, bool) {
         let d = self.d();
         let mut parts = DocBuf::new();
         let mut breaks = false;
-        for comment in self.comments_to_emit_between(start, end) {
+        for comment in self.comments_to_emit_between(start, emit_end) {
             if !comment.is_block {
                 continue;
             }
@@ -437,11 +452,17 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" "));
             } else {
                 breaks = true;
-                parts.push(if self.comment_isolated_on_its_line(comment) {
+                let sep = if self.comment_isolated_on_its_line(comment) {
                     d.hardline()
                 } else {
                     d.line()
-                });
+                };
+                self.push_blank_preserving_separator(
+                    &mut parts,
+                    comment.span.end,
+                    self.blank_scan_end_after(comment, run_end),
+                    sep,
+                );
             }
         }
         (d.concat(&parts), breaks)
@@ -858,22 +879,40 @@ impl<'a> Printer<'a> {
         (i == 0 && run_start < union.span.start) || self.union_member_has_leading_comments(union, i)
     }
 
-    /// Where the UNION-bound part of a handed run ends: `union.span.start` when the run
-    /// ahead of the union's head ends in a multi-line block — prettier binds that block to
-    /// the union, so the whole outside run prints ahead of the pipe — else `run_start`
-    /// (nothing is union-bound; the run leads the first member). See
-    /// [`Self::union_prints_hugged_with`] for the binding.
+    /// Where the UNION-bound part of a handed run ends — the SPLIT prettier makes in a
+    /// run the enclosing seam handed in, stated as a position both halves take.
+    ///
+    /// Prettier binds each comment from its own two sides (`printLeadingComment`), so a
+    /// run ahead of the union's head is not one claim: the comments that END THEIR LINE
+    /// are the union's and print ahead of the pipe its broken layout synthesizes, while
+    /// the tail the author GLUED to that head leads the first member and prints after it
+    /// (`= /* c1 */⏎/* c2 */ A | B | C` → `=⏎/* c1 */⏎| /* c2 */ A⏎| B`). Taking the whole
+    /// run into the member instead put the author's own break inside the member's align
+    /// (`| /* c1 */⏎  /* c2 */ A`), and leaving the whole run to the seam stranded the
+    /// glued tail ahead of the pipe (`/* c2 */ | A`) — a form prettier never emits.
+    ///
+    /// So the member-bound tail is the maximal suffix of SINGLE-LINE blocks each glued to
+    /// what follows it; everything before is union-bound. A MULTI-LINE block is the
+    /// union's even glued to the head (prettier's binding for a block outside the span —
+    /// see [`Self::union_prints_hugged_with`]), so it ends the tail rather than joining
+    /// it. With nothing glued the whole run is union-bound; with the whole run glued
+    /// nothing is, and the result is `run_start`.
+    ///
+    /// Only the OUT-OF-SPAN region splits: a run the author wrote after an authored `|`
+    /// is inside the union, where prettier keeps the member's whole run after the pipe
+    /// (`| /* c1 */⏎  /* c2 */ A`) — the shape this split exists to keep out of the
+    /// out-of-span case.
     fn union_bound_handed_run_end(&self, union: &TSUnionType<'_>, run_start: u32) -> u32 {
-        if run_start < union.span.start
-            && self
-                .comments_to_emit_between(run_start, union.span.start)
-                .last()
-                .is_some_and(|c| c.multiline)
-        {
-            union.span.start
-        } else {
-            run_start
+        if run_start >= union.span.start {
+            return run_start;
         }
+        // The LAST comment that ends the member-bound tail — the last one that is not a
+        // single-line block glued to what follows it. Its own end is the split; with none,
+        // every comment is glued and nothing is union-bound.
+        self.comments_to_emit_between(run_start, union.span.start)
+            .filter(|c| c.multiline || !self.comment_hugs_next(c))
+            .last()
+            .map_or(run_start, |c| c.span.end)
     }
 
     fn union_member_has_leading_comments(&self, union: &TSUnionType<'_>, i: usize) -> bool {
@@ -1265,15 +1304,19 @@ impl<'a> Printer<'a> {
     /// of the `|` the broken layout synthesizes (`/* c */ | A`), a position prettier never
     /// produces (it binds the comment to the first member: `| /* c */ A`), while the same
     /// program with the `|` authored already prints prettier's form — two fixed points
-    /// keyed on pure layout. Handed in, the first-member arm places the run after its
-    /// `if_break` pipe: the flat render keeps the caller's bytes (`/* c */ A | B`), the
-    /// broken one matches prettier. Every layout emits ONE first-member run from the handed
-    /// start (the collapse and the line-comment layout included), so a handed run and the
-    /// in-span gap's own never print separately. With a leading `|` authored, the caller's
-    /// gap ends at that pipe and the handed run joins the in-span run behind it.
+    /// keyed on pure layout. Handed in, the first-member arm places the run's GLUED TAIL
+    /// after its `if_break` pipe: the flat render keeps the caller's bytes
+    /// (`/* c */ A | B`), the broken one matches prettier. Every layout emits ONE
+    /// first-member run from the handed start (the collapse and the line-comment layout
+    /// included), so a handed run and the in-span gap's own never print separately. With a
+    /// leading `|` authored, the caller's gap ends at that pipe and the handed run joins
+    /// the in-span run behind it.
     ///
-    /// ⚠️ A handed run's MULTI-LINE part is emitted **outside** the members' group
-    /// ([`Self::build_union_type_doc_inner`]): inside it, its forced break fabricated the
+    /// ⚠️ A handed run is not one claim: its UNION-bound part — what the author broke
+    /// after, plus a multi-line block — is emitted **outside** the members' group
+    /// ([`Self::union_bound_handed_run_end`] draws the split,
+    /// [`Self::build_union_type_doc_inner`] emits it). That placement is the rule, not a
+    /// detail: inside the group, a multi-line block's forced break fabricated the
     /// leading-`|` layout for every union that would otherwise fit flat. Prettier prints a
     /// leading comment through `printComments`, outside the `group` `printUnionType`
     /// returns — the same shape, and the same reason, as the expression side's
@@ -1594,8 +1637,12 @@ impl<'a> Printer<'a> {
             let leading = if head_region_claimed {
                 d.empty()
             } else {
-                self.build_member_leading_block_comments(run_start, member.span().start)
-                    .0
+                self.build_member_leading_block_comments(
+                    run_start,
+                    first_member_start,
+                    first_member_start,
+                )
+                .0
             };
             let member_doc = self.build_type_doc_maybe_parens(member, member_parens);
             return d.concat(&[leading, member_doc]);
@@ -1608,9 +1655,10 @@ impl<'a> Printer<'a> {
         //        | T3
         let mut parts = d.pooled_docbuf();
 
-        // A handed run ending in a MULTI-LINE block is the UNION's, not the first member's
-        // (prettier's binding, [`Self::union_prints_hugged_with`]): it stays ahead of the
-        // pipe (`/* c⏎d */ | A`), the in-span part after.
+        // The UNION-bound part of a handed run — what the author broke after, and a
+        // multi-line block glued or not ([`Self::union_bound_handed_run_end`], prettier's
+        // per-comment binding): it stays ahead of the pipe (`/* c1 */⏎| /* c2 */ A`), the
+        // glued tail and the in-span part after.
         //
         // ⚠️ It is emitted OUTSIDE the members' group below, and that placement is the rule,
         // not a detail. A multi-line block reprints to a body the layout memo answers
@@ -1627,7 +1675,7 @@ impl<'a> Printer<'a> {
             self.union_bound_handed_run_end(union, run_start)
         };
         let union_bound_run = (union_bound_end > run_start).then(|| {
-            self.build_member_leading_block_comments(run_start, union_bound_end)
+            self.build_member_leading_block_comments(run_start, union_bound_end, first_member_start)
                 .0
         });
 
@@ -1678,8 +1726,11 @@ impl<'a> Printer<'a> {
                 // trailing and losing the freeze next pass. The own-line block's own
                 // hardline forces the group broken, so the `if_break` `| ` appears.
                 if has_comments && frozen {
-                    let (run, _) =
-                        self.build_member_leading_block_comments(union.span.start, type_start);
+                    let (run, _) = self.build_member_leading_block_comments(
+                        union.span.start,
+                        type_start,
+                        type_start,
+                    );
                     parts.push(run);
                 }
 
@@ -1702,8 +1753,11 @@ impl<'a> Printer<'a> {
                 // (`| /* c */ A` when broken, `/* c */ A | B` flat) — as the head of the
                 // one run from `run_start`, less its union-bound part emitted above.
                 if has_leading_run && !frozen {
-                    let (run, _) =
-                        self.build_member_leading_block_comments(union_bound_end, type_start);
+                    let (run, _) = self.build_member_leading_block_comments(
+                        union_bound_end,
+                        type_start,
+                        type_start,
+                    );
                     parts.push(self.union_member_leading_run_offset_doc(run));
                 }
             }
@@ -2624,7 +2678,11 @@ impl<'a> Printer<'a> {
             // its line is exactly what `intersection_needs_line_comment_layout` routes
             // away from this layout, so every comment reaching here is inline-able and
             // the flag is always false.
-            let (run, _) = self.build_member_leading_block_comments(sep_pos + 1, next_member_start);
+            let (run, _) = self.build_member_leading_block_comments(
+                sep_pos + 1,
+                next_member_start,
+                next_member_start,
+            );
             parts.push(run);
         }
     }
@@ -3992,7 +4050,7 @@ impl<'a> Printer<'a> {
                 find_separator_position(self.source, prev_type_end, type_start, b'&')
             {
                 let (run, breaks) =
-                    self.build_member_leading_block_comments(sep_pos + 1, type_start);
+                    self.build_member_leading_block_comments(sep_pos + 1, type_start, type_start);
                 parts.push(run);
                 run_breaks = breaks;
             }
