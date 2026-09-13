@@ -29,6 +29,15 @@ hidden-dir rule, the safety nets, the warning text all live **here**. The split:
 answers "should the *tsv walk* prune/descend/format this entry", which layers the
 heuristic and safety nets on top of the matcher.
 
+**Three modules, one crate root.** `lib.rs` re-exports the whole public surface from
+`policy.rs` (the safety nets, the heuristic, the extension set and the verdicts over them
+— `classify_dir`, `should_format_file`, `is_path_pruned`), `quote.rs` (how a printed path
+is spelled, and which characters an offered ignore-file line can spell at all) and
+`warnings.rs` (the diagnostics discovery raises, with the re-include ladders both
+warnings offer — all but `path_shadow_warning`, the per-file replay of the shadow
+warning, which sits beside `is_path_pruned` in `policy.rs`); each module carries its own
+tests, over the shared stacks in `test_support`.
+
 **Pure, not FS-bound.** Everything here is a decision over already-resolved
 inputs (the entry name, the format-root-relative path, whether the heuristic is
 active at this level, and a built `IgnoreStack`). It touches no filesystem.
@@ -53,7 +62,9 @@ crates (the open-convention stance):
 - `is_formattable(name)` — extension check over the JS/TS family
   (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript), `.svelte`,
   and `.css` (matches `Path::extension`; a bare `.ts` dotfile is a stem, not
-  formattable). `.jsx`/`.tsx` are absent — JSX is out of scope. Accepts a bare
+  formattable), read without regard to ASCII case (`A.TS`), as prettier infers a
+  parser from the lowercased name — every extension dispatch in both CLIs reads it the
+  same way. `.jsx`/`.tsx` are absent — JSX is out of scope. Accepts a bare
   name or a whole path.
 - `unsupported_extension_error(path) -> Option<String>` — the argument error for
   an explicitly named **file** whose extension tsv doesn't format, `None`
@@ -68,14 +79,17 @@ crates (the open-convention stance):
 - `formattable_extension_list(separator)` — the extension set rendered as prose
   (`".ts, .mts, …"`), the one spelling behind every message that lists it (the
   refusal above, the CLI's nothing-in-scope error).
-- `quote_path(path) -> Cow<str>` / `quote_path_bytes(bytes) -> Cow<[u8]>` — a path as
+- `quote_path(path) -> Cow<str>` / `quote_path_owned(path: String) -> String` /
+  `quote_path_bytes(bytes) -> Cow<[u8]>` — a path as
   a diagnostic or a listing spells it: verbatim, unless it holds a control character
   (U+0000–U+001F, U+007F) or a double quote, in which case the whole path is wrapped in
   double quotes and C-escaped the way `git ls-files` prints such a name under
   `core.quotePath=false` (`\a` `\b` `\t` `\n` `\v` `\f` `\r` `\"` `\\` by name, any
   other control character as three octal digits, every other byte as itself — a byte
   outside ASCII stays raw even inside the quotes). A backslash escapes inside a quoted
-  path but never triggers the quoting, since every Windows path holds one. Every
+  path but never triggers the quoting, since every Windows path holds one. The owned
+  form hands a `String` back untouched when nothing in it needs quoting, for a caller that
+  already built the text (the CLI's `error:` lines). Every
   warning and error this crate builds spells its paths through it (the re-include
   *patterns* a warning offers stay literal — they are pasted into an ignore file, which
   reads no escapes — so one that would hold a control character other than a tab is not
@@ -135,7 +149,10 @@ crates (the open-convention stance):
   (`first_pruned_ancestor`).
 - `excluded_argument_warning(display, rel, is_dir, loose_root, &IgnoreStack)
   -> Option<String>` — the warning for a path an argument **named** (a file, or a
-  directory root) that an ignore file puts out of scope. Whether it IS out of scope is
+  directory root) that an ignore file puts out of scope. `is_dir` is the kind as the
+  matcher reads it, so a symbolic link is never one whatever it points at: a
+  directory-only rule does not match a link for git, and the lines offered re-include
+  the link itself (`!/foo`, which a `!/foo/` would not). Whether it IS out of scope is
   the matcher's answer alone (`IgnoreStack::is_ignored`), which both CLIs gate every
   named path on (`collect_root`, `collect_file`) — also what keeps the walk's leaf-only
   matcher query sound for the root: the safety nets and the build-output heuristic
@@ -193,7 +210,13 @@ crates (the open-convention stance):
   line silences each one it does not re-spell after it. A rule reaching below its
   deepest literal directory (`!dist/**/keep.ts`, `!dist/*/keep.ts`) opens that subtree
   with git's every-directory-no-file idiom instead — `/dist/**` then `!/dist/**/` —
-  since a `/dist/*` would close the directories it reaches into. Anchored and relative
+  since a `/dist/*` would close the directories it reaches into. A directory a rule
+  re-includes **whole** (a directory-only `!dist/sub/`) takes no close at all — nothing
+  under it is excluded again, no pair is spelled below it, and under a `/dist/**` an
+  every-depth sibling put above it, its files come back with `!/dist/sub/**` — since a
+  second rule under the same pruned directory otherwise closed what the first had
+  re-included, silently, with the warning gone (pinned as a property over every
+  combination of up to three rule shapes, not as transcripts). Anchored and relative
   to the file's directory, because a root-relative line does nothing in a nested file,
   and outside a repo (format root = filesystem root) in any file, while an unanchored
   one-segment `!dist/` re-includes a `dist` at every depth. A tsv layer is read after

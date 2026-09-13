@@ -23,7 +23,13 @@ fn main() {
         .map(std::ffi::OsString::into_string)
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_else(|arg| {
-            err_line!("Invalid utf8: {}", arg.to_string_lossy());
+            // spelled lossily, and quoted as every printed path is: this is the one
+            // diagnostic whose name the caller could not have cleaned, so a control
+            // character in it must not split the line
+            err_line!(
+                "Invalid utf8: {}",
+                tsv_discover::quote_path_owned(arg.to_string_lossy().into_owned())
+            );
             std::process::exit(1)
         });
     let arg_strs: Vec<&str> = args.iter().map(String::as_str).collect();

@@ -146,7 +146,8 @@ impl IgnoreStack {
     }
 
     /// Whether `path` (relative to the format root, `/`-separated) is ignored;
-    /// `is_dir` marks directories so trailing-`/` patterns apply.
+    /// `is_dir` marks directories so trailing-`/` patterns apply — a symbolic link is
+    /// not one, whatever it points at, as git reads one.
     pub fn is_ignored(&self, path: &str, is_dir: bool) -> bool {
         self.inner.is_ignored(path, is_dir)
     }

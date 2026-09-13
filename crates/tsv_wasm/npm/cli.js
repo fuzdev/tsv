@@ -16,9 +16,13 @@
  * the same numbers), announced when it bites. Under it, the count is clamped
  * to the file count, and a worker the host refuses narrows the pool (see
  * `format_files_parallel`) rather than failing the run. `--content`/`--stdin` and
- * `--list` stay on one thread either way, and so does `--jobs 1` — except that a
- * file whose format ran out of V8's stack on this thread is retried in a
- * one-worker pool (`retry_overflowed_files`).
+ * `--list` stay on one thread either way. So does a `--jobs 1` run on the WASM
+ * engine — except that a file whose format ran out of V8's stack on this thread is
+ * retried in a one-worker pool (`retry_overflowed_files`) — while on the N-API
+ * engine path mode NEVER formats on the main thread: a one-file run takes a pool of
+ * one worker (`resolve_route`), since a native stack overflow is a SIGSEGV no catch
+ * survives and only a pool worker carries the reserved stack (see
+ * `WORKER_STACK_SIZE_MB`).
  * Which engine a worker binds is decided by whether the main thread's
  * `./index.js` exposes a `wasm_module`: the WASM package hands the compiled
  * module across and the worker initializes from it (compiled code is shared
@@ -48,7 +52,15 @@ import {
 	writeSync
 } from 'node:fs';
 import { availableParallelism } from 'node:os';
-import { dirname, isAbsolute, join, relative as path_relative, resolve, sep } from 'node:path';
+import {
+	basename,
+	dirname,
+	isAbsolute,
+	join,
+	relative as path_relative,
+	resolve as path_resolve,
+	sep
+} from 'node:path';
 import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads';
 
 /** The compiled module a worker inherited from the main thread, or `undefined`
@@ -569,10 +581,25 @@ function unresolvable_root_error(root) {
 	return with_arg_policy((policy) => policy.unresolvable_root_error(root));
 }
 
+/** Whether `path`'s extension is `ext`, ignoring ASCII case — read as Rust's
+ * `Path::extension` reads it, the one reading every dispatch here and in the native CLI
+ * takes (`tsv_discover::is_formattable`, `ParserType::from_extension`,
+ * `tsv_ts::Goal::from_extension`): off the final component, so a bare dotfile
+ * (`dir/.css`) is a stem with no extension; and lowercased, as prettier infers a parser
+ * from the lowercased name — `A.TS` is the same kind of file as `a.ts`. */
+function has_extension_ignoring_case(path, ext) {
+	const name = basename(path);
+	return (
+		name.length > ext.length + 1 &&
+		name[name.length - ext.length - 1] === '.' &&
+		name.slice(-ext.length).toLowerCase() === ext
+	);
+}
+
 /** Extension-based parser detection, mirroring the native `ParserType::from_extension`. */
 function parser_from_extension(path) {
-	if (path.endsWith('.svelte')) return 'svelte';
-	if (path.endsWith('.css')) return 'css';
+	if (has_extension_ignoring_case(path, 'svelte')) return 'svelte';
+	if (has_extension_ignoring_case(path, 'css')) return 'css';
 	return 'typescript';
 }
 
@@ -588,7 +615,9 @@ function parser_from_extension(path) {
  * — the retry fires only on a module parse failure.
  */
 function source_type_from_extension(path) {
-	return path.endsWith('.mjs') || path.endsWith('.mts') ? 'module' : undefined;
+	return has_extension_ignoring_case(path, 'mjs') || has_extension_ignoring_case(path, 'mts')
+		? 'module'
+		: undefined;
 }
 
 async function run_format({ values, positionals }) {
@@ -633,7 +662,7 @@ function format_single(values, positionals) {
 		// `source_type` undefined on the goalless languages, which reads as the default
 		formatted = FORMATTERS[values.parser](input, { sourceType: source_type });
 	} catch (error) {
-		exit_with_error(2, `Parse error: ${error.message}`);
+		exit_with_error(2, single_input_failure(error));
 	}
 	if (values.check) {
 		if (formatted !== input) {
@@ -729,10 +758,7 @@ async function format_paths(values, positionals) {
 	}
 
 	const jobs = resolve_jobs(explicit_jobs, files.length);
-	const run =
-		jobs > 1
-			? await format_files_parallel(files, values.check, jobs)
-			: { outcomes: format_files(files, values.check), on_main_thread: true };
+	const run = await resolve_route(files, values.check, jobs);
 	// a deep file's verdict must not turn on which route ran it: a file whose format ran
 	// out of V8's stack on THIS thread is retried in a one-worker pool, whose stack is
 	// the larger reservation — whichever route ran here, the pool's own single-thread
@@ -809,7 +835,7 @@ function format_one(path, check) {
 		// A `RangeError` takes the same recovery: V8's own stack overflow strands the
 		// instance too (see `recover_engine_suffix`), and any other one costs at most a
 		// reinstantiate it did not need.
-		if (error instanceof WebAssembly.RuntimeError || error instanceof RangeError) {
+		if (is_engine_failure(error)) {
 			return {
 				kind: 'error',
 				message: `${error_message(error)}${recover_engine_suffix(error)}`,
@@ -836,6 +862,38 @@ function format_one(path, check) {
  * holds a `String` here. */
 function error_message(error) {
 	return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Whether a throw out of the engine is the engine failing rather than the input being
+ * rejected: a WASM trap (`WebAssembly.RuntimeError` — a deep input overran the module's
+ * own stack) or V8's `RangeError` (its native stack ran out first). A parse error is a
+ * plain `Error`. `format_one` reads the same split to recover the engine between files.
+ */
+function is_engine_failure(error) {
+	return error instanceof WebAssembly.RuntimeError || error instanceof RangeError;
+}
+
+/**
+ * The line a single-input run — `--content`/`--stdin` (`format_single`), or `parse` on
+ * any of its three inputs, a file path included (`run_parse`) — dies with when the
+ * engine throws: `Parse error:` for a rejected input, as the native CLI prints one, and
+ * `Error:` naming the engine for a trap or a stack overflow — the one mode where the
+ * message is the whole output, so calling `memory access out of bounds` a parse error
+ * blamed the input for the engine's ceiling. No recovery is attempted: the process
+ * exits on this line. (On the N-API engine a native overflow is a SIGSEGV that reaches
+ * no catch — docs/cli.md §Recursion Depth.)
+ */
+function single_input_failure(error) {
+	if (!is_engine_failure(error)) return `Parse error: ${error_message(error)}`;
+	const message = error_message(error);
+	// a trap and V8's `Maximum call stack size exceeded` are the input's nesting; the one
+	// other `RangeError` the engine can throw — `Invalid string length`, an output past
+	// V8's string ceiling — is not, so the nesting clause is stated only for the first two
+	const nested = !(error instanceof RangeError) || /call stack/i.test(message);
+	return nested
+		? `Error: the engine failed on this input (${message}): it is nested past the engine's stack`
+		: `Error: the engine failed on this input (${message})`;
 }
 
 /** Format every file on this thread — the path below `WORKER_FILE_THRESHOLD`,
@@ -1073,7 +1131,10 @@ function cpu_index(field) {
 function cpu_list_len(list) {
 	let total = 0;
 	for (const part of list.trim().split(',')) {
-		const [lo, hi] = part.split('-');
+		// split at the FIRST `-` only, as the native `split_once` does: `0-3-5` is then a
+		// low end and a malformed high end, worth 0, where a full split read it as 0–3
+		const dash = part.indexOf('-');
+		const [lo, hi] = dash === -1 ? [part, undefined] : [part.slice(0, dash), part.slice(dash + 1)];
 		const low = cpu_index(lo);
 		if (low === undefined) continue;
 		if (hi === undefined) {
@@ -1084,6 +1145,27 @@ function cpu_list_len(list) {
 		if (high !== undefined && high >= low) total += high - low + 1;
 	}
 	return total;
+}
+
+/**
+ * Format `files` by the route `jobs` picks: a pool of `jobs` workers, or — for a width
+ * of 1 — this thread, on the WASM engine alone. On the N-API engine a width of 1 is
+ * still a pool, of one worker: the main thread runs on whatever stack Node inherited
+ * (~1 MiB of V8 stack over the process's own), a pool worker on the reserved
+ * `WORKER_STACK_SIZE_MB`, and a native overflow is a SIGSEGV that reaches no catch —
+ * so a deep file's verdict turned on how many OTHER files the tree held, and a run that
+ * died that way had already rewritten every file ahead of it, having printed none of
+ * them. The WASM engine has no such route dependence: its overflow is a trap the file's
+ * own catch contains (`format_one`), and V8's own overflow is retried in a worker
+ * (`retry_overflowed_files`). One worker's startup on a one-file run is what the
+ * native CLI pays too, which formats on a sized thread on every route.
+ */
+async function resolve_route(files, check, jobs) {
+	// nothing in scope (every argument excluded, or a walk that only errored): no worker
+	// is brought up to claim nothing, as the native collected route spawns none
+	if (files.length === 0) return { outcomes: [], on_main_thread: true };
+	if (jobs > 1 || !IS_WASM_ENGINE) return format_files_parallel(files, check, jobs);
+	return { outcomes: format_files(files, check), on_main_thread: true };
 }
 
 /**
@@ -1311,30 +1393,27 @@ function run_parse({ values, positionals }) {
 	// --source-type is validated upfront (exit 1) like the native CLI; it only
 	// affects the TypeScript parser (svelte is always a module, css has no goal).
 	const source_type = resolve_source_type(values.source_type, 1);
-	// refused before the input is read, so a `--stdin` this turns away never waits on its
-	// writer (the native `ParseCommand::run` order); the file arm, whose parser the
-	// extension picks, is checked after
-	if (flag_parser !== undefined) refuse_source_type_language(flag_parser, source_type, 1);
-
-	// Input precedence mirrors the native `InputArgs::resolve`: --content > --stdin > file.
-	let input;
+	// The parser is settled — and `--source-type` graded against it — before the input
+	// is read, whichever arm picks it, as the native `InputArgs::parser_type` orders it: a
+	// `--stdin` this turns away never waits on its writer, and a file arm's refusal does
+	// not turn on whether the file exists. Precedence mirrors it too: --content > --stdin
+	// > file.
 	let parser;
+	let path;
 	if (values.content !== undefined) {
 		if (flag_parser === undefined) {
 			exit_with_error(1, 'Error: --content requires --parser <svelte|typescript|css>');
 		}
 		parser = flag_parser;
-		input = values.content;
 	} else if (values.stdin) {
 		if (flag_parser === undefined) {
 			exit_with_error(1, 'Error: --stdin requires --parser <svelte|typescript|css>');
 		}
 		parser = flag_parser;
-		input = read_stdin(1);
 	} else if (positionals.length > 0) {
-		const path = positionals[0];
+		path = positionals[0];
 		// A directory is refused by name ahead of the parser choice, as the native
-		// `InputArgs::resolve` refuses it: this command reads one file, and the read
+		// `InputArgs::parser_type` refuses it: this command reads one file, and the read
 		// below would report `EISDIR` under a message that calls it one.
 		let is_dir = false;
 		try {
@@ -1349,7 +1428,7 @@ function run_parse({ values, positionals }) {
 			// The path's extension picks the parser, so it must be one tsv handles: the
 			// dispatch has no unknown arm, and a `.md` would otherwise parse as
 			// TypeScript and report a syntax error about prose. Same check, same message
-			// as `format <file>` and the native `InputArgs::resolve`; an explicit
+			// as `format <file>` and the native `InputArgs::parser_type`; an explicit
 			// `--parser` is the override.
 			const unsupported = unsupported_extension_error(path);
 			if (unsupported !== undefined) {
@@ -1359,16 +1438,25 @@ function run_parse({ values, positionals }) {
 		} else {
 			parser = flag_parser;
 		}
-		try {
-			input = decode_source(readFileSync(path));
-		} catch (error) {
-			exit_with_error(1, `Error: Error reading file ${quote_path(path)}: ${error.message}`);
-		}
 	} else {
 		exit_with_error(1, 'Error: No input provided. Use a file path, --content, or --stdin');
 	}
-
 	refuse_source_type_language(parser, source_type, 1);
+
+	// the read, by the precedence the arms above settled the parser under
+	// (`InputArgs::read`)
+	let input;
+	if (values.content !== undefined) {
+		input = values.content;
+	} else if (values.stdin) {
+		input = read_stdin(1);
+	} else {
+		try {
+			input = decode_source(readFileSync(path));
+		} catch (error) {
+			exit_with_error(1, `Error: Error reading file ${quote_path(path)}: ${error_message(error)}`);
+		}
+	}
 
 	// --no-locations drops per-node `loc` (span-only wire; svelte also `name_loc`,
 	// a no-op for css); orthogonal to --source-type (the source type drives the TS
@@ -1382,7 +1470,7 @@ function run_parse({ values, positionals }) {
 			sourceType: source_type
 		});
 	} catch (error) {
-		exit_with_error(1, `Parse error: ${error.message}`);
+		exit_with_error(1, single_input_failure(error));
 	}
 	if (values.pretty) {
 		// A re-serialization, where the native CLI re-indents the compact bytes
@@ -1569,10 +1657,22 @@ function read_ignore_file(path, warnings) {
 	} catch (error) {
 		if (error.code === 'ENOENT') return undefined;
 		warnings.push(
-			`could not read ${quote_path(path)} (${error_message(error)}); its ignore rules are not applied`
+			`could not read ${quote_path(path)} (${runtime_error_text(error)}); its ignore rules are not applied`
 		);
 		return undefined;
 	}
+}
+
+/**
+ * A filesystem error's text beside a path the diagnostic already names: Node's own
+ * message with the `, open '<path>'` / `, scandir '<path>'` tail it appends taken off,
+ * since that path is the one the line spells (quoted) already — the code and
+ * description stay (`EACCES: permission denied`), this runtime's wording as sanctioned
+ * (docs/cli.md §Multi-File Formatting). One strip for every such line, so the unreadable
+ * ignore file and the unreadable directory read alike.
+ */
+function runtime_error_text(error) {
+	return error_message(error).replace(/, \w+ '.*'$/s, '');
 }
 
 /** Whether `path` names an ignore file: a regular file, reached through a symlink
@@ -1727,7 +1827,19 @@ function discover_files(paths) {
 				excluded_files++;
 			}
 		} else {
-			collect_root(paths[i], cwd, files, errors, warnings);
+			// whether the directory argument is a symbolic link is what the matcher grades
+			// it by (`collect_root`); a symlinked directory a rule excludes counts as an
+			// excluded file argument, as the matcher graded it. Mirrors the native
+			// `classify_args`
+			let symlink = false;
+			try {
+				symlink = lstatSync(paths[i]).isSymbolicLink();
+			} catch {
+				// raced away after the stat above; the walk reports it
+			}
+			if (collect_root(paths[i], symlink, cwd, files, errors, warnings)) {
+				excluded_files++;
+			}
 		}
 	}
 	free_file_scope(file_scope);
@@ -1931,10 +2043,10 @@ function push_tsv_layer(stack, anchor, layer) {
  * build-output heuristic is still on below them (no `.gitignore` among them was read).
  * Mirrors the native `preload_ancestors`.
  */
-function preload_ancestors(stack, dirs, format_root, in_repo, warnings) {
+function preload_ancestors(stack, dirs, format_root, warnings) {
 	let heuristic_active = true;
 	for (const dir of dirs) {
-		if (push_dir_layers(stack, dir, format_root, in_repo, warnings)?.gitignore) {
+		if (push_dir_layers(stack, dir, format_root, warnings)?.gitignore) {
 			heuristic_active = false;
 		}
 	}
@@ -1957,9 +2069,10 @@ function preload_ancestors(stack, dirs, format_root, in_repo, warnings) {
  * named (`probe_ignore_presence`).
  * @returns {{tsv: boolean, gitignore: boolean} | null}
  */
-function push_dir_layers(stack, dir, format_root, in_repo, warnings) {
-	const anchor = rel_under(format_root, dir) ?? '';
+function push_dir_layers(stack, dir, format_root, warnings) {
+	const anchor = rel_under(format_root.path, dir) ?? '';
 	if (stack.is_ignored(anchor, true)) return null;
+	const { in_repo } = format_root;
 	return push_layers(stack, dir, anchor, in_repo, probe_ignore_presence(dir, in_repo), warnings);
 }
 
@@ -2063,8 +2176,8 @@ function absolute_named_path(path, cwd) {
 		}
 		return join(realpathSync(split.parent), split.name);
 	} catch {
-		if (isAbsolute(path)) return resolve(path);
-		return cwd === null ? null : resolve(cwd, path);
+		if (isAbsolute(path)) return path_resolve(path);
+		return cwd === null ? null : path_resolve(cwd, path);
 	}
 }
 
@@ -2099,15 +2212,30 @@ function lexical_split(path) {
 }
 
 /**
- * The format root above `dir` and whether it is a repo root: inside a git repo the repo
- * root (a hard stop — nothing above it is read), outside one the filesystem root (so an
- * ancestor `.formatignore` is honored). Mirrors the native `format_root_of`.
+ * The format root above `dir` — `{path, in_repo}`: inside a git repo the repo root (a
+ * hard stop — nothing above it is read), where `.gitignore` is consulted and a warning
+ * names a path relative to it; outside one the filesystem root (so an ancestor
+ * `.formatignore` is honored), where `.gitignore` is not consulted and a warning names a
+ * path absolutely. One value for the two facts, read off it (`in_repo`, `loose_root_of`)
+ * rather than carried beside each other. Mirrors the native `FormatRoot::of`.
  */
 function format_root_of(dir) {
 	const repo_root = find_repo_root(dir);
 	return repo_root === null
-		? { format_root: filesystem_root(dir), in_repo: false }
-		: { format_root: repo_root, in_repo: true };
+		? { path: filesystem_root(dir), in_repo: false }
+		: { path: repo_root, in_repo: true };
+}
+
+/** Whether two format roots are one root. */
+function same_format_root(a, b) {
+	return a !== null && b !== null && a.path === b.path && a.in_repo === b.in_repo;
+}
+
+/** The format root's display path where a warning names a path absolutely — outside a
+ * git repo, where the root is the filesystem root — and `undefined` inside one. Mirrors
+ * the native `FormatRoot::loose_root`. */
+function loose_root_of(format_root) {
+	return format_root.in_repo ? undefined : format_root.path;
 }
 
 /**
@@ -2120,22 +2248,21 @@ function format_root_of(dir) {
  * frees it (`free_file_scope`). Mirrors the native `FileScope`.
  */
 function new_file_scope() {
-	return { format_root: null, in_repo: false, stack: null, dirs: [] };
+	return { format_root: null, stack: null, dirs: [] };
 }
 
 /** Move `scope` to `dir`, a file argument's canonical directory. Mirrors the native
  * `FileScope::enter`. */
 function enter_file_scope(scope, dir, warnings) {
 	if (scope.dirs.length > 0 && scope.dirs[scope.dirs.length - 1].dir === dir) return;
-	const { format_root, in_repo } = format_root_of(dir);
-	if (format_root !== scope.format_root || in_repo !== scope.in_repo) {
+	const format_root = format_root_of(dir);
+	if (!same_format_root(format_root, scope.format_root)) {
 		free_file_scope(scope);
 		scope.format_root = format_root;
-		scope.in_repo = in_repo;
 		scope.stack = new IgnoreStack();
 		scope.dirs = [];
 	}
-	const chain = ancestor_chain(format_root, dir);
+	const chain = ancestor_chain(format_root.path, dir);
 	let shared = 0;
 	while (
 		shared < scope.dirs.length &&
@@ -2150,7 +2277,7 @@ function enter_file_scope(scope, dir, warnings) {
 	for (const level of chain.slice(shared)) {
 		scope.dirs.push({
 			dir: level,
-			pushed: push_dir_layers(scope.stack, level, format_root, in_repo, warnings)
+			pushed: push_dir_layers(scope.stack, level, format_root, warnings)
 		});
 	}
 }
@@ -2179,7 +2306,7 @@ function collect_file(path, cwd, scope, files, errors, warnings) {
 		return false;
 	}
 	enter_file_scope(scope, dirname(file_abs), warnings);
-	const rel = rel_under(scope.format_root, file_abs) ?? '';
+	const rel = rel_under(scope.format_root.path, file_abs) ?? '';
 	if (!scope.stack.is_ignored(rel, false)) {
 		files.push(path);
 		return false;
@@ -2188,16 +2315,10 @@ function collect_file(path, cwd, scope, files, errors, warnings) {
 		path,
 		rel,
 		false,
-		loose_root(scope.format_root, scope.in_repo)
+		loose_root_of(scope.format_root)
 	);
 	if (warning !== undefined) warnings.push(warning);
 	return true;
-}
-
-/** The format root's display path outside a git repo — where a warning names a path
- * absolutely — and `undefined` inside one. Mirrors the native `loose_root`. */
-function loose_root(format_root, in_repo) {
-	return in_repo ? undefined : format_root;
 }
 
 /**
@@ -2209,18 +2330,18 @@ function loose_root(format_root, in_repo) {
  * repo, a `.prettierignore` it shadows per-directory), and `.gitignore` at each
  * level when in a repo. Mirrors the native `collect_root`.
  */
-function collect_root(root, cwd, files, errors, warnings) {
+function collect_root(root, symlink, cwd, files, errors, warnings) {
 	const root_abs = absolute_named_path(root, cwd);
 	if (root_abs === null) {
 		errors.push(unresolvable_root_error(root));
-		return;
+		return false;
 	}
-	const { format_root, in_repo } = format_root_of(root_abs);
+	const format_root = format_root_of(root_abs);
 
 	const stack = new IgnoreStack();
 	// `root` relative to the format root (always an ancestor-or-self of it, so
 	// never null); '' means `root` *is* the format root
-	const base_rel = rel_under(format_root, root_abs) ?? '';
+	const base_rel = rel_under(format_root.path, root_abs) ?? '';
 
 	// preload the ancestors *above* `root` (format root → `root`'s parent). `root`
 	// and everything below reads its own ignore files in collect_recursive from
@@ -2229,9 +2350,8 @@ function collect_root(root, cwd, files, errors, warnings) {
 	// twice. Ancestors above `root` aren't listed, so they keep the direct open.
 	const heuristic_active = preload_ancestors(
 		stack,
-		ancestor_chain(format_root, root_abs).slice(0, -1),
+		ancestor_chain(format_root.path, root_abs).slice(0, -1),
 		format_root,
-		in_repo,
 		warnings
 	);
 
@@ -2242,18 +2362,22 @@ function collect_root(root, cwd, files, errors, warnings) {
 	// classify_dir/should_format_file) is exact only once an entry's ancestors are
 	// cleared, which this gate also secures for `root`. The safety nets and the
 	// build-output heuristic grade neither the root nor its ancestors, in either regime:
-	// they prune what a walk discovers, and the caller named this directory. Mirrors the
-	// native collect_root.
-	if (stack.is_ignored(base_rel, true)) {
+	// they prune what a walk discovers, and the caller named this directory. A symlink to
+	// a directory is walked as one but graded by the matcher as git grades it — a link,
+	// which a directory-only rule (`foo/`) does not match and a warning's re-include names
+	// as a file (`!/foo`) — and one a rule excludes counts as an excluded FILE argument
+	// (the returned boolean), since it was graded as one. Mirrors the native collect_root.
+	const matcher_dir = !symlink;
+	if (stack.is_ignored(base_rel, matcher_dir)) {
 		const warning = stack.excluded_argument_warning(
 			root,
 			base_rel,
-			true,
-			loose_root(format_root, in_repo)
+			matcher_dir,
+			loose_root_of(format_root)
 		);
 		if (warning !== undefined) warnings.push(warning);
 		free_ignore_stack(stack);
-		return;
+		return symlink;
 	}
 
 	collect_recursive(
@@ -2261,7 +2385,7 @@ function collect_root(root, cwd, files, errors, warnings) {
 		root_abs,
 		base_rel,
 		true,
-		loose_root(format_root, in_repo),
+		format_root,
 		stack,
 		heuristic_active,
 		files,
@@ -2275,6 +2399,7 @@ function collect_root(root, cwd, files, errors, warnings) {
 	// (A throw out of discovery aborts the run before any format call, so no
 	// leaked registration can ever meet a reinstantiated engine.)
 	free_ignore_stack(stack);
+	return false;
 }
 
 /** A path's components, split on either separator spelling where the platform
@@ -2344,17 +2469,16 @@ function collect_recursive(
 	dir_abs,
 	dir_rel,
 	is_target_root,
-	// the format root's display path outside a git repo, `undefined` inside one — what a
-	// warning names a path by (loose_root), and so also whether the format root is a git
-	// repo (`.gitignore` is read only then). Mirrors the native collect_recursive
-	loose_root,
+	// the format root: whether it is a git repo (`.gitignore` is read only then) and what
+	// a warning names a path by (`loose_root_of`). Mirrors the native collect_recursive
+	format_root,
 	stack,
 	heuristic_active,
 	files,
 	errors,
 	warnings
 ) {
-	const in_repo = loose_root === undefined;
+	const { in_repo } = format_root;
 	// Entry names come back decoded: a name that is not UTF-8 is spelled with U+FFFD, which
 	// names nothing on disk, so such a file reports `read failed` where the native walk
 	// keeps the bytes and formats it (docs/cli.md §Multi-File Formatting, "A non-UTF-8 file
@@ -2369,12 +2493,9 @@ function collect_recursive(
 	} catch (error) {
 		// named by the absolute path, as every ignore-file warning names its directory, so
 		// `tsv format t ./t` reports an unreadable `t/locked` once, not once per spelling —
-		// which also means dropping the `, scandir '<path>'` tail Node appends to its own
-		// message, since that path is the argument's spelling (the code and description
-		// stay: `EACCES: permission denied`, this runtime's wording as sanctioned)
-		errors.push(
-			`${quote_path(dir_abs)}: read_dir failed: ${error_message(error).replace(/, \w+ '.*'$/s, '')}`
-		);
+		// which is also why the tail Node appends comes off (`runtime_error_text`): that
+		// path is the argument's spelling
+		errors.push(`${quote_path(dir_abs)}: read_dir failed: ${runtime_error_text(error)}`);
 		return;
 	}
 	// Single pass over the listing for the ignore-file presence flags this dir
@@ -2442,7 +2563,7 @@ function collect_recursive(
 				// on `prune_warn` fetch the message from Rust (single source of
 				// truth — the JS CLI never templates it). One warning per pruned dir.
 				if (verdict === 'prune_warn') {
-					const warning = stack.shadow_warning(child_rel, loose_root);
+					const warning = stack.shadow_warning(child_rel, loose_root_of(format_root));
 					if (warning !== undefined) warnings.push(warning);
 				}
 				continue;
@@ -2453,7 +2574,7 @@ function collect_recursive(
 				join(dir_abs, entry.name),
 				child_rel,
 				false,
-				loose_root,
+				format_root,
 				stack,
 				child_heuristic,
 				files,

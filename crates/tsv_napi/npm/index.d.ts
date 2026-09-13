@@ -145,7 +145,7 @@ export class IgnoreStack {
 	push_prettierignore(anchor: string, content: string): void;
 	/** Pop the most recently pushed tsv layer. */
 	pop_tsv(): void;
-	/** Whether `path` is ignored; `is_dir` makes trailing-`/` patterns apply. */
+	/** Whether `path` is ignored; `is_dir` makes trailing-`/` patterns apply (a symbolic link is not a directory here, as for git). */
 	is_ignored(path: string, is_dir: boolean): boolean;
 	/** Discovery verdict for a child directory: `'descend'`, `'prune'`, or `'prune_warn'`. */
 	classify_dir(name: string, child_rel: string, heuristic_active: boolean): string;
@@ -177,7 +177,7 @@ export class IgnoreStack {
 	gitignore_symlink_warning(path: string): string;
 	/** The traversal error for a relative root the working directory cannot resolve. */
 	unresolvable_root_error(root: string): string;
-	/** The warning for a named path an ignore file excludes, else `undefined` (also for a named file a `.formatignore` / `.prettierignore` excludes, skipped quietly). `loose_root` is the format root outside a git repo. */
+	/** The warning for a named path an ignore file excludes, else `undefined` (also for a named file a `.formatignore` / `.prettierignore` excludes, skipped quietly). `is_dir` is the kind as the matcher reads it — never for a symbolic link, whatever it points at. `loose_root` is the format root outside a git repo. */
 	excluded_argument_warning(
 		display: string,
 		rel: string,
