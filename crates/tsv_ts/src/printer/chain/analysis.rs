@@ -14,7 +14,7 @@ use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_a
 use crate::printer::{ParenContext, Printer, is_multiline_template_expression, needs_parens};
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::has_newline_before_position;
-use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_comments_in_range};
+use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_spanning_comments_to_emit_in_range};
 
 //
 // Linearization
@@ -390,7 +390,11 @@ fn non_null_operand_paren_leading_start(
     comments: &[Comment],
 ) -> Option<u32> {
     (non_null.seals_optional_chain()
-        || has_line_comments_in_range(comments, non_null.expression.span().end, non_null.span.end))
+        || has_line_spanning_comments_to_emit_in_range(
+            comments,
+            non_null.expression.span().end,
+            non_null.span.end,
+        ))
     .then_some(non_null.span.start)
 }
 
@@ -449,13 +453,15 @@ fn linearize_recursive<'a>(
             // - a sealed parenthesized optional chain (`(a?.b)!.c`): the trailing
             //   access reached via this node's parent must not be absorbed, so it
             //   renders `(a?.b)!.c`, not `a?.b!.c`;
-            // - a `//` in the operand→`!` gap (`(aaa // c⏎)!.bbb`), which can only come
-            //   from a grouping shell — written bare, the `//` would swallow the `!`
-            //   (`[no LineTerminator here]`). The shell is RETAINED for the comment's
-            //   sake, emitted inside the parens (`build_paren_operand_comment_doc`'s
-            //   line-comment layout), the same answer the standalone non-null gives
-            //   this gap. Flattening instead hands the region to `NonNullGap::Bang`,
-            //   whose emitter is block-only — the `//` would be dropped, with nothing
+            // - a comment that SPANS A LINE in the operand→`!` gap (`(aaa // c⏎)!.bbb`,
+            //   `(aaa /* a⏎b */)!.bbb`), which can only come from a grouping shell —
+            //   written bare, the `//` would swallow the `!` and the multi-line block
+            //   would put a line break before it (`[no LineTerminator here]`). The shell
+            //   is RETAINED for the comment's sake, emitted inside the parens
+            //   (`build_paren_operand_comment_doc`'s expanded layout), the same answer
+            //   the standalone non-null gives this gap. Flattening instead hands the
+            //   region to `NonNullGap::Bang`, whose emitter is block-only — the `//`
+            //   would be dropped and the block inlined into a dead output, with nothing
             //   left to parenthesize at print time.
             let inner = &non_null.expression;
             if let Some(start) = non_null_operand_paren_leading_start(non_null, input.comments) {

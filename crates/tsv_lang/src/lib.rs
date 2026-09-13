@@ -50,6 +50,7 @@ pub use comment::{
     comments_to_emit_in_range, directive_alone_on_line, find_first_comment_from,
     has_comments_on_page_from, has_comments_on_page_in_range, has_comments_to_emit_from,
     has_comments_to_emit_in_range, has_line_comments_from, has_line_comments_in_range,
+    has_line_spanning_comments_to_emit_from, has_line_spanning_comments_to_emit_in_range,
     has_multiline_block_comments_on_page_from, has_multiline_block_comments_on_page_in_range,
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
     is_honored_format_ignore, is_indentable_block, merge_nestled_block_comments, nestled_run_start,

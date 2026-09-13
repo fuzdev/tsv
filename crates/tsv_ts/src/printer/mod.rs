@@ -78,7 +78,7 @@ use tsv_lang::{
         arena::{DocArena, DocId},
     },
     has_comments_on_page_from, has_comments_to_emit_from, has_line_comments_from,
-    has_multiline_block_comments_on_page_from,
+    has_line_spanning_comments_to_emit_from, has_multiline_block_comments_on_page_from,
     printing::{self, LineTable},
     range_too_narrow_for_a_comment,
     source_scan::{
@@ -1433,6 +1433,31 @@ impl<'a> Printer<'a> {
             return false;
         }
         has_line_comments_from(
+            self.comment_free_gap.comments(),
+            self.search_comments_from(start),
+            end,
+        )
+    }
+
+    /// **to emit**: whether a comment in `[start, end)` occupies more than one output
+    /// line — a `//` or a multi-line block
+    /// ([`tsv_lang::has_line_spanning_comments_to_emit_in_range`]). The question every
+    /// `[no LineTerminator here]` gap asks of the grouping shell that holds it: such a
+    /// comment cannot be inlined ahead of the restricted token, so the shell is kept
+    /// and opened (`docs/comments.md`; the cataloged ASI-gap divergences).
+    pub(crate) fn has_line_spanning_comments_to_emit_between(&self, start: u32, end: u32) -> bool {
+        !range_too_narrow_for_a_comment(start, end)
+            && self.has_line_spanning_comments_to_emit_between_wide(start, end)
+    }
+
+    /// The search half of [`Self::has_line_spanning_comments_to_emit_between`] — one
+    /// outlined copy, behind the comment-free window ([`Self::comment_free_gap`]).
+    #[inline(never)]
+    fn has_line_spanning_comments_to_emit_between_wide(&self, start: u32, end: u32) -> bool {
+        if self.comment_free_gap.contains(start, end) {
+            return false;
+        }
+        has_line_spanning_comments_to_emit_from(
             self.comment_free_gap.comments(),
             self.search_comments_from(start),
             end,

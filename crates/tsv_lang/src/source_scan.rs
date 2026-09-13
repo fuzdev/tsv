@@ -445,11 +445,11 @@ pub fn rfind_char_skipping_comments(
 /// Whether `keyword` occurs at `i` as a **whole word** — present byte-for-byte
 /// and not flanked by a JS/TS identifier byte (alphanumeric, `_`, or `$`), so
 /// `export` does not match inside `exported` or `$export`. The boundary check is
-/// against the full `bytes`, not any `[start, end)` window. Caller ensures `i +
-/// keyword.len() <= bytes.len()`.
+/// against the full `bytes`, not any `[start, end)` window. A keyword that would
+/// run past the end of `bytes` is not there.
 #[inline]
-fn whole_word_at(bytes: &[u8], i: usize, keyword: &[u8]) -> bool {
-    &bytes[i..i + keyword.len()] == keyword && word_boundaries_ok(bytes, i, keyword.len())
+pub fn whole_word_at(bytes: &[u8], i: usize, keyword: &[u8]) -> bool {
+    bytes[i..].starts_with(keyword) && word_boundaries_ok(bytes, i, keyword.len())
 }
 
 /// Like [`whole_word_at`], but matching `keyword` ASCII-case-insensitively.

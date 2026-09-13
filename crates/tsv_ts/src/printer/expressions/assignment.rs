@@ -1384,11 +1384,13 @@ impl<'a> Printer<'a> {
                 self.has_line_comments_in_chain(member.object)
             }
             Expression::TSNonNullExpression(non_null) => {
-                // The operand→`!` gap: a `//` in a retained paren shell
-                // (`(a?.b // c⏎)!`) opens the shell — the chain breaks at the comment
-                // like any other chain gap, so the `=` hugs it.
+                // The operand→`!` gap: a comment that spans a line in a retained paren
+                // shell (`(a?.b // c⏎)!`, `(a?.b /* c⏎d */)!`) opens the shell — the chain
+                // breaks at the comment like any other chain gap, so the `=` hugs it. The
+                // same reading the non-null's retain gate takes (`build_ts_non_null_doc`),
+                // so the layout and the emitter cannot disagree about which shell opens.
                 let operand_end = non_null.expression.span().end;
-                if self.has_line_comments_between(operand_end, non_null.span.end) {
+                if self.has_line_spanning_comments_to_emit_between(operand_end, non_null.span.end) {
                     return true;
                 }
                 self.has_line_comments_in_chain(non_null.expression)
