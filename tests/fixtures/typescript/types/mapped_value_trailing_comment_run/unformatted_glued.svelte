@@ -22,13 +22,13 @@
 	// run keeps its order and its lines
 	type D = {
 		[K in T]: V; // c7
-		/* c8 */ /* c9 */
+		/* c8 *//* c9 */
 	};
 
 	// a multi-line block glued there answers the same way
 	type E = {
 		[K in T]: V; // c10
-		/* c11 */ /* c12
+		/* c11 *//* c12
 c13 */
 	};
 </script>

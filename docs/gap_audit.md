@@ -150,7 +150,8 @@ kinds. A **printer** shape emits invalid text: a multi-line block moved across a
 paren into a `[no LineTerminator here]` slot (`yield (/* a⏎b */x)` → `yield /* a⏎b */ x`,
 and the same before `=>`, a non-null `!`, a tuple `?`, a conditional type's `extends`), two
 comments welded into one by a line-suffix flush inside a multi-line block
-(`/* a /* t */⏎b */`, unterminated), a `;` placed where the enclosing grammar admits none
+(`/* a /* t */⏎b */`, unterminated — once, before the renderer drained a pending suffix
+AHEAD of a multi-line text rather than at its interior breaks), a `;` placed where the enclosing grammar admits none
 (`{let a; /* c */}` in a Svelte declaration tag). A **parser** shape emits VALID text tsv's
 own parser over-rejects — the union printer's leading-pipe layout inside a type argument's
 index (`fn<⏎A[⏎| B // c⏎| C]⏎>()`), which the type-argument lookahead once refused — or

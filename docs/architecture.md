@@ -359,7 +359,7 @@ Doc nodes are allocated in a contiguous `DocArena`. Each node is referenced by a
 ```rust
 pub enum DocNode {
     Text(DocText),                              // Static, pooled, source-span, or verbatim-span
-    MultilineText { span, first_width },        // Pooled multi-line block-comment body
+    MultilineText { span, first_width, literal }, // Pooled multi-line block-comment body (hard or literal breaks)
     Line(LineKind),                             // Normal, soft, hard, literal
     Indent(DocId),                              // Increase indent
     Dedent(DocId),                              // Decrease indent

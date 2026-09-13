@@ -132,11 +132,24 @@ pub enum DocNode {
     /// (clamped like every cached text width — see [`pooled_text_width`]),
     /// so the fits walk measures the node without touching the pool.
     ///
-    /// Used for indentable (JSDoc / `*`-aligned) multi-line block comments,
-    /// whose continuation lines all use the uniform hardline (context-indent)
-    /// layout. Always contains a newline, so it forces enclosing groups to break
-    /// (`will_break` is true) exactly like the hardlines it replaces.
-    MultilineText { span: PoolSpan, first_width: u16 },
+    /// Used for multi-line block comments. An indentable one (JSDoc / `*`-aligned)
+    /// takes the uniform hardline (context-indent) layout on every continuation
+    /// line; a non-indentable one sets `literal`, and each `\n` then renders as a
+    /// `literalline` instead — a bare newline, no trim and no indent — so the
+    /// comment's interior columns are kept exactly as authored. Always contains a
+    /// newline, so it forces enclosing groups to break (`will_break` is true)
+    /// exactly like the hardlines it replaces.
+    ///
+    /// One node for the whole comment is what lets the renderer treat it as ONE
+    /// token: a pending `line_suffix` flushes AHEAD of it rather than at an
+    /// interior break, where it would land inside the comment
+    /// (`arena_render::flush_suffix_ahead_of_multiline_text`). The per-line concat
+    /// this replaced flushed at those breaks and welded the two comments.
+    MultilineText {
+        span: PoolSpan,
+        first_width: u16,
+        literal: bool,
+    },
 
     /// Line break - behavior depends on kind and mode
     Line(LineKind),
@@ -1868,10 +1881,27 @@ impl DocArena {
     /// borrowing the pool.
     #[inline]
     pub fn multiline_text(&self, s: &str) -> DocId {
+        self.multiline_text_with(s, false)
+    }
+
+    /// [`Self::multiline_text`] whose interior breaks are `literalline`s — a bare
+    /// newline, no trim and no indent — for a non-indentable multi-line block
+    /// comment, whose interior is kept verbatim. Same framing contract: `s` holds
+    /// the delimiters and every line exactly as it should print.
+    #[inline]
+    pub fn multiline_text_literal(&self, s: &str) -> DocId {
+        self.multiline_text_with(s, true)
+    }
+
+    fn multiline_text_with(&self, s: &str, literal: bool) -> DocId {
         let first = &s[..next_lf(s.as_bytes(), 0)];
         let first_width = clamp_text_width(visual_width(first, TAB_WIDTH));
         let span = self.pool_push(s);
-        self.alloc(DocNode::MultilineText { span, first_width })
+        self.alloc(DocNode::MultilineText {
+            span,
+            first_width,
+            literal,
+        })
     }
 
     /// Create a pooled-text doc (via [`Self::text_pooled`]) for a *line comment*
@@ -3962,6 +3992,15 @@ impl PoolTextWriter<'_> {
     #[inline]
     pub fn finish_multiline_text(self) -> DocId {
         let id = self.arena.multiline_text(&self.scratch);
+        self.park();
+        id
+    }
+
+    /// Finish into a literal-break [`DocNode::MultilineText`] doc — the streaming
+    /// equivalent of [`DocArena::multiline_text_literal`].
+    #[inline]
+    pub fn finish_multiline_text_literal(self) -> DocId {
+        let id = self.arena.multiline_text_literal(&self.scratch);
         self.park();
         id
     }
